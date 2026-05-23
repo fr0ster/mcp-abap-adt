@@ -148,7 +148,7 @@ Per repo, unit-first (mock the native/IO seams):
 
 ## 7. Release order (cross-package)
 
-Bottom-up, publish + bump consumers (follow the cross-package-fix-cycle discipline):
+Bottom-up. **The user publishes each package — the agent never runs `npm publish`.** Consumers import published npm versions (not local links), so each step is hard-gated: implement → commit → PR/merge → user publishes → bump consumer to the confirmed version → next step (follow the cross-package-fix-cycle discipline):
 
 1. `interfaces` — union + fields + `ICertificateMaterialLoader`. Publish, bump everywhere.
 2. `auth-providers` — `KerberosProvider` + `kerberosSpnego` (optionalDep). Publish.

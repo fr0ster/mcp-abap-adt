@@ -10,7 +10,9 @@
 
 **Spec:** `docs/superpowers/specs/2026-05-23-cert-kerberos-auth-design.md` (this repo).
 
-**Worktree discipline:** Each phase runs in its own repo. Before touching a repo, create a worktree on branch `feat/cert-kerberos-auth` in that repo (`git worktree add .worktrees/cert-kerberos-auth -b feat/cert-kerberos-auth`; ensure `.worktrees/` is gitignored). Never commit to `master`/`main` directly. Publish + bump between phases.
+**Worktree discipline:** Each phase runs in its own repo. Before touching a repo, create a worktree on branch `feat/cert-kerberos-auth` in that repo (`git worktree add .worktrees/cert-kerberos-auth -b feat/cert-kerberos-auth`; ensure `.worktrees/` is gitignored). Never commit to `master`/`main` directly.
+
+**PUBLISH GATE (critical):** The agent **NEVER runs `npm publish`** — the **user publishes**. Packages depend on each other via **published npm imports, not local links**, so a consumer repo cannot be tested or bumped against unpublished changes. Each phase therefore ends at a hard gate: implement → commit → (PR/merge) → **hand the package off to the user to publish and wait for their confirmation of the published version** → only then bump the consumer and start the next phase.
 
 **Decisions locked:** PEM **and** PFX both supported. Single-leg Negotiate only (no mutual-auth continuation in v1).
 
@@ -127,12 +129,12 @@ git add src/auth/ICertificateMaterialLoader.ts src/index.ts
 git commit -m "feat(types): add ICertificateMaterialLoader"
 ```
 
-### Task 1.4: Publish interfaces
+### Task 1.4: Release interfaces (publish gate — user publishes)
 
-- [ ] **Step 1:** Bump version in `package.json` (patch/minor per repo convention), update CHANGELOG.
-- [ ] **Step 2:** `npm run build && npm publish` (or repo's publish script).
-- [ ] **Step 3:** Note the published version `X.Y.Z` — consumers below pin to it.
-- [ ] **Step 4:** Open PR for the worktree branch, merge per project workflow.
+- [ ] **Step 1:** Bump version in `package.json` (patch/minor per repo convention), update CHANGELOG. Commit.
+- [ ] **Step 2:** `npm run build` and run the package's tests — confirm green. **Do NOT publish.**
+- [ ] **Step 3:** Open PR for the worktree branch, merge per project workflow.
+- [ ] **Step 4: HAND OFF — ask the user to `npm publish` and tell you the published version `X.Y.Z`. Wait for confirmation before Phase 2** (consumers import the published version, not a local link).
 
 ---
 
@@ -322,9 +324,11 @@ git add src/providers/KerberosProvider.ts src/providers/index.ts src/index.ts sr
 git commit -m "feat(providers): add KerberosProvider (SPNEGO, opaque token)"
 ```
 
-### Task 2.3: Publish auth-providers
+### Task 2.3: Release auth-providers (publish gate — user publishes)
 
-- [ ] Bump version + CHANGELOG, build, `npm publish`. Note version. PR + merge.
+- [ ] **Step 1:** Bump version + CHANGELOG, commit. `npm run build` + tests green. **Do NOT publish.**
+- [ ] **Step 2:** PR + merge.
+- [ ] **Step 3: HAND OFF — ask the user to publish; wait for the confirmed published version before Phase 3.**
 
 ---
 
@@ -809,15 +813,17 @@ git add src/connection/connectionFactory.ts src/config/sapConfig.ts src/__tests_
 git commit -m "feat(connection): route certificate/kerberos in factory; extend config signature"
 ```
 
-### Task 3.6: Publish connection
+### Task 3.6: Release connection (publish gate — user publishes)
 
-- [ ] Bump + CHANGELOG, build, `npm publish`. Note version. PR + merge.
+- [ ] **Step 1:** Bump + CHANGELOG, commit. `npm run build` + tests green. **Do NOT publish.**
+- [ ] **Step 2:** PR + merge.
+- [ ] **Step 3: HAND OFF — ask the user to publish; wait for the confirmed published version before Phase 4.**
 
 ---
 
 ## Phase 4 — `@mcp-abap-adt/auth-broker` (`~/prj/mcp-abap-adt-auth-broker`)
 
-First: bump `@mcp-abap-adt/auth-providers` + `@mcp-abap-adt/connection` + `@mcp-abap-adt/interfaces` to the versions published above.
+First: bump `@mcp-abap-adt/auth-providers` + `@mcp-abap-adt/connection` + `@mcp-abap-adt/interfaces` to the versions **the user confirmed published** in Phases 1–3.
 
 ### Task 4.1: Select provider/mode for kerberos & certificate
 
@@ -884,17 +890,17 @@ git add src/AuthBroker.ts src/__tests__/broker/authTypeSelection.test.ts
 git commit -m "feat(broker): KerberosProvider wiring; certificate session-only mode"
 ```
 
-### Task 4.2: Broker mode mapping + publish
+### Task 4.2: Broker mode mapping + release (publish gate — user publishes)
 
 - [ ] **Step 1:** Where the broker derives mode (`session-only`/`session-provider`/`full`), map `certificate → session-only`, `kerberos → session-provider`. Add/extend a unit test asserting the mode.
-- [ ] **Step 2:** Commit.
-- [ ] **Step 3:** Bump + CHANGELOG, build, `npm publish`. Note version. PR + merge.
+- [ ] **Step 2:** Commit. Bump + CHANGELOG. `npm run build` + tests green. **Do NOT publish.** PR + merge.
+- [ ] **Step 3: HAND OFF — ask the user to publish; wait for the confirmed published version before Phase 5.**
 
 ---
 
 ## Phase 5 — `mcp-abap-adt` (server, this repo)
 
-First: bump `@mcp-abap-adt/auth-broker`, `@mcp-abap-adt/connection`, `@mcp-abap-adt/interfaces` to the versions published above. Work on branch `feat/cert-kerberos-auth` (worktree).
+First: bump `@mcp-abap-adt/auth-broker`, `@mcp-abap-adt/connection`, `@mcp-abap-adt/interfaces` to the versions **the user confirmed published** in Phases 1–4. Work on branch `feat/cert-kerberos-auth` (worktree).
 
 ### Task 5.1: Extract shared `parseAuthType()` and accept new types
 
@@ -1042,10 +1048,11 @@ git commit -m "docs: certificate + kerberos auth env vars and setup"
 - [ ] **Step 2:** **Coordinate with the user** to run against a real on-prem system that supports the auth type (per CLAUDE.md — do not automate SAP env verification). Validate spec assumption A1 (single-leg) on kerberos here.
 - [ ] **Step 3:** Save full log to `/tmp/integration-cert-kerberos.log` (no `tail` truncation). Commit any test additions.
 
-### Task 5.6: Release server
+### Task 5.6: Release server (publish gate — user publishes)
 
-- [ ] Bump version + CHANGELOG, regenerate tool catalogs if affected (auth is not a tool, likely none), open PR, merge per workflow.
-- [ ] **Delete the spec** `docs/superpowers/specs/2026-05-23-cert-kerberos-auth-design.md` and this plan once implemented (project lifecycle rule). History remains in git.
+- [ ] **Step 1:** Bump version + CHANGELOG, regenerate tool catalogs if affected (auth is not a tool, likely none). `npm run build` + tests green. **Do NOT publish.** Open PR, merge per workflow.
+- [ ] **Step 2: HAND OFF — ask the user to publish the server package.**
+- [ ] **Step 3:** Once the user confirms the full feature is published and verified, **delete the spec** `docs/superpowers/specs/2026-05-23-cert-kerberos-auth-design.md` and this plan (project lifecycle rule). History remains in git.
 
 ---
 

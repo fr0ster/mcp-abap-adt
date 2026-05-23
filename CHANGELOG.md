@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [6.9.0] - 2026-05-24
+
+### Added
+- **Certificate (mTLS) and Kerberos (SPNEGO) authentication** for on-prem HTTP connections. Select via `SAP_AUTH_TYPE=certificate` or `SAP_AUTH_TYPE=kerberos`.
+  - Certificate: PEM (`SAP_CERT_PATH` + `SAP_CERT_KEY_PATH`) or PKCS#12 (`SAP_CERT_PFX_PATH` + optional `SAP_CERT_PASSPHRASE`). mTLS — no `SAP_USERNAME`/`SAP_PASSWORD` needed.
+  - Kerberos: single-leg Negotiate via the optional `kerberos` native package; SPN from `SAP_KERBEROS_SPN` (or derived `HTTP@<host>`, service class via `SAP_KERBEROS_SERVICE`). Requires a valid TGT (`kinit`) or keytab on the host.
+  - Both bypass the auth-broker (no browser/OAuth flow). Requires `@mcp-abap-adt/interfaces@^7.2.0`, `@mcp-abap-adt/connection@^1.9.0`.
+
+### ⚠️ Help wanted — not yet validated on a live system
+These two auth paths pass full unit coverage but have **not** been exercised against a real SAP system. If you have an on-prem system with **client-certificate** or **Kerberos/SPNEGO** SSO, please try `SAP_AUTH_TYPE=certificate`/`kerberos` and report results — especially whether Kerberos works with a single-leg Negotiate token or your system requires mutual-auth continuation. Please open an issue with what you see; feedback will confirm or refine these flows.
+
 ## [6.8.0] - 2026-05-16
 
 ### Changed

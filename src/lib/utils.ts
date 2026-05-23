@@ -1336,11 +1336,14 @@ SAP CONNECTION (.env file):
                                    Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required for basic auth)
                                    Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt (default: basic)
+  SAP_AUTH_TYPE                    Authentication type: basic|jwt|saml|certificate|kerberos (default: basic)
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (required for jwt auth)
+  SAP_CERT_PATH / SAP_CERT_KEY_PATH         Client cert + key (PEM) for certificate auth
+  SAP_CERT_PFX_PATH / SAP_CERT_PASSPHRASE   PKCS#12 cert for certificate auth (alternative to PEM)
+  SAP_KERBEROS_SPN                          SPN for kerberos auth (default HTTP@<host>)
 
 GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
   To generate .env file from SAP BTP service key JSON file, install the

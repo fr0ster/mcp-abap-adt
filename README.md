@@ -301,6 +301,40 @@ SAP_CONNECTION_TYPE=rfc
 
 See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
 
+For client certificate (mTLS) authentication — on-prem HTTP only:
+```bash
+SAP_URL=https://your-sap-system.com
+SAP_AUTH_TYPE=certificate
+
+# PEM format (provide both files):
+SAP_CERT_PATH=/path/to/client.crt
+SAP_CERT_KEY_PATH=/path/to/client.key
+
+# Or PKCS#12 format (alternative to PEM):
+# SAP_CERT_PFX_PATH=/path/to/client.pfx
+# SAP_CERT_PASSPHRASE=your-passphrase
+```
+
+For Kerberos (SPNEGO) authentication — on-prem HTTP only:
+```bash
+SAP_URL=https://your-sap-system.com
+SAP_AUTH_TYPE=kerberos
+
+# Optional: explicit SPN (default: HTTP@<host>)
+# SAP_KERBEROS_SPN=HTTP@mysaphost.corp.example
+```
+
+**Certificate auth notes:**
+- Identifies the client via mTLS — no `SAP_USERNAME` / `SAP_PASSWORD` required.
+- Provide either PEM files (`SAP_CERT_PATH` + `SAP_CERT_KEY_PATH`) or a PKCS#12 file (`SAP_CERT_PFX_PATH`), not both.
+- On-prem HTTP connections only (`SAP_CONNECTION_TYPE=rfc` is not supported).
+
+**Kerberos auth notes:**
+- Requires a valid Kerberos ticket on the host before starting the server. Obtain one with `kinit` or a keytab.
+- The optional [`kerberos`](https://www.npmjs.com/package/kerberos) npm package must be installed (needs GSSAPI dev libs on Linux / build tools on Windows): `npm i kerberos`.
+- No `SAP_USERNAME` / `SAP_PASSWORD` required — identity comes from the TGT.
+- Both auth types bypass the auth-broker; use `.env` directly.
+
 **Generate .env from Service Key (JWT):**
 ```bash
 # Install the connection package globally (one-time setup)

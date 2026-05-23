@@ -11,6 +11,7 @@ import {
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, type AxiosResponse } from 'axios';
+import { parseAuthType } from './config/parseAuthType.js';
 import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
@@ -1890,21 +1891,7 @@ export function getConfig(): SapConfig {
   }
 
   // Auto-detect auth type: JWT token → jwt; SAP_AUTH_TYPE → explicit; default → basic
-  let authType: SapConfig['authType'] = 'basic';
-  if (process.env.SAP_JWT_TOKEN) {
-    authType = 'jwt';
-  } else if (process.env.SAP_AUTH_TYPE) {
-    const rawAuthType = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
-    if (rawAuthType === 'xsuaa') {
-      authType = 'jwt';
-    } else if (
-      rawAuthType === 'basic' ||
-      rawAuthType === 'jwt' ||
-      rawAuthType === 'saml'
-    ) {
-      authType = rawAuthType;
-    }
-  }
+  const authType = parseAuthType(process.env);
 
   // Connection type: http (default) or rfc
   const connectionType: SapConfig['connectionType'] =

@@ -8,6 +8,8 @@ import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import * as yaml from 'yaml';
+import { applyCertKerberosFields } from '../../../lib/config/applyAuthFields';
+import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
 import { createTestLogger } from './loggerHelpers';
@@ -407,17 +409,7 @@ export function getSapConfigFromEnv(): SapConfig {
     throw new Error(`Invalid SAP_URL: ${urlRaw}`);
   }
 
-  let authType: SapConfig['authType'] = 'basic';
-  if (process.env.SAP_AUTH_TYPE) {
-    const raw = process.env.SAP_AUTH_TYPE.trim().toLowerCase();
-    if (raw === 'xsuaa') {
-      authType = 'jwt';
-    } else if (raw === 'basic' || raw === 'jwt' || raw === 'saml') {
-      authType = raw;
-    }
-  } else if (process.env.SAP_JWT_TOKEN) {
-    authType = 'jwt';
-  }
+  const authType: SapConfig['authType'] = parseAuthType(process.env);
 
   const connectionType: SapConfig['connectionType'] =
     process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
@@ -444,6 +436,8 @@ export function getSapConfigFromEnv(): SapConfig {
     if (process.env.SAP_UAA_CLIENT_SECRET) {
       config.uaaClientSecret = process.env.SAP_UAA_CLIENT_SECRET;
     }
+  } else if (applyCertKerberosFields(config, process.env)) {
+    // certificate / kerberos: no username/password required
   } else {
     config.username = process.env.SAP_USERNAME || '';
     config.password = process.env.SAP_PASSWORD || '';

@@ -261,13 +261,22 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
 
 describe('runSearchSource — time budget (Fix A)', () => {
   it('returns partial hits and sets truncated.by_timeout=true when deadline is exceeded mid-scan', async () => {
-    // Two PROG targets; fake clock passes the deadline after the first source read
+    // Two PROG targets both containing the query. concurrency:1 makes scanning strictly
+    // sequential so the now() call order is deterministic.
+    //
+    // Exact now() call sequence with concurrency:1 and one source unit per PROG target:
+    //   Call 1 — deadline computation: now() + 500 = 1500
+    //   Call 2 — pump shouldStop() before Z_P1: must be < 1500 → enter worker
+    //   Call 3 — deadlinePassed() at top of for-await body for Z_P1's unit: must be < 1500
+    //             → unit processed, hit added to targetHits, worker completes, allHits.push
+    //   Call 4 — pump shouldStop() before Z_P2: must be >= 1500 → onStop, pump exits
+    //
+    // Calls 1-3 return 1000 (below deadline); call 4+ returns 2000 (above deadline).
+    // This guarantees Z_P1's hit survives in allHits while Z_P2/Z_P3 are never started.
     let callCount = 0;
     const fakeNow = () => {
       callCount++;
-      // First call: compute deadline (now() + budget = 1000 + 500 = 1500)
-      // Subsequent calls check the deadline; pass deadline after 2nd call
-      return callCount <= 1 ? 1000 : 2000; // 2000 >= 1500 → deadline passed
+      return callCount <= 3 ? 1000 : 2000;
     };
 
     const deps: OrchestratorDeps = {
@@ -285,14 +294,18 @@ describe('runSearchSource — time budget (Fix A)', () => {
       now: fakeNow,
     };
 
+    // concurrency:1 ensures the call sequence above is strictly serial.
     const result = await runSearchSource(deps, {
       ...baseInput,
-      concurrency: 1, // serial so deadline kicks in predictably
+      concurrency: 1,
       time_budget_ms: 500,
     });
 
+    // Partial hits: Z_P1 was fully scanned and its hit must survive in results
+    expect(result.results.length).toBeGreaterThanOrEqual(1);
     expect(result.truncated.by_timeout).toBe(true);
-    // Fewer sources scanned than the 3 available
+    // Strictly fewer sources scanned than the 3 available (Z_P2 and Z_P3 were skipped)
+    expect(result.scanned.sources).toBeGreaterThanOrEqual(1);
     expect(result.scanned.sources).toBeLessThan(3);
   });
 
@@ -316,10 +329,10 @@ describe('runSearchSource — time budget (Fix A)', () => {
     expect(result.results).toHaveLength(2);
   });
 
-  it('stops picking new targets from pump when deadline is already passed', async () => {
-    // Deadline is already expired before any work starts
-    const fakeNow = () => 9999; // always past any deadline
-    const fetchedTargets: string[] = [];
+  it('completes full scan when deadline is never reached, by_timeout=false', async () => {
+    // fakeNow always returns 9999; deadline = 9999 + 1 = 10000.
+    // Since 9999 < 10000 the deadline is never passed → full scan with by_timeout=false.
+    const fakeNow = () => 9999;
 
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
@@ -327,8 +340,7 @@ describe('runSearchSource — time budget (Fix A)', () => {
         { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: {
-        async readProgram(name) {
-          fetchedTargets.push(name);
+        async readProgram() {
           return 'marker';
         },
         async readInclude() {
@@ -351,11 +363,12 @@ describe('runSearchSource — time budget (Fix A)', () => {
     const result = await runSearchSource(deps, {
       ...baseInput,
       concurrency: 1,
-      time_budget_ms: 1, // deadline = 9999 + 1 = 10000; fakeNow always returns 9999 so NOT passed initially
+      time_budget_ms: 1, // deadline = 9999 + 1 = 10000; fakeNow always returns 9999 so never passed
     });
-    // With fakeNow always 9999 and deadline = 10000, deadline is NOT passed → full scan
+    // Deadline is never reached → full scan
     expect(result.truncated.by_timeout).toBe(false);
     expect(result.scanned.sources).toBe(2);
+    expect(result.results).toHaveLength(2);
   });
 
   it('stops inside the for-await loop when deadline passes after pump starts processing a target', async () => {

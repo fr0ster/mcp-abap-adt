@@ -228,6 +228,7 @@ export async function runSearchSource(
       }
     },
     () => {
+      // onStop may be called by multiple pump coroutines under concurrency > 1; setting a boolean is idempotent.
       timedOut = true;
     },
     deadlinePassed,

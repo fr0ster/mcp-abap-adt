@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## [6.10.0] - 2026-05-24
+
+### Added
+- **`SearchSource` time budget → partial results.** New `time_budget_ms` argument: when the internal scan deadline is exceeded, the tool returns the hits gathered so far instead of nothing, with a new `truncated.by_timeout: true` flag. Set it below your client/transport timeout (e.g. `540000` for a 600s client). Addresses the "no partial result after 600s" failure in #89.
+
+### Changed
+- **`SearchSource` default `max_hits_per_object` raised `1` → `100`.** The old default of 1 silently capped per-object hits and tripped `truncated.by_object_cap` on any object with ≥2 matches. (#89)
+- **`SearchSource` tool description clarified:** `by_object_cap` means a per-object hit cap was reached (raise `max_hits_per_object`), NOT a limit on the number of objects scanned (that is `max_objects` / `by_max_objects`). Added concurrency guidance — `concurrency` is capped at 16 per call; run only ONE `SearchSource` per destination at a time (parallel calls saturate the SAP scan backend). (#89)
+
+### Notes
+- The remaining #89 item — pushing the substring filter to a server-side ADT source-search endpoint (the only change that makes large-package scans *fast* rather than just *interruptible*) — is deferred pending live-system research into the ADT API.
+
 ## [6.9.2] - 2026-05-24
 
 ### Documentation

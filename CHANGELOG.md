@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.9.2] - 2026-05-24
+
+### Documentation
+- README: document the NTLM hard-reject behavior in the Kerberos auth section (carries the connection `1.9.1` change to the published package).
+
 ## [6.9.1] - 2026-05-24
 
 ### Changed

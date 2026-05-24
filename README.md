@@ -336,6 +336,7 @@ SAP_AUTH_TYPE=kerberos
 - The optional [`kerberos`](https://www.npmjs.com/package/kerberos) npm package must be installed (needs GSSAPI dev libs on Linux / build tools on Windows): `npm i kerberos`.
 - No `SAP_USERNAME` / `SAP_PASSWORD` required — identity comes from the TGT.
 - Both auth types bypass the auth-broker; use `.env` directly.
+- **NTLM is hard-rejected:** if the SAP system offers NTLM instead of Kerberos/SPNEGO, the connection fails with a clear error rather than silently downgrading. Ensure the system accepts Kerberos (SPNEGO) for your user.
 
 > **⚠️ Help wanted — not yet validated on a live system.** Certificate and Kerberos auth pass full unit coverage but have not been tested against a real SAP system. If you have on-prem **client-certificate** or **Kerberos/SPNEGO** SSO, please try it and [open an issue](https://github.com/fr0ster/mcp-abap-adt/issues) with results — especially whether Kerberos succeeds with a single-leg Negotiate token or your system needs mutual-auth continuation.
 

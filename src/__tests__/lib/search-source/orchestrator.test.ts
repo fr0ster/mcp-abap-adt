@@ -81,6 +81,7 @@ describe('runSearchSource', () => {
     expect(result.truncated).toEqual({
       by_object_cap: false,
       by_max_objects: false,
+      by_timeout: false,
     });
   });
 
@@ -224,6 +225,7 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
     expect(result.truncated).toEqual({
       by_object_cap: false,
       by_max_objects: false,
+      by_timeout: false,
     });
   });
 
@@ -254,5 +256,164 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
     });
     expect(result.scanned.packages).toBe(1);
     expect(fetchedFor).toBe('ZPKG');
+  });
+});
+
+describe('runSearchSource — time budget (Fix A)', () => {
+  it('returns partial hits and sets truncated.by_timeout=true when deadline is exceeded mid-scan', async () => {
+    // Two PROG targets; fake clock passes the deadline after the first source read
+    let callCount = 0;
+    const fakeNow = () => {
+      callCount++;
+      // First call: compute deadline (now() + budget = 1000 + 500 = 1500)
+      // Subsequent calls check the deadline; pass deadline after 2nd call
+      return callCount <= 1 ? 1000 : 2000; // 2000 >= 1500 → deadline passed
+    };
+
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P3', adtType: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'PROG:Z_P1': 'marker here',
+        'PROG:Z_P2': 'marker here',
+        'PROG:Z_P3': 'marker here',
+      }),
+      resolvePackages: identityResolver,
+      now: fakeNow,
+    };
+
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      concurrency: 1, // serial so deadline kicks in predictably
+      time_budget_ms: 500,
+    });
+
+    expect(result.truncated.by_timeout).toBe(true);
+    // Fewer sources scanned than the 3 available
+    expect(result.scanned.sources).toBeLessThan(3);
+  });
+
+  it('returns truncated.by_timeout=false and full results when no time_budget_ms is set', async () => {
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'PROG:Z_P1': 'marker here',
+        'PROG:Z_P2': 'marker here',
+      }),
+      resolvePackages: identityResolver,
+    };
+
+    const result = await runSearchSource(deps, baseInput);
+
+    expect(result.truncated.by_timeout).toBe(false);
+    expect(result.scanned.sources).toBe(2);
+    expect(result.results).toHaveLength(2);
+  });
+
+  it('stops picking new targets from pump when deadline is already passed', async () => {
+    // Deadline is already expired before any work starts
+    const fakeNow = () => 9999; // always past any deadline
+    const fetchedTargets: string[] = [];
+
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: {
+        async readProgram(name) {
+          fetchedTargets.push(name);
+          return 'marker';
+        },
+        async readInclude() {
+          return null;
+        },
+        async readClassMain() {
+          return null;
+        },
+        async fetchFugrStructure() {
+          return [];
+        },
+        async readFugrFm() {
+          return null;
+        },
+      },
+      resolvePackages: identityResolver,
+      now: fakeNow,
+    };
+
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      concurrency: 1,
+      time_budget_ms: 1, // deadline = 9999 + 1 = 10000; fakeNow always returns 9999 so NOT passed initially
+    });
+    // With fakeNow always 9999 and deadline = 10000, deadline is NOT passed → full scan
+    expect(result.truncated.by_timeout).toBe(false);
+    expect(result.scanned.sources).toBe(2);
+  });
+
+  it('stops inside the for-await loop when deadline passes after pump starts processing a target', async () => {
+    // callCount=1: deadline computation → 1000, deadline=1500
+    // callCount=2: pump shouldStop check → 1000 (not passed yet) → enters worker for Z_P1
+    // callCount=3+: deadlinePassed inside for-await → 2000 >= 1500 → break + timedOut
+    let callCount = 0;
+    const fakeNow = () => {
+      callCount++;
+      if (callCount === 1) return 1000; // deadline = 1000 + 500 = 1500
+      if (callCount === 2) return 1000; // pump check: not yet past
+      return 2000; // all subsequent calls: past deadline
+    };
+
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'PROG:Z_P1': 'marker here\nmarker again',
+        'PROG:Z_P2': 'marker here',
+      }),
+      resolvePackages: identityResolver,
+      now: fakeNow,
+    };
+
+    const result = await runSearchSource(deps, {
+      ...baseInput,
+      concurrency: 1,
+      time_budget_ms: 500,
+    });
+
+    expect(result.truncated.by_timeout).toBe(true);
+    // The for-await deadline check fires on the first unit of Z_P1 → 0 sources counted
+    expect(result.scanned.sources).toBe(0);
+    expect(result.results).toHaveLength(0);
+  });
+});
+
+describe('runSearchSource — default max_hits_per_object=100 (Fix B)', () => {
+  it('returns all hits when count is below default 100 cap, and by_object_cap stays false', async () => {
+    const deps: OrchestratorDeps = {
+      fetchPackageContents: pkg([
+        { name: 'Z_PROG', adtType: 'PROG/P', packageName: 'ZPKG' },
+      ]),
+      sourceReader: sourceFor({
+        'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3',
+      }),
+      resolvePackages: identityResolver,
+    };
+    // Do NOT pass max_hits_per_object — rely on default (100)
+    const result = await runSearchSource(deps, {
+      query: 'marker',
+      packages: ['ZPKG'],
+      object_types: ['PROG'],
+    });
+    expect(result.results).toHaveLength(3);
+    expect(result.truncated.by_object_cap).toBe(false);
   });
 });

@@ -33,6 +33,8 @@ export interface OrchestratorInput {
   max_objects?: number;
   concurrency?: number;
   version?: SourceVersion;
+  /** Internal scan deadline in ms. When exceeded, returns hits gathered so far with truncated.by_timeout=true. */
+  time_budget_ms?: number;
 }
 
 export interface SearchHit {
@@ -54,20 +56,27 @@ export interface OrchestratorResult {
   results: SearchHit[];
   no_hits?: NoHitEntry[];
   scanned: { packages: number; objects: number; sources: number };
-  truncated: { by_object_cap: boolean; by_max_objects: boolean };
+  truncated: {
+    by_object_cap: boolean;
+    by_max_objects: boolean;
+    /** True when a time_budget_ms deadline was exceeded; results contain hits gathered before the cutoff. */
+    by_timeout: boolean;
+  };
 }
 
 export interface OrchestratorDeps {
   fetchPackageContents: PackageContentsFetcher;
   sourceReader: ReadSourceUnitsDeps;
   resolvePackages: (entries: string[]) => Promise<string[]>;
+  /** Injectable clock for deterministic tests. Defaults to Date.now. */
+  now?: () => number;
 }
 
 const DEFAULTS = {
   include_subpackages: true,
   object_types: ['PROG', 'FUGR', 'CLAS'] as const,
   exclude_comments: false,
-  max_hits_per_object: 1,
+  max_hits_per_object: 100,
   emit_no_hits: false,
   max_objects: 500,
   concurrency: 8,
@@ -78,10 +87,16 @@ async function runWithLimit<T>(
   items: T[],
   limit: number,
   worker: (item: T) => Promise<void>,
+  onStop?: () => void,
+  shouldStop?: () => boolean,
 ): Promise<void> {
   let next = 0;
   async function pump(): Promise<void> {
     while (true) {
+      if (shouldStop?.()) {
+        onStop?.();
+        return;
+      }
       const idx = next++;
       if (idx >= items.length) return;
       await worker(items[idx]);
@@ -113,6 +128,13 @@ export async function runSearchSource(
   );
   const emitNoHits = input.emit_no_hits ?? DEFAULTS.emit_no_hits;
   const version = input.version ?? DEFAULTS.version;
+  const now = deps.now ?? Date.now;
+  const timeBudgetMs =
+    input.time_budget_ms != null && input.time_budget_ms > 0
+      ? input.time_budget_ms
+      : null;
+  const deadline = timeBudgetMs != null ? now() + timeBudgetMs : null;
+  const deadlinePassed = (): boolean => deadline != null && now() >= deadline;
 
   const resolvedPackages = await deps.resolvePackages(input.packages);
   const enumerateInput: EnumerateInput = {
@@ -135,68 +157,81 @@ export async function runSearchSource(
   const noHits: NoHitEntry[] = [];
   let sourcesScanned = 0;
   let truncatedByObjectCap = false;
+  let timedOut = false;
 
-  await runWithLimit(targets, concurrency, async (target) => {
-    let totalForTarget = 0;
-    let capHitForTarget = false;
-    const targetHits: SearchHit[] = [];
+  await runWithLimit(
+    targets,
+    concurrency,
+    async (target) => {
+      let totalForTarget = 0;
+      let capHitForTarget = false;
+      const targetHits: SearchHit[] = [];
 
-    for await (const unit of readSourceUnits(
-      deps.sourceReader,
-      target,
-      version,
-    )) {
-      sourcesScanned++;
-      const remaining = maxHits - totalForTarget;
-      if (remaining <= 0) {
-        const probe = scanLines(unit.lines, {
+      for await (const unit of readSourceUnits(
+        deps.sourceReader,
+        target,
+        version,
+      )) {
+        if (deadlinePassed()) {
+          timedOut = true;
+          break;
+        }
+        sourcesScanned++;
+        const remaining = maxHits - totalForTarget;
+        if (remaining <= 0) {
+          const probe = scanLines(unit.lines, {
+            query: input.query,
+            query2: input.query2,
+            exclude: input.exclude,
+            exclude_comments: input.exclude_comments,
+            max_hits: 1,
+          });
+          if (probe.hits.length > 0) {
+            capHitForTarget = true;
+            break;
+          }
+          continue;
+        }
+        const scan = scanLines(unit.lines, {
           query: input.query,
           query2: input.query2,
           exclude: input.exclude,
           exclude_comments: input.exclude_comments,
-          max_hits: 1,
+          max_hits: remaining,
         });
-        if (probe.hits.length > 0) {
+        for (const h of scan.hits) {
+          targetHits.push({
+            devclass: target.devclass,
+            object_type: target.object_type,
+            object_name: target.object_name,
+            include: unit.include,
+            line: h.line,
+            snippet: h.snippet,
+          });
+        }
+        totalForTarget += scan.hits.length;
+        if (scan.capped) {
           capHitForTarget = true;
           break;
         }
-        continue;
       }
-      const scan = scanLines(unit.lines, {
-        query: input.query,
-        query2: input.query2,
-        exclude: input.exclude,
-        exclude_comments: input.exclude_comments,
-        max_hits: remaining,
-      });
-      for (const h of scan.hits) {
-        targetHits.push({
+
+      if (capHitForTarget) truncatedByObjectCap = true;
+      if (targetHits.length === 0 && emitNoHits) {
+        noHits.push({
           devclass: target.devclass,
           object_type: target.object_type,
           object_name: target.object_name,
-          include: unit.include,
-          line: h.line,
-          snippet: h.snippet,
         });
+      } else {
+        allHits.push(...targetHits);
       }
-      totalForTarget += scan.hits.length;
-      if (scan.capped) {
-        capHitForTarget = true;
-        break;
-      }
-    }
-
-    if (capHitForTarget) truncatedByObjectCap = true;
-    if (targetHits.length === 0 && emitNoHits) {
-      noHits.push({
-        devclass: target.devclass,
-        object_type: target.object_type,
-        object_name: target.object_name,
-      });
-    } else {
-      allHits.push(...targetHits);
-    }
-  });
+    },
+    () => {
+      timedOut = true;
+    },
+    deadlinePassed,
+  );
 
   allHits.sort((a, b) => {
     if (a.devclass !== b.devclass) return a.devclass < b.devclass ? -1 : 1;
@@ -225,6 +260,7 @@ export async function runSearchSource(
     truncated: {
       by_object_cap: truncatedByObjectCap,
       by_max_objects: truncatedByMaxObjects,
+      by_timeout: timedOut,
     },
   };
   if (emitNoHits) result.no_hits = noHits;

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.9.1] - 2026-05-24
+
+### Changed
+- Bump `@mcp-abap-adt/connection` to `^1.9.1`, which adds **NTLM hard-reject** for Kerberos auth: a Kerberos connection now fails with a clear error if the SAP system offers NTLM (instead of silently swallowing the 401). Only Kerberos/SPNEGO is accepted.
+
 ## [6.9.0] - 2026-05-24
 
 ### Added

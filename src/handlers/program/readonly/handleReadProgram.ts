@@ -72,6 +72,27 @@ export async function handleReadProgram(
       logger?.warn(`Could not read metadata for ${programName}: ${e?.message}`);
     }
 
+    // A readable main program (PROG/P) always returns source. If both source
+    // and metadata are empty, the name is almost certainly an include
+    // (PROG/I) — surface that as a structured error with a redirect instead of
+    // a misleading { success: true, source_code: null } that the model reads
+    // as a permission/inactive-object problem rather than "wrong tool".
+    if (source_code === null && metadata === null) {
+      return return_response({
+        data: JSON.stringify(
+          {
+            success: false,
+            error: 'include_name_passed',
+            program_name: programName,
+            message: `No main-program source found for "${programName}". If this is an include (e.g. a name returned by GetIncludesList), call GetInclude("${programName}") instead.`,
+            suggestion: `GetInclude("${programName}")`,
+          },
+          null,
+          2,
+        ),
+      } as AxiosResponse);
+    }
+
     return return_response({
       data: JSON.stringify(
         {

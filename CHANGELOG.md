@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [6.11.1] - 2026-05-29
+
+### Fixed
+- **`ReadProgram` returned a silent `{ success: true, source_code: null }` for include names.** LLM agents loading a report's full source call `ReadProgram` on the include names returned by `GetIncludesList`, get `null`, read it as a permission/inactive-object problem rather than "wrong tool", and stall. A readable main program (`PROG/P`) always returns source; when both source and metadata come back empty the name is an include (`PROG/I`). `ReadProgram` now returns a structured `{ success: false, error: "include_name_passed", suggestion: "GetInclude(\"<name>\")" }` so the caller gets an actionable signal at the point of failure. (#91)
+- **`GetProgFullCode` read include source via the wrong content key.** `handleGetInclude` returns `{ type: 'text', text }`, but two call sites read `c.data`: the recursive `collectIncludes` helper (so nested includes were never discovered) and the `FUGR` branch (so every function-group include came back as `code: null`). All sites now read `c.text`. (#91)
+
 ## [6.11.0] - 2026-05-28
 
 ### Added

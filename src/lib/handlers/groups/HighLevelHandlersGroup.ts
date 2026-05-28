@@ -1,5 +1,21 @@
 // Per-type activate handlers (reused from low-level)
 import {
+  TOOL_DEFINITION as GetATCFindings_Tool,
+  handleGetATCFindings,
+} from '../../../handlers/atc/high/handleGetATCFindings';
+import {
+  TOOL_DEFINITION as GetATCRunStatus_Tool,
+  handleGetATCRunStatus,
+} from '../../../handlers/atc/high/handleGetATCRunStatus';
+import {
+  handleListATCCheckVariants,
+  TOOL_DEFINITION as ListATCCheckVariants_Tool,
+} from '../../../handlers/atc/high/handleListATCCheckVariants';
+import {
+  handleRunATC,
+  TOOL_DEFINITION as RunATC_Tool,
+} from '../../../handlers/atc/high/handleRunATC';
+import {
   TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
   handleCheckBehaviorDefinition,
 } from '../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
@@ -825,6 +841,22 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteCdsUnitTest_Tool,
         handler: withContext(handleDeleteCdsUnitTest),
+      },
+      {
+        toolDefinition: RunATC_Tool,
+        handler: withContext(handleRunATC),
+      },
+      {
+        toolDefinition: GetATCRunStatus_Tool,
+        handler: withContext(handleGetATCRunStatus),
+      },
+      {
+        toolDefinition: GetATCFindings_Tool,
+        handler: withContext(handleGetATCFindings),
+      },
+      {
+        toolDefinition: ListATCCheckVariants_Tool,
+        handler: withContext(handleListATCCheckVariants),
       },
       {
         toolDefinition: GetLocalTestClass_Tool,

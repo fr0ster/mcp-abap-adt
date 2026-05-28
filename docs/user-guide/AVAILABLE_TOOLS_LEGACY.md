@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 130
+- Total tools: 134
 - Read-Only: 12
-- High-Level: 58
+- High-Level: 62
 - Low-Level: 60
 
 ## Navigation
@@ -35,6 +35,11 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [View](#read-only-view)
     - [ReadView](#readview-read-only-view)
 - [High-Level Group](#high-level-group)
+  - [Atc](#high-level-atc)
+    - [GetATCFindings](#getatcfindings-high-level-atc)
+    - [GetATCRunStatus](#getatcrunstatus-high-level-atc)
+    - [ListATCCheckVariants](#listatccheckvariants-high-level-atc)
+    - [RunATC](#runatc-high-level-atc)
   - [Class](#high-level-class)
     - [CheckClass](#checkclass-high-level-class)
     - [CreateClass](#createclass-high-level-class)
@@ -374,6 +379,68 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="high-level-group"></a>
 ## High-Level Group
+
+<a id="high-level-atc"></a>
+### High-Level / Atc
+
+<a id="getatcfindings-high-level-atc"></a>
+#### GetATCFindings (High-Level / Atc)
+**Description:** Retrieve ATC findings for a completed worklist. The worklist_id is returned by 
+
+**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `format` (string, optional (default: xml)) - Findings format: 
+- `include_exempted_findings` (boolean, optional (default: false)) - Include exempted (suppressed) findings in the result.
+- `worklist_id` (string, required) - 32-character worklist GUID returned by RunATC.
+
+---
+
+<a id="getatcrunstatus-high-level-atc"></a>
+#### GetATCRunStatus (High-Level / Atc)
+**Description:** Read the status of an asynchronous ATC run by run_id. Response body contains 
+
+**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `run_id` (string, required) - Run identifier returned by RunATC.
+- `with_long_polling` (boolean, optional (default: true)) - Use server-side long polling so the call returns sooner after the run finishes.
+
+---
+
+<a id="listatccheckvariants-high-level-atc"></a>
+#### ListATCCheckVariants (High-Level / Atc)
+**Description:** List available ATC check variants on the SAP system. Returns the variants XML. 
+
+**Source:** `src/handlers/atc/high/handleListATCCheckVariants.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `max_item_count` (number, optional (default: 500).)) - Maximum number of variants to return (default: 500).
+- `name_pattern` (string, optional (default: *").)) - Name filter pattern, 
+
+---
+
+<a id="runatc-high-level-atc"></a>
+#### RunATC (High-Level / Atc)
+**Description:** Start an asynchronous ATC (ABAP Test Cockpit) run for an ABAP object. 
+
+**Source:** `src/handlers/atc/high/handleRunATC.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `check_variant` (string, optional) - ATC check variant name. If omitted, uses the system
+- `max_findings` (number, optional (default: 100).)) - Maximum number of findings to return (default: 100).
+- `object_name` (string, required) - Name of the ABAP object to check (e.g., 
+- `object_type` (string, required) - Type of object to check. Use 
+
+---
 
 <a id="high-level-class"></a>
 ### High-Level / Class
@@ -2271,4 +2338,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-05-15*
+*Last updated: 2026-05-28*

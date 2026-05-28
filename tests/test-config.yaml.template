@@ -1789,6 +1789,26 @@ cds_unit_test:
           ENDCLASS.
 
 # Class Unit Test (Low-Level and High-Level)
+atc:
+  test_cases:
+    - name: "package_findings"
+      enabled: false  # ← change to true and point object_name to a real package in your dev system
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "ATC high-level handlers full flow: ListATCCheckVariants → RunATC → poll GetATCRunStatus → GetATCFindings"
+      params:
+        # Target object for the ATC run
+        # Use a package with a small number of objects so the run finishes quickly,
+        # or a single class for the fastest possible run (e.g. object_type: class).
+        object_name: "Z_ATC_TEST_PACKAGE"  # ← CHANGE to a package/class in your dev system
+        object_type: "package"             # class | interface | program | function_group | include | package
+        check_variant: ""                  # empty = use system default (read from /atc/customizing)
+        max_findings: 100
+        # Poll cadence for GetATCRunStatus — defaults match the Java reference
+        poll_interval_ms: 4000
+        max_polls: 75                      # 75 * 4s = 5 minutes
+        # Optional: validate findings format ("xml" or "checkstyle")
+        findings_format: "xml"
+
 class_unit_test:
   test_cases:
     - name: "full_workflow"

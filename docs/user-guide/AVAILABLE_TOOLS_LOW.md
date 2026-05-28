@@ -575,14 +575,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type 
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type (class/program/interface/function_group/function_module/table/structure/view/domain/data_element/behavior_definition/metadata_extension)
+- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, view, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
 
 ---
@@ -1992,4 +1992,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-05-15*
+*Last updated: 2026-05-28*

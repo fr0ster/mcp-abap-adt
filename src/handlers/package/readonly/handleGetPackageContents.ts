@@ -2,7 +2,6 @@ import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
@@ -33,7 +32,6 @@ interface GetPackageContentsArgs {
   include_subpackages?: boolean;
   max_depth?: number;
   include_descriptions?: boolean;
-  filePath?: string;
 }
 
 export async function handleGetPackageContents(
@@ -68,10 +66,6 @@ export async function handleGetPackageContents(
         },
       ],
     };
-
-    if (args.filePath) {
-      writeResultToFile(JSON.stringify(finalResult, null, 2), args.filePath);
-    }
 
     return finalResult;
   } catch (error) {

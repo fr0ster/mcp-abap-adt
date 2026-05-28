@@ -1,6 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetAbapSemanticAnalysis',
   available_in: ['onprem', 'cloud'] as const,
@@ -12,10 +11,6 @@ export const TOOL_DEFINITION = {
       code: {
         type: 'string',
         description: 'ABAP source code to analyze',
-      },
-      filePath: {
-        type: 'string',
-        description: 'Optional file path to write the result to',
       },
     },
     required: ['code'],
@@ -454,13 +449,6 @@ export async function handleGetAbapSemanticAnalysis(
         },
       ],
     };
-
-    if (args.filePath) {
-      logger?.debug(
-        `Writing semantic analysis result to file: ${args.filePath}`,
-      );
-      writeResultToFile(JSON.stringify(analysis, null, 2), args.filePath);
-    }
 
     return result;
   } catch (error) {

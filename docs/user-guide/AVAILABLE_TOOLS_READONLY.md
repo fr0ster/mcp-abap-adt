@@ -258,7 +258,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, required) - Name of the ABAP program or include
-- `object_type` (string, required) - [read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)
+- `object_type` (string, required) - [read-only] ADT object type of the parent. Only these four values are supported: 
 - `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 
 ---
@@ -458,7 +458,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to parse
-- `filePath` (string, optional) - Optional file path to write the result to
 
 ---
 
@@ -470,7 +469,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to analyze
-- `filePath` (string, optional) - Optional file path to write the result to
 
 ---
 
@@ -482,7 +480,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to analyze and resolve symbols for
-- `filePath` (string, optional) - Optional file path to write the result to
 
 ---
 
@@ -600,9 +597,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
 **Parameters:**
-- `enable_all_types` (boolean, optional (default: false)) - If true, searches in all available object types (Eclipse 
-- `object_name` (string, required) - Name of the ABAP object
-- `object_type` (string, required) - Type of the ABAP object (class, interface, program, table, etc.)
+- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 
+- `object_name` (string, required) - Name of the ABAP object. For function modules the name MUST be in the form 
+- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 
 
 ---
 
@@ -916,4 +913,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-05-15*
+*Last updated: 2026-05-28*

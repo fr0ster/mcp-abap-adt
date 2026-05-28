@@ -5,10 +5,10 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 130
+- Total tools: 135
 - Read-Only: 12
-- High-Level: 58
-- Low-Level: 60
+- High-Level: 62
+- Low-Level: 61
 
 ## Navigation
 
@@ -55,6 +55,11 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Common](#high-level-common)
     - [ActivateObjects](#activateobjects-high-level-common)
+  - [Compact](#high-level-compact)
+    - [HandlerCreate](#handlercreate-high-level-compact)
+    - [HandlerDelete](#handlerdelete-high-level-compact)
+    - [HandlerGet](#handlerget-high-level-compact)
+    - [HandlerUpdate](#handlerupdate-high-level-compact)
   - [Function](#high-level-function)
     - [CheckFunctionGroup](#checkfunctiongroup-high-level-function)
     - [CheckFunctionModule](#checkfunctionmodule-high-level-function)
@@ -122,6 +127,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [ValidateClassLow](#validateclasslow-low-level-class)
   - [Common](#low-level-common)
     - [ActivateObjectLow](#activateobjectlow-low-level-common)
+    - [DeleteObjectLow](#deleteobjectlow-low-level-common)
   - [Function](#low-level-function)
     - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low-level-function)
     - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low-level-function)
@@ -256,7 +262,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, required) - Name of the ABAP program or include
-- `object_type` (string, required) - [read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)
+- `object_type` (string, required) - [read-only] ADT object type of the parent. Only these four values are supported: 
 - `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 
 ---
@@ -651,6 +657,123 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `objects` (array, required) - Array of objects to activate. Each object must have 
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+
+---
+
+<a id="high-level-compact"></a>
+### High-Level / Compact
+
+<a id="handlercreate-high-level-compact"></a>
+#### HandlerCreate (High-Level / Compact)
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+
+**Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate object after create.
+- `application` (string, optional) - Domain application area.
+- `class_name` (string, optional) - ABAP class name.
+- `conversion_exit` (string, optional) - Conversion exit name.
+- `datatype` (string, optional) - ABAP data type.
+- `decimals` (number, optional) - Decimal places.
+- `description` (string, optional) - Human-readable object description.
+- `domain_name` (string, optional) - ABAP domain name.
+- `fixed_values` (array, optional) - Domain fixed values list.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `length` (number, optional) - Length for typed artifacts.
+- `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `object_type` (any, required) - 
+- `package_name` (string, optional) - ABAP package name.
+- `program_name` (string, optional) - ABAP program name.
+- `program_type` (string, optional) - ABAP program type.
+- `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `transport_request` (string, optional) - Transport request id (if required by system).
+- `value_table` (string, optional) - Foreign key value table.
+
+---
+
+<a id="handlerdelete-high-level-compact"></a>
+#### HandlerDelete (High-Level / Compact)
+**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+
+**Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `class_name` (string, optional) - ABAP class name.
+- `domain_name` (string, optional) - ABAP domain name.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `object_type` (any, required) - 
+- `program_name` (string, optional) - ABAP program name.
+- `transport_request` (string, optional) - Transport request id (if required by system).
+
+---
+
+<a id="handlerget-high-level-compact"></a>
+#### HandlerGet (High-Level / Compact)
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+
+**Source:** `src/handlers/compact/high/handleHandlerGet.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `behavior_definition_name` (string, optional) - Behavior definition name.
+- `behavior_implementation_name` (string, optional) - Behavior implementation name.
+- `class_name` (string, optional) - Class name.
+- `data_element_name` (string, optional) - Data element name.
+- `domain_name` (string, optional) - Domain name.
+- `function_group_name` (string, optional) - Function group name.
+- `function_module_name` (string, optional) - Function module name.
+- `interface_name` (string, optional) - Interface name.
+- `metadata_extension_name` (string, optional) - Metadata extension name.
+- `object_type` (any, required) - 
+- `package_name` (string, optional) - Package name.
+- `program_name` (string, optional) - Program name.
+- `response_format` (string, optional) - Response format for SERVICE_BINDING reads.
+- `run_id` (string, optional) - Unit test run id.
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `version` (any, optional) - 
+- `view_name` (string, optional) - View name.
+
+---
+
+<a id="handlerupdate-high-level-compact"></a>
+#### HandlerUpdate (High-Level / Compact)
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+
+**Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate object after update.
+- `class_name` (string, optional) - ABAP class name.
+- `conversion_exit` (string, optional) - Conversion exit name.
+- `datatype` (string, optional) - ABAP data type.
+- `decimals` (number, optional) - Decimal places.
+- `description` (string, optional) - Human-readable object description.
+- `domain_name` (string, optional) - ABAP domain name.
+- `fixed_values` (array, optional) - Domain fixed values list.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `length` (number, optional) - Length for typed artifacts.
+- `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `object_type` (any, required) - 
+- `package_name` (string, optional) - ABAP package name.
+- `program_name` (string, optional) - ABAP program name.
+- `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `source_code` (string, optional) - ABAP source code payload.
+- `transport_request` (string, optional) - Transport request id (if required by system).
+- `value_table` (string, optional) - Foreign key value table.
 
 ---
 
@@ -1540,6 +1663,22 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="deleteobjectlow-low-level-common"></a>
+#### DeleteObjectLow (Low-Level / Common)
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type 
+
+**Source:** `src/handlers/common/low/handleDeleteObject.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, optional) - Required only for function_module type
+- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
+- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, view, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
+- `transport_request` (string, optional) - Transport request number
+
+---
+
 <a id="low-level-function"></a>
 ### Low-Level / Function
 
@@ -2271,4 +2410,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-05-15*
+*Last updated: 2026-05-28*

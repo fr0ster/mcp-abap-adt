@@ -1,6 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';
@@ -15,10 +14,6 @@ export const TOOL_DEFINITION = {
       code: {
         type: 'string',
         description: 'ABAP source code to analyze and resolve symbols for',
-      },
-      filePath: {
-        type: 'string',
-        description: 'Optional file path to write the result to',
       },
     },
     required: ['code'],
@@ -780,13 +775,6 @@ export async function handleGetAbapSystemSymbols(
         },
       ],
     };
-
-    if (args.filePath) {
-      logger?.debug(
-        `Writing system symbol resolution result to file: ${args.filePath}`,
-      );
-      writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-    }
 
     return response;
   } catch (error) {

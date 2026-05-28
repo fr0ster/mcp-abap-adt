@@ -1,6 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetAbapAST',
   available_in: ['onprem', 'cloud'] as const,
@@ -12,10 +11,6 @@ export const TOOL_DEFINITION = {
       code: {
         type: 'string',
         description: 'ABAP source code to parse',
-      },
-      filePath: {
-        type: 'string',
-        description: 'Optional file path to write the result to',
       },
     },
     required: ['code'],
@@ -179,11 +174,6 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
         },
       ],
     };
-
-    if (args.filePath) {
-      logger?.debug(`Writing AST result to file: ${args.filePath}`);
-      writeResultToFile(JSON.stringify(ast, null, 2), args.filePath);
-    }
 
     return result;
   } catch (error) {

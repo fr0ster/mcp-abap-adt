@@ -6,7 +6,6 @@ import {
   McpError,
   makeAdtRequestWithTimeout,
 } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementImpl',
   available_in: ['onprem', 'cloud'] as const,
@@ -159,9 +158,6 @@ export async function handleGetEnhancementImpl(
           },
         ],
       };
-      if (args.filePath) {
-        writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-      }
       return result;
     } else {
       logger?.warn(
@@ -206,12 +202,6 @@ export async function handleGetEnhancementImpl(
             },
           ],
         };
-        if (args.filePath) {
-          writeResultToFile(
-            JSON.stringify(fallbackResult, null, 2),
-            args.filePath,
-          );
-        }
         return fallbackResult;
       } else {
         throw new McpError(

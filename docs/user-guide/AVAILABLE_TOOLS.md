@@ -566,7 +566,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, required) - Name of the ABAP program or include
-- `object_type` (string, required) - [read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)
+- `object_type` (string, required) - [read-only] ADT object type of the parent. Only these four values are supported: 
 - `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 
 ---
@@ -766,7 +766,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to parse
-- `filePath` (string, optional) - Optional file path to write the result to
 
 ---
 
@@ -778,7 +777,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to analyze
-- `filePath` (string, optional) - Optional file path to write the result to
 
 ---
 
@@ -790,7 +788,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `code` (string, required) - ABAP source code to analyze and resolve symbols for
-- `filePath` (string, optional) - Optional file path to write the result to
 
 ---
 
@@ -908,9 +905,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
 **Parameters:**
-- `enable_all_types` (boolean, optional (default: false)) - If true, searches in all available object types (Eclipse 
-- `object_name` (string, required) - Name of the ABAP object
-- `object_type` (string, required) - Type of the ABAP object (class, interface, program, table, etc.)
+- `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 
+- `object_name` (string, required) - Name of the ABAP object. For function modules the name MUST be in the form 
+- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 
 
 ---
 
@@ -1684,7 +1681,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
@@ -1714,7 +1711,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerdelete-high-level-compact"></a>
 #### HandlerDelete (High-Level / Compact)
-**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
@@ -1757,7 +1754,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
-**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerGet.ts`
 
@@ -1948,7 +1945,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerupdate-high-level-compact"></a>
 #### HandlerUpdate (High-Level / Compact)
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
@@ -3534,14 +3531,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type 
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type (class/program/interface/function_group/function_module/table/structure/view/domain/data_element/behavior_definition/metadata_extension)
+- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, view, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
 
 ---
@@ -4951,4 +4948,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-05-15*
+*Last updated: 2026-05-28*

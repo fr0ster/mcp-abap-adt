@@ -258,9 +258,12 @@ function parseTopLevelProperties(propertiesContent) {
       if (close === -1) break;
       const body = propertiesContent.slice(open + 1, close);
 
-      const type = body.match(/type\s*:\s*['"]([^'"]+)['"]/)?.[1] || 'any';
+      const type =
+        body.match(/type\s*:\s*(['"])((?:\\.|(?!\1).)*)\1/)?.[2] || 'any';
       const description =
-        body.match(/description\s*:\s*['"]([^'"]+)['"]/)?.[1] || '';
+        body
+          .match(/description\s*:\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/)?.[2]
+          ?.replace(/\\(['"\\])/g, '$1') || '';
       const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
 
       props[key] = {
@@ -334,7 +337,9 @@ function extractToolDefinition(filePath) {
   const nameMatch = block.match(/name\s*:\s*['"]([^'"]+)['"]/);
   if (!nameMatch) return null;
 
-  const descMatch = block.match(/description\s*:\s*['"]([^'"]+)['"]/);
+  const descMatch = block.match(
+    /description\s*:\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/,
+  );
   const inputSchemaBlock = extractInputSchemaBlock(block);
   const inputSchemaRef = inputSchemaBlock ? null : extractInputSchemaRef(block);
   let inputSchema = parseInputSchemaBlock(inputSchemaBlock);
@@ -375,7 +380,7 @@ function extractToolDefinition(filePath) {
 
   return {
     name: nameMatch[1],
-    description: descMatch ? descMatch[1] : '',
+    description: descMatch ? descMatch[2].replace(/\\(['"\\])/g, '$1') : '',
     inputSchema,
     inputSchemaRef,
     availableIn,

@@ -158,12 +158,22 @@ export async function handleUnlockObject(
             .getFunctionGroup()
             .unlock({ functionGroupName: objectName }, lock_handle);
           break;
-        case 'function_module':
-          return return_error(
-            new Error(
-              'Function module unlocking via UnlockObject is not supported. Use function-module-specific handler.',
-            ),
+        case 'function_module': {
+          if (!objectName.includes('|')) {
+            return return_error(
+              new Error('Function module name must be in format GROUP|FM_NAME'),
+            );
+          }
+          const [groupName, fmName] = objectName.split('|');
+          await client.getFunctionModule().unlock(
+            {
+              functionGroupName: groupName,
+              functionModuleName: fmName,
+            },
+            lock_handle,
           );
+          break;
+        }
         case 'table':
           await client
             .getTable()

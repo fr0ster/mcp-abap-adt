@@ -1,7 +1,6 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError, return_error } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
@@ -18,7 +17,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['PROG/P', 'PROG/I', 'FUGR', 'CLAS/OC'],
         description:
-          '[read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)',
+          "[read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.",
       },
       detailed: {
         type: 'boolean',
@@ -255,9 +254,6 @@ export async function handleGetIncludesList(
           },
         ],
       };
-      if (args.filePath) {
-        writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-      }
       return result;
     } else {
       // Return minimal text response (original format)
@@ -273,9 +269,6 @@ export async function handleGetIncludesList(
           },
         ],
       };
-      if (args.filePath) {
-        writeResultToFile(responseData, args.filePath);
-      }
       return plainResult;
     }
   } catch (error) {

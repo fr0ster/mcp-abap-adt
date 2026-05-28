@@ -6,7 +6,6 @@ import {
   McpError,
   makeAdtRequestWithTimeout,
 } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 // TODO: Migrate to infrastructure module
 // This handler uses direct ADT endpoint: /sap/bc/adt/programs/includes/{name}/source/main
@@ -38,9 +37,6 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
       'default',
     );
     const plainText = response.data;
-    if (args.filePath) {
-      writeResultToFile(plainText, args.filePath);
-    }
     logger?.info(`✅ GetInclude completed: ${args.include_name}`);
     return {
       isError: false,

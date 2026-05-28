@@ -6,7 +6,6 @@ import {
   McpError,
   makeAdtRequestWithTimeout,
 } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementSpot',
   available_in: ['onprem', 'cloud'] as const,
@@ -175,9 +174,6 @@ export async function handleGetEnhancementSpot(
           },
         ],
       };
-      if (args.filePath) {
-        writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-      }
       return result;
     } else {
       throw new McpError(

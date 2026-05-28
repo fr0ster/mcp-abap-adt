@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+## [6.11.0] - 2026-05-28
+
+### Added
+- **`LockObjectLow` / `UnlockObjectLow` now support `function_module`.** The schema already advertised `function_module` with `GROUP|FM_NAME` name format, but the handlers returned an unsupported-operation error. Both now parse the compound name and delegate to `client.getFunctionModule().lock()/unlock()`. (#90)
+
+### Changed
+- **Tool descriptions aligned with implementation.** `GetWhereUsed` now lists the closed set of supported `object_type` values, documents the `GROUP|FM_NAME` format for function modules, clarifies that `view = CDS DDL source` (classic DDIC views unsupported), and warns about the cost of `enable_all_types`. `DeleteObjectLow` and the four compact `Handler{Create,Delete,Get,Update}` tools annotate `PROGRAM` as `[onprem/legacy only]` in their descriptions (no `available_in` change — the rest of the supported types are still valid on cloud). `GetIncludesList` spells out the four supported `object_type` enum values. (#90)
+- **`server.json` version synced to package.json.** It had drifted to `6.8.0`; now follows the package version.
+
+### Removed
+- **Dead `filePath` / `writeResultToFile` plumbing.** A side-channel `filePath` argument was accepted (often without being declared in `inputSchema`) by ten read-only handlers — `GetInclude`, `GetIncludesList`, `GetSqlQuery`, `GetEnhancements`, `GetEnhancementSpot`, `GetEnhancementImpl`, `GetPackageContents`, `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols`. The lib comment claimed it sandboxed writes to `./output`, but did no validation — any absolute path the process could write to was accepted. The feature was no longer relied on, so it has been removed along with `src/lib/writeResultToFile.ts`. (#90)
+
+### Fixed
+- **`tools/generate-tools-docs.js` truncated descriptions at the first inner quote.** Both the per-property and the top-level extractor used `/description\s*:\s*['"]([^'"]+)['"]/`, which stops the capture at the first `'` or `"` of any kind. New descriptions added in this release would have rendered as `Answers:`, `form`, `Supported values:` etc. in `AVAILABLE_TOOLS*.md`. Switched to a quote-balanced pattern with an unescape pass. (#90)
+
 ## [6.10.0] - 2026-05-24
 
 ### Added

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### Added
+- **ATC (ABAP Test Cockpit) support.** Four new high-level handlers expose the ATC worklist+run flow:
+  - `RunATC` — create a worklist for a check variant, submit an asynchronous ATC run against an ABAP object (class, interface, program, function group, include, or package). Falls back to the system default check variant when `check_variant` is omitted. Returns `worklist_id` + `run_id`.
+  - `GetATCRunStatus` — poll an ATC run by `run_id` (long polling supported); response body contains `status="finished"` / `status="cancelled"`.
+  - `GetATCFindings` — fetch findings by `worklist_id` once the run is finished. Supports native ATC XML and Checkstyle XML output (`format: "xml" | "checkstyle"`).
+  - `ListATCCheckVariants` — discover available ATC check variants on the system.
+- New `AdtClient.getAtc()` factory in `@mcp-abap-adt/adt-clients` returning `AdtAtc` (high-level wrapper) plus low-level helpers (`createAtcWorklist`, `startAtcRun`, `getAtcRunStatus`, `getAtcWorklistFindings`, `listAtcVariants`, `getAtcCustomizing`, `parseSystemDefaultVariant`, `extractAtcRunId`, `extractAtcWorklistId`) and parameter types in `@mcp-abap-adt/interfaces` (`IRunAtcParams`, `IGetAtcRunStatusParams`, `IGetAtcFindingsParams`, `IListAtcCheckVariantsParams`, `AtcObjectType`, `AtcFindingsFormat`).
+
 ## [8.6.1] - 2026-07-05
 
 ### Changed

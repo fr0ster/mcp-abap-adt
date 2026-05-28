@@ -90,7 +90,7 @@ export async function handleGetProgFullCode(
       includeResult.content.length > 0
     ) {
       const c = includeResult.content[0];
-      if (c.type === 'text' && 'data' in c) code = c.data as string;
+      if (c.type === 'text' && 'text' in c) code = c.text as string;
     }
 
     // Find nested includes in code (ABAP: INCLUDE <name>. or 'INCLUDE <name> .')
@@ -269,7 +269,7 @@ export async function handleGetProgFullCode(
               incResult.content.length > 0
             ) {
               const c = incResult.content[0];
-              if (c.type === 'text' && 'data' in c) incCode = c.data as string;
+              if (c.type === 'text' && 'text' in c) incCode = c.text as string;
             }
             codeObjects.push({
               OBJECT_TYPE: 'PROG/I',

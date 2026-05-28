@@ -163,12 +163,19 @@ export async function handleLockObject(
             .getFunctionGroup()
             .lock({ functionGroupName: objectName });
           break;
-        case 'function_module':
-          return return_error(
-            new Error(
-              'Function module locking via LockObject is not supported. Use function-module-specific handler.',
-            ),
-          );
+        case 'function_module': {
+          if (!objectName.includes('|')) {
+            return return_error(
+              new Error('Function module name must be in format GROUP|FM_NAME'),
+            );
+          }
+          const [groupName, fmName] = objectName.split('|');
+          lockHandle = await client.getFunctionModule().lock({
+            functionGroupName: groupName,
+            functionModuleName: fmName,
+          });
+          break;
+        }
         case 'table':
           lockHandle = await client.getTable().lock({ tableName: objectName });
           break;

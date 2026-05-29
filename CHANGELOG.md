@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [6.11.2] - 2026-05-29
+
+### Fixed
+- **`ReadProgram` could still return a silent `{ success: true, source_code: null }` for non-main-program names.** The 6.11.1 heuristic only fired when *both* source and metadata came back empty; when the `programs` endpoint returned metadata for a non-`PROG/P` object (e.g. an include) the response slipped through to a misleading `success: true` with `source_code: null`. `ReadProgram` now parses `adtcore:type` from the metadata and rejects anything other than a main program (`PROG/P`) with a structured `{ success: false, error: "invalid_object_type", object_type, message }`. No tool redirect is emitted — choosing the right tool is the consumer's decision. The tool description now states it works only for main programs (`PROG/P`). (#91)
+
 ## [6.11.1] - 2026-05-29
 
 ### Fixed

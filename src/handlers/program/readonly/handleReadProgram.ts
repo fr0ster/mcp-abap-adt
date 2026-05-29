@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadProgram',
   available_in: ['onprem', 'legacy'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP program (report) source code and metadata. Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.',
+    'Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP MAIN PROGRAM (report) source code and metadata. Works ONLY for main programs (adtcore type PROG/P); include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -72,20 +72,32 @@ export async function handleReadProgram(
       logger?.warn(`Could not read metadata for ${programName}: ${e?.message}`);
     }
 
-    // A readable main program (PROG/P) always returns source. If both source
-    // and metadata are empty, the name is almost certainly an include
-    // (PROG/I) — surface that as a structured error with a redirect instead of
-    // a misleading { success: true, source_code: null } that the model reads
-    // as a permission/inactive-object problem rather than "wrong tool".
-    if (source_code === null && metadata === null) {
+    // ReadProgram only reads main programs (PROG/P). Detect the actual object
+    // type from the metadata and reject anything else (e.g. includes PROG/I) so
+    // the caller gets a structured "invalid_object_type" error instead of a
+    // misleading { success: true, source_code: null } that reads as a
+    // permission/inactive-object problem rather than "wrong object type".
+    // No redirect/suggestion is emitted — choosing the right tool is the
+    // consumer's decision; we only report what the object is.
+    const objectType = metadata
+      ? (/adtcore:type="([^"]+)"/.exec(metadata)?.[1] ?? null)
+      : null;
+
+    const isMainProgram = objectType === 'PROG/P';
+    // When metadata is missing entirely we cannot read it as a main program
+    // either (the programs endpoint returned nothing usable for both source
+    // and metadata) — treat that as the same error.
+    if (!isMainProgram || (source_code === null && metadata === null)) {
       return return_response({
         data: JSON.stringify(
           {
             success: false,
-            error: 'include_name_passed',
+            error: 'invalid_object_type',
             program_name: programName,
-            message: `No main-program source found for "${programName}". If this is an include (e.g. a name returned by GetIncludesList), call GetInclude("${programName}") instead.`,
-            suggestion: `GetInclude("${programName}")`,
+            object_type: objectType,
+            message: objectType
+              ? `"${programName}" has object type ${objectType}, not a main program (PROG/P). ReadProgram reads only main programs (PROG/P).`
+              : `No main-program (PROG/P) source or metadata found for "${programName}". ReadProgram reads only main programs (PROG/P).`,
           },
           null,
           2,

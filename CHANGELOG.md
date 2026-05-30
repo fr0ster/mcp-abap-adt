@@ -2,8 +2,10 @@
 
 ## [Unreleased]
 
+## [7.0.0] - 2026-05-30
+
 ### Changed
-- **`EmbeddableMcpServer` now applies `ReadVsGetDedupStrategy` by default.** Previously the embeddable server defaulted to `NoDedupStrategy`, so exposing `readonly` + `high` together surfaced both `Read<X>` and `Get<X>` for the same operation (e.g. `ReadProgram` + `GetProgram`), leaving tool selection up to the client. Embedders (e.g. cloud-llm-hub) now get the same single-tool-per-operation view as the standalone launcher. **Behavior change**: consumers that relied on both variants being exposed must now opt out by passing `readOnlyDedupStrategy: new NoDedupStrategy()`.
+- **BREAKING: `EmbeddableMcpServer` now applies `ReadVsGetDedupStrategy` by default.** Previously the embeddable server defaulted to `NoDedupStrategy`, so exposing `readonly` + `high` together surfaced both `Read<X>` and `Get<X>` for the same operation (e.g. `ReadProgram` + `GetProgram`), leaving tool selection up to the client. Embedders (e.g. cloud-llm-hub) now get the same single-tool-per-operation view as the standalone launcher. Consumers that relied on both variants being exposed must opt out by passing `readOnlyDedupStrategy: new NoDedupStrategy()`. No code-level API change — the difference is the set of tools exposed to clients.
 
 ## [6.11.3] - 2026-05-30
 

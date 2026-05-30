@@ -63,10 +63,6 @@ import {
   TOOL_DEFINITION as ReadPackage_Tool,
 } from '../../../handlers/package/readonly/handleReadPackage';
 import {
-  TOOL_DEFINITION as GetProgFullCode_Tool,
-  handleGetProgFullCode,
-} from '../../../handlers/program/readonly/handleGetProgFullCode';
-import {
   handleReadProgram,
   TOOL_DEFINITION as ReadProgram_Tool,
 } from '../../../handlers/program/readonly/handleReadProgram';
@@ -181,10 +177,6 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ListTransports_Tool,
         handler: (args: any) => handleListTransports(this.context, args),
-      },
-      {
-        toolDefinition: GetProgFullCode_Tool,
-        handler: (args: any) => handleGetProgFullCode(this.context, args),
       },
       // Read object source + metadata handlers
       {

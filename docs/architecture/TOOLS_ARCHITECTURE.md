@@ -145,7 +145,6 @@ import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/class/handleGetCla
 const DYNAMIC_IMPORT_TOOLS: ToolDefinition[] = [
   GetObjectsByType_Tool,
   GetObjectsList_Tool,
-  GetProgFullCode_Tool,
   GetObjectNodeFromCache_Tool,
   DescribeByList_Tool
 ];
@@ -206,7 +205,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
 ```
 
 **Note:** Most handlers are statically imported, but some use dynamic imports to avoid circular dependencies or improve startup performance:
-- `GetObjectsList`, `GetObjectsByType`, `GetProgFullCode`, `GetObjectNodeFromCache`, `DescribeByList` (marked in `DYNAMIC_IMPORT_TOOLS`)
+- `GetObjectsList`, `GetObjectsByType`, `GetObjectNodeFromCache`, `DescribeByList` (marked in `DYNAMIC_IMPORT_TOOLS`)
 - `GetAdtTypes`, `GetObjectStructure` (also use dynamic import but are in main `ALL_TOOLS` array)
 
 ## Benefits

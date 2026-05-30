@@ -16,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'GetInclude',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Retrieve source code of a specific ABAP include file.',
+    '[read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). This is the correct tool for include names (PROG/I) — ReadProgram does not read includes.',
   inputSchema: {
     include_name: z.string().describe('Name of the ABAP Include'),
   },

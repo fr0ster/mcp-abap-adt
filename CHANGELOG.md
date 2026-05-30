@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Removed
+- **`GetProgFullCode` removed as a redundant read path.** A program or function group with includes can already be read through one canonical path — `ReadProgram` / `ReadFunctionGroup` (main) → `GetIncludesList` → `GetInclude` per include — and an explicit `GetInclude` is required anyway (includes can live outside any single object's tree). Two overlapping strategies made LLM and RAG-based tool selection non-deterministic. The piecemeal path covers function groups as well (`GetIncludesList` accepts `FUGR`), so no capability is lost. (#100)
+
+### Changed
+- **Sharpened source-read tool descriptions for clearer LLM / semantic tool selection.** `ReadProgram` now reads as "Read a MAIN ABAP program … NOT for includes — use `GetInclude`" (dropping the misleading "Create, Update" lead-in on a read-only tool), and `GetInclude` now reads as "Read ANY single ABAP include source by name, from anywhere in the repository … the correct tool for include names (PROG/I)". `GetIncludesList` is unchanged. (#100)
+
 ## [6.11.2] - 2026-05-29
 
 ### Fixed

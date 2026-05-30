@@ -233,7 +233,6 @@ interface HandlerContext {
   - [x] `handleGetFunction`
   - [x] `handleGetFunctionGroup`
   - [x] `handleGetObjectInfo`
-  - [x] `handleGetProgFullCode`
   - [x] `handleGetServiceDefinition`
   - [x] `handleGetTransport`
   - [x] `handleGetAbapSystemSymbols`

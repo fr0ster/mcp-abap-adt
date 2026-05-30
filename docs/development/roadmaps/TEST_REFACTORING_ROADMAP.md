@@ -414,7 +414,6 @@ describe('Class High-Level Handlers Integration', () => {
   - Search: `handleSearchObject`, `handleGetObjectsList`, `handleGetObjectsByType`
   - Transport: `handleGetTransport`
   - Include: `handleGetIncludesList`, `handleGetInclude`
-  - Program: `handleGetProgFullCode`
   - ServiceDefinition: `handleGetServiceDefinition`
 - **BehaviorDefinition Handlers (7/7)** ✅:
   - High-level: `handleCreateBehaviorDefinition`
@@ -431,10 +430,9 @@ describe('Class High-Level Handlers Integration', () => {
 - **Interface Handlers (10/10)** ✅:
   - High-level: `handleCreateInterface`, `handleUpdateInterface`
   - Low-level: `handleCreateInterface`, `handleUpdateInterface`, `handleDeleteInterface`, `handleLockInterface`, `handleUnlockInterface`, `handleActivateInterface`, `handleCheckInterface`, `handleValidateInterface`
-- **Program Handlers (11/11)** ✅:
+- **Program Handlers (10/10)** ✅:
   - High-level: `handleCreateProgram`, `handleUpdateProgram`
   - Low-level: `handleCreateProgram`, `handleUpdateProgram`, `handleDeleteProgram`, `handleLockProgram`, `handleUnlockProgram`, `handleActivateProgram`, `handleCheckProgram`, `handleValidateProgram`
-  - Read-only: `handleGetProgFullCode`
 - **Structure Handlers (10/10)** ✅:
   - High-level: `handleCreateStructure`, `handleUpdateStructure`
   - Low-level: `handleCreateStructure`, `handleUpdateStructure`, `handleDeleteStructure`, `handleLockStructure`, `handleUnlockStructure`, `handleActivateStructure`, `handleCheckStructure`, `handleValidateStructure`

@@ -88,20 +88,21 @@ Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express):
 ```typescript
 import {
   EmbeddableMcpServer,
-  ReadVsGetDedupStrategy, // optional: hide Read<X> when Get<X> also exposed
+  NoDedupStrategy, // optional: expose both Read<X> and Get<X>
 } from '@mcp-abap-adt/core/server';
 
 const server = new EmbeddableMcpServer({
   connection,              // Your AbapConnection instance
   logger,                  // Optional logger
   exposition: ['readonly', 'high'],  // Handler groups to expose
-  // Optional; default: no dedup — existing consumers see no change.
-  readOnlyDedupStrategy: new ReadVsGetDedupStrategy(),
+  // Default hides Read<X> when Get<X> is exposed (ReadVsGetDedupStrategy).
+  // Pass NoDedupStrategy to expose both variants instead.
+  // readOnlyDedupStrategy: new NoDedupStrategy(),
 });
 await server.connect(transport);
 ```
 
-See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for opt-in dedup of readonly tools against high/low/compact, including how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
+See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high/low/compact, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
 
 ## Quick Start
 

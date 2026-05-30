@@ -109,7 +109,7 @@ Valid combinations: `[readonly]`, `[readonly, high]`, `[readonly, low]`, `[high]
 
 When both `readonly` and `high` are exposed, `Read<X>` readonly handlers duplicate the corresponding `Get<X>` from the high-level group (e.g. `ReadFunctionModule` vs `GetFunctionModule`). The launcher hides the readonly `Read<X>` variants in this case so that only one tool per operation is visible to the client.
 
-Embedder consumers of `EmbeddableMcpServer` keep the previous behavior (both variants exposed) unless they opt in by passing a `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
+`EmbeddableMcpServer` applies the same dedup by default, so embedders see one tool per operation just like the launcher. Consumers that need both variants can opt out by passing `new NoDedupStrategy()` as `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
 
 ### Config File
 
@@ -280,7 +280,9 @@ import {
 const server = new EmbeddableMcpServer({
   connection,
   exposition: ['readonly', 'high'],
-  // Opt in to dedup — hide ReadFunctionModule when GetFunctionModule is exposed, etc.
+  // Default already applies ReadVsGetDedupStrategy — hides ReadFunctionModule
+  // when GetFunctionModule is exposed, etc. Pass it explicitly to be explicit,
+  // or pass `new NoDedupStrategy()` to expose both variants.
   readOnlyDedupStrategy: new ReadVsGetDedupStrategy(),
 });
 ```
@@ -289,8 +291,8 @@ const server = new EmbeddableMcpServer({
 
 | Strategy | Behavior |
 |---|---|
-| `NoDedupStrategy` (default) | Never excludes anything — readonly group is exposed as-is. |
-| `ReadVsGetDedupStrategy` | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
+| `NoDedupStrategy` | Never excludes anything — readonly group is exposed as-is (opt-out). |
+| `ReadVsGetDedupStrategy` (default) | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
 
 **Custom strategies**: implement `IReadOnlyDedupStrategy` for role-based or domain-specific rules:
 
@@ -311,4 +313,4 @@ class RoleAwareDedup implements IReadOnlyDedupStrategy {
 }
 ```
 
-The default (no dedup) preserves behavior for existing consumers — upgrading the package does not change exposed tool sets unless the consumer explicitly passes a strategy.
+The default (`ReadVsGetDedupStrategy`) gives embedders the same single-tool-per-operation view as the launcher. Consumers that relied on both `Read<X>` and `Get<X>` being exposed must pass `new NoDedupStrategy()` to keep that behavior.

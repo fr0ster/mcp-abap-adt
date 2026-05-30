@@ -5,8 +5,8 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 135
-- Read-Only: 12
+- Total tools: 134
+- Read-Only: 11
 - High-Level: 62
 - Low-Level: 61
 
@@ -28,7 +28,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetPackageContents](#getpackagecontents-read-only-package)
     - [ReadPackage](#readpackage-read-only-package)
   - [Program](#read-only-program)
-    - [GetProgFullCode](#getprogfullcode-read-only-program)
     - [ReadProgram](#readprogram-read-only-program)
   - [System](#read-only-system)
     - [SearchSource](#searchsource-read-only-system)
@@ -240,7 +239,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Retrieve source code of a specific ABAP include file.
+**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). This is the correct tool for include names (PROG/I) — ReadProgram does not read includes.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -317,23 +316,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 <a id="read-only-program"></a>
 ### Read-Only / Program
 
-<a id="getprogfullcode-read-only-program"></a>
-#### GetProgFullCode (Read-Only / Program)
-**Description:** [read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.
-
-**Source:** `src/handlers/program/readonly/handleGetProgFullCode.ts`
-
-**Available in:** `onprem`, `legacy`
-
-**Parameters:**
-- `name` (string, required) - [read-only] Technical name of the program or function group (e.g., '/CBY/MM_INVENTORY')
-- `type` (string, required) - [read-only] 'PROG/P' for program or 'FUGR' for function group
-
----
-
 <a id="readprogram-read-only-program"></a>
 #### ReadProgram (Read-Only / Program)
-**Description:** Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP program (report) source code and metadata. Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.
+**Description:** [read-only] Read a MAIN ABAP program (report) source code and metadata by name. Works ONLY for main programs (adtcore type PROG/P); NOT for includes — use GetInclude for include source. Include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
@@ -2410,4 +2395,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-05-28*
+*Last updated: 2026-05-30*

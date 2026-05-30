@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'ReadProgram',
   available_in: ['onprem', 'legacy'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP MAIN PROGRAM (report) source code and metadata. Works ONLY for main programs (adtcore type PROG/P); include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.',
+    '[read-only] Read a MAIN ABAP program (report) source code and metadata by name. Works ONLY for main programs (adtcore type PROG/P); NOT for includes — use GetInclude for include source. Include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -523,6 +523,10 @@ import {
   handleGetUnitTestStatus,
 } from '../../../handlers/unit_test/high/handleGetUnitTestStatus';
 import {
+  handleRunAbapUnit,
+  TOOL_DEFINITION as RunAbapUnit_Tool,
+} from '../../../handlers/unit_test/high/handleRunAbapUnit';
+import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleRunUnitTest';
@@ -874,6 +878,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: RunUnitTest_Tool,
         handler: withContext(handleRunUnitTest),
+      },
+      {
+        toolDefinition: RunAbapUnit_Tool,
+        handler: withContext(handleRunAbapUnit),
       },
       {
         toolDefinition: GetUnitTest_Tool,

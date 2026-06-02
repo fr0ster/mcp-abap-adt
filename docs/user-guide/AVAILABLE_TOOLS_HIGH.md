@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 131
+- Total tools: 132
 
 ## Navigation
 
@@ -154,6 +154,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
@@ -2000,6 +2001,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runabapunit-high-level-unit-test"></a>
+#### RunAbapUnit (High-Level / Unit Test)
+**Description:** Run ABAP Unit tests for a single ABAP object synchronously and return a 
+
+**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
+
+**Parameters:**
+- `object_name` (string, required) - Name of the ABAP object to test (e.g., 
+- `object_type` (string, required) - Type of object to test. Use 
+- `test_scope` (string, optional (default: own_tests)) - Scope of test discovery: 
+- `with_coverage` (boolean, optional (default: false).)) - Include code coverage measurement (default: false).
+
+---
+
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
@@ -2108,4 +2123,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-05-28*
+*Last updated: 2026-06-01*

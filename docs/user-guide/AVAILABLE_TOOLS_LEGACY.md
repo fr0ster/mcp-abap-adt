@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 134
+- Total tools: 135
 - Read-Only: 12
-- High-Level: 62
+- High-Level: 63
 - Low-Level: 60
 
 ## Navigation
@@ -99,6 +99,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
@@ -1212,6 +1213,22 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `run_id` (string, required) - Run identifier returned by unit test run.
 - `with_long_polling` (boolean, optional (default: true)) - Enable long polling while waiting for status.
+
+---
+
+<a id="runabapunit-high-level-unit-test"></a>
+#### RunAbapUnit (High-Level / Unit Test)
+**Description:** Run ABAP Unit tests for a single ABAP object synchronously and return a 
+
+**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `object_name` (string, required) - Name of the ABAP object to test (e.g., 
+- `object_type` (string, required) - Type of object to test. Use 
+- `test_scope` (string, optional (default: own_tests)) - Scope of test discovery: 
+- `with_coverage` (boolean, optional (default: false).)) - Include code coverage measurement (default: false).
 
 ---
 
@@ -2338,4 +2355,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-05-28*
+*Last updated: 2026-06-01*

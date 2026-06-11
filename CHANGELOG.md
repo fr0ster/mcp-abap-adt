@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [7.0.1] - 2026-06-11
+
+### Fixed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.4.2` to `^5.4.4` to pick up the stateful-lock-chain fix. Object writes (e.g. `UpdateClass`) no longer fail with HTTP `423 — not locked (invalid lock handle)` on older ABAP kernels (e.g. BASIS 7.55) over HTTP: the client now keeps the connection stateful for the whole `lock → check → update → unlock` chain across all object types, instead of switching back to stateless before the lock-bound PUT. Newer kernels (758/816) already tolerated the stateless write. No server-side API or tool-schema change. (#106)
+
 ## [7.0.0] - 2026-05-30
 
 ### Changed

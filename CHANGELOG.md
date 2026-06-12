@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [7.0.2] - 2026-06-13
+
+### Added
+- **Created objects now adopt the logon language as their master/original language.** `getSystemContext()` reads `SAP_LANGUAGE` into `masterLanguage`, and `createAdtClient()` forwards it to the ADT client, so every `Create*` tool stamps `adtcore:masterLanguage`/`adtcore:language` with the session language instead of always `EN`. When `SAP_LANGUAGE` is unset the client still defaults to `EN`. Requires the configured language to be installed on the target system (otherwise SAP normalizes it to the system default). (#105)
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.4.4` to `^5.5.0` for the configurable-master-language support. Clean registry install (no `link:true`/`file:` in the lockfile).
+
+### Note
+- A per-call `master_language` parameter on the high-level `Create*` tool schemas (to override the session language per object) is planned as a follow-up; the underlying client already supports `config.masterLanguage`.
+
 ## [7.0.1] - 2026-06-11
 
 ### Fixed

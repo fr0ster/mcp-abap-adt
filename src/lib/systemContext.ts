@@ -7,6 +7,8 @@ export interface IAdtSystemContext {
   responsible?: string;
   client?: string;
   isLegacy?: boolean;
+  /** Master/original language for created objects (adtcore:masterLanguage). From SAP_LANGUAGE; library defaults to EN when unset. */
+  masterLanguage?: string;
 }
 
 // Singleton cache is sufficient: one MCP session always maps to one SAP system.
@@ -38,6 +40,7 @@ export async function resolveSystemContext(
     cached = {
       masterSystem: overrides.masterSystem,
       responsible: overrides.responsible,
+      masterLanguage: overrides.masterLanguage ?? process.env.SAP_LANGUAGE,
       isLegacy: cached?.isLegacy ?? detectLegacy(),
     };
     return cached;
@@ -51,9 +54,10 @@ export async function resolveSystemContext(
   // Priority 2: env vars (on-prem or explicitly configured)
   const masterSystem = process.env.SAP_MASTER_SYSTEM;
   const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
+  const masterLanguage = process.env.SAP_LANGUAGE;
 
-  if (masterSystem || responsible) {
-    cached = { masterSystem, responsible, isLegacy };
+  if (masterSystem || responsible || masterLanguage) {
+    cached = { masterSystem, responsible, masterLanguage, isLegacy };
     return cached;
   }
 
@@ -64,10 +68,11 @@ export async function resolveSystemContext(
       masterSystem: info?.systemID,
       responsible: info?.userName,
       client: info?.client,
+      masterLanguage,
       isLegacy,
     };
   } catch {
-    cached = { isLegacy };
+    cached = { masterLanguage, isLegacy };
   }
 
   return cached;

@@ -14,8 +14,12 @@ export function createAdtClient(
 ): AdtClient {
   const ctx = getSystemContext();
   const options =
-    ctx.masterSystem || ctx.responsible
-      ? { masterSystem: ctx.masterSystem, responsible: ctx.responsible }
+    ctx.masterSystem || ctx.responsible || ctx.masterLanguage
+      ? {
+          masterSystem: ctx.masterSystem,
+          responsible: ctx.responsible,
+          masterLanguage: ctx.masterLanguage,
+        }
       : undefined;
   if (ctx.isLegacy) {
     return new AdtClientLegacy(connection, logger, options);

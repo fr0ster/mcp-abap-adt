@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [7.0.3] - 2026-06-13
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.5.0` to `^5.6.0`. Picks up: `package` create now honours the configurable master language (so `CreatePackage` stamps the session `SAP_LANGUAGE` like the other object types — #105), and the behaviorDefinition namespace URL-encoding fix (namespaced `/NSP/…` behavior definitions can now be read/locked/updated/activated/checked/unlocked/deleted). Clean registry install (no `link:true`/`file:` in the lockfile).
+
+### Note
+- Per-call `master_language` tool parameter on `Create*` and the inbound `X-SAP-Language` header override are a planned follow-up; this release wires the session-language default to package as well.
+
 ## [7.0.2] - 2026-06-13
 
 ### Added

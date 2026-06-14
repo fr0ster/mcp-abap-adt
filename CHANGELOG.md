@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Added
+- **Per-call `master_language` parameter on the high-level `Create*` tools** (#105). Optional; lets a caller set the master/original language of a single created object (e.g. `"DE"`, `"ZH"`), overriding the session default. Threaded into the ADT client as `config.masterLanguage`. Covers class, program, interface, ddl, domain, structure, table, table type, data element, function group, service definition, service binding, behavior definition, metadata extension, package. When omitted, resolution falls back to the session language (`SAP_LANGUAGE`) then `EN`.
+- **`x-sap-language` HTTP/SSE request header** (#105). Per-request/per-session master-language override for created objects (precedence: tool parameter → `x-sap-language` header → `SAP_LANGUAGE` → `EN`). Carried in a request-scoped context (`AsyncLocalStorage`), not the process-global system-context cache, so it cannot leak across requests, sessions, or connection modes.
+
 ## [8.0.0] - 2026-06-26
 
 ### Changed (BREAKING)

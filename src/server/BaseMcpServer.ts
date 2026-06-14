@@ -12,7 +12,10 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
-import { resolveSystemContext } from '../lib/systemContext.js';
+import {
+  resolveSystemContext,
+  setSystemContext,
+} from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -211,6 +214,7 @@ export abstract class BaseMcpServer extends McpServer {
     const client = getHeader('x-sap-client') || '';
     const masterSystem = getHeader('x-sap-master-system');
     const responsible = getHeader('x-sap-responsible');
+    const masterLanguage = getHeader('x-sap-language');
 
     if (!url) {
       throw new Error('x-sap-url header is required for direct SAP connection');
@@ -219,6 +223,15 @@ export abstract class BaseMcpServer extends McpServer {
     const metadata: Record<string, string> = {};
     if (masterSystem) metadata.masterSystem = masterSystem;
     if (responsible) metadata.responsible = responsible;
+    if (masterLanguage) metadata.masterLanguage = masterLanguage;
+
+    // Per-request master/original language override for created objects.
+    // Highest-priority source after an explicit tool parameter; takes
+    // precedence over the SAP_LANGUAGE default. Written straight to the
+    // system context the ADT client reads (createAdtClient -> getSystemContext).
+    if (masterLanguage) {
+      setSystemContext({ masterLanguage });
+    }
 
     if (jwtToken) {
       // JWT auth

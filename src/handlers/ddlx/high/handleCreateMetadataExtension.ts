@@ -34,6 +34,11 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate after creation. Default: true',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['name', 'package_name'],
   },
@@ -45,6 +50,7 @@ interface CreateMetadataExtensionArgs {
   package_name: string;
   transport_request?: string;
   activate?: boolean;
+  master_language?: string;
 }
 
 export async function handleCreateMetadataExtension(
@@ -77,6 +83,7 @@ export async function handleCreateMetadataExtension(
       description: args.description || name,
       packageName: args.package_name,
       transportRequest: args.transport_request || '',
+      masterLanguage: args.master_language,
     });
 
     // Lock

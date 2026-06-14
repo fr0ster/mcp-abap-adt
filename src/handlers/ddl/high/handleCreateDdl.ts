@@ -39,6 +39,11 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Optional description (defaults to ddl_name).',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['ddl_name', 'package_name'],
   },
@@ -49,6 +54,7 @@ interface CreateDdlArgs {
   package_name: string;
   transport_request?: string;
   description?: string;
+  master_language?: string;
 }
 
 export async function handleCreateDdl(context: HandlerContext, params: any) {
@@ -90,6 +96,7 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
       packageName: args.package_name,
       ddlSource: '',
       transportRequest: args.transport_request,
+      masterLanguage: args.master_language,
     });
     logger?.info(`DDL source created: ${ddlName}`);
 

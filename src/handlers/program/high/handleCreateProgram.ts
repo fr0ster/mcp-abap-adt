@@ -62,6 +62,11 @@ export const TOOL_DEFINITION = {
         description:
           "Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'",
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['program_name', 'package_name'],
   },
@@ -74,6 +79,7 @@ interface CreateProgramArgs {
   transport_request?: string;
   program_type?: string;
   application?: string;
+  master_language?: string;
 }
 
 export async function handleCreateProgram(
@@ -142,6 +148,7 @@ export async function handleCreateProgram(
       transportRequest: args.transport_request,
       programType: args.program_type,
       application: args.application,
+      masterLanguage: args.master_language,
     });
     logger?.info(`Program created: ${programName}`);
 

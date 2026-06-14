@@ -54,6 +54,11 @@ export const TOOL_DEFINITION = {
         description:
           'Activate service definition after creation. Default: true.',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['service_definition_name', 'package_name'],
   },
@@ -66,6 +71,7 @@ interface CreateServiceDefinitionArgs {
   transport_request?: string;
   source_code?: string;
   activate?: boolean;
+  master_language?: string;
 }
 
 /**
@@ -127,6 +133,7 @@ export async function handleCreateServiceDefinition(
         description: typedArgs.description || serviceDefinitionName,
         packageName: typedArgs.package_name.toUpperCase(),
         transportRequest: typedArgs.transport_request,
+        masterLanguage: typedArgs.master_language,
         ...(typedArgs.source_code && { sourceCode: typedArgs.source_code }),
       };
 

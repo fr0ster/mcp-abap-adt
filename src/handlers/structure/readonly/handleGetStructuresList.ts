@@ -24,6 +24,12 @@ export const TOOL_DEFINITION = {
         description: 'Version to read: "active" (default) or "inactive".',
         default: 'active',
       },
+      include_extensions: {
+        type: 'boolean',
+        description:
+          '[read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.',
+        default: true,
+      },
       timeout: {
         type: 'number',
         description: '[read-only] Timeout in ms for each ADT request.',
@@ -34,7 +40,8 @@ export const TOOL_DEFINITION = {
 } as const;
 
 interface StructureNode {
-  structure: string; // the structure's own name (root = the requested structure)
+  structure: string; // the embedded structure's own name (root = the requested structure)
+  attribute: string | null; // component name it is embedded under (null = anonymous / root)
   kind: 'root' | 'include' | 'append'; // how THIS node is embedded into its parent
   children: StructureNode[]; // embedded structures of this one
   cyclic?: boolean;
@@ -42,16 +49,23 @@ interface StructureNode {
 }
 
 interface EmbeddedRef {
-  name: string;
+  name: string; // embedded structure name
+  attribute: string | null; // component/attribute name (named include) or null (anonymous)
   kind: 'include' | 'append';
 }
 
 /**
- * Parses structure DDL/field-list source for embedded structures
- * (.INCLUDE / .APPEND / modern DDL `include`). Plain component lines are
- * ignored — only embedded STRUCTURES are returned.
+ * Parses structure/table DDL (or classic field-list) source for embedded
+ * STRUCTURES. Recognised forms (see a real table like VBAK):
+ *   include <name>;                  -> anonymous include (attribute = null)
+ *   <attr> : include <name>;         -> named include (attribute = <attr>)
+ *   .INCLUDE <name>                  -> classic include
+ *   .APPEND[STRUCTURE] <name>        -> classic append
+ * Plain component lines (`fld : type;`) and annotations (`@AbapCatalog…`) are
+ * NOT structure embeddings and are ignored — do NOT confuse the
+ * `@AbapCatalog.enhancement.category` annotation with an include/append.
  */
-function parseEmbeddedStructures(source: string): EmbeddedRef[] {
+export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
   const refs: EmbeddedRef[] = [];
   if (!source) return refs;
 
@@ -60,26 +74,51 @@ function parseEmbeddedStructures(source: string): EmbeddedRef[] {
     // Strip line comments (both classic '* ' and DDL '//').
     let line = rawLine.replace(/\/\/.*$/, '');
     line = line.trim();
-    if (!line) continue;
+    if (!line || line.startsWith('@') || line.startsWith('*')) continue;
 
     // Classic field-list: .INCLUDE <name> / .APPEND[STRUCTURE] <name>
     const classicAppend = line.match(
       /^\.append(?:structure)?\s+([a-z0-9_/]+)/i,
     );
     if (classicAppend) {
-      refs.push({ name: classicAppend[1].toUpperCase(), kind: 'append' });
+      refs.push({
+        name: classicAppend[1].toUpperCase(),
+        attribute: null,
+        kind: 'append',
+      });
       continue;
     }
     const classicInclude = line.match(/^\.include\s+([a-z0-9_/]+)/i);
     if (classicInclude) {
-      refs.push({ name: classicInclude[1].toUpperCase(), kind: 'include' });
+      refs.push({
+        name: classicInclude[1].toUpperCase(),
+        attribute: null,
+        kind: 'include',
+      });
       continue;
     }
 
-    // Modern DDL: `include <name>;`
+    // Modern DDL named include: `<attr> : include <name>;`
+    const namedInclude = line.match(
+      /^([a-z][a-z0-9_]*)\s*:\s*include\s+([a-z0-9_/]+)\s*;?/i,
+    );
+    if (namedInclude) {
+      refs.push({
+        name: namedInclude[2].toUpperCase(),
+        attribute: namedInclude[1].toLowerCase(),
+        kind: 'include',
+      });
+      continue;
+    }
+
+    // Modern DDL anonymous include: `include <name>;`
     const ddlInclude = line.match(/^include\s+([a-z0-9_/]+)\s*;?/i);
     if (ddlInclude) {
-      refs.push({ name: ddlInclude[1].toUpperCase(), kind: 'include' });
+      refs.push({
+        name: ddlInclude[1].toUpperCase(),
+        attribute: null,
+        kind: 'include',
+      });
     }
   }
 
@@ -103,48 +142,119 @@ export async function handleGetStructuresList(
   args: {
     structure_name: string;
     version?: 'active' | 'inactive';
+    include_extensions?: boolean;
     timeout?: number;
   },
 ) {
   const { connection, logger } = context;
   try {
     const { structure_name, version = 'active' } = args;
+    const includeExtensions = args.include_extensions !== false;
     if (!structure_name)
       return return_error(new Error('structure_name is required'));
 
     const client = createAdtClient(connection, logger);
     const obj = client.getStructure();
+    const utils = client.getUtils();
     const rootName = structure_name.toUpperCase();
 
-    // Read root source first; failure here is fatal for the whole call.
-    let rootSource: string | null;
-    try {
-      const readResult = await obj.read(
-        { structureName: rootName },
-        version as 'active' | 'inactive',
+    /**
+     * Read the DDL source of a structure OR table (the embed/extend syntax is
+     * identical, and an extension's base is often a table). Try the structure
+     * endpoint first, fall back to the table endpoint.
+     */
+    const readDdl = async (name: string): Promise<string | null> => {
+      try {
+        const sr = await obj.read(
+          { structureName: name },
+          version as 'active' | 'inactive',
+        );
+        const s = extractSource(sr);
+        if (s != null) return s;
+      } catch {
+        // fall through to table
+      }
+      try {
+        const tr = await client
+          .getTable()
+          .read({ tableName: name }, version as 'active' | 'inactive');
+        return extractSource(tr);
+      } catch {
+        return null;
+      }
+    };
+
+    /**
+     * Find extension (append) structures of `baseName` via where-used: an
+     * extension is a structure whose source is `extend type <baseName> with …`.
+     * The base's own source does NOT list its extensions, so we resolve them
+     * from the where-used referencing objects (structures only) and confirm by
+     * reading each candidate's source.
+     */
+    const findExtensions = async (baseName: string): Promise<EmbeddedRef[]> => {
+      if (!includeExtensions) return [];
+      let wuData = '';
+      try {
+        const wu: any = await utils.getWhereUsed({
+          object_name: baseName,
+          object_type: 'structure',
+        } as any);
+        wuData = String(wu?.data ?? '');
+      } catch (e: any) {
+        logger?.warn(
+          `where-used failed for ${baseName}: ${e?.message ?? String(e)}`,
+        );
+        return [];
+      }
+      // Candidate referencing STRUCTURES (globalType TABL/DS), excluding self.
+      const candidates = new Set<string>();
+      for (const m of wuData.matchAll(
+        /displayName="([^"]+)"[^>]*globalType="(TABL\/DS[^"]*)"/g,
+      )) {
+        const name = m[1]
+          .replace(/\s*\(.*\)$/, '')
+          .trim()
+          .toUpperCase();
+        if (name && name !== baseName) candidates.add(name);
+      }
+      const extendRe = new RegExp(
+        `extend\\s+type\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+with`,
+        'i',
       );
-      rootSource = extractSource(readResult);
-    } catch (e: any) {
-      return return_error(
-        new Error(
-          `Could not read structure ${rootName}: ${e?.message ?? String(e)}`,
-        ),
-      );
-    }
+      const refs: EmbeddedRef[] = [];
+      for (const cand of candidates) {
+        const csrc = await readDdl(cand);
+        if (csrc && extendRe.test(csrc)) {
+          refs.push({ name: cand, attribute: null, kind: 'append' });
+        }
+      }
+      return refs;
+    };
+
+    // Read root source first (structure or table); failure here is fatal.
+    const rootSource = await readDdl(rootName);
     if (rootSource == null) {
       return return_error(
-        new Error(`Could not read source for structure ${rootName}`),
+        new Error(`Could not read source for structure/table ${rootName}`),
       );
     }
 
     const visited = new Set<string>([rootName]);
 
-    const buildChildren = async (source: string): Promise<StructureNode[]> => {
-      const refs = parseEmbeddedStructures(source);
+    const buildChildren = async (
+      structureName: string,
+      source: string,
+    ): Promise<StructureNode[]> => {
+      // includes come from the source; extensions (appends) from where-used.
+      const refs: EmbeddedRef[] = [
+        ...parseEmbeddedStructures(source),
+        ...(await findExtensions(structureName)),
+      ];
       const children: StructureNode[] = [];
       for (const ref of refs) {
         const node: StructureNode = {
           structure: ref.name,
+          attribute: ref.attribute,
           kind: ref.kind,
           children: [],
         };
@@ -156,22 +266,11 @@ export async function handleGetStructuresList(
         }
         visited.add(ref.name);
 
-        try {
-          const childResult = await obj.read(
-            { structureName: ref.name },
-            version as 'active' | 'inactive',
-          );
-          const childSource = extractSource(childResult);
-          if (childSource == null) {
-            node.error = `Could not read source for structure ${ref.name}`;
-          } else {
-            node.children = await buildChildren(childSource);
-          }
-        } catch (e: any) {
-          logger?.warn(
-            `Could not read source for ${ref.name}: ${e?.message ?? String(e)}`,
-          );
-          node.error = e?.message ?? String(e);
+        const childSource = await readDdl(ref.name);
+        if (childSource == null) {
+          node.error = `Could not read source for ${ref.name}`;
+        } else {
+          node.children = await buildChildren(ref.name, childSource);
         }
 
         children.push(node);
@@ -181,8 +280,9 @@ export async function handleGetStructuresList(
 
     const tree: StructureNode = {
       structure: rootName,
+      attribute: null,
       kind: 'root',
-      children: await buildChildren(rootSource),
+      children: await buildChildren(rootName, rootSource),
     };
 
     return return_response({

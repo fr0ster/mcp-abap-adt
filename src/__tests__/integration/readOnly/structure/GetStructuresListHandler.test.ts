@@ -4,9 +4,12 @@
  * - GetStructuresList — recursively lists the structures embedded in an ABAP
  *   structure (.INCLUDE / append) as a tree.
  *
- * Reads the shared base structure (ZAC_SHR_STRU_BASE) which contains
- * `include ZAC_SHR_STRU_INC;`. Asserts that the returned tree has a child whose
+ * Reads the shared base structure (ZMCP_SHR_STRU) which contains
+ * `include ZMCP_SHR_STRU_INC;`. Asserts that the returned tree has a child whose
  * `structure` equals the expected include with `kind === 'include'`.
+ *
+ * Structure names come from the config case params (`structure_name` root,
+ * `expected_include` child) — they are not hardcoded in this file.
  *
  * Config-driven: skips cleanly when no SAP connection / test case disabled /
  * wrong system type / structure not found.

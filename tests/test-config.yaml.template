@@ -2173,6 +2173,17 @@ list_function_modules_readonly:
       params:
         function_group_name: "ZMCP_SHR_FGRP"
 
+# GetStructuresList (read-only) — recursively lists structures embedded in a structure
+get_structures_list_readonly:
+  test_cases:
+    - name: "list_embedded_structures"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "List the structures embedded (.INCLUDE / include) in the shared base structure"
+      params:
+        structure_name: "ZAC_SHR_STRU_BASE"
+        expected_include: "ZAC_SHR_STRU_INC"
+
 # FunctionInclude high-level lifecycle (create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.
 function_include_high:

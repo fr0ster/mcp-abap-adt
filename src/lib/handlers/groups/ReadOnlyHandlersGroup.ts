@@ -87,6 +87,10 @@ import {
   TOOL_DEFINITION as ReadServiceDefinition_Tool,
 } from '../../../handlers/service_definition/readonly/handleReadServiceDefinition';
 import {
+  TOOL_DEFINITION as GetStructuresList_Tool,
+  handleGetStructuresList,
+} from '../../../handlers/structure/readonly/handleGetStructuresList';
+import {
   handleReadStructure,
   TOOL_DEFINITION as ReadStructure_Tool,
 } from '../../../handlers/structure/readonly/handleReadStructure';
@@ -210,6 +214,10 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ReadStructure_Tool,
         handler: (args: any) => handleReadStructure(this.context, args),
+      },
+      {
+        toolDefinition: GetStructuresList_Tool,
+        handler: (args: any) => handleGetStructuresList(this.context, args),
       },
       {
         toolDefinition: ReadView_Tool,

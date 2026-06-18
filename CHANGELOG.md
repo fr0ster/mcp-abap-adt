@@ -10,6 +10,7 @@
   - High-level: `CreateFunctionInclude`, `UpdateFunctionInclude`, `DeleteFunctionInclude`.
   - The list tools surface the new adt-clients `getUtils().listFunctionGroupIncludes()` / `listFunctionModules()` (nodestructure drill-down). `DeleteFunctionInclude` surfaces SAP's refusal message when an include can only be deleted via the Function Builder.
 - Integration tests (`FunctionIncludeReadOnlyHandlers`, `FunctionIncludeHighHandlers`) and `tests/test-config.yaml.template` cases for the new tools.
+- **Structure embedding tools (tree output).** New read-only `GetStructuresList` — recursively lists the structures embedded in an ABAP structure as a TREE, marking each node `include` vs `append` and distinguishing the structure name from how it is embedded. `GetIncludesList` reworked from a flat list to a recursive TREE (each include may have child includes; cycle-guarded, depth-capped). Integration test `GetStructuresListHandler` + `tests/test-config.yaml.template` case.
 
 ### Changed
 - Bumped `@mcp-abap-adt/adt-clients` from `^5.6.0` to `^5.8.0` (adds `listFunctionModules`/`listFunctionGroupIncludes`; `getFunctionInclude().read()` returns source; `delete()` surfaces server-refused deletions). Clean registry install (no `link:true`/`file:`).

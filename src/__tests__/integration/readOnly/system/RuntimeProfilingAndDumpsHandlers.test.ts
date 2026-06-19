@@ -18,6 +18,7 @@ import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/syste
 import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
@@ -692,54 +693,70 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
         }
 
+        // Hard mode drives everything through one cached MCP client, so there
+        // is no second isolated connection for the dump trigger. Under the
+        // stdio transport (what test-config.yaml sets) BaseMcpServer caches the
+        // ABAP connection, so the dumping run would poison the same context we
+        // then read from — exactly the problem this test avoids in soft mode.
+        // The isolation is soft-mode only; skip cleanly in hard mode.
+        if (tester.isHardMode()) {
+          throw new Error(
+            'SKIP: dump sub-test runs in soft mode only (hard-mode stdio caches the ABAP connection — no isolated trigger connection)',
+          );
+        }
+
         const dumpClassName = createName(
           normalizeNamePrefix(context.params?.dump_class_prefix, 'ZADT_RTDMP'),
         );
+
+        // In soft mode the MCP tool layer is bypassed; always call the handler
+        // directly via the directCall argument so context.connection is used.
         const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
+          _toolName: string,
+          _args: Record<string, unknown>,
           directCall: () => Promise<any>,
-        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+        ) => directCall();
+
+        // Trigger the dump on a dedicated throwaway connection so the dump's
+        // server-side context loss lands on IT, not on the main connection we
+        // read the dump from. The dump is keyed to the user (same trial user),
+        // so the main connection's feed read still finds it.
+        const { connection: triggerConnection } =
+          await createTestConnectionAndSession();
+        const triggerContext: LambdaTesterContext = {
+          ...context,
+          connection: triggerConnection,
+        };
 
         try {
+          // create + ACTIVATE the division-by-zero class on the trigger
+          // connection (active so the forced run actually executes and dumps).
           await createRunnableClass(
-            context,
+            triggerContext,
             dumpClassName,
             buildDumpClassSource(dumpClassName),
-            tester.isHardMode() ? invoke : undefined,
+            undefined,
+            { activate: true },
           );
 
-          if (tester.isHardMode()) {
-            const runResult = await invoke(
-              'RuntimeRunClassWithProfiling',
-              {
-                class_name: dumpClassName,
-                description: `MCP_RUNTIME_DUMP_${Date.now()}`,
-                all_procedural_units: true,
-                sql_trace: false,
-                max_time_for_tracing: 600,
-              },
-              async () => {
-                throw new Error(
-                  'Direct runtime run is not available in hard mode',
-                );
-              },
+          // Forced run on the trigger connection → HTTP 500 → real dump.
+          const triggerExecutor = new AdtExecutor(triggerConnection, logger);
+          try {
+            await triggerExecutor
+              .getClassExecutor()
+              .run({ className: dumpClassName });
+          } catch (runError: any) {
+            logger?.info(
+              `Expected failing run for dump generation: ${runError?.message || String(runError)}`,
             );
-            if (runResult.isError) {
-              logger?.info(
-                `Expected failing run for dump generation: ${extractHandlerErrorText(runResult)}`,
-              );
-            }
-          } else {
-            const executor = new AdtExecutor(context.connection, logger);
-            try {
-              await executor
-                .getClassExecutor()
-                .run({ className: dumpClassName });
-            } catch (runError: any) {
-              logger?.info(
-                `Expected failing run for dump generation: ${runError?.message || String(runError)}`,
-              );
+          } finally {
+            // Soft-mode HTTP has no network close; drop local session/cookie
+            // state best-effort and stop using the connection.
+            const resettable = triggerConnection as unknown as {
+              reset?: () => void;
+            };
+            if (typeof resettable.reset === 'function') {
+              resettable.reset();
             }
           }
 
@@ -889,11 +906,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(analyzeData.summary).toBeDefined();
           expect(analyzeData.payload).toBeUndefined();
         } finally {
-          await deleteClassIfExists(
-            context,
-            dumpClassName,
-            tester.isHardMode() ? invoke : undefined,
-          );
+          await deleteClassIfExists(context, dumpClassName, undefined);
         }
       });
     },

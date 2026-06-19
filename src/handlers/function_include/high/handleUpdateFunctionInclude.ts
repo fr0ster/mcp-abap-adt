@@ -36,6 +36,12 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable includes.',
       },
+      activate: {
+        type: 'boolean',
+        description:
+          'Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.',
+        default: false,
+      },
     },
     required: ['function_group_name', 'include_name', 'source_code'],
   },
@@ -46,6 +52,7 @@ interface UpdateFunctionIncludeArgs {
   include_name: string;
   source_code: string;
   transport_request?: string;
+  activate?: boolean;
 }
 
 /**
@@ -80,13 +87,17 @@ export async function handleUpdateFunctionInclude(
 
     try {
       const client = createAdtClient(connection, logger);
+      const shouldActivate = args.activate === true;
 
-      await client.getFunctionInclude().update({
-        functionGroupName,
-        includeName,
-        sourceCode: args.source_code,
-        transportRequest: args.transport_request,
-      });
+      await client.getFunctionInclude().update(
+        {
+          functionGroupName,
+          includeName,
+          sourceCode: args.source_code,
+          transportRequest: args.transport_request,
+        },
+        { activateOnUpdate: shouldActivate },
+      );
 
       logger?.info(
         `✅ UpdateFunctionInclude completed successfully: ${includeName}`,
@@ -97,7 +108,8 @@ export async function handleUpdateFunctionInclude(
         function_group_name: functionGroupName,
         include_name: includeName,
         transport_request: args.transport_request || null,
-        message: `Function include ${includeName} source code updated successfully`,
+        activated: shouldActivate,
+        message: `Function include ${includeName} source code updated successfully${shouldActivate ? ' and activated' : ''}`,
       };
 
       return return_response({

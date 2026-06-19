@@ -460,6 +460,9 @@ shared_dependencies:
     - name: "ZMCP_BLD_SHR_FGR"
       description: "Shared function group for read tests"
       available_in: ["onprem", "cloud", "legacy"]
+    - name: "ZMCP_SHR_FGRP"
+      description: "Shared FUGR for include/FM tests"
+      available_in: ["onprem", "cloud", "legacy"]
 
   function_modules:
     - name: "Z_MCP_BLD_SHR_FM"
@@ -468,6 +471,18 @@ shared_dependencies:
       available_in: ["onprem", "cloud", "legacy"]
       source: |
         FUNCTION Z_MCP_BLD_SHR_FM
+            IMPORTING
+               VALUE(IV_INPUT) TYPE  STRING
+            EXPORTING
+               VALUE(EV_OUTPUT) TYPE  STRING.
+          ev_output = |Echo: { iv_input }|.
+        ENDFUNCTION.
+    - name: "Z_MCP_SHR_FM"
+      group: "ZMCP_SHR_FGRP"
+      description: "Shared FM for include/FM tests"
+      available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        FUNCTION Z_MCP_SHR_FM
             IMPORTING
                VALUE(IV_INPUT) TYPE  STRING
             EXPORTING
@@ -2224,9 +2239,8 @@ function_include_high:
         description: "Custom include for high-level lifecycle tests"
         # transport_request: ""  # uncomment / set for transportable packages
         update_source_code: |
-          * Custom include created by FunctionInclude high-level integration test
-          DATA: gv_finc_test TYPE string.
-          gv_finc_test = 'function-include-roundtrip'.
+          * Custom include for FunctionInclude high-level integration test
+          DATA gv_finc_test TYPE string VALUE 'function-include-roundtrip'.
 
 # CheckMetadataExtension
 check_metadata_extension_high:

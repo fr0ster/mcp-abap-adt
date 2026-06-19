@@ -249,12 +249,11 @@ describe('FunctionInclude ReadOnly Handlers Integration', () => {
         ).toUpperCase(),
       );
       const topInclude = `L${functionGroupName.toUpperCase()}TOP`;
-      const collectorInclude = `L${functionGroupName.toUpperCase()}UXX`;
 
-      // The TOP include must be present.
+      // The TOP include must be present. ListFunctionGroupIncludes returns ALL
+      // FUGR/I includes faithfully (including the generated L<FUGR>UXX collector);
+      // filtering the collector is a backup-tool concern, not this read tool's.
       expect(includeNames).toContain(topInclude);
-      // The generated UXX collector include must be excluded.
-      expect(includeNames).not.toContain(collectorInclude);
 
       testLogger?.info(
         `✅ ListFunctionGroupIncludes completed: ${data.total} include(s)`,

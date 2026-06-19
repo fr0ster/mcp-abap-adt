@@ -150,6 +150,7 @@ async function createRunnableClass(
     args: Record<string, unknown>,
     directCall: () => Promise<any>,
   ) => Promise<any>,
+  options?: { activate?: boolean },
 ): Promise<void> {
   if (invokeTool) {
     const createResponse = await invokeTool(
@@ -181,11 +182,14 @@ async function createRunnableClass(
     transportRequest: context.transportRequest,
     description: `MCP runtime test ${className}`.slice(0, 60),
   });
-  await client.getClass().update({
-    className,
-    transportRequest: context.transportRequest,
-    sourceCode,
-  });
+  await client.getClass().update(
+    {
+      className,
+      transportRequest: context.transportRequest,
+      sourceCode,
+    },
+    { activateOnUpdate: options?.activate === true },
+  );
 }
 
 async function deleteClassIfExists(

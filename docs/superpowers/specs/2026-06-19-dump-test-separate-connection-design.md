@@ -64,17 +64,26 @@ on the test's main (clean-context) connection.
    - forced run (`classrun`) → HTTP 500 → a real runtime dump is recorded
      server-side under the connection's user. The 500 / context loss now lands
      on the **throwaway** connection.
-2. **Hard mode is transport-specific.** This bug is a soft-mode phenomenon: soft
-   mode reuses one persistent direct connection, whose application context the
-   dumping run consumes. In **HTTP hard mode** each tool call is independent
-   (server-side stateless per request), so the same-connection poisoning does
-   not arise the same way, and `LambdaTester` additionally **caches** its
-   hard-mode client. Therefore the trigger-connection isolation is implemented
-   for **soft mode**. If hard-mode isolation is ever needed, the trigger path
-   must **bypass `tester.invokeToolOrHandler`** and own a fresh
-   `createHardModeClient()` lifecycle (with its own `close()`), not reuse the
-   cached tester client. The integration suite runs soft mode by default
-   (`integration_hard_mode.enabled: false`).
+2. **Hard mode: the dump sub-test is skipped (soft-mode-only fix).** The
+   isolation needs two distinct connections — one to trigger the dump, one
+   (clean) to read it. In hard mode the test drives everything through a single
+   `LambdaTester`-cached MCP client (`tester.invokeToolOrHandler`), so there is
+   no second isolated connection to use for the trigger. Crucially, the default
+   hard transport is **stdio** (`integration_hard_mode.transport: "stdio"`), and
+   `BaseMcpServer` **caches the ABAP connection** for stdio — so the dumping run
+   poisons that same cached server-side connection context, exactly like soft
+   mode. (HTTP/SSE hard mode is server-side stateless per request and would not
+   poison, but the single-cached-client limitation still blocks in-process
+   isolation.)
+
+   **Decision:** the dump sub-test runs in **soft mode only**; in hard mode it
+   **skips cleanly** (logged), like the existing config/platform skips.
+   Supporting it in hard mode would require the trigger path to **bypass
+   `tester.invokeToolOrHandler`** and own a dedicated fresh `createHardModeClient()`
+   — and for stdio, a **separate server process** — so its connection is
+   distinct from the read client's. That is deferred (YAGNI: the suite runs soft
+   mode by default — `integration_hard_mode.enabled: false` — and hard mode is
+   used only for targeted verification).
 3. **Main connection (unchanged context)** reads the result and cleans up:
    - `RuntimeListFeeds(feed_type: 'dumps', ...)` with the existing retry loop,
    - `RuntimeGetDumpById(dump_id, view)` + the summary read.
@@ -120,12 +129,16 @@ on the test's main (clean-context) connection.
 
 ### Testing
 
-Run `RuntimeProfilingAndDumps` against the trial cloud system:
+Run `RuntimeProfilingAndDumps` against the trial cloud system in **soft mode**
+(`integration_hard_mode.enabled: false`):
 
 - the dump sub-test **creates a dump and reads it** (no `SKIP: no runtime dump
   found`, no `400 session` failure),
 - the profiling sub-test stays green,
 - full suite green.
+
+In **hard mode** the dump sub-test skips cleanly (by design, see Design §2); the
+rest of the suite is unaffected.
 
 ## Resolved open question — how the dump class gets activated
 

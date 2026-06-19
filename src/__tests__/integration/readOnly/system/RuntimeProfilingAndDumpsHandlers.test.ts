@@ -879,6 +879,15 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(dumpData.dump_id).toBe(dumpId);
           expect(dumpData.view).toBe(dumpView);
 
+          // Bind the read dump to THIS run: its content must reference the
+          // uniquely-named class we just dumped. Without this, taking the
+          // newest feed entry could read an unrelated pre-existing dump and
+          // pass (false green) even if the forced run produced no dump.
+          const dumpText = JSON.stringify(
+            dumpData.payload ?? dumpData,
+          ).toUpperCase();
+          expect(dumpText).toContain(dumpClassName.toUpperCase());
+
           const analyze = await invoke(
             'RuntimeGetDumpById',
             {

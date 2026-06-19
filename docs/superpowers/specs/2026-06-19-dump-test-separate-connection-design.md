@@ -51,29 +51,45 @@ on the test's main (clean-context) connection.
 
 ### Components / data flow
 
-1. **Dedicated trigger connection** — the dump class's whole lifecycle runs on a
-   second connection obtained the same way the suite already gets its primary
-   one (`createTestConnectionAndSession()` in soft mode; a separate hard-mode
-   client in hard mode):
+1. **Dedicated trigger connection (soft mode)** — the dump class's whole
+   lifecycle runs on a second connection from a fresh
+   `createTestConnectionAndSession()`:
    - create the division-by-zero class,
    - **activate** it — required so the forced run actually executes the
      `lv_num / lv_den` (with `lv_den = 0`) and produces the dump. Activation
      itself does not execute code, so it never dumps; if activation ever dumped,
-     that would be an ABAP-system defect, not this test's concern.
+     that would be an ABAP-system defect, not this test's concern. (Activation
+     support in the class helper is added per the resolved open question below;
+     `createRunnableProgram` already activates, so there is precedent.)
    - forced run (`classrun`) → HTTP 500 → a real runtime dump is recorded
      server-side under the connection's user. The 500 / context loss now lands
      on the **throwaway** connection.
-2. **Main connection (unchanged context)** reads the result:
+2. **Hard mode is transport-specific.** This bug is a soft-mode phenomenon: soft
+   mode reuses one persistent direct connection, whose application context the
+   dumping run consumes. In **HTTP hard mode** each tool call is independent
+   (server-side stateless per request), so the same-connection poisoning does
+   not arise the same way, and `LambdaTester` additionally **caches** its
+   hard-mode client. Therefore the trigger-connection isolation is implemented
+   for **soft mode**. If hard-mode isolation is ever needed, the trigger path
+   must **bypass `tester.invokeToolOrHandler`** and own a fresh
+   `createHardModeClient()` lifecycle (with its own `close()`), not reuse the
+   cached tester client. The integration suite runs soft mode by default
+   (`integration_hard_mode.enabled: false`).
+3. **Main connection (unchanged context)** reads the result and cleans up:
    - `RuntimeListFeeds(feed_type: 'dumps', ...)` with the existing retry loop,
    - `RuntimeGetDumpById(dump_id, view)` + the summary read.
    Because this connection never ran the dumping class, its application context
    is intact and the feed read succeeds.
-3. The dump is keyed to the **user**, not the connection, so the dump produced
+4. The dump is keyed to the **user**, not the connection, so the dump produced
    via the trigger connection is visible to the feed read on the main
    connection (same trial user).
-4. **Cleanup** — the dump class is deleted via the trigger connection (or
-   whichever connection holds the lock), consistent with the existing
-   `deleteClassIfExists` cleanup pattern.
+5. **Cleanup** — delete the dump class via the **main (clean-context)
+   connection**, because the trigger connection's application context was just
+   destroyed by the dump and a delete there could itself hit
+   `session no longer exists` and leak the generated class. Object identity is
+   server-wide, so `deleteClassIfExists` on the main connection acquires its own
+   lock and deletes regardless of which connection created the class. A delete
+   via the trigger connection is at most a best-effort fallback.
 
 ### What stays the same
 
@@ -91,8 +107,16 @@ on the test's main (clean-context) connection.
   logged exactly as today ("Expected failing run for dump generation: …").
 - If the trigger connection cannot be created (no SAP config), the test skips
   cleanly, same as the existing config-driven skip behaviour.
-- The trigger connection is torn down in a `finally` so a failure mid-test does
-  not leak a connection/session.
+- **Teardown is transport-specific.** Soft-mode HTTP connections have no
+  network `close`/`disconnect` (HTTP is connectionless; session state is the
+  client-side cookie). `createTestConnectionAndSession()` returns
+  `{ connection, session, ... }` with **no close handle**, so "teardown" for the
+  trigger connection means: stop using it and drop the reference; optionally
+  call `connection.reset()` (available on the HTTP connection) to clear its
+  local cookie/CSRF state. There is no server-side logout to perform and nothing
+  leaks by letting it be garbage-collected. (Only a hard-mode
+  `createHardModeClient()` — if ever used for the trigger path — owns a real
+  `close()` that must run in a `finally`.)
 
 ### Testing
 
@@ -102,6 +126,19 @@ Run `RuntimeProfilingAndDumps` against the trial cloud system:
   found`, no `400 session` failure),
 - the profiling sub-test stays green,
 - full suite green.
+
+## Resolved open question — how the dump class gets activated
+
+The soft-mode `createRunnableClass` currently does create + update but **does
+not activate**. The dump class must be active to run and dump.
+
+**Decision:** add an optional `activate` flag to `createRunnableClass` (default
+`false`). When `true`, the soft-mode path passes `{ activateOnUpdate: true }` to
+`client.getClass().update(...)`. The dump path calls it with `activate: true`;
+the profiling path keeps the default (`false`), so its behaviour — already green
+via the CPU-workload fix — is unchanged. This keeps a single helper (DRY) and
+mirrors `createRunnableProgram`, which already activates. A separate helper was
+rejected as duplication.
 
 ## Out of scope
 

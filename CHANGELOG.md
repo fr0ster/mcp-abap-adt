@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [7.1.1] - 2026-06-19
+
+### Fixed
+- **`UpdateFunctionInclude` now supports an `activate` parameter** (default `false`) — when `true`, the include is activated after the source update so the new source becomes the active version, mirroring `UpdateFunctionModule`. Previously the tool always left the updated source inactive.
+- Integration-test + `test-config.yaml.template` fixes for the new function-include / structure tools (verified end-to-end on a real system): the FUGR-include lifecycle update source is now a valid declaration (a bare executable statement in an include caused "Statement is not accessible"); the `ListFunctionGroupIncludes` test no longer asserts the generated `L<FUGR>UXX` collector is absent (the tool faithfully returns ALL `FUGR/I` includes — collector filtering is a backup-tool concern); the template seeds the shared `ZMCP_SHR_FGRP` / `Z_MCP_SHR_FM` the function-include tests reference.
+
 ## [7.1.0] - 2026-06-18
 
 ### Added

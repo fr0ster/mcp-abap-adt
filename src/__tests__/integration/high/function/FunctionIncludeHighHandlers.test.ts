@@ -204,6 +204,7 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
             include_name: includeName,
             source_code: updatedSourceCode,
             transport_request: transportRequest,
+            activate: true,
           },
           () =>
             handleUpdateFunctionInclude(
@@ -213,6 +214,7 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
                 include_name: includeName,
                 source_code: updatedSourceCode,
                 transport_request: transportRequest,
+                activate: true,
               },
             ),
         );

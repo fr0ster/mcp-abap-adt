@@ -912,9 +912,23 @@ describe('Admin: Setup shared dependencies', () => {
         }
       }
 
-      // 3. Group-activate all objects (retry to resolve circular dependencies)
+      // 3. Activate all objects.
+      //
+      // Preferred path: a single bulk group-activate (resolves cross-object
+      // dependency ordering in one activation run). On cloud, however,
+      // bulk-activating many objects can exceed the activation-run request
+      // timeout (adt-clients uses a fixed ~45s timeout that is NOT overridable
+      // via activateObjectsGroup). Retrying the full group after a timeout just
+      // burns another 45s, so on timeout we skip straight to the batched
+      // fallback: activate in small chunks (each chunk is one cheap activation
+      // run well under the limit), two passes to resolve ordering between
+      // dependents (pass 2 retries only what failed in pass 1).
       if (toActivate.length > 0) {
+        const isTimeout = (err: any) =>
+          err?.code === 'ECONNABORTED' || /timeout/i.test(err?.message || '');
+
         const maxActivationAttempts = 3;
+        let groupActivated = false;
         for (let attempt = 1; attempt <= maxActivationAttempts; attempt++) {
           testsLogger?.info?.(
             `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
@@ -942,13 +956,9 @@ describe('Admin: Setup shared dependencies', () => {
               testsLogger?.error?.(
                 `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
               );
-              results.push({
-                type: 'activation',
-                name: 'GROUP',
-                status: `FAILED: ${errors.length} activation error(s)`,
-              });
-            } else if (activationResult.activated && activationResult.checked) {
+            } else {
               testsLogger?.info?.('Group activation completed successfully');
+              groupActivated = true;
             }
             if (warnings.length > 0) {
               testsLogger?.warn?.(
@@ -957,18 +967,83 @@ describe('Admin: Setup shared dependencies', () => {
             }
             break; // Success or final attempt — stop retrying
           } catch (error: any) {
+            // Retrying the full group after a timeout wastes another ~45s and
+            // will time out again — go straight to the batched fallback.
+            if (isTimeout(error)) {
+              testsLogger?.warn?.(
+                `Group activation timed out (${error.message}); falling back to batched activation`,
+              );
+              break;
+            }
             if (attempt < maxActivationAttempts) {
               testsLogger?.warn?.(
                 `Activation attempt ${attempt} failed: ${error.message}, retrying...`,
               );
               continue;
             }
-            testsLogger?.error?.(`Group activation failed: ${error.message}`);
+            testsLogger?.warn?.(
+              `Group activation failed: ${error.message}; falling back to batched activation`,
+            );
+          }
+        }
+
+        // Fallback: bulk group-activate never succeeded (e.g. timed out on
+        // cloud). Activate in small chunks — far fewer activation runs than
+        // one-per-object, each well under the timeout. Two passes resolve
+        // ordering between dependents; pass 2 retries only the leftovers.
+        if (!groupActivated) {
+          const CHUNK_SIZE = 5;
+          let pending = toActivate;
+          let lastErrors = new Map<string, string>();
+
+          for (let pass = 1; pass <= 2 && pending.length > 0; pass++) {
+            testsLogger?.info?.(
+              `Fallback activation pass ${pass}/2: ${pending.length} object(s) in chunks of ${CHUNK_SIZE}...`,
+            );
+            const failedThisPass: typeof toActivate = [];
+            lastErrors = new Map();
+
+            for (let i = 0; i < pending.length; i += CHUNK_SIZE) {
+              const chunk = pending.slice(i, i + CHUNK_SIZE);
+              const recordFailure = (msg: string) => {
+                for (const obj of chunk) {
+                  failedThisPass.push(obj);
+                  lastErrors.set(`${obj.type} ${obj.name}`, msg);
+                }
+              };
+              try {
+                const resp = await client
+                  .getUtils()
+                  .activateObjectsGroup(chunk, true);
+                const r = parseActivationResponse(resp.data);
+                const errs = r.messages.filter(
+                  (m) => m.type === 'error' || m.type === 'E',
+                );
+                if (errs.length > 0) {
+                  recordFailure(
+                    errs.map((e: any) => e.shortText || e.text).join('; '),
+                  );
+                }
+              } catch (e: any) {
+                recordFailure(e?.message || String(e));
+              }
+            }
+            pending = failedThisPass;
+          }
+
+          if (pending.length > 0) {
+            testsLogger?.error?.(
+              `Fallback activation failed for:\n${[...lastErrors.entries()].map(([k, v]) => `  ${k}: ${v}`).join('\n')}`,
+            );
             results.push({
               type: 'activation',
-              name: 'GROUP',
-              status: `FAILED: ${error.message}`,
+              name: 'FALLBACK',
+              status: `FAILED: ${pending.length} object(s) not activated`,
             });
+          } else {
+            testsLogger?.info?.(
+              'Fallback activation completed successfully (batched group-activate)',
+            );
           }
         }
       }

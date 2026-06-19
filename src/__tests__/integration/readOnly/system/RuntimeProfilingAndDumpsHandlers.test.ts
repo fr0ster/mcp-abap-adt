@@ -35,15 +35,19 @@ function parseTextPayload(result: any): any {
   return JSON.parse(textContent.text);
 }
 
-function extractDumpIdFromLink(link: string): string {
-  const match = link.match(/\/runtime\/dump\/(.+)$/);
-  return match ? decodeURIComponent(match[1]) : '';
+function extractDumpIdFromFeedEntry(entry: any): string {
+  // The dump id lives in the feed entry `id` (the `link` field is empty in the
+  // runtime-dumps feed). The path is `/runtime/dumps/<id>` (plural). The id
+  // segment is URL-encoded (trailing/embedded spaces as %20) and contains no
+  // "/", so it is passed as-is — NOT decoded — to RuntimeGetDumpById, which
+  // reads `/runtime/dump/<id>` (singular) and rejects ids containing "/".
+  const source = String(entry?.id ?? entry?.link ?? '');
+  const match = source.match(/\/runtime\/dumps\/(.+)$/);
+  return match ? match[1] : '';
 }
 
 function extractDumpIdsFromFeedEntries(entries: any[]): string[] {
-  return entries
-    .map((e: any) => extractDumpIdFromLink(e.link ?? ''))
-    .filter(Boolean);
+  return entries.map(extractDumpIdFromFeedEntry).filter(Boolean);
 }
 
 function extractHandlerErrorText(result: any): string {

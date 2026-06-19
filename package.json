@@ -50,6 +50,7 @@
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:check": "jest --testPathPatterns='admin/shared-deps/check' --testPathIgnorePatterns='[]' --passWithNoTests",
+    "polygon:backup": "adt-backup backup --package ZMCP_SHR_PKG --env-path trial.env --output tests/fixtures/polygon.backup.yaml",
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",
     "format": "npx biome format --write src",

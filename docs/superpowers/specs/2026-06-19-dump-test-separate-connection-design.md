@@ -68,9 +68,12 @@ on the test's main (clean-context) connection.
    isolation needs two distinct connections — one to trigger the dump, one
    (clean) to read it. In hard mode the test drives everything through a single
    `LambdaTester`-cached MCP client (`tester.invokeToolOrHandler`), so there is
-   no second isolated connection to use for the trigger. Crucially, the default
-   hard transport is **stdio** (`integration_hard_mode.transport: "stdio"`), and
-   `BaseMcpServer` **caches the ABAP connection** for stdio — so the dumping run
+   no second isolated connection to use for the trigger. Crucially, the **stdio**
+   hard transport is supported — and is what this repo's `test-config.yaml` sets
+   (`integration_hard_mode.transport: "stdio"`), although the helper's code-level
+   fallback when `transport` is unset is `http`
+   (`String(hard.transport || 'http')` in `helpers/testers/hardMode.ts`). Under
+   stdio, `BaseMcpServer` **caches the ABAP connection**, so the dumping run
    poisons that same cached server-side connection context, exactly like soft
    mode. (HTTP/SSE hard mode is server-side stateless per request and would not
    poison, but the single-cached-client limitation still blocks in-process

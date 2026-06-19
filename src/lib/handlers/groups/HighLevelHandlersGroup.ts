@@ -220,6 +220,18 @@ import {
   handleGetFunctionGroup,
 } from '../../../handlers/function_group/high/handleGetFunctionGroup';
 import {
+  TOOL_DEFINITION as CreateFunctionInclude_Tool,
+  handleCreateFunctionInclude,
+} from '../../../handlers/function_include/high/handleCreateFunctionInclude';
+import {
+  TOOL_DEFINITION as DeleteFunctionInclude_Tool,
+  handleDeleteFunctionInclude,
+} from '../../../handlers/function_include/high/handleDeleteFunctionInclude';
+import {
+  handleUpdateFunctionInclude,
+  TOOL_DEFINITION as UpdateFunctionInclude_Tool,
+} from '../../../handlers/function_include/high/handleUpdateFunctionInclude';
+import {
   TOOL_DEFINITION as DeleteFunctionModule_Tool,
   handleDeleteFunctionModule,
 } from '../../../handlers/function_module/high/handleDeleteFunctionModule';
@@ -937,6 +949,18 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteFunctionModule_Tool,
         handler: withContext(handleDeleteFunctionModule),
+      },
+      {
+        toolDefinition: CreateFunctionInclude_Tool,
+        handler: withContext(handleCreateFunctionInclude),
+      },
+      {
+        toolDefinition: UpdateFunctionInclude_Tool,
+        handler: withContext(handleUpdateFunctionInclude),
+      },
+      {
+        toolDefinition: DeleteFunctionInclude_Tool,
+        handler: withContext(handleDeleteFunctionInclude),
       },
       {
         toolDefinition: CreateBdef_Tool,

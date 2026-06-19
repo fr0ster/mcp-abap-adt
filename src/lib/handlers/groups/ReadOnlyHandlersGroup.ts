@@ -35,6 +35,18 @@ import {
   TOOL_DEFINITION as ReadFunctionGroup_Tool,
 } from '../../../handlers/function_group/readonly/handleReadFunctionGroup';
 import {
+  handleListFunctionGroupIncludes,
+  TOOL_DEFINITION as ListFunctionGroupIncludes_Tool,
+} from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
+import {
+  handleListFunctionModules,
+  TOOL_DEFINITION as ListFunctionModules_Tool,
+} from '../../../handlers/function_include/readonly/handleListFunctionModules';
+import {
+  handleReadFunctionInclude,
+  TOOL_DEFINITION as ReadFunctionInclude_Tool,
+} from '../../../handlers/function_include/readonly/handleReadFunctionInclude';
+import {
   handleReadFunctionModule,
   TOOL_DEFINITION as ReadFunctionModule_Tool,
 } from '../../../handlers/function_module/readonly/handleReadFunctionModule';
@@ -74,6 +86,10 @@ import {
   handleReadServiceDefinition,
   TOOL_DEFINITION as ReadServiceDefinition_Tool,
 } from '../../../handlers/service_definition/readonly/handleReadServiceDefinition';
+import {
+  TOOL_DEFINITION as GetStructuresList_Tool,
+  handleGetStructuresList,
+} from '../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   handleReadStructure,
   TOOL_DEFINITION as ReadStructure_Tool,
@@ -200,6 +216,10 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleReadStructure(this.context, args),
       },
       {
+        toolDefinition: GetStructuresList_Tool,
+        handler: (args: any) => handleGetStructuresList(this.context, args),
+      },
+      {
         toolDefinition: ReadView_Tool,
         handler: (args: any) => handleReadView(this.context, args),
       },
@@ -214,6 +234,19 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ReadFunctionModule_Tool,
         handler: (args: any) => handleReadFunctionModule(this.context, args),
+      },
+      {
+        toolDefinition: ReadFunctionInclude_Tool,
+        handler: (args: any) => handleReadFunctionInclude(this.context, args),
+      },
+      {
+        toolDefinition: ListFunctionGroupIncludes_Tool,
+        handler: (args: any) =>
+          handleListFunctionGroupIncludes(this.context, args),
+      },
+      {
+        toolDefinition: ListFunctionModules_Tool,
+        handler: (args: any) => handleListFunctionModules(this.context, args),
       },
       {
         toolDefinition: ReadFunctionGroup_Tool,

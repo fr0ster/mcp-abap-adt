@@ -65,6 +65,7 @@ async function forceSaveViewSource(
 /** Map shared_dependencies section name to ADT object type code */
 const TYPE_CODES: Record<string, string> = {
   tables: 'TABL/DT',
+  structures: 'TABL/DS',
   views: 'DDLS/DF',
   behavior_definitions: 'BDEF/BDO',
   classes: 'CLAS/OC',
@@ -230,6 +231,100 @@ describe('Admin: Setup shared dependencies', () => {
                 status: `FAILED: ${msg}`,
               });
             }
+          }
+        }
+      }
+
+      // --- Structures ---
+      // Structures must be created SEQUENTIALLY with per-item activation:
+      // a base structure that contains `include <other>;` requires the
+      // included structure to already exist AND be active. Config lists the
+      // include first and the base second, so processing in list order with
+      // immediate activation satisfies the dependency. These are NOT added to
+      // the group-activation list (they are already active by this point).
+      const structures = sharedConfig.structures || [];
+      if (structures.length > 0) {
+        testsLogger?.info?.(
+          `Creating Structures (${structures.length}) sequentially with activation...`,
+        );
+        for (const item of structures) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(
+              `Skipping structure ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
+            continue;
+          }
+          try {
+            let exists = false;
+            try {
+              const readResult = await client
+                .getStructure()
+                .read({ structureName: item.name });
+              exists = readResult !== undefined;
+            } catch {
+              exists = false;
+            }
+
+            if (!exists) {
+              try {
+                // create() only builds the skeleton (does NOT apply ddlCode)
+                await client.getStructure().create({
+                  structureName: item.name,
+                  packageName,
+                  description: item.description || 'Shared test structure',
+                  transportRequest,
+                });
+                testsLogger?.info?.(`Created structure ${item.name}`);
+              } catch (createError: any) {
+                const cmsg =
+                  createError instanceof Error
+                    ? createError.message
+                    : String(createError);
+                if (
+                  cmsg.includes('409') ||
+                  cmsg.includes('already exist') ||
+                  cmsg.includes('NoAccess')
+                ) {
+                  testsLogger?.warn?.(
+                    `Structure ${item.name} create issue (may already exist): ${cmsg.substring(0, 120)}`,
+                  );
+                } else {
+                  throw createError;
+                }
+              }
+            }
+
+            // Apply the real DDL source, then activate immediately so that a
+            // later base structure can reference this one via `include`.
+            if (item.source) {
+              await client.getStructure().update(
+                {
+                  structureName: item.name,
+                  ddlCode: item.source,
+                  transportRequest,
+                },
+                { sourceCode: item.source },
+              );
+              testsLogger?.info?.(`Updated structure ${item.name} source`);
+            }
+            await client.getStructure().activate({ structureName: item.name });
+            testsLogger?.info?.(`Activated structure ${item.name}`);
+
+            results.push({
+              type: 'structures',
+              name: item.name,
+              status: exists ? 'existed' : 'created',
+            });
+          } catch (error: any) {
+            const msg = error instanceof Error ? error.message : String(error);
+            testsLogger?.error?.(
+              `Failed to setup structure ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: 'structures',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
           }
         }
       }

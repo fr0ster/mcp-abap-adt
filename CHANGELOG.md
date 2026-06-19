@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [7.1.0] - 2026-06-18
+
+### Added
+- **Function-group include tools.** Six new MCP tools expose ADT function-group include operations:
+  - Read-only: `ReadFunctionInclude` (source + metadata), `ListFunctionGroupIncludes` (a FUGR's includes — TOP + custom), `ListFunctionModules` (a FUGR's function modules).
+  - High-level: `CreateFunctionInclude`, `UpdateFunctionInclude`, `DeleteFunctionInclude`.
+  - The list tools surface the new adt-clients `getUtils().listFunctionGroupIncludes()` / `listFunctionModules()` (nodestructure drill-down). `DeleteFunctionInclude` surfaces SAP's refusal message when an include can only be deleted via the Function Builder.
+- Integration tests (`FunctionIncludeReadOnlyHandlers`, `FunctionIncludeHighHandlers`) and `tests/test-config.yaml.template` cases for the new tools.
+- **Structure embedding tools (tree output).** New read-only `GetStructuresList` — recursively lists the structures embedded in an ABAP structure (or table) as a TREE. Each node records the embedded structure name, the `attribute` it is embedded under (named include `attr : include X;` vs anonymous `include X;` → `null`), and `kind`: `include` (from the source) or `append` (an extension found via where-used whose source is `extend type <this> with …`). Includes come from the DDL/classic source (`include X;`, `.INCLUDE`/`.APPEND`); appends are resolved via where-used (toggle with `include_extensions`, default true). Cycle-guarded. `GetIncludesList` reworked from a flat list to a recursive TREE (each include may have child includes; cycle-guarded, depth-capped). Integration test `GetStructuresListHandler` + `tests/test-config.yaml.template` case (shared structures `ZMCP_SHR_STRU` / `ZMCP_SHR_STRU_INC`).
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.6.0` to `^5.8.0` (adds `listFunctionModules`/`listFunctionGroupIncludes`; `getFunctionInclude().read()` returns source; `delete()` surfaces server-refused deletions). Clean registry install (no `link:true`/`file:`).
+
 ## [7.0.3] - 2026-06-13
 
 ### Changed

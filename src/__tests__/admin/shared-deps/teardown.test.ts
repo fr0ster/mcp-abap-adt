@@ -190,6 +190,25 @@ describe('Admin: Teardown shared dependencies', () => {
         results.push({ type: 'views', name: item.name, status });
       }
 
+      // 3b. Structures (delete after views, before tables).
+      // Reverse the config list order so the BASE structure (which embeds the
+      // include via `include`) is deleted before the included structure —
+      // otherwise the include reference blocks deletion of the child.
+      const structures = [...(sharedConfig.structures || [])].reverse();
+      for (const item of structures) {
+        const status = await safeDelete(
+          `structure ${item.name}`,
+          async () => {
+            await client.getStructure().delete({
+              structureName: item.name,
+              transportRequest,
+            });
+          },
+          testsLogger,
+        );
+        results.push({ type: 'structures', name: item.name, status });
+      }
+
       // 4. Tables
       const tables = sharedConfig.tables || [];
       for (const item of tables) {

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Test infrastructure (`shared:setup`):** the shared-dependency setup is now resilient to the cloud activation-run timeout. Bulk-activating the ~24 shared objects in one activation run can exceed adt-clients' fixed ~45s request timeout; the setup now skips the doomed full-group retries on a timeout and falls back to batched activation (chunks of 5, with a second pass retrying only the leftovers). No change to the published package — test tooling only.
+
 ## [7.1.1] - 2026-06-19
 
 ### Fixed

@@ -837,11 +837,18 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             }
           }
 
+          const generatedDumpId = dumpIdFromGeneratedFailure;
           const dumpId =
-            dumpIdFromGeneratedFailure || context.params?.dump_id || undefined;
+            generatedDumpId || context.params?.dump_id || undefined;
           if (!dumpId) {
+            // We activated and executed a division-by-zero class, which MUST
+            // produce a runtime dump. Not finding it in the feed is a real
+            // failure (the run did not dump, or the feed lookup/extraction is
+            // broken) — fail, do NOT skip. `params.dump_id` is the explicit
+            // opt-out for read-only environments where self-generating a dump
+            // is not desired; only then is a missing generated dump tolerated.
             throw new Error(
-              'SKIP: no runtime dump found after forced division-by-zero run (set params.dump_id as fallback)',
+              'no runtime dump found in the feed after activating and executing the division-by-zero class — the forced run did not dump or the feed lookup is broken (set params.dump_id to read a pre-existing dump instead)',
             );
           }
           const dumpView =
@@ -879,14 +886,17 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(dumpData.dump_id).toBe(dumpId);
           expect(dumpData.view).toBe(dumpView);
 
-          // Bind the read dump to THIS run: its content must reference the
-          // uniquely-named class we just dumped. Without this, taking the
-          // newest feed entry could read an unrelated pre-existing dump and
-          // pass (false green) even if the forced run produced no dump.
-          const dumpText = JSON.stringify(
-            dumpData.payload ?? dumpData,
-          ).toUpperCase();
-          expect(dumpText).toContain(dumpClassName.toUpperCase());
+          // Bind a self-generated dump to THIS run: its content must reference
+          // the uniquely-named class we just dumped, so taking the newest feed
+          // entry cannot pass on an unrelated pre-existing dump. Skip this bind
+          // only for the explicit `params.dump_id` read-only path, where the
+          // dump is a pre-existing one unrelated to dumpClassName.
+          if (generatedDumpId) {
+            const dumpText = JSON.stringify(
+              dumpData.payload ?? dumpData,
+            ).toUpperCase();
+            expect(dumpText).toContain(dumpClassName.toUpperCase());
+          }
 
           const analyze = await invoke(
             'RuntimeGetDumpById',

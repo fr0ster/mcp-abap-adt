@@ -108,12 +108,21 @@ export class ServerConfigManager {
     const transport = this.parseTransport();
     const exposition = this.parseExposition();
 
+    // Resolve final host/port in a transport-aware way: SSE must fall back to
+    // the SSE-specific defaults/flags (--sse-host/--sse-port, MCP_SSE_HOST/PORT,
+    // 3001) rather than the HTTP ones, so `--transport=sse` listens on 3001 and
+    // the SSE flags/env actually take effect. The generic --host/--port still
+    // win when provided.
+    const isSse = transport === 'sse';
+    const transportHost = isSse ? parsed.sseHost : parsed.httpHost;
+    const transportPort = isSse ? parsed.ssePort : parsed.httpPort;
+
     return {
       transport: transport || 'stdio',
       exposition: exposition.length > 0 ? exposition : ['readonly', 'high'],
       configFile: parseConfigArg(),
-      host: ArgumentsParser.getArgument('--host') || parsed.httpHost,
-      port: this.parsePort() || parsed.httpPort,
+      host: ArgumentsParser.getArgument('--host') || transportHost,
+      port: this.parsePort() || transportPort,
       httpJsonResponse: parsed.httpJsonResponse || undefined,
       httpPath:
         ArgumentsParser.getArgument('--path') ||

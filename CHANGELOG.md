@@ -4,12 +4,12 @@
 
 ## [7.1.3] - 2026-06-20
 
-> Published-content fixes: corrects the npm package name shown in the install
-> docs and removes a broken CLI bin entry. `README.md` and `docs/` ship in the
-> package (`files`), so these reach npm users with this release. No runtime
-> (`dist/`) behaviour change.
+> Fixes the SSE transport host/port resolution, removes a broken CLI bin entry,
+> and corrects the install documentation (`README.md`/`docs/` ship in `files`,
+> so the doc fixes reach npm users with this release).
 
 ### Fixed
+- **SSE transport now honours its own host/port.** `--transport=sse` resolved the final host/port from the HTTP defaults/flags (`httpHost`/`httpPort`, so it listened on `3000`), ignoring `--sse-host`/`--sse-port` and `MCP_SSE_HOST`/`MCP_SSE_PORT`. Host/port resolution is now transport-aware: SSE falls back to the SSE defaults (host `127.0.0.1`, port `3001`) and its `--sse-*` flags / `MCP_SSE_*` env vars take effect; the generic `--host`/`--port` still win when provided. (`src/lib/config/ServerConfigManager.ts`.)
 - **Removed the dangling `mcp-abap-adt-v2` bin entry.** `package.json`/`package-lock.json` still mapped `mcp-abap-adt-v2` → `bin/mcp-abap-adt-v2.js`, a file removed in an earlier release, so a global install created a broken `mcp-abap-adt-v2` symlink. The only binary is `mcp-abap-adt`. Also fixed a stale `mcp-abap-adt-v2` example in `tools/show-storage-paths.js` help output.
 - **Documentation accuracy sweep:**
   - Install docs/README used the wrong npm scope `@fr0ster/mcp-abap-adt`; corrected to `@mcp-abap-adt/core` (the GitHub repo path and the `io.github.fr0ster/…` registry id are unchanged).

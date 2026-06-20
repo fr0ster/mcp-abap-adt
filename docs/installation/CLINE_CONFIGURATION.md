@@ -192,12 +192,12 @@ Choose one method:
 
 **A. Using NPX** (recommended):
 ```bash
-npx @mcp-abap-adt/core --transport=http --http-port=3000
+npx @mcp-abap-adt/core --transport=http --port=3000
 ```
 
 **B. Using Global Install**:
 ```bash
-mcp-abap-adt --transport=http --http-port=3000
+mcp-abap-adt --transport=http --port=3000
 ```
 
 **C. Using NPM Script** (local development):
@@ -258,12 +258,12 @@ Choose one method:
 
 **A. Using NPX** (recommended):
 ```bash
-npx @mcp-abap-adt/core --transport=sse --sse-port=3001 --env=/path/to/.env
+npx @mcp-abap-adt/core --transport=sse --port=3001 --env=/path/to/.env
 ```
 
 **B. Using Global Install**:
 ```bash
-mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
+mcp-abap-adt --transport=sse --port=3001 --env=/path/to/.env
 ```
 
 **C. Using NPM Script** (local development):
@@ -418,10 +418,10 @@ You can run multiple instances with different SAP systems:
 
 ```bash
 # HTTP
-node ./bin/mcp-abap-adt.js --transport=http --http-port=8080 --http-host=0.0.0.0
+node ./bin/mcp-abap-adt.js --transport=http --port=8080 --host=0.0.0.0
 
 # SSE
-node ./bin/mcp-abap-adt.js --transport=sse --sse-port=8081 --sse-host=0.0.0.0
+node ./bin/mcp-abap-adt.js --transport=sse --port=8081 --host=0.0.0.0
 ```
 
 ### CORS Configuration

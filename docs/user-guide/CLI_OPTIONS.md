@@ -29,7 +29,7 @@ Load server configuration from a YAML file instead of command-line arguments. If
 mcp-abap-adt --conf=config.yaml
 
 # Override YAML values with command-line arguments
-mcp-abap-adt --conf=config.yaml --http-port=8080
+mcp-abap-adt --conf=config.yaml --port=8080
 ```
 
 **Benefits:**
@@ -126,7 +126,7 @@ mcp-abap-adt --transport=http
 mcp-abap-adt --transport=sse
 ```
 
-**Note:** Select the transport with `--transport=stdio|http|sse`. There are no `--http`/`--sse` standalone shortcuts; configure host and port with `--http-host`/`--http-port` and `--sse-host`/`--sse-port`.
+**Note:** The default transport is `stdio`; running bare `mcp-abap-adt` starts stdio. Select the transport explicitly with `--transport=stdio|http|sse`. There are no `--http`/`--sse` standalone shortcuts; configure host and port with the generic `--host`/`--port` flags (and the path flags `--path`/`--sse-path`/`--post-path`).
 
 ## SAP Connection Type
 
@@ -227,17 +227,17 @@ Used with `--transport=http` or `--transport=streamable-http`.
 
 ### Port Configuration
 
-**--http-port=\<port\>**
+**--port=\<port\>**
 
 HTTP server port (default: 3000).
 
 ```bash
-mcp-abap-adt --transport=http --http-port=8080
+mcp-abap-adt --transport=http --port=8080
 ```
 
 ### Host Binding
 
-**--http-host=\<host\>**
+**--host=\<host\>**
 
 HTTP server host address (default: 127.0.0.1, localhost only for security).
 
@@ -247,16 +247,26 @@ HTTP server host address (default: 127.0.0.1, localhost only for security).
 
 ```bash
 # Bind to localhost only (default, secure)
-mcp-abap-adt --transport=http --http-host=127.0.0.1
+mcp-abap-adt --transport=http --host=127.0.0.1
 
 # Bind to all interfaces (less secure, client must provide all headers)
-mcp-abap-adt --transport=http --http-host=0.0.0.0
+mcp-abap-adt --transport=http --host=0.0.0.0
 ```
 
 **When using 0.0.0.0:**
 - Client must provide all connection parameters in HTTP headers (SAP_URL, SAP_JWT_TOKEN, etc.)
 - Server acts as a simple proxy - no default destination lookup
 - All responsibility for connection configuration is on the client
+
+### Path Configuration
+
+**--path=\<path\>** (alias **--http-path=\<path\>**)
+
+HTTP endpoint path (default: /mcp/stream/http).
+
+```bash
+mcp-abap-adt --transport=http --path=/mcp/stream/http
+```
 
 ### Response Format
 
@@ -304,8 +314,8 @@ mcp-abap-adt --transport=http --http-enable-dns-protection
 
 ```bash
 mcp-abap-adt --transport=http \
-  --http-port=8080 \
-  --http-host=0.0.0.0 \
+  --port=8080 \
+  --host=0.0.0.0 \
   --http-allowed-origins=http://localhost:3000,https://myapp.com \
   --http-enable-dns-protection \
   --env-path=~/configs/sap-prod.env
@@ -317,17 +327,17 @@ Used with `mcp-abap-adt --transport=sse` or `--transport=sse`.
 
 ### Port Configuration
 
-**--sse-port=\<port\>**
+**--port=\<port\>**
 
 SSE server port (default: 3001).
 
 ```bash
-mcp-abap-adt --transport=sse --sse-port=8081
+mcp-abap-adt --transport=sse --port=8081
 ```
 
 ### Host Binding
 
-**--sse-host=\<host\>**
+**--host=\<host\>**
 
 SSE server host address (default: 127.0.0.1, localhost only for security).
 
@@ -337,16 +347,30 @@ SSE server host address (default: 127.0.0.1, localhost only for security).
 
 ```bash
 # Bind to localhost only (default, secure)
-mcp-abap-adt --transport=sse --sse-host=127.0.0.1
+mcp-abap-adt --transport=sse --host=127.0.0.1
 
 # Bind to all interfaces (less secure, client must provide all headers)
-mcp-abap-adt --transport=sse --sse-host=0.0.0.0
+mcp-abap-adt --transport=sse --host=0.0.0.0
 ```
 
 **When using 0.0.0.0:**
 - Client must provide all connection parameters in HTTP headers (SAP_URL, SAP_JWT_TOKEN, etc.)
 - Server acts as a simple proxy - no default destination lookup
 - All responsibility for connection configuration is on the client
+
+### Path Configuration
+
+**--sse-path=\<path\>**
+
+SSE connection path (default: /sse).
+
+**--post-path=\<path\>**
+
+SSE message post path (default: /messages).
+
+```bash
+mcp-abap-adt --transport=sse --sse-path=/sse --post-path=/messages
+```
 
 ### CORS Configuration
 
@@ -380,8 +404,8 @@ mcp-abap-adt --transport=sse --sse-enable-dns-protection
 
 ```bash
 mcp-abap-adt --transport=sse \
-  --sse-port=3001 \
-  --sse-host=0.0.0.0 \
+  --port=3001 \
+  --host=0.0.0.0 \
   --sse-allowed-origins=http://localhost:3000 \
   --sse-enable-dns-protection \
   --env-path=~/configs/sap-dev.env
@@ -477,7 +501,7 @@ mcp-abap-adt --transport=http --env-path ~/.mcp-abap-adt.env
 
 When the same option is specified multiple ways, this is the priority order (highest to lowest):
 
-1. **Command line arguments** (`--http-port=8080`)
+1. **Command line arguments** (`--port=8080`)
 2. **Environment variables** (`MCP_HTTP_PORT=8080`)
 3. **Default values**
 
@@ -485,7 +509,7 @@ Example:
 ```bash
 # Port 9000 wins (command line)
 export MCP_HTTP_PORT=8080
-mcp-abap-adt --transport=http --http-port=9000
+mcp-abap-adt --transport=http --port=9000
 ```
 
 ## Common Usage Patterns
@@ -544,7 +568,7 @@ EOF
 # Run with explicit config
 mcp-abap-adt --transport=http \
   --env-path=/etc/mcp-abap-adt/prod.env \
-  --http-port=8080 \
+  --port=8080 \
   --http-enable-dns-protection
 ```
 
@@ -560,7 +584,7 @@ mcp-abap-adt --transport=http \
 # Quick switch
 alias mcp-dev='mcp-abap-adt --env-path=~/sap-configs/dev.env'
 alias mcp-test='mcp-abap-adt --env-path=~/sap-configs/test.env'
-alias mcp-prod='mcp-abap-adt --transport=http --env-path=~/sap-configs/prod.env --http-port=8080'
+alias mcp-prod='mcp-abap-adt --transport=http --env-path=~/sap-configs/prod.env --port=8080'
 
 # Use
 mcp-dev
@@ -590,7 +614,7 @@ mcp-abap-adt 2>&1 | grep MCP-ENV
 lsof -i :3000
 
 # Use different port
-mcp-abap-adt --transport=http --http-port=3001
+mcp-abap-adt --transport=http --port=3001
 ```
 
 ### Can't Find .env File

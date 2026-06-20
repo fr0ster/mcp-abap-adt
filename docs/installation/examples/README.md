@@ -33,13 +33,13 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 1. Start server in separate terminal:
    ```bash
    # With NPX (recommended) - uses auth-broker by default
-   npx @mcp-abap-adt/core --transport=http --http-port=3000
+   npx @mcp-abap-adt/core --transport=http --port=3000
    
    # Or force auth-broker (ignores .env)
-   npx @mcp-abap-adt/core --transport=http --http-port=3000 --auth-broker
+   npx @mcp-abap-adt/core --transport=http --port=3000 --auth-broker
    
    # Or with global install
-   mcp-abap-adt --transport=http --http-port=3000
+   mcp-abap-adt --transport=http --port=3000
    
    # Or local dev
    npm run start:http
@@ -73,10 +73,10 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
 2. **Start server with auth-broker**:
    ```bash
    # With NPX (recommended)
-   npx @mcp-abap-adt/core --transport=http --http-port=3000 --auth-broker
+   npx @mcp-abap-adt/core --transport=http --port=3000 --auth-broker
    
    # Or with global install
-   mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+   mcp-abap-adt --transport=http --port=3000 --auth-broker
    ```
    
    **Note**: 
@@ -111,10 +111,10 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
 1. Start server in separate terminal:
    ```bash
    # With NPX (recommended)
-   npx @mcp-abap-adt/core --transport=sse --sse-port=3001 --env=/path/to/.env
+   npx @mcp-abap-adt/core --transport=sse --port=3001 --env=/path/to/.env
    
    # Or with global install
-   mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
+   mcp-abap-adt --transport=sse --port=3001 --env=/path/to/.env
    
    # Or local dev
    npm run start:sse

@@ -28,7 +28,7 @@ Command-line arguments **always override** YAML values. This allows you to:
 Example:
 ```bash
 # Use config.yaml but override the port
-mcp-abap-adt --conf=config.yaml --http-port=8080
+mcp-abap-adt --conf=config.yaml --port=8080
 ```
 
 ## Configuration File Structure

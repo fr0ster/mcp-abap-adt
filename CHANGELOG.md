@@ -2,8 +2,17 @@
 
 ## [Unreleased]
 
+## [7.1.2] - 2026-06-20
+
+> **Test infrastructure only.** The published runtime (`dist/`) is unchanged from
+> 7.1.1 — no tool, handler, or library behaviour changed for consumers. This
+> release bundles integration-test reliability fixes and a stale-metadata fix.
+
 ### Fixed
-- **Test infrastructure (`shared:setup`):** the shared-dependency setup is now resilient to the cloud activation-run timeout. Bulk-activating the ~24 shared objects in one activation run can exceed adt-clients' fixed ~45s request timeout; the setup now skips the doomed full-group retries on a timeout and falls back to batched activation (chunks of 5, with a second pass retrying only the leftovers). No change to the published package — test tooling only.
+- **`shared:setup` resilient to the cloud activation-run timeout.** Bulk-activating the ~24 shared objects in one activation run can exceed adt-clients' fixed ~45s request timeout; on a timeout the setup now skips the doomed full-group retries and falls back to batched activation (chunks of 5, with a second pass retrying only the leftovers) instead of failing.
+- **Runtime profiling test produces a trace.** The runnable class now does measurable CPU work so the profiler arms and a trace is written; a trivial single-statement class finished before tracing engaged, so the trace never resolved (`Failed to resolve traceId`).
+- **Runtime dump test actually creates and reads a dump** (was silently skipping or hitting a `400 session` error). It activates the division-by-zero class, triggers the dump on a separate connection (so the dumping run's server-side context loss does not poison the connection used to read the dump), fixes dump-id extraction from the feed entry (`id` field, plural `/runtime/dumps/<id>` path, URL-encoded, no decode), binds the read dump to the uniquely-named generated class, and fails (instead of skipping) when no dump is produced. `params.dump_id` remains the explicit opt-out for read-only environments.
+- **`server.json` version** was stale at `7.0.3`; bumped to match the package version.
 
 ## [7.1.1] - 2026-06-19
 

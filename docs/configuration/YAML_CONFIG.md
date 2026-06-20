@@ -66,9 +66,6 @@ http:
   # When using 0.0.0.0, client must provide all connection headers - server won't use default destination
   host: 127.0.0.1
   json-response: false
-  allowed-origins: []
-  allowed-hosts: []
-  enable-dns-protection: false
 
 # SSE (Server-Sent Events) transport options
 sse:
@@ -76,9 +73,6 @@ sse:
   # Host binding: 127.0.0.1 (default, localhost only, secure) or 0.0.0.0 (all interfaces, less secure)
   # When using 0.0.0.0, client must provide all connection headers - server won't use default destination
   host: 127.0.0.1
-  allowed-origins: []
-  allowed-hosts: []
-  enable-dns-protection: false
 ```
 
 ## Configuration Options
@@ -103,9 +97,6 @@ sse:
 | `http.port` | number | `3000` | HTTP server port |
 | `http.host` | string | `127.0.0.1` | HTTP server host (`127.0.0.1`/`localhost` for local only, `0.0.0.0` for all interfaces) |
 | `http.json-response` | boolean | `false` | Enable JSON response format |
-| `http.allowed-origins` | array/string | `[]` | Allowed CORS origins (comma-separated string or array) |
-| `http.allowed-hosts` | array/string | `[]` | Allowed hosts (comma-separated string or array) |
-| `http.enable-dns-protection` | boolean | `false` | Enable DNS rebinding protection |
 
 ### SSE Options
 
@@ -113,9 +104,6 @@ sse:
 |--------|------|---------|-------------|
 | `sse.port` | number | `3001` | SSE server port |
 | `sse.host` | string | `127.0.0.1` | SSE server host |
-| `sse.allowed-origins` | array/string | `[]` | Allowed CORS origins (comma-separated string or array) |
-| `sse.allowed-hosts` | array/string | `[]` | Allowed hosts (comma-separated string or array) |
-| `sse.enable-dns-protection` | boolean | `false` | Enable DNS rebinding protection |
 
 ## Examples
 
@@ -145,15 +133,13 @@ Usage:
 mcp-abap-adt --conf=config.yaml
 ```
 
-### Example 3: SSE Mode with CORS
+### Example 3: SSE Mode with Custom Host and Port
 
 ```yaml
 transport: sse
 sse:
   port: 3001
-  allowed-origins:
-    - http://localhost:3000
-    - http://localhost:5173
+  host: 127.0.0.1
 ```
 
 Usage:
@@ -225,13 +211,11 @@ http:
   port: 3000
 ```
 
-### Test Config 4: sse-cors.yaml
+### Test Config 4: sse-default.yaml
 ```yaml
 transport: sse
 sse:
   port: 3001
-  allowed-origins:
-    - http://localhost:3000
 ```
 
 Run tests with different configs:
@@ -239,7 +223,7 @@ Run tests with different configs:
 mcp-abap-adt --conf=stdio-stdio.yaml
 mcp-abap-adt --conf=stdio-env.yaml
 mcp-abap-adt --conf=http-default.yaml
-mcp-abap-adt --conf=sse-cors.yaml
+mcp-abap-adt --conf=sse-default.yaml
 ```
 
 ## Benefits

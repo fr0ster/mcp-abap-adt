@@ -379,8 +379,6 @@ mcp-abap-adt --transport=sse --port=3001 --env=C:\\path\\to\\your\\e19.env
 - `--port=<port>` - Server port (default: 3001 for sse)
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
-- `--sse-allowed-origins LIST` - Comma-separated allowed origins
-- `--sse-enable-dns-protection` - Enable DNS rebinding protection
 - `--env=PATH` - Path to `.env` file (required for SSE mode)
 
 **Example with custom port and host:**

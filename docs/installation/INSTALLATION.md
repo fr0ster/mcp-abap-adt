@@ -430,18 +430,12 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--port=<port>` - Server port (default: 3000 for http)
 - `--path=<path>` / `--http-path=<path>` (alias) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-json-response` - Enable JSON response format
-- `--http-allowed-origins=<list>` - Comma-separated allowed origins for CORS
-- `--http-allowed-hosts=<list>` - Comma-separated allowed hosts
-- `--http-enable-dns-protection` - Enable DNS rebinding protection
 
 **SSE Server Options (for `mcp-abap-adt --transport=sse`):**
 - `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
 - `--port=<port>` - Server port (default: 3001 for sse)
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
-- `--sse-allowed-origins=<list>` - Comma-separated allowed origins for CORS
-- `--sse-allowed-hosts=<list>` - Comma-separated allowed hosts
-- `--sse-enable-dns-protection` - Enable DNS rebinding protection
 
 **Environment Variables:**
 
@@ -494,12 +488,11 @@ mcp-abap-adt --help
 # Use custom .env from different location
 mcp-abap-adt --env=~/configs/sap-production.env
 
-# Start HTTP server with CORS configuration
-mcp-abap-adt --transport=http --port=8080 \
-  --http-allowed-origins=http://localhost:3000,https://myapp.com
+# Start HTTP server
+mcp-abap-adt --transport=http --port=8080
 
-# Start SSE with DNS protection
-mcp-abap-adt --transport=sse --port=3001 --sse-enable-dns-protection
+# Start SSE server
+mcp-abap-adt --transport=sse --port=3001
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**

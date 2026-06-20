@@ -424,14 +424,6 @@ node ./bin/mcp-abap-adt.js --transport=http --port=8080 --host=0.0.0.0
 node ./bin/mcp-abap-adt.js --transport=sse --port=8081 --host=0.0.0.0
 ```
 
-### CORS Configuration
-
-```bash
-node ./bin/mcp-abap-adt.js --transport=http \
-  --http-allowed-origins=http://localhost:3000,https://example.com \
-  --http-enable-dns-protection
-```
-
 ### Environment Variables
 
 Instead of command-line arguments, you can use environment variables:

@@ -278,46 +278,12 @@ Enable JSON response format.
 mcp-abap-adt --transport=http --http-json-response
 ```
 
-### CORS Configuration
-
-**--http-allowed-origins=\<list\>**
-
-Comma-separated list of allowed origins for CORS.
-
-```bash
-# Single origin
-mcp-abap-adt --transport=http --http-allowed-origins=http://localhost:3000
-
-# Multiple origins
-mcp-abap-adt --transport=http --http-allowed-origins=http://localhost:3000,https://app.example.com
-```
-
-**--http-allowed-hosts=\<list\>**
-
-Comma-separated list of allowed hosts.
-
-```bash
-mcp-abap-adt --transport=http --http-allowed-hosts=localhost,myapp.local
-```
-
-### Security
-
-**--http-enable-dns-protection**
-
-Enable DNS rebinding protection.
-
-```bash
-mcp-abap-adt --transport=http --http-enable-dns-protection
-```
-
 ### Complete HTTP Example
 
 ```bash
 mcp-abap-adt --transport=http \
   --port=8080 \
   --host=0.0.0.0 \
-  --http-allowed-origins=http://localhost:3000,https://myapp.com \
-  --http-enable-dns-protection \
   --env-path=~/configs/sap-prod.env
 ```
 
@@ -372,42 +338,12 @@ SSE message post path (default: /messages).
 mcp-abap-adt --transport=sse --sse-path=/sse --post-path=/messages
 ```
 
-### CORS Configuration
-
-**--sse-allowed-origins=\<list\>**
-
-Comma-separated list of allowed origins for CORS.
-
-```bash
-mcp-abap-adt --transport=sse --sse-allowed-origins=http://localhost:3000,https://app.example.com
-```
-
-**--sse-allowed-hosts=\<list\>**
-
-Comma-separated list of allowed hosts.
-
-```bash
-mcp-abap-adt --transport=sse --sse-allowed-hosts=localhost,myapp.local
-```
-
-### Security
-
-**--sse-enable-dns-protection**
-
-Enable DNS rebinding protection.
-
-```bash
-mcp-abap-adt --transport=sse --sse-enable-dns-protection
-```
-
 ### Complete SSE Example
 
 ```bash
 mcp-abap-adt --transport=sse \
   --port=3001 \
   --host=0.0.0.0 \
-  --sse-allowed-origins=http://localhost:3000 \
-  --sse-enable-dns-protection \
   --env-path=~/configs/sap-dev.env
 ```
 
@@ -430,17 +366,11 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_HTTP_PORT` - Default HTTP port
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
 - `MCP_HTTP_ENABLE_JSON_RESPONSE` - Enable JSON responses (true|false)
-- `MCP_HTTP_ALLOWED_ORIGINS` - Allowed CORS origins (comma-separated)
-- `MCP_HTTP_ALLOWED_HOSTS` - Allowed hosts (comma-separated)
-- `MCP_HTTP_ENABLE_DNS_PROTECTION` - Enable DNS protection (true|false)
 
 ### SSE Transport
 
 - `MCP_SSE_PORT` - Default SSE port
 - `MCP_SSE_HOST` - Default SSE host
-- `MCP_SSE_ALLOWED_ORIGINS` - Allowed CORS origins (comma-separated)
-- `MCP_SSE_ALLOWED_HOSTS` - Allowed hosts (comma-separated)
-- `MCP_SSE_ENABLE_DNS_PROTECTION` - Enable DNS protection (true|false)
 
 ### SAP Connection
 
@@ -483,7 +413,6 @@ These are typically set in `.env` file:
 **Shell environment:**
 ```bash
 export MCP_HTTP_PORT=8080
-export MCP_HTTP_ALLOWED_ORIGINS=http://localhost:3000
 mcp-abap-adt --transport=http
 ```
 
@@ -491,7 +420,6 @@ mcp-abap-adt --transport=http
 ```bash
 # ~/.mcp-abap-adt.env
 MCP_HTTP_PORT=8080
-MCP_HTTP_ALLOWED_ORIGINS=http://localhost:3000,https://myapp.com
 
 # Use it
 mcp-abap-adt --transport=http --env-path ~/.mcp-abap-adt.env
@@ -568,8 +496,7 @@ EOF
 # Run with explicit config
 mcp-abap-adt --transport=http \
   --env-path=/etc/mcp-abap-adt/prod.env \
-  --port=8080 \
-  --http-enable-dns-protection
+  --port=8080
 ```
 
 ### Multi-Environment

@@ -36,10 +36,10 @@ Download and install from a pre-built `.tgz` package:
 # Or receive it from your administrator
 
 # Install globally (recommended)
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 
 # Or install locally in your project
-npm install ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install ./mcp-abap-adt-core-7.1.2.tgz
 ```
 
 After installation, you'll have access to:
@@ -245,7 +245,7 @@ This project uses **npm workspaces** to manage multiple packages (`@mcp-abap-adt
 
 ### Installing from Pre-built Package
 
-The pre-built package (`fr0ster-mcp-abap-adt-<version>.tgz`) contains everything you need to run the server without building from source.
+The pre-built package (`mcp-abap-adt-core-<version>.tgz`) contains everything you need to run the server without building from source.
 
 #### Prerequisites
 - Node.js 18 or later
@@ -257,7 +257,7 @@ Install globally to use commands from anywhere:
 
 ```bash
 # Install from local package file
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 
 # Verify installation
 mcp-abap-adt --help
@@ -302,7 +302,7 @@ Install in your project directory:
 cd /path/to/your/project
 
 # Install the package
-npm install /path/to/fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install /path/to/mcp-abap-adt-core-7.1.2.tgz
 
 # Use via npx
 npx mcp-abap-adt --transport=http --port 3000
@@ -510,10 +510,10 @@ To update to a newer version:
 
 ```bash
 # Uninstall old version
-npm uninstall -g @fr0ster/mcp-abap-adt
+npm uninstall -g @mcp-abap-adt/core
 
 # Install new version
-npm install -g ./fr0ster-mcp-abap-adt-1.2.0.tgz
+npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 ```
 
 #### Troubleshooting Package Installation
@@ -537,7 +537,7 @@ $env:PATH += ";$(npm config get prefix)"
 Solution:
 ```bash
 # Use sudo for global installation
-sudo npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+sudo npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 
 # Or configure npm to use a different directory (recommended)
 mkdir ~/.npm-global
@@ -546,7 +546,7 @@ echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 
 # Then install without sudo
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 ```
 
 ---

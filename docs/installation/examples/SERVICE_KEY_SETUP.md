@@ -40,7 +40,7 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ```bash
 # With NPX (recommended)
-npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+npx @mcp-abap-adt/core --transport=http --http-port=3000 --auth-broker
 
 # Or with global install
 mcp-abap-adt --transport=http --http-port=3000 --auth-broker

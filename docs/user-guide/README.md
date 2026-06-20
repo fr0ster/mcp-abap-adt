@@ -14,7 +14,7 @@ Install from a pre-built `.tgz` package:
 
 ```bash
 # Install globally
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 
 # Available commands:
 mcp-abap-adt          # HTTP transport (default)

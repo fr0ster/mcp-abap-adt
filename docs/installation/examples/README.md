@@ -17,7 +17,7 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 
 ### STDIO with Global Install
 **File**: `cline-stdio-global-config.json`
-- Requires: `npm install -g @fr0ster/mcp-abap-adt`
+- Requires: `npm install -g @mcp-abap-adt/core`
 - Faster startup than npx
 - Version controlled by you
 
@@ -33,10 +33,10 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 1. Start server in separate terminal:
    ```bash
    # With NPX (recommended) - uses auth-broker by default
-   npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000
+   npx @mcp-abap-adt/core --transport=http --http-port=3000
    
    # Or force auth-broker (ignores .env)
-   npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+   npx @mcp-abap-adt/core --transport=http --http-port=3000 --auth-broker
    
    # Or with global install
    mcp-abap-adt --transport=http --http-port=3000
@@ -73,7 +73,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
 2. **Start server with auth-broker**:
    ```bash
    # With NPX (recommended)
-   npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+   npx @mcp-abap-adt/core --transport=http --http-port=3000 --auth-broker
    
    # Or with global install
    mcp-abap-adt --transport=http --http-port=3000 --auth-broker
@@ -111,7 +111,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
 1. Start server in separate terminal:
    ```bash
    # With NPX (recommended)
-   npx @fr0ster/mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
+   npx @mcp-abap-adt/core --transport=sse --sse-port=3001 --env=/path/to/.env
    
    # Or with global install
    mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
@@ -140,7 +140,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
       "command": "npx",
       "args": [
         "-y",
-        "@fr0ster/mcp-abap-adt",
+        "@mcp-abap-adt/core",
         "--transport=stdio",
         "--env=/Users/YOUR_USERNAME/.env"
       ],
@@ -159,7 +159,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
       "command": "npx",
       "args": [
         "-y",
-        "@fr0ster/mcp-abap-adt",
+        "@mcp-abap-adt/core",
         "--transport=stdio",
         "--env=C:/Users/YOUR_USERNAME/.env"
       ],

@@ -97,7 +97,7 @@ Install from a pre-built `.tgz` package file:
 ```bash
 # Download or obtain the package file
 # Then install globally
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 
 # Verify installation
 mcp-abap-adt --help
@@ -131,7 +131,7 @@ mcp-abap-adt --transport=http --env /path/to/custom/.env --port 8080
 cd /path/to/your/project
 
 # Install package locally
-npm install /path/to/fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install /path/to/mcp-abap-adt-core-7.1.2.tgz
 
 # Use via npx
 npx mcp-abap-adt --transport=http --port 3000
@@ -214,7 +214,7 @@ MCP ABAP ADT Server supports two transport protocols:
 
 Uses **stdio** mode (must be explicitly specified).
 
-**⚠️ IMPORTANT:** After global installation (`npm install -g @fr0ster/mcp-abap-adt`), use the `mcp-abap-adt` command with `--transport=stdio` and `--env` arguments.
+**⚠️ IMPORTANT:** After global installation (`npm install -g @mcp-abap-adt/core`), use the `mcp-abap-adt` command with `--transport=stdio` and `--env` arguments.
 
 1. Install Cline extension in VS Code
 2. Open Cline settings (JSON): `Cmd+Shift+P` → "Preferences: Open User Settings (JSON)"
@@ -260,7 +260,7 @@ Uses **stdio** mode (must be explicitly specified).
     "mcp-abap-adt": {
       "command": "node",
       "args": [
-        "/usr/local/lib/node_modules/@fr0ster/mcp-abap-adt/bin/mcp-abap-adt.js",
+        "/usr/local/lib/node_modules/@mcp-abap-adt/core/bin/mcp-abap-adt.js",
         "--transport=stdio",
         "--env=/path/to/your/e19.env"
       ]

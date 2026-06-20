@@ -160,7 +160,7 @@ When reviewing code or documentation:
 
 This submodule is used by the main `cloud-llm-hub` project:
 
-- **Import path**: `@fr0ster/mcp-abap-adt`
+- **Import path**: `@mcp-abap-adt/core`
 - **Build output**: `dist/` directory
 - **Usage**: Imported in `srv/mcp-proxy.ts` and `srv/mcp-manager.ts`
 - **MCP Endpoints**: Exposed via CAP service at `/mcp/stream/http` and `/mcp/sse`

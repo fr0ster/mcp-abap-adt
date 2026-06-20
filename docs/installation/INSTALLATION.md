@@ -36,10 +36,10 @@ Download and install from a pre-built `.tgz` package:
 # Or receive it from your administrator
 
 # Install globally (recommended)
-npm install -g ./mcp-abap-adt-core-7.1.2.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Or install locally in your project
-npm install ./mcp-abap-adt-core-7.1.2.tgz
+npm install ./mcp-abap-adt-core-<version>.tgz
 ```
 
 After installation, you'll have access to:
@@ -257,7 +257,7 @@ Install globally to use commands from anywhere:
 
 ```bash
 # Install from local package file
-npm install -g ./mcp-abap-adt-core-7.1.2.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Verify installation
 mcp-abap-adt --help
@@ -302,7 +302,7 @@ Install in your project directory:
 cd /path/to/your/project
 
 # Install the package
-npm install /path/to/mcp-abap-adt-core-7.1.2.tgz
+npm install /path/to/mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
 npx mcp-abap-adt --transport=http --port 3000
@@ -513,7 +513,7 @@ To update to a newer version:
 npm uninstall -g @mcp-abap-adt/core
 
 # Install new version
-npm install -g ./mcp-abap-adt-core-7.1.2.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 ```
 
 #### Troubleshooting Package Installation
@@ -537,7 +537,7 @@ $env:PATH += ";$(npm config get prefix)"
 Solution:
 ```bash
 # Use sudo for global installation
-sudo npm install -g ./mcp-abap-adt-core-7.1.2.tgz
+sudo npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Or configure npm to use a different directory (recommended)
 mkdir ~/.npm-global
@@ -546,7 +546,7 @@ echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 
 # Then install without sudo
-npm install -g ./mcp-abap-adt-core-7.1.2.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 ```
 
 ---

@@ -13,7 +13,7 @@
 - **Removed the dangling `mcp-abap-adt-v2` bin entry.** `package.json`/`package-lock.json` still mapped `mcp-abap-adt-v2` → `bin/mcp-abap-adt-v2.js`, a file removed in an earlier release, so a global install created a broken `mcp-abap-adt-v2` symlink. The only binary is `mcp-abap-adt`. Also fixed a stale `mcp-abap-adt-v2` example in `tools/show-storage-paths.js` help output.
 - **Documentation accuracy sweep:**
   - Install docs/README used the wrong npm scope `@fr0ster/mcp-abap-adt`; corrected to `@mcp-abap-adt/core` (the GitHub repo path and the `io.github.fr0ster/…` registry id are unchanged).
-  - Stale local-pack tarball names / version pins (`…-1.1.0/1.2.0.tgz`) → `mcp-abap-adt-core-7.1.3.tgz`; Node requirement `18` → `22+` (matches `engines`); removed the non-existent `npm run start:legacy` / `dev:stdio` references and the `bin/mcp-abap-adt-v2.js` run examples.
+  - Stale local-pack tarball names / version pins (`…-1.1.0/1.2.0.tgz`) → version-independent `mcp-abap-adt-core-<version>.tgz` (so they no longer drift); Node requirement `18` → `22+` (matches `engines`); removed the non-existent `npm run start:legacy` / `dev:stdio` references and the `bin/mcp-abap-adt-v2.js` run examples.
   - Corrected narrative drift: default transport is `stdio` (not HTTP); HTTP/SSE host default is `127.0.0.1` (not `0.0.0.0`); removed non-existent `--http`/`--sse` CLI shortcuts; refreshed handler-group tool counts and the `src/handlers/` directory list; the `system` handler group rides with `readonly` (it is not always included).
   - Regenerated `docs/user-guide/AVAILABLE_TOOLS*.md` from the current `TOOL_DEFINITION`s (function-include tools, `GetStructuresList`, `GetIncludesList` tree, `GetProgFullCode` removal, refreshed counts).
 

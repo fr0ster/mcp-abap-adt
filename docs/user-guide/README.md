@@ -14,7 +14,7 @@ Install from a pre-built `.tgz` package:
 
 ```bash
 # Install globally
-npm install -g ./mcp-abap-adt-core-7.1.2.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Available commands:
 mcp-abap-adt          # stdio transport (default, for MCP clients)

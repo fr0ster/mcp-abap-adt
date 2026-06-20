@@ -90,7 +90,7 @@ Install from a pre-built `.tgz` package file:
 ```powershell
 # Download or obtain the package file
 # Then install globally
-npm install -g .\mcp-abap-adt-core-7.1.2.tgz
+npm install -g .\mcp-abap-adt-core-<version>.tgz
 
 # Verify installation
 mcp-abap-adt --help
@@ -124,7 +124,7 @@ mcp-abap-adt --transport=http --env C:\path\to\custom\.env --port 8080
 cd C:\path\to\your\project
 
 # Install package locally
-npm install C:\path\to\mcp-abap-adt-core-7.1.2.tgz
+npm install C:\path\to\mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
 npx mcp-abap-adt --transport=http --port 3000

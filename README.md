@@ -257,9 +257,6 @@ npm run start:http
 
 # SSE mode
 npm run start:sse
-
-# Legacy v1 server (for backward compatibility)
-npm run start:legacy
 ```
 
 ### Environment Configuration

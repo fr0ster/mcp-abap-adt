@@ -18,7 +18,7 @@ After installation, you'll be able to:
 ## 🔧 Prerequisites
 
 All platforms require:
-- **Node.js** 18 or later
+- **Node.js** 22 or later
 - **npm** (comes with Node.js)
 - **Git**
 - Access to SAP ABAP system (on-premise or BTP)
@@ -248,7 +248,7 @@ This project uses **npm workspaces** to manage multiple packages (`@mcp-abap-adt
 The pre-built package (`mcp-abap-adt-core-<version>.tgz`) contains everything you need to run the server without building from source.
 
 #### Prerequisites
-- Node.js 18 or later
+- Node.js 22 or later
 - npm 9 or later
 
 #### Global Installation (Recommended)

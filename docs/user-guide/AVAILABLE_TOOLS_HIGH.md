@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 127
+- Total tools: 130
 
 ## Navigation
 
@@ -88,6 +88,10 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Function Group](#high-level-function-group)
     - [DeleteFunctionGroup](#deletefunctiongroup-high-level-function-group)
     - [GetFunctionGroup](#getfunctiongroup-high-level-function-group)
+  - [Function Include](#high-level-function-include)
+    - [CreateFunctionInclude](#createfunctioninclude-high-level-function-include)
+    - [DeleteFunctionInclude](#deletefunctioninclude-high-level-function-include)
+    - [UpdateFunctionInclude](#updatefunctioninclude-high-level-function-include)
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
@@ -1263,6 +1267,51 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-function-include"></a>
+### High-Level / Function Include
+
+<a id="createfunctioninclude-high-level-function-include"></a>
+#### CreateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+
+**Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
+
+**Parameters:**
+- `description` (string, optional) - Optional description for the include
+- `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
+- `include_name` (string, required) - Include name (e.g., LZTEST_FG_001F01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="deletefunctioninclude-high-level-function-include"></a>
+#### DeleteFunctionInclude (High-Level / Function Include)
+**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGF01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="updatefunctioninclude-high-level-function-include"></a>
+#### UpdateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+
+**Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
+
+**Parameters:**
+- `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
+- `function_group_name` (string, required) - Function group name containing the include (e.g., ZOK_FG_MCP01).
+- `include_name` (string, required) - Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.
+- `source_code` (string, required) - Complete ABAP include source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable includes.
+
+---
+
 <a id="high-level-function-module"></a>
 ### High-Level / Function Module
 
@@ -2049,4 +2098,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-05-30*
+*Last updated: 2026-06-20*

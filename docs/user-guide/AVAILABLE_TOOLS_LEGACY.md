@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 134
-- Read-Only: 11
-- High-Level: 62
+- Total tools: 141
+- Read-Only: 15
+- High-Level: 65
 - Low-Level: 61
 
 ## Navigation
@@ -17,6 +17,10 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [ReadClass](#readclass-read-only-class)
   - [Function Group](#read-only-function-group)
     - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+  - [Function Include](#read-only-function-include)
+    - [ListFunctionGroupIncludes](#listfunctiongroupincludes-read-only-function-include)
+    - [ListFunctionModules](#listfunctionmodules-read-only-function-include)
+    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
   - [Function Module](#read-only-function-module)
     - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
@@ -29,6 +33,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [ReadPackage](#readpackage-read-only-package)
   - [Program](#read-only-program)
     - [ReadProgram](#readprogram-read-only-program)
+  - [Structure](#read-only-structure)
+    - [GetStructuresList](#getstructureslist-read-only-structure)
   - [System](#read-only-system)
     - [SearchSource](#searchsource-read-only-system)
   - [View](#read-only-view)
@@ -69,6 +75,10 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [Function Group](#high-level-function-group)
     - [DeleteFunctionGroup](#deletefunctiongroup-high-level-function-group)
     - [GetFunctionGroup](#getfunctiongroup-high-level-function-group)
+  - [Function Include](#high-level-function-include)
+    - [CreateFunctionInclude](#createfunctioninclude-high-level-function-include)
+    - [DeleteFunctionInclude](#deletefunctioninclude-high-level-function-include)
+    - [UpdateFunctionInclude](#updatefunctioninclude-high-level-function-include)
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
@@ -216,6 +226,50 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="read-only-function-include"></a>
+### Read-Only / Function Include
+
+<a id="listfunctiongroupincludes-read-only-function-include"></a>
+#### ListFunctionGroupIncludes (Read-Only / Function Include)
+**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group.
+
+**Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+
+---
+
+<a id="listfunctionmodules-read-only-function-include"></a>
+#### ListFunctionModules (Read-Only / Function Include)
+**Description:** [read-only] List the function modules of an ABAP function group.
+
+**Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+
+---
+
+<a id="readfunctioninclude-read-only-function-include"></a>
+#### ReadFunctionInclude (Read-Only / Function Include)
+**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
+
+**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGTOP, LZ_MY_FGU01).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
 <a id="read-only-function-module"></a>
 ### Read-Only / Function Module
 
@@ -326,6 +380,25 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-structure"></a>
+### Read-Only / Structure
+
+<a id="getstructureslist-read-only-structure"></a>
+#### GetStructuresList (Read-Only / Structure)
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.
+
+**Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
+- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -886,6 +959,57 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_FUNCTIONGROUP).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="high-level-function-include"></a>
+### High-Level / Function Include
+
+<a id="createfunctioninclude-high-level-function-include"></a>
+#### CreateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+
+**Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `description` (string, optional) - Optional description for the include
+- `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
+- `include_name` (string, required) - Include name (e.g., LZTEST_FG_001F01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="deletefunctioninclude-high-level-function-include"></a>
+#### DeleteFunctionInclude (High-Level / Function Include)
+**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGF01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="updatefunctioninclude-high-level-function-include"></a>
+#### UpdateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+
+**Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
+- `function_group_name` (string, required) - Function group name containing the include (e.g., ZOK_FG_MCP01).
+- `include_name` (string, required) - Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.
+- `source_code` (string, required) - Complete ABAP include source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable includes.
 
 ---
 
@@ -2395,4 +2519,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-05-30*
+*Last updated: 2026-06-20*

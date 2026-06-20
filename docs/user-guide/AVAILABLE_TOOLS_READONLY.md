@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 55
+- Total tools: 59
 
 ## Navigation
 
@@ -24,6 +24,10 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetEnhancementSpot](#getenhancementspot-read-only-enhancement)
   - [Function Group](#read-only-function-group)
     - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+  - [Function Include](#read-only-function-include)
+    - [ListFunctionGroupIncludes](#listfunctiongroupincludes-read-only-function-include)
+    - [ListFunctionModules](#listfunctionmodules-read-only-function-include)
+    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
   - [Function Module](#read-only-function-module)
     - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
@@ -47,6 +51,7 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Service Definition](#read-only-service-definition)
     - [ReadServiceDefinition](#readservicedefinition-read-only-service-definition)
   - [Structure](#read-only-structure)
+    - [GetStructuresList](#getstructureslist-read-only-structure)
     - [ReadStructure](#readstructure-read-only-structure)
   - [System](#read-only-system)
     - [DescribeByList](#describebylist-read-only-system)
@@ -214,6 +219,44 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-function-include"></a>
+### Read-Only / Function Include
+
+<a id="listfunctiongroupincludes-read-only-function-include"></a>
+#### ListFunctionGroupIncludes (Read-Only / Function Include)
+**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group.
+
+**Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+
+---
+
+<a id="listfunctionmodules-read-only-function-include"></a>
+#### ListFunctionModules (Read-Only / Function Include)
+**Description:** [read-only] List the function modules of an ABAP function group.
+
+**Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+
+---
+
+<a id="readfunctioninclude-read-only-function-include"></a>
+#### ReadFunctionInclude (Read-Only / Function Include)
+**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
+
+**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGTOP, LZ_MY_FGU01).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -410,6 +453,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="read-only-structure"></a>
 ### Read-Only / Structure
+
+<a id="getstructureslist-read-only-structure"></a>
+#### GetStructuresList (Read-Only / Structure)
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.
+
+**Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
+
+**Parameters:**
+- `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
+- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
 
 <a id="readstructure-read-only-structure"></a>
 #### ReadStructure (Read-Only / Structure)
@@ -900,4 +957,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-05-30*
+*Last updated: 2026-06-20*

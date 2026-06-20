@@ -221,14 +221,14 @@ After installing globally with `npm install -g`, you can run from any directory:
 # Show help
 mcp-abap-adt --help
 
-# Default HTTP mode (works without .env file)
+# Default stdio mode (for MCP clients; requires .env file or --mcp parameter)
 mcp-abap-adt
 
-# HTTP mode on custom port
-mcp-abap-adt --http-port=8080
-
-# Use stdio mode (for MCP clients, requires .env file or --mcp parameter)
+# stdio mode (explicit; default when --transport is omitted)
 mcp-abap-adt --transport=stdio
+
+# HTTP mode on custom port (HTTP requires --transport=http)
+mcp-abap-adt --transport=http --port=8080
 
 # Use stdio mode with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=stdio --mcp=TRIAL
@@ -240,7 +240,7 @@ mcp-abap-adt --env=trial
 mcp-abap-adt --env-path=/path/to/my.env
 
 # SSE mode (requires .env file or --mcp parameter)
-mcp-abap-adt --transport=sse --sse-port=3001
+mcp-abap-adt --transport=sse --port=3001
 
 # SSE mode with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=sse --mcp=TRIAL
@@ -257,9 +257,6 @@ npm run start:http
 
 # SSE mode
 npm run start:sse
-
-# Legacy v1 server (for backward compatibility)
-npm run start:legacy
 ```
 
 ### Environment Configuration

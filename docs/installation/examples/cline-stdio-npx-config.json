@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@fr0ster/mcp-abap-adt",
+        "@mcp-abap-adt/core",
         "--transport=stdio",
         "--env=/REPLACE/WITH/PATH/TO/.env"
       ],

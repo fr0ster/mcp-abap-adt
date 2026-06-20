@@ -12,7 +12,7 @@ Automatically creates GitHub releases when you push a version tag.
 
 **What it does:**
 1. Checks out code with submodules
-2. Sets up Node.js 18
+2. Sets up Node.js 22
 3. Installs dependencies
 4. Builds the project
 5. Runs tests (non-blocking)
@@ -42,7 +42,7 @@ Runs continuous integration tests on every push and PR.
 
 **What it does:**
 1. Tests on multiple OS (Ubuntu, macOS, Windows)
-2. Tests on multiple Node.js versions (18, 20)
+2. Tests on multiple Node.js versions (22, 25)
 3. Builds and tests the project
 4. Verifies package creation
 5. Tests package installation

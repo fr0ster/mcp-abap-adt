@@ -43,7 +43,7 @@ npm install ./mcp-abap-adt-core-<version>.tgz
 ```
 
 After installation, you'll have access to:
-- `mcp-abap-adt` - MCP ABAP ADT Server (default: HTTP mode)
+- `mcp-abap-adt` - MCP ABAP ADT Server (default: stdio mode)
 - `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
 - `mcp-abap-adt --transport=http` - HTTP server transport
 - `mcp-abap-adt --transport=sse` - SSE transport
@@ -90,7 +90,7 @@ mcp-auth auth -k path/to/service-key.json
 
 **Run the server:**
 ```bash
-# Default HTTP mode (uses auth-broker by default, even if .env exists)
+# Default stdio mode (bare command starts stdio; HTTP/SSE require --transport=http/--transport=sse)
 # Note: auth-broker is available for stdio/SSE via `--mcp=<destination>` and for HTTP via destination headers
 mcp-abap-adt
 
@@ -111,7 +111,7 @@ mcp-abap-adt --env-path=/path/to/my.env
 mcp-abap-adt --env-path ~/configs/sap-dev.env
 
 # Start HTTP server on custom port
-mcp-abap-adt --transport=http --http-port=8080
+mcp-abap-adt --transport=http --port=8080
 ```
 
 **Environment File Priority:**
@@ -268,7 +268,7 @@ mcp-abap-adt --transport=sse --help
 **Available commands after global installation:**
 
 ```bash
-# Default HTTP mode (uses auth-broker by default)
+# Default stdio mode (HTTP/SSE require --transport=http/--transport=sse)
 mcp-abap-adt
 
 # Force use of auth-broker (service keys), ignore .env file
@@ -281,10 +281,10 @@ mcp-abap-adt --transport=stdio
 mcp-abap-adt --env-path=/path/to/.env
 
 # HTTP server transport
-mcp-abap-adt --transport=http --http-port=3000
+mcp-abap-adt --transport=http --port=3000
 
 # SSE transport
-mcp-abap-adt --transport=sse --sse-port=3001
+mcp-abap-adt --transport=sse --port=3001
 ```
 
 **For JWT authentication with service keys**, install separately:
@@ -305,7 +305,7 @@ cd /path/to/your/project
 npm install /path/to/mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
-npx mcp-abap-adt --transport=http --http-port=3000
+npx mcp-abap-adt --transport=http --port=3000
 ```
 
 #### Configuration
@@ -375,7 +375,7 @@ EOF
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --transport=http --env-path /path/to/custom/.env --http-port=3000
+mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port=3000
 ```
 
 #### Usage Examples
@@ -387,22 +387,22 @@ mcp-abap-adt --transport=http
 
 **Example 2: Start HTTP server on custom port**
 ```bash
-mcp-abap-adt --transport=http --http-port=8080
+mcp-abap-adt --transport=http --port=8080
 ```
 
 **Example 3: Start HTTP server accessible from network**
 ```bash
-mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=3000
+mcp-abap-adt --transport=http --host=0.0.0.0 --port=3000
 ```
 
 **Example 4: Use custom environment file**
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --http-port=8080
+mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
 ```
 
 **Example 5: Start SSE server**
 ```bash
-mcp-abap-adt --transport=sse --sse-port=3000
+mcp-abap-adt --transport=sse --port=3000
 ```
 
 #### Command Line Options
@@ -426,16 +426,19 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
 
 **HTTP Server Options (for `mcp-abap-adt --transport=http`):**
-- `--http-port=<port>` - HTTP server port (default: 3000)
-- `--http-host=<host>` - HTTP server host (default: 127.0.0.1)
+- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` - Server port (default: 3000 for http)
+- `--path=<path>` / `--http-path=<path>` (alias) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-json-response` - Enable JSON response format
 - `--http-allowed-origins=<list>` - Comma-separated allowed origins for CORS
 - `--http-allowed-hosts=<list>` - Comma-separated allowed hosts
 - `--http-enable-dns-protection` - Enable DNS rebinding protection
 
 **SSE Server Options (for `mcp-abap-adt --transport=sse`):**
-- `--sse-port=<port>` - SSE server port (default: 3001)
-- `--sse-host=<host>` - SSE server host (default: 127.0.0.1)
+- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` - Server port (default: 3001 for sse)
+- `--sse-path=<path>` - SSE connection path (default: /sse)
+- `--post-path=<path>` - SSE message post path (default: /messages)
 - `--sse-allowed-origins=<list>` - Comma-separated allowed origins for CORS
 - `--sse-allowed-hosts=<list>` - Comma-separated allowed hosts
 - `--sse-enable-dns-protection` - Enable DNS rebinding protection
@@ -492,11 +495,11 @@ mcp-abap-adt --help
 mcp-abap-adt --env=~/configs/sap-production.env
 
 # Start HTTP server with CORS configuration
-mcp-abap-adt --transport=http --http-port=8080 \
+mcp-abap-adt --transport=http --port=8080 \
   --http-allowed-origins=http://localhost:3000,https://myapp.com
 
 # Start SSE with DNS protection
-mcp-abap-adt --transport=sse --sse-port=3001 --sse-enable-dns-protection
+mcp-abap-adt --transport=sse --port=3001 --sse-enable-dns-protection
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**

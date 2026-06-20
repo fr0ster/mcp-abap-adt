@@ -104,7 +104,7 @@ mcp-abap-adt --help
 ```
 
 **Available commands after installation:**
-- `mcp-abap-adt` - HTTP transport (default)
+- `mcp-abap-adt` - stdio transport (default)
 - `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
 - `mcp-abap-adt --transport=http` - HTTP server transport
 - `mcp-abap-adt --transport=sse` - SSE server transport
@@ -115,13 +115,13 @@ mcp-abap-adt --help
 mcp-abap-adt --transport=http
 
 # HTTP server on custom port
-mcp-abap-adt --transport=http --http-port=8080
+mcp-abap-adt --transport=http --port=8080
 
 # SSE server accessible from network
-mcp-abap-adt --transport=sse --sse-host=0.0.0.0 --sse-port=3000
+mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3000
 
 # Use custom .env file
-mcp-abap-adt --transport=http --env /path/to/custom/.env --http-port=8080
+mcp-abap-adt --transport=http --env /path/to/custom/.env --port=8080
 ```
 
 **Local Installation (Project-specific):**
@@ -134,7 +134,7 @@ cd /path/to/your/project
 npm install /path/to/mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
-npx mcp-abap-adt --transport=http --http-port=3000
+npx mcp-abap-adt --transport=http --port=3000
 ```
 
 **Troubleshooting:**
@@ -206,8 +206,8 @@ SAP_TIMEOUT_DEFAULT=45000
 
 MCP ABAP ADT Server supports two transport protocols:
 
-1. **http** (default) - HTTP StreamableHTTP transport, works without .env file
-2. **stdio** - Standard input/output, used by Cline/Cursor (requires .env file)
+1. **stdio** (default) - Standard input/output, used by Cline/Cursor (requires .env file)
+2. **http** - HTTP StreamableHTTP transport (requires `--transport=http`), works without .env file
 2. **SSE/HTTP** - Server-Sent Events over HTTP, for web interfaces
 
 ### Cline (VS Code Extension)
@@ -237,7 +237,7 @@ Uses **stdio** mode (must be explicitly specified).
 ```
 
 **Important notes:**
-- `--transport=stdio` is **required** (default is HTTP mode)
+- `--transport=stdio` is the default; HTTP/SSE require `--transport=http`/`--transport=sse`
 - `--env` argument is **required** if `.env` file is not in the current working directory
 - If `.env` file is in the current directory, you can omit `--env` argument:
 
@@ -295,29 +295,30 @@ Add to Cursor settings (`~/.cursor/config.json`):
 
 ### HTTP Mode (Streamable HTTP)
 
-**⚠️ IMPORTANT:** HTTP mode is the **default** mode. No `.env` file is required for HTTP mode (connection can be configured via HTTP headers).
+**⚠️ IMPORTANT:** HTTP mode requires `--transport=http` (the default transport is stdio). No `.env` file is required for HTTP mode (connection can be configured via HTTP headers).
 
 **Starting HTTP Server:**
 
 ```bash
-# Start server in HTTP mode (default, no arguments needed)
-mcp-abap-adt
+# Start server in HTTP mode (requires --transport=http)
+mcp-abap-adt --transport=http
 
 # Or explicitly specify HTTP mode
 mcp-abap-adt --transport=streamable-http
 
 # Or with custom port
-mcp-abap-adt --transport=streamable-http --http-port=8080
+mcp-abap-adt --transport=streamable-http --port=8080
 ```
 
 **HTTP Server Options:**
-- `--transport=streamable-http` or `--transport=http` - Use HTTP transport (default)
-- `--http-port PORT` - Port number (default: 3000)
-- `--http-host HOST` - Host address (default: 127.0.0.1)
+- `--transport=streamable-http` or `--transport=http` - Use HTTP transport (stdio is the default)
+- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` - Server port (default: 3000 for http)
+- `--path=<path>` (alias `--http-path=<path>`) - HTTP endpoint path (default: /mcp/stream/http)
 
 **Example with custom port:**
 ```bash
-mcp-abap-adt --transport=streamable-http --http-port=8080
+mcp-abap-adt --transport=streamable-http --port=8080
 ```
 
 Server will be available at: `http://localhost:8080/mcp/stream/http`
@@ -360,20 +361,22 @@ mcp-abap-adt --transport=streamable-http --env=/path/to/your/e19.env
 mcp-abap-adt --transport=sse --env=/path/to/your/e19.env
 
 # Or with custom port
-mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/your/e19.env
+mcp-abap-adt --transport=sse --port=3001 --env=/path/to/your/e19.env
 ```
 
 **SSE Server Options:**
 - `--transport=sse` - Use SSE transport
-- `--sse-port PORT` - Port number (default: 3001)
-- `--sse-host HOST` - Host address (default: 127.0.0.1)
+- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` - Server port (default: 3001 for sse)
+- `--sse-path=<path>` - SSE connection path (default: /sse)
+- `--post-path=<path>` - SSE message post path (default: /messages)
 - `--sse-allowed-origins LIST` - Comma-separated allowed origins
 - `--sse-enable-dns-protection` - Enable DNS rebinding protection
 - `--env=PATH` - Path to `.env` file (required for SSE mode)
 
 **Example with custom port and host:**
 ```bash
-mcp-abap-adt --transport=sse --sse-port=4100 --sse-host=127.0.0.1 --env=/path/to/your/e19.env
+mcp-abap-adt --transport=sse --port=4100 --host=127.0.0.1 --env=/path/to/your/e19.env
 ```
 
 Server will be available at: `http://127.0.0.1:4100/sse`

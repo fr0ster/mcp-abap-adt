@@ -8,9 +8,9 @@ If you prefer not to edit JSON/TOML by hand, use the configurator CLI:
 ## Overview
 
 The `mcp-abap-adt` server supports multiple transport modes:
-- **streamable-http** - HTTP-based transport with streaming support (default)
-- **stdio** - Standard input/output (for MCP clients like Cline, Cursor)
-- **sse** - Server-Sent Events transport
+- **stdio** - Standard input/output (default; for MCP clients like Cline, Cursor)
+- **streamable-http** - HTTP-based transport with streaming support (requires `--transport=http`)
+- **sse** - Server-Sent Events transport (requires `--transport=sse`)
 
 For HTTP-based transports (streamable-http and sse), you can configure SAP connection parameters via HTTP headers, allowing dynamic connection configuration per request.
 
@@ -471,7 +471,7 @@ The server can be started in HTTP mode with:
 ```bash
 npm run start:http
 # or
-node dist/index.js --transport streamable-http --http-port 3000
+node dist/index.js --transport streamable-http --port 3000
 ```
 
 ### Environment Variables

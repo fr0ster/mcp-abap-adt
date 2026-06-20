@@ -288,13 +288,15 @@ launcher.ts main()
 
 Handlers are organized into groups by access level:
 
-| Group | Purpose | Typical Tool Count |
+| Group | Purpose | Approx. Tool Count |
 |:---|:---|:---|
-| `ReadOnlyHandlersGroup` | Get operations (read source, metadata) | ~10 |
-| `HighLevelHandlersGroup` | Full CRUD (Create, Update, Delete, Get) | ~90 |
-| `LowLevelHandlersGroup` | Fine-grained (lock, unlock, activate, validate) | ~40 |
-| `SearchHandlersGroup` | Repository search, where-used | ~5 |
-| `SystemHandlersGroup` | System info, discovery | ~3 |
+| `ReadOnlyHandlersGroup` | Get operations (read source, metadata) | ~29 |
+| `HighLevelHandlersGroup` | Full CRUD (Create, Update, Delete, Get) | ~121 |
+| `LowLevelHandlersGroup` | Fine-grained (lock, unlock, activate, validate) | ~120 |
+| `SearchHandlersGroup` | Repository search, where-used | ~4 |
+| `SystemHandlersGroup` | System info, discovery | ~30 |
+
+Counts drift as tools are added; see [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) for the authoritative, up-to-date list.
 
 The `exposition` configuration controls which groups are active, enabling read-only deployments or full-access modes.
 

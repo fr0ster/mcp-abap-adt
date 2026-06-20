@@ -17,8 +17,8 @@ Install from a pre-built `.tgz` package:
 npm install -g ./mcp-abap-adt-core-7.1.2.tgz
 
 # Available commands:
-mcp-abap-adt          # HTTP transport (default)
-mcp-abap-adt --transport=stdio    # stdio transport (for MCP clients)
+mcp-abap-adt          # stdio transport (default, for MCP clients)
+mcp-abap-adt --transport=http     # HTTP server
 mcp-abap-adt --transport=sse      # SSE server
 ```
 

@@ -126,7 +126,7 @@ mcp-abap-adt --transport=http
 mcp-abap-adt --transport=sse
 ```
 
-**Note:** You can use shortcuts `--http` or `--sse` instead of `--transport=http` or `--transport=sse`.
+**Note:** Select the transport with `--transport=stdio|http|sse`. There are no `--http`/`--sse` standalone shortcuts; configure host and port with `--http-host`/`--http-port` and `--sse-host`/`--sse-port`.
 
 ## SAP Connection Type
 

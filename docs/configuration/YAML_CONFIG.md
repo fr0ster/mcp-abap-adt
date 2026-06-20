@@ -101,7 +101,7 @@ sse:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `http.port` | number | `3000` | HTTP server port |
-| `http.host` | string | `0.0.0.0` | HTTP server host (`0.0.0.0` for all interfaces, `localhost` for local only) |
+| `http.host` | string | `127.0.0.1` | HTTP server host (`127.0.0.1`/`localhost` for local only, `0.0.0.0` for all interfaces) |
 | `http.json-response` | boolean | `false` | Enable JSON response format |
 | `http.allowed-origins` | array/string | `[]` | Allowed CORS origins (comma-separated string or array) |
 | `http.allowed-hosts` | array/string | `[]` | Allowed hosts (comma-separated string or array) |
@@ -112,7 +112,7 @@ sse:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `sse.port` | number | `3001` | SSE server port |
-| `sse.host` | string | `0.0.0.0` | SSE server host |
+| `sse.host` | string | `127.0.0.1` | SSE server host |
 | `sse.allowed-origins` | array/string | `[]` | Allowed CORS origins (comma-separated string or array) |
 | `sse.allowed-hosts` | array/string | `[]` | Allowed hosts (comma-separated string or array) |
 | `sse.enable-dns-protection` | boolean | `false` | Enable DNS rebinding protection |

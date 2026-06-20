@@ -62,7 +62,7 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Object search
    - Code search
 
-6. **system** - Always included automatically  
+6. **system** - Included only when the exposition includes `readonly` (added alongside the read-only group)
    - Where-used analysis (GetWhereUsed)
    - Type information (GetTypeInfo)
    - Object info (GetObjectInfo)
@@ -75,12 +75,12 @@ V2 server supports flexible handler set configuration through the `--exposition`
 
 ## Usage
 
-**Note:** `search` and `system` handler groups are ALWAYS included regardless of `--exposition` setting.
+**Note:** The `search` handler group is ALWAYS included regardless of `--exposition`. The `system` handler group is included only when the exposition contains `readonly` (it is registered together with the read-only group). The default exposition is `readonly,high`, so both are present by default.
 
 ### Command Line
 
 ```bash
-# Default: readonly + high (+ search + system always included)
+# Default: readonly + high (+ search always; + system because readonly is present)
 node bin/mcp-abap-adt.js --transport=stdio --env-path=.env
 
 # Only read-only operations (safest)

@@ -16,6 +16,7 @@
   - Stale local-pack tarball names / version pins (`…-1.1.0/1.2.0.tgz`) → version-independent `mcp-abap-adt-core-<version>.tgz` (so they no longer drift); Node requirement `18` → `22+` (matches `engines`); removed the non-existent `npm run start:legacy` / `dev:stdio` references and the `bin/mcp-abap-adt-v2.js` run examples.
   - Corrected narrative drift: default transport is `stdio` (not HTTP); HTTP/SSE host default is `127.0.0.1` (not `0.0.0.0`); removed non-existent `--http`/`--sse` CLI shortcuts; refreshed handler-group tool counts and the `src/handlers/` directory list; the `system` handler group rides with `readonly` (it is not always included).
   - Regenerated `docs/user-guide/AVAILABLE_TOOLS*.md` from the current `TOOL_DEFINITION`s (function-include tools, `GetStructuresList`, `GetIncludesList` tree, `GetProgFullCode` removal, refreshed counts).
+  - Removed documentation for the CORS / allowed-hosts / DNS-rebinding-protection options (`--http`/`--sse-allowed-origins`/`-allowed-hosts`/`-enable-dns-protection`, the matching `MCP_*` env vars, and the `http`/`sse` `allowed-origins`/`allowed-hosts`/`enable-dns-protection` YAML keys): they are parsed but not wired to the servers, so documenting them overstated capability. Actually implementing these is planned for a follow-up release.
 
 ## [7.1.2] - 2026-06-20
 

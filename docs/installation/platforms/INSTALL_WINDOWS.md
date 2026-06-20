@@ -108,13 +108,13 @@ mcp-abap-adt --help
 mcp-abap-adt --transport=http
 
 # HTTP server on custom port
-mcp-abap-adt --transport=http --port 8080
+mcp-abap-adt --transport=http --http-port=8080
 
 # SSE server accessible from network
-mcp-abap-adt --transport=sse --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=sse --sse-host=0.0.0.0 --sse-port=3000
 
 # Use custom .env file
-mcp-abap-adt --transport=http --env C:\path\to\custom\.env --port 8080
+mcp-abap-adt --transport=http --env C:\path\to\custom\.env --http-port=8080
 ```
 
 **Local Installation (Project-specific):**
@@ -127,7 +127,7 @@ cd C:\path\to\your\project
 npm install C:\path\to\mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
-npx mcp-abap-adt --transport=http --port 3000
+npx mcp-abap-adt --transport=http --http-port=3000
 ```
 
 **Troubleshooting:**
@@ -322,7 +322,7 @@ mcp-abap-adt --transport=streamable-http --http-port=8080
 **HTTP Server Options:**
 - `--transport=streamable-http` or `--transport=http` - Use HTTP transport (default)
 - `--http-port PORT` - Port number (default: 3000)
-- `--http-host HOST` - Host address (default: 0.0.0.0)
+- `--http-host HOST` - Host address (default: 127.0.0.1)
 
 **Example with custom port:**
 ```powershell
@@ -375,7 +375,7 @@ mcp-abap-adt --transport=sse --sse-port=3001 --env=C:\\path\\to\\your\\e19.env
 **SSE Server Options:**
 - `--transport=sse` - Use SSE transport
 - `--sse-port PORT` - Port number (default: 3001)
-- `--sse-host HOST` - Host address (default: 0.0.0.0)
+- `--sse-host HOST` - Host address (default: 127.0.0.1)
 - `--sse-allowed-origins LIST` - Comma-separated allowed origins
 - `--sse-enable-dns-protection` - Enable DNS rebinding protection
 - `--env=PATH` - Path to `.env` file (required for SSE mode)

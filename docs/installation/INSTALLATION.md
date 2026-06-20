@@ -305,7 +305,7 @@ cd /path/to/your/project
 npm install /path/to/mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
-npx mcp-abap-adt --transport=http --port 3000
+npx mcp-abap-adt --transport=http --http-port=3000
 ```
 
 #### Configuration
@@ -375,7 +375,7 @@ EOF
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port 3000
+mcp-abap-adt --transport=http --env-path /path/to/custom/.env --http-port=3000
 ```
 
 #### Usage Examples
@@ -387,22 +387,22 @@ mcp-abap-adt --transport=http
 
 **Example 2: Start HTTP server on custom port**
 ```bash
-mcp-abap-adt --transport=http --port 8080
+mcp-abap-adt --transport=http --http-port=8080
 ```
 
 **Example 3: Start HTTP server accessible from network**
 ```bash
-mcp-abap-adt --transport=http --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=3000
 ```
 
 **Example 4: Use custom environment file**
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env-path /opt/config/.env.production --http-port=8080
 ```
 
 **Example 5: Start SSE server**
 ```bash
-mcp-abap-adt --transport=sse --port 3000
+mcp-abap-adt --transport=sse --sse-port=3000
 ```
 
 #### Command Line Options
@@ -427,7 +427,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 
 **HTTP Server Options (for `mcp-abap-adt --transport=http`):**
 - `--http-port=<port>` - HTTP server port (default: 3000)
-- `--http-host=<host>` - HTTP server host (default: 0.0.0.0)
+- `--http-host=<host>` - HTTP server host (default: 127.0.0.1)
 - `--http-json-response` - Enable JSON response format
 - `--http-allowed-origins=<list>` - Comma-separated allowed origins for CORS
 - `--http-allowed-hosts=<list>` - Comma-separated allowed hosts
@@ -435,7 +435,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 
 **SSE Server Options (for `mcp-abap-adt --transport=sse`):**
 - `--sse-port=<port>` - SSE server port (default: 3001)
-- `--sse-host=<host>` - SSE server host (default: 0.0.0.0)
+- `--sse-host=<host>` - SSE server host (default: 127.0.0.1)
 - `--sse-allowed-origins=<list>` - Comma-separated allowed origins for CORS
 - `--sse-allowed-hosts=<list>` - Comma-separated allowed hosts
 - `--sse-enable-dns-protection` - Enable DNS rebinding protection

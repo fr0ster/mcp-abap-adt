@@ -499,8 +499,8 @@ Table rows: `http.allowed-hosts`, `http.allowed-origins`, `http.enable-dns-prote
 
 - [ ] **Step 4: Verify no "CORS" wording** crept in and examples use host:port:
 
-Run: `grep -rni "CORS\|Access-Control" docs | grep -viE "archive/"`
-Expected: no new lines describing these flags as CORS.
+Run: `grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration`
+Expected: no user-facing lines describe the allowed-hosts/allowed-origins/enable-dns-protection options as CORS. (Do NOT scan `docs/superpowers/` — the spec and this plan intentionally say "NOT CORS" / mention `Access-Control-Allow-Origin`, so they would be false positives.)
 
 - [ ] **Step 5: Commit**
 
@@ -523,7 +523,7 @@ git commit -m "docs: document DNS-rebinding protection (Host/Origin allowlist)"
 ## [7.2.0] - 2026-06-21
 
 ### Added
-- **DNS-rebinding protection for the HTTP/SSE transports.** `--http`/`--sse-allowed-hosts`, `--allowed-origins`, and `--enable-dns-protection` (plus the matching `MCP_*` env vars and `http`/`sse` YAML keys) now take effect: when enabled with an allowlist, requests with a non-allowlisted `Host`/`Origin` header are rejected with HTTP 403. Transport-aware (http uses `http*`, sse uses `sse*`); applied in `registerRoutes` so both standalone and embedded modes are protected; `/mcp/health` is ungated. Defaults off (no-op). This is Host/Origin allowlist validation, NOT browser CORS. Values are matched exactly (Host includes port, e.g. `localhost:3000`). Implemented as own Express middleware rather than the now-deprecated SDK transport options.
+- **DNS-rebinding protection for the HTTP/SSE transports.** `--http-allowed-hosts`/`--sse-allowed-hosts`, `--http-allowed-origins`/`--sse-allowed-origins`, and `--http-enable-dns-protection`/`--sse-enable-dns-protection` (plus the matching `MCP_HTTP_*`/`MCP_SSE_*` env vars and the `http`/`sse` `allowed-hosts`/`allowed-origins`/`enable-dns-protection` YAML keys) now take effect: when enabled with an allowlist, requests with a non-allowlisted `Host`/`Origin` header are rejected with HTTP 403. Transport-aware (http uses `http*`, sse uses `sse*`); applied in `registerRoutes` so both standalone and embedded modes are protected; `/mcp/health` is ungated. Defaults off (no-op). This is Host/Origin allowlist validation, NOT browser CORS. Values are matched exactly (Host includes port, e.g. `localhost:3000`). Implemented as own Express middleware rather than the now-deprecated SDK transport options.
 ```
 
 - [ ] **Step 3: Final gate**

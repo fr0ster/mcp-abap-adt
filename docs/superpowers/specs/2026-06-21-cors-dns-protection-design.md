@@ -55,48 +55,78 @@ would need migration later; we chose the durable, SDK-recommended path.
 
 ### New module — `src/server/dnsRebindingProtection.ts`
 
-A factory returning an Express `RequestHandler`, mirroring the SDK semantics:
+Because `IHttpApplication.post(path, handler)` takes a **single** handler and
+`IHttpApplication.use` is optional (not all embedded apps support it), we do NOT
+use `app.use(...)` middleware. Instead the module exposes a **handler wrapper**
+that runs the validation and then delegates — applied inside `registerRoutes()`
+so it protects BOTH standalone and embedded modes (see §server integration).
+
 ```ts
 import type { Request, Response, NextFunction } from 'express';
 
 export interface DnsRebindingOptions {
   enable?: boolean;
-  allowedHosts?: string[];
-  allowedOrigins?: string[];
+  allowedHosts?: string[];   // exact raw Host header values, incl. port (e.g. "localhost:3000")
+  allowedOrigins?: string[]; // exact raw Origin header values (e.g. "https://app.example.com")
 }
 
-export function createDnsRebindingMiddleware(opts: DnsRebindingOptions) {
-  const enabled = opts.enable === true;
+type RouteHandler = (
+  req: Request,
+  res: Response,
+  next?: NextFunction,
+) => void | Promise<void>;
+
+/** Returns a 403 JSON-RPC body if the request must be rejected, else null. */
+export function checkDnsRebinding(
+  headers: { host?: string; origin?: string },
+  opts: DnsRebindingOptions,
+): { status: number; body: unknown } | null {
+  if (opts.enable !== true) return null; // disabled → no validation
   const hosts = opts.allowedHosts ?? [];
   const origins = opts.allowedOrigins ?? [];
-  return (req: Request, res: Response, next: NextFunction): void => {
-    if (!enabled) return next();
-    if (hosts.length > 0) {
-      const host = req.headers.host;
-      if (!host || !hosts.includes(host)) {
-        res.status(403).json({
-          jsonrpc: '2.0',
-          error: { code: -32000, message: `Invalid Host header: ${host ?? ''}` },
-          id: null,
-        });
-        return;
-      }
+  if (hosts.length > 0) {
+    const host = headers.host;
+    if (!host || !hosts.includes(host)) {
+      return reject(`Invalid Host header: ${host ?? ''}`);
     }
-    if (origins.length > 0) {
-      const origin = req.headers.origin;
-      if (origin && !origins.includes(origin)) {
-        res.status(403).json({
-          jsonrpc: '2.0',
-          error: { code: -32000, message: `Invalid Origin header: ${origin}` },
-          id: null,
-        });
-        return;
-      }
+  }
+  if (origins.length > 0) {
+    const origin = headers.origin;
+    if (origin && !origins.includes(origin)) {
+      return reject(`Invalid Origin header: ${origin}`);
     }
-    next();
+  }
+  return null;
+}
+
+function reject(message: string) {
+  return {
+    status: 403,
+    body: { jsonrpc: '2.0', error: { code: -32000, message }, id: null },
+  };
+}
+
+/** Wrap an MCP route handler so it validates Host/Origin first. */
+export function withDnsRebindingProtection(
+  handler: RouteHandler,
+  opts: DnsRebindingOptions,
+): RouteHandler {
+  return (req, res, next) => {
+    const rejection = checkDnsRebinding(
+      { host: req.headers.host, origin: req.headers.origin },
+      opts,
+    );
+    if (rejection) {
+      res.status(rejection.status).json(rejection.body);
+      return;
+    }
+    return handler(req, res, next);
   };
 }
 ```
+Note: `Host`/`Origin` are matched as **exact raw header values** (the SDK does the
+same). The `Host` header normally includes the port — `localhost:3000`, not
+`localhost`. Origin includes scheme — `https://app.example.com`.
 
 ### Config data flow
 
@@ -138,12 +168,19 @@ export function createDnsRebindingMiddleware(opts: DnsRebindingOptions) {
    `new SseServer(...)` and `new StreamableHttpServer(...)` option objects.
 
 4. **`src/server/StreamableHttpServer.ts`** & **`src/server/SseServer.ts`** — add
-   the three fields to each `*ServerOptions` interface, store on the instance, and
-   in `start()` register the middleware on the Express app BEFORE the MCP route
-   handlers (the `this.path` POST/all routes for HTTP; the SSE + post routes for
-   SSE). Do NOT gate the `/mcp/health` endpoint. The SDK transports are created
-   WITHOUT the deprecated `allowed*`/`enableDnsRebindingProtection` options (the
-   middleware does the validation).
+   the three fields to each `*ServerOptions` interface and store them on the
+   instance. Apply protection **inside `registerRoutes()`** (NOT in `start()`),
+   because `registerRoutes()` is the shared path for BOTH standalone mode and
+   embedded mode (`start()` delegates to `registerRoutes(this.externalApp)` and
+   returns). Wrap the MCP route handler(s) with `withDnsRebindingProtection(...)`:
+   - HTTP: `app.post(this.path, withDnsRebindingProtection(handler, opts))` and the
+     same wrapping for the `app.all(this.path, …)` fallback handler.
+   - SSE: wrap the SSE connection (GET) handler and the message POST handler.
+   - Leave `/mcp/health` (and any non-MCP route) **ungated**.
+   Do NOT use `app.use(...)` — `IHttpApplication.post` takes a single handler and
+   `IHttpApplication.use` is optional, so wrapping the handler is the only approach
+   that works in embedded mode too. The SDK transports are still created WITHOUT
+   the deprecated `allowed*`/`enableDnsRebindingProtection` options.
 
 ### Documentation (restore, accurate)
 
@@ -154,17 +191,27 @@ described as **DNS-rebinding protection (Host + Origin allowlist)** — not CORS
 Each must state: it only takes effect when `enable-dns-protection` is set AND at
 least one of `allowed-hosts`/`allowed-origins` is non-empty; transport-specific
 (`--http-*` for http, `--sse-*` for sse); a non-allowlisted Host/Origin yields HTTP
-403. Keep the generic flag style and correct defaults established in 7.1.3.
+403. **Values are matched as exact raw header values**: `allowed-hosts` entries must
+include the port the client actually sends (e.g. `localhost:3000`, not `localhost`),
+and `allowed-origins` entries include the scheme (e.g. `https://app.example.com`) —
+include an example to prevent accidental lockout. Keep the generic flag style and
+correct defaults established in 7.1.3.
 
 ### Testing
 
-- **Unit — `src/__tests__/server/dnsRebindingProtection.test.ts`** (Express not
-  required; call the handler with stub `req`/`res`/`next`):
-  - disabled → always `next()`, never 403.
-  - enabled + allowedHosts set: allowed host → next; missing/other host → 403.
-  - enabled + allowedOrigins set: matching origin → next; absent origin → next;
+- **Unit — `src/__tests__/server/dnsRebindingProtection.test.ts`** — test
+  `checkDnsRebinding(headers, opts)` directly (pure, no Express needed), and
+  `withDnsRebindingProtection` with stub `req`/`res`/`next`:
+  - disabled → `checkDnsRebinding` returns null / wrapper calls `next`, never 403.
+  - enabled + allowedHosts set: allowed host (with port) → pass; missing/other host → 403.
+  - enabled + allowedOrigins set: matching origin → pass; absent origin → pass;
     other origin → 403.
-  - enabled with empty lists → next (no-op), matching the SDK requirement note.
+  - enabled with empty lists → pass (no-op), matching the SDK requirement note.
+  - exact-match incl. port: `allowedHosts=['localhost:3000']` rejects `Host: localhost`
+    and accepts `Host: localhost:3000`.
+- Both standalone and embedded modes are covered because the wrapper is applied in
+  the shared `registerRoutes()`; a focused test may assert the wrapped handler
+  rejects before delegating.
 - **Unit — ServerConfigManager mapping** (set `process.argv`): `--transport=http
   --http-allowed-origins=a,b --http-enable-dns-protection` → `config.allowedOrigins
   = ['a','b']`, `config.enableDnsRebindingProtection === true`; `--transport=sse

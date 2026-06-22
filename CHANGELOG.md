@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [7.2.1] - 2026-06-23
+
+### Fixed
+- **`GetStructuresList` now returns extension (append) structures in the tree.** Calling it with just a structure name (e.g. `ZMCP_SHR_STRU`) returns a hierarchy containing both the included structure (`kind: include`) and the appending structure that `extend type <this> with …` (`kind: append`). Previously appends were missed: the where-used lookup used the default scope (some object types unselected, so the extension's type was excluded) and a fragile `displayName`/`globalType` regex. It now uses `getWhereUsedList({ enableAllTypes: true })` and the parsed references. Also removed dead `.APPEND` source-parsing (ADT never emits `.APPEND` in a structure's source — appends are separate `extend type` objects). Verified end-to-end on a real system.
+
 ## [7.2.0] - 2026-06-22
 
 ### Added

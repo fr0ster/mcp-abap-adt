@@ -2220,10 +2220,14 @@ get_structures_list_readonly:
     - name: "list_embedded_structures"
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
-      description: "List the structures embedded (.INCLUDE / include) in the shared base structure"
+      description: "List the structures embedded (include) and extending (append) the shared base structure"
       params:
         structure_name: "ZMCP_SHR_STRU"
         expected_include: "ZMCP_SHR_STRU_INC"
+        # Extension (append) structure that `extend type ZMCP_SHR_STRU with …`.
+        # Created out-of-band (adt-clients cannot create `extend type` objects);
+        # leave empty to skip the append assertion on systems without it.
+        expected_append: "ZOK_S_APPEND"
 
 # FunctionInclude high-level lifecycle (create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.

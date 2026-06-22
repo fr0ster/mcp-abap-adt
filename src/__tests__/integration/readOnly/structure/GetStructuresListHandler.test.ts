@@ -188,8 +188,24 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       expect(child).toBeDefined();
       expect(child?.kind).toBe('include');
 
+      // Append (extension) child — config-driven; only asserted when the test
+      // case provides `expected_append` (the extension is created out-of-band,
+      // since adt-clients cannot create `extend type` objects).
+      const expectedAppend = testCase.params.expected_append
+        ? String(testCase.params.expected_append).toUpperCase()
+        : null;
+      if (expectedAppend) {
+        const appendChild = (tree.children ?? []).find(
+          (node) => node.structure === expectedAppend,
+        );
+        expect(appendChild).toBeDefined();
+        expect(appendChild?.kind).toBe('append');
+      }
+
       testLogger?.info(
-        `✅ GetStructuresList completed: found include ${expectedInclude}`,
+        `✅ GetStructuresList completed: found include ${expectedInclude}${
+          expectedAppend ? ` + append ${expectedAppend}` : ''
+        }`,
       );
     },
     getTimeout('medium'),

@@ -498,8 +498,7 @@ git commit -m "feat(server): apply DNS-rebinding guard in SseServer registerRout
 - [ ] **Step 1: Add a flag-reference block** to CLI_OPTIONS.md (HTTP section and SSE section) and to the INSTALLATION.md / platform-guide option lists, using this content (adjust `--http-`/`--sse-` per section):
 
 ```
-DNS-rebinding protection (Host + Origin allowlist; NOT browser CORS — no
-Access-Control-Allow-Origin headers are emitted):
+DNS-rebinding protection (Host + Origin allowlist; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted):
 
 - `--http-allowed-hosts=<list>`   Comma-separated exact Host header values to allow,
                                   including port (e.g. localhost:3000).
@@ -525,8 +524,8 @@ Table rows: `http.allowed-hosts`, `http.allowed-origins`, `http.enable-dns-prote
 
 - [ ] **Step 4: Verify no "CORS" wording** crept in and examples use host:port:
 
-Run: `grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration | grep -viE 'not (a |browser )?cors|no Access-Control-Allow-Origin'`
-Expected: **empty**. The intentional "NOT browser CORS / no Access-Control-Allow-Origin" disclaimers added in Step 1 are filtered out by the second `grep`; any line that survives would be wrongly presenting these options as CORS and must be fixed. (Do NOT scan `docs/superpowers/` — the spec/plan there intentionally discuss CORS and would be false positives.)
+Run: `grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration | grep -viE 'not (a |browser )?cors|access-control-allow-origin headers are emitted'`
+Expected: **empty**. The intentional disclaimer ("NOT browser CORS — no Access-Control-Allow-Origin headers are emitted") is filtered out — the two allow-patterns cover it whether it stays on one line or wraps onto two. Any line that survives would be wrongly presenting these options as CORS and must be fixed. (Do NOT scan `docs/superpowers/` — the spec/plan there intentionally discuss CORS and would be false positives.)
 
 - [ ] **Step 5: Commit**
 

@@ -259,8 +259,34 @@ describe('ServerConfigManager DNS-rebinding mapping', () => {
     expect(c.allowedOrigins).toBeUndefined();
     expect(c.enableDnsRebindingProtection).toBe(false);
   });
+
+  it('maps MCP_HTTP_* env vars', () => {
+    process.env.MCP_HTTP_ALLOWED_ORIGINS = 'https://a.com';
+    process.env.MCP_HTTP_ENABLE_DNS_PROTECTION = 'true';
+    try {
+      const c = configFor(['--transport=http']);
+      expect(c.allowedOrigins).toEqual(['https://a.com']);
+      expect(c.enableDnsRebindingProtection).toBe(true);
+    } finally {
+      delete process.env.MCP_HTTP_ALLOWED_ORIGINS;
+      delete process.env.MCP_HTTP_ENABLE_DNS_PROTECTION;
+    }
+  });
+
+  it('maps YAML keys via applyYamlConfigToArgs', () => {
+    // YAML path: applyYamlConfigToArgs pushes flags onto argv, then ArgumentsParser reads them.
+    process.argv = ['node', 'x', '--transport=http'];
+    applyYamlConfigToArgs({
+      http: { 'allowed-hosts': ['localhost:3000'], 'enable-dns-protection': true },
+    } as any);
+    const c = new ServerConfigManager().getConfigSync();
+    expect(c.allowedHosts).toEqual(['localhost:3000']);
+    expect(c.enableDnsRebindingProtection).toBe(true);
+  });
 });
 ```
+
+(Top of the test file also import the YAML helper: `import { applyYamlConfigToArgs } from '../../lib/config/yamlConfig';`. Confirm the env-var names against `ArgumentsParser` — `MCP_HTTP_ALLOWED_ORIGINS` / `MCP_HTTP_ALLOWED_HOSTS` / `MCP_HTTP_ENABLE_DNS_PROTECTION` and the `MCP_SSE_*` equivalents — and adjust if they differ.)
 
 - [ ] **Step 2: Run it to verify it fails**
 
@@ -499,8 +525,8 @@ Table rows: `http.allowed-hosts`, `http.allowed-origins`, `http.enable-dns-prote
 
 - [ ] **Step 4: Verify no "CORS" wording** crept in and examples use host:port:
 
-Run: `grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration`
-Expected: no user-facing lines describe the allowed-hosts/allowed-origins/enable-dns-protection options as CORS. (Do NOT scan `docs/superpowers/` — the spec and this plan intentionally say "NOT CORS" / mention `Access-Control-Allow-Origin`, so they would be false positives.)
+Run: `grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration | grep -viE 'not (a |browser )?cors|no Access-Control-Allow-Origin'`
+Expected: **empty**. The intentional "NOT browser CORS / no Access-Control-Allow-Origin" disclaimers added in Step 1 are filtered out by the second `grep`; any line that survives would be wrongly presenting these options as CORS and must be fixed. (Do NOT scan `docs/superpowers/` — the spec/plan there intentionally discuss CORS and would be false positives.)
 
 - [ ] **Step 5: Commit**
 
@@ -519,8 +545,10 @@ git commit -m "docs: document DNS-rebinding protection (Host/Origin allowlist)"
 
 - [ ] **Step 2: Add CHANGELOG `[7.2.0] - <date>`**:
 
+Use the ACTUAL release date (the day Task 8 runs), not a hardcoded one:
+
 ```markdown
-## [7.2.0] - 2026-06-21
+## [7.2.0] - <YYYY-MM-DD release date>
 
 ### Added
 - **DNS-rebinding protection for the HTTP/SSE transports.** `--http-allowed-hosts`/`--sse-allowed-hosts`, `--http-allowed-origins`/`--sse-allowed-origins`, and `--http-enable-dns-protection`/`--sse-enable-dns-protection` (plus the matching `MCP_HTTP_*`/`MCP_SSE_*` env vars and the `http`/`sse` `allowed-hosts`/`allowed-origins`/`enable-dns-protection` YAML keys) now take effect: when enabled with an allowlist, requests with a non-allowlisted `Host`/`Origin` header are rejected with HTTP 403. Transport-aware (http uses `http*`, sse uses `sse*`); applied in `registerRoutes` so both standalone and embedded modes are protected; `/mcp/health` is ungated. Defaults off (no-op). This is Host/Origin allowlist validation, NOT browser CORS. Values are matched exactly (Host includes port, e.g. `localhost:3000`). Implemented as own Express middleware rather than the now-deprecated SDK transport options.

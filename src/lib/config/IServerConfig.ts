@@ -62,6 +62,12 @@ export interface IServerConfig {
   host?: string;
   /** Server port */
   port?: number;
+  /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
+  allowedHosts?: string[];
+  /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
+  allowedOrigins?: string[];
+  /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
+  enableDnsRebindingProtection?: boolean;
 
   // ============================================================================
   // HTTP/SSE SPECIFIC

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [7.2.0] - 2026-06-22
+
+### Added
+- **DNS-rebinding protection for the HTTP/SSE transports.** `--http-allowed-hosts`/`--sse-allowed-hosts`, `--http-allowed-origins`/`--sse-allowed-origins`, and `--http-enable-dns-protection`/`--sse-enable-dns-protection` (plus the matching `MCP_HTTP_*`/`MCP_SSE_*` env vars and the `http`/`sse` `allowed-hosts`/`allowed-origins`/`enable-dns-protection` YAML keys) now take effect: when enabled with an allowlist, requests with a non-allowlisted `Host`/`Origin` header are rejected with HTTP 403. Transport-aware (http uses `http*`, sse uses `sse*`); applied in `registerRoutes` so both standalone and embedded modes are protected; `/mcp/health` is ungated. Defaults off (no-op). This is Host/Origin allowlist validation, NOT browser CORS. Values are matched exactly (Host includes port, e.g. `localhost:3000`). Implemented as own Express middleware rather than the now-deprecated SDK transport options.
+
 ## [7.1.3] - 2026-06-20
 
 > Fixes the SSE transport host/port resolution, removes a broken CLI bin entry,

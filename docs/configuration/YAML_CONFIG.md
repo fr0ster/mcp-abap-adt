@@ -66,6 +66,9 @@ http:
   # When using 0.0.0.0, client must provide all connection headers - server won't use default destination
   host: 127.0.0.1
   json-response: false
+  allowed-hosts: []          # DNS-rebinding protection: exact Host values incl. port, e.g. ["localhost:3000"]
+  allowed-origins: []        # DNS-rebinding protection: exact Origin values incl. scheme, e.g. ["https://app.example.com"]
+  enable-dns-protection: false  # Enable Host/Origin allowlist validation (needs at least one list set)
 
 # SSE (Server-Sent Events) transport options
 sse:
@@ -73,6 +76,9 @@ sse:
   # Host binding: 127.0.0.1 (default, localhost only, secure) or 0.0.0.0 (all interfaces, less secure)
   # When using 0.0.0.0, client must provide all connection headers - server won't use default destination
   host: 127.0.0.1
+  allowed-hosts: []          # DNS-rebinding protection: exact Host values incl. port, e.g. ["localhost:3001"]
+  allowed-origins: []        # DNS-rebinding protection: exact Origin values incl. scheme, e.g. ["https://app.example.com"]
+  enable-dns-protection: false  # Enable Host/Origin allowlist validation (needs at least one list set)
 ```
 
 ## Configuration Options
@@ -97,6 +103,9 @@ sse:
 | `http.port` | number | `3000` | HTTP server port |
 | `http.host` | string | `127.0.0.1` | HTTP server host (`127.0.0.1`/`localhost` for local only, `0.0.0.0` for all interfaces) |
 | `http.json-response` | boolean | `false` | Enable JSON response format |
+| `http.allowed-hosts` | string[] | `[]` | DNS-rebinding protection: exact Host header values to allow, including port (e.g. `localhost:3000`). NOT browser CORS — no Access-Control-Allow-Origin headers are emitted. |
+| `http.allowed-origins` | string[] | `[]` | DNS-rebinding protection: exact Origin header values to allow, including scheme (e.g. `https://app.example.com`). |
+| `http.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation. Required for `allowed-hosts`/`allowed-origins` to take effect; needs at least one list set. Non-allowlisted Host/Origin → HTTP 403. |
 
 ### SSE Options
 
@@ -104,6 +113,9 @@ sse:
 |--------|------|---------|-------------|
 | `sse.port` | number | `3001` | SSE server port |
 | `sse.host` | string | `127.0.0.1` | SSE server host |
+| `sse.allowed-hosts` | string[] | `[]` | DNS-rebinding protection: exact Host header values to allow, including port (e.g. `localhost:3001`). NOT browser CORS — no Access-Control-Allow-Origin headers are emitted. |
+| `sse.allowed-origins` | string[] | `[]` | DNS-rebinding protection: exact Origin header values to allow, including scheme (e.g. `https://app.example.com`). |
+| `sse.enable-dns-protection` | boolean | `false` | Enable Host/Origin allowlist validation. Required for `allowed-hosts`/`allowed-origins` to take effect; needs at least one list set. Non-allowlisted Host/Origin → HTTP 403. |
 
 ## Examples
 

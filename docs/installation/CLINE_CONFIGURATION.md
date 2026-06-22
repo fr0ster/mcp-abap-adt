@@ -458,7 +458,11 @@ Instead of command-line arguments, you can use environment variables:
 
 1. **Never commit** `.env` files with credentials to git
 2. **Use JWT authentication** for production environments
-3. **Enable DNS protection** for HTTP/SSE servers exposed to network
+3. **Enable DNS-rebinding protection** for HTTP/SSE servers exposed to network — use `--http-enable-dns-protection` with `--http-allowed-hosts` to restrict which Host headers are accepted. Example:
+   ```bash
+   mcp-abap-adt --transport=http --http-enable-dns-protection --http-allowed-hosts=localhost:3000
+   ```
+   This is Host/Origin allowlist validation, NOT browser CORS — no `Access-Control-Allow-Origin` headers are emitted. A non-allowlisted Host gets HTTP 403. The `--http-allowed-hosts` value must include the port (e.g. `localhost:3000`, not `localhost`).
 4. **Use HTTPS** in production (configure reverse proxy)
 
 ## Next Steps

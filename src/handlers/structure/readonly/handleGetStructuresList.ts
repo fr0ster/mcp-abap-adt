@@ -187,29 +187,35 @@ export async function handleGetStructuresList(
      */
     const findExtensions = async (baseName: string): Promise<EmbeddedRef[]> => {
       if (!includeExtensions) return [];
-      let wuData = '';
+      // Use getWhereUsedList with enableAllTypes: the DEFAULT where-used scope
+      // leaves some object types unselected, so an extension's type may be
+      // excluded and the search returns nothing useful. enableAllTypes selects
+      // every type, and the result is already parsed into { name, type } refs.
+      let references: Array<{ name?: string; type?: string }> = [];
       try {
-        const wu: any = await utils.getWhereUsed({
+        const wu = await utils.getWhereUsedList({
           object_name: baseName,
           object_type: 'structure',
+          enableAllTypes: true,
         } as any);
-        wuData = String(wu?.data ?? '');
+        references = (wu?.references ?? []) as Array<{
+          name?: string;
+          type?: string;
+        }>;
       } catch (e: any) {
         logger?.warn(
           `where-used failed for ${baseName}: ${e?.message ?? String(e)}`,
         );
         return [];
       }
-      // Candidate referencing STRUCTURES (globalType TABL/DS), excluding self.
+      // Candidate referencing DDIC structures/tables (TABL/*), excluding self.
+      // The authoritative filter is the source check below (`extend type`).
       const candidates = new Set<string>();
-      for (const m of wuData.matchAll(
-        /displayName="([^"]+)"[^>]*globalType="(TABL\/DS[^"]*)"/g,
-      )) {
-        const name = m[1]
-          .replace(/\s*\(.*\)$/, '')
-          .trim()
-          .toUpperCase();
-        if (name && name !== baseName) candidates.add(name);
+      for (const ref of references) {
+        const name = (ref.name ?? '').trim().toUpperCase();
+        if (!name || name === baseName) continue;
+        if (!/^TABL\//i.test(ref.type ?? '')) continue;
+        candidates.add(name);
       }
       const extendRe = new RegExp(
         `extend\\s+type\\s+${baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+with`,

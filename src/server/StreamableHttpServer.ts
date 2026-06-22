@@ -8,6 +8,7 @@ import type { TlsConfig } from '../lib/config/IServerConfig.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
+import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import type {
   IHttpApplication,
   RouteRegistrationOptions,
@@ -64,6 +65,12 @@ export interface StreamableHttpServerOptions {
    * @default false
    */
   allowDestinationHeader?: boolean;
+  /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
+  allowedHosts?: string[];
+  /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
+  allowedOrigins?: string[];
+  /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
+  enableDnsRebindingProtection?: boolean;
 }
 
 /**
@@ -86,6 +93,9 @@ export class StreamableHttpServer extends BaseMcpServer {
   private standaloneServer?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
   private readonly allowDestinationHeader: boolean;
+  private readonly allowedHosts?: string[];
+  private readonly allowedOrigins?: string[];
+  private readonly enableDnsRebindingProtection?: boolean;
   /** Per-destination lock to serialize token acquisition (prevents concurrent OAuth flows) */
   private readonly authLocks = new Map<string, Promise<void>>();
 
@@ -108,6 +118,9 @@ export class StreamableHttpServer extends BaseMcpServer {
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
     this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;
+    this.allowedHosts = opts?.allowedHosts;
+    this.allowedOrigins = opts?.allowedOrigins;
+    this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
     // Register handlers once for shared MCP server
     this.registerHandlers(this.handlersRegistry);
   }
@@ -271,13 +284,22 @@ export class StreamableHttpServer extends BaseMcpServer {
       });
     });
 
+    const dnsOpts = {
+      enable: this.enableDnsRebindingProtection,
+      allowedHosts: this.allowedHosts,
+      allowedOrigins: this.allowedOrigins,
+    };
+
     // Only handle POST requests - GET SSE streams cause abort errors on disconnect
-    app.post(this.path, handler);
+    app.post(this.path, withDnsRebindingProtection(handler, dnsOpts) as any);
 
     // Return 405 for other methods to avoid SSE stream issues
-    app.all(this.path, (_req: Request, res: Response) => {
-      res.status(405).send('Method Not Allowed');
-    });
+    app.all(
+      this.path,
+      withDnsRebindingProtection((_req: Request, res: Response) => {
+        res.status(405).send('Method Not Allowed');
+      }, dnsOpts) as any,
+    );
 
     console.error(
       `[StreamableHttpServer] Routes registered on external app at ${this.path}`,

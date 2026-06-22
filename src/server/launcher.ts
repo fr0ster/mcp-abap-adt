@@ -371,6 +371,9 @@ async function main() {
       logger: loggerForTransport,
       tls: config.tls,
       allowDestinationHeader: config.allowDestinationHeader,
+      allowedHosts: config.allowedHosts,
+      allowedOrigins: config.allowedOrigins,
+      enableDnsRebindingProtection: config.enableDnsRebindingProtection,
     });
     activeServer = server;
     await server.start();
@@ -388,6 +391,9 @@ async function main() {
     logger: loggerForTransport,
     tls: config.tls,
     allowDestinationHeader: config.allowDestinationHeader,
+    allowedHosts: config.allowedHosts,
+    allowedOrigins: config.allowedOrigins,
+    enableDnsRebindingProtection: config.enableDnsRebindingProtection,
   });
   activeServer = server;
   await server.start();

@@ -527,8 +527,16 @@ Table rows: `http.allowed-hosts`, `http.allowed-origins`, `http.enable-dns-prote
 
 - [ ] **Step 4: Verify no "CORS" wording** crept in and examples use host:port:
 
-Run: `grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration | grep -viE 'not (a |browser )?cors|access-control-allow-origin headers are emitted'`
-Expected: **empty**. The intentional disclaimer ("NOT browser CORS — no Access-Control-Allow-Origin headers are emitted") is filtered out — the two allow-patterns cover it whether it stays on one line or wraps onto two. Any line that survives would be wrongly presenting these options as CORS and must be fixed. (Do NOT scan `docs/superpowers/` — the spec/plan there intentionally discuss CORS and would be false positives.)
+Run (explicit success-on-empty so an agent/CI executor reads the exit code correctly — a bare `grep | grep -v` pipeline exits 1 when clean, which would look like a failure):
+```bash
+if grep -rniE 'CORS|Access-Control' docs/user-guide docs/installation docs/configuration \
+   | grep -viE 'not (a |browser )?cors|access-control-allow-origin headers are emitted'; then
+  echo 'FAIL: user-facing docs present these options as CORS'; exit 1
+else
+  echo 'OK: no misleading CORS wording'
+fi
+```
+Expected: prints `OK: no misleading CORS wording` and exits 0. It fails (exit 1) only if a surviving line wrongly presents these options as CORS. The intentional disclaimer ("NOT browser CORS — no Access-Control-Allow-Origin headers are emitted") is filtered by the two allow-patterns whether it stays on one line or wraps. (Do NOT scan `docs/superpowers/` — the spec/plan there intentionally discuss CORS and would be false positives.)
 
 - [ ] **Step 5: Commit**
 

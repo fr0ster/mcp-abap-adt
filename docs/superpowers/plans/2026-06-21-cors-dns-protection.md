@@ -241,6 +241,13 @@ function configFor(args: string[]) {
 }
 
 describe('ServerConfigManager DNS-rebinding mapping', () => {
+  const ORIG_ARGV = process.argv;
+  const ORIG_ENV = { ...process.env };
+  afterEach(() => {
+    process.argv = ORIG_ARGV;
+    process.env = { ...ORIG_ENV };
+  });
+
   it('maps http flags transport-aware', () => {
     const c = configFor([
       '--transport=http',
@@ -261,16 +268,12 @@ describe('ServerConfigManager DNS-rebinding mapping', () => {
   });
 
   it('maps MCP_HTTP_* env vars', () => {
+    // afterEach restores process.env, so no manual cleanup needed.
     process.env.MCP_HTTP_ALLOWED_ORIGINS = 'https://a.com';
     process.env.MCP_HTTP_ENABLE_DNS_PROTECTION = 'true';
-    try {
-      const c = configFor(['--transport=http']);
-      expect(c.allowedOrigins).toEqual(['https://a.com']);
-      expect(c.enableDnsRebindingProtection).toBe(true);
-    } finally {
-      delete process.env.MCP_HTTP_ALLOWED_ORIGINS;
-      delete process.env.MCP_HTTP_ENABLE_DNS_PROTECTION;
-    }
+    const c = configFor(['--transport=http']);
+    expect(c.allowedOrigins).toEqual(['https://a.com']);
+    expect(c.enableDnsRebindingProtection).toBe(true);
   });
 
   it('maps YAML keys via applyYamlConfigToArgs', () => {

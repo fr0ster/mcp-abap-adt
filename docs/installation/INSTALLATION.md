@@ -430,12 +430,18 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--port=<port>` - Server port (default: 3000 for http)
 - `--path=<path>` / `--http-path=<path>` (alias) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-json-response` - Enable JSON response format
+- `--http-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3000`)
+- `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
+- `--http-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
 **SSE Server Options (for `mcp-abap-adt --transport=sse`):**
 - `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
 - `--port=<port>` - Server port (default: 3001 for sse)
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
+- `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
+- `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
+- `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
 **Environment Variables:**
 
@@ -447,8 +453,14 @@ You can also configure the server using environment variables.
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_HTTP_PORT` - Default HTTP port
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
+- `MCP_HTTP_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3000`)
+- `MCP_HTTP_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
+- `MCP_HTTP_ENABLE_DNS_PROTECTION` - Enable HTTP Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 - `MCP_SSE_PORT` - Default SSE port
 - `MCP_SSE_HOST` - Default SSE host (default: 127.0.0.1)
+- `MCP_SSE_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3001`)
+- `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
+- `MCP_SSE_ENABLE_DNS_PROTECTION` - Enable SSE Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 - `MCP_UNSAFE` - Disable connection validation (true|false)
 - `MCP_USE_AUTH_BROKER` - Force auth-broker usage (true|false)
 - `MCP_BROWSER` - Browser for OAuth2 flow (e.g., chrome, firefox)

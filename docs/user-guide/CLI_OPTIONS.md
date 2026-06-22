@@ -278,6 +278,30 @@ Enable JSON response format.
 mcp-abap-adt --transport=http --http-json-response
 ```
 
+### DNS-Rebinding Protection (HTTP)
+
+DNS-rebinding protection (Host + Origin allowlist; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted):
+
+- `--http-allowed-hosts=<list>`   Comma-separated exact Host header values to allow,
+                                  including port (e.g. `localhost:3000`).
+- `--http-allowed-origins=<list>` Comma-separated exact Origin header values to allow,
+                                  including scheme (e.g. `https://app.example.com`).
+- `--http-enable-dns-protection`  Enable validation. Required for the allowlists to take
+                                  effect; needs at least one of the two lists set.
+                                  A non-allowlisted Host/Origin gets HTTP 403.
+
+Only effective when `--http-enable-dns-protection` is set AND at least one allowlist is non-empty.
+Env vars: `MCP_HTTP_ALLOWED_HOSTS`, `MCP_HTTP_ALLOWED_ORIGINS`, `MCP_HTTP_ENABLE_DNS_PROTECTION`.
+YAML keys: `http.allowed-hosts`, `http.allowed-origins`, `http.enable-dns-protection`.
+
+```bash
+# Enable DNS-rebinding protection for HTTP transport
+mcp-abap-adt --transport=http \
+  --http-enable-dns-protection \
+  --http-allowed-hosts=localhost:3000 \
+  --http-allowed-origins=https://app.example.com
+```
+
 ### Complete HTTP Example
 
 ```bash
@@ -338,6 +362,30 @@ SSE message post path (default: /messages).
 mcp-abap-adt --transport=sse --sse-path=/sse --post-path=/messages
 ```
 
+### DNS-Rebinding Protection (SSE)
+
+DNS-rebinding protection (Host + Origin allowlist; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted):
+
+- `--sse-allowed-hosts=<list>`   Comma-separated exact Host header values to allow,
+                                 including port (e.g. `localhost:3001`).
+- `--sse-allowed-origins=<list>` Comma-separated exact Origin header values to allow,
+                                 including scheme (e.g. `https://app.example.com`).
+- `--sse-enable-dns-protection`  Enable validation. Required for the allowlists to take
+                                 effect; needs at least one of the two lists set.
+                                 A non-allowlisted Host/Origin gets HTTP 403.
+
+Only effective when `--sse-enable-dns-protection` is set AND at least one allowlist is non-empty.
+Env vars: `MCP_SSE_ALLOWED_HOSTS`, `MCP_SSE_ALLOWED_ORIGINS`, `MCP_SSE_ENABLE_DNS_PROTECTION`.
+YAML keys: `sse.allowed-hosts`, `sse.allowed-origins`, `sse.enable-dns-protection`.
+
+```bash
+# Enable DNS-rebinding protection for SSE transport
+mcp-abap-adt --transport=sse \
+  --sse-enable-dns-protection \
+  --sse-allowed-hosts=localhost:3001 \
+  --sse-allowed-origins=https://app.example.com
+```
+
 ### Complete SSE Example
 
 ```bash
@@ -366,11 +414,17 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_HTTP_PORT` - Default HTTP port
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
 - `MCP_HTTP_ENABLE_JSON_RESPONSE` - Enable JSON responses (true|false)
+- `MCP_HTTP_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3000`)
+- `MCP_HTTP_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme, e.g. `https://app.example.com`)
+- `MCP_HTTP_ENABLE_DNS_PROTECTION` - Enable Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 
 ### SSE Transport
 
 - `MCP_SSE_PORT` - Default SSE port
 - `MCP_SSE_HOST` - Default SSE host
+- `MCP_SSE_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3001`)
+- `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme, e.g. `https://app.example.com`)
+- `MCP_SSE_ENABLE_DNS_PROTECTION` - Enable Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 
 ### SAP Connection
 

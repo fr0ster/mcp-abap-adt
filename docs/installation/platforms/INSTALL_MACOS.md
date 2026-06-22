@@ -315,6 +315,9 @@ mcp-abap-adt --transport=streamable-http --port=8080
 - `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
 - `--port=<port>` - Server port (default: 3000 for http)
 - `--path=<path>` (alias `--http-path=<path>`) - HTTP endpoint path (default: /mcp/stream/http)
+- `--http-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3000`)
+- `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
+- `--http-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); non-allowlisted Host/Origin → HTTP 403
 
 **Example with custom port:**
 ```bash
@@ -371,6 +374,9 @@ mcp-abap-adt --transport=sse --port=3001 --env=/path/to/your/e19.env
 - `--sse-path=<path>` - SSE connection path (default: /sse)
 - `--post-path=<path>` - SSE message post path (default: /messages)
 - `--env=PATH` - Path to `.env` file (required for SSE mode)
+- `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
+- `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
+- `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); non-allowlisted Host/Origin → HTTP 403
 
 **Example with custom port and host:**
 ```bash

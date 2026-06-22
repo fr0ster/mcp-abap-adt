@@ -116,6 +116,15 @@ export class ServerConfigManager {
     const isSse = transport === 'sse';
     const transportHost = isSse ? parsed.sseHost : parsed.httpHost;
     const transportPort = isSse ? parsed.ssePort : parsed.httpPort;
+    const transportAllowedOrigins = isSse
+      ? parsed.sseAllowedOrigins
+      : parsed.httpAllowedOrigins;
+    const transportAllowedHosts = isSse
+      ? parsed.sseAllowedHosts
+      : parsed.httpAllowedHosts;
+    const transportEnableDns = isSse
+      ? parsed.sseEnableDnsProtection
+      : parsed.httpEnableDnsProtection;
 
     return {
       transport: transport || 'stdio',
@@ -123,6 +132,9 @@ export class ServerConfigManager {
       configFile: parseConfigArg(),
       host: ArgumentsParser.getArgument('--host') || transportHost,
       port: this.parsePort() || transportPort,
+      allowedOrigins: transportAllowedOrigins,
+      allowedHosts: transportAllowedHosts,
+      enableDnsRebindingProtection: transportEnableDns ?? false,
       httpJsonResponse: parsed.httpJsonResponse || undefined,
       httpPath:
         ArgumentsParser.getArgument('--path') ||

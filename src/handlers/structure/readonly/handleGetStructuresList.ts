@@ -60,10 +60,11 @@ interface EmbeddedRef {
  *   include <name>;                  -> anonymous include (attribute = null)
  *   <attr> : include <name>;         -> named include (attribute = <attr>)
  *   .INCLUDE <name>                  -> classic include
- *   .APPEND[STRUCTURE] <name>        -> classic append
- * Plain component lines (`fld : type;`) and annotations (`@AbapCatalog…`) are
- * NOT structure embeddings and are ignored — do NOT confuse the
- * `@AbapCatalog.enhancement.category` annotation with an include/append.
+ * Appends are NOT in the source — an append is a separate object that
+ * `extend type <this> with …`, resolved via where-used (findExtensions), not
+ * parsed here. Plain component lines (`fld : type;`) and annotations
+ * (`@AbapCatalog…`) are NOT structure embeddings and are ignored — do NOT
+ * confuse the `@AbapCatalog.enhancement.category` annotation with an include.
  */
 export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
   const refs: EmbeddedRef[] = [];
@@ -76,18 +77,11 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
     line = line.trim();
     if (!line || line.startsWith('@') || line.startsWith('*')) continue;
 
-    // Classic field-list: .INCLUDE <name> / .APPEND[STRUCTURE] <name>
-    const classicAppend = line.match(
-      /^\.append(?:structure)?\s+([a-z0-9_/]+)/i,
-    );
-    if (classicAppend) {
-      refs.push({
-        name: classicAppend[1].toUpperCase(),
-        attribute: null,
-        kind: 'append',
-      });
-      continue;
-    }
+    // Classic field-list include: .INCLUDE <name>
+    // NOTE: appends are NOT parsed from source — ADT does not emit a `.APPEND`
+    // line in a structure's source. An append is a separate object that
+    // `extend type <this> with …`; those are resolved via where-used in
+    // findExtensions(), not here.
     const classicInclude = line.match(/^\.include\s+([a-z0-9_/]+)/i);
     if (classicInclude) {
       refs.push({

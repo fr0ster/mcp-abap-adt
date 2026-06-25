@@ -21,14 +21,14 @@ import {
 /** Map dep_* param names to shared_dependencies section names */
 const DEP_PARAM_MAP: Record<string, string> = {
   dep_table_name: 'tables',
-  dep_view_name: 'views',
+  dep_ddl_name: 'views',
   dep_bdef_name: 'behavior_definitions',
 };
 
 /** Map generic param names to shared_dependencies section names */
 const PARAM_TO_TYPE: Record<string, string> = {
   table_name: 'tables',
-  view_name: 'views',
+  ddl_name: 'views',
   root_entity: 'views',
   behavior_definition: 'behavior_definitions',
   structure_name: 'structures',

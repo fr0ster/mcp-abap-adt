@@ -15,6 +15,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - [Read-Only Group](#read-only-group)
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
+  - [Ddl](#read-only-ddl)
+    - [ReadDdl](#readddl-read-only-ddl)
   - [Function Group](#read-only-function-group)
     - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
   - [Function Include](#read-only-function-include)
@@ -37,8 +39,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetStructuresList](#getstructureslist-read-only-structure)
   - [System](#read-only-system)
     - [SearchSource](#searchsource-read-only-system)
-  - [View](#read-only-view)
-    - [ReadView](#readview-read-only-view)
 - [High-Level Group](#high-level-group)
   - [Class](#high-level-class)
     - [CheckClass](#checkclass-high-level-class)
@@ -65,6 +65,12 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [HandlerDelete](#handlerdelete-high-level-compact)
     - [HandlerGet](#handlerget-high-level-compact)
     - [HandlerUpdate](#handlerupdate-high-level-compact)
+  - [Ddl](#high-level-ddl)
+    - [CheckDdl](#checkddl-high-level-ddl)
+    - [CreateDdl](#createddl-high-level-ddl)
+    - [DeleteDdl](#deleteddl-high-level-ddl)
+    - [GetDdl](#getddl-high-level-ddl)
+    - [UpdateDdl](#updateddl-high-level-ddl)
   - [Function](#high-level-function)
     - [CheckFunctionGroup](#checkfunctiongroup-high-level-function)
     - [CheckFunctionModule](#checkfunctionmodule-high-level-function)
@@ -111,12 +117,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
-  - [View](#high-level-view)
-    - [CheckView](#checkview-high-level-view)
-    - [CreateView](#createview-high-level-view)
-    - [DeleteView](#deleteview-high-level-view)
-    - [GetView](#getview-high-level-view)
-    - [UpdateView](#updateview-high-level-view)
 - [Low-Level Group](#low-level-group)
   - [Class](#low-level-class)
     - [ActivateClassLow](#activateclasslow-low-level-class)
@@ -137,6 +137,15 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [Common](#low-level-common)
     - [ActivateObjectLow](#activateobjectlow-low-level-common)
     - [DeleteObjectLow](#deleteobjectlow-low-level-common)
+  - [Ddl](#low-level-ddl)
+    - [ActivateDdlLow](#activateddllow-low-level-ddl)
+    - [CheckDdlLow](#checkddllow-low-level-ddl)
+    - [CreateDdlLow](#createddllow-low-level-ddl)
+    - [DeleteDdlLow](#deleteddllow-low-level-ddl)
+    - [LockDdlLow](#lockddllow-low-level-ddl)
+    - [UnlockDdlLow](#unlockddllow-low-level-ddl)
+    - [UpdateDdlLow](#updateddllow-low-level-ddl)
+    - [ValidateDdlLow](#validateddllow-low-level-ddl)
   - [Function](#low-level-function)
     - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low-level-function)
     - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low-level-function)
@@ -177,15 +186,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UnlockProgramLow](#unlockprogramlow-low-level-program)
     - [UpdateProgramLow](#updateprogramlow-low-level-program)
     - [ValidateProgramLow](#validateprogramlow-low-level-program)
-  - [View](#low-level-view)
-    - [ActivateViewLow](#activateviewlow-low-level-view)
-    - [CheckViewLow](#checkviewlow-low-level-view)
-    - [CreateViewLow](#createviewlow-low-level-view)
-    - [DeleteViewLow](#deleteviewlow-low-level-view)
-    - [LockViewLow](#lockviewlow-low-level-view)
-    - [UnlockViewLow](#unlockviewlow-low-level-view)
-    - [UpdateViewLow](#updateviewlow-low-level-view)
-    - [ValidateViewLow](#validateviewlow-low-level-view)
 
 ---
 
@@ -205,6 +205,23 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-ddl"></a>
+### Read-Only / Ddl
+
+<a id="readddl-read-only-ddl"></a>
+#### ReadDdl (Read-Only / Ddl)
+**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+
+**Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -416,23 +433,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - None
-
----
-
-<a id="read-only-view"></a>
-### Read-Only / View
-
-<a id="readview-read-only-view"></a>
-#### ReadView (Read-Only / View)
-**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
-
-**Source:** `src/handlers/view/readonly/handleReadView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
 
 ---
 
@@ -723,7 +723,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
@@ -755,7 +755,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="handlerdelete-high-level-compact"></a>
 #### HandlerDelete (High-Level / Compact)
-**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
@@ -774,7 +774,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
-**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerGet.ts`
 
@@ -785,6 +785,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `behavior_implementation_name` (string, optional) - Behavior implementation name.
 - `class_name` (string, optional) - Class name.
 - `data_element_name` (string, optional) - Data element name.
+- `ddl_name` (string, optional) - DDL source name.
 - `domain_name` (string, optional) - Domain name.
 - `function_group_name` (string, optional) - Function group name.
 - `function_module_name` (string, optional) - Function module name.
@@ -800,13 +801,12 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
 - `version` (any, optional) - 
-- `view_name` (string, optional) - View name.
 
 ---
 
 <a id="handlerupdate-high-level-compact"></a>
 #### HandlerUpdate (High-Level / Compact)
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
@@ -832,6 +832,84 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `source_code` (string, optional) - ABAP source code payload.
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
+
+---
+
+<a id="high-level-ddl"></a>
+### High-Level / Ddl
+
+<a id="checkddl-high-level-ddl"></a>
+#### CheckDdl (High-Level / Ddl)
+**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view name to check, passed as ddl_name (e.g., ZI_MY_VIEW).
+- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
+
+---
+
+<a id="createddl-high-level-ddl"></a>
+#### CreateDdl (High-Level / Ddl)
+**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state. Use UpdateDdl to set DDL source code.
+
+**Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `description` (string, optional) - Optional description (defaults to ddl_name).
+- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
+
+---
+
+<a id="deleteddl-high-level-ddl"></a>
+#### DeleteDdl (High-Level / Ddl)
+**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="getddl-high-level-ddl"></a>
+#### GetDdl (High-Level / Ddl)
+**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
+
+**Source:** `src/handlers/ddl/high/handleGetDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="updateddl-high-level-ddl"></a>
+#### UpdateDdl (High-Level / Ddl)
+**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new view.
+
+**Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate after update. Default: false.
+- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
+- `ddl_source` (string, required) - Complete DDL source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
@@ -1426,84 +1504,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-<a id="high-level-view"></a>
-### High-Level / View
-
-<a id="checkview-high-level-view"></a>
-#### CheckView (High-Level / View)
-**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
-
-**Source:** `src/handlers/view/high/handleCheckView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
-- `view_name` (string, required) - CDS view name (e.g., ZI_MY_VIEW).
-
----
-
-<a id="createview-high-level-view"></a>
-#### CreateView (High-Level / View)
-**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state.
-
-**Source:** `src/handlers/view/high/handleCreateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `description` (string, optional) - Optional description (defaults to view_name).
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (required for transportable packages).
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
-
----
-
-<a id="deleteview-high-level-view"></a>
-#### DeleteView (High-Level / View)
-**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
-
-**Source:** `src/handlers/view/high/handleDeleteView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-<a id="getview-high-level-view"></a>
-#### GetView (High-Level / View)
-**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
-
-**Source:** `src/handlers/view/high/handleGetView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-<a id="updateview-high-level-view"></a>
-#### UpdateView (High-Level / View)
-**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates.
-
-**Source:** `src/handlers/view/high/handleUpdateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `activate` (boolean, optional) - Activate after update. Default: false.
-- `ddl_source` (string, required) - Complete DDL source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
-
----
-
 <a id="low-level-group"></a>
 ## Low-Level Group
 
@@ -1783,8 +1783,142 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, view, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
+- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
+
+---
+
+<a id="low-level-ddl"></a>
+### Low-Level / Ddl
+
+<a id="activateddllow-low-level-ddl"></a>
+#### ActivateDdlLow (Low-Level / Ddl)
+**Description:** Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., ZVW_MY_VIEW).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="checkddllow-low-level-ddl"></a>
+#### CheckDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
+
+**Source:** `src/handlers/ddl/low/handleCheckDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
+
+---
+
+<a id="createddllow-low-level-ddl"></a>
+#### CreateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Create a new ABAP DDL source. - use CreateDdl (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
+
+**Source:** `src/handlers/ddl/low/handleCreateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
+- `ddl_name` (string, required) - View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `description` (string, required) - View description.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `view_type` (string, optional) - View type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
+
+---
+
+<a id="deleteddllow-low-level-ddl"></a>
+#### DeleteDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="lockddllow-low-level-ddl"></a>
+#### LockDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+
+**Source:** `src/handlers/ddl/low/handleLockDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="unlockddllow-low-level-ddl"></a>
+#### UnlockDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Unlock an ABAP DDL source after modification. Must use the same session_id and lock_handle from LockDdlLow operation.
+
+**Source:** `src/handlers/ddl/low/handleUnlockDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
+- `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
+- `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="updateddllow-low-level-ddl"></a>
+#### UpdateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
+
+**Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
+- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
+- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="validateddllow-low-level-ddl"></a>
+#### ValidateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Source:** `src/handlers/ddl/low/handleValidateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - View name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, required) - View description. Required for validation.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 ---
 
@@ -2385,138 +2519,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-<a id="low-level-view"></a>
-### Low-Level / View
-
-<a id="activateviewlow-low-level-view"></a>
-#### ActivateViewLow (Low-Level / View)
-**Description:** Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/view/low/handleActivateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., ZVW_MY_VIEW).
-
----
-
-<a id="checkviewlow-low-level-view"></a>
-#### CheckViewLow (Low-Level / View)
-**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
-
-**Source:** `src/handlers/view/low/handleCheckView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="createviewlow-low-level-view"></a>
-#### CreateViewLow (Low-Level / View)
-**Description:** [low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/view/low/handleCreateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `description` (string, required) - View description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_name` (string, required) - View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `view_type` (string, optional) - View type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
-
----
-
-<a id="deleteviewlow-low-level-view"></a>
-#### DeleteViewLow (Low-Level / View)
-**Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
-
-**Source:** `src/handlers/view/low/handleDeleteView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="lockviewlow-low-level-view"></a>
-#### LockViewLow (Low-Level / View)
-**Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/view/low/handleLockView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="unlockviewlow-low-level-view"></a>
-#### UnlockViewLow (Low-Level / View)
-**Description:** [low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.
-
-**Source:** `src/handlers/view/low/handleUnlockView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockView operation.
-- `session_id` (string, required) - Session ID from LockView operation. Must be the same as used in LockView.
-- `session_state` (object, optional) - Session state from LockView (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="updateviewlow-low-level-view"></a>
-#### UpdateViewLow (Low-Level / View)
-**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/view/low/handleUpdateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
-
----
-
-<a id="validateviewlow-low-level-view"></a>
-#### ValidateViewLow (Low-Level / View)
-**Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/view/low/handleValidateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `description` (string, required) - View description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name to validate (e.g., Z_MY_PROGRAM).
-
----
-
-*Last updated: 2026-06-20*
+*Last updated: 2026-06-25*

@@ -113,7 +113,7 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
     });
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger?.error(`Error creating view ${ddlName}: ${errorMessage}`);
+    logger?.error(`Error creating DDL source ${ddlName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   }
 }

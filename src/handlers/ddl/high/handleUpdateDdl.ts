@@ -277,7 +277,7 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
       // ignore parse errors
     }
 
-    logger?.error(`Error updating view ${ddlName}: ${errorMessage}`);
+    logger?.error(`Error updating DDL source ${ddlName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   }
 }

@@ -19,13 +19,13 @@ export const TOOL_DEFINITION = {
   name: 'ActivateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    'Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., ZVW_MY_VIEW).',
+        description: 'DDL source name (e.g., ZVW_MY_VIEW).',
       },
       session_id: {
         type: 'string',

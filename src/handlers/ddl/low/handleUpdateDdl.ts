@@ -138,7 +138,7 @@ export async function handleUpdateDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error updating view ${ddlName}: ${error?.message || error}`,
+        `Error updating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

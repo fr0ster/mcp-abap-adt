@@ -40,11 +40,6 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
-      view_type: {
-        type: 'string',
-        description:
-          "View type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).",
-      },
       application: {
         type: 'string',
         description: "Application area (optional, default: '*').",
@@ -161,7 +156,7 @@ export async function handleCreateDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error creating view ${ddlName}: ${error?.message || error}`,
+        `Error creating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

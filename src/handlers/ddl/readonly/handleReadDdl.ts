@@ -10,13 +10,13 @@ export const TOOL_DEFINITION = {
   name: 'ReadDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.',
+    'Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_VIEW).',
+        description: 'DDL source name (e.g., Z_MY_VIEW).',
       },
       version: {
         type: 'string',

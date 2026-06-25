@@ -19,13 +19,13 @@ export const TOOL_DEFINITION = {
   name: 'ValidateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Validate an ABAP DDL source name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'DDL source name to validate (e.g., Z_MY_PROGRAM).',
       },
       package_name: {
         type: 'string',
@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
       },
       description: {
         type: 'string',
-        description: 'View description. Required for validation.',
+        description: 'DDL source description. Required for validation.',
       },
       session_id: {
         type: 'string',

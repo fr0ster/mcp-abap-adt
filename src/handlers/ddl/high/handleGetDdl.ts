@@ -98,7 +98,7 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error reading view ${ddlName}: ${error?.message || error}`,
+        `Error reading DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

@@ -160,12 +160,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readddl-read-only-ddl"></a>
 #### ReadDdl (Read-Only / Ddl)
-**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+**Description:** Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---

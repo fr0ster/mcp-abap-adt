@@ -760,12 +760,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateddllow-low-level-ddl"></a>
 #### ActivateDdlLow (Low-Level / Ddl)
-**Description:** Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., ZVW_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., ZVW_MY_VIEW).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -773,12 +773,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkddllow-low-level-ddl"></a>
 #### CheckDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
+**Description:** [low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
 
 **Source:** `src/handlers/ddl/low/handleCheckDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -800,7 +800,6 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_type` (string, optional) - View type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 
 ---
 
@@ -860,13 +859,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="validateddllow-low-level-ddl"></a>
 #### ValidateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Validate an ABAP DDL source name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddl/low/handleValidateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name to validate (e.g., Z_MY_PROGRAM).
-- `description` (string, required) - View description. Required for validation.
+- `ddl_name` (string, required) - DDL source name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, required) - DDL source description. Required for validation.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.

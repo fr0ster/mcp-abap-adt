@@ -174,8 +174,8 @@ export async function handleCheckObject(
           break;
         case 'view':
           checkState = await client
-            .getView()
-            .check({ viewName: objectName }, checkVersion);
+            .getDdl()
+            .check({ ddlName: objectName }, checkVersion);
           break;
         case 'domain':
           checkState = await client

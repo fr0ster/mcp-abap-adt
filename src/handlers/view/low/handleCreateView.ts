@@ -124,8 +124,8 @@ export async function handleCreateView(
 
     try {
       // Create view
-      const createState = await client.getView().create({
-        viewName,
+      const createState = await client.getDdl().create({
+        ddlName: viewName,
         description,
         packageName: package_name,
         ddlSource: '',

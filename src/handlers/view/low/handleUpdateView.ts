@@ -106,9 +106,9 @@ export async function handleUpdateView(
     try {
       // Update view with DDL source
       const updateState = await client
-        .getView()
+        .getDdl()
         .update(
-          { viewName: viewName, ddlSource: ddl_source },
+          { ddlName: viewName, ddlSource: ddl_source },
           { lockHandle: lock_handle },
         );
       const updateResult = updateState.updateResult;

@@ -185,7 +185,7 @@ export async function handleUnlockObject(
             .unlock({ structureName: objectName }, lock_handle);
           break;
         case 'view':
-          await client.getView().unlock({ viewName: objectName }, lock_handle);
+          await client.getDdl().unlock({ ddlName: objectName }, lock_handle);
           break;
         case 'domain':
           await client

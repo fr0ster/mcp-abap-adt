@@ -40,12 +40,12 @@ export async function handleReadView(
 
     const client = createAdtClient(connection, logger);
     const viewName = view_name.toUpperCase();
-    const obj = client.getView();
+    const obj = client.getDdl();
 
     let source_code: string | null = null;
     try {
       const readResult = await obj.read(
-        { viewName },
+        { ddlName: viewName },
         version as 'active' | 'inactive',
       );
       if (readResult?.readResult?.data) {
@@ -60,7 +60,7 @@ export async function handleReadView(
 
     let metadata: string | null = null;
     try {
-      const metaResult = await obj.readMetadata({ viewName });
+      const metaResult = await obj.readMetadata({ ddlName: viewName });
       if (metaResult?.metadataResult?.data) {
         metadata =
           typeof metaResult.metadataResult.data === 'string'

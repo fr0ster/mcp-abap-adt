@@ -148,8 +148,8 @@ export async function handleDeleteObject(
         case 'view':
         case 'ddls/df':
           response = (
-            await crudClient.getView().delete({
-              viewName: objectName,
+            await crudClient.getDdl().delete({
+              ddlName: objectName,
               transportRequest: transport_request,
             })
           ).deleteResult;

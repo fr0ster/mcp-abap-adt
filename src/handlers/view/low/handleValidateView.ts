@@ -104,8 +104,8 @@ export async function handleValidateView(
 
     try {
       // Validate view
-      const validationState = await client.getView().validate({
-        viewName: viewName,
+      const validationState = await client.getDdl().validate({
+        ddlName: viewName,
         packageName: package_name.toUpperCase(),
         description: description,
       });

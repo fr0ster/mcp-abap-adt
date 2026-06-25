@@ -88,7 +88,7 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
     try {
       // Lock
       logger?.debug(`Locking view: ${viewName}`);
-      lockHandle = await client.getView().lock({ viewName });
+      lockHandle = await client.getDdl().lock({ ddlName: viewName });
       logger?.debug(
         `View locked: ${viewName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
       );
@@ -100,8 +100,11 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
           await safeCheckOperation(
             () =>
               client
-                .getView()
-                .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
+                .getDdl()
+                .check(
+                  { ddlName: viewName, ddlSource: args.ddl_source },
+                  'inactive',
+                ),
             viewName,
             {
               debug: (message: string) => logger?.debug(message),
@@ -126,9 +129,9 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
 
       // Update
       logger?.debug(`Updating view DDL source: ${viewName}`);
-      await client.getView().update(
+      await client.getDdl().update(
         {
-          viewName,
+          ddlName: viewName,
           ddlSource: args.ddl_source,
           transportRequest: args.transport_request,
         },
@@ -139,7 +142,7 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
       if (lockHandle) {
         try {
           logger?.debug(`Unlocking view: ${viewName}`);
-          await client.getView().unlock({ viewName }, lockHandle);
+          await client.getDdl().unlock({ ddlName: viewName }, lockHandle);
           logger?.info(`View unlocked: ${viewName}`);
         } catch (unlockError: any) {
           logger?.warn(
@@ -156,8 +159,11 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
         await safeCheckOperation(
           () =>
             client
-              .getView()
-              .check({ viewName, ddlSource: args.ddl_source }, 'inactive'),
+              .getDdl()
+              .check(
+                { ddlName: viewName, ddlSource: args.ddl_source },
+                'inactive',
+              ),
           viewName,
           {
             debug: (message: string) => logger?.debug(message),
@@ -180,7 +186,9 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
     if (shouldActivate) {
       logger?.debug(`Activating view: ${viewName}`);
       try {
-        const activateState = await client.getView().activate({ viewName });
+        const activateState = await client
+          .getDdl()
+          .activate({ ddlName: viewName });
         activateResponse = activateState.activateResult;
         logger?.info(`View activated: ${viewName}`);
       } catch (activationError: any) {

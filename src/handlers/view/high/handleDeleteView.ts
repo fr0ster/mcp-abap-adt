@@ -1,7 +1,7 @@
 /**
  * DeleteView Handler - Delete ABAP View via AdtClient
  *
- * Uses AdtClient.getView().delete() for high-level delete operation.
+ * Uses AdtClient.getDdl().delete() for high-level delete operation.
  * Includes deletion check before actual deletion.
  */
 
@@ -43,7 +43,7 @@ interface DeleteViewArgs {
 /**
  * Main handler for DeleteView MCP tool
  *
- * Uses AdtClient.getView().delete() - high-level delete operation with deletion check
+ * Uses AdtClient.getDdl().delete() - high-level delete operation with deletion check
  */
 export async function handleDeleteView(
   context: HandlerContext,
@@ -65,9 +65,9 @@ export async function handleDeleteView(
 
     try {
       // Delete view using AdtClient (includes deletion check)
-      const viewObject = client.getView();
+      const viewObject = client.getDdl();
       const deleteResult = await viewObject.delete({
-        viewName,
+        ddlName: viewName,
         transportRequest: transport_request,
       });
 

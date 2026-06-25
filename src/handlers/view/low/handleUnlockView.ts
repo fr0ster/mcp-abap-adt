@@ -100,8 +100,8 @@ export async function handleUnlockView(
     try {
       // Unlock view
       const unlockState = await client
-        .getView()
-        .unlock({ viewName: viewName }, lock_handle);
+        .getDdl()
+        .unlock({ ddlName: viewName }, lock_handle);
       const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {

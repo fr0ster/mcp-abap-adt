@@ -89,7 +89,7 @@ export async function handleLockView(
 
     try {
       // Lock view
-      const lockHandle = await client.getView().lock({ viewName: viewName });
+      const lockHandle = await client.getDdl().lock({ ddlName: viewName });
 
       if (!lockHandle) {
         throw new Error(

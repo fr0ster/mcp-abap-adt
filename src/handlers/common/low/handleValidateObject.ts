@@ -269,8 +269,8 @@ export async function handleValidateObject(
           break;
         }
         case 'view': {
-          const validationState = await validationClient.getView().validate({
-            viewName: objectName,
+          const validationState = await validationClient.getDdl().validate({
+            ddlName: objectName,
             packageName: package_name || undefined,
             description: description || undefined,
           });

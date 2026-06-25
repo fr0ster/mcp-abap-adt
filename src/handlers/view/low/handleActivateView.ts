@@ -91,8 +91,8 @@ export async function handleActivateView(
     try {
       // Activate view
       const activateState = await client
-        .getView()
-        .activate({ viewName: viewName });
+        .getDdl()
+        .activate({ ddlName: viewName });
       const response = activateState.activateResult;
 
       if (!response) {

@@ -65,8 +65,8 @@ export async function handleDeleteView(
 
     try {
       // Delete view
-      const deleteState = await client.getView().delete({
-        viewName: viewName,
+      const deleteState = await client.getDdl().delete({
+        ddlName: viewName,
         transportRequest: transport_request,
       });
       const deleteResult = deleteState.deleteResult;

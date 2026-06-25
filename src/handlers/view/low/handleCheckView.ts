@@ -119,8 +119,8 @@ export async function handleCheckView(
       // Check view with optional source code (for validating new/unsaved code)
       // If ddl_source is provided, it will be base64 encoded in the request body
       const checkState = await client
-        .getView()
-        .check({ viewName: viewName, ddlSource: ddl_source }, checkVersion);
+        .getDdl()
+        .check({ ddlName: viewName, ddlSource: ddl_source }, checkVersion);
       const response = checkState.checkResult;
 
       if (!response) {

@@ -75,8 +75,8 @@ export async function handleCreateView(context: HandlerContext, params: any) {
 
     // Validate
     logger?.debug(`Validating view: ${viewName}`);
-    await client.getView().validate({
-      viewName,
+    await client.getDdl().validate({
+      ddlName: viewName,
       packageName: args.package_name,
       description: args.description || viewName,
     });
@@ -84,8 +84,8 @@ export async function handleCreateView(context: HandlerContext, params: any) {
 
     // Create
     logger?.debug(`Creating view: ${viewName}`);
-    await client.getView().create({
-      viewName,
+    await client.getDdl().create({
+      ddlName: viewName,
       description: args.description || viewName,
       packageName: args.package_name,
       ddlSource: '',

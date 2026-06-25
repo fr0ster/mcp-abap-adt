@@ -1,7 +1,7 @@
 /**
  * GetView Handler - Read ABAP View via AdtClient
  *
- * Uses AdtClient.getView().read() for high-level read operation.
+ * Uses AdtClient.getDdl().read() for high-level read operation.
  * Supports both active and inactive versions.
  */
 
@@ -45,7 +45,7 @@ interface GetViewArgs {
 /**
  * Main handler for GetView MCP tool
  *
- * Uses AdtClient.getView().read() - high-level read operation
+ * Uses AdtClient.getDdl().read() - high-level read operation
  */
 export async function handleGetView(
   context: HandlerContext,
@@ -67,9 +67,9 @@ export async function handleGetView(
 
     try {
       // Read view using AdtClient
-      const viewObject = client.getView();
+      const viewObject = client.getDdl();
       const readResult = await viewObject.read(
-        { viewName },
+        { ddlName: viewName },
         version as 'active' | 'inactive',
       );
 

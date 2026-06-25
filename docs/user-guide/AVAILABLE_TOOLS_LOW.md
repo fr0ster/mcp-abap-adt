@@ -794,8 +794,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `ddl_name` (string, required) - View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `description` (string, required) - View description.
+- `ddl_name` (string, required) - DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `description` (string, required) - DDL source description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -806,24 +806,24 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteddllow-low-level-ddl"></a>
 #### DeleteDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 
 ---
 
 <a id="lockddllow-low-level-ddl"></a>
 #### LockDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+**Description:** [low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/ddl/low/handleLockDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -836,7 +836,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleUnlockDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
 - `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
 - `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -845,14 +845,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateddllow-low-level-ddl"></a>
 #### UpdateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
+**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.
 - `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
+- `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 

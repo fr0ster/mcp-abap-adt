@@ -735,6 +735,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
@@ -763,6 +764,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, optional) - ABAP class name.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `domain_name` (string, optional) - ABAP domain name.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
@@ -817,6 +819,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `ddl_source` (string, optional) - Complete DDL source code (for DDL update).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
@@ -855,14 +859,14 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state. Use UpdateDdl to set DDL source code.
+**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
 - `description` (string, optional) - Optional description (defaults to ddl_name).
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -871,35 +875,35 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 
 ---
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
+**Description:** Retrieve ABAP DDL source definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new view.
+**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -907,7 +911,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
-- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002).
 - `ddl_source` (string, required) - Complete DDL source code.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1833,8 +1837,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `ddl_name` (string, required) - View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `description` (string, required) - View description.
+- `ddl_name` (string, required) - DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `description` (string, required) - DDL source description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1845,28 +1849,28 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deleteddllow-low-level-ddl"></a>
 #### DeleteDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 
 ---
 
 <a id="lockddllow-low-level-ddl"></a>
 #### LockDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+**Description:** [low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/ddl/low/handleLockDdl.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1881,7 +1885,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
 - `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
 - `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
 - `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1890,16 +1894,16 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updateddllow-low-level-ddl"></a>
 #### UpdateDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
+**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
 
 **Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.
 - `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
+- `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 

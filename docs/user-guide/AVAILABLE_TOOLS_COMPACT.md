@@ -248,6 +248,7 @@ Preferred dedicated compact tools and minimal payloads:
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
@@ -274,6 +275,7 @@ Preferred dedicated compact tools and minimal payloads:
 
 **Parameters:**
 - `class_name` (string, optional) - ABAP class name.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `domain_name` (string, optional) - ABAP domain name.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
@@ -511,6 +513,8 @@ Preferred dedicated compact tools and minimal payloads:
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `ddl_source` (string, optional) - Complete DDL source code (for DDL update).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.

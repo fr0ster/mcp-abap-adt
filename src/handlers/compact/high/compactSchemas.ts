@@ -29,6 +29,10 @@ export const compactCreateSchema = {
       description: 'ABAP function group name.',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
+    ddl_name: {
+      type: 'string',
+      description: 'DDL source name (CDS view, AMDP table function, etc.).',
+    },
     description: {
       type: 'string',
       description: 'Human-readable object description.',
@@ -137,7 +141,15 @@ export const compactUpdateSchema = {
       description: 'ABAP function group name.',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
+    ddl_name: {
+      type: 'string',
+      description: 'DDL source name (CDS view, AMDP table function, etc.).',
+    },
     source_code: { type: 'string', description: 'ABAP source code payload.' },
+    ddl_source: {
+      type: 'string',
+      description: 'Complete DDL source code (for DDL update).',
+    },
     transport_request: {
       type: 'string',
       description: 'Transport request id (if required by system).',
@@ -190,6 +202,10 @@ export const compactDeleteSchema = {
     function_group_name: {
       type: 'string',
       description: 'ABAP function group name.',
+    },
+    ddl_name: {
+      type: 'string',
+      description: 'DDL source name (CDS view, AMDP table function, etc.).',
     },
     transport_request: {
       type: 'string',

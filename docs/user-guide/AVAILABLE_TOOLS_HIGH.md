@@ -635,6 +635,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
@@ -661,6 +662,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, optional) - ABAP class name.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `domain_name` (string, optional) - ABAP domain name.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
@@ -898,6 +900,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `ddl_source` (string, optional) - Complete DDL source code (for DDL update).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
@@ -1046,12 +1050,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state. Use UpdateDdl to set DDL source code.
+**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
 - `description` (string, optional) - Optional description (defaults to ddl_name).
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -1060,37 +1064,37 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 
 ---
 
 <a id="getddl-high-level-ddl"></a>
 #### GetDdl (High-Level / Ddl)
-**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
+**Description:** Retrieve ABAP DDL source definition. Supports reading active or inactive version.
 
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - View name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new view.
+**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
-- `ddl_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002).
 - `ddl_source` (string, required) - Complete DDL source code.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 

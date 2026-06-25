@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
           'function_module',
           'table',
           'structure',
-          'view',
+          'ddl',
           'domain',
           'data_element',
           'package',
@@ -107,7 +107,7 @@ export async function handleUnlockObject(
       'function_module',
       'table',
       'structure',
-      'view',
+      'ddl',
       'domain',
       'data_element',
       'package',
@@ -184,7 +184,7 @@ export async function handleUnlockObject(
             .getStructure()
             .unlock({ structureName: objectName }, lock_handle);
           break;
-        case 'view':
+        case 'ddl':
           await client.getDdl().unlock({ ddlName: objectName }, lock_handle);
           break;
         case 'domain':

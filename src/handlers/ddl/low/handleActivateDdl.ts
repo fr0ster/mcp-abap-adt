@@ -1,7 +1,7 @@
 /**
- * UpdateView Handler - Update ABAP View DDL Source
+ * ActivateView Handler - Activate ABAP View (CDS View)
  *
- * Uses AdtClient.updateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.activateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -9,33 +9,23 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'UpdateViewLow',
+  name: 'ActivateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.',
+    'Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description:
-          'View name (e.g., ZOK_R_TEST_0002). View must already exist.',
-      },
-      ddl_source: {
-        type: 'string',
-        description:
-          "Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.",
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from LockObject. Required for update operation.',
+        description: 'View name (e.g., ZVW_MY_VIEW).',
       },
       session_id: {
         type: 'string',
@@ -53,14 +43,12 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name', 'ddl_source', 'lock_handle'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface UpdateViewArgs {
-  view_name: string;
-  ddl_source: string;
-  lock_handle: string;
+interface ActivateDdlArgs {
+  ddl_name: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -70,24 +58,21 @@ interface UpdateViewArgs {
 }
 
 /**
- * Main handler for UpdateView MCP tool
+ * Main handler for ActivateDdl MCP tool
  *
- * Uses AdtClient.updateView - low-level single method call
+ * Uses AdtClient.activateView - low-level single method call
  */
-export async function handleUpdateView(
+export async function handleActivateDdl(
   context: HandlerContext,
-  args: UpdateViewArgs,
+  args: ActivateDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, ddl_source, lock_handle, session_id, session_state } =
-      args as UpdateViewArgs;
+    const { ddl_name, session_id, session_state } = args as ActivateDdlArgs;
 
     // Validation
-    if (!view_name || !ddl_source || !lock_handle) {
-      return return_error(
-        new Error('view_name, ddl_source, and lock_handle are required'),
-      );
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
@@ -99,38 +84,57 @@ export async function handleUpdateView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view update: ${viewName}`);
+    logger?.info(`Starting view activation: ${ddlName}`);
 
     try {
-      // Update view with DDL source
-      const updateState = await client
+      // Activate view
+      const activateState = await client
         .getDdl()
-        .update(
-          { ddlName: viewName, ddlSource: ddl_source },
-          { lockHandle: lock_handle },
-        );
-      const updateResult = updateState.updateResult;
+        .activate({ ddlName: ddlName });
+      const response = activateState.activateResult;
 
-      if (!updateResult) {
+      if (!response) {
         throw new Error(
-          `Update did not return a response for view ${viewName}`,
+          `Activation did not return a response for view ${ddlName}`,
         );
       }
 
-      // Get updated session state after update
+      // Parse activation response
+      const activationResult = parseActivationResponse(response.data);
+      const success = activationResult.activated && activationResult.checked;
 
-      logger?.info(`✅ UpdateView completed: ${viewName}`);
+      // Get updated session state after activation
+
+      logger?.info(`✅ ActivateView completed: ${ddlName}`);
+      logger?.info(
+        `   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`,
+      );
+      logger?.info(`   Messages: ${activationResult.messages.length}`);
 
       return return_response({
         data: JSON.stringify(
           {
-            success: true,
-            view_name: viewName,
+            success,
+            ddl_name: ddlName,
+            activation: {
+              activated: activationResult.activated,
+              checked: activationResult.checked,
+              generated: activationResult.generated,
+            },
+            messages: activationResult.messages,
+            warnings: activationResult.messages.filter(
+              (m) => m.type === 'warning' || m.type === 'W',
+            ),
+            errors: activationResult.messages.filter(
+              (m) => m.type === 'error' || m.type === 'E',
+            ),
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${viewName} updated successfully. Remember to unlock using UnlockObject.`,
+            message: success
+              ? `View ${ddlName} activated successfully`
+              : `View ${ddlName} activation completed with ${activationResult.messages.length} message(s)`,
           },
           null,
           2,
@@ -138,16 +142,14 @@ export async function handleUpdateView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error updating view ${viewName}: ${error?.message || error}`,
+        `Error activating view ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to update view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to activate view: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `View ${viewName} is locked by another user or lock handle is invalid.`;
+        errorMessage = `View ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

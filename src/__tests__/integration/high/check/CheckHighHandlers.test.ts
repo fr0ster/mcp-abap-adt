@@ -11,6 +11,7 @@
 import { handleCheckBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckClass } from '../../../../handlers/class/high/handleCheckClass';
 import { handleCheckDataElement } from '../../../../handlers/data_element/high/handleCheckDataElement';
+import { handleCheckDdl } from '../../../../handlers/ddl/high/handleCheckDdl';
 import { handleCheckMetadataExtension } from '../../../../handlers/ddlx/high/handleCheckMetadataExtension';
 import { handleCheckDomain } from '../../../../handlers/domain/high/handleCheckDomain';
 import { handleCheckFunctionGroup } from '../../../../handlers/function/high/handleCheckFunctionGroup';
@@ -20,7 +21,6 @@ import { handleCheckPackage } from '../../../../handlers/package/high/handleChec
 import { handleCheckProgram } from '../../../../handlers/program/high/handleCheckProgram';
 import { handleCheckStructure } from '../../../../handlers/structure/high/handleCheckStructure';
 import { handleCheckTable } from '../../../../handlers/table/high/handleCheckTable';
-import { handleCheckView } from '../../../../handlers/view/high/handleCheckView';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -168,15 +168,15 @@ describe('Check High-Level Handlers Integration', () => {
     );
   });
 
-  // CheckView
-  describe('CheckView', () => {
+  // CheckDdl
+  describe('CheckDdl', () => {
     let tester: LambdaTester;
 
     beforeAll(async () => {
       tester = new LambdaTester(
-        'check_view_high',
+        'check_ddl_high',
         'check_existing',
-        'check-view-high',
+        'check-ddl-high',
       );
       await tester.beforeAll(
         async () => {},
@@ -195,30 +195,30 @@ describe('Check High-Level Handlers Integration', () => {
     });
 
     it(
-      'should check existing view and return normalized response',
+      'should check existing CDS view and return normalized response',
       async () => {
         await tester.run(async (context: LambdaTesterContext) => {
           const { connection, params, logger } = context;
-          const objectName = params.view_name;
+          const objectName = params.ddl_name;
 
           logger?.info(`   • check: ${objectName}`);
-          const checkLogger = createTestLogger('check-view');
+          const checkLogger = createTestLogger('check-ddl');
           const response = await tester.invokeToolOrHandler(
-            'CheckView',
-            { view_name: objectName },
+            'CheckDdl',
+            { ddl_name: objectName },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckView(ctx, { view_name: objectName });
+              return handleCheckDdl(ctx, { ddl_name: objectName });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.view_name).toBe(objectName.toUpperCase());
+          expect(data.ddl_name).toBe(objectName.toUpperCase());
 
           const cr = data.check_result;
           logger?.success(

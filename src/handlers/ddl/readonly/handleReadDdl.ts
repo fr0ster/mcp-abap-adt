@@ -7,14 +7,14 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'ReadView',
+  name: 'ReadDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
         description: 'View name (e.g., Z_MY_VIEW).',
       },
@@ -25,27 +25,27 @@ export const TOOL_DEFINITION = {
         default: 'active',
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-export async function handleReadView(
+export async function handleReadDdl(
   context: HandlerContext,
-  args: { view_name: string; version?: 'active' | 'inactive' },
+  args: { ddl_name: string; version?: 'active' | 'inactive' },
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, version = 'active' } = args;
-    if (!view_name) return return_error(new Error('view_name is required'));
+    const { ddl_name, version = 'active' } = args;
+    if (!ddl_name) return return_error(new Error('ddl_name is required'));
 
     const client = createAdtClient(connection, logger);
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
     const obj = client.getDdl();
 
     let source_code: string | null = null;
     try {
       const readResult = await obj.read(
-        { ddlName: viewName },
+        { ddlName: ddlName },
         version as 'active' | 'inactive',
       );
       if (readResult?.readResult?.data) {
@@ -55,12 +55,12 @@ export async function handleReadView(
             : safeStringify(readResult.readResult.data);
       }
     } catch (e: any) {
-      logger?.warn(`Could not read source for ${viewName}: ${e?.message}`);
+      logger?.warn(`Could not read source for ${ddlName}: ${e?.message}`);
     }
 
     let metadata: string | null = null;
     try {
-      const metaResult = await obj.readMetadata({ ddlName: viewName });
+      const metaResult = await obj.readMetadata({ ddlName: ddlName });
       if (metaResult?.metadataResult?.data) {
         metadata =
           typeof metaResult.metadataResult.data === 'string'
@@ -68,14 +68,14 @@ export async function handleReadView(
             : safeStringify(metaResult.metadataResult.data);
       }
     } catch (e: any) {
-      logger?.warn(`Could not read metadata for ${viewName}: ${e?.message}`);
+      logger?.warn(`Could not read metadata for ${ddlName}: ${e?.message}`);
     }
 
     return return_response({
       data: JSON.stringify(
         {
           success: true,
-          view_name: viewName,
+          ddl_name: ddlName,
           version,
           source_code,
           metadata,

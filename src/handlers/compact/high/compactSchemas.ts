@@ -81,7 +81,7 @@ export const compactGetSchema = {
     data_element_name: { type: 'string', description: 'Data element name.' },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
-    view_name: { type: 'string', description: 'View name.' },
+    ddl_name: { type: 'string', description: 'DDL source name.' },
     function_module_name: {
       type: 'string',
       description: 'Function module name.',
@@ -477,7 +477,7 @@ export const compactValidateSchema = {
         'FUNCTION_MODULE',
         'TABLE',
         'STRUCTURE',
-        'VIEW',
+        'DDL',
         'DOMAIN',
         'DATA_ELEMENT',
         'PACKAGE',
@@ -487,7 +487,7 @@ export const compactValidateSchema = {
         'SERVICE_BINDING',
       ],
       description:
-        'Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, VIEW, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.',
+        'Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.',
     },
     object_name: {
       type: 'string',

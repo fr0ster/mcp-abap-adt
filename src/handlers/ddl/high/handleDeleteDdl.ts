@@ -1,8 +1,8 @@
 /**
- * DeleteView Handler - Delete ABAP View
+ * DeleteView Handler - Delete ABAP View via AdtClient
  *
- * Uses AdtClient.deleteView from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().delete() for high-level delete operation.
+ * Includes deletion check before actual deletion.
  */
 
 import { createAdtClient } from '../../../lib/clients';
@@ -14,16 +14,16 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'DeleteViewLow',
+  name: 'DeleteDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_PROGRAM).',
+        description: 'View name (e.g., Z_MY_VIEW).',
       },
       transport_request: {
         type: 'string',
@@ -31,61 +31,59 @@ export const TOOL_DEFINITION = {
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface DeleteViewArgs {
-  view_name: string;
+interface DeleteDdlArgs {
+  ddl_name: string;
   transport_request?: string;
 }
 
 /**
- * Main handler for DeleteView MCP tool
+ * Main handler for DeleteDdl MCP tool
  *
- * Uses AdtClient.deleteView - low-level single method call
+ * Uses AdtClient.getDdl().delete() - high-level delete operation with deletion check
  */
-export async function handleDeleteView(
+export async function handleDeleteDdl(
   context: HandlerContext,
-  args: DeleteViewArgs,
+  args: DeleteDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, transport_request } = args as DeleteViewArgs;
+    const { ddl_name, transport_request } = args as DeleteDdlArgs;
 
     // Validation
-    if (!view_name) {
-      return return_error(new Error('view_name is required'));
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view deletion: ${viewName}`);
+    logger?.info(`Starting view deletion: ${ddlName}`);
 
     try {
-      // Delete view
-      const deleteState = await client.getDdl().delete({
-        ddlName: viewName,
+      // Delete view using AdtClient (includes deletion check)
+      const viewObject = client.getDdl();
+      const deleteResult = await viewObject.delete({
+        ddlName: ddlName,
         transportRequest: transport_request,
       });
-      const deleteResult = deleteState.deleteResult;
 
-      if (!deleteResult) {
-        throw new Error(
-          `Delete did not return a response for view ${viewName}`,
-        );
+      if (!deleteResult || !deleteResult.deleteResult) {
+        throw new Error(`Delete did not return a response for view ${ddlName}`);
       }
 
-      logger?.info(`✅ DeleteView completed successfully: ${viewName}`);
+      logger?.info(`✅ DeleteDdl completed successfully: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
           {
             success: true,
-            view_name: viewName,
+            ddl_name: ddlName,
             transport_request: transport_request || null,
-            message: `View ${viewName} deleted successfully.`,
+            message: `View ${ddlName} deleted successfully.`,
           },
           null,
           2,
@@ -93,16 +91,16 @@ export async function handleDeleteView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error deleting view ${viewName}: ${error?.message || error}`,
+        `Error deleting view ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
       let errorMessage = `Failed to delete view: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found. It may already be deleted.`;
+        errorMessage = `View ${ddlName} not found. It may already be deleted.`;
       } else if (error.response?.status === 423) {
-        errorMessage = `View ${viewName} is locked by another user. Cannot delete.`;
+        errorMessage = `View ${ddlName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
       } else if (

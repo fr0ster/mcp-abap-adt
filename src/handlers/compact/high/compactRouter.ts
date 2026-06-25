@@ -28,6 +28,10 @@ import { handleCreateDataElement } from '../../data_element/high/handleCreateDat
 import { handleDeleteDataElement } from '../../data_element/high/handleDeleteDataElement';
 import { handleGetDataElement } from '../../data_element/high/handleGetDataElement';
 import { handleUpdateDataElement } from '../../data_element/high/handleUpdateDataElement';
+import { handleCreateDdl } from '../../ddl/high/handleCreateDdl';
+import { handleDeleteDdl } from '../../ddl/high/handleDeleteDdl';
+import { handleGetDdl } from '../../ddl/high/handleGetDdl';
+import { handleUpdateDdl } from '../../ddl/high/handleUpdateDdl';
 import { handleCreateMetadataExtension } from '../../ddlx/high/handleCreateMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../ddlx/high/handleUpdateMetadataExtension';
 import { handleCreateDomain } from '../../domain/high/handleCreateDomain';
@@ -79,10 +83,6 @@ import { handleGetCdsUnitTest } from '../../unit_test/high/handleGetCdsUnitTest'
 import { handleGetUnitTest } from '../../unit_test/high/handleGetUnitTest';
 import { handleUpdateCdsUnitTest } from '../../unit_test/high/handleUpdateCdsUnitTest';
 import { handleUpdateUnitTest } from '../../unit_test/high/handleUpdateUnitTest';
-import { handleCreateView } from '../../view/high/handleCreateView';
-import { handleDeleteView } from '../../view/high/handleDeleteView';
-import { handleGetView } from '../../view/high/handleGetView';
-import { handleUpdateView } from '../../view/high/handleUpdateView';
 import {
   COMPACT_CRUD_MATRIX,
   type CompactCrudOperation,
@@ -131,11 +131,11 @@ export const compactRouterMap: CompactRouterMap = {
     update: handleUpdateStructure as unknown as CompactHandler,
     delete: handleDeleteStructure as unknown as CompactHandler,
   },
-  VIEW: {
-    create: handleCreateView as unknown as CompactHandler,
-    get: handleGetView as unknown as CompactHandler,
-    update: handleUpdateView as unknown as CompactHandler,
-    delete: handleDeleteView as unknown as CompactHandler,
+  DDL: {
+    create: handleCreateDdl as unknown as CompactHandler,
+    get: handleGetDdl as unknown as CompactHandler,
+    update: handleUpdateDdl as unknown as CompactHandler,
+    delete: handleDeleteDdl as unknown as CompactHandler,
   },
   SERVICE_DEFINITION: {
     create: handleCreateServiceDefinition as unknown as CompactHandler,

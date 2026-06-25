@@ -1,7 +1,7 @@
 /**
- * ActivateView Handler - Activate ABAP View (CDS View)
+ * LockView Handler - Lock ABAP View
  *
- * Uses AdtClient.activateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.lockView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -9,23 +9,22 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  parseActivationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'ActivateViewLow',
+  name: 'LockDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., ZVW_MY_VIEW).',
+        description: 'View name (e.g., Z_MY_PROGRAM).',
       },
       session_id: {
         type: 'string',
@@ -43,12 +42,12 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface ActivateViewArgs {
-  view_name: string;
+interface LockDdlArgs {
+  ddl_name: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -58,21 +57,21 @@ interface ActivateViewArgs {
 }
 
 /**
- * Main handler for ActivateView MCP tool
+ * Main handler for LockDdl MCP tool
  *
- * Uses AdtClient.activateView - low-level single method call
+ * Uses AdtClient.lockView - low-level single method call
  */
-export async function handleActivateView(
+export async function handleLockDdl(
   context: HandlerContext,
-  args: ActivateViewArgs,
+  args: LockDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, session_id, session_state } = args as ActivateViewArgs;
+    const { ddl_name, session_id, session_state } = args as LockDdlArgs;
 
     // Validation
-    if (!view_name) {
-      return return_error(new Error('view_name is required'));
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
@@ -84,57 +83,34 @@ export async function handleActivateView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view activation: ${viewName}`);
+    logger?.info(`Starting view lock: ${ddlName}`);
 
     try {
-      // Activate view
-      const activateState = await client
-        .getDdl()
-        .activate({ ddlName: viewName });
-      const response = activateState.activateResult;
+      // Lock view
+      const lockHandle = await client.getDdl().lock({ ddlName: ddlName });
 
-      if (!response) {
+      if (!lockHandle) {
         throw new Error(
-          `Activation did not return a response for view ${viewName}`,
+          `Lock did not return a lock handle for view ${ddlName}`,
         );
       }
 
-      // Parse activation response
-      const activationResult = parseActivationResponse(response.data);
-      const success = activationResult.activated && activationResult.checked;
+      // Get updated session state after lock
 
-      // Get updated session state after activation
-
-      logger?.info(`✅ ActivateView completed: ${viewName}`);
-      logger?.info(
-        `   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`,
-      );
-      logger?.info(`   Messages: ${activationResult.messages.length}`);
+      logger?.info(`✅ LockView completed: ${ddlName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify(
           {
-            success,
-            view_name: viewName,
-            activation: {
-              activated: activationResult.activated,
-              checked: activationResult.checked,
-              generated: activationResult.generated,
-            },
-            messages: activationResult.messages,
-            warnings: activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
-            ),
-            errors: activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            ),
+            success: true,
+            ddl_name: ddlName,
             session_id: session_id || null,
+            lock_handle: lockHandle,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: success
-              ? `View ${viewName} activated successfully`
-              : `View ${viewName} activation completed with ${activationResult.messages.length} message(s)`,
+            message: `View ${ddlName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
           },
           null,
           2,
@@ -142,14 +118,16 @@ export async function handleActivateView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error activating view ${viewName}: ${error?.message || error}`,
+        `Error locking view ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to activate view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to lock view: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
+        errorMessage = `View ${ddlName} not found.`;
+      } else if (error.response?.status === 409) {
+        errorMessage = `View ${ddlName} is already locked by another user.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
           'function_module',
           'table',
           'structure',
-          'view',
+          'ddl',
           'domain',
           'data_element',
           'package',
@@ -111,7 +111,7 @@ export async function handleLockObject(
       'function_module',
       'table',
       'structure',
-      'view',
+      'ddl',
       'domain',
       'data_element',
       'package',
@@ -184,7 +184,7 @@ export async function handleLockObject(
             .getStructure()
             .lock({ structureName: objectName });
           break;
-        case 'view':
+        case 'ddl':
           lockHandle = await client.getDdl().lock({ ddlName: objectName });
           break;
         case 'domain':

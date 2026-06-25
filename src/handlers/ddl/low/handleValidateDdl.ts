@@ -1,7 +1,7 @@
 /**
- * CreateView Handler - Create ABAP View
+ * ValidateView Handler - Validate ABAP View Name
  *
- * Uses AdtClient.createView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.validateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -9,45 +9,32 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
+  parseValidationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'CreateViewLow',
+  name: 'ValidateDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
+    '[low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description:
-          'View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
-      },
-      description: {
-        type: 'string',
-        description: 'View description.',
+        description: 'View name to validate (e.g., Z_MY_PROGRAM).',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
-      },
-      transport_request: {
-        type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages.',
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
       },
-      view_type: {
+      description: {
         type: 'string',
-        description:
-          "View type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).",
-      },
-      application: {
-        type: 'string',
-        description: "Application area (optional, default: '*').",
+        description: 'View description. Required for validation.',
       },
       session_id: {
         type: 'string',
@@ -65,15 +52,14 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name', 'description', 'package_name'],
+    required: ['ddl_name', 'package_name', 'description'],
   },
 } as const;
 
-interface CreateViewArgs {
-  view_name: string;
-  description: string;
+interface ValidateDdlArgs {
+  ddl_name: string;
   package_name: string;
-  transport_request?: string;
+  description: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -83,29 +69,23 @@ interface CreateViewArgs {
 }
 
 /**
- * Main handler for CreateView MCP tool
+ * Main handler for ValidateDdl MCP tool
  *
- * Uses AdtClient.createView - low-level single method call
+ * Uses AdtClient.validateView - low-level single method call
  */
-export async function handleCreateView(
+export async function handleValidateDdl(
   context: HandlerContext,
-  args: CreateViewArgs,
+  args: ValidateDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const {
-      view_name,
-      description,
-      package_name,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as CreateViewArgs;
+    const { ddl_name, description, package_name, session_id, session_state } =
+      args as ValidateDdlArgs;
 
     // Validation
-    if (!view_name || !description || !package_name) {
+    if (!ddl_name || !package_name || !description) {
       return return_error(
-        new Error('view_name, description, and package_name are required'),
+        new Error('ddl_name, package_name, and description are required'),
       );
     }
 
@@ -118,42 +98,41 @@ export async function handleCreateView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view creation: ${viewName}`);
+    logger?.info(`Starting view validation: ${ddlName}`);
 
     try {
-      // Create view
-      const createState = await client.getDdl().create({
-        ddlName: viewName,
-        description,
-        packageName: package_name,
-        ddlSource: '',
-        transportRequest: transport_request,
+      // Validate view
+      const validationState = await client.getDdl().validate({
+        ddlName: ddlName,
+        packageName: package_name.toUpperCase(),
+        description: description,
       });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for view ${viewName}`,
-        );
+      const validationResponse = validationState.validationResponse;
+      if (!validationResponse) {
+        throw new Error('Validation did not return a result');
       }
+      const result = parseValidationResponse(
+        validationResponse as AxiosResponse,
+      );
 
-      // Get updated session state after create
+      // Get updated session state after validation
 
-      logger?.info(`✅ CreateView completed: ${viewName}`);
+      logger?.info(`✅ ValidateView completed: ${ddlName}`);
+      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({
         data: JSON.stringify(
           {
-            success: true,
-            view_name: viewName,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
+            success: result.valid,
+            ddl_name: ddlName,
+            validation_result: result,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${viewName} created successfully. Use LockView and UpdateView to add source code, then UnlockView and ActivateObject.`,
+            message: result.valid
+              ? `View name ${ddlName} is valid and available`
+              : `View name ${ddlName} validation failed: ${result.message}`,
           },
           null,
           2,
@@ -161,14 +140,14 @@ export async function handleCreateView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error creating view ${viewName}: ${error?.message || error}`,
+        `Error validating view ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to create view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to validate view: ${error.message || String(error)}`;
 
-      if (error.response?.status === 409) {
-        errorMessage = `View ${viewName} already exists.`;
+      if (error.response?.status === 404) {
+        errorMessage = `View ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

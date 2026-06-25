@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
       object_type: {
         type: 'string',
         description:
-          "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'view', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
+          "Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'",
         enum: [
           'class',
           'program',
@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
           'function_group',
           'table',
           'structure',
-          'view',
+          'ddl',
           'domain',
           'data_element',
           'package',
@@ -145,7 +145,7 @@ export async function handleValidateObject(
       'function_group',
       'table',
       'structure',
-      'view',
+      'ddl',
       'domain',
       'data_element',
       'package',
@@ -268,7 +268,7 @@ export async function handleValidateObject(
           result = parseValidationResponse(structureResponse as AxiosResponse);
           break;
         }
-        case 'view': {
+        case 'ddl': {
           const validationState = await validationClient.getDdl().validate({
             ddlName: objectName,
             packageName: package_name || undefined,

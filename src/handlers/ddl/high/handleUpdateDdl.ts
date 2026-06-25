@@ -16,14 +16,14 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'UpdateView',
+  name: 'UpdateDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates.',
+    'Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new view.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
         description: 'View name (e.g., ZOK_R_TEST_0002).',
       },
@@ -38,37 +38,37 @@ export const TOOL_DEFINITION = {
         description: 'Activate after update. Default: false.',
       },
     },
-    required: ['view_name', 'ddl_source'],
+    required: ['ddl_name', 'ddl_source'],
   },
 } as const;
 
-interface UpdateViewArgs {
-  view_name: string;
+interface UpdateDdlArgs {
+  ddl_name: string;
   ddl_source: string;
   transport_request?: string;
   activate?: boolean;
 }
 
-export async function handleUpdateView(context: HandlerContext, params: any) {
+export async function handleUpdateDdl(context: HandlerContext, params: any) {
   const { connection, logger } = context;
-  const args: UpdateViewArgs = params;
+  const args: UpdateDdlArgs = params;
 
-  if (!args.view_name || !args.ddl_source) {
+  if (!args.ddl_name || !args.ddl_source) {
     return return_error(
-      new Error('Missing required parameters: view_name and ddl_source'),
+      new Error('Missing required parameters: ddl_name and ddl_source'),
     );
   }
 
-  const viewName = args.view_name.toUpperCase();
+  const ddlName = args.ddl_name.toUpperCase();
   logger?.info(
-    `Starting view source update: ${viewName} (activate=${args.activate === true})`,
+    `Starting view source update: ${ddlName} (activate=${args.activate === true})`,
   );
 
   // Connection setup
   try {
     // Get connection from session context (set by ProtocolHandler)
     // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger?.debug(`Created separate connection for handler call: ${viewName}`);
+    logger?.debug(`Created separate connection for handler call: ${ddlName}`);
   } catch (connectionError: any) {
     const errorMessage =
       connectionError instanceof Error
@@ -87,36 +87,36 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
 
     try {
       // Lock
-      logger?.debug(`Locking view: ${viewName}`);
-      lockHandle = await client.getDdl().lock({ ddlName: viewName });
+      logger?.debug(`Locking view: ${ddlName}`);
+      lockHandle = await client.getDdl().lock({ ddlName: ddlName });
       logger?.debug(
-        `View locked: ${viewName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+        `View locked: ${ddlName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
       );
 
       // Check new code BEFORE update (only when activating)
       if (shouldActivate) {
-        logger?.debug(`Checking new DDL code before update: ${viewName}`);
+        logger?.debug(`Checking new DDL code before update: ${ddlName}`);
         try {
           await safeCheckOperation(
             () =>
               client
                 .getDdl()
                 .check(
-                  { ddlName: viewName, ddlSource: args.ddl_source },
+                  { ddlName: ddlName, ddlSource: args.ddl_source },
                   'inactive',
                 ),
-            viewName,
+            ddlName,
             {
               debug: (message: string) => logger?.debug(message),
             },
           );
-          logger?.debug(`New code check passed: ${viewName}`);
+          logger?.debug(`New code check passed: ${ddlName}`);
         } catch (checkError: any) {
           if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(`View ${viewName} was already checked - continuing`);
+            logger?.debug(`View ${ddlName} was already checked - continuing`);
           } else {
             logger?.error(
-              `New code check failed: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+              `New code check failed: ${ddlName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
             );
             throw new Error(
               `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
@@ -124,29 +124,29 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
           }
         }
       } else {
-        logger?.debug(`Skipping syntax check (activate=false): ${viewName}`);
+        logger?.debug(`Skipping syntax check (activate=false): ${ddlName}`);
       }
 
       // Update
-      logger?.debug(`Updating view DDL source: ${viewName}`);
+      logger?.debug(`Updating view DDL source: ${ddlName}`);
       await client.getDdl().update(
         {
-          ddlName: viewName,
+          ddlName: ddlName,
           ddlSource: args.ddl_source,
           transportRequest: args.transport_request,
         },
         { lockHandle },
       );
-      logger?.info(`View DDL source updated: ${viewName}`);
+      logger?.info(`View DDL source updated: ${ddlName}`);
     } finally {
       if (lockHandle) {
         try {
-          logger?.debug(`Unlocking view: ${viewName}`);
-          await client.getDdl().unlock({ ddlName: viewName }, lockHandle);
-          logger?.info(`View unlocked: ${viewName}`);
+          logger?.debug(`Unlocking view: ${ddlName}`);
+          await client.getDdl().unlock({ ddlName: ddlName }, lockHandle);
+          logger?.info(`View unlocked: ${ddlName}`);
         } catch (unlockError: any) {
           logger?.warn(
-            `Failed to unlock view ${viewName}: ${unlockError?.message || unlockError}`,
+            `Failed to unlock view ${ddlName}: ${unlockError?.message || unlockError}`,
           );
         }
       }
@@ -154,28 +154,28 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
 
     // Check inactive version (after unlock, only when activating)
     if (shouldActivate) {
-      logger?.debug(`Checking inactive version: ${viewName}`);
+      logger?.debug(`Checking inactive version: ${ddlName}`);
       try {
         await safeCheckOperation(
           () =>
             client
               .getDdl()
               .check(
-                { ddlName: viewName, ddlSource: args.ddl_source },
+                { ddlName: ddlName, ddlSource: args.ddl_source },
                 'inactive',
               ),
-          viewName,
+          ddlName,
           {
             debug: (message: string) => logger?.debug(message),
           },
         );
-        logger?.debug(`Inactive version check completed: ${viewName}`);
+        logger?.debug(`Inactive version check completed: ${ddlName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`View ${viewName} was already checked - continuing`);
+          logger?.debug(`View ${ddlName} was already checked - continuing`);
         } else {
           logger?.warn(
-            `Inactive version check had issues: ${viewName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
+            `Inactive version check had issues: ${ddlName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
           );
         }
       }
@@ -184,23 +184,23 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
     // Activate if requested
     let activateResponse: any | undefined;
     if (shouldActivate) {
-      logger?.debug(`Activating view: ${viewName}`);
+      logger?.debug(`Activating view: ${ddlName}`);
       try {
         const activateState = await client
           .getDdl()
-          .activate({ ddlName: viewName });
+          .activate({ ddlName: ddlName });
         activateResponse = activateState.activateResult;
-        logger?.info(`View activated: ${viewName}`);
+        logger?.info(`View activated: ${ddlName}`);
       } catch (activationError: any) {
         logger?.error(
-          `Activation failed: ${viewName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
+          `Activation failed: ${ddlName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
         );
         throw new Error(
           `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
         );
       }
     } else {
-      logger?.debug(`Skipping activation for: ${viewName}`);
+      logger?.debug(`Skipping activation for: ${ddlName}`);
     }
 
     // Parse activation warnings if activation was performed
@@ -226,15 +226,15 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
       }
     }
 
-    logger?.info(`UpdateView completed successfully: ${viewName}`);
+    logger?.info(`UpdateDdl completed successfully: ${ddlName}`);
 
     const result = {
       success: true,
-      view_name: viewName,
+      ddl_name: ddlName,
       type: 'DDLS',
       activated: shouldActivate,
-      message: `View ${viewName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`,
+      message: `View ${ddlName} updated${shouldActivate ? ' and activated' : ''} successfully`,
+      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`,
       steps_completed: [
         'lock',
         'check_new_code',
@@ -277,7 +277,7 @@ export async function handleUpdateView(context: HandlerContext, params: any) {
       // ignore parse errors
     }
 
-    logger?.error(`Error updating view ${viewName}: ${errorMessage}`);
+    logger?.error(`Error updating view ${ddlName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   }
 }

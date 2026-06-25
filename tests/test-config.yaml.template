@@ -1531,7 +1531,7 @@ create_transported_object:
 # Standard SAP objects registry for read-only tests
 
 # View (View)
-create_view:
+create_ddl:
   test_cases:
     - name: "builder_view"
       enabled: true
@@ -1540,7 +1540,7 @@ create_view:
       params:
         # package_name: "ZMCP_BLD_PKG01"
         table_name: "ZMCP_VIEW_TBL02"
-        view_name: "ZMCP_BLD_VIEW_H1"
+        ddl_name: "ZMCP_BLD_VIEW_H1"
         description: "ViewBuilder workflow view"
         transport_request: ""
         table_source: |
@@ -1575,7 +1575,7 @@ create_view:
       params:
         # package_name: "ZMCP_BLD_PKG01"
         table_name: "ZMCP_CDS_TBL02"
-        view_name: "ZMCP_BLD_CDSV_H1"
+        ddl_name: "ZMCP_BLD_CDSV_H1"
         description: "ViewBuilder CDS unit test view"
         transport_request: ""
         table_source: |
@@ -1631,14 +1631,14 @@ create_view:
 # Create Function Group
 
 # View (View - Low-Level)
-create_view_low:
+create_ddl_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
       description: "View low-level handler full workflow test"
       params:
-        view_name: "ZMCP_BLD_VIEW_L1"
+        ddl_name: "ZMCP_BLD_VIEW_L1"
         description: "View low-level handler test view"
         # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
@@ -2081,15 +2081,15 @@ check_bdef_high:
       params:
         name: "ZI_MCP_SHR_ROOT"
 
-# CheckView
-check_view_high:
+# CheckDdl
+check_ddl_high:
   test_cases:
     - name: "check_existing"
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
       description: "Check an existing CDS view for syntax errors"
       params:
-        view_name: "ZI_MCP_SHR_ROOT"
+        ddl_name: "ZI_MCP_SHR_ROOT"
 
 # CheckDomain
 check_domain_high:

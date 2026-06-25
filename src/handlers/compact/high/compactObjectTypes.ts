@@ -5,7 +5,7 @@ export type CompactObjectType =
   | 'TRANSPORT'
   | 'TABLE'
   | 'STRUCTURE'
-  | 'VIEW'
+  | 'DDL'
   | 'SERVICE_DEFINITION'
   | 'SERVICE_BINDING'
   | 'CLASS'
@@ -32,7 +32,7 @@ export const COMPACT_OBJECT_TYPES: CompactObjectType[] = [
   'TRANSPORT',
   'TABLE',
   'STRUCTURE',
-  'VIEW',
+  'DDL',
   'SERVICE_DEFINITION',
   'SERVICE_BINDING',
   'CLASS',

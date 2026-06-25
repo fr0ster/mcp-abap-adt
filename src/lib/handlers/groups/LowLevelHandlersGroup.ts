@@ -48,6 +48,15 @@ import { handleUnlockDataElement } from '../../../handlers/data_element/low/hand
 // Import low-level handlers - DataElement
 import { handleUpdateDataElement } from '../../../handlers/data_element/low/handleUpdateDataElement';
 import { handleValidateDataElement } from '../../../handlers/data_element/low/handleValidateDataElement';
+import { handleActivateDdl } from '../../../handlers/ddl/low/handleActivateDdl';
+import { handleCheckDdl } from '../../../handlers/ddl/low/handleCheckDdl';
+import { handleCreateDdl as handleCreateDdlLow } from '../../../handlers/ddl/low/handleCreateDdl';
+import { handleDeleteDdl } from '../../../handlers/ddl/low/handleDeleteDdl';
+import { handleLockDdl } from '../../../handlers/ddl/low/handleLockDdl';
+import { handleUnlockDdl } from '../../../handlers/ddl/low/handleUnlockDdl';
+// Import low-level handlers - Ddl
+import { handleUpdateDdl as handleUpdateDdlLow } from '../../../handlers/ddl/low/handleUpdateDdl';
+import { handleValidateDdl } from '../../../handlers/ddl/low/handleValidateDdl';
 import { handleActivateMetadataExtension } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 // Import low-level handlers - MetadataExtension (DDLX)
 import { handleCheckMetadataExtension } from '../../../handlers/ddlx/low/handleCheckMetadataExtension';
@@ -130,15 +139,6 @@ import { handleUpdateTable as handleUpdateTableLow } from '../../../handlers/tab
 import { handleValidateTable } from '../../../handlers/table/low/handleValidateTable';
 // Import low-level handlers - Transport
 import { handleCreateTransport as handleCreateTransportLow } from '../../../handlers/transport/low/handleCreateTransport';
-import { handleActivateView } from '../../../handlers/view/low/handleActivateView';
-import { handleCheckView } from '../../../handlers/view/low/handleCheckView';
-import { handleCreateView as handleCreateViewLow } from '../../../handlers/view/low/handleCreateView';
-import { handleDeleteView } from '../../../handlers/view/low/handleDeleteView';
-import { handleLockView } from '../../../handlers/view/low/handleLockView';
-import { handleUnlockView } from '../../../handlers/view/low/handleUnlockView';
-// Import low-level handlers - View
-import { handleUpdateView as handleUpdateViewLow } from '../../../handlers/view/low/handleUpdateView';
-import { handleValidateView } from '../../../handlers/view/low/handleValidateView';
 // import { TOOL_DEFINITION as DeleteObject_Tool } from "../../../handlers/common/low/handleDeleteObject";
 // import { TOOL_DEFINITION as CheckObject_Tool } from "../../../handlers/common/low/handleCheckObject";
 // import { TOOL_DEFINITION as ValidateObject_Tool } from "../../../handlers/common/low/handleValidateObject";
@@ -183,6 +183,15 @@ import { TOOL_DEFINITION as UnlockDataElement_Tool } from '../../../handlers/dat
 // Import TOOL_DEFINITION from data_element low handlers
 import { TOOL_DEFINITION as UpdateDataElementLow_Tool } from '../../../handlers/data_element/low/handleUpdateDataElement';
 import { TOOL_DEFINITION as ValidateDataElement_Tool } from '../../../handlers/data_element/low/handleValidateDataElement';
+import { TOOL_DEFINITION as ActivateDdl_Tool } from '../../../handlers/ddl/low/handleActivateDdl';
+import { TOOL_DEFINITION as CheckDdl_Tool } from '../../../handlers/ddl/low/handleCheckDdl';
+import { TOOL_DEFINITION as CreateDdlLow_Tool } from '../../../handlers/ddl/low/handleCreateDdl';
+import { TOOL_DEFINITION as DeleteDdl_Tool } from '../../../handlers/ddl/low/handleDeleteDdl';
+import { TOOL_DEFINITION as LockDdl_Tool } from '../../../handlers/ddl/low/handleLockDdl';
+import { TOOL_DEFINITION as UnlockDdl_Tool } from '../../../handlers/ddl/low/handleUnlockDdl';
+// Import TOOL_DEFINITION from ddl low handlers
+import { TOOL_DEFINITION as UpdateDdl_Tool } from '../../../handlers/ddl/low/handleUpdateDdl';
+import { TOOL_DEFINITION as ValidateDdl_Tool } from '../../../handlers/ddl/low/handleValidateDdl';
 import { TOOL_DEFINITION as ActivateMetadataExtension_Tool } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 // Import TOOL_DEFINITION from ddlx low handlers
 import { TOOL_DEFINITION as CheckMetadataExtension_Tool } from '../../../handlers/ddlx/low/handleCheckMetadataExtension';
@@ -265,15 +274,6 @@ import { TOOL_DEFINITION as UpdateTableLow_Tool } from '../../../handlers/table/
 import { TOOL_DEFINITION as ValidateTable_Tool } from '../../../handlers/table/low/handleValidateTable';
 // Import TOOL_DEFINITION from transport low handlers
 import { TOOL_DEFINITION as CreateTransportLow_Tool } from '../../../handlers/transport/low/handleCreateTransport';
-import { TOOL_DEFINITION as ActivateView_Tool } from '../../../handlers/view/low/handleActivateView';
-import { TOOL_DEFINITION as CheckView_Tool } from '../../../handlers/view/low/handleCheckView';
-import { TOOL_DEFINITION as CreateViewLow_Tool } from '../../../handlers/view/low/handleCreateView';
-import { TOOL_DEFINITION as DeleteView_Tool } from '../../../handlers/view/low/handleDeleteView';
-import { TOOL_DEFINITION as LockView_Tool } from '../../../handlers/view/low/handleLockView';
-import { TOOL_DEFINITION as UnlockView_Tool } from '../../../handlers/view/low/handleUnlockView';
-// Import TOOL_DEFINITION from view low handlers
-import { TOOL_DEFINITION as UpdateView_Tool } from '../../../handlers/view/low/handleUpdateView';
-import { TOOL_DEFINITION as ValidateView_Tool } from '../../../handlers/view/low/handleValidateView';
 
 /**
  * Handler group for all low-level handlers
@@ -577,53 +577,53 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
           return handleActivateStructure(this.context, args);
         },
       },
-      // View low-level handlers
+      // Ddl low-level handlers
       {
-        toolDefinition: UpdateView_Tool,
+        toolDefinition: UpdateDdl_Tool,
         handler: (args: any) => {
-          return handleUpdateViewLow(this.context, args);
+          return handleUpdateDdlLow(this.context, args);
         },
       },
       {
-        toolDefinition: CheckView_Tool,
+        toolDefinition: CheckDdl_Tool,
         handler: (args: any) => {
-          return handleCheckView(this.context, args);
+          return handleCheckDdl(this.context, args);
         },
       },
       {
-        toolDefinition: DeleteView_Tool,
+        toolDefinition: DeleteDdl_Tool,
         handler: (args: any) => {
-          return handleDeleteView(this.context, args);
+          return handleDeleteDdl(this.context, args);
         },
       },
       {
-        toolDefinition: LockView_Tool,
+        toolDefinition: LockDdl_Tool,
         handler: (args: any) => {
-          return handleLockView(this.context, args);
+          return handleLockDdl(this.context, args);
         },
       },
       {
-        toolDefinition: UnlockView_Tool,
+        toolDefinition: UnlockDdl_Tool,
         handler: (args: any) => {
-          return handleUnlockView(this.context, args);
+          return handleUnlockDdl(this.context, args);
         },
       },
       {
-        toolDefinition: ValidateView_Tool,
+        toolDefinition: ValidateDdl_Tool,
         handler: (args: any) => {
-          return handleValidateView(this.context, args);
+          return handleValidateDdl(this.context, args);
         },
       },
       {
-        toolDefinition: CreateViewLow_Tool,
+        toolDefinition: CreateDdlLow_Tool,
         handler: (args: any) => {
-          return handleCreateViewLow(this.context, args);
+          return handleCreateDdlLow(this.context, args);
         },
       },
       {
-        toolDefinition: ActivateView_Tool,
+        toolDefinition: ActivateDdl_Tool,
         handler: (args: any) => {
-          return handleActivateView(this.context, args);
+          return handleActivateDdl(this.context, args);
         },
       },
       // Class low-level handlers

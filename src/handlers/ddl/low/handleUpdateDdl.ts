@@ -1,7 +1,7 @@
 /**
- * UnlockView Handler - Unlock ABAP View
+ * UpdateView Handler - Update ABAP View DDL Source
  *
- * Uses AdtClient.unlockView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.updateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -15,30 +15,37 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'UnlockViewLow',
+  name: 'UpdateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.',
+    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_PROGRAM).',
+        description:
+          'View name (e.g., ZOK_R_TEST_0002). View must already exist.',
+      },
+      ddl_source: {
+        type: 'string',
+        description:
+          "Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.",
       },
       lock_handle: {
         type: 'string',
-        description: 'Lock handle from LockView operation.',
+        description:
+          'Lock handle from LockObject. Required for update operation.',
       },
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockView operation. Must be the same as used in LockView.',
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockView (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },
@@ -46,14 +53,15 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name', 'lock_handle', 'session_id'],
+    required: ['ddl_name', 'ddl_source', 'lock_handle'],
   },
 } as const;
 
-interface UnlockViewArgs {
-  view_name: string;
+interface UpdateDdlArgs {
+  ddl_name: string;
+  ddl_source: string;
   lock_handle: string;
-  session_id: string;
+  session_id?: string;
   session_state?: {
     cookies?: string;
     csrf_token?: string;
@@ -62,23 +70,23 @@ interface UnlockViewArgs {
 }
 
 /**
- * Main handler for UnlockView MCP tool
+ * Main handler for UpdateDdl MCP tool
  *
- * Uses AdtClient.unlockView - low-level single method call
+ * Uses AdtClient.updateView - low-level single method call
  */
-export async function handleUnlockView(
+export async function handleUpdateDdl(
   context: HandlerContext,
-  args: UnlockViewArgs,
+  args: UpdateDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, lock_handle, session_id, session_state } =
-      args as UnlockViewArgs;
+    const { ddl_name, ddl_source, lock_handle, session_id, session_state } =
+      args as UpdateDdlArgs;
 
     // Validation
-    if (!view_name || !lock_handle || !session_id) {
+    if (!ddl_name || !ddl_source || !lock_handle) {
       return return_error(
-        new Error('view_name, lock_handle, and session_id are required'),
+        new Error('ddl_name, ddl_source, and lock_handle are required'),
       );
     }
 
@@ -91,37 +99,36 @@ export async function handleUnlockView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(
-      `Starting view unlock: ${viewName} (session: ${session_id.substring(0, 8)}...)`,
-    );
+    logger?.info(`Starting view update: ${ddlName}`);
 
     try {
-      // Unlock view
-      const unlockState = await client
+      // Update view with DDL source
+      const updateState = await client
         .getDdl()
-        .unlock({ ddlName: viewName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for view ${viewName}`,
+        .update(
+          { ddlName: ddlName, ddlSource: ddl_source },
+          { lockHandle: lock_handle },
         );
+      const updateResult = updateState.updateResult;
+
+      if (!updateResult) {
+        throw new Error(`Update did not return a response for view ${ddlName}`);
       }
 
-      // Get updated session state after unlock
+      // Get updated session state after update
 
-      logger?.info(`✅ UnlockView completed: ${viewName}`);
+      logger?.info(`✅ UpdateView completed: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
           {
             success: true,
-            view_name: viewName,
-            session_id: session_id,
+            ddl_name: ddlName,
+            session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${viewName} unlocked successfully.`,
+            message: `View ${ddlName} updated successfully. Remember to unlock using UnlockObject.`,
           },
           null,
           2,
@@ -129,16 +136,16 @@ export async function handleUnlockView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error unlocking view ${viewName}: ${error?.message || error}`,
+        `Error updating view ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to unlock view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to update view: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockView.`;
+        errorMessage = `View ${ddlName} not found.`;
+      } else if (error.response?.status === 423) {
+        errorMessage = `View ${ddlName} is locked by another user or lock handle is invalid.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

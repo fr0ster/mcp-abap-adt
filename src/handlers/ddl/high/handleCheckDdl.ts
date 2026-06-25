@@ -1,18 +1,19 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { normalizeCheckResponse } from '../../../lib/normalizeCheckResponse';
-import { handleCheckView as handleCheckViewLow } from '../low/handleCheckView';
+import { handleCheckDdl as handleCheckDdlLow } from '../low/handleCheckDdl';
 
 export const TOOL_DEFINITION = {
-  name: 'CheckView',
+  name: 'CheckDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     'Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'CDS view name (e.g., ZI_MY_VIEW).',
+        description:
+          'CDS view name to check, passed as ddl_name (e.g., ZI_MY_VIEW).',
       },
       version: {
         type: 'string',
@@ -26,14 +27,14 @@ export const TOOL_DEFINITION = {
           'Optional: DDL source code to validate instead of the saved version.',
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-export async function handleCheckView(
+export async function handleCheckDdl(
   context: HandlerContext,
-  args: { view_name: string; version?: string; ddl_source?: string },
+  args: { ddl_name: string; version?: string; ddl_source?: string },
 ) {
-  const result = await handleCheckViewLow(context, args);
-  return normalizeCheckResponse(result, args.view_name?.toUpperCase());
+  const result = await handleCheckDdlLow(context, args);
+  return normalizeCheckResponse(result, args.ddl_name?.toUpperCase());
 }

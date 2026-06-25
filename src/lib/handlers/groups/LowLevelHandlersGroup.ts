@@ -187,11 +187,11 @@ import { TOOL_DEFINITION as ActivateDdl_Tool } from '../../../handlers/ddl/low/h
 import { TOOL_DEFINITION as CheckDdl_Tool } from '../../../handlers/ddl/low/handleCheckDdl';
 import { TOOL_DEFINITION as CreateDdlLow_Tool } from '../../../handlers/ddl/low/handleCreateDdl';
 import { TOOL_DEFINITION as DeleteDdl_Tool } from '../../../handlers/ddl/low/handleDeleteDdl';
-import { TOOL_DEFINITION as LockDdl_Tool } from '../../../handlers/ddl/low/handleLockDdl';
-import { TOOL_DEFINITION as UnlockDdl_Tool } from '../../../handlers/ddl/low/handleUnlockDdl';
+import { TOOL_DEFINITION as LockDdlLow_Tool } from '../../../handlers/ddl/low/handleLockDdl';
+import { TOOL_DEFINITION as UnlockDdlLow_Tool } from '../../../handlers/ddl/low/handleUnlockDdl';
 // Import TOOL_DEFINITION from ddl low handlers
 import { TOOL_DEFINITION as UpdateDdl_Tool } from '../../../handlers/ddl/low/handleUpdateDdl';
-import { TOOL_DEFINITION as ValidateDdl_Tool } from '../../../handlers/ddl/low/handleValidateDdl';
+import { TOOL_DEFINITION as ValidateDdlLow_Tool } from '../../../handlers/ddl/low/handleValidateDdl';
 import { TOOL_DEFINITION as ActivateMetadataExtension_Tool } from '../../../handlers/ddlx/low/handleActivateMetadataExtension';
 // Import TOOL_DEFINITION from ddlx low handlers
 import { TOOL_DEFINITION as CheckMetadataExtension_Tool } from '../../../handlers/ddlx/low/handleCheckMetadataExtension';
@@ -597,19 +597,19 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
         },
       },
       {
-        toolDefinition: LockDdl_Tool,
+        toolDefinition: LockDdlLow_Tool,
         handler: (args: any) => {
           return handleLockDdl(this.context, args);
         },
       },
       {
-        toolDefinition: UnlockDdl_Tool,
+        toolDefinition: UnlockDdlLow_Tool,
         handler: (args: any) => {
           return handleUnlockDdl(this.context, args);
         },
       },
       {
-        toolDefinition: ValidateDdl_Tool,
+        toolDefinition: ValidateDdlLow_Tool,
         handler: (args: any) => {
           return handleValidateDdl(this.context, args);
         },

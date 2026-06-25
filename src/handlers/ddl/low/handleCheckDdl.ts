@@ -1,5 +1,5 @@
 /**
- * CheckView Handler - Syntax check for ABAP View
+ * CheckDdlLow Handler - Syntax check for ABAP DDL Source
  *
  * Uses AdtClient.checkView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -132,7 +132,7 @@ export async function handleCheckDdl(
 
       // Get updated session state after check
 
-      logger?.info(`✅ CheckView completed: ${ddlName}`);
+      logger?.info(`✅ CheckDdlLow completed: ${ddlName}`);
       logger?.info(`   Status: ${checkResult.status}`);
       logger?.info(
         `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,

@@ -1,5 +1,5 @@
 /**
- * GetView Handler - Read ABAP View via AdtClient
+ * GetDdl Handler - Read ABAP DDL Source via AdtClient
  *
  * Uses AdtClient.getDdl().read() for high-level read operation.
  * Supports both active and inactive versions.
@@ -75,7 +75,7 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
       }
 
       // Extract data from read result
-      const viewData =
+      const ddlData =
         typeof readResult.readResult.data === 'string'
           ? readResult.readResult.data
           : JSON.stringify(readResult.readResult.data);
@@ -88,7 +88,7 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
             success: true,
             ddl_name: ddlName,
             version,
-            view_data: viewData,
+            ddl_data: ddlData,
             status: readResult.readResult.status,
             status_text: readResult.readResult.statusText,
           },

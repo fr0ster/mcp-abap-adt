@@ -1,5 +1,5 @@
 /**
- * LockView Handler - Lock ABAP View
+ * LockDdlLow Handler - Lock ABAP DDL Source
  *
  * Uses AdtClient.lockView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -15,7 +15,7 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'LockDdl',
+  name: 'LockDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
@@ -99,7 +99,7 @@ export async function handleLockDdl(
 
       // Get updated session state after lock
 
-      logger?.info(`✅ LockView completed: ${ddlName}`);
+      logger?.info(`✅ LockDdlLow completed: ${ddlName}`);
       logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({

@@ -1,5 +1,5 @@
 /**
- * UpdateView Handler - Update ABAP View DDL Source
+ * UpdateDdlLow Handler - Update ABAP DDL Source
  *
  * Uses AdtClient.updateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.',
+    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -119,7 +119,7 @@ export async function handleUpdateDdl(
 
       // Get updated session state after update
 
-      logger?.info(`✅ UpdateView completed: ${ddlName}`);
+      logger?.info(`✅ UpdateDdlLow completed: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(

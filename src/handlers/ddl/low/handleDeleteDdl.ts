@@ -1,5 +1,5 @@
 /**
- * DeleteView Handler - Delete ABAP View
+ * DeleteDdlLow Handler - Delete ABAP DDL Source
  *
  * Uses AdtClient.deleteView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -75,7 +75,7 @@ export async function handleDeleteDdl(
         throw new Error(`Delete did not return a response for view ${ddlName}`);
       }
 
-      logger?.info(`✅ DeleteView completed successfully: ${ddlName}`);
+      logger?.info(`✅ DeleteDdlLow completed successfully: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(

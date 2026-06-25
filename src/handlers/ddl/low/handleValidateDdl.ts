@@ -1,5 +1,5 @@
 /**
- * ValidateView Handler - Validate ABAP View Name
+ * ValidateDdlLow Handler - Validate ABAP DDL Source Name
  *
  * Uses AdtClient.validateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -16,7 +16,7 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'ValidateDdl',
+  name: 'ValidateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
     '[low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
@@ -119,7 +119,7 @@ export async function handleValidateDdl(
 
       // Get updated session state after validation
 
-      logger?.info(`✅ ValidateView completed: ${ddlName}`);
+      logger?.info(`✅ ValidateDdlLow completed: ${ddlName}`);
       logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
 
       return return_response({

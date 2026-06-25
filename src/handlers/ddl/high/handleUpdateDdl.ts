@@ -1,5 +1,5 @@
 /**
- * UpdateView Handler - Update existing CDS/Classic view DDL source
+ * UpdateDdl Handler - Update existing CDS/Classic view DDL source
  *
  * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */

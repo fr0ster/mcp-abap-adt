@@ -1,5 +1,5 @@
 /**
- * ActivateView Handler - Activate ABAP View (CDS View)
+ * ActivateDdlLow Handler - Activate ABAP DDL Source (CDS View)
  *
  * Uses AdtClient.activateView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -107,7 +107,7 @@ export async function handleActivateDdl(
 
       // Get updated session state after activation
 
-      logger?.info(`✅ ActivateView completed: ${ddlName}`);
+      logger?.info(`✅ ActivateDdlLow completed: ${ddlName}`);
       logger?.info(
         `   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`,
       );

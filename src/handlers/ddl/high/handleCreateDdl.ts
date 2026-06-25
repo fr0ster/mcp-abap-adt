@@ -1,8 +1,8 @@
 /**
- * CreateView Handler - CDS/Classic View Creation via ADT API
+ * CreateDdl Handler - CDS/Classic View Creation via ADT API
  *
  * Workflow: validate -> create (object in initial state)
- * DDL source is set via UpdateView handler.
+ * DDL source is set via UpdateDdl handler.
  */
 
 import { createAdtClient } from '../../../lib/clients';

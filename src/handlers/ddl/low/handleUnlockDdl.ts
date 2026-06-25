@@ -1,5 +1,5 @@
 /**
- * UnlockView Handler - Unlock ABAP View
+ * UnlockDdlLow Handler - Unlock ABAP DDL Source
  *
  * Uses AdtClient.unlockView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -15,10 +15,10 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'UnlockDdl',
+  name: 'UnlockDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.',
+    '[low-level] Unlock an ABAP DDL source after modification. Must use the same session_id and lock_handle from LockDdlLow operation.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -28,17 +28,17 @@ export const TOOL_DEFINITION = {
       },
       lock_handle: {
         type: 'string',
-        description: 'Lock handle from LockView operation.',
+        description: 'Lock handle from LockDdlLow operation.',
       },
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockView operation. Must be the same as used in LockView.',
+          'Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockView (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          'Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },
@@ -110,7 +110,7 @@ export async function handleUnlockDdl(
 
       // Get updated session state after unlock
 
-      logger?.info(`✅ UnlockView completed: ${ddlName}`);
+      logger?.info(`✅ UnlockDdlLow completed: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
@@ -136,7 +136,7 @@ export async function handleUnlockDdl(
       if (error.response?.status === 404) {
         errorMessage = `View ${ddlName} not found.`;
       } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockView.`;
+        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockDdlLow.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

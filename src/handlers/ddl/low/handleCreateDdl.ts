@@ -1,5 +1,5 @@
 /**
- * CreateView Handler - Create ABAP View
+ * CreateDdlLow Handler - Create ABAP DDL Source
  *
  * Uses AdtClient.createView from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
+    '[low-level] Create a new ABAP DDL source. - use CreateDdl (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -139,7 +139,7 @@ export async function handleCreateDdl(
 
       // Get updated session state after create
 
-      logger?.info(`✅ CreateView completed: ${ddlName}`);
+      logger?.info(`✅ CreateDdlLow completed: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
@@ -151,7 +151,7 @@ export async function handleCreateDdl(
             transport_request: transport_request || null,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${ddlName} created successfully. Use LockView and UpdateView to add source code, then UnlockView and ActivateObject.`,
+            message: `DDL source ${ddlName} created successfully. Use LockDdlLow and UpdateDdlLow to add source code, then UnlockDdlLow and ActivateDdlLow.`,
           },
           null,
           2,

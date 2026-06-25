@@ -1,5 +1,5 @@
 /**
- * DeleteView Handler - Delete ABAP View via AdtClient
+ * DeleteDdl Handler - Delete ABAP DDL Source via AdtClient
  *
  * Uses AdtClient.getDdl().delete() for high-level delete operation.
  * Includes deletion check before actual deletion.

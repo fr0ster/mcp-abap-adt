@@ -17,13 +17,13 @@ export const TOOL_DEFINITION = {
   name: 'DeleteDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_VIEW).',
+        description: 'DDL source name (e.g., Z_MY_VIEW).',
       },
       transport_request: {
         type: 'string',
@@ -72,7 +72,9 @@ export async function handleDeleteDdl(
       });
 
       if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(`Delete did not return a response for view ${ddlName}`);
+        throw new Error(
+          `Delete did not return a response for DDL source ${ddlName}`,
+        );
       }
 
       logger?.info(`✅ DeleteDdl completed successfully: ${ddlName}`);
@@ -83,7 +85,7 @@ export async function handleDeleteDdl(
             success: true,
             ddl_name: ddlName,
             transport_request: transport_request || null,
-            message: `View ${ddlName} deleted successfully.`,
+            message: `DDL source ${ddlName} deleted successfully.`,
           },
           null,
           2,
@@ -95,12 +97,12 @@ export async function handleDeleteDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to delete view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to delete DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found. It may already be deleted.`;
+        errorMessage = `DDL source ${ddlName} not found. It may already be deleted.`;
       } else if (error.response?.status === 423) {
-        errorMessage = `View ${ddlName} is locked by another user. Cannot delete.`;
+        errorMessage = `DDL source ${ddlName} is locked by another user. Cannot delete.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Bad request. Check if transport request is required and valid.`;
       } else if (

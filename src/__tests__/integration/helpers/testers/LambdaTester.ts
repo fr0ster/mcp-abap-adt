@@ -662,7 +662,7 @@ export class LambdaTester {
     const name = encodeURIComponent(objectName.toLowerCase());
     const handlerName = this.handlerName || '';
     if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
-    if (handlerName.includes('view'))
+    if (handlerName.includes('ddl') || handlerName.includes('view'))
       return `/sap/bc/adt/ddic/ddl/sources/${name}`;
     if (handlerName.includes('structure'))
       return `/sap/bc/adt/ddic/structures/${name}`;

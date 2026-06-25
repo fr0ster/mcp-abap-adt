@@ -25,11 +25,11 @@ export const TOOL_DEFINITION = {
       ddl_name: {
         type: 'string',
         description:
-          'View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
+          'DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
-        description: 'View description.',
+        description: 'DDL source description.',
       },
       package_name: {
         type: 'string',
@@ -134,7 +134,9 @@ export async function handleCreateDdl(
       const createResult = createState.createResult;
 
       if (!createResult) {
-        throw new Error(`Create did not return a response for view ${ddlName}`);
+        throw new Error(
+          `Create did not return a response for DDL source ${ddlName}`,
+        );
       }
 
       // Get updated session state after create
@@ -163,10 +165,10 @@ export async function handleCreateDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to create view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to create DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 409) {
-        errorMessage = `View ${ddlName} already exists.`;
+        errorMessage = `DDL source ${ddlName} already exists.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

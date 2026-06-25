@@ -18,13 +18,13 @@ export const TOOL_DEFINITION = {
   name: 'CreateDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state. Use UpdateDdl to set DDL source code.',
+    'Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).',
+        description: 'DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).',
       },
       package_name: {
         type: 'string',
@@ -99,7 +99,7 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
       package_name: args.package_name,
       transport_request: args.transport_request || null,
       type: 'DDLS',
-      message: `View ${ddlName} created successfully. Use UpdateDdl to set DDL source code.`,
+      message: `DDL source ${ddlName} created successfully. Use UpdateDdl to set DDL source code.`,
       uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`,
       steps_completed: ['validate', 'create'],
     };

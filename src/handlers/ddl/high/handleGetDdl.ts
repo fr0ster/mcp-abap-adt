@@ -17,13 +17,13 @@ export const TOOL_DEFINITION = {
   name: 'GetDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Retrieve ABAP view definition. Supports reading active or inactive version.',
+    'Retrieve ABAP DDL source definition. Supports reading active or inactive version.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_VIEW).',
+        description: 'DDL source name (e.g., Z_MY_VIEW).',
       },
       version: {
         type: 'string',
@@ -71,7 +71,7 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
       );
 
       if (!readResult || !readResult.readResult) {
-        throw new Error(`View ${ddlName} not found`);
+        throw new Error(`DDL source ${ddlName} not found`);
       }
 
       // Extract data from read result
@@ -102,12 +102,12 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
       );
 
       // Parse error message
-      let errorMessage = `Failed to read view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to read DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (error.response?.status === 423) {
-        errorMessage = `View ${ddlName} is locked by another user.`;
+        errorMessage = `DDL source ${ddlName} is locked by another user.`;
       }
 
       return return_error(new Error(errorMessage));

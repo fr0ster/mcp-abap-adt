@@ -18,13 +18,13 @@ export const TOOL_DEFINITION = {
   name: 'LockDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
+    '[low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_PROGRAM).',
+        description: 'DDL source name (e.g., Z_MY_PROGRAM).',
       },
       session_id: {
         type: 'string',
@@ -110,7 +110,7 @@ export async function handleLockDdl(
             session_id: session_id || null,
             lock_handle: lockHandle,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${ddlName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+            message: `DDL source ${ddlName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
           },
           null,
           2,
@@ -122,12 +122,12 @@ export async function handleLockDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to lock view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to lock DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (error.response?.status === 409) {
-        errorMessage = `View ${ddlName} is already locked by another user.`;
+        errorMessage = `DDL source ${ddlName} is already locked by another user.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

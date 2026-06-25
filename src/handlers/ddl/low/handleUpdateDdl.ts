@@ -18,14 +18,14 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.',
+    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
         description:
-          'View name (e.g., ZOK_R_TEST_0002). View must already exist.',
+          'DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.',
       },
       ddl_source: {
         type: 'string',
@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
       lock_handle: {
         type: 'string',
         description:
-          'Lock handle from LockObject. Required for update operation.',
+          'Lock handle from LockDdlLow. Required for update operation.',
       },
       session_id: {
         type: 'string',
@@ -114,7 +114,9 @@ export async function handleUpdateDdl(
       const updateResult = updateState.updateResult;
 
       if (!updateResult) {
-        throw new Error(`Update did not return a response for view ${ddlName}`);
+        throw new Error(
+          `Update did not return a response for DDL source ${ddlName}`,
+        );
       }
 
       // Get updated session state after update
@@ -128,7 +130,7 @@ export async function handleUpdateDdl(
             ddl_name: ddlName,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${ddlName} updated successfully. Remember to unlock using UnlockObject.`,
+            message: `DDL source ${ddlName} updated successfully. Remember to unlock using UnlockDdlLow.`,
           },
           null,
           2,
@@ -140,12 +142,12 @@ export async function handleUpdateDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to update view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to update DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (error.response?.status === 423) {
-        errorMessage = `View ${ddlName} is locked by another user or lock handle is invalid.`;
+        errorMessage = `DDL source ${ddlName} is locked by another user or lock handle is invalid.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

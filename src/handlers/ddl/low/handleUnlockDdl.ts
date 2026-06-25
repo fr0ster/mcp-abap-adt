@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_PROGRAM).',
+        description: 'DDL source name (e.g., Z_MY_PROGRAM).',
       },
       lock_handle: {
         type: 'string',
@@ -105,7 +105,9 @@ export async function handleUnlockDdl(
       const unlockResult = unlockState.unlockResult;
 
       if (!unlockResult) {
-        throw new Error(`Unlock did not return a response for view ${ddlName}`);
+        throw new Error(
+          `Unlock did not return a response for DDL source ${ddlName}`,
+        );
       }
 
       // Get updated session state after unlock
@@ -119,7 +121,7 @@ export async function handleUnlockDdl(
             ddl_name: ddlName,
             session_id: session_id,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${ddlName} unlocked successfully.`,
+            message: `DDL source ${ddlName} unlocked successfully.`,
           },
           null,
           2,
@@ -131,10 +133,10 @@ export async function handleUnlockDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to unlock view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to unlock DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (error.response?.status === 400) {
         errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockDdlLow.`;
       } else if (

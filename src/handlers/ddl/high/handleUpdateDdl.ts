@@ -19,13 +19,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new view.',
+    'Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'View name (e.g., ZOK_R_TEST_0002).',
+        description: 'DDL source name (e.g., ZOK_R_TEST_0002).',
       },
       ddl_source: { type: 'string', description: 'Complete DDL source code.' },
       transport_request: {
@@ -233,7 +233,7 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
       ddl_name: ddlName,
       type: 'DDLS',
       activated: shouldActivate,
-      message: `View ${ddlName} updated${shouldActivate ? ' and activated' : ''} successfully`,
+      message: `DDL source ${ddlName} updated${shouldActivate ? ' and activated' : ''} successfully`,
       uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`,
       steps_completed: [
         'lock',

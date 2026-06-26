@@ -12,10 +12,7 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
-import {
-  resolveSystemContext,
-  setSystemContext,
-} from '../lib/systemContext.js';
+import { resolveSystemContext } from '../lib/systemContext.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -225,19 +222,12 @@ export abstract class BaseMcpServer extends McpServer {
     if (responsible) metadata.responsible = responsible;
     if (masterLanguage) metadata.masterLanguage = masterLanguage;
 
-    // Per-request master/original language override for created objects.
-    // Highest-priority source after an explicit tool parameter; takes
-    // precedence over the SAP_LANGUAGE default. Written straight to the
-    // system context the ADT client reads (createAdtClient -> getSystemContext).
-    //
-    // IMPORTANT: write UNCONDITIONALLY (even when the header is absent →
-    // `undefined`). The system-context cache is process-global, so a value
-    // from an earlier request would otherwise leak into a later request that
-    // omits the header. Making every header-based request authoritative for
-    // masterLanguage prevents that cross-request leak.
-    // NOTE: this clears sequential leakage; full isolation under *concurrent*
-    // HTTP/SSE requests needs request-scoped context (tracked for #110).
-    setSystemContext({ masterLanguage });
+    // Per-request master/original language (x-sap-language) is carried in the
+    // per-request connection metadata above and, for HTTP/SSE, in the
+    // request-scoped context the transport establishes around dispatch (see
+    // runWithRequestContext in StreamableHttpServer/SseServer). It is NOT
+    // written to the process-global system-context cache, which would leak the
+    // value across requests, sessions, and connection modes (#110).
 
     if (jwtToken) {
       // JWT auth

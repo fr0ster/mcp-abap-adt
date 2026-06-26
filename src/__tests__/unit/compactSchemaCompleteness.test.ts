@@ -237,3 +237,60 @@ for (const op of ['create', 'update', 'delete'] as const) {
     }
   });
 }
+
+/**
+ * Guard (per-type): for each TYPE advertised in the facade description,
+ * every advertised arg must be a member of that type's routed handler
+ * top-level inputSchema.required. Catches wrong args listed for a specific
+ * object type (e.g. run_id advertised for CDS_UNIT_TEST update/delete when
+ * that handler actually requires class_name / test_class_source).
+ * Advertised args are a SUBSET check — descriptions may legitimately omit
+ * common args like package_name.
+ */
+function parseDescriptionArgsByType(
+  description: string,
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  const matches = [...description.matchAll(/([A-Z_]+)\(([^)]*)\)/g)];
+  for (const m of matches) {
+    const type = m[1];
+    const args: string[] = [];
+    for (const part of m[2].split(',')) {
+      const token = part.trim();
+      if (/^[a-z_]+\*$/.test(token)) {
+        args.push(token.slice(0, -1));
+      }
+    }
+    if (args.length > 0) {
+      map.set(type, args);
+    }
+  }
+  return map;
+}
+
+for (const op of ['create', 'update', 'delete'] as const) {
+  describe(`compact ${op} facade description per-type args match handler required`, () => {
+    const typeArgsMap = parseDescriptionArgsByType(FACADE[op].description);
+    if (typeArgsMap.size === 0) {
+      it('(no per-type advertised args)', () => expect(true).toBe(true));
+    } else {
+      for (const [type, advertised] of typeArgsMap) {
+        const handlerDef = ROUTED[op][type];
+        if (!handlerDef) {
+          // Type not in ROUTED map (e.g. PACKAGE in create has no separate handler def here)
+          continue;
+        }
+        const handlerRequired = requiredOf(handlerDef).filter(
+          (r: string) => r !== 'object_type',
+        );
+        // Zod-based handlers have no JSON-schema required[]; skip them.
+        if (handlerRequired.length === 0) continue;
+        for (const arg of advertised) {
+          it(`${op} ${type}(${arg}*) is a required arg of the routed handler`, () => {
+            expect(handlerRequired).toContain(arg);
+          });
+        }
+      }
+    }
+  });
+}

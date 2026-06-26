@@ -341,4 +341,84 @@ describe('WhereUsed Handler Integration', () => {
     },
     getTimeout('long'),
   );
+
+  it(
+    'should restrict results to enable_only_types (server-side type filtering)',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const { connection, params } = context;
+        const testClass = params?.test_class || 'CL_ABAP_CHAR_UTILITIES';
+
+        const invoke = async (extra: Record<string, unknown>) =>
+          tester.invokeToolOrHandler(
+            'GetWhereUsed',
+            { object_name: testClass, object_type: 'class', ...extra },
+            async () => {
+              const handlerContext = createHandlerContext({
+                connection,
+                logger,
+              });
+              return handleGetWhereUsed(handlerContext, {
+                object_name: testClass,
+                object_type: 'class',
+                ...extra,
+              } as any);
+            },
+          );
+
+        // Baseline: all types — gather the distinct referencing types.
+        logger?.info('🔍 Type filtering: ALL types baseline');
+        const allResult = await invoke({ enable_all_types: true });
+        const allData = extractResultData(allResult);
+        const allTypes: string[] = Array.from(
+          new Set<string>(
+            (allData.references || []).map((r: any) => String(r.type)),
+          ),
+        );
+        logger?.info(
+          `📊 ALL: ${allData.total_references} refs across [${allTypes.join(', ')}]`,
+        );
+
+        if (allData.total_references === 0) {
+          logger?.info('⚠️ No references — nothing to filter, skipping asserts');
+          return;
+        }
+
+        // KEEP: 'CLAS/OC' is a standard searchable scope type for a class's
+        // where-used. Narrowing to it must succeed and return no MORE than the
+        // baseline; when the baseline spans several types it must return fewer
+        // (SAP searched only classes server-side). Note: result `type` codes
+        // (e.g. FUGR/F container nodes) are a different vocabulary than the
+        // scope selection codes, so we assert on counts, not per-ref types.
+        logger?.info('🔍 Type filtering: ONLY [CLAS/OC] (valid scope type)');
+        const keptResult = await invoke({ enable_only_types: ['CLAS/OC'] });
+        const keptData = extractResultData(keptResult);
+        logger?.info(
+          `📊 KEEP [CLAS/OC]: ${keptData.total_references} refs (baseline ${allData.total_references})`,
+        );
+        expect(keptResult.isError).toBe(false);
+        expect(keptData.enable_only_types).toEqual(['CLAS/OC']);
+        expect(keptData.total_references).toBeLessThanOrEqual(
+          allData.total_references,
+        );
+        if (allTypes.length > 1) {
+          expect(keptData.total_references).toBeLessThan(
+            allData.total_references,
+          );
+        }
+
+        // INVALID: a type that is not in the object's scope must be rejected
+        // with an error — never silently fall back to the full default set.
+        logger?.info('🔍 Type filtering: ONLY [BOGUS/XX] (must error)');
+        const badResult = await invoke({ enable_only_types: ['BOGUS/XX'] });
+        const badText =
+          (badResult.content.find((c: any) => c.type === 'text') as any)
+            ?.text || '';
+        logger?.info(`📊 INVALID [BOGUS/XX]: isError=${badResult.isError}`);
+        expect(badResult.isError).toBe(true);
+        expect(badText).toContain('BOGUS/XX');
+      });
+    },
+    getTimeout('long'),
+  );
 });

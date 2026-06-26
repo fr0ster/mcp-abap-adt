@@ -50,6 +50,11 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate after creation. Default: true',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['name', 'package_name', 'root_entity', 'implementation_type'],
   },
@@ -63,6 +68,7 @@ interface CreateBehaviorDefinitionArgs {
   root_entity: string;
   implementation_type: BehaviorDefinitionImplementationType;
   activate?: boolean;
+  master_language?: string;
 }
 
 export async function handleCreateBehaviorDefinition(
@@ -105,6 +111,7 @@ export async function handleCreateBehaviorDefinition(
       | 'transportRequest'
       | 'rootEntity'
       | 'implementationType'
+      | 'masterLanguage'
     > = {
       name,
       description: args.description || name,
@@ -112,6 +119,7 @@ export async function handleCreateBehaviorDefinition(
       transportRequest: args.transport_request || '',
       rootEntity: args.root_entity,
       implementationType: args.implementation_type,
+      masterLanguage: args.master_language,
     };
     await client.getBehaviorDefinition().create(createConfig);
 

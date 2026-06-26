@@ -7,6 +7,7 @@ import type { AuthBrokerFactory } from '../lib/auth/index.js';
 import type { TlsConfig } from '../lib/config/IServerConfig.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
+import { runWithRequestContext } from '../lib/requestContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import type {
@@ -243,7 +244,15 @@ export class StreamableHttpServer extends BaseMcpServer {
         });
 
         await server.connect(transport);
-        await transport.handleRequest(req, res, req.body);
+        // Scope the per-request master language (x-sap-language) to this
+        // request's dispatch so it cannot leak into other requests/modes via
+        // a process-global cache (#110).
+        const rawLang =
+          req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
+        const masterLanguage = Array.isArray(rawLang) ? rawLang[0] : rawLang;
+        await runWithRequestContext({ masterLanguage }, () =>
+          transport.handleRequest(req, res, req.body),
+        );
         if (!isPing) {
           console.error(
             `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) completed`,

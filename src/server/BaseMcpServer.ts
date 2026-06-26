@@ -211,6 +211,7 @@ export abstract class BaseMcpServer extends McpServer {
     const client = getHeader('x-sap-client') || '';
     const masterSystem = getHeader('x-sap-master-system');
     const responsible = getHeader('x-sap-responsible');
+    const masterLanguage = getHeader('x-sap-language');
 
     if (!url) {
       throw new Error('x-sap-url header is required for direct SAP connection');
@@ -219,6 +220,14 @@ export abstract class BaseMcpServer extends McpServer {
     const metadata: Record<string, string> = {};
     if (masterSystem) metadata.masterSystem = masterSystem;
     if (responsible) metadata.responsible = responsible;
+    if (masterLanguage) metadata.masterLanguage = masterLanguage;
+
+    // Per-request master/original language (x-sap-language) is carried in the
+    // per-request connection metadata above and, for HTTP/SSE, in the
+    // request-scoped context the transport establishes around dispatch (see
+    // runWithRequestContext in StreamableHttpServer/SseServer). It is NOT
+    // written to the process-global system-context cache, which would leak the
+    // value across requests, sessions, and connection modes (#110).
 
     if (jwtToken) {
       // JWT auth

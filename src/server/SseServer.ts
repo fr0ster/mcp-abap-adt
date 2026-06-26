@@ -7,6 +7,7 @@ import type { AuthBrokerFactory } from '../lib/auth/index.js';
 import type { TlsConfig } from '../lib/config/IServerConfig.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
+import { runWithRequestContext } from '../lib/requestContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import type {
@@ -76,6 +77,8 @@ export interface SseServerOptions {
 type SessionEntry = {
   server: BaseMcpServer;
   transport: SSEServerTransport;
+  /** Per-session master language (x-sap-language), scoped around each POST dispatch (#110). */
+  masterLanguage?: string;
 };
 
 /**
@@ -309,7 +312,15 @@ export class SseServer {
     console.error(
       `[SSE GET] Created session ${sessionId} for destination ${destination}`,
     );
-    this.sessions.set(sessionId, { server, transport });
+    // Capture the per-session master language (x-sap-language) once at
+    // connection time; it is scoped around each POST dispatch below so it
+    // never leaks into other sessions via a process-global cache (#110).
+    const rawSseLang =
+      req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
+    const masterLanguage = Array.isArray(rawSseLang)
+      ? rawSseLang[0]
+      : rawSseLang;
+    this.sessions.set(sessionId, { server, transport, masterLanguage });
     console.error(
       `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
     );
@@ -371,7 +382,10 @@ export class SseServer {
     }
 
     try {
-      await entry.transport.handlePostMessage(req, res, req.body);
+      await runWithRequestContext(
+        { masterLanguage: entry.masterLanguage },
+        () => entry.transport.handlePostMessage(req, res, req.body),
+      );
       if (!isPing) {
         console.error(
           `[SSE POST] Successfully processed for session ${sessionId}`,

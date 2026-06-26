@@ -117,6 +117,11 @@ export const TOOL_DEFINITION = {
         description:
           'Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['structure_name', 'package_name', 'fields'],
   },
@@ -147,6 +152,7 @@ interface CreateStructureArgs {
   fields: StructureField[];
   includes?: StructureInclude[];
   activate?: boolean;
+  master_language?: string;
 }
 
 /**
@@ -231,6 +237,7 @@ export async function handleCreateStructure(
         packageName: createStructureArgs.package_name,
         ddlCode: '',
         transportRequest: createStructureArgs.transport_request,
+        masterLanguage: createStructureArgs.master_language,
       });
 
       // Lock

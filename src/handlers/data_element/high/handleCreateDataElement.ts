@@ -114,6 +114,11 @@ export const TOOL_DEFINITION = {
         description:
           'Set/Get parameter ID. Applied during update step after creation.',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['data_element_name', 'package_name'],
   },
@@ -142,6 +147,7 @@ interface DataElementArgs {
   search_help_parameter?: string;
   set_get_parameter?: string;
   activate?: boolean;
+  master_language?: string;
 }
 
 /**
@@ -200,6 +206,7 @@ export async function handleCreateDataElement(
         length: typedArgs.length,
         decimals: typedArgs.decimals,
         transportRequest: typedArgs.transport_request,
+        masterLanguage: typedArgs.master_language,
       });
 
       // Lock

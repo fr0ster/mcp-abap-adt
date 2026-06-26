@@ -1,7 +1,7 @@
 /**
  * UnlockDdlLow Handler - Unlock ABAP DDL Source
  *
- * Uses AdtClient.unlockView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().unlock from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -64,7 +64,7 @@ interface UnlockDdlArgs {
 /**
  * Main handler for UnlockDdl MCP tool
  *
- * Uses AdtClient.unlockView - low-level single method call
+ * Uses AdtClient.getDdl().unlock - low-level single method call
  */
 export async function handleUnlockDdl(
   context: HandlerContext,
@@ -98,7 +98,7 @@ export async function handleUnlockDdl(
     );
 
     try {
-      // Unlock view
+      // Unlock DDL source
       const unlockState = await client
         .getDdl()
         .unlock({ ddlName: ddlName }, lock_handle);

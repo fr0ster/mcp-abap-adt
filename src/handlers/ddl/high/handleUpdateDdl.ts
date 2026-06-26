@@ -61,7 +61,7 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
 
   const ddlName = args.ddl_name.toUpperCase();
   logger?.info(
-    `Starting DDL source source update: ${ddlName} (activate=${args.activate === true})`,
+    `Starting DDL source update: ${ddlName} (activate=${args.activate === true})`,
   );
 
   // Connection setup
@@ -87,10 +87,10 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
 
     try {
       // Lock
-      logger?.debug(`Locking view: ${ddlName}`);
+      logger?.debug(`Locking DDL source: ${ddlName}`);
       lockHandle = await client.getDdl().lock({ ddlName: ddlName });
       logger?.debug(
-        `View locked: ${ddlName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+        `DDL source locked: ${ddlName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
       );
 
       // Check new code BEFORE update (only when activating)
@@ -113,7 +113,9 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
           logger?.debug(`New code check passed: ${ddlName}`);
         } catch (checkError: any) {
           if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(`View ${ddlName} was already checked - continuing`);
+            logger?.debug(
+              `DDL source ${ddlName} was already checked - continuing`,
+            );
           } else {
             logger?.error(
               `New code check failed: ${ddlName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
@@ -128,7 +130,7 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
       }
 
       // Update
-      logger?.debug(`Updating view DDL source: ${ddlName}`);
+      logger?.debug(`Updating DDL source: ${ddlName}`);
       await client.getDdl().update(
         {
           ddlName: ddlName,
@@ -137,16 +139,16 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
         },
         { lockHandle },
       );
-      logger?.info(`View DDL source updated: ${ddlName}`);
+      logger?.info(`DDL source updated: ${ddlName}`);
     } finally {
       if (lockHandle) {
         try {
-          logger?.debug(`Unlocking view: ${ddlName}`);
+          logger?.debug(`Unlocking DDL source: ${ddlName}`);
           await client.getDdl().unlock({ ddlName: ddlName }, lockHandle);
-          logger?.info(`View unlocked: ${ddlName}`);
+          logger?.info(`DDL source unlocked: ${ddlName}`);
         } catch (unlockError: any) {
           logger?.warn(
-            `Failed to unlock view ${ddlName}: ${unlockError?.message || unlockError}`,
+            `Failed to unlock DDL source ${ddlName}: ${unlockError?.message || unlockError}`,
           );
         }
       }
@@ -172,7 +174,9 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
         logger?.debug(`Inactive version check completed: ${ddlName}`);
       } catch (checkError: any) {
         if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`View ${ddlName} was already checked - continuing`);
+          logger?.debug(
+            `DDL source ${ddlName} was already checked - continuing`,
+          );
         } else {
           logger?.warn(
             `Inactive version check had issues: ${ddlName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
@@ -184,13 +188,13 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
     // Activate if requested
     let activateResponse: any | undefined;
     if (shouldActivate) {
-      logger?.debug(`Activating view: ${ddlName}`);
+      logger?.debug(`Activating DDL source: ${ddlName}`);
       try {
         const activateState = await client
           .getDdl()
           .activate({ ddlName: ddlName });
         activateResponse = activateState.activateResult;
-        logger?.info(`View activated: ${ddlName}`);
+        logger?.info(`DDL source activated: ${ddlName}`);
       } catch (activationError: any) {
         logger?.error(
           `Activation failed: ${ddlName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,

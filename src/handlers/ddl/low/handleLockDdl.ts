@@ -1,7 +1,7 @@
 /**
  * LockDdlLow Handler - Lock ABAP DDL Source
  *
- * Uses AdtClient.lockView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().lock from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -59,7 +59,7 @@ interface LockDdlArgs {
 /**
  * Main handler for LockDdl MCP tool
  *
- * Uses AdtClient.lockView - low-level single method call
+ * Uses AdtClient.getDdl().lock - low-level single method call
  */
 export async function handleLockDdl(
   context: HandlerContext,
@@ -88,12 +88,12 @@ export async function handleLockDdl(
     logger?.info(`Starting DDL source lock: ${ddlName}`);
 
     try {
-      // Lock view
+      // Lock DDL source
       const lockHandle = await client.getDdl().lock({ ddlName: ddlName });
 
       if (!lockHandle) {
         throw new Error(
-          `Lock did not return a lock handle for view ${ddlName}`,
+          `Lock did not return a lock handle for DDL source ${ddlName}`,
         );
       }
 

@@ -1,7 +1,7 @@
 /**
  * DeleteDdlLow Handler - Delete ABAP DDL Source
  *
- * Uses AdtClient.deleteView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().delete from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -43,7 +43,7 @@ interface DeleteDdlArgs {
 /**
  * Main handler for DeleteDdl MCP tool
  *
- * Uses AdtClient.deleteView - low-level single method call
+ * Uses AdtClient.getDdl().delete - low-level single method call
  */
 export async function handleDeleteDdl(
   context: HandlerContext,
@@ -64,7 +64,7 @@ export async function handleDeleteDdl(
     logger?.info(`Starting DDL source deletion: ${ddlName}`);
 
     try {
-      // Delete view
+      // Delete DDL source
       const deleteState = await client.getDdl().delete({
         ddlName: ddlName,
         transportRequest: transport_request,

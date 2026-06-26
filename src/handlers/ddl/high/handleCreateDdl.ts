@@ -74,16 +74,16 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
     const client = createAdtClient(connection, logger);
 
     // Validate
-    logger?.debug(`Validating view: ${ddlName}`);
+    logger?.debug(`Validating DDL source: ${ddlName}`);
     await client.getDdl().validate({
       ddlName: ddlName,
       packageName: args.package_name,
       description: args.description || ddlName,
     });
-    logger?.debug(`View validation passed: ${ddlName}`);
+    logger?.debug(`DDL source validation passed: ${ddlName}`);
 
     // Create
-    logger?.debug(`Creating view: ${ddlName}`);
+    logger?.debug(`Creating DDL source: ${ddlName}`);
     await client.getDdl().create({
       ddlName: ddlName,
       description: args.description || ddlName,
@@ -91,7 +91,7 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
       ddlSource: '',
       transportRequest: args.transport_request,
     });
-    logger?.info(`View created: ${ddlName}`);
+    logger?.info(`DDL source created: ${ddlName}`);
 
     const result = {
       success: true,

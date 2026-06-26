@@ -1,7 +1,7 @@
 /**
  * ActivateDdlLow Handler - Activate ABAP DDL Source (CDS View)
  *
- * Uses AdtClient.activateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().activate from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -60,7 +60,7 @@ interface ActivateDdlArgs {
 /**
  * Main handler for ActivateDdl MCP tool
  *
- * Uses AdtClient.activateView - low-level single method call
+ * Uses AdtClient.getDdl().activate - low-level single method call
  */
 export async function handleActivateDdl(
   context: HandlerContext,
@@ -89,7 +89,7 @@ export async function handleActivateDdl(
     logger?.info(`Starting DDL source activation: ${ddlName}`);
 
     try {
-      // Activate view
+      // Activate DDL source
       const activateState = await client
         .getDdl()
         .activate({ ddlName: ddlName });
@@ -133,8 +133,8 @@ export async function handleActivateDdl(
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: success
-              ? `View ${ddlName} activated successfully`
-              : `View ${ddlName} activation completed with ${activationResult.messages.length} message(s)`,
+              ? `DDL source ${ddlName} activated successfully`
+              : `DDL source ${ddlName} activation completed with ${activationResult.messages.length} message(s)`,
           },
           null,
           2,
@@ -146,10 +146,10 @@ export async function handleActivateDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to activate view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to activate DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

@@ -1,7 +1,7 @@
 /**
  * CheckDdlLow Handler - Syntax check for ABAP DDL Source
  *
- * Uses AdtClient.checkView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().check from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -73,7 +73,7 @@ interface CheckDdlArgs {
 /**
  * Main handler for CheckDdl MCP tool
  *
- * Uses AdtClient.checkView - low-level single method call
+ * Uses AdtClient.getDdl().check - low-level single method call
  */
 export async function handleCheckDdl(
   context: HandlerContext,
@@ -116,7 +116,7 @@ export async function handleCheckDdl(
     );
 
     try {
-      // Check view with optional source code (for validating new/unsaved code)
+      // Check DDL source with optional source code (for validating new/unsaved code)
       // If ddl_source is provided, it will be base64 encoded in the request body
       const checkState = await client
         .getDdl()
@@ -150,8 +150,8 @@ export async function handleCheckDdl(
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: checkResult.success
-              ? `View ${ddlName} has no syntax errors`
-              : `View ${ddlName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
+              ? `DDL source ${ddlName} has no syntax errors`
+              : `DDL source ${ddlName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
           },
           null,
           2,
@@ -163,10 +163,10 @@ export async function handleCheckDdl(
       );
 
       // Parse error message
-      let errorMessage = `Failed to check view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to check DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

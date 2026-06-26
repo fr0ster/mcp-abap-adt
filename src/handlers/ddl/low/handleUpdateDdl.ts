@@ -1,7 +1,7 @@
 /**
  * UpdateDdlLow Handler - Update ABAP DDL Source
  *
- * Uses AdtClient.updateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().update from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -72,7 +72,7 @@ interface UpdateDdlArgs {
 /**
  * Main handler for UpdateDdl MCP tool
  *
- * Uses AdtClient.updateView - low-level single method call
+ * Uses AdtClient.getDdl().update - low-level single method call
  */
 export async function handleUpdateDdl(
   context: HandlerContext,
@@ -104,7 +104,7 @@ export async function handleUpdateDdl(
     logger?.info(`Starting DDL source update: ${ddlName}`);
 
     try {
-      // Update view with DDL source
+      // Update DDL source
       const updateState = await client
         .getDdl()
         .update(

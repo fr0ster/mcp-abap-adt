@@ -1,7 +1,7 @@
 /**
  * ValidateDdlLow Handler - Validate ABAP DDL Source Name
  *
- * Uses AdtClient.validateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().validate from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -71,7 +71,7 @@ interface ValidateDdlArgs {
 /**
  * Main handler for ValidateDdl MCP tool
  *
- * Uses AdtClient.validateView - low-level single method call
+ * Uses AdtClient.getDdl().validate - low-level single method call
  */
 export async function handleValidateDdl(
   context: HandlerContext,
@@ -103,7 +103,7 @@ export async function handleValidateDdl(
     logger?.info(`Starting DDL source validation: ${ddlName}`);
 
     try {
-      // Validate view
+      // Validate DDL source
       const validationState = await client.getDdl().validate({
         ddlName: ddlName,
         packageName: package_name.toUpperCase(),
@@ -131,8 +131,8 @@ export async function handleValidateDdl(
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: result.valid
-              ? `View name ${ddlName} is valid and available`
-              : `View name ${ddlName} validation failed: ${result.message}`,
+              ? `DDL source ${ddlName} is valid and available`
+              : `DDL source ${ddlName} validation failed: ${result.message}`,
           },
           null,
           2,
@@ -147,7 +147,7 @@ export async function handleValidateDdl(
       let errorMessage = `Failed to validate DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${ddlName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

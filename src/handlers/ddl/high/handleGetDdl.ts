@@ -63,7 +63,7 @@ export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
     logger?.info(`Reading DDL source ${ddlName}, version: ${version}`);
 
     try {
-      // Read view using AdtClient
+      // Read DDL source using AdtClient
       const viewObject = client.getDdl();
       const readResult = await viewObject.read(
         { ddlName: ddlName },

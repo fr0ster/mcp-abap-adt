@@ -1,7 +1,7 @@
 /**
  * CreateDdlLow Handler - Create ABAP DDL Source
  *
- * Uses AdtClient.createView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().create from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -80,7 +80,7 @@ interface CreateDdlArgs {
 /**
  * Main handler for CreateDdl MCP tool
  *
- * Uses AdtClient.createView - low-level single method call
+ * Uses AdtClient.getDdl().create - low-level single method call
  */
 export async function handleCreateDdl(
   context: HandlerContext,
@@ -118,7 +118,7 @@ export async function handleCreateDdl(
     logger?.info(`Starting DDL source creation: ${ddlName}`);
 
     try {
-      // Create view
+      // Create DDL source
       const createState = await client.getDdl().create({
         ddlName: ddlName,
         description,

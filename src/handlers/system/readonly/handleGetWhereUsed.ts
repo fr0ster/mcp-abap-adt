@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
         type: 'array',
         items: { type: 'string' },
         description:
-          "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Type codes come from the where-used scope. Takes precedence over enable_all_types.",
+          "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.",
       },
       disable_types: {
         type: 'array',
@@ -85,6 +85,37 @@ export async function handleGetWhereUsed(
     // Create AdtClient and get utilities
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
+
+    // Validate enable_only_types against the object's where-used scope. The
+    // scope lists exactly which object types are searchable for THIS object;
+    // selecting a type that is absent would otherwise leave an all-deselected
+    // scope, which SAP silently treats as "default" and returns the full,
+    // unfiltered result set. We refuse that: only valid scope types are
+    // searched, anything else is an explicit error — so we return only what
+    // was asked for, never extra.
+    if (typedArgs.enable_only_types && typedArgs.enable_only_types.length > 0) {
+      const scopeResponse = await utils.getWhereUsedScope({
+        object_name: typedArgs.object_name,
+        object_type: typedArgs.object_type,
+      });
+      const available = new Set<string>(
+        [
+          ...String(scopeResponse.data).matchAll(
+            /<usagereferences:type\b[^>]*\bname="([^"]+)"/g,
+          ),
+        ].map((m) => m[1]),
+      );
+      const unknown = typedArgs.enable_only_types.filter(
+        (t) => !available.has(t),
+      );
+      if (unknown.length > 0) {
+        throw new McpError(
+          ErrorCode.InvalidParams,
+          `enable_only_types contains object type(s) not searchable in the where-used scope of ${typedArgs.object_type}/${typedArgs.object_name}: ${unknown.join(', ')}. ` +
+            `Supported types for this object: ${[...available].sort().join(', ')}.`,
+        );
+      }
+    }
 
     // Use getWhereUsedList for parsed results
     const result = await utils.getWhereUsedList({

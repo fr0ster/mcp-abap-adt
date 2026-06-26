@@ -69,6 +69,84 @@ export const compactCreateSchema = {
         required: ['low', 'text'],
       },
     },
+    table_name: { type: 'string', description: 'Table name.' },
+    structure_name: { type: 'string', description: 'Structure name.' },
+    data_element_name: { type: 'string', description: 'Data element name.' },
+    interface_name: { type: 'string', description: 'Interface name.' },
+    service_definition_name: {
+      type: 'string',
+      description: 'Service definition name.',
+    },
+    service_binding_name: {
+      type: 'string',
+      description: 'Service binding name.',
+    },
+    name: {
+      type: 'string',
+      description:
+        'Object name for handlers that require a generic `name` (behavior definition, metadata extension).',
+    },
+    root_entity: {
+      type: 'string',
+      description: 'Root CDS entity name (behavior definition create).',
+    },
+    implementation_type: {
+      type: 'string',
+      enum: ['Managed', 'Unmanaged', 'Abstract', 'Projection'],
+      description: 'Behavior definition implementation type.',
+    },
+    behavior_definition: {
+      type: 'string',
+      description:
+        'Referenced behavior definition name (behavior implementation create).',
+    },
+    cds_view_name: {
+      type: 'string',
+      description: 'CDS view name to validate for unit test doubles.',
+    },
+    fields: {
+      type: 'array',
+      description: 'Structure fields (for STRUCTURE create).',
+      items: {
+        type: 'object',
+        properties: {
+          name: { type: 'string', description: 'Field name.' },
+          data_type: { type: 'string', description: 'Field data type.' },
+          length: { type: 'number', description: 'Field length.' },
+          decimals: { type: 'number', description: 'Decimal places.' },
+          domain: { type: 'string', description: 'Domain reference.' },
+          data_element: {
+            type: 'string',
+            description: 'Data element reference.',
+          },
+          structure_ref: {
+            type: 'string',
+            description: 'Included structure reference.',
+          },
+          table_ref: { type: 'string', description: 'Table type reference.' },
+          description: { type: 'string', description: 'Field description.' },
+        },
+        required: ['name'],
+      },
+    },
+    tests: {
+      type: 'array',
+      description: 'Container/test class pairs (for UNIT_TEST create).',
+      items: {
+        type: 'object',
+        properties: {
+          container_class: {
+            type: 'string',
+            description: 'Class that owns the test include.',
+          },
+          test_class: {
+            type: 'string',
+            description: 'Test class inside the include.',
+          },
+        },
+        required: ['container_class', 'test_class'],
+      },
+    },
   },
   required: ['object_type'],
 } as const;
@@ -184,6 +262,79 @@ export const compactUpdateSchema = {
         required: ['low', 'text'],
       },
     },
+    table_name: { type: 'string', description: 'Table name.' },
+    structure_name: { type: 'string', description: 'Structure name.' },
+    data_element_name: { type: 'string', description: 'Data element name.' },
+    interface_name: { type: 'string', description: 'Interface name.' },
+    service_definition_name: {
+      type: 'string',
+      description: 'Service definition name.',
+    },
+    service_binding_name: {
+      type: 'string',
+      description: 'Service binding name.',
+    },
+    service_name: {
+      type: 'string',
+      description: 'Published service name (service binding update).',
+    },
+    name: {
+      type: 'string',
+      description:
+        'Object name for handlers that require a generic `name` (behavior definition, metadata extension).',
+    },
+    behavior_definition: {
+      type: 'string',
+      description:
+        'Referenced behavior definition name (behavior implementation update).',
+    },
+    ddl_code: {
+      type: 'string',
+      description: 'Complete DDL source code (for TABLE/STRUCTURE update).',
+    },
+    implementation_code: {
+      type: 'string',
+      description: 'Behavior implementation methods source code.',
+    },
+    test_class_source: {
+      type: 'string',
+      description: 'Updated local test class source (CDS_UNIT_TEST update).',
+    },
+    test_class_code: {
+      type: 'string',
+      description: 'Updated source for the local test class.',
+    },
+    local_types_code: {
+      type: 'string',
+      description: 'Updated source for class local types.',
+    },
+    definitions_code: {
+      type: 'string',
+      description: 'Updated source for class local definitions.',
+    },
+    macros_code: {
+      type: 'string',
+      description: 'Updated source for class local macros.',
+    },
+    run_id: {
+      type: 'string',
+      description: 'Unit test run id (UNIT_TEST update).',
+    },
+    binding_variant: {
+      type: 'string',
+      enum: [
+        'ODATA_V2_UI',
+        'ODATA_V2_WEB_API',
+        'ODATA_V4_UI',
+        'ODATA_V4_WEB_API',
+      ],
+      description: 'Service binding variant (service binding update).',
+    },
+    desired_publication_state: {
+      type: 'string',
+      enum: ['published', 'unpublished', 'unchanged'],
+      description: 'Target publication state (service binding update).',
+    },
   },
   required: ['object_type'],
 } as const;
@@ -210,6 +361,34 @@ export const compactDeleteSchema = {
     transport_request: {
       type: 'string',
       description: 'Transport request id (if required by system).',
+    },
+    table_name: { type: 'string', description: 'Table name.' },
+    structure_name: { type: 'string', description: 'Structure name.' },
+    data_element_name: { type: 'string', description: 'Data element name.' },
+    interface_name: { type: 'string', description: 'Interface name.' },
+    service_definition_name: {
+      type: 'string',
+      description: 'Service definition name.',
+    },
+    service_binding_name: {
+      type: 'string',
+      description: 'Service binding name.',
+    },
+    behavior_definition_name: {
+      type: 'string',
+      description: 'Behavior definition name.',
+    },
+    behavior_implementation_name: {
+      type: 'string',
+      description: 'Behavior implementation name.',
+    },
+    metadata_extension_name: {
+      type: 'string',
+      description: 'Metadata extension name.',
+    },
+    run_id: {
+      type: 'string',
+      description: 'Unit test run id (UNIT_TEST delete).',
     },
   },
   required: ['object_type'],

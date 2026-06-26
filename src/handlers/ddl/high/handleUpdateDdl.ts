@@ -61,7 +61,7 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
 
   const ddlName = args.ddl_name.toUpperCase();
   logger?.info(
-    `Starting view source update: ${ddlName} (activate=${args.activate === true})`,
+    `Starting DDL source source update: ${ddlName} (activate=${args.activate === true})`,
   );
 
   // Connection setup

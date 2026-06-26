@@ -86,7 +86,7 @@ export async function handleActivateDdl(
 
     const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view activation: ${ddlName}`);
+    logger?.info(`Starting DDL source activation: ${ddlName}`);
 
     try {
       // Activate view
@@ -97,7 +97,7 @@ export async function handleActivateDdl(
 
       if (!response) {
         throw new Error(
-          `Activation did not return a response for view ${ddlName}`,
+          `Activation did not return a response for DDL source ${ddlName}`,
         );
       }
 
@@ -142,7 +142,7 @@ export async function handleActivateDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error activating view ${ddlName}: ${error?.message || error}`,
+        `Error activating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

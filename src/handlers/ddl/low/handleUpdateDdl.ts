@@ -101,7 +101,7 @@ export async function handleUpdateDdl(
 
     const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view update: ${ddlName}`);
+    logger?.info(`Starting DDL source update: ${ddlName}`);
 
     try {
       // Update view with DDL source

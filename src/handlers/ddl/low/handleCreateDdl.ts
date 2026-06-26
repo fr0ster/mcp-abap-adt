@@ -115,7 +115,7 @@ export async function handleCreateDdl(
 
     const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view creation: ${ddlName}`);
+    logger?.info(`Starting DDL source creation: ${ddlName}`);
 
     try {
       // Create view

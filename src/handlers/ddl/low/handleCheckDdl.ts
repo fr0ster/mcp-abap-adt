@@ -112,7 +112,7 @@ export async function handleCheckDdl(
         : 'inactive';
 
     logger?.info(
-      `Starting view check: ${ddlName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`,
+      `Starting DDL source check: ${ddlName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`,
     );
 
     try {
@@ -124,7 +124,9 @@ export async function handleCheckDdl(
       const response = checkState.checkResult;
 
       if (!response) {
-        throw new Error(`Check did not return a response for view ${ddlName}`);
+        throw new Error(
+          `Check did not return a response for DDL source ${ddlName}`,
+        );
       }
 
       // Parse check results
@@ -157,7 +159,7 @@ export async function handleCheckDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error checking view ${ddlName}: ${error?.message || error}`,
+        `Error checking DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

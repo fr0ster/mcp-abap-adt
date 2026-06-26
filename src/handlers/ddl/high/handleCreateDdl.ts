@@ -68,7 +68,7 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
   }
 
   const ddlName = args.ddl_name.toUpperCase();
-  logger?.info(`Starting view creation: ${ddlName}`);
+  logger?.info(`Starting DDL source creation: ${ddlName}`);
 
   try {
     const client = createAdtClient(connection, logger);

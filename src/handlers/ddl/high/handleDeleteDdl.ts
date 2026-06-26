@@ -61,7 +61,7 @@ export async function handleDeleteDdl(
     const client = createAdtClient(connection, logger);
     const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view deletion: ${ddlName}`);
+    logger?.info(`Starting DDL source deletion: ${ddlName}`);
 
     try {
       // Delete view using AdtClient (includes deletion check)
@@ -93,7 +93,7 @@ export async function handleDeleteDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error deleting view ${ddlName}: ${error?.message || error}`,
+        `Error deleting DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

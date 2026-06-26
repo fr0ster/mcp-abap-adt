@@ -85,7 +85,7 @@ export async function handleLockDdl(
 
     const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view lock: ${ddlName}`);
+    logger?.info(`Starting DDL source lock: ${ddlName}`);
 
     try {
       // Lock view
@@ -118,7 +118,7 @@ export async function handleLockDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error locking view ${ddlName}: ${error?.message || error}`,
+        `Error locking DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

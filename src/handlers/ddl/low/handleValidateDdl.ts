@@ -100,7 +100,7 @@ export async function handleValidateDdl(
 
     const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view validation: ${ddlName}`);
+    logger?.info(`Starting DDL source validation: ${ddlName}`);
 
     try {
       // Validate view
@@ -140,11 +140,11 @@ export async function handleValidateDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error validating view ${ddlName}: ${error?.message || error}`,
+        `Error validating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to validate view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to validate DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
         errorMessage = `View ${ddlName} not found.`;

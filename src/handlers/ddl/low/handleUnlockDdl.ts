@@ -94,7 +94,7 @@ export async function handleUnlockDdl(
     const ddlName = ddl_name.toUpperCase();
 
     logger?.info(
-      `Starting view unlock: ${ddlName} (session: ${session_id.substring(0, 8)}...)`,
+      `Starting DDL source unlock: ${ddlName} (session: ${session_id.substring(0, 8)}...)`,
     );
 
     try {
@@ -129,7 +129,7 @@ export async function handleUnlockDdl(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error unlocking view ${ddlName}: ${error?.message || error}`,
+        `Error unlocking DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message

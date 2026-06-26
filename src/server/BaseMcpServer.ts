@@ -229,9 +229,15 @@ export abstract class BaseMcpServer extends McpServer {
     // Highest-priority source after an explicit tool parameter; takes
     // precedence over the SAP_LANGUAGE default. Written straight to the
     // system context the ADT client reads (createAdtClient -> getSystemContext).
-    if (masterLanguage) {
-      setSystemContext({ masterLanguage });
-    }
+    //
+    // IMPORTANT: write UNCONDITIONALLY (even when the header is absent →
+    // `undefined`). The system-context cache is process-global, so a value
+    // from an earlier request would otherwise leak into a later request that
+    // omits the header. Making every header-based request authoritative for
+    // masterLanguage prevents that cross-request leak.
+    // NOTE: this clears sequential leakage; full isolation under *concurrent*
+    // HTTP/SSE requests needs request-scoped context (tracked for #110).
+    setSystemContext({ masterLanguage });
 
     if (jwtToken) {
       // JWT auth

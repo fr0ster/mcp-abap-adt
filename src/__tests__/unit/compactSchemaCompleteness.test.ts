@@ -33,6 +33,9 @@ import {
   compactDeleteSchema,
   compactUpdateSchema,
 } from '../../handlers/compact/high/compactSchemas';
+import { TOOL_DEFINITION as FACADE_CREATE } from '../../handlers/compact/high/handleHandlerCreate';
+import { TOOL_DEFINITION as FACADE_DELETE } from '../../handlers/compact/high/handleHandlerDelete';
+import { TOOL_DEFINITION as FACADE_UPDATE } from '../../handlers/compact/high/handleHandlerUpdate';
 import { TOOL_DEFINITION as C_DATA_ELEMENT } from '../../handlers/data_element/high/handleCreateDataElement';
 import { TOOL_DEFINITION as D_DATA_ELEMENT } from '../../handlers/data_element/high/handleDeleteDataElement';
 import { TOOL_DEFINITION as U_DATA_ELEMENT } from '../../handlers/data_element/high/handleUpdateDataElement';
@@ -187,6 +190,48 @@ for (const op of ['create', 'update', 'delete'] as const) {
         continue;
       }
       it.each(required)(`${type}: %s`, (arg) => {
+        expect(props).toContain(arg);
+      });
+    }
+  });
+}
+
+/**
+ * Guard (Task 2): every arg advertised in the facade TOOL_DEFINITION.description
+ * as `TYPE(arg*)` must be a property of the matching compact schema.
+ * Catches stale description text that references args the schema doesn't expose.
+ */
+function parseDescriptionArgs(
+  description: string,
+): Array<[type: string, arg: string]> {
+  const pairs: Array<[string, string]> = [];
+  const matches = [...description.matchAll(/([A-Z_]+)\(([^)]*)\)/g)];
+  for (const m of matches) {
+    const type = m[1];
+    for (const part of m[2].split(',')) {
+      const token = part.trim();
+      if (/^[a-z_]+\*$/.test(token)) {
+        pairs.push([type, token.slice(0, -1)]);
+      }
+    }
+  }
+  return pairs;
+}
+
+const FACADE = {
+  create: FACADE_CREATE,
+  update: FACADE_UPDATE,
+  delete: FACADE_DELETE,
+} as const;
+
+for (const op of ['create', 'update', 'delete'] as const) {
+  describe(`compact ${op} facade description only advertises schema-backed args`, () => {
+    const props = Object.keys(SCHEMA[op].properties);
+    const advertised = parseDescriptionArgs(FACADE[op].description);
+    if (advertised.length === 0) {
+      it('(no advertised required args)', () => expect(true).toBe(true));
+    } else {
+      it.each(advertised)('%s(%s*) is backed by schema', (_type, arg) => {
         expect(props).toContain(arg);
       });
     }

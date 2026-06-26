@@ -1,7 +1,7 @@
 /**
- * ValidateView Handler - Validate ABAP View Name
+ * UpdateDdlLow Handler - Update ABAP DDL Source
  *
- * Uses AdtClient.validateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().update from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -9,32 +9,33 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  parseValidationResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'ValidateViewLow',
+  name: 'UpdateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
-        type: 'string',
-        description: 'View name to validate (e.g., Z_MY_PROGRAM).',
-      },
-      package_name: {
+      ddl_name: {
         type: 'string',
         description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+          'DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.',
       },
-      description: {
+      ddl_source: {
         type: 'string',
-        description: 'View description. Required for validation.',
+        description:
+          "Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.",
+      },
+      lock_handle: {
+        type: 'string',
+        description:
+          'Lock handle from LockDdlLow. Required for update operation.',
       },
       session_id: {
         type: 'string',
@@ -52,14 +53,14 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name', 'package_name', 'description'],
+    required: ['ddl_name', 'ddl_source', 'lock_handle'],
   },
 } as const;
 
-interface ValidateViewArgs {
-  view_name: string;
-  package_name: string;
-  description: string;
+interface UpdateDdlArgs {
+  ddl_name: string;
+  ddl_source: string;
+  lock_handle: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -69,23 +70,23 @@ interface ValidateViewArgs {
 }
 
 /**
- * Main handler for ValidateView MCP tool
+ * Main handler for UpdateDdl MCP tool
  *
- * Uses AdtClient.validateView - low-level single method call
+ * Uses AdtClient.getDdl().update - low-level single method call
  */
-export async function handleValidateView(
+export async function handleUpdateDdl(
   context: HandlerContext,
-  args: ValidateViewArgs,
+  args: UpdateDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, description, package_name, session_id, session_state } =
-      args as ValidateViewArgs;
+    const { ddl_name, ddl_source, lock_handle, session_id, session_state } =
+      args as UpdateDdlArgs;
 
     // Validation
-    if (!view_name || !package_name || !description) {
+    if (!ddl_name || !ddl_source || !lock_handle) {
       return return_error(
-        new Error('view_name, package_name, and description are required'),
+        new Error('ddl_name, ddl_source, and lock_handle are required'),
       );
     }
 
@@ -98,41 +99,38 @@ export async function handleValidateView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view validation: ${viewName}`);
+    logger?.info(`Starting DDL source update: ${ddlName}`);
 
     try {
-      // Validate view
-      const validationState = await client.getView().validate({
-        viewName: viewName,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
+      // Update DDL source
+      const updateState = await client
+        .getDdl()
+        .update(
+          { ddlName: ddlName, ddlSource: ddl_source },
+          { lockHandle: lock_handle },
+        );
+      const updateResult = updateState.updateResult;
+
+      if (!updateResult) {
+        throw new Error(
+          `Update did not return a response for DDL source ${ddlName}`,
+        );
       }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
 
-      // Get updated session state after validation
+      // Get updated session state after update
 
-      logger?.info(`✅ ValidateView completed: ${viewName}`);
-      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
+      logger?.info(`✅ UpdateDdlLow completed: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
           {
-            success: result.valid,
-            view_name: viewName,
-            validation_result: result,
+            success: true,
+            ddl_name: ddlName,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `View name ${viewName} is valid and available`
-              : `View name ${viewName} validation failed: ${result.message}`,
+            message: `DDL source ${ddlName} updated successfully. Remember to unlock using UnlockDdlLow.`,
           },
           null,
           2,
@@ -140,14 +138,16 @@ export async function handleValidateView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error validating view ${viewName}: ${error?.message || error}`,
+        `Error updating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to validate view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to update DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
+      } else if (error.response?.status === 423) {
+        errorMessage = `DDL source ${ddlName} is locked by another user or lock handle is invalid.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

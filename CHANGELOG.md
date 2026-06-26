@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [8.0.0] - 2026-06-26
+
+### Changed (BREAKING)
+- **`View` DDL-source tools renamed to `Ddl`.** Migrated to `@mcp-abap-adt/adt-clients@^6.0.0`, whose misnamed `getView()` client became the generic DDL-source client `getDdl()` (`/sap/bc/adt/ddic/ddl/sources/` — CDS views, AMDP table functions, other DDL sources). MCP tools renamed: `GetView`→`GetDdl`, `ReadView`→`ReadDdl`, `CreateView`→`CreateDdl`, `UpdateView`→`UpdateDdl`, `DeleteView`→`DeleteDdl`, `CheckView`→`CheckDdl`, `ActivateView`→`ActivateDdl`, and the `*ViewLow` variants → `*DdlLow`. The tool argument `view_name` is now `ddl_name`.
+- **Generic object tools** (`LockObject`/`UnlockObject`/`CheckObject`/`ValidateObject`/`DeleteObject`): the `object_type` value `"view"` is renamed to `"ddl"` (removed, no alias).
+- **Compact facade** (`HandlerGet`/`HandlerCreate`/… ): the `object_type` value `VIEW` is renamed to `DDL` and its `view_name` argument to `ddl_name` (removed, no alias).
+
 ## [7.2.1] - 2026-06-23
 
 ### Fixed

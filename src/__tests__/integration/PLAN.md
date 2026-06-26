@@ -37,8 +37,8 @@ src/__tests__/integration/
 │   └── StructureLowHandlers.test.ts
 ├── table/
 │   └── TableLowHandlers.test.ts
-├── view/
-│   └── ViewLowHandlers.test.ts
+├── ddl/
+│   └── DdlLowHandlers.test.ts
 ├── package/
 │   └── PackageLowHandlers.test.ts
 ├── behaviorDefinition/
@@ -97,7 +97,7 @@ Each test file should test the complete workflow:
 - [x] **DataElement** - `DataElementLowHandlers.test.ts` ✅
 - [x] **Structure** - `StructureLowHandlers.test.ts` ✅
 - [x] **Table** - `TableLowHandlers.test.ts` ✅
-- [x] **View** - `ViewLowHandlers.test.ts` ✅
+- [x] **Ddl** - `DdlLowHandlers.test.ts` ✅
 
 ### Priority 3 (Other Objects)
 - [x] **Package** - `PackageLowHandlers.test.ts` ✅
@@ -145,7 +145,7 @@ DEBUG_ADT_TESTS=true npm test -- --testPathPattern=integration/class
 - [x] Test infrastructure (helpers, config)
 - [x] Example test (Class)
 - [x] All Priority 1 tests ✅
-- [x] Priority 2 tests (Domain, DataElement, Table, View, Structure) ✅
+- [x] Priority 2 tests (Domain, DataElement, Table, Ddl, Structure) ✅
 - [x] All Priority 3 tests ✅
 
 ## Next Steps

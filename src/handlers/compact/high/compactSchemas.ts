@@ -29,6 +29,10 @@ export const compactCreateSchema = {
       description: 'ABAP function group name.',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
+    ddl_name: {
+      type: 'string',
+      description: 'DDL source name (CDS view, AMDP table function, etc.).',
+    },
     description: {
       type: 'string',
       description: 'Human-readable object description.',
@@ -81,7 +85,7 @@ export const compactGetSchema = {
     data_element_name: { type: 'string', description: 'Data element name.' },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },
-    view_name: { type: 'string', description: 'View name.' },
+    ddl_name: { type: 'string', description: 'DDL source name.' },
     function_module_name: {
       type: 'string',
       description: 'Function module name.',
@@ -137,7 +141,15 @@ export const compactUpdateSchema = {
       description: 'ABAP function group name.',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
+    ddl_name: {
+      type: 'string',
+      description: 'DDL source name (CDS view, AMDP table function, etc.).',
+    },
     source_code: { type: 'string', description: 'ABAP source code payload.' },
+    ddl_source: {
+      type: 'string',
+      description: 'Complete DDL source code (for DDL update).',
+    },
     transport_request: {
       type: 'string',
       description: 'Transport request id (if required by system).',
@@ -190,6 +202,10 @@ export const compactDeleteSchema = {
     function_group_name: {
       type: 'string',
       description: 'ABAP function group name.',
+    },
+    ddl_name: {
+      type: 'string',
+      description: 'DDL source name (CDS view, AMDP table function, etc.).',
     },
     transport_request: {
       type: 'string',
@@ -477,7 +493,7 @@ export const compactValidateSchema = {
         'FUNCTION_MODULE',
         'TABLE',
         'STRUCTURE',
-        'VIEW',
+        'DDL',
         'DOMAIN',
         'DATA_ELEMENT',
         'PACKAGE',
@@ -487,7 +503,7 @@ export const compactValidateSchema = {
         'SERVICE_BINDING',
       ],
       description:
-        'Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, VIEW, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.',
+        'Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.',
     },
     object_name: {
       type: 'string',

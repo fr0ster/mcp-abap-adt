@@ -160,7 +160,7 @@ export class LambdaTester {
           testParams.function_name ||
           testParams.program_name ||
           testParams.table_name ||
-          testParams.view_name ||
+          testParams.ddl_name ||
           testParams.domain_name ||
           testParams.data_element_name ||
           testParams.structure_name ||
@@ -187,7 +187,7 @@ export class LambdaTester {
           if (testParams.interface_name) testParams.interface_name = objectName;
           if (testParams.function_name) testParams.function_name = objectName;
           if (testParams.table_name) testParams.table_name = objectName;
-          if (testParams.view_name) testParams.view_name = objectName;
+          if (testParams.ddl_name) testParams.ddl_name = objectName;
           if (testParams.domain_name) testParams.domain_name = objectName;
           if (testParams.data_element_name)
             testParams.data_element_name = objectName;
@@ -283,7 +283,7 @@ export class LambdaTester {
         testParams.function_name ||
         testParams.program_name ||
         testParams.table_name ||
-        testParams.view_name ||
+        testParams.ddl_name ||
         testParams.domain_name ||
         testParams.data_element_name ||
         testParams.structure_name ||
@@ -662,7 +662,7 @@ export class LambdaTester {
     const name = encodeURIComponent(objectName.toLowerCase());
     const handlerName = this.handlerName || '';
     if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
-    if (handlerName.includes('view'))
+    if (handlerName.includes('ddl') || handlerName.includes('view'))
       return `/sap/bc/adt/ddic/ddl/sources/${name}`;
     if (handlerName.includes('structure'))
       return `/sap/bc/adt/ddic/structures/${name}`;

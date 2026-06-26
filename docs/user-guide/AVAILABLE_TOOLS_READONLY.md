@@ -16,6 +16,8 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ReadClass](#readclass-read-only-class)
   - [Data Element](#read-only-data-element)
     - [ReadDataElement](#readdataelement-read-only-data-element)
+  - [Ddl](#read-only-ddl)
+    - [ReadDdl](#readddl-read-only-ddl)
   - [Domain](#read-only-domain)
     - [ReadDomain](#readdomain-read-only-domain)
   - [Enhancement](#read-only-enhancement)
@@ -87,8 +89,6 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
-  - [View](#read-only-view)
-    - [ReadView](#readview-read-only-view)
 
 ---
 
@@ -151,6 +151,21 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-ddl"></a>
+### Read-Only / Ddl
+
+<a id="readddl-read-only-ddl"></a>
+#### ReadDdl (Read-Only / Ddl)
+**Description:** Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+
+**Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -942,19 +957,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="read-only-view"></a>
-### Read-Only / View
-
-<a id="readview-read-only-view"></a>
-#### ReadView (Read-Only / View)
-**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
-
-**Source:** `src/handlers/view/readonly/handleReadView.ts`
-
-**Parameters:**
-- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-*Last updated: 2026-06-20*
+*Last updated: 2026-06-25*

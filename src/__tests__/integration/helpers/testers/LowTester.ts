@@ -637,7 +637,7 @@ export class LowTester extends LambdaTester {
     const handlerName = (this as any).handlerName || '';
     if (handlerName.includes('class')) return 'class_name';
     if (handlerName.includes('table')) return 'table_name';
-    if (handlerName.includes('view')) return 'view_name';
+    if (handlerName.includes('ddl')) return 'ddl_name';
     if (handlerName.includes('program')) return 'program_name';
     if (handlerName.includes('interface')) return 'interface_name';
     if (handlerName.includes('domain')) return 'domain_name';

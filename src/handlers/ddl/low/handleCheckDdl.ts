@@ -1,7 +1,7 @@
 /**
- * CheckView Handler - Syntax check for ABAP View
+ * CheckDdlLow Handler - Syntax check for ABAP DDL Source
  *
- * Uses AdtClient.checkView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().check from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -16,16 +16,16 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'CheckViewLow',
+  name: 'CheckDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).',
+    '[low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_PROGRAM).',
+        description: 'DDL source name (e.g., Z_MY_PROGRAM).',
       },
       ddl_source: {
         type: 'string',
@@ -54,12 +54,12 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface CheckViewArgs {
-  view_name: string;
+interface CheckDdlArgs {
+  ddl_name: string;
   ddl_source?: string;
   version?: string;
   session_id?: string;
@@ -71,27 +71,27 @@ interface CheckViewArgs {
 }
 
 /**
- * Main handler for CheckView MCP tool
+ * Main handler for CheckDdl MCP tool
  *
- * Uses AdtClient.checkView - low-level single method call
+ * Uses AdtClient.getDdl().check - low-level single method call
  */
-export async function handleCheckView(
+export async function handleCheckDdl(
   context: HandlerContext,
-  args: CheckViewArgs,
+  args: CheckDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
     const {
-      view_name,
+      ddl_name,
       ddl_source,
       version = 'inactive',
       session_id,
       session_state,
-    } = args as CheckViewArgs;
+    } = args as CheckDdlArgs;
 
     // Validation
-    if (!view_name) {
-      return return_error(new Error('view_name is required'));
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
@@ -103,7 +103,7 @@ export async function handleCheckView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
     const validVersions = ['active', 'inactive'];
     const checkVersion =
@@ -112,19 +112,21 @@ export async function handleCheckView(
         : 'inactive';
 
     logger?.info(
-      `Starting view check: ${viewName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`,
+      `Starting DDL source check: ${ddlName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`,
     );
 
     try {
-      // Check view with optional source code (for validating new/unsaved code)
+      // Check DDL source with optional source code (for validating new/unsaved code)
       // If ddl_source is provided, it will be base64 encoded in the request body
       const checkState = await client
-        .getView()
-        .check({ viewName: viewName, ddlSource: ddl_source }, checkVersion);
+        .getDdl()
+        .check({ ddlName: ddlName, ddlSource: ddl_source }, checkVersion);
       const response = checkState.checkResult;
 
       if (!response) {
-        throw new Error(`Check did not return a response for view ${viewName}`);
+        throw new Error(
+          `Check did not return a response for DDL source ${ddlName}`,
+        );
       }
 
       // Parse check results
@@ -132,7 +134,7 @@ export async function handleCheckView(
 
       // Get updated session state after check
 
-      logger?.info(`✅ CheckView completed: ${viewName}`);
+      logger?.info(`✅ CheckDdlLow completed: ${ddlName}`);
       logger?.info(`   Status: ${checkResult.status}`);
       logger?.info(
         `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
@@ -142,14 +144,14 @@ export async function handleCheckView(
         data: JSON.stringify(
           {
             success: checkResult.success,
-            view_name: viewName,
+            ddl_name: ddlName,
             version: checkVersion,
             check_result: checkResult,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: checkResult.success
-              ? `View ${viewName} has no syntax errors`
-              : `View ${viewName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
+              ? `DDL source ${ddlName} has no syntax errors`
+              : `DDL source ${ddlName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
           },
           null,
           2,
@@ -157,14 +159,14 @@ export async function handleCheckView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error checking view ${viewName}: ${error?.message || error}`,
+        `Error checking DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to check view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to check DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

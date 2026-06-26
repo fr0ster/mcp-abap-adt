@@ -1,8 +1,8 @@
 /**
- * CreateView Handler - CDS/Classic View Creation via ADT API
+ * CreateDdl Handler - CDS/Classic View Creation via ADT API
  *
  * Workflow: validate -> create (object in initial state)
- * DDL source is set via UpdateView handler.
+ * DDL source is set via UpdateDdl handler.
  */
 
 import { createAdtClient } from '../../../lib/clients';
@@ -15,16 +15,16 @@ import {
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
-  name: 'CreateView',
+  name: 'CreateDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state.',
+    'Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).',
+        description: 'DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).',
       },
       package_name: {
         type: 'string',
@@ -37,27 +37,27 @@ export const TOOL_DEFINITION = {
       },
       description: {
         type: 'string',
-        description: 'Optional description (defaults to view_name).',
+        description: 'Optional description (defaults to ddl_name).',
       },
     },
-    required: ['view_name', 'package_name'],
+    required: ['ddl_name', 'package_name'],
   },
 } as const;
 
-interface CreateViewArgs {
-  view_name: string;
+interface CreateDdlArgs {
+  ddl_name: string;
   package_name: string;
   transport_request?: string;
   description?: string;
 }
 
-export async function handleCreateView(context: HandlerContext, params: any) {
+export async function handleCreateDdl(context: HandlerContext, params: any) {
   const { connection, logger } = context;
-  const args: CreateViewArgs = params;
+  const args: CreateDdlArgs = params;
 
-  if (!args.view_name || !args.package_name) {
+  if (!args.ddl_name || !args.package_name) {
     return return_error(
-      new Error('Missing required parameters: view_name and package_name'),
+      new Error('Missing required parameters: ddl_name and package_name'),
     );
   }
 
@@ -67,40 +67,40 @@ export async function handleCreateView(context: HandlerContext, params: any) {
     return return_error(error as Error);
   }
 
-  const viewName = args.view_name.toUpperCase();
-  logger?.info(`Starting view creation: ${viewName}`);
+  const ddlName = args.ddl_name.toUpperCase();
+  logger?.info(`Starting DDL source creation: ${ddlName}`);
 
   try {
     const client = createAdtClient(connection, logger);
 
     // Validate
-    logger?.debug(`Validating view: ${viewName}`);
-    await client.getView().validate({
-      viewName,
+    logger?.debug(`Validating DDL source: ${ddlName}`);
+    await client.getDdl().validate({
+      ddlName: ddlName,
       packageName: args.package_name,
-      description: args.description || viewName,
+      description: args.description || ddlName,
     });
-    logger?.debug(`View validation passed: ${viewName}`);
+    logger?.debug(`DDL source validation passed: ${ddlName}`);
 
     // Create
-    logger?.debug(`Creating view: ${viewName}`);
-    await client.getView().create({
-      viewName,
-      description: args.description || viewName,
+    logger?.debug(`Creating DDL source: ${ddlName}`);
+    await client.getDdl().create({
+      ddlName: ddlName,
+      description: args.description || ddlName,
       packageName: args.package_name,
       ddlSource: '',
       transportRequest: args.transport_request,
     });
-    logger?.info(`View created: ${viewName}`);
+    logger?.info(`DDL source created: ${ddlName}`);
 
     const result = {
       success: true,
-      view_name: viewName,
+      ddl_name: ddlName,
       package_name: args.package_name,
       transport_request: args.transport_request || null,
       type: 'DDLS',
-      message: `View ${viewName} created successfully. Use UpdateView to set DDL source code.`,
-      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(viewName).toLowerCase()}`,
+      message: `DDL source ${ddlName} created successfully. Use UpdateDdl to set DDL source code.`,
+      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`,
       steps_completed: ['validate', 'create'],
     };
 
@@ -113,7 +113,7 @@ export async function handleCreateView(context: HandlerContext, params: any) {
     });
   } catch (error: any) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger?.error(`Error creating view ${viewName}: ${errorMessage}`);
+    logger?.error(`Error creating DDL source ${ddlName}: ${errorMessage}`);
     return return_error(new Error(errorMessage));
   }
 }

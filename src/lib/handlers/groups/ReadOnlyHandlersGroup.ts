@@ -15,6 +15,10 @@ import {
   TOOL_DEFINITION as ReadDataElement_Tool,
 } from '../../../handlers/data_element/readonly/handleReadDataElement';
 import {
+  handleReadDdl,
+  TOOL_DEFINITION as ReadDdl_Tool,
+} from '../../../handlers/ddl/readonly/handleReadDdl';
+import {
   handleReadDomain,
   TOOL_DEFINITION as ReadDomain_Tool,
 } from '../../../handlers/domain/readonly/handleReadDomain';
@@ -110,10 +114,6 @@ import {
   handleListTransports,
   TOOL_DEFINITION as ListTransports_Tool,
 } from '../../../handlers/transport/readonly/handleListTransports';
-import {
-  handleReadView,
-  TOOL_DEFINITION as ReadView_Tool,
-} from '../../../handlers/view/readonly/handleReadView';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 import {
@@ -220,8 +220,8 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleGetStructuresList(this.context, args),
       },
       {
-        toolDefinition: ReadView_Tool,
-        handler: (args: any) => handleReadView(this.context, args),
+        toolDefinition: ReadDdl_Tool,
+        handler: (args: any) => handleReadDdl(this.context, args),
       },
       {
         toolDefinition: ReadDomain_Tool,

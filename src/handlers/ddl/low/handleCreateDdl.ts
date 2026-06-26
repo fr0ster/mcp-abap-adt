@@ -1,7 +1,7 @@
 /**
- * CreateView Handler - Create ABAP View
+ * CreateDdlLow Handler - Create ABAP DDL Source
  *
- * Uses AdtClient.createView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().create from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -15,21 +15,21 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'CreateViewLow',
+  name: 'CreateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
+    '[low-level] Create a new ABAP DDL source. - use CreateDdl (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
         description:
-          'View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
+          'DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
-        description: 'View description.',
+        description: 'DDL source description.',
       },
       package_name: {
         type: 'string',
@@ -39,11 +39,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
-      },
-      view_type: {
-        type: 'string',
-        description:
-          "View type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).",
       },
       application: {
         type: 'string',
@@ -65,12 +60,12 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name', 'description', 'package_name'],
+    required: ['ddl_name', 'description', 'package_name'],
   },
 } as const;
 
-interface CreateViewArgs {
-  view_name: string;
+interface CreateDdlArgs {
+  ddl_name: string;
   description: string;
   package_name: string;
   transport_request?: string;
@@ -83,29 +78,29 @@ interface CreateViewArgs {
 }
 
 /**
- * Main handler for CreateView MCP tool
+ * Main handler for CreateDdl MCP tool
  *
- * Uses AdtClient.createView - low-level single method call
+ * Uses AdtClient.getDdl().create - low-level single method call
  */
-export async function handleCreateView(
+export async function handleCreateDdl(
   context: HandlerContext,
-  args: CreateViewArgs,
+  args: CreateDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
     const {
-      view_name,
+      ddl_name,
       description,
       package_name,
       transport_request,
       session_id,
       session_state,
-    } = args as CreateViewArgs;
+    } = args as CreateDdlArgs;
 
     // Validation
-    if (!view_name || !description || !package_name) {
+    if (!ddl_name || !description || !package_name) {
       return return_error(
-        new Error('view_name, description, and package_name are required'),
+        new Error('ddl_name, description, and package_name are required'),
       );
     }
 
@@ -118,14 +113,14 @@ export async function handleCreateView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view creation: ${viewName}`);
+    logger?.info(`Starting DDL source creation: ${ddlName}`);
 
     try {
-      // Create view
-      const createState = await client.getView().create({
-        viewName,
+      // Create DDL source
+      const createState = await client.getDdl().create({
+        ddlName: ddlName,
         description,
         packageName: package_name,
         ddlSource: '',
@@ -135,25 +130,25 @@ export async function handleCreateView(
 
       if (!createResult) {
         throw new Error(
-          `Create did not return a response for view ${viewName}`,
+          `Create did not return a response for DDL source ${ddlName}`,
         );
       }
 
       // Get updated session state after create
 
-      logger?.info(`✅ CreateView completed: ${viewName}`);
+      logger?.info(`✅ CreateDdlLow completed: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
           {
             success: true,
-            view_name: viewName,
+            ddl_name: ddlName,
             description,
             package_name: package_name,
             transport_request: transport_request || null,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${viewName} created successfully. Use LockView and UpdateView to add source code, then UnlockView and ActivateObject.`,
+            message: `DDL source ${ddlName} created successfully. Use LockDdlLow and UpdateDdlLow to add source code, then UnlockDdlLow and ActivateDdlLow.`,
           },
           null,
           2,
@@ -161,14 +156,14 @@ export async function handleCreateView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error creating view ${viewName}: ${error?.message || error}`,
+        `Error creating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to create view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to create DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 409) {
-        errorMessage = `View ${viewName} already exists.`;
+        errorMessage = `DDL source ${ddlName} already exists.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

@@ -178,7 +178,7 @@ export async function ensureSharedDependency(
       const result = await client.getTable().read({ tableName: name });
       exists = result?.readResult !== undefined;
     } else if (type === 'views') {
-      const result = await client.getView().read({ viewName: name });
+      const result = await client.getDdl().read({ ddlName: name });
       exists = result !== undefined;
     } else if (type === 'behavior_definitions') {
       const result = await client.getBehaviorDefinition().read({ name });
@@ -220,8 +220,8 @@ export async function ensureSharedDependency(
         log?.info?.(`Shared table ${name} activated`);
       }
     } else if (type === 'views') {
-      await client.getView().create({
-        viewName: name,
+      await client.getDdl().create({
+        ddlName: name,
         packageName,
         description: depConfig.description || 'Shared test view',
         ddlSource: depConfig.source,
@@ -229,9 +229,9 @@ export async function ensureSharedDependency(
       });
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared view ${name}...`);
-        await client.getView().update(
+        await client.getDdl().update(
           {
-            viewName: name,
+            ddlName: name,
             ddlSource: depConfig.source,
             transportRequest,
           },
@@ -367,7 +367,7 @@ export async function ensureSharedObjects(
     },
     {
       type: 'views',
-      readFn: (name) => client.getView().read({ viewName: name }),
+      readFn: (name) => client.getDdl().read({ ddlName: name }),
     },
     {
       type: 'behavior_definitions',

@@ -1,7 +1,7 @@
 /**
- * UnlockView Handler - Unlock ABAP View
+ * LockDdlLow Handler - Lock ABAP DDL Source
  *
- * Uses AdtClient.unlockView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().lock from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -15,30 +15,26 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'UnlockViewLow',
+  name: 'LockDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.',
+    '[low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_PROGRAM).',
-      },
-      lock_handle: {
-        type: 'string',
-        description: 'Lock handle from LockView operation.',
+        description: 'DDL source name (e.g., Z_MY_PROGRAM).',
       },
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockView operation. Must be the same as used in LockView.',
+          'Session ID from GetSession. If not provided, a new session will be created.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockView (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },
@@ -46,14 +42,13 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name', 'lock_handle', 'session_id'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface UnlockViewArgs {
-  view_name: string;
-  lock_handle: string;
-  session_id: string;
+interface LockDdlArgs {
+  ddl_name: string;
+  session_id?: string;
   session_state?: {
     cookies?: string;
     csrf_token?: string;
@@ -62,24 +57,21 @@ interface UnlockViewArgs {
 }
 
 /**
- * Main handler for UnlockView MCP tool
+ * Main handler for LockDdl MCP tool
  *
- * Uses AdtClient.unlockView - low-level single method call
+ * Uses AdtClient.getDdl().lock - low-level single method call
  */
-export async function handleUnlockView(
+export async function handleLockDdl(
   context: HandlerContext,
-  args: UnlockViewArgs,
+  args: LockDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, lock_handle, session_id, session_state } =
-      args as UnlockViewArgs;
+    const { ddl_name, session_id, session_state } = args as LockDdlArgs;
 
     // Validation
-    if (!view_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('view_name, lock_handle, and session_id are required'),
-      );
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
@@ -91,37 +83,34 @@ export async function handleUnlockView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(
-      `Starting view unlock: ${viewName} (session: ${session_id.substring(0, 8)}...)`,
-    );
+    logger?.info(`Starting DDL source lock: ${ddlName}`);
 
     try {
-      // Unlock view
-      const unlockState = await client
-        .getView()
-        .unlock({ viewName: viewName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
+      // Lock DDL source
+      const lockHandle = await client.getDdl().lock({ ddlName: ddlName });
 
-      if (!unlockResult) {
+      if (!lockHandle) {
         throw new Error(
-          `Unlock did not return a response for view ${viewName}`,
+          `Lock did not return a lock handle for DDL source ${ddlName}`,
         );
       }
 
-      // Get updated session state after unlock
+      // Get updated session state after lock
 
-      logger?.info(`✅ UnlockView completed: ${viewName}`);
+      logger?.info(`✅ LockDdlLow completed: ${ddlName}`);
+      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
 
       return return_response({
         data: JSON.stringify(
           {
             success: true,
-            view_name: viewName,
-            session_id: session_id,
+            ddl_name: ddlName,
+            session_id: session_id || null,
+            lock_handle: lockHandle,
             session_state: null, // Session state management is now handled by auth-broker,
-            message: `View ${viewName} unlocked successfully.`,
+            message: `DDL source ${ddlName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
           },
           null,
           2,
@@ -129,16 +118,16 @@ export async function handleUnlockView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error unlocking view ${viewName}: ${error?.message || error}`,
+        `Error locking DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to unlock view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to lock DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockView.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
+      } else if (error.response?.status === 409) {
+        errorMessage = `DDL source ${ddlName} is already locked by another user.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

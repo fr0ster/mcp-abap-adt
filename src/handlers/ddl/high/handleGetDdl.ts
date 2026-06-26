@@ -1,7 +1,7 @@
 /**
- * GetView Handler - Read ABAP View via AdtClient
+ * GetDdl Handler - Read ABAP DDL Source via AdtClient
  *
- * Uses AdtClient.getView().read() for high-level read operation.
+ * Uses AdtClient.getDdl().read() for high-level read operation.
  * Supports both active and inactive versions.
  */
 
@@ -14,16 +14,16 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'GetView',
+  name: 'GetDdl',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Retrieve ABAP view definition. Supports reading active or inactive version.',
+    'Retrieve ABAP DDL source definition. Supports reading active or inactive version.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., Z_MY_VIEW).',
+        description: 'DDL source name (e.g., Z_MY_VIEW).',
       },
       version: {
         type: 'string',
@@ -33,65 +33,62 @@ export const TOOL_DEFINITION = {
         default: 'active',
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface GetViewArgs {
-  view_name: string;
+interface GetDdlArgs {
+  ddl_name: string;
   version?: 'active' | 'inactive';
 }
 
 /**
- * Main handler for GetView MCP tool
+ * Main handler for GetDdl MCP tool
  *
- * Uses AdtClient.getView().read() - high-level read operation
+ * Uses AdtClient.getDdl().read() - high-level read operation
  */
-export async function handleGetView(
-  context: HandlerContext,
-  args: GetViewArgs,
-) {
+export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
   const { connection, logger } = context;
   try {
-    const { view_name, version = 'active' } = args as GetViewArgs;
+    const { ddl_name, version = 'active' } = args as GetDdlArgs;
 
     // Validation
-    if (!view_name) {
-      return return_error(new Error('view_name is required'));
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Reading view ${viewName}, version: ${version}`);
+    logger?.info(`Reading DDL source ${ddlName}, version: ${version}`);
 
     try {
-      // Read view using AdtClient
-      const viewObject = client.getView();
-      const readResult = await viewObject.read(
-        { viewName },
+      // Read DDL source using AdtClient
+      const ddlObject = client.getDdl();
+      const readResult = await ddlObject.read(
+        { ddlName: ddlName },
         version as 'active' | 'inactive',
       );
 
       if (!readResult || !readResult.readResult) {
-        throw new Error(`View ${viewName} not found`);
+        throw new Error(`DDL source ${ddlName} not found`);
       }
 
       // Extract data from read result
-      const viewData =
+      const ddlData =
         typeof readResult.readResult.data === 'string'
           ? readResult.readResult.data
           : JSON.stringify(readResult.readResult.data);
 
-      logger?.info(`✅ GetView completed successfully: ${viewName}`);
+      logger?.info(`✅ GetDdl completed successfully: ${ddlName}`);
 
       return return_response({
         data: JSON.stringify(
           {
             success: true,
-            view_name: viewName,
+            ddl_name: ddlName,
             version,
-            view_data: viewData,
+            ddl_data: ddlData,
             status: readResult.readResult.status,
             status_text: readResult.readResult.statusText,
           },
@@ -101,16 +98,16 @@ export async function handleGetView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error reading view ${viewName}: ${error?.message || error}`,
+        `Error reading DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to read view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to read DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (error.response?.status === 423) {
-        errorMessage = `View ${viewName} is locked by another user.`;
+        errorMessage = `DDL source ${ddlName} is locked by another user.`;
       }
 
       return return_error(new Error(errorMessage));

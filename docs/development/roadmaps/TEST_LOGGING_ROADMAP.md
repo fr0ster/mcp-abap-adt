@@ -54,7 +54,7 @@ Standardize test logging across all integration tests to provide clear visibilit
 - [ ] `InterfaceHighHandlers.test.ts`
 - [ ] `ProgramHighHandlers.test.ts`
 - [ ] `TableHighHandlers.test.ts`
-- [ ] `ViewHighHandlers.test.ts`
+- [ ] `DdlHighHandlers.test.ts`
 - [ ] `StructureHighHandlers.test.ts`
 - [ ] `DataElementHighHandlers.test.ts`
 - [ ] `DomainHighHandlers.test.ts`
@@ -70,7 +70,7 @@ Standardize test logging across all integration tests to provide clear visibilit
 - [ ] `InterfaceLowHandlers.test.ts`
 - [ ] `ProgramLowHandlers.test.ts`
 - [ ] `TableLowHandlers.test.ts`
-- [ ] `ViewLowHandlers.test.ts`
+- [ ] `DdlLowHandlers.test.ts`
 - [ ] `StructureLowHandlers.test.ts`
 - [ ] `DataElementLowHandlers.test.ts`
 - [ ] `DomainLowHandlers.test.ts`

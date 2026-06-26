@@ -37,7 +37,7 @@ const testsLogger = createTestLogger('shared-setup');
 
 /**
  * Force-save DDL source for a CDS view by bypassing syntax check.
- * Uses AdtClient.getView().lock() / update(lockHandle) / unlock() — public IAdtObject API.
+ * Uses AdtClient.getDdl().lock() / update(lockHandle) / unlock() — public IAdtObject API.
  * Needed for views with circular dependencies (RAP root/child composition)
  * that cannot pass checkView before the counterpart view is active.
  * Group activation handles the mutual refs once both have stored source.
@@ -48,14 +48,17 @@ async function forceSaveViewSource(
   ddlSource: string,
   transportRequest?: string,
 ): Promise<void> {
-  const lockHandle = await client.getView().lock({ viewName });
+  const lockHandle = await client.getDdl().lock({ ddlName: viewName });
   try {
     await client
-      .getView()
-      .update({ viewName, ddlSource, transportRequest }, { lockHandle });
+      .getDdl()
+      .update(
+        { ddlName: viewName, ddlSource, transportRequest },
+        { lockHandle },
+      );
   } finally {
     try {
-      await client.getView().unlock({ viewName }, lockHandle);
+      await client.getDdl().unlock({ ddlName: viewName }, lockHandle);
     } catch {
       // ignore unlock errors
     }
@@ -346,16 +349,16 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getView()
-                .read({ viewName: item.name });
+                .getDdl()
+                .read({ ddlName: item.name });
               exists = readResult !== undefined;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getView().create({
-                viewName: item.name,
+              await client.getDdl().create({
+                ddlName: item.name,
                 packageName,
                 description: item.description || 'Shared test view',
                 ddlSource: item.source,
@@ -366,9 +369,9 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (item.source) {
               try {
-                await client.getView().update(
+                await client.getDdl().update(
                   {
-                    viewName: item.name,
+                    ddlName: item.name,
                     ddlSource: item.source,
                     transportRequest,
                   },

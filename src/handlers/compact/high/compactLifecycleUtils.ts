@@ -8,7 +8,7 @@ export type LowObjectType =
   | 'function_module'
   | 'table'
   | 'structure'
-  | 'view'
+  | 'ddl'
   | 'domain'
   | 'data_element'
   | 'package'
@@ -24,7 +24,7 @@ const compactToLowMap: Partial<Record<CompactObjectType, LowObjectType>> = {
   FUNCTION_MODULE: 'function_module',
   TABLE: 'table',
   STRUCTURE: 'structure',
-  VIEW: 'view',
+  DDL: 'ddl',
   DOMAIN: 'domain',
   DATA_ELEMENT: 'data_element',
   PACKAGE: 'package',

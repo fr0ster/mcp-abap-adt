@@ -1,7 +1,7 @@
 /**
- * ActivateView Handler - Activate ABAP View (CDS View)
+ * ActivateDdlLow Handler - Activate ABAP DDL Source (CDS View)
  *
- * Uses AdtClient.activateView from @mcp-abap-adt/adt-clients.
+ * Uses AdtClient.getDdl().activate from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
  */
 
@@ -16,16 +16,16 @@ import {
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
-  name: 'ActivateViewLow',
+  name: 'ActivateDdlLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    'Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
-      view_name: {
+      ddl_name: {
         type: 'string',
-        description: 'View name (e.g., ZVW_MY_VIEW).',
+        description: 'DDL source name (e.g., ZVW_MY_VIEW).',
       },
       session_id: {
         type: 'string',
@@ -43,12 +43,12 @@ export const TOOL_DEFINITION = {
         },
       },
     },
-    required: ['view_name'],
+    required: ['ddl_name'],
   },
 } as const;
 
-interface ActivateViewArgs {
-  view_name: string;
+interface ActivateDdlArgs {
+  ddl_name: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -58,21 +58,21 @@ interface ActivateViewArgs {
 }
 
 /**
- * Main handler for ActivateView MCP tool
+ * Main handler for ActivateDdl MCP tool
  *
- * Uses AdtClient.activateView - low-level single method call
+ * Uses AdtClient.getDdl().activate - low-level single method call
  */
-export async function handleActivateView(
+export async function handleActivateDdl(
   context: HandlerContext,
-  args: ActivateViewArgs,
+  args: ActivateDdlArgs,
 ) {
   const { connection, logger } = context;
   try {
-    const { view_name, session_id, session_state } = args as ActivateViewArgs;
+    const { ddl_name, session_id, session_state } = args as ActivateDdlArgs;
 
     // Validation
-    if (!view_name) {
-      return return_error(new Error('view_name is required'));
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
     }
 
     const client = createAdtClient(connection, logger);
@@ -84,20 +84,20 @@ export async function handleActivateView(
       // Ensure connection is established
     }
 
-    const viewName = view_name.toUpperCase();
+    const ddlName = ddl_name.toUpperCase();
 
-    logger?.info(`Starting view activation: ${viewName}`);
+    logger?.info(`Starting DDL source activation: ${ddlName}`);
 
     try {
-      // Activate view
+      // Activate DDL source
       const activateState = await client
-        .getView()
-        .activate({ viewName: viewName });
+        .getDdl()
+        .activate({ ddlName: ddlName });
       const response = activateState.activateResult;
 
       if (!response) {
         throw new Error(
-          `Activation did not return a response for view ${viewName}`,
+          `Activation did not return a response for DDL source ${ddlName}`,
         );
       }
 
@@ -107,7 +107,7 @@ export async function handleActivateView(
 
       // Get updated session state after activation
 
-      logger?.info(`✅ ActivateView completed: ${viewName}`);
+      logger?.info(`✅ ActivateDdlLow completed: ${ddlName}`);
       logger?.info(
         `   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`,
       );
@@ -117,7 +117,7 @@ export async function handleActivateView(
         data: JSON.stringify(
           {
             success,
-            view_name: viewName,
+            ddl_name: ddlName,
             activation: {
               activated: activationResult.activated,
               checked: activationResult.checked,
@@ -133,8 +133,8 @@ export async function handleActivateView(
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: success
-              ? `View ${viewName} activated successfully`
-              : `View ${viewName} activation completed with ${activationResult.messages.length} message(s)`,
+              ? `DDL source ${ddlName} activated successfully`
+              : `DDL source ${ddlName} activation completed with ${activationResult.messages.length} message(s)`,
           },
           null,
           2,
@@ -142,14 +142,14 @@ export async function handleActivateView(
       } as AxiosResponse);
     } catch (error: any) {
       logger?.error(
-        `Error activating view ${viewName}: ${error?.message || error}`,
+        `Error activating DDL source ${ddlName}: ${error?.message || error}`,
       );
 
       // Parse error message
-      let errorMessage = `Failed to activate view: ${error.message || String(error)}`;
+      let errorMessage = `Failed to activate DDL source: ${error.message || String(error)}`;
 
       if (error.response?.status === 404) {
-        errorMessage = `View ${viewName} not found.`;
+        errorMessage = `DDL source ${ddlName} not found.`;
       } else if (
         error.response?.data &&
         typeof error.response.data === 'string'

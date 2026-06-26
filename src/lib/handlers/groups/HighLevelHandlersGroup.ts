@@ -140,6 +140,30 @@ import {
   handleActivateDataElement,
 } from '../../../handlers/data_element/low/handleActivateDataElement';
 import {
+  TOOL_DEFINITION as CheckDdl_Tool,
+  handleCheckDdl,
+} from '../../../handlers/ddl/high/handleCheckDdl';
+import {
+  TOOL_DEFINITION as CreateDdl_Tool,
+  handleCreateDdl,
+} from '../../../handlers/ddl/high/handleCreateDdl';
+import {
+  TOOL_DEFINITION as DeleteDdl_Tool,
+  handleDeleteDdl,
+} from '../../../handlers/ddl/high/handleDeleteDdl';
+import {
+  TOOL_DEFINITION as GetDdl_Tool,
+  handleGetDdl,
+} from '../../../handlers/ddl/high/handleGetDdl';
+import {
+  handleUpdateDdl as handleUpdateDdlHigh,
+  TOOL_DEFINITION as UpdateDdlHigh_Tool,
+} from '../../../handlers/ddl/high/handleUpdateDdl';
+import {
+  TOOL_DEFINITION as ActivateDdl_Tool,
+  handleActivateDdl,
+} from '../../../handlers/ddl/low/handleActivateDdl';
+import {
   TOOL_DEFINITION as CheckMetadataExtension_Tool,
   handleCheckMetadataExtension,
 } from '../../../handlers/ddlx/high/handleCheckMetadataExtension';
@@ -461,30 +485,6 @@ import {
   handleUpdateUnitTest,
   TOOL_DEFINITION as UpdateUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateUnitTest';
-import {
-  TOOL_DEFINITION as CheckView_Tool,
-  handleCheckView,
-} from '../../../handlers/view/high/handleCheckView';
-import {
-  TOOL_DEFINITION as CreateView_Tool,
-  handleCreateView,
-} from '../../../handlers/view/high/handleCreateView';
-import {
-  TOOL_DEFINITION as DeleteView_Tool,
-  handleDeleteView,
-} from '../../../handlers/view/high/handleDeleteView';
-import {
-  TOOL_DEFINITION as GetView_Tool,
-  handleGetView,
-} from '../../../handlers/view/high/handleGetView';
-import {
-  handleUpdateView as handleUpdateViewHigh,
-  TOOL_DEFINITION as UpdateViewHigh_Tool,
-} from '../../../handlers/view/high/handleUpdateView';
-import {
-  TOOL_DEFINITION as ActivateView_Tool,
-  handleActivateView,
-} from '../../../handlers/view/low/handleActivateView';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -550,12 +550,12 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
-          ...ActivateView_Tool,
-          name: 'ActivateView',
+          ...ActivateDdl_Tool,
+          name: 'ActivateDdl',
           description:
-            'Activate a CDS view. Use after CreateView or UpdateView if the object remains inactive.',
+            'Activate a CDS view. Use after CreateDdl or UpdateDdl if the object remains inactive.',
         },
-        handler: withContext(handleActivateView),
+        handler: withContext(handleActivateDdl),
       },
       {
         toolDefinition: {
@@ -715,20 +715,20 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleDeleteStructure),
       },
       {
-        toolDefinition: CreateView_Tool,
-        handler: withContext(handleCreateView),
+        toolDefinition: CreateDdl_Tool,
+        handler: withContext(handleCreateDdl),
       },
       {
-        toolDefinition: GetView_Tool,
-        handler: withContext(handleGetView),
+        toolDefinition: GetDdl_Tool,
+        handler: withContext(handleGetDdl),
       },
       {
-        toolDefinition: UpdateViewHigh_Tool,
-        handler: withContext(handleUpdateViewHigh),
+        toolDefinition: UpdateDdlHigh_Tool,
+        handler: withContext(handleUpdateDdlHigh),
       },
       {
-        toolDefinition: DeleteView_Tool,
-        handler: withContext(handleDeleteView),
+        toolDefinition: DeleteDdl_Tool,
+        handler: withContext(handleDeleteDdl),
       },
       {
         toolDefinition: CreateServiceDefinition_Tool,
@@ -1060,8 +1060,8 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleCheckTable),
       },
       {
-        toolDefinition: CheckView_Tool,
-        handler: withContext(handleCheckView),
+        toolDefinition: CheckDdl_Tool,
+        handler: withContext(handleCheckDdl),
       },
     ];
   }

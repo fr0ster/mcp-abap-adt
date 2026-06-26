@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
       object_type: {
         type: 'string',
         description:
-          'Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, view, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).',
+          'Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).',
       },
       function_group_name: {
         type: 'string',
@@ -145,11 +145,11 @@ export async function handleDeleteObject(
             })
           ).deleteResult;
           break;
-        case 'view':
+        case 'ddl':
         case 'ddls/df':
           response = (
-            await crudClient.getView().delete({
-              viewName: objectName,
+            await crudClient.getDdl().delete({
+              ddlName: objectName,
               transportRequest: transport_request,
             })
           ).deleteResult;

@@ -33,6 +33,18 @@ export const TOOL_DEFINITION = {
           "If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.",
         default: false,
       },
+      enable_only_types: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          "Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Type codes come from the where-used scope. Takes precedence over enable_all_types.",
+      },
+      disable_types: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          "Remove these ADT object types from the default scope, keeping the rest (e.g. ['CLAS/OC'] to drop class usages). Applied on top of the default scope or of enable_only_types/enable_all_types.",
+      },
     },
     required: ['object_name', 'object_type'],
   },
@@ -42,6 +54,8 @@ interface WhereUsedArgs {
   object_name: string;
   object_type: string;
   enable_all_types?: boolean;
+  enable_only_types?: string[];
+  disable_types?: string[];
 }
 
 /**
@@ -77,6 +91,8 @@ export async function handleGetWhereUsed(
       object_name: typedArgs.object_name,
       object_type: typedArgs.object_type,
       enableAllTypes: typedArgs.enable_all_types,
+      enableOnlyTypes: typedArgs.enable_only_types,
+      disableTypes: typedArgs.disable_types,
     });
 
     logger?.debug(
@@ -88,6 +104,8 @@ export async function handleGetWhereUsed(
       object_name: result.objectName,
       object_type: result.objectType,
       enable_all_types: typedArgs.enable_all_types || false,
+      enable_only_types: typedArgs.enable_only_types,
+      disable_types: typedArgs.disable_types,
       total_references: result.totalReferences,
       result_description: result.resultDescription,
       references: result.references.map((ref) => ({

@@ -65,8 +65,8 @@ export async function handleDeleteDdl(
 
     try {
       // Delete DDL source using AdtClient (includes deletion check)
-      const viewObject = client.getDdl();
-      const deleteResult = await viewObject.delete({
+      const ddlObject = client.getDdl();
+      const deleteResult = await ddlObject.delete({
         ddlName: ddlName,
         transportRequest: transport_request,
       });

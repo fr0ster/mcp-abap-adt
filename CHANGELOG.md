@@ -2,9 +2,14 @@
 
 ## [Unreleased]
 
+## [8.1.0] - 2026-06-26
+
 ### Added
 - **Per-call `master_language` parameter on the high-level `Create*` tools** (#105). Optional; lets a caller set the master/original language of a single created object (e.g. `"DE"`, `"ZH"`), overriding the session default. Threaded into the ADT client as `config.masterLanguage`. Covers class, program, interface, ddl, domain, structure, table, table type, data element, function group, service definition, service binding, behavior definition, metadata extension, package. When omitted, resolution falls back to the session language (`SAP_LANGUAGE`) then `EN`.
 - **`x-sap-language` HTTP/SSE request header** (#105). Per-request/per-session master-language override for created objects (precedence: tool parameter → `x-sap-language` header → `SAP_LANGUAGE` → `EN`). Carried in a request-scoped context (`AsyncLocalStorage`), not the process-global system-context cache, so it cannot leak across requests, sessions, or connection modes.
+- **Compact facade `create`/`update`/`delete` now expose every routed object type's required arguments.** Previously many type-specific args (e.g. `table_name`, `structure_name`, `service_definition_name`, `ddl_code`, `lock_handle`, `implementation_code`, `properties`, `container_class`, `test_class`, `cds_view_name`, …) were absent from the compact schemas, so schema-driven MCP clients could not construct valid calls for most object types. All missing properties have been added as optional properties to `compactCreateSchema`, `compactUpdateSchema`, and `compactDeleteSchema`. Non-breaking (additive optional properties; compact schema `required` stays `['object_type']`; no routed handler changed).
+- **Runtime guard `compactSchemaCompleteness.test.ts`** — fails CI if any routed handler's top-level required arg is not present in the corresponding compact schema, preventing future drift.
+- **Corrected compact facade descriptions** for `HandlerCreate`: `UNIT_TEST` now advertises `container_class*/test_class*` and `CDS_UNIT_TEST` now advertises `class_name*/package_name*/cds_view_name*` (previously both incorrectly showed `run_id*`, which is an update/delete arg).
 
 ## [8.0.0] - 2026-06-26
 

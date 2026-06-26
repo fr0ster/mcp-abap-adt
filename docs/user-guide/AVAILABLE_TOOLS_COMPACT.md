@@ -238,30 +238,43 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="handlercreate-compact"></a>
 #### HandlerCreate (Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate object after create.
 - `application` (string, optional) - Domain application area.
+- `behavior_definition` (string, optional) - Referenced behavior definition name (behavior implementation create).
+- `cds_view_name` (string, optional) - CDS view name to validate for unit test doubles.
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
+- `data_element_name` (string, optional) - Data element name.
 - `datatype` (string, optional) - ABAP data type.
 - `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
+- `fields` (array, optional) - Structure fields (for STRUCTURE create).
 - `fixed_values` (array, optional) - Domain fixed values list.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
+- `implementation_type` (string, optional) - Behavior definition implementation type.
+- `interface_name` (string, optional) - Interface name.
 - `length` (number, optional) - Length for typed artifacts.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `object_type` (any, required) - 
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
+- `root_entity` (string, optional) - Root CDS entity name (behavior definition create).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
 - `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `tests` (array, optional) - Container/test class pairs (for UNIT_TEST create).
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
@@ -269,18 +282,28 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="handlerdelete-compact"></a>
 #### HandlerDelete (Compact)
-**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
 **Parameters:**
+- `behavior_definition_name` (string, optional) - Behavior definition name.
+- `behavior_implementation_name` (string, optional) - Behavior implementation name.
 - `class_name` (string, optional) - ABAP class name.
+- `data_element_name` (string, optional) - Data element name.
 - `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `domain_name` (string, optional) - ABAP domain name.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
+- `interface_name` (string, optional) - Interface name.
+- `metadata_extension_name` (string, optional) - Metadata extension name.
 - `object_type` (any, required) - 
 - `program_name` (string, optional) - ABAP program name.
+- `run_id` (string, optional) - Unit test run id (UNIT_TEST delete).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
 - `transport_request` (string, optional) - Transport request id (if required by system).
 
 ---
@@ -504,30 +527,49 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="handlerupdate-compact"></a>
 #### HandlerUpdate (Compact)
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate object after update.
+- `behavior_definition` (string, optional) - Referenced behavior definition name (behavior implementation update).
+- `binding_variant` (string, optional) - Service binding variant (service binding update).
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
+- `data_element_name` (string, optional) - Data element name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_code` (string, optional) - Complete DDL source code (for TABLE/STRUCTURE update).
 - `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `ddl_source` (string, optional) - Complete DDL source code (for DDL update).
 - `decimals` (number, optional) - Decimal places.
+- `definitions_code` (string, optional) - Updated source for class local definitions.
 - `description` (string, optional) - Human-readable object description.
+- `desired_publication_state` (string, optional) - Target publication state (service binding update).
 - `domain_name` (string, optional) - ABAP domain name.
 - `fixed_values` (array, optional) - Domain fixed values list.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
+- `implementation_code` (string, optional) - Behavior implementation methods source code.
+- `interface_name` (string, optional) - Interface name.
 - `length` (number, optional) - Length for typed artifacts.
+- `local_types_code` (string, optional) - Updated source for class local types.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `macros_code` (string, optional) - Updated source for class local macros.
+- `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `object_type` (any, required) - 
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
+- `run_id` (string, optional) - Unit test run id (UNIT_TEST update).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `service_name` (string, optional) - Published service name (service binding update).
 - `sign_exists` (boolean, optional) - Allow signed values (domain setting).
 - `source_code` (string, optional) - ABAP source code payload.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `test_class_code` (string, optional) - Updated source for the local test class.
+- `test_class_source` (string, optional) - Updated local test class source (CDS_UNIT_TEST update).
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 

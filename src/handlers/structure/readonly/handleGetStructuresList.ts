@@ -144,6 +144,10 @@ export async function handleGetStructuresList(
   try {
     const { structure_name, version = 'active' } = args;
     const includeExtensions = args.include_extensions !== false;
+    // Set when the append where-used lookup fails for every resolved
+    // object_type, so the response can flag that appends could not be
+    // determined (≠ "no appends"). #128
+    let appendsUnavailable = false;
     if (!structure_name)
       return return_error(new Error('structure_name is required'));
 
@@ -187,24 +191,48 @@ export async function handleGetStructuresList(
      */
     const findExtensions = async (baseName: string): Promise<EmbeddedRef[]> => {
       if (!includeExtensions) return [];
-      // Use getWhereUsedList with enableAllTypes: the DEFAULT where-used scope
-      // leaves some object types unselected, so an extension's type may be
-      // excluded and the search returns nothing useful. enableAllTypes selects
-      // every type, and the result is already parsed into { name, type } refs.
+      // Scope the where-used search to append structures only
+      // (enableOnlyTypes: ['TABL/DS']). where-used caps the number of returned
+      // records, so with the default/all-types scope a heavily-used base has
+      // its append (structure) records crowded out by other reference types and
+      // dropped → 0 appends. Restricting the search to TABL/DS server-side keeps
+      // the appends within the cap. An append is always a structure (TABL/DS),
+      // not a table, so TABL/DS is the only type we need here.
+      //
+      // The base may be defined as a structure OR a table; where-used needs the
+      // matching object_type to build the URI (a structures URI 404s for a table
+      // and vice-versa). adt-clients deliberately does not auto-fallback (it
+      // would hide a wrong object_type), so resolve it here like readDdl does:
+      // try 'structure', fall back to 'table'. (#128, adt-clients #54)
       let references: Array<{ name?: string; type?: string }> = [];
-      try {
-        const wu = await utils.getWhereUsedList({
-          object_name: baseName,
-          object_type: 'structure',
-          enableAllTypes: true,
-        } as any);
-        references = (wu?.references ?? []) as Array<{
-          name?: string;
-          type?: string;
-        }>;
-      } catch (e: any) {
+      let resolved = false;
+      let lastErr: unknown;
+      for (const objectType of ['structure', 'table'] as const) {
+        try {
+          const wu = await utils.getWhereUsedList({
+            object_name: baseName,
+            object_type: objectType,
+            enableOnlyTypes: ['TABL/DS'],
+          } as any);
+          references = (wu?.references ?? []) as Array<{
+            name?: string;
+            type?: string;
+          }>;
+          resolved = true;
+          break;
+        } catch (e) {
+          lastErr = e;
+        }
+      }
+      if (!resolved) {
+        // Do NOT swallow the failure into an empty result — flag the response
+        // as degraded so callers can tell "could not determine appends" apart
+        // from "no appends".
+        appendsUnavailable = true;
         logger?.warn(
-          `where-used failed for ${baseName}: ${e?.message ?? String(e)}`,
+          `where-used failed for ${baseName}: ${
+            (lastErr as any)?.message ?? String(lastErr)
+          }`,
         );
         return [];
       }
@@ -290,6 +318,11 @@ export async function handleGetStructuresList(
         {
           success: true,
           structure_name: rootName,
+          // True when a where-used lookup failed, so appends could not be
+          // determined and the tree may be missing them (≠ "no appends"). #128
+          ...(includeExtensions && appendsUnavailable
+            ? { appends_unavailable: true }
+            : {}),
           tree,
         },
         null,

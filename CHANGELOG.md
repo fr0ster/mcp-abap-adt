@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.1.1] - 2026-06-27
+
+### Fixed
+- **`GetStructuresList` no longer loses append structures on heavily-used objects (#128).** The append (where-used) search now scopes to append structures only (`enableOnlyTypes: ['TABL/DS']`) instead of searching all types: where-used caps the number of returned records, so on a widely-referenced base (e.g. a standard S/4 table) the append records were crowded out by other reference types and dropped, yielding `0` appends. It also resolves the base `object_type` itself (try `structure`, fall back to `table`) so a table base no longer 404s on a structures URI, and it sets `appends_unavailable: true` when the where-used lookup fails for every object_type — so callers can tell "could not determine appends" apart from "no appends" instead of getting a silent `0`.
+
 ## [8.1.0] - 2026-06-26
 
 ### Added

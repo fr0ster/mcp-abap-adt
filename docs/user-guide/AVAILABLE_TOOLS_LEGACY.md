@@ -5,8 +5,8 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 141
-- Read-Only: 15
+- Total tools: 143
+- Read-Only: 17
 - High-Level: 65
 - Low-Level: 61
 
@@ -15,6 +15,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - [Read-Only Group](#read-only-group)
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
+  - [Common](#read-only-common)
+    - [GetObjectVersions](#getobjectversions-read-only-common)
+    - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
   - [Ddl](#read-only-ddl)
     - [ReadDdl](#readddl-read-only-ddl)
   - [Function Group](#read-only-function-group)
@@ -206,6 +209,38 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-common"></a>
+### Read-Only / Common
+
+<a id="getobjectversions-read-only-common"></a>
+#### GetObjectVersions (Read-Only / Common)
+**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
+- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, ZIF_MY_INTERFACE, Z_MY_TABLE).
+- `object_type` (string, required) - Object type.
+
+---
+
+<a id="getobjectversionsource-read-only-common"></a>
+#### GetObjectVersionSource (Read-Only / Common)
+**Description:** [read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetObjectVersions version entry.
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
 
 ---
 
@@ -471,6 +506,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
 - `final` (boolean, optional) - Mark class as final. Default: false
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
 - `superclass` (string, optional) - Optional superclass name.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -910,6 +946,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
 - `description` (string, optional) - Optional description (defaults to ddl_name).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
@@ -1002,6 +1039,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
 - `function_group_name` (string, required) - Function group name (e.g., ZTEST_FG_001). Must follow SAP naming conventions (start with Z or Y, max 26 chars).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1197,6 +1235,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
 - `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1304,6 +1343,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).
 - `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
@@ -2564,4 +2604,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-06-26*
+*Last updated: 2026-06-28*

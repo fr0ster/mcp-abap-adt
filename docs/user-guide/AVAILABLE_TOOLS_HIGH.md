@@ -192,6 +192,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
 - `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
 - `package_name` (string, required) - Package name
 - `root_entity` (string, required) - Root Entity name (CDS View name)
@@ -323,6 +324,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
 - `final` (boolean, optional) - Mark class as final. Default: false
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
 - `superclass` (string, optional) - Optional superclass name.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -1011,6 +1013,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `heading_label` (string, optional) - Heading field label (max 55 chars). Applied during update step after creation.
 - `length` (number, optional (default: 100)) - Data type length. Usually inherited from domain.
 - `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `medium_label` (string, optional) - Medium field label (max 20 chars). Applied during update step after creation.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `search_help` (string, optional) - Search help name. Applied during update step after creation.
@@ -1099,6 +1102,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
 - `description` (string, optional) - Optional description (defaults to ddl_name).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
@@ -1165,6 +1169,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number
@@ -1216,6 +1221,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
 - `lowercase` (boolean, optional (default: false)) - (optional) Allow lowercase input
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, optional) - (optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `sign_exists` (boolean, optional (default: false)) - (optional) Field has sign (+/-)
 - `transport_request` (string, optional) - (optional) Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -1307,6 +1313,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
 - `function_group_name` (string, required) - Function group name (e.g., ZTEST_FG_001). Must follow SAP naming conventions (start with Z or Y, max 26 chars).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1478,6 +1485,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
 - `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1609,6 +1617,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).
 - `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
@@ -1667,6 +1676,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional (default: true)) - Activate service binding after create. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI)) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - ABAP package name.
 - `response_format` (string, optional (default: xml)) - 
 - `service_binding_name` (string, required) - Service binding name.
@@ -1756,6 +1766,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `service_definition_name` (string, required) - Service definition name (e.g., ZSD_MY_SERVICE). Must follow SAP naming conventions (start with Z or Y).
 - `source_code` (string, optional) - Service definition source code (optional). If not provided, a minimal template will be created.
@@ -1828,6 +1839,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
 - `fields` (array, required (default: 0)) - Array of structure fields
 - `includes` (array, optional) - Include other structures in this structure
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -1914,6 +1926,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, optional) - Table description for validation and creation.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -2144,4 +2157,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-26*
+*Last updated: 2026-06-28*

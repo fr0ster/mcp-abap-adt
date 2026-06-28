@@ -1991,4 +1991,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-26*
+*Last updated: 2026-06-28*

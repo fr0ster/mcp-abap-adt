@@ -11,6 +11,14 @@ import {
   TOOL_DEFINITION as ReadClass_Tool,
 } from '../../../handlers/class/readonly/handleReadClass';
 import {
+  TOOL_DEFINITION as GetObjectVersionSource_Tool,
+  handleGetObjectVersionSource,
+} from '../../../handlers/common/readonly/handleGetObjectVersionSource';
+import {
+  TOOL_DEFINITION as GetObjectVersions_Tool,
+  handleGetObjectVersions,
+} from '../../../handlers/common/readonly/handleGetObjectVersions';
+import {
   handleReadDataElement,
   TOOL_DEFINITION as ReadDataElement_Tool,
 } from '../../../handlers/data_element/readonly/handleReadDataElement';
@@ -218,6 +226,15 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetStructuresList_Tool,
         handler: (args: any) => handleGetStructuresList(this.context, args),
+      },
+      {
+        toolDefinition: GetObjectVersions_Tool,
+        handler: (args: any) => handleGetObjectVersions(this.context, args),
+      },
+      {
+        toolDefinition: GetObjectVersionSource_Tool,
+        handler: (args: any) =>
+          handleGetObjectVersionSource(this.context, args),
       },
       {
         toolDefinition: ReadDdl_Tool,

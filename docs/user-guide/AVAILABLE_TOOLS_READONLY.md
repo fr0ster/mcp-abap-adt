@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 59
+- Total tools: 61
 
 ## Navigation
 
@@ -14,6 +14,9 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ReadBehaviorImplementation](#readbehaviorimplementation-read-only-behavior-implementation)
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
+  - [Common](#read-only-common)
+    - [GetObjectVersions](#getobjectversions-read-only-common)
+    - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
   - [Data Element](#read-only-data-element)
     - [ReadDataElement](#readdataelement-read-only-data-element)
   - [Ddl](#read-only-ddl)
@@ -137,6 +140,34 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-common"></a>
+### Read-Only / Common
+
+<a id="getobjectversions-read-only-common"></a>
+#### GetObjectVersions (Read-Only / Common)
+**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
+
+**Parameters:**
+- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
+- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, ZIF_MY_INTERFACE, Z_MY_TABLE).
+- `object_type` (string, required) - Object type.
+
+---
+
+<a id="getobjectversionsource-read-only-common"></a>
+#### GetObjectVersionSource (Read-Only / Common)
+**Description:** [read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetObjectVersions version entry.
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
 
 ---
 
@@ -959,4 +990,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-26*
+*Last updated: 2026-06-28*

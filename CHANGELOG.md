@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [8.2.0] - 2026-06-28
+
+### Added
+- **Object history tools (#30).** Two read-only tools backed by `@mcp-abap-adt/adt-clients` 7.0.0's version-history API: `GetObjectVersions` (lists an object's SAP version history — `versionId`, `author`, `updatedAt`, `title`, and an opaque `contentUri` per entry) and `GetObjectVersionSource` (fetches the source of a specific version by its `contentUri`). Both dispatch by `object_type` across the same 13 object types as the generic object tools (class, program, interface, function_group, function_module, table, structure, ddl, domain, data_element, package, behavior_definition, metadata_extension); object types without a version endpoint return a clear `UNSUPPORTED_OPERATION` error rather than raw HTTP.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.0.1` and `@mcp-abap-adt/interfaces@^9.0.0`** (from `^6.1.0` / `^7.2.0`). 7.0.1 also makes where-used resilient on S/4 systems whose `/usageReferences/scope` sub-resource returns 404 — the library now falls back to an unscoped search with client-side type narrowing, hardening the append detection in `GetStructuresList` (#128) at the library level. No mcp-abap-adt tool contract changed by the migration.
+
 ## [8.1.1] - 2026-06-27
 
 ### Fixed

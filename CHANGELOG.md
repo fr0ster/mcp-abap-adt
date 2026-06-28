@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.3.0] - 2026-06-29
+
+### Added
+- **Per-object high-level version tools (#30).** Added `Get<Object>Versions` and `Get<Object>VersionSource` for the 13 versioned object types (class, program, interface, function_group, function_module, table, structure, ddl, domain, data_element, package, behavior_definition, metadata_extension) to the **HighLevel** group — e.g. `GetProgramVersions`/`GetProgramVersionSource`, `GetClassVersions`/`GetClassVersionSource`. These mirror the per-object `Get<Object>` read tools (the way `GetProgram` coexists with the read-only `ReadProgram`), so development clients that run with the ReadOnly analytics group disabled still get object version history. Each tool's `available_in` matches its `Get<Object>` counterpart (e.g. `GetProgramVersions` is onprem/legacy only). The generic `GetObjectVersions`/`GetObjectVersionSource` in the ReadOnly group are unchanged.
+
 ## [8.2.0] - 2026-06-28
 
 ### Added

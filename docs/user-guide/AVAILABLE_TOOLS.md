@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 315
+- Total tools: 341
 - Read-only tools: 61
-- High-level tools: 130
+- High-level tools: 156
 - Low-level tools: 124
 
 - Compact tools: 22 (included in High-level group)
@@ -138,6 +138,32 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Common](#high-level-common)
     - [ActivateObjects](#activateobjects-high-level-common)
+    - [GetBehaviorDefinitionVersions](#getbehaviordefinitionversions-high-level-common)
+    - [GetBehaviorDefinitionVersionSource](#getbehaviordefinitionversionsource-high-level-common)
+    - [GetClassVersions](#getclassversions-high-level-common)
+    - [GetClassVersionSource](#getclassversionsource-high-level-common)
+    - [GetDataElementVersions](#getdataelementversions-high-level-common)
+    - [GetDataElementVersionSource](#getdataelementversionsource-high-level-common)
+    - [GetDdlVersions](#getddlversions-high-level-common)
+    - [GetDdlVersionSource](#getddlversionsource-high-level-common)
+    - [GetDomainVersions](#getdomainversions-high-level-common)
+    - [GetDomainVersionSource](#getdomainversionsource-high-level-common)
+    - [GetFunctionGroupVersions](#getfunctiongroupversions-high-level-common)
+    - [GetFunctionGroupVersionSource](#getfunctiongroupversionsource-high-level-common)
+    - [GetFunctionModuleVersions](#getfunctionmoduleversions-high-level-common)
+    - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-high-level-common)
+    - [GetInterfaceVersions](#getinterfaceversions-high-level-common)
+    - [GetInterfaceVersionSource](#getinterfaceversionsource-high-level-common)
+    - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
+    - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
+    - [GetPackageVersions](#getpackageversions-high-level-common)
+    - [GetPackageVersionSource](#getpackageversionsource-high-level-common)
+    - [GetProgramVersions](#getprogramversions-high-level-common)
+    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
+    - [GetStructureVersions](#getstructureversions-high-level-common)
+    - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
+    - [GetTableVersions](#gettableversions-high-level-common)
+    - [GetTableVersionSource](#gettableversionsource-high-level-common)
   - [Compact](#high-level-compact)
     - [HandlerActivate](#handleractivate-high-level-compact)
     - [HandlerCdsUnitTestResult](#handlercdsunittestresult-high-level-compact)
@@ -1674,6 +1700,293 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+
+---
+
+<a id="getbehaviordefinitionversions-high-level-common"></a>
+#### GetBehaviorDefinitionVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a RAP behavior definition. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetBehaviorDefinitionVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `behavior_definition_name` (string, required) - RAP behavior definition name.
+
+---
+
+<a id="getbehaviordefinitionversionsource-high-level-common"></a>
+#### GetBehaviorDefinitionVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific RAP behavior definition version by its content_uri (taken from a GetBehaviorDefinitionVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetBehaviorDefinitionVersions entry.
+
+---
+
+<a id="getclassversions-high-level-common"></a>
+#### GetClassVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetClassVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `class_name` (string, required) - ABAP class name.
+
+---
+
+<a id="getclassversionsource-high-level-common"></a>
+#### GetClassVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP class version by its content_uri (taken from a GetClassVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetClassVersions entry.
+
+---
+
+<a id="getdataelementversions-high-level-common"></a>
+#### GetDataElementVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP data element. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetDataElementVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `data_element_name` (string, required) - ABAP data element name.
+
+---
+
+<a id="getdataelementversionsource-high-level-common"></a>
+#### GetDataElementVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP data element version by its content_uri (taken from a GetDataElementVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDataElementVersions entry.
+
+---
+
+<a id="getddlversions-high-level-common"></a>
+#### GetDdlVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetDdlVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view (DDL source) name.
+
+---
+
+<a id="getddlversionsource-high-level-common"></a>
+#### GetDdlVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific CDS view (DDL source) version by its content_uri (taken from a GetDdlVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDdlVersions entry.
+
+---
+
+<a id="getdomainversions-high-level-common"></a>
+#### GetDomainVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP domain. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetDomainVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `domain_name` (string, required) - ABAP domain name.
+
+---
+
+<a id="getdomainversionsource-high-level-common"></a>
+#### GetDomainVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP domain version by its content_uri (taken from a GetDomainVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDomainVersions entry.
+
+---
+
+<a id="getfunctiongroupversions-high-level-common"></a>
+#### GetFunctionGroupVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP function group. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetFunctionGroupVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - ABAP function group name.
+
+---
+
+<a id="getfunctiongroupversionsource-high-level-common"></a>
+#### GetFunctionGroupVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP function group version by its content_uri (taken from a GetFunctionGroupVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionGroupVersions entry.
+
+---
+
+<a id="getfunctionmoduleversions-high-level-common"></a>
+#### GetFunctionModuleVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetFunctionModuleVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Owning function group name (required).
+- `function_module_name` (string, required) - ABAP function module name.
+
+---
+
+<a id="getfunctionmoduleversionsource-high-level-common"></a>
+#### GetFunctionModuleVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP function module version by its content_uri (taken from a GetFunctionModuleVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionModuleVersions entry.
+
+---
+
+<a id="getinterfaceversions-high-level-common"></a>
+#### GetInterfaceVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `interface_name` (string, required) - ABAP interface name.
+
+---
+
+<a id="getinterfaceversionsource-high-level-common"></a>
+#### GetInterfaceVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP interface version by its content_uri (taken from a GetInterfaceVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetInterfaceVersions entry.
+
+---
+
+<a id="getmetadataextensionversions-high-level-common"></a>
+#### GetMetadataExtensionVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a CDS metadata extension. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetMetadataExtensionVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `metadata_extension_name` (string, required) - CDS metadata extension name.
+
+---
+
+<a id="getmetadataextensionversionsource-high-level-common"></a>
+#### GetMetadataExtensionVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific CDS metadata extension version by its content_uri (taken from a GetMetadataExtensionVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetMetadataExtensionVersions entry.
+
+---
+
+<a id="getpackageversions-high-level-common"></a>
+#### GetPackageVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP package. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetPackageVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `package_name` (string, required) - ABAP package name.
+
+---
+
+<a id="getpackageversionsource-high-level-common"></a>
+#### GetPackageVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP package version by its content_uri (taken from a GetPackageVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetPackageVersions entry.
+
+---
+
+<a id="getprogramversions-high-level-common"></a>
+#### GetProgramVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetProgramVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `program_name` (string, required) - ABAP program name.
+
+---
+
+<a id="getprogramversionsource-high-level-common"></a>
+#### GetProgramVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP program version by its content_uri (taken from a GetProgramVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetProgramVersions entry.
+
+---
+
+<a id="getstructureversions-high-level-common"></a>
+#### GetStructureVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP structure. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetStructureVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `structure_name` (string, required) - ABAP structure name.
+
+---
+
+<a id="getstructureversionsource-high-level-common"></a>
+#### GetStructureVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP structure version by its content_uri (taken from a GetStructureVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetStructureVersions entry.
+
+---
+
+<a id="gettableversions-high-level-common"></a>
+#### GetTableVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP table. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetTableVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `table_name` (string, required) - ABAP table name.
+
+---
+
+<a id="gettableversionsource-high-level-common"></a>
+#### GetTableVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP table version by its content_uri (taken from a GetTableVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetTableVersions entry.
 
 ---
 

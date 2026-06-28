@@ -115,6 +115,7 @@ import {
   TOOL_DEFINITION as ActivateObjects_Tool,
   handleActivateObjects,
 } from '../../../handlers/common/high/handleActivateObjects';
+import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
 import {
   TOOL_DEFINITION as CheckDataElement_Tool,
   handleCheckDataElement,
@@ -1063,6 +1064,13 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         toolDefinition: CheckDdl_Tool,
         handler: withContext(handleCheckDdl),
       },
+      // Per-object high-level version-history tools (#30): 13 types ×
+      // {Versions, VersionSource}. HighLevel-only (ReadOnly keeps the generic
+      // GetObjectVersions/GetObjectVersionSource).
+      ...buildObjectVersionTools().map((entry) => ({
+        toolDefinition: entry.toolDefinition,
+        handler: withContext(entry.handler),
+      })),
     ];
   }
 }

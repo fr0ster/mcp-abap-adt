@@ -16,6 +16,13 @@ const COMPACT_MATRIX_PATH = path.join(
   __dirname,
   '../src/handlers/compact/high/compactMatrix.ts',
 );
+// Per-object high-level version tools are built by a DRY factory (#30) rather
+// than one-TOOL_DEFINITION-per-file, so the file walker can't see them. Parse
+// the factory's VERSIONED_TYPES table directly (same pattern as compactMatrix).
+const OBJECT_VERSION_TOOLS_PATH = path.join(
+  __dirname,
+  '../src/handlers/common/high/objectVersionTools.ts',
+);
 const OUTPUT_PATHS = {
   all: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS.md'),
   readonly: path.join(
@@ -442,11 +449,78 @@ function loadCompactMatrix() {
   };
 }
 
+/**
+ * Synthesize doc entries for the per-object high-level version tools (#30),
+ * which are produced by the buildObjectVersionTools() factory and therefore are
+ * not discoverable by the per-file TOOL_DEFINITION walker. Parses the factory's
+ * VERSIONED_TYPES table to stay in sync with the source of truth.
+ */
+function loadObjectVersionTools() {
+  const content = fs.readFileSync(OBJECT_VERSION_TOOLS_PATH, 'utf8');
+  const rowRegex =
+    /object_type:\s*'([^']+)',\s*display:\s*'([^']+)',\s*nameParam:\s*'([^']+)',\s*label:\s*'([^']+)',\s*available_in:\s*\[([^\]]*)\]/g;
+  const tools = [];
+  let m = rowRegex.exec(content);
+  while (m !== null) {
+    const [, objectType, display, nameParam, label, availRaw] = m;
+    const availableIn = availRaw
+      .split(',')
+      .map((s) => s.trim().replace(/['"]/g, ''))
+      .filter(Boolean);
+    const isFm = objectType === 'function_module';
+
+    const versionsProps = {
+      [nameParam]: { type: 'string', description: `${label} name.` },
+    };
+    const versionsRequired = [nameParam];
+    if (isFm) {
+      versionsProps.function_group_name = {
+        type: 'string',
+        description: 'Owning function group name (required).',
+      };
+      versionsRequired.push('function_group_name');
+    }
+
+    tools.push({
+      name: `Get${display}Versions`,
+      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via Get${display}VersionSource.`,
+      inputSchema: { properties: versionsProps, required: versionsRequired },
+      inputSchemaRef: null,
+      availableIn,
+      objectFolder: 'common',
+      objectTitle: titleCaseFolder('common'),
+      level: 'high',
+      filePath: 'src/handlers/common/high/objectVersionTools.ts',
+    });
+    tools.push({
+      name: `Get${display}VersionSource`,
+      description: `[read-only] Fetch the source of a specific ${label} version by its content_uri (taken from a Get${display}Versions entry).`,
+      inputSchema: {
+        properties: {
+          content_uri: {
+            type: 'string',
+            description: `Opaque content_uri taken from a Get${display}Versions entry.`,
+          },
+        },
+        required: ['content_uri'],
+      },
+      inputSchemaRef: null,
+      availableIn,
+      objectFolder: 'common',
+      objectTitle: titleCaseFolder('common'),
+      level: 'high',
+      filePath: 'src/handlers/common/high/objectVersionTools.ts',
+    });
+    m = rowRegex.exec(content);
+  }
+  return tools;
+}
+
 function loadToolsFromHandlers() {
   const files = [];
   walk(HANDLERS_ROOT, files);
 
-  const tools = [];
+  const tools = [...loadObjectVersionTools()];
 
   for (const filePath of files) {
     const rel = path.relative(HANDLERS_ROOT, filePath).replace(/\\/g, '/');

@@ -11,6 +11,10 @@ import {
   TOOL_DEFINITION as ReadClass_Tool,
 } from '../../../handlers/class/readonly/handleReadClass';
 import {
+  TOOL_DEFINITION as GetObjectVersionDiff_Tool,
+  handleGetObjectVersionDiff,
+} from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
+import {
   TOOL_DEFINITION as GetObjectVersionSource_Tool,
   handleGetObjectVersionSource,
 } from '../../../handlers/common/readonly/handleGetObjectVersionSource';
@@ -235,6 +239,10 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         toolDefinition: GetObjectVersionSource_Tool,
         handler: (args: any) =>
           handleGetObjectVersionSource(this.context, args),
+      },
+      {
+        toolDefinition: GetObjectVersionDiff_Tool,
+        handler: (args: any) => handleGetObjectVersionDiff(this.context, args),
       },
       {
         toolDefinition: ReadDdl_Tool,

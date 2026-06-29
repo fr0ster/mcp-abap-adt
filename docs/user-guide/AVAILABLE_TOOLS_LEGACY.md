@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 157
-- Read-Only: 17
-- High-Level: 79
+- Total tools: 165
+- Read-Only: 18
+- High-Level: 86
 - Low-Level: 61
 
 ## Navigation
@@ -16,6 +16,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
   - [Common](#read-only-common)
+    - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
   - [Ddl](#read-only-ddl)
@@ -63,18 +64,25 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Common](#high-level-common)
     - [ActivateObjects](#activateobjects-high-level-common)
+    - [GetClassVersionDiff](#getclassversiondiff-high-level-common)
     - [GetClassVersions](#getclassversions-high-level-common)
     - [GetClassVersionSource](#getclassversionsource-high-level-common)
+    - [GetDdlVersionDiff](#getddlversiondiff-high-level-common)
     - [GetDdlVersions](#getddlversions-high-level-common)
     - [GetDdlVersionSource](#getddlversionsource-high-level-common)
+    - [GetFunctionGroupVersionDiff](#getfunctiongroupversiondiff-high-level-common)
     - [GetFunctionGroupVersions](#getfunctiongroupversions-high-level-common)
     - [GetFunctionGroupVersionSource](#getfunctiongroupversionsource-high-level-common)
+    - [GetFunctionModuleVersionDiff](#getfunctionmoduleversiondiff-high-level-common)
     - [GetFunctionModuleVersions](#getfunctionmoduleversions-high-level-common)
     - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-high-level-common)
+    - [GetInterfaceVersionDiff](#getinterfaceversiondiff-high-level-common)
     - [GetInterfaceVersions](#getinterfaceversions-high-level-common)
     - [GetInterfaceVersionSource](#getinterfaceversionsource-high-level-common)
+    - [GetPackageVersionDiff](#getpackageversiondiff-high-level-common)
     - [GetPackageVersions](#getpackageversions-high-level-common)
     - [GetPackageVersionSource](#getpackageversionsource-high-level-common)
+    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
     - [GetProgramVersions](#getprogramversions-high-level-common)
     - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
   - [Compact](#high-level-compact)
@@ -228,6 +236,21 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="read-only-common"></a>
 ### Read-Only / Common
+
+<a id="getobjectversiondiff-read-only-common"></a>
+#### GetObjectVersionDiff (Read-Only / Common)
+**Description:** [read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+
+---
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
@@ -768,6 +791,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="getclassversiondiff-high-level-common"></a>
+#### GetClassVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP class versions, by their content_uris (taken from GetClassVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetClassVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetClassVersions entry).
+
+---
+
 <a id="getclassversions-high-level-common"></a>
 #### GetClassVersions (High-Level / Common)
 **Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetClassVersionSource.
@@ -791,6 +828,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetClassVersions entry.
+
+---
+
+<a id="getddlversiondiff-high-level-common"></a>
+#### GetDdlVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two CDS view (DDL source) versions, by their content_uris (taken from GetDdlVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDdlVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDdlVersions entry).
 
 ---
 
@@ -820,6 +871,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="getfunctiongroupversiondiff-high-level-common"></a>
+#### GetFunctionGroupVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP function group versions, by their content_uris (taken from GetFunctionGroupVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionGroupVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionGroupVersions entry).
+
+---
+
 <a id="getfunctiongroupversions-high-level-common"></a>
 #### GetFunctionGroupVersions (High-Level / Common)
 **Description:** [read-only] List the SAP version history of a ABAP function group. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetFunctionGroupVersionSource.
@@ -843,6 +908,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionGroupVersions entry.
+
+---
+
+<a id="getfunctionmoduleversiondiff-high-level-common"></a>
+#### GetFunctionModuleVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP function module versions, by their content_uris (taken from GetFunctionModuleVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionModuleVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionModuleVersions entry).
 
 ---
 
@@ -873,6 +952,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="getinterfaceversiondiff-high-level-common"></a>
+#### GetInterfaceVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP interface versions, by their content_uris (taken from GetInterfaceVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetInterfaceVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetInterfaceVersions entry).
+
+---
+
 <a id="getinterfaceversions-high-level-common"></a>
 #### GetInterfaceVersions (High-Level / Common)
 **Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
@@ -899,6 +992,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
+<a id="getpackageversiondiff-high-level-common"></a>
+#### GetPackageVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP package versions, by their content_uris (taken from GetPackageVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetPackageVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetPackageVersions entry).
+
+---
+
 <a id="getpackageversions-high-level-common"></a>
 #### GetPackageVersions (High-Level / Common)
 **Description:** [read-only] List the SAP version history of a ABAP package. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via GetPackageVersionSource.
@@ -922,6 +1029,20 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetPackageVersions entry.
+
+---
+
+<a id="getprogramversiondiff-high-level-common"></a>
+#### GetProgramVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP program versions, by their content_uris (taken from GetProgramVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetProgramVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetProgramVersions entry).
 
 ---
 
@@ -2801,4 +2922,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-06-28*
+*Last updated: 2026-06-29*

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.4.0] - 2026-06-29
+
+### Added
+- **Version diff tools (#30).** `GetObjectVersionDiff` (generic, ReadOnly) and per-object `Get<Object>VersionDiff` (HighLevel, 13 types — e.g. `GetClassVersionDiff`, `GetProgramVersionDiff`) return a unified diff between two object versions, given the two `content_uri`s from a `…Versions` call. Each fetches both version sources and diffs them (jsdiff, 3 lines of context); the response includes `identical` and the unified `diff`. Per-object `available_in` mirrors the type's `Get<Object>` tool. Completes #30's "diff between two versions" (2b) alongside the version-history (8.2.0) and per-object high-level (8.3.0) tools.
+
 ## [8.3.0] - 2026-06-29
 
 ### Added

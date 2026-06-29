@@ -511,6 +511,29 @@ function loadObjectVersionTools() {
       level: 'high',
       filePath: 'src/handlers/common/high/objectVersionTools.ts',
     });
+    tools.push({
+      name: `Get${display}VersionDiff`,
+      description: `[read-only] Compute a unified diff between two ${label} versions, by their content_uris (taken from Get${display}Versions entries).`,
+      inputSchema: {
+        properties: {
+          content_uri_from: {
+            type: 'string',
+            description: `Opaque content_uri of the OLD/base version (from a Get${display}Versions entry).`,
+          },
+          content_uri_to: {
+            type: 'string',
+            description: `Opaque content_uri of the NEW/compare version (from a Get${display}Versions entry).`,
+          },
+        },
+        required: ['content_uri_from', 'content_uri_to'],
+      },
+      inputSchemaRef: null,
+      availableIn,
+      objectFolder: 'common',
+      objectTitle: titleCaseFolder('common'),
+      level: 'high',
+      filePath: 'src/handlers/common/high/objectVersionTools.ts',
+    });
     m = rowRegex.exec(content);
   }
   return tools;

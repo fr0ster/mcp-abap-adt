@@ -18,6 +18,7 @@ jest.mock('../../lib/clients', () => ({
   }),
 }));
 
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
 import { handleGetObjectVersionDiff } from '../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
@@ -130,6 +131,46 @@ describe('version diff tools (#30)', () => {
     });
     expect(result.isError).toBe(true);
     expect(mockClassGetVersionSource).not.toHaveBeenCalled();
+  });
+
+  it('generic GetObjectVersionDiff returns clean error on UNSUPPORTED_OPERATION', async () => {
+    const err = Object.assign(new Error('version diff not available'), {
+      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+    });
+    mockClassGetVersionSource.mockRejectedValue(err);
+
+    const result = await handleGetObjectVersionDiff(ctx, {
+      object_type: 'class',
+      content_uri_from:
+        '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      content_uri_to: '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
+    });
+
+    expect(result.isError).toBe(true);
+    const errText =
+      (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
+    expect(errText).toContain('not supported');
+    expect(errText).not.toContain('stack');
+    expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
+  });
+
+  it('per-object GetClassVersionDiff returns clean error on UNSUPPORTED_OPERATION', async () => {
+    const err = Object.assign(new Error('version diff not available'), {
+      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+    });
+    mockClassGetVersionSource.mockRejectedValue(err);
+
+    const result = await tool('GetClassVersionDiff').handler(ctx, {
+      content_uri_from: '/cls?version=00001',
+      content_uri_to: '/cls?version=00002',
+    });
+
+    expect(result.isError).toBe(true);
+    const errText =
+      (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
+    expect(errText).toContain('not supported');
+    expect(errText).not.toContain('stack');
+    expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
   });
 
   it('the factory builds 13 VersionDiff tools (39 total) and they register in High', () => {

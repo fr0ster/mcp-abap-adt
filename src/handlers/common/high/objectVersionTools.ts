@@ -27,6 +27,7 @@ import {
   return_error,
   return_response,
 } from '../../../lib/utils';
+import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
 import { resolveVersionedObject } from '../readonly/resolveVersionedObject';
 
 /** Handler signature before context injection (the group wraps with withContext). */
@@ -305,16 +306,105 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   return { toolDefinition, handler };
 }
 
+function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
+  const toolDefinition: ToolDefinition = {
+    name: `Get${row.display}VersionDiff`,
+    ...(row.available_in ? { available_in: row.available_in } : {}),
+    description: `[read-only] Compute a unified diff between two ${row.label} versions, by their content_uris (taken from Get${row.display}Versions entries).`,
+    inputSchema: {
+      type: 'object',
+      properties: {
+        content_uri_from: {
+          type: 'string',
+          description: `Opaque content_uri of the OLD/base version (from a Get${row.display}Versions entry).`,
+        },
+        content_uri_to: {
+          type: 'string',
+          description: `Opaque content_uri of the NEW/compare version (from a Get${row.display}Versions entry).`,
+        },
+      },
+      required: ['content_uri_from', 'content_uri_to'],
+    },
+  };
+
+  const handler: RawHandler = async (context, args) => {
+    const { connection, logger } = context;
+    try {
+      const content_uri_from = args?.content_uri_from;
+      const content_uri_to = args?.content_uri_to;
+      if (!content_uri_from || !content_uri_to) {
+        return return_error(
+          new Error('content_uri_from and content_uri_to are required'),
+        );
+      }
+
+      const client = createAdtClient(connection, logger);
+      // content_uri carries the full object identity; a placeholder name is only
+      // needed to obtain the right IAdtObject instance.
+      const resolved = resolveVersionedObject(
+        client,
+        row.object_type,
+        'X',
+        'X',
+      );
+      if (!resolved) {
+        return return_error(
+          new Error(`Unsupported object_type: ${row.object_type}`),
+        );
+      }
+
+      try {
+        const { diff, identical, notes } = await buildVersionDiff(
+          resolved.obj,
+          String(content_uri_from),
+          String(content_uri_to),
+        );
+        return return_response({
+          data: JSON.stringify(
+            {
+              success: true,
+              object_type: row.object_type,
+              content_uri_from,
+              content_uri_to,
+              identical,
+              diff,
+              ...(notes ? { notes } : {}),
+            },
+            null,
+            2,
+          ),
+        } as AxiosResponse);
+      } catch (error: any) {
+        if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
+          return return_error(
+            new Error(
+              `Version diff is not supported for object_type '${row.object_type}'.`,
+            ),
+          );
+        }
+        return return_error(
+          error instanceof Error ? error : new Error(String(error)),
+        );
+      }
+    } catch (error: any) {
+      return return_error(error);
+    }
+  };
+
+  return { toolDefinition, handler };
+}
+
 /**
- * Build all 26 high-level per-object version tools (13 types ×
- * {Versions, VersionSource}). The handlers take (context, args); the registering
- * group wraps each with withContext.
+ * Build all 39 high-level per-object version tools (13 types ×
+ * {Versions, VersionSource, VersionDiff}). The handlers take (context, args);
+ * the registering group wraps each with withContext.
  */
 export function buildObjectVersionTools(): ObjectVersionToolEntry[] {
   const entries: ObjectVersionToolEntry[] = [];
   for (const row of VERSIONED_TYPES) {
     entries.push(buildVersionsTool(row));
     entries.push(buildVersionSourceTool(row));
+    entries.push(buildVersionDiffTool(row));
   }
   return entries;
 }

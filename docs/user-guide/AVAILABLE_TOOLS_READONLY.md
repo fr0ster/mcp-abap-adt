@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 61
+- Total tools: 62
 
 ## Navigation
 
@@ -15,6 +15,7 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
   - [Common](#read-only-common)
+    - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
     - [GetObjectVersions](#getobjectversions-read-only-common)
     - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
   - [Data Element](#read-only-data-element)
@@ -145,6 +146,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="read-only-common"></a>
 ### Read-Only / Common
+
+<a id="getobjectversiondiff-read-only-common"></a>
+#### GetObjectVersionDiff (Read-Only / Common)
+**Description:** [read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+
+---
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
@@ -990,4 +1004,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-28*
+*Last updated: 2026-06-29*

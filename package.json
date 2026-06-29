@@ -115,6 +115,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
     "@modelcontextprotocol/inspector": "^0.21.1",
+    "@types/diff": "^5.2.3",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.2",
@@ -147,6 +148,7 @@
     "@mcp-abap-adt/logger": "^0.1.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.14.0",
+    "diff": "^5.2.2",
     "fast-xml-parser": "^5.5.10",
     "js-yaml": "^4.1.1",
     "pino": "^10.1.0",

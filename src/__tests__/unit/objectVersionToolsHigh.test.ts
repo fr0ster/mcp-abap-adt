@@ -120,7 +120,7 @@ describe('per-object high-level version tools (#30)', () => {
     expect(data.source).toBe('DEFINE TABLE zmy_table.');
   });
 
-  it('registers all 26 expected tool names', () => {
+  it('registers all 39 expected tool names', () => {
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
     const displays = [
       'Class',
@@ -140,12 +140,13 @@ describe('per-object high-level version tools (#30)', () => {
     const expected = displays.flatMap((d) => [
       `Get${d}Versions`,
       `Get${d}VersionSource`,
+      `Get${d}VersionDiff`,
     ]);
     expect(names.sort()).toEqual(expected.sort());
-    expect(new Set(names).size).toBe(26);
+    expect(new Set(names).size).toBe(39);
   });
 
-  it('the registered HighLevel group contains all 26 version tools (no dups)', () => {
+  it('the registered HighLevel group contains all 39 version tools (no dups)', () => {
     const group = new HighLevelHandlersGroup({
       connection: {},
       logger: undefined,

@@ -162,7 +162,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getobjectversions-read-only-common"></a>
 #### GetObjectVersions (Read-Only / Common)
-**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.
 
 **Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
 
@@ -1004,4 +1004,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-29*
+*Last updated: 2026-06-30*

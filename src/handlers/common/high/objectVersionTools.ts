@@ -169,7 +169,7 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
   const toolDefinition: ToolDefinition = {
     name: `Get${row.display}Versions`,
     ...(row.available_in ? { available_in: row.available_in } : {}),
-    description: `[read-only] List the SAP version history of a ${row.label}. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via Get${row.display}VersionSource.`,
+    description: `[read-only] List the SAP version history of a ${row.label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${row.display}VersionSource.`,
     inputSchema: {
       type: 'object',
       properties,

@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [8.5.0] - 2026-06-30
+
+### Added
+- **Version history now surfaces the transport request (#30).** `GetObjectVersions` / `Get<Object>Versions` now include `transportRequest` (e.g. `DS4K901917`) and `transportDescription` per version when the SAP version feed carries them — so an agent can map an object's versions to the transports that produced them, which is the "transports of an object" piece of #30. Comes from `@mcp-abap-adt/adt-clients` 7.2.0; no tool/argument change (the new fields are additive on each version entry).
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.2.0` and `@mcp-abap-adt/interfaces@^9.1.0`** (from `^7.1.0` / `^9.0.0`). 7.2.0 parses the per-version transport-request link into the new optional `IObjectVersion.transportRequest`/`transportDescription` (requires interfaces ^9.1.0). Non-breaking.
+
 ## [8.4.0] - 2026-06-29
 
 ### Added

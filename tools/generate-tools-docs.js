@@ -483,7 +483,7 @@ function loadObjectVersionTools() {
 
     tools.push({
       name: `Get${display}Versions`,
-      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title and an opaque content_uri to fetch that version's source via Get${display}VersionSource.`,
+      description: `[read-only] List the SAP version history of a ${label}. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via Get${display}VersionSource.`,
       inputSchema: { properties: versionsProps, required: versionsRequired },
       inputSchemaRef: null,
       availableIn,

@@ -77,6 +77,31 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
     expect(data.versions).toEqual(versions);
   });
 
+  it('passes through transportRequest/transportDescription per version (adt-clients 7.2.0)', async () => {
+    const versions = [
+      {
+        versionId: '00002',
+        author: 'DEV',
+        updatedAt: '2026-06-30T00:00:00Z',
+        title: 'Version List',
+        transportRequest: 'DS4K901917',
+        transportDescription: 'My change',
+        contentUri: '/sap/bc/adt/...;version=00002',
+      },
+    ];
+    mockClassGetVersions.mockResolvedValue(versions);
+
+    const result = await handleGetObjectVersions(ctx, {
+      object_type: 'class',
+      object_name: 'zcl_my_class',
+    });
+
+    expect(result.isError).toBe(false);
+    const v = payload(result).versions[0];
+    expect(v.transportRequest).toBe('DS4K901917');
+    expect(v.transportDescription).toBe('My change');
+  });
+
   it('dispatches a table to getTable().getVersions with tableName', async () => {
     mockTableGetVersions.mockResolvedValue([]);
 

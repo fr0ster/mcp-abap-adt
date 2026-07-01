@@ -1,0 +1,37 @@
+version: 2
+updates:
+  # npm dependencies — grouped to cut PR noise, cooled down to dodge freshly-published malware
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+    # Hold new releases 7 days before proposing them (supply-chain cooldown)
+    cooldown:
+      default-days: 7
+    groups:
+      # One PR for all minor+patch version bumps — keeps the real (major/security) ones visible
+      minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - "minor"
+          - "patch"
+      # One PR per batch of security fixes
+      security:
+        applies-to: security-updates
+
+  # GitHub Actions — batch all action bumps into a single weekly PR
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    labels:
+      - "dependencies"
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns:
+          - "*"

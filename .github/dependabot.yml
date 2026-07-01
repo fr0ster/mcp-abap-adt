@@ -1,6 +1,6 @@
 version: 2
 updates:
-  # npm dependencies — grouped to cut PR noise, cooled down to dodge freshly-published malware
+  # npm dependencies — grouped to cut PR noise; version-update cooldown ages new releases
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
@@ -8,7 +8,8 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
-    # Hold new releases 7 days before proposing them (supply-chain cooldown)
+    # Applies to VERSION updates only (not security updates): hold a new release 7 days
+    # before proposing a routine bump, so a version yanked/patched within days is skipped.
     cooldown:
       default-days: 7
     groups:

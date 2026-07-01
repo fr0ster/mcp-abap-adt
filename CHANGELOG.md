@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Security
-- **Cleared the residual dev-tooling Dependabot alerts.** Upstream patches now exist for the transitive dev dependencies that 8.5.1 had to leave as "accepted", so added `overrides` to pull them: `shell-quote ^1.8.4` (the critical, previously unpatched — via MCP Inspector), `esbuild ^0.28.1` (via `tsx`), `@babel/core ^7.29.6` (via Jest), and a **scoped** `@istanbuljs/load-nyc-config › js-yaml ^3.15.0` (via Jest, leaving the direct `js-yaml@4.3.0` untouched). `npm audit` is now **0** (was 57 before 8.5.1). All four are dev-tooling only — not in the published tarball — and `overrides` are not inherited by consumers, so **no republish is required**; this only cleans the repo's own lockfile so the GitHub alerts close.
+- **Removed all dependency `overrides` — `npm audit` is 0 without any of them.** The overrides added in 8.5.1 turned out to be crutches: a clean lockfile resolution already reaches patched versions within each maintainer's declared semver range, so forcing transitive versions (an untested parent/child combination) was both unnecessary and a maintenance liability. Dropped the entire `overrides` block (11 entries) and let the tree resolve in-range. The single dep that stayed stuck — `esbuild` (low, dev-only, pinned by `tsx@4.21` to `~0.27.0`) — was fixed the right way: by bumping the direct dev dependency we own, `tsx ^4.21.0 → ^4.22.4`, whose maintainer moved the pin to `esbuild ~0.28.0` (includes the patched `0.28.1`). No overrides remain; every fix now comes from a direct-dependency bump or in-range resolution. Verified: `npm audit` 0, `build` + `test:check` + 348 unit tests green. Dev-tooling only, not in the published tarball — no republish required.
 
 ## [8.5.1] - 2026-07-01
 

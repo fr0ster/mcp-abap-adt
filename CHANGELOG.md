@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Security
+- **Cleared the residual dev-tooling Dependabot alerts.** Upstream patches now exist for the transitive dev dependencies that 8.5.1 had to leave as "accepted", so added `overrides` to pull them: `shell-quote ^1.8.4` (the critical, previously unpatched — via MCP Inspector), `esbuild ^0.28.1` (via `tsx`), `@babel/core ^7.29.6` (via Jest), and a **scoped** `@istanbuljs/load-nyc-config › js-yaml ^3.15.0` (via Jest, leaving the direct `js-yaml@4.3.0` untouched). `npm audit` is now **0** (was 57 before 8.5.1). All four are dev-tooling only — not in the published tarball — and `overrides` are not inherited by consumers, so **no republish is required**; this only cleans the repo's own lockfile so the GitHub alerts close.
+
 ## [8.5.1] - 2026-07-01
 
 ### Security

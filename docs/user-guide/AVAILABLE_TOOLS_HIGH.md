@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 169
+- Total tools: 177
 
 ## Navigation
 
@@ -146,6 +146,15 @@ Generated from code in `src/handlers/**` (not from docs).
     - [DeleteInterface](#deleteinterface-high-level-interface)
     - [GetInterface](#getinterface-high-level-interface)
     - [UpdateInterface](#updateinterface-high-level-interface)
+  - [Message Class](#high-level-message-class)
+    - [CreateMessageClass](#createmessageclass-high-level-message-class)
+    - [CreateMessageClassMessage](#createmessageclassmessage-high-level-message-class)
+    - [DeleteMessageClass](#deletemessageclass-high-level-message-class)
+    - [DeleteMessageClassMessage](#deletemessageclassmessage-high-level-message-class)
+    - [GetMessageClass](#getmessageclass-high-level-message-class)
+    - [GetMessageClassMessage](#getmessageclassmessage-high-level-message-class)
+    - [UpdateMessageClass](#updatemessageclass-high-level-message-class)
+    - [UpdateMessageClassMessage](#updatemessageclassmessage-high-level-message-class)
   - [Metadata Extension](#high-level-metadata-extension)
     - [DeleteMetadataExtension](#deletemetadataextension-high-level-metadata-extension)
     - [GetMetadataExtension](#getmetadataextension-high-level-metadata-extension)
@@ -2011,6 +2020,117 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-message-class"></a>
+### High-Level / Message Class
+
+<a id="createmessageclass-high-level-message-class"></a>
+#### CreateMessageClass (High-Level / Message Class)
+**Description:** Operation: Create. Subject: Message Class (MSAG). Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+
+**Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
+
+**Parameters:**
+- `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
+- `master_language` (string, optional) - (optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS). Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name (e.g., ZMY_PKG, $TMP for local objects).
+- `transport_request` (string, optional) - (optional) Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="createmessageclassmessage-high-level-message-class"></a>
+#### CreateMessageClassMessage (High-Level / Message Class)
+**Description:** Operation: Create. Subject: a single message inside a Message Class (MSAG). Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
+
+**Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
+
+**Parameters:**
+- `description` (string, optional) - (optional) Long description for the message.
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
+- `msgtext` (string, required) - Message text. May contain placeholders &1 &2 &3 &4 (or &).
+- `self_explanatory` (boolean, optional (default: false)) - (optional) Mark the message as self-explanatory (no long text needed). Default: false.
+- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable objects.
+
+---
+
+<a id="deletemessageclass-high-level-message-class"></a>
+#### DeleteMessageClass (High-Level / Message Class)
+**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system. Includes a deletion check before the actual deletion. Transport request required for transportable objects, optional for local ($TMP).
+
+**Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects, optional for local ($TMP).
+
+---
+
+<a id="deletemessageclassmessage-high-level-message-class"></a>
+#### DeleteMessageClassMessage (High-Level / Message Class)
+**Description:** Operation: Delete. Subject: a single message inside a Message Class (MSAG). Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+
+**Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number to delete (e.g., "001").
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects, optional for local ($TMP).
+
+---
+
+<a id="getmessageclass-high-level-message-class"></a>
+#### GetMessageClass (High-Level / Message Class)
+**Description:** Retrieve an ABAP message class (MSAG/T100) with its messages: name, description, package, master language and the message list (msgno, msgtext, self-explanatory).
+
+**Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+
+---
+
+<a id="getmessageclassmessage-high-level-message-class"></a>
+#### GetMessageClassMessage (High-Level / Message Class)
+**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). Returns msgno, msgtext, self-explanatory flag and description.
+
+**Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
+
+---
+
+<a id="updatemessageclass-high-level-message-class"></a>
+#### UpdateMessageClass (High-Level / Message Class)
+**Description:** Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
+
+**Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
+
+**Parameters:**
+- `description` (string, required) - New short description for the message class.
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable objects.
+
+---
+
+<a id="updatemessageclassmessage-high-level-message-class"></a>
+#### UpdateMessageClassMessage (High-Level / Message Class)
+**Description:** Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+
+**Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
+
+**Parameters:**
+- `description` (string, optional) - (optional) Long description for the message.
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
+- `msgtext` (string, required) - New message text. May contain placeholders &1 &2 &3 &4 (or &).
+- `self_explanatory` (boolean, optional) - (optional) Mark the message as self-explanatory.
+- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable objects.
+
+---
+
 <a id="high-level-metadata-extension"></a>
 ### High-Level / Metadata Extension
 
@@ -2639,4 +2759,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-07-05*

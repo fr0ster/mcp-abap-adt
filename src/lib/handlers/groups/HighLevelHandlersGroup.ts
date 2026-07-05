@@ -289,6 +289,38 @@ import {
   handleActivateInterface,
 } from '../../../handlers/interface/low/handleActivateInterface';
 import {
+  TOOL_DEFINITION as CreateMessageClass_Tool,
+  handleCreateMessageClass,
+} from '../../../handlers/message_class/high/handleCreateMessageClass';
+import {
+  TOOL_DEFINITION as CreateMessageClassMessage_Tool,
+  handleCreateMessageClassMessage,
+} from '../../../handlers/message_class/high/handleCreateMessageClassMessage';
+import {
+  TOOL_DEFINITION as DeleteMessageClass_Tool,
+  handleDeleteMessageClass,
+} from '../../../handlers/message_class/high/handleDeleteMessageClass';
+import {
+  TOOL_DEFINITION as DeleteMessageClassMessage_Tool,
+  handleDeleteMessageClassMessage,
+} from '../../../handlers/message_class/high/handleDeleteMessageClassMessage';
+import {
+  TOOL_DEFINITION as GetMessageClass_Tool,
+  handleGetMessageClass,
+} from '../../../handlers/message_class/high/handleGetMessageClass';
+import {
+  TOOL_DEFINITION as GetMessageClassMessage_Tool,
+  handleGetMessageClassMessage,
+} from '../../../handlers/message_class/high/handleGetMessageClassMessage';
+import {
+  handleUpdateMessageClass,
+  TOOL_DEFINITION as UpdateMessageClass_Tool,
+} from '../../../handlers/message_class/high/handleUpdateMessageClass';
+import {
+  handleUpdateMessageClassMessage,
+  TOOL_DEFINITION as UpdateMessageClassMessage_Tool,
+} from '../../../handlers/message_class/high/handleUpdateMessageClassMessage';
+import {
   TOOL_DEFINITION as DeleteMetadataExtension_Tool,
   handleDeleteMetadataExtension,
 } from '../../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
@@ -662,6 +694,38 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteDomain_Tool,
         handler: withContext(handleDeleteDomain),
+      },
+      {
+        toolDefinition: GetMessageClass_Tool,
+        handler: withContext(handleGetMessageClass),
+      },
+      {
+        toolDefinition: CreateMessageClass_Tool,
+        handler: withContext(handleCreateMessageClass),
+      },
+      {
+        toolDefinition: UpdateMessageClass_Tool,
+        handler: withContext(handleUpdateMessageClass),
+      },
+      {
+        toolDefinition: DeleteMessageClass_Tool,
+        handler: withContext(handleDeleteMessageClass),
+      },
+      {
+        toolDefinition: GetMessageClassMessage_Tool,
+        handler: withContext(handleGetMessageClassMessage),
+      },
+      {
+        toolDefinition: CreateMessageClassMessage_Tool,
+        handler: withContext(handleCreateMessageClassMessage),
+      },
+      {
+        toolDefinition: UpdateMessageClassMessage_Tool,
+        handler: withContext(handleUpdateMessageClassMessage),
+      },
+      {
+        toolDefinition: DeleteMessageClassMessage_Tool,
+        handler: withContext(handleDeleteMessageClassMessage),
       },
       {
         toolDefinition: CreateDataElement_Tool,

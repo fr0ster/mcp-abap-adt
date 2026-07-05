@@ -79,6 +79,14 @@ import {
   TOOL_DEFINITION as ReadInterface_Tool,
 } from '../../../handlers/interface/readonly/handleReadInterface';
 import {
+  handleReadMessageClass,
+  TOOL_DEFINITION as ReadMessageClass_Tool,
+} from '../../../handlers/message_class/readonly/handleReadMessageClass';
+import {
+  handleReadMessageClassMessage,
+  TOOL_DEFINITION as ReadMessageClassMessage_Tool,
+} from '../../../handlers/message_class/readonly/handleReadMessageClassMessage';
+import {
   handleReadMetadataExtension,
   TOOL_DEFINITION as ReadMetadataExtension_Tool,
 } from '../../../handlers/metadata_extension/readonly/handleReadMetadataExtension';
@@ -251,6 +259,15 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ReadDomain_Tool,
         handler: (args: any) => handleReadDomain(this.context, args),
+      },
+      {
+        toolDefinition: ReadMessageClass_Tool,
+        handler: (args: any) => handleReadMessageClass(this.context, args),
+      },
+      {
+        toolDefinition: ReadMessageClassMessage_Tool,
+        handler: (args: any) =>
+          handleReadMessageClassMessage(this.context, args),
       },
       {
         toolDefinition: ReadDataElement_Tool,

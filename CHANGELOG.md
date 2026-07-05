@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+## [8.6.0] - 2026-07-05
+
+### Added
+- **Message Class (MSAG / T100) CRUD tools.** Exposes the new message-class client from `@mcp-abap-adt/adt-clients` 7.3.x as MCP tools:
+  - **ReadOnly group:** `ReadMessageClass` (class header + all messages), `ReadMessageClassMessage` (one message by number).
+  - **HighLevel group:** `GetMessageClass`, `CreateMessageClass`, `UpdateMessageClass`, `DeleteMessageClass`, and per-message `GetMessageClassMessage`, `CreateMessageClassMessage`, `UpdateMessageClassMessage`, `DeleteMessageClassMessage`.
+  - Message classes are not activatable/versioned, so there are no Check/Activate/Versions tools for them. Transport handling matches the other CRUD objects (`transport_request` sent as `corrNr`; required for transportable packages). `available_in: ['onprem', 'cloud']`.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.3.1` and `@mcp-abap-adt/interfaces@^9.2.0`** (from `^7.2.1` / `^9.1.0`). 7.3.0 adds the Message Class client (`getMessageClass()` / `getMessageClassMessage()`); 7.3.1 wires `transport_request` (`corrNr`) from config. Non-breaking for existing tools.
+
 ## [8.5.2] - 2026-07-05
 
 ### Fixed

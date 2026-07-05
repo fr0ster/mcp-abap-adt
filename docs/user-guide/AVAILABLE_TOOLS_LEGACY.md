@@ -2922,4 +2922,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-07-05*

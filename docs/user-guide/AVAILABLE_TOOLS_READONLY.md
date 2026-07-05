@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 62
+- Total tools: 64
 
 ## Navigation
 
@@ -41,6 +41,9 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetIncludesList](#getincludeslist-read-only-include)
   - [Interface](#read-only-interface)
     - [ReadInterface](#readinterface-read-only-interface)
+  - [Message Class](#read-only-message-class)
+    - [ReadMessageClass](#readmessageclass-read-only-message-class)
+    - [ReadMessageClassMessage](#readmessageclassmessage-read-only-message-class)
   - [Metadata Extension](#read-only-metadata-extension)
     - [ReadMetadataExtension](#readmetadataextension-read-only-metadata-extension)
   - [Package](#read-only-package)
@@ -377,6 +380,32 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-message-class"></a>
+### Read-Only / Message Class
+
+<a id="readmessageclass-read-only-message-class"></a>
+#### ReadMessageClass (Read-Only / Message Class)
+**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) with all of its messages. Answers: "show message class X", "list messages of message class", "display message text 001 of class". Returns name, description, package, master language and the array of messages (msgno, msgtext, self-explanatory, description).
+
+**Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+
+---
+
+<a id="readmessageclassmessage-read-only-message-class"></a>
+#### ReadMessageClassMessage (Read-Only / Message Class)
+**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of class ZMY_MSGS", "get text of message". Returns msgno, msgtext, self-explanatory flag and description.
+
+**Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
 
 ---
 
@@ -1004,4 +1033,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-06-30*
+*Last updated: 2026-07-05*

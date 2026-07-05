@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.6.1] - 2026-07-05
+
+### Changed
+- **Declared the SAP connection environment variables in `server.json` (#142 follow-up).** The MCP Registry entry carried no `environmentVariables`, so registry-based installers (e.g. FLUJO) launched the server with no configuration — it then ran in tool-inspection-only mode and the client timed out waiting for a usable connection. `server.json` now declares the connection variables (`SAP_URL` required; `SAP_AUTH_TYPE`, `SAP_SYSTEM_TYPE` with choices/defaults; `SAP_CLIENT`, `SAP_JWT_TOKEN` (secret), `SAP_USERNAME`, `SAP_PASSWORD` (secret), `SAP_LANGUAGE`, `SAP_MASTER_SYSTEM`, `SAP_RESPONSIBLE`), so registry clients can prompt for and inject them. No code change — the server already completes the MCP handshake without env vars (verified); this only surfaces the required configuration to installers. Republished to the MCP Registry via `mcp-publisher`.
+
 ## [8.6.0] - 2026-07-05
 
 ### Added

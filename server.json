@@ -6,15 +6,77 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "8.6.0",
+  "version": "8.6.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/core",
-      "version": "8.6.0",
+      "version": "8.6.1",
       "transport": {
         "type": "stdio"
-      }
+      },
+      "environmentVariables": [
+        {
+          "name": "SAP_URL",
+          "description": "Base URL of the ABAP system (e.g. https://my-system.example.com or a BTP ABAP service URL). Required to connect; without it the server starts in tool-inspection-only mode.",
+          "isRequired": true,
+          "format": "string",
+          "placeholder": "https://your-abap-system.example.com"
+        },
+        {
+          "name": "SAP_AUTH_TYPE",
+          "description": "Authentication method: 'xsuaa' for JWT/OAuth2 (BTP ABAP Cloud) or 'basic' for username/password (on-prem).",
+          "format": "string",
+          "choices": ["xsuaa", "basic"],
+          "default": "xsuaa"
+        },
+        {
+          "name": "SAP_SYSTEM_TYPE",
+          "description": "System type, controls which tools are available (e.g. Programs are onprem-only).",
+          "format": "string",
+          "choices": ["cloud", "onprem", "legacy"],
+          "default": "cloud"
+        },
+        {
+          "name": "SAP_CLIENT",
+          "description": "ABAP client/mandant number (e.g. 100). Optional for BTP ABAP Cloud.",
+          "format": "string",
+          "placeholder": "100"
+        },
+        {
+          "name": "SAP_JWT_TOKEN",
+          "description": "JWT bearer token for SAP_AUTH_TYPE=xsuaa. Provide this (or the SAP_UAA_* refresh-token set) for JWT auth.",
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SAP_USERNAME",
+          "description": "Username for SAP_AUTH_TYPE=basic (on-prem).",
+          "format": "string"
+        },
+        {
+          "name": "SAP_PASSWORD",
+          "description": "Password for SAP_AUTH_TYPE=basic (on-prem).",
+          "isSecret": true,
+          "format": "string"
+        },
+        {
+          "name": "SAP_LANGUAGE",
+          "description": "Logon language (ISO code, e.g. 'en', 'de').",
+          "format": "string",
+          "default": "en"
+        },
+        {
+          "name": "SAP_MASTER_SYSTEM",
+          "description": "System context for on-prem create/update operations (e.g. DEV).",
+          "format": "string"
+        },
+        {
+          "name": "SAP_RESPONSIBLE",
+          "description": "Responsible user for on-prem create/update operations.",
+          "format": "string"
+        }
+      ]
     }
   ]
 }

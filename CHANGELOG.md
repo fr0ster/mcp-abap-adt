@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.5.2] - 2026-07-05
+
+### Fixed
+- **`npx -y @mcp-abap-adt/core` (and any fresh install) crashed with `Cannot find module 'yaml'` (#143).** The runtime config loader (`src/lib/config/yamlConfig.ts`) imported the `yaml` package, but `yaml` was declared only in `devDependencies` — so it was absent from the published tarball and every consumer install failed at startup. Consolidated all runtime YAML parsing onto `js-yaml` (already a runtime `dependency`, via `load()`), migrated the two integration-test helpers off `yaml` as well, and **removed the `yaml` package entirely** — one YAML library instead of two, and the runtime import now resolves from a declared dependency. Added `yamlConfig` unit tests to guard it.
+
 ### Security
 - **Removed all dependency `overrides` — `npm audit` is 0 without any of them.** The overrides added in 8.5.1 turned out to be crutches: a clean lockfile resolution already reaches patched versions within each maintainer's declared semver range, so forcing transitive versions (an untested parent/child combination) was both unnecessary and a maintenance liability. Dropped the entire `overrides` block (11 entries) and let the tree resolve in-range. The single dep that stayed stuck — `esbuild` (low, dev-only, pinned by `tsx@4.21` to `~0.27.0`) — was fixed the right way: by bumping the direct dev dependency we own, `tsx ^4.21.0 → ^4.22.4`, whose maintainer moved the pin to `esbuild ~0.28.0` (includes the patched `0.28.1`). No overrides remain; every fix now comes from a direct-dependency bump or in-range resolution. Verified: `npm audit` 0, `build` + `test:check` + 348 unit tests green. Dev-tooling only, not in the published tarball — no republish required.
 

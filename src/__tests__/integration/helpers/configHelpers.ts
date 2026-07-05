@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
-import * as yaml from 'yaml';
+import * as yaml from 'js-yaml';
 import { applyCertKerberosFields } from '../../../lib/config/applyAuthFields';
 import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';
@@ -252,7 +252,7 @@ export function loadTestConfig(): any {
 
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, 'utf8');
-    cachedConfig = yaml.parse(configContent) || {};
+    cachedConfig = (yaml.load(configContent) as Record<string, unknown>) || {};
     return cachedConfig;
   }
 
@@ -261,7 +261,8 @@ export function loadTestConfig(): any {
       '⚠️ tests/test-config.yaml not found. Using template (all integration tests will be disabled).',
     );
     const templateContent = fs.readFileSync(templatePath, 'utf8');
-    cachedConfig = yaml.parse(templateContent) || {};
+    cachedConfig =
+      (yaml.load(templateContent) as Record<string, unknown>) || {};
     return cachedConfig;
   }
 

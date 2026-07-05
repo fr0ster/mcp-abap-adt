@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "8.5.1",
+  "version": "8.5.2",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -134,8 +134,7 @@
     "serve-handler": "^6.1.7",
     "ts-jest": "^29.2.0",
     "tsx": "^4.22.4",
-    "typescript": "^6.0.2",
-    "yaml": "^2.8.1"
+    "typescript": "^6.0.2"
   },
   "dependencies": {
     "@mcp-abap-adt/adt-clients": "^7.2.1",

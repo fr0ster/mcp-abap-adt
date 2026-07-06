@@ -100,7 +100,7 @@ function main() {
   console.error('    AUTH_BROKER_PATH=/path1:/path2 node tools/show-storage-paths.js');
   console.error('');
   console.error('  With --auth-broker-path argument:');
-  console.error('    mcp-abap-adt-v2 --auth-broker-path=/path/to/custom --mcp=TRIAL');
+  console.error('    mcp-abap-adt --auth-broker-path=/path/to/custom --mcp=TRIAL');
   console.error('');
 
   console.error('💡 Platform-specific defaults:');

@@ -14,11 +14,11 @@ Install from a pre-built `.tgz` package:
 
 ```bash
 # Install globally
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Available commands:
-mcp-abap-adt          # HTTP transport (default)
-mcp-abap-adt --transport=stdio    # stdio transport (for MCP clients)
+mcp-abap-adt          # stdio transport (default, for MCP clients)
+mcp-abap-adt --transport=http     # HTTP server
 mcp-abap-adt --transport=sse      # SSE server
 ```
 
@@ -33,7 +33,7 @@ SAP_JWT_TOKEN=your-jwt-token
 EOF
 
 # Run HTTP server
-mcp-abap-adt --transport=http --port 3000
+mcp-abap-adt --transport=http --port=3000
 ```
 
 See [Installation Guide](../installation/INSTALLATION.md#package-installation-details) for detailed instructions.
@@ -91,7 +91,7 @@ objects for each package. Each object includes:
 
 After installing from package, these commands are available:
 
-### `mcp-abap-adt` - Default HTTP transport
+### `mcp-abap-adt` - Default stdio transport
 ```bash
 mcp-abap-adt [--env <destination>] [--env-path /path/to/.env]
 ```
@@ -113,15 +113,15 @@ Starts HTTP server with Server-Sent Events transport.
 
 ### Example 1: HTTP Server on Port 8080
 ```bash
-mcp-abap-adt --transport=http --port 8080
+mcp-abap-adt --transport=http --port=8080
 ```
 
 ### Example 2: SSE Server Accessible from Network
 ```bash
-mcp-abap-adt --transport=sse --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3000
 ```
 
 ### Example 3: Custom Environment File
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
 ```

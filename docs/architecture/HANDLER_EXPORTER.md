@@ -13,14 +13,14 @@ The `HandlerExporter` class allows you to register all ABAP ADT handlers on any 
 ## Installation
 
 ```bash
-npm install @fr0ster/mcp-abap-adt
+npm install @mcp-abap-adt/core
 ```
 
 ## Basic Usage
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { HandlerExporter } from "@fr0ster/mcp-abap-adt/handlers";
+import { HandlerExporter } from "@mcp-abap-adt/core/handlers";
 import { createAbapConnection } from "@mcp-abap-adt/connection";
 
 // Create your MCP server
@@ -138,7 +138,7 @@ for (const entry of entries) {
 If you're using v2 server classes directly:
 
 ```typescript
-import { StreamableHttpServer } from "@fr0ster/mcp-abap-adt/server/v2";
+import { StreamableHttpServer } from "@mcp-abap-adt/core/server/v2";
 
 const exporter = new HandlerExporter();
 const registry = exporter.createRegistry();
@@ -155,7 +155,7 @@ Example for cloud-llm-hub style integration:
 ```typescript
 import cds from "@sap/cds";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { HandlerExporter } from "@fr0ster/mcp-abap-adt";
+import { HandlerExporter } from "@mcp-abap-adt/core";
 import { createConnection } from "./connections/connectionFactory";
 
 // Create MCP server instance
@@ -191,12 +191,12 @@ If you were using `mcp_abap_adt_server` directly:
 
 ```typescript
 // Old way (still works via legacy import)
-import { mcp_abap_adt_server } from "@fr0ster/mcp-abap-adt";
+import { mcp_abap_adt_server } from "@mcp-abap-adt/core";
 const server = new mcp_abap_adt_server({ connection });
 await server.run();
 
 // New way (recommended for embedding)
-import { HandlerExporter } from "@fr0ster/mcp-abap-adt/handlers";
+import { HandlerExporter } from "@mcp-abap-adt/core/handlers";
 const exporter = new HandlerExporter();
 exporter.registerOnServer(yourMcpServer, () => connection);
 ```

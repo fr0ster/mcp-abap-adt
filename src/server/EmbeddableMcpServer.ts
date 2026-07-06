@@ -8,7 +8,10 @@ import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGr
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from '../lib/handlers/groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from '../lib/handlers/groups/SystemHandlersGroup.js';
-import type { IReadOnlyDedupStrategy } from '../lib/handlers/groups/strategies/index.js';
+import {
+  type IReadOnlyDedupStrategy,
+  ReadVsGetDedupStrategy,
+} from '../lib/handlers/groups/strategies/index.js';
 import type {
   IHandlerGroup,
   IHandlersRegistry,
@@ -85,11 +88,12 @@ export interface EmbeddableMcpServerOptions {
    * Optional strategy that decides which readonly handlers to dedup (hide)
    * when overriding groups (high / low / compact) are also exposed.
    *
-   * Default: no dedup — readonly handlers are exposed verbatim, preserving
-   * prior behavior for existing consumers. Pass `new ReadVsGetDedupStrategy()`
-   * (exported from this package) to hide `Read<X>` when a corresponding
-   * `Get<X>` is contributed by another group, or supply a custom
-   * implementation for bespoke role-based rules.
+   * Default: `ReadVsGetDedupStrategy` — hides a readonly `Read<X>` handler
+   * when a corresponding `Get<X>` is contributed by another group, so a single
+   * deterministic tool is exposed per operation (matching the standalone
+   * launcher). Pass `new NoDedupStrategy()` (exported from this package) to
+   * expose readonly handlers verbatim, or supply a custom implementation for
+   * bespoke role-based rules.
    */
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
 }
@@ -168,7 +172,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       | 'search'
     )[],
     logger?: Logger,
-    readOnlyDedupStrategy?: IReadOnlyDedupStrategy,
+    readOnlyDedupStrategy: IReadOnlyDedupStrategy = new ReadVsGetDedupStrategy(),
   ): IHandlersRegistry {
     // Dummy context - not actually used because BaseMcpServer.registerHandlers()
     // creates wrapper lambdas that call getConnection() for fresh context
@@ -178,7 +182,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     };
 
     // Build non-readonly groups first so their tool names can feed the
-    // readonly dedup strategy (when one is provided by the consumer).
+    // readonly dedup strategy (defaults to ReadVsGetDedupStrategy).
     const overridingGroups: IHandlerGroup[] = [];
     if (exposition.includes('high')) {
       overridingGroups.push(new HighLevelHandlersGroup(dummyContext));

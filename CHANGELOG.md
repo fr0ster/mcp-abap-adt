@@ -10,6 +10,206 @@
   - `ListATCCheckVariants` — discover available ATC check variants on the system.
 - New `AdtClient.getAtc()` factory in `@mcp-abap-adt/adt-clients` returning `AdtAtc` (high-level wrapper) plus low-level helpers (`createAtcWorklist`, `startAtcRun`, `getAtcRunStatus`, `getAtcWorklistFindings`, `listAtcVariants`, `getAtcCustomizing`, `parseSystemDefaultVariant`, `extractAtcRunId`, `extractAtcWorklistId`) and parameter types in `@mcp-abap-adt/interfaces` (`IRunAtcParams`, `IGetAtcRunStatusParams`, `IGetAtcFindingsParams`, `IListAtcCheckVariantsParams`, `AtcObjectType`, `AtcFindingsFormat`).
 
+## [8.6.1] - 2026-07-05
+
+### Changed
+- **Declared the SAP connection environment variables in `server.json` (#142 follow-up).** The MCP Registry entry carried no `environmentVariables`, so registry-based installers (e.g. FLUJO) launched the server with no configuration — it then ran in tool-inspection-only mode and the client timed out waiting for a usable connection. `server.json` now declares the connection variables (`SAP_URL` required; `SAP_AUTH_TYPE`, `SAP_SYSTEM_TYPE` with choices/defaults; `SAP_CLIENT`, `SAP_JWT_TOKEN` (secret), `SAP_USERNAME`, `SAP_PASSWORD` (secret), `SAP_LANGUAGE`, `SAP_MASTER_SYSTEM`, `SAP_RESPONSIBLE`), so registry clients can prompt for and inject them. No code change — the server already completes the MCP handshake without env vars (verified); this only surfaces the required configuration to installers. Republished to the MCP Registry via `mcp-publisher`.
+
+## [8.6.0] - 2026-07-05
+
+### Added
+- **Message Class (MSAG / T100) CRUD tools.** Exposes the new message-class client from `@mcp-abap-adt/adt-clients` 7.3.x as MCP tools:
+  - **ReadOnly group:** `ReadMessageClass` (class header + all messages), `ReadMessageClassMessage` (one message by number).
+  - **HighLevel group:** `GetMessageClass`, `CreateMessageClass`, `UpdateMessageClass`, `DeleteMessageClass`, and per-message `GetMessageClassMessage`, `CreateMessageClassMessage`, `UpdateMessageClassMessage`, `DeleteMessageClassMessage`.
+  - Message classes are not activatable/versioned, so there are no Check/Activate/Versions tools for them. Transport handling matches the other CRUD objects (`transport_request` sent as `corrNr`; required for transportable packages). `available_in: ['onprem', 'cloud']`.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.3.1` and `@mcp-abap-adt/interfaces@^9.2.0`** (from `^7.2.1` / `^9.1.0`). 7.3.0 adds the Message Class client (`getMessageClass()` / `getMessageClassMessage()`); 7.3.1 wires `transport_request` (`corrNr`) from config. Non-breaking for existing tools.
+
+## [8.5.2] - 2026-07-05
+
+### Fixed
+- **`npx -y @mcp-abap-adt/core` (and any fresh install) crashed with `Cannot find module 'yaml'` (#143).** The runtime config loader (`src/lib/config/yamlConfig.ts`) imported the `yaml` package, but `yaml` was declared only in `devDependencies` — so it was absent from the published tarball and every consumer install failed at startup. Consolidated all runtime YAML parsing onto `js-yaml` (already a runtime `dependency`, via `load()`), migrated the two integration-test helpers off `yaml` as well, and **removed the `yaml` package entirely** — one YAML library instead of two, and the runtime import now resolves from a declared dependency. Added `yamlConfig` unit tests to guard it.
+
+### Security
+- **Removed all dependency `overrides` — `npm audit` is 0 without any of them.** The overrides added in 8.5.1 turned out to be crutches: a clean lockfile resolution already reaches patched versions within each maintainer's declared semver range, so forcing transitive versions (an untested parent/child combination) was both unnecessary and a maintenance liability. Dropped the entire `overrides` block (11 entries) and let the tree resolve in-range. The single dep that stayed stuck — `esbuild` (low, dev-only, pinned by `tsx@4.21` to `~0.27.0`) — was fixed the right way: by bumping the direct dev dependency we own, `tsx ^4.21.0 → ^4.22.4`, whose maintainer moved the pin to `esbuild ~0.28.0` (includes the patched `0.28.1`). No overrides remain; every fix now comes from a direct-dependency bump or in-range resolution. Verified: `npm audit` 0, `build` + `test:check` + 348 unit tests green. Dev-tooling only, not in the published tarball — no republish required.
+
+## [8.5.1] - 2026-07-01
+
+### Security
+- **Supply-chain dependency remediation (0 shipped high/critical).** Fixed the runtime vulnerabilities at their root by migrating to `@mcp-abap-adt/adt-clients@^7.2.1` (its security release bumping `axios ^1.18.1` + `fast-xml-parser ^5.9.3`), and bumping this package's own direct deps to match: `axios ^1.14.0 → ^1.18.1`, `fast-xml-parser ^5.5.10 → ^5.9.3`, `js-yaml ^4.1.1 → ^4.3.0`. Added `overrides` to pull patched transitive deps still on vulnerable versions: `form-data ^4.0.6`, `hono ^4.12.27`, `@hono/node-server ^1.19.14`, `fast-uri ^3.1.3`, `ws ^8.21.0`, `ip-address ^10.2.0`, `qs ^6.15.3` (all within the same major — no breaking bumps). `npm audit` dropped from 57→5; the production (`--omit=dev`) tree carries no high/critical. The 5 residual advisories are dev-tooling only (MCP Inspector → `shell-quote`/`concurrently`, Jest → `js-yaml@3`, `tsx` → `esbuild`, `@babel/core`) and are not in the published tarball; `shell-quote` has no upstream patch yet (tracked).
+- **Supply-chain hardening (low-noise).** Added a CI security gate — `npm audit --omit=dev --audit-level=high` — that fails the build only on shipped high+/critical vulnerabilities, keeping signal high without nagging on dev/low/moderate noise. Post-install scripts intentionally left enabled (no dep in the tree ships install/postinstall scripts; local scripts and CI actions must keep working).
+
+## [8.5.0] - 2026-06-30
+
+### Added
+- **Version history now surfaces the transport request (#30).** `GetObjectVersions` / `Get<Object>Versions` now include `transportRequest` (e.g. `DS4K901917`) and `transportDescription` per version when the SAP version feed carries them — so an agent can map an object's versions to the transports that produced them, which is the "transports of an object" piece of #30. Comes from `@mcp-abap-adt/adt-clients` 7.2.0; no tool/argument change (the new fields are additive on each version entry).
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.2.0` and `@mcp-abap-adt/interfaces@^9.1.0`** (from `^7.1.0` / `^9.0.0`). 7.2.0 parses the per-version transport-request link into the new optional `IObjectVersion.transportRequest`/`transportDescription` (requires interfaces ^9.1.0). Non-breaking.
+
+## [8.4.0] - 2026-06-29
+
+### Added
+- **Version diff tools (#30).** `GetObjectVersionDiff` (generic, ReadOnly) and per-object `Get<Object>VersionDiff` (HighLevel, 13 types — e.g. `GetClassVersionDiff`, `GetProgramVersionDiff`) return a unified diff between two object versions, given the two `content_uri`s from a `…Versions` call. Each fetches both version sources and diffs them (jsdiff, 3 lines of context); the response includes `identical` and the unified `diff`. Per-object `available_in` mirrors the type's `Get<Object>` tool. Completes #30's "diff between two versions" (2b) alongside the version-history (8.2.0) and per-object high-level (8.3.0) tools.
+
+## [8.3.0] - 2026-06-29
+
+### Added
+- **Per-object high-level version tools (#30).** Added `Get<Object>Versions` and `Get<Object>VersionSource` for the 13 versioned object types (class, program, interface, function_group, function_module, table, structure, ddl, domain, data_element, package, behavior_definition, metadata_extension) to the **HighLevel** group — e.g. `GetProgramVersions`/`GetProgramVersionSource`, `GetClassVersions`/`GetClassVersionSource`. These mirror the per-object `Get<Object>` read tools (the way `GetProgram` coexists with the read-only `ReadProgram`), so development clients that run with the ReadOnly analytics group disabled still get object version history. Each tool's `available_in` matches its `Get<Object>` counterpart (e.g. `GetProgramVersions` is onprem/legacy only). The generic `GetObjectVersions`/`GetObjectVersionSource` in the ReadOnly group are unchanged.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.1.0`** (from `^7.0.1`). 7.1.0 makes where-used result parsing namespace-prefix agnostic (`usagereferences:` vs `usageReferences:`), further hardening append detection in `GetStructuresList` (#128) on systems that emit the other prefix; it also adds per-group subpath exports (`/core`, `/runtime`, …) — not yet adopted here. Non-breaking; no tool contract changed.
+
+## [8.2.0] - 2026-06-28
+
+### Added
+- **Object history tools (#30).** Two read-only tools backed by `@mcp-abap-adt/adt-clients` 7.0.0's version-history API: `GetObjectVersions` (lists an object's SAP version history — `versionId`, `author`, `updatedAt`, `title`, and an opaque `contentUri` per entry) and `GetObjectVersionSource` (fetches the source of a specific version by its `contentUri`). Both dispatch by `object_type` across the same 13 object types as the generic object tools (class, program, interface, function_group, function_module, table, structure, ddl, domain, data_element, package, behavior_definition, metadata_extension); object types without a version endpoint return a clear `UNSUPPORTED_OPERATION` error rather than raw HTTP.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.0.1` and `@mcp-abap-adt/interfaces@^9.0.0`** (from `^6.1.0` / `^7.2.0`). 7.0.1 also makes where-used resilient on S/4 systems whose `/usageReferences/scope` sub-resource returns 404 — the library now falls back to an unscoped search with client-side type narrowing, hardening the append detection in `GetStructuresList` (#128) at the library level. No mcp-abap-adt tool contract changed by the migration.
+
+## [8.1.1] - 2026-06-27
+
+### Fixed
+- **`GetStructuresList` no longer loses append structures on heavily-used objects (#128).** The append (where-used) search now scopes to append structures only (`enableOnlyTypes: ['TABL/DS']`) instead of searching all types: where-used caps the number of returned records, so on a widely-referenced base (e.g. a standard S/4 table) the append records were crowded out by other reference types and dropped, yielding `0` appends. It also resolves the base `object_type` itself (try `structure`, fall back to `table`) so a table base no longer 404s on a structures URI, and it sets `appends_unavailable: true` when the where-used lookup fails for every object_type — so callers can tell "could not determine appends" apart from "no appends" instead of getting a silent `0`.
+
+## [8.1.0] - 2026-06-26
+
+### Added
+- **Per-call `master_language` parameter on the high-level `Create*` tools** (#105). Optional; lets a caller set the master/original language of a single created object (e.g. `"DE"`, `"ZH"`), overriding the session default. Threaded into the ADT client as `config.masterLanguage`. Covers class, program, interface, ddl, domain, structure, table, table type, data element, function group, service definition, service binding, behavior definition, metadata extension, package. When omitted, resolution falls back to the session language (`SAP_LANGUAGE`) then `EN`.
+- **`x-sap-language` HTTP/SSE request header** (#105). Per-request/per-session master-language override for created objects (precedence: tool parameter → `x-sap-language` header → `SAP_LANGUAGE` → `EN`). Carried in a request-scoped context (`AsyncLocalStorage`), not the process-global system-context cache, so it cannot leak across requests, sessions, or connection modes.
+- **Compact facade `create`/`update`/`delete` now expose every routed object type's required arguments.** Previously many type-specific args (e.g. `table_name`, `structure_name`, `service_definition_name`, `ddl_code`, `lock_handle`, `implementation_code`, `properties`, `container_class`, `test_class`, `cds_view_name`, …) were absent from the compact schemas, so schema-driven MCP clients could not construct valid calls for most object types. All missing properties have been added as optional properties to `compactCreateSchema`, `compactUpdateSchema`, and `compactDeleteSchema`. Non-breaking (additive optional properties; compact schema `required` stays `['object_type']`; no routed handler changed).
+- **Runtime guard `compactSchemaCompleteness.test.ts`** — fails CI if any routed handler's top-level required arg is not present in the corresponding compact schema, preventing future drift.
+- **Corrected compact facade descriptions** for `HandlerCreate`: `UNIT_TEST` now advertises `container_class*/test_class*` and `CDS_UNIT_TEST` now advertises `class_name*/package_name*/cds_view_name*` (previously both incorrectly showed `run_id*`, which is an update/delete arg).
+
+## [8.0.0] - 2026-06-26
+
+### Changed (BREAKING)
+- **`View` DDL-source tools renamed to `Ddl`.** Migrated to `@mcp-abap-adt/adt-clients@^6.0.0`, whose misnamed `getView()` client became the generic DDL-source client `getDdl()` (`/sap/bc/adt/ddic/ddl/sources/` — CDS views, AMDP table functions, other DDL sources). MCP tools renamed: `GetView`→`GetDdl`, `ReadView`→`ReadDdl`, `CreateView`→`CreateDdl`, `UpdateView`→`UpdateDdl`, `DeleteView`→`DeleteDdl`, `CheckView`→`CheckDdl`, `ActivateView`→`ActivateDdl`, and the `*ViewLow` variants → `*DdlLow`. The tool argument `view_name` is now `ddl_name`.
+- **Generic object tools** (`LockObject`/`UnlockObject`/`CheckObject`/`ValidateObject`/`DeleteObject`): the `object_type` value `"view"` is renamed to `"ddl"` (removed, no alias).
+- **Compact facade** (`HandlerGet`/`HandlerCreate`/… ): the `object_type` value `VIEW` is renamed to `DDL` and its `view_name` argument to `ddl_name` (removed, no alias).
+
+## [7.2.1] - 2026-06-23
+
+### Fixed
+- **`GetStructuresList` now returns extension (append) structures in the tree.** Calling it with just a structure name (e.g. `ZMCP_SHR_STRU`) returns a hierarchy containing both the included structure (`kind: include`) and the appending structure that `extend type <this> with …` (`kind: append`). Previously appends were missed: the where-used lookup used the default scope (some object types unselected, so the extension's type was excluded) and a fragile `displayName`/`globalType` regex. It now uses `getWhereUsedList({ enableAllTypes: true })` and the parsed references. Also removed dead `.APPEND` source-parsing (ADT never emits `.APPEND` in a structure's source — appends are separate `extend type` objects). Verified end-to-end on a real system.
+
+## [7.2.0] - 2026-06-22
+
+### Added
+- **DNS-rebinding protection for the HTTP/SSE transports.** `--http-allowed-hosts`/`--sse-allowed-hosts`, `--http-allowed-origins`/`--sse-allowed-origins`, and `--http-enable-dns-protection`/`--sse-enable-dns-protection` (plus the matching `MCP_HTTP_*`/`MCP_SSE_*` env vars and the `http`/`sse` `allowed-hosts`/`allowed-origins`/`enable-dns-protection` YAML keys) now take effect: when enabled with an allowlist, requests with a non-allowlisted `Host`/`Origin` header are rejected with HTTP 403. Transport-aware (http uses `http*`, sse uses `sse*`); applied in `registerRoutes` so both standalone and embedded modes are protected; `/mcp/health` is ungated. Defaults off (no-op). This is Host/Origin allowlist validation, NOT browser CORS. Values are matched exactly (Host includes port, e.g. `localhost:3000`). Implemented as own Express middleware rather than the now-deprecated SDK transport options.
+
+## [7.1.3] - 2026-06-20
+
+> Fixes the SSE transport host/port resolution, removes a broken CLI bin entry,
+> and corrects the install documentation (`README.md`/`docs/` ship in `files`,
+> so the doc fixes reach npm users with this release).
+
+### Fixed
+- **SSE transport now honours its own host/port.** `--transport=sse` resolved the final host/port from the HTTP defaults/flags (`httpHost`/`httpPort`, so it listened on `3000`), ignoring `--sse-host`/`--sse-port` and `MCP_SSE_HOST`/`MCP_SSE_PORT`. Host/port resolution is now transport-aware: SSE falls back to the SSE defaults (host `127.0.0.1`, port `3001`) and its `--sse-*` flags / `MCP_SSE_*` env vars take effect; the generic `--host`/`--port` still win when provided. (`src/lib/config/ServerConfigManager.ts`.)
+- **Removed the dangling `mcp-abap-adt-v2` bin entry.** `package.json`/`package-lock.json` still mapped `mcp-abap-adt-v2` → `bin/mcp-abap-adt-v2.js`, a file removed in an earlier release, so a global install created a broken `mcp-abap-adt-v2` symlink. The only binary is `mcp-abap-adt`. Also fixed a stale `mcp-abap-adt-v2` example in `tools/show-storage-paths.js` help output.
+- **Documentation accuracy sweep:**
+  - Install docs/README used the wrong npm scope `@fr0ster/mcp-abap-adt`; corrected to `@mcp-abap-adt/core` (the GitHub repo path and the `io.github.fr0ster/…` registry id are unchanged).
+  - Stale local-pack tarball names / version pins (`…-1.1.0/1.2.0.tgz`) → version-independent `mcp-abap-adt-core-<version>.tgz` (so they no longer drift); Node requirement `18` → `22+` (matches `engines`); removed the non-existent `npm run start:legacy` / `dev:stdio` references and the `bin/mcp-abap-adt-v2.js` run examples.
+  - Corrected narrative drift: default transport is `stdio` (not HTTP); HTTP/SSE host default is `127.0.0.1` (not `0.0.0.0`); removed non-existent `--http`/`--sse` CLI shortcuts; refreshed handler-group tool counts and the `src/handlers/` directory list; the `system` handler group rides with `readonly` (it is not always included).
+  - Regenerated `docs/user-guide/AVAILABLE_TOOLS*.md` from the current `TOOL_DEFINITION`s (function-include tools, `GetStructuresList`, `GetIncludesList` tree, `GetProgFullCode` removal, refreshed counts).
+  - Removed documentation for the CORS / allowed-hosts / DNS-rebinding-protection options (`--http`/`--sse-allowed-origins`/`-allowed-hosts`/`-enable-dns-protection`, the matching `MCP_*` env vars, and the `http`/`sse` `allowed-origins`/`allowed-hosts`/`enable-dns-protection` YAML keys): they are parsed but not wired to the servers, so documenting them overstated capability. Actually implementing these is planned for a follow-up release.
+
+## [7.1.2] - 2026-06-20
+
+> **Test infrastructure only.** The published runtime (`dist/`) is unchanged from
+> 7.1.1 — no tool, handler, or library behaviour changed for consumers. This
+> release bundles integration-test reliability fixes and a stale-metadata fix.
+
+### Fixed
+- **`shared:setup` resilient to the cloud activation-run timeout.** Bulk-activating the ~24 shared objects in one activation run can exceed adt-clients' fixed ~45s request timeout; on a timeout the setup now skips the doomed full-group retries and falls back to batched activation (chunks of 5, with a second pass retrying only the leftovers) instead of failing.
+- **Runtime profiling test produces a trace.** The runnable class now does measurable CPU work so the profiler arms and a trace is written; a trivial single-statement class finished before tracing engaged, so the trace never resolved (`Failed to resolve traceId`).
+- **Runtime dump test actually creates and reads a dump** (was silently skipping or hitting a `400 session` error). It activates the division-by-zero class, triggers the dump on a separate connection (so the dumping run's server-side context loss does not poison the connection used to read the dump), fixes dump-id extraction from the feed entry (`id` field, plural `/runtime/dumps/<id>` path, URL-encoded, no decode), binds the read dump to the uniquely-named generated class, and fails (instead of skipping) when no dump is produced. `params.dump_id` remains the explicit opt-out for read-only environments.
+- **`server.json` version** was stale at `7.0.3`; bumped to match the package version.
+
+## [7.1.1] - 2026-06-19
+
+### Fixed
+- **`UpdateFunctionInclude` now supports an `activate` parameter** (default `false`) — when `true`, the include is activated after the source update so the new source becomes the active version, mirroring `UpdateFunctionModule`. Previously the tool always left the updated source inactive.
+- Integration-test + `test-config.yaml.template` fixes for the new function-include / structure tools (verified end-to-end on a real system): the FUGR-include lifecycle update source is now a valid declaration (a bare executable statement in an include caused "Statement is not accessible"); the `ListFunctionGroupIncludes` test no longer asserts the generated `L<FUGR>UXX` collector is absent (the tool faithfully returns ALL `FUGR/I` includes — collector filtering is a backup-tool concern); the template seeds the shared `ZMCP_SHR_FGRP` / `Z_MCP_SHR_FM` the function-include tests reference.
+
+## [7.1.0] - 2026-06-18
+
+### Added
+- **Function-group include tools.** Six new MCP tools expose ADT function-group include operations:
+  - Read-only: `ReadFunctionInclude` (source + metadata), `ListFunctionGroupIncludes` (a FUGR's includes — TOP + custom), `ListFunctionModules` (a FUGR's function modules).
+  - High-level: `CreateFunctionInclude`, `UpdateFunctionInclude`, `DeleteFunctionInclude`.
+  - The list tools surface the new adt-clients `getUtils().listFunctionGroupIncludes()` / `listFunctionModules()` (nodestructure drill-down). `DeleteFunctionInclude` surfaces SAP's refusal message when an include can only be deleted via the Function Builder.
+- Integration tests (`FunctionIncludeReadOnlyHandlers`, `FunctionIncludeHighHandlers`) and `tests/test-config.yaml.template` cases for the new tools.
+- **Structure embedding tools (tree output).** New read-only `GetStructuresList` — recursively lists the structures embedded in an ABAP structure (or table) as a TREE. Each node records the embedded structure name, the `attribute` it is embedded under (named include `attr : include X;` vs anonymous `include X;` → `null`), and `kind`: `include` (from the source) or `append` (an extension found via where-used whose source is `extend type <this> with …`). Includes come from the DDL/classic source (`include X;`, `.INCLUDE`/`.APPEND`); appends are resolved via where-used (toggle with `include_extensions`, default true). Cycle-guarded. `GetIncludesList` reworked from a flat list to a recursive TREE (each include may have child includes; cycle-guarded, depth-capped). Integration test `GetStructuresListHandler` + `tests/test-config.yaml.template` case (shared structures `ZMCP_SHR_STRU` / `ZMCP_SHR_STRU_INC`).
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.6.0` to `^5.8.0` (adds `listFunctionModules`/`listFunctionGroupIncludes`; `getFunctionInclude().read()` returns source; `delete()` surfaces server-refused deletions). Clean registry install (no `link:true`/`file:`).
+
+## [7.0.3] - 2026-06-13
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.5.0` to `^5.6.0`. Picks up: `package` create now honours the configurable master language (so `CreatePackage` stamps the session `SAP_LANGUAGE` like the other object types — #105), and the behaviorDefinition namespace URL-encoding fix (namespaced `/NSP/…` behavior definitions can now be read/locked/updated/activated/checked/unlocked/deleted). Clean registry install (no `link:true`/`file:` in the lockfile).
+
+### Note
+- Per-call `master_language` tool parameter on `Create*` and the inbound `X-SAP-Language` header override are a planned follow-up; this release wires the session-language default to package as well.
+
+## [7.0.2] - 2026-06-13
+
+### Added
+- **Created objects now adopt the logon language as their master/original language.** `getSystemContext()` reads `SAP_LANGUAGE` into `masterLanguage`, and `createAdtClient()` forwards it to the ADT client, so every `Create*` tool stamps `adtcore:masterLanguage`/`adtcore:language` with the session language instead of always `EN`. When `SAP_LANGUAGE` is unset the client still defaults to `EN`. Requires the configured language to be installed on the target system (otherwise SAP normalizes it to the system default). (#105)
+
+### Changed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.4.4` to `^5.5.0` for the configurable-master-language support. Clean registry install (no `link:true`/`file:` in the lockfile).
+
+### Note
+- A per-call `master_language` parameter on the high-level `Create*` tool schemas (to override the session language per object) is planned as a follow-up; the underlying client already supports `config.masterLanguage`.
+
+## [7.0.1] - 2026-06-11
+
+### Fixed
+- Bumped `@mcp-abap-adt/adt-clients` from `^5.4.2` to `^5.4.4` to pick up the stateful-lock-chain fix. Object writes (e.g. `UpdateClass`) no longer fail with HTTP `423 — not locked (invalid lock handle)` on older ABAP kernels (e.g. BASIS 7.55) over HTTP: the client now keeps the connection stateful for the whole `lock → check → update → unlock` chain across all object types, instead of switching back to stateless before the lock-bound PUT. Newer kernels (758/816) already tolerated the stateless write. No server-side API or tool-schema change. (#106)
+
+## [7.0.0] - 2026-05-30
+
+### Changed
+- **BREAKING: `EmbeddableMcpServer` now applies `ReadVsGetDedupStrategy` by default.** Previously the embeddable server defaulted to `NoDedupStrategy`, so exposing `readonly` + `high` together surfaced both `Read<X>` and `Get<X>` for the same operation (e.g. `ReadProgram` + `GetProgram`), leaving tool selection up to the client. Embedders (e.g. cloud-llm-hub) now get the same single-tool-per-operation view as the standalone launcher. Consumers that relied on both variants being exposed must opt out by passing `readOnlyDedupStrategy: new NoDedupStrategy()`. No code-level API change — the difference is the set of tools exposed to clients.
+
+## [6.11.3] - 2026-05-30
+
+### Removed
+- **`GetProgFullCode` removed as a redundant read path.** A program or function group with includes can already be read through one canonical path — `ReadProgram` / `ReadFunctionGroup` (main) → `GetIncludesList` → `GetInclude` per include — and an explicit `GetInclude` is required anyway (includes can live outside any single object's tree). Two overlapping strategies made LLM and RAG-based tool selection non-deterministic. The piecemeal path covers function groups as well (`GetIncludesList` accepts `FUGR`), so no capability is lost. (#100)
+
+### Changed
+- **Sharpened source-read tool descriptions for clearer LLM / semantic tool selection.** `ReadProgram` now reads as "Read a MAIN ABAP program … NOT for includes — use `GetInclude`" (dropping the misleading "Create, Update" lead-in on a read-only tool), and `GetInclude` now reads as "Read ANY single ABAP include source by name, from anywhere in the repository … the correct tool for include names (PROG/I)". `GetIncludesList` is unchanged. (#100)
+
+## [6.11.2] - 2026-05-29
+
+### Fixed
+- **`ReadProgram` could still return a silent `{ success: true, source_code: null }` for non-main-program names.** The 6.11.1 heuristic only fired when *both* source and metadata came back empty; when the `programs` endpoint returned metadata for a non-`PROG/P` object (e.g. an include) the response slipped through to a misleading `success: true` with `source_code: null`. `ReadProgram` now parses `adtcore:type` from the metadata and rejects anything other than a main program (`PROG/P`) with a structured `{ success: false, error: "invalid_object_type", object_type, message }`. No tool redirect is emitted — choosing the right tool is the consumer's decision. The tool description now states it works only for main programs (`PROG/P`). (#91)
+
+## [6.11.1] - 2026-05-29
+
+### Fixed
+- **`ReadProgram` returned a silent `{ success: true, source_code: null }` for include names.** LLM agents loading a report's full source call `ReadProgram` on the include names returned by `GetIncludesList`, get `null`, read it as a permission/inactive-object problem rather than "wrong tool", and stall. A readable main program (`PROG/P`) always returns source; when both source and metadata come back empty the name is an include (`PROG/I`). `ReadProgram` now returns a structured `{ success: false, error: "include_name_passed", suggestion: "GetInclude(\"<name>\")" }` so the caller gets an actionable signal at the point of failure. (#91)
+- **`GetProgFullCode` read include source via the wrong content key.** `handleGetInclude` returns `{ type: 'text', text }`, but two call sites read `c.data`: the recursive `collectIncludes` helper (so nested includes were never discovered) and the `FUGR` branch (so every function-group include came back as `code: null`). All sites now read `c.text`. (#91)
+
+## [6.11.0] - 2026-05-28
+
+### Added
+- **`LockObjectLow` / `UnlockObjectLow` now support `function_module`.** The schema already advertised `function_module` with `GROUP|FM_NAME` name format, but the handlers returned an unsupported-operation error. Both now parse the compound name and delegate to `client.getFunctionModule().lock()/unlock()`. (#90)
+
+### Changed
+- **Tool descriptions aligned with implementation.** `GetWhereUsed` now lists the closed set of supported `object_type` values, documents the `GROUP|FM_NAME` format for function modules, clarifies that `view = CDS DDL source` (classic DDIC views unsupported), and warns about the cost of `enable_all_types`. `DeleteObjectLow` and the four compact `Handler{Create,Delete,Get,Update}` tools annotate `PROGRAM` as `[onprem/legacy only]` in their descriptions (no `available_in` change — the rest of the supported types are still valid on cloud). `GetIncludesList` spells out the four supported `object_type` enum values. (#90)
+- **`server.json` version synced to package.json.** It had drifted to `6.8.0`; now follows the package version.
+
+### Removed
+- **Dead `filePath` / `writeResultToFile` plumbing.** A side-channel `filePath` argument was accepted (often without being declared in `inputSchema`) by ten read-only handlers — `GetInclude`, `GetIncludesList`, `GetSqlQuery`, `GetEnhancements`, `GetEnhancementSpot`, `GetEnhancementImpl`, `GetPackageContents`, `GetAbapAST`, `GetAbapSemanticAnalysis`, `GetAbapSystemSymbols`. The lib comment claimed it sandboxed writes to `./output`, but did no validation — any absolute path the process could write to was accepted. The feature was no longer relied on, so it has been removed along with `src/lib/writeResultToFile.ts`. (#90)
+
+### Fixed
+- **`tools/generate-tools-docs.js` truncated descriptions at the first inner quote.** Both the per-property and the top-level extractor used `/description\s*:\s*['"]([^'"]+)['"]/`, which stops the capture at the first `'` or `"` of any kind. New descriptions added in this release would have rendered as `Answers:`, `form`, `Supported values:` etc. in `AVAILABLE_TOOLS*.md`. Switched to a quote-balanced pattern with an unescape pass. (#90)
+
 ## [6.10.0] - 2026-05-24
 
 ### Added

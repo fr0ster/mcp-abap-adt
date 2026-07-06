@@ -60,7 +60,7 @@ describe('ReadVsGetDedupStrategy', () => {
       'ServiceDefinition',
       'Structure',
       'Table',
-      'View',
+      'Ddl',
     ];
     const overriding = new Set(suffixes.map((s) => 'Get' + s));
     for (const s of suffixes) {

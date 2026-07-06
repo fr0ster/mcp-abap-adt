@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "6.10.0",
+  "version": "8.6.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -50,6 +50,7 @@
     "shared:setup": "jest --testPathPatterns='admin/shared-deps/setup' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:teardown": "jest --testPathPatterns='admin/shared-deps/teardown' --testPathIgnorePatterns='[]' --runInBand --passWithNoTests",
     "shared:check": "jest --testPathPatterns='admin/shared-deps/check' --testPathIgnorePatterns='[]' --passWithNoTests",
+    "polygon:backup": "adt-backup backup --package ZMCP_SHR_PKG --env-path trial.env --output tests/fixtures/polygon.backup.yaml",
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",
     "format": "npx biome format --write src",
@@ -114,6 +115,7 @@
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
     "@modelcontextprotocol/inspector": "^0.21.1",
+    "@types/diff": "^5.2.3",
     "@types/jest": "^30.0.0",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^25.5.2",
@@ -131,23 +133,23 @@
     "pino-pretty": "^13.1.3",
     "serve-handler": "^6.1.7",
     "ts-jest": "^29.2.0",
-    "tsx": "^4.21.0",
-    "typescript": "^6.0.2",
-    "yaml": "^2.8.1"
+    "tsx": "^4.22.4",
+    "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^5.4.2",
+    "@mcp-abap-adt/adt-clients": "^7.3.1",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
     "@mcp-abap-adt/auth-stores": "^1.0.4",
     "@mcp-abap-adt/connection": "^1.9.1",
     "@mcp-abap-adt/header-validator": "^0.1.8",
-    "@mcp-abap-adt/interfaces": "^7.2.0",
+    "@mcp-abap-adt/interfaces": "^9.2.0",
     "@mcp-abap-adt/logger": "^0.1.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "axios": "^1.14.0",
-    "fast-xml-parser": "^5.5.10",
-    "js-yaml": "^4.1.1",
+    "axios": "^1.18.1",
+    "diff": "^5.2.2",
+    "fast-xml-parser": "^5.9.3",
+    "js-yaml": "^4.3.0",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3",
     "xml-js": "^1.6.11",
@@ -169,8 +171,7 @@
     "CHANGELOG.md"
   ],
   "bin": {
-    "mcp-abap-adt": "./bin/mcp-abap-adt.js",
-    "mcp-abap-adt-v2": "./bin/mcp-abap-adt-v2.js"
+    "mcp-abap-adt": "./bin/mcp-abap-adt.js"
   },
   "jest": {
     "preset": "ts-jest",

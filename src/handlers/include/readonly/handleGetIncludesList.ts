@@ -1,7 +1,6 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError, return_error } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
@@ -18,7 +17,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['PROG/P', 'PROG/I', 'FUGR', 'CLAS/OC'],
         description:
-          '[read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)',
+          "[read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.",
       },
       detailed: {
         type: 'boolean',
@@ -130,13 +129,72 @@ function parseIncludeNamesFromXml(xmlData: string): string[] {
   return [...new Set(includeNames)]; // Remove duplicates
 }
 
+interface IncludeNode {
+  name: string;
+  children: IncludeNode[];
+  cyclic?: boolean;
+  truncated?: boolean;
+}
+
+const MAX_INCLUDE_DEPTH = 20;
+
+/**
+ * Discovers the direct child includes of a single object via its ADT node
+ * structure. Returns an empty array when the object has no includes node.
+ */
+async function discoverIncludeNames(
+  utils: any,
+  parentType: string,
+  parentName: string,
+  requestTimeout: number,
+): Promise<string[]> {
+  const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> =>
+    Promise.race([
+      p,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                `Timeout after ${requestTimeout}ms while ${what} for ${parentName}`,
+              ),
+            ),
+          requestTimeout,
+        ),
+      ),
+    ]);
+
+  // Step 1: root node structure to find the includes node id.
+  const rootResponse = (await withTimeout(
+    utils.fetchNodeStructure(parentType, parentName, '000000', true),
+    'fetching root node structure',
+  )) as { data: string };
+
+  const includesInfo = parseIncludesFromXml(rootResponse.data);
+  const includesNode = includesInfo.find((info) => info.name === 'PROG/I');
+  if (!includesNode) return [];
+
+  // Step 2: include list under that node.
+  const includesResponse = (await withTimeout(
+    utils.fetchNodeStructure(
+      parentType,
+      parentName,
+      includesNode.node_id,
+      true,
+    ),
+    'fetching includes list',
+  )) as { data: string };
+
+  return parseIncludeNamesFromXml(includesResponse.data);
+}
+
 export async function handleGetIncludesList(
   context: HandlerContext,
   args: any,
 ) {
   const { connection, logger } = context;
   try {
-    const { object_name, object_type, timeout, detailed } = args;
+    const { object_name, object_type, timeout } = args;
 
     if (
       !object_name ||
@@ -158,126 +216,76 @@ export async function handleGetIncludesList(
     // Default timeout: 30 seconds
     const requestTimeout =
       timeout && typeof timeout === 'number' ? timeout : 30000;
-    const isDetailed = detailed === true;
 
-    // Pass object_type straight through as parentType
     const parentName = object_name.toUpperCase();
     const parentType = object_type;
 
     logger?.info(
-      `Starting includes discovery for ${parentName} (${parentType}), detailed=${isDetailed}`,
+      `Starting includes tree discovery for ${parentName} (${parentType})`,
     );
 
-    // Create AdtClient and get utilities
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
-    // Step 1: Get root node structure to find includes node (with timeout)
-    const rootResponse = await Promise.race([
-      utils.fetchNodeStructure(
-        parentType,
-        parentName,
-        '000000', // Root node
-        true, // with descriptions
-      ),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout after ${requestTimeout}ms while fetching root node structure for ${object_name}`,
-              ),
-            ),
-          requestTimeout,
-        ),
-      ),
-    ]);
+    const visited = new Set<string>([parentName]);
 
-    // Step 2: Parse response to find includes node ID
-    const includesInfo = parseIncludesFromXml(rootResponse.data);
-    const includesNode = includesInfo.find((info) => info.name === 'PROG/I');
+    const buildChildren = async (
+      ownerType: string,
+      ownerName: string,
+      depth: number,
+    ): Promise<IncludeNode[]> => {
+      const names = await discoverIncludeNames(
+        utils,
+        ownerType,
+        ownerName,
+        requestTimeout,
+      );
+      const children: IncludeNode[] = [];
+      for (const rawName of names) {
+        const name = rawName.toUpperCase();
+        const node: IncludeNode = { name, children: [] };
 
-    if (!includesNode) {
-      logger?.info(`No includes found in ${object_type} '${object_name}'`);
-      // Return empty result if no includes node found
-      return {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: `No includes found in ${object_type} '${object_name}'.`,
-          },
-        ],
-      };
-    }
+        if (visited.has(name)) {
+          node.cyclic = true;
+          children.push(node);
+          continue;
+        }
+        if (depth >= MAX_INCLUDE_DEPTH) {
+          node.truncated = true;
+          children.push(node);
+          continue;
+        }
+        visited.add(name);
 
-    // Step 3: Get includes list using the found node ID (with timeout)
-    const includesResponse = await Promise.race([
-      utils.fetchNodeStructure(
-        parentType,
-        parentName,
-        includesNode.node_id,
-        true, // with descriptions
-      ),
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout after ${requestTimeout}ms while fetching includes list for ${object_name}`,
-              ),
-            ),
-          requestTimeout,
-        ),
-      ),
-    ]);
-
-    // Step 4: Parse the includes response to extract include names
-    const includeNames = parseIncludeNamesFromXml(includesResponse.data);
-
-    if (isDetailed) {
-      // Return detailed JSON response as text (for compatibility)
-      const detailedResponse = {
-        object_name: object_name,
-        object_type: object_type,
-        detailed: true,
-        total_includes: includeNames.length,
-        includes: includeNames,
-        includes_node_info: includesNode,
-      };
-
-      const result = {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(detailedResponse, null, 2),
-          },
-        ],
-      };
-      if (args.filePath) {
-        writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
+        // Recurse into the include as a PROG/I.
+        node.children = await buildChildren('PROG/I', name, depth + 1);
+        children.push(node);
       }
-      return result;
-    } else {
-      // Return minimal text response (original format)
-      const responseData =
-        includeNames.length > 0 ? includeNames.join('\n') : '';
+      return children;
+    };
 
-      const plainResult = {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: responseData,
-          },
-        ],
-      };
-      if (args.filePath) {
-        writeResultToFile(responseData, args.filePath);
-      }
-      return plainResult;
-    }
+    const tree: IncludeNode = {
+      name: parentName,
+      children: await buildChildren(parentType, parentName, 0),
+    };
+
+    return {
+      isError: false,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              object_name: parentName,
+              object_type: parentType,
+              tree,
+            },
+            null,
+            2,
+          ),
+        },
+      ],
+    };
   } catch (error) {
     logger?.error(
       `Error getting includes list: ${error instanceof Error ? error.message : String(error)}`,

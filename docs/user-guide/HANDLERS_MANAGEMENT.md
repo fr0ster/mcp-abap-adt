@@ -62,7 +62,7 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - Object search
    - Code search
 
-6. **system** - Always included automatically  
+6. **system** - Included only when the exposition includes `readonly` (added alongside the read-only group)
    - Where-used analysis (GetWhereUsed)
    - Type information (GetTypeInfo)
    - Object info (GetObjectInfo)
@@ -75,25 +75,25 @@ V2 server supports flexible handler set configuration through the `--exposition`
 
 ## Usage
 
-**Note:** `search` and `system` handler groups are ALWAYS included regardless of `--exposition` setting.
+**Note:** The `search` handler group is ALWAYS included regardless of `--exposition`. The `system` handler group is included only when the exposition contains `readonly` (it is registered together with the read-only group). The default exposition is `readonly,high`, so both are present by default.
 
 ### Command Line
 
 ```bash
-# Default: readonly + high (+ search + system always included)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env
+# Default: readonly + high (+ search always; + system because readonly is present)
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env
 
 # Only read-only operations (safest)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly
 
 # Read-only + high-level writes (recommended)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,high
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,high
 
 # Compact facade only
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=compact
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=compact
 
 # Low-level writes (use instead of `high`, not together)
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env --exposition=readonly,low
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env --exposition=readonly,low
 ```
 
 #### Validation rules
@@ -109,7 +109,7 @@ Valid combinations: `[readonly]`, `[readonly, high]`, `[readonly, low]`, `[high]
 
 When both `readonly` and `high` are exposed, `Read<X>` readonly handlers duplicate the corresponding `Get<X>` from the high-level group (e.g. `ReadFunctionModule` vs `GetFunctionModule`). The launcher hides the readonly `Read<X>` variants in this case so that only one tool per operation is visible to the client.
 
-Embedder consumers of `EmbeddableMcpServer` keep the previous behavior (both variants exposed) unless they opt in by passing a `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
+`EmbeddableMcpServer` applies the same dedup by default, so embedders see one tool per operation just like the launcher. Consumers that need both variants can opt out by passing `new NoDedupStrategy()` as `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
 
 ### Config File
 
@@ -129,7 +129,7 @@ Set `MCP_EXPOSITION`:
 
 ```bash
 export MCP_EXPOSITION=readonly,high
-node bin/mcp-abap-adt-v2.js --transport=stdio --env-path=.env
+node bin/mcp-abap-adt.js --transport=stdio --env-path=.env
 ```
 
 ## Generating Handler Documentation
@@ -280,7 +280,9 @@ import {
 const server = new EmbeddableMcpServer({
   connection,
   exposition: ['readonly', 'high'],
-  // Opt in to dedup — hide ReadFunctionModule when GetFunctionModule is exposed, etc.
+  // Default already applies ReadVsGetDedupStrategy — hides ReadFunctionModule
+  // when GetFunctionModule is exposed, etc. Pass it explicitly to be explicit,
+  // or pass `new NoDedupStrategy()` to expose both variants.
   readOnlyDedupStrategy: new ReadVsGetDedupStrategy(),
 });
 ```
@@ -289,8 +291,8 @@ const server = new EmbeddableMcpServer({
 
 | Strategy | Behavior |
 |---|---|
-| `NoDedupStrategy` (default) | Never excludes anything — readonly group is exposed as-is. |
-| `ReadVsGetDedupStrategy` | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
+| `NoDedupStrategy` | Never excludes anything — readonly group is exposed as-is (opt-out). |
+| `ReadVsGetDedupStrategy` (default) | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
 
 **Custom strategies**: implement `IReadOnlyDedupStrategy` for role-based or domain-specific rules:
 
@@ -311,4 +313,4 @@ class RoleAwareDedup implements IReadOnlyDedupStrategy {
 }
 ```
 
-The default (no dedup) preserves behavior for existing consumers — upgrading the package does not change exposed tool sets unless the consumer explicitly passes a strategy.
+The default (`ReadVsGetDedupStrategy`) gives embedders the same single-tool-per-operation view as the launcher. Consumers that relied on both `Read<X>` and `Get<X>` being exposed must pass `new NoDedupStrategy()` to keep that behavior.

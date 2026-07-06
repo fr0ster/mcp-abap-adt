@@ -162,6 +162,7 @@ SAP CONNECTION (.env file):
   HTTP/SSE Headers (System Context):
     x-sap-master-system              Per-request SAP system ID (overrides SAP_MASTER_SYSTEM)
     x-sap-responsible                Per-request responsible user (overrides SAP_RESPONSIBLE)
+    x-sap-language                    Per-request master/original language for created objects (overrides SAP_LANGUAGE)
 
 GENERATING .ENV FROM SERVICE KEY:
   Install connection package: npm install -g @mcp-abap-adt/connection
@@ -371,6 +372,9 @@ async function main() {
       logger: loggerForTransport,
       tls: config.tls,
       allowDestinationHeader: config.allowDestinationHeader,
+      allowedHosts: config.allowedHosts,
+      allowedOrigins: config.allowedOrigins,
+      enableDnsRebindingProtection: config.enableDnsRebindingProtection,
     });
     activeServer = server;
     await server.start();
@@ -388,6 +392,9 @@ async function main() {
     logger: loggerForTransport,
     tls: config.tls,
     allowDestinationHeader: config.allowDestinationHeader,
+    allowedHosts: config.allowedHosts,
+    allowedOrigins: config.allowedOrigins,
+    enableDnsRebindingProtection: config.enableDnsRebindingProtection,
   });
   activeServer = server;
   await server.start();

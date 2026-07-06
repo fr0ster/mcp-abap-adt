@@ -18,6 +18,7 @@ import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/syste
 import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { createHandlerContext } from '../../helpers/testHelpers';
@@ -34,15 +35,19 @@ function parseTextPayload(result: any): any {
   return JSON.parse(textContent.text);
 }
 
-function extractDumpIdFromLink(link: string): string {
-  const match = link.match(/\/runtime\/dump\/(.+)$/);
-  return match ? decodeURIComponent(match[1]) : '';
+function extractDumpIdFromFeedEntry(entry: any): string {
+  // The dump id lives in the feed entry `id` (the `link` field is empty in the
+  // runtime-dumps feed). The path is `/runtime/dumps/<id>` (plural). The id
+  // segment is URL-encoded (trailing/embedded spaces as %20) and contains no
+  // "/", so it is passed as-is — NOT decoded — to RuntimeGetDumpById, which
+  // reads `/runtime/dump/<id>` (singular) and rejects ids containing "/".
+  const source = String(entry?.id ?? entry?.link ?? '');
+  const match = source.match(/\/runtime\/dumps\/(.+)$/);
+  return match ? match[1] : '';
 }
 
 function extractDumpIdsFromFeedEntries(entries: any[]): string[] {
-  return entries
-    .map((e: any) => extractDumpIdFromLink(e.link ?? ''))
-    .filter(Boolean);
+  return entries.map(extractDumpIdFromFeedEntry).filter(Boolean);
 }
 
 function extractHandlerErrorText(result: any): string {
@@ -102,6 +107,15 @@ ENDCLASS.
 
 CLASS ${className} IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
+    " Do measurable CPU work so the runtime profiler has time to arm and
+    " actually captures a trace — a trivial single-statement body finishes
+    " before tracing engages, so no trace file is ever written (the trace
+    " then never resolves no matter how long we poll).
+    DATA lv_x TYPE i.
+    DO 2000000 TIMES.
+      lv_x = sy-index MOD 100.
+    ENDDO.
+    out->write( lv_x ).
     out->write( |MCP runtime class profiling ${className}| ).
   ENDMETHOD.
 ENDCLASS.
@@ -141,6 +155,7 @@ async function createRunnableClass(
     args: Record<string, unknown>,
     directCall: () => Promise<any>,
   ) => Promise<any>,
+  options?: { activate?: boolean },
 ): Promise<void> {
   if (invokeTool) {
     const createResponse = await invokeTool(
@@ -172,11 +187,14 @@ async function createRunnableClass(
     transportRequest: context.transportRequest,
     description: `MCP runtime test ${className}`.slice(0, 60),
   });
-  await client.getClass().update({
-    className,
-    transportRequest: context.transportRequest,
-    sourceCode,
-  });
+  await client.getClass().update(
+    {
+      className,
+      transportRequest: context.transportRequest,
+      sourceCode,
+    },
+    { activateOnUpdate: options?.activate === true },
+  );
 }
 
 async function deleteClassIfExists(
@@ -679,54 +697,70 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
         }
 
+        // Hard mode drives everything through one cached MCP client, so there
+        // is no second isolated connection for the dump trigger. Under the
+        // stdio transport (what test-config.yaml sets) BaseMcpServer caches the
+        // ABAP connection, so the dumping run would poison the same context we
+        // then read from — exactly the problem this test avoids in soft mode.
+        // The isolation is soft-mode only; skip cleanly in hard mode.
+        if (tester.isHardMode()) {
+          throw new Error(
+            'SKIP: dump sub-test runs in soft mode only (hard-mode stdio caches the ABAP connection — no isolated trigger connection)',
+          );
+        }
+
         const dumpClassName = createName(
           normalizeNamePrefix(context.params?.dump_class_prefix, 'ZADT_RTDMP'),
         );
+
+        // In soft mode the MCP tool layer is bypassed; always call the handler
+        // directly via the directCall argument so context.connection is used.
         const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
+          _toolName: string,
+          _args: Record<string, unknown>,
           directCall: () => Promise<any>,
-        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+        ) => directCall();
+
+        // Trigger the dump on a dedicated throwaway connection so the dump's
+        // server-side context loss lands on IT, not on the main connection we
+        // read the dump from. The dump is keyed to the user (same trial user),
+        // so the main connection's feed read still finds it.
+        const { connection: triggerConnection } =
+          await createTestConnectionAndSession();
+        const triggerContext: LambdaTesterContext = {
+          ...context,
+          connection: triggerConnection,
+        };
 
         try {
+          // create + ACTIVATE the division-by-zero class on the trigger
+          // connection (active so the forced run actually executes and dumps).
           await createRunnableClass(
-            context,
+            triggerContext,
             dumpClassName,
             buildDumpClassSource(dumpClassName),
-            tester.isHardMode() ? invoke : undefined,
+            undefined,
+            { activate: true },
           );
 
-          if (tester.isHardMode()) {
-            const runResult = await invoke(
-              'RuntimeRunClassWithProfiling',
-              {
-                class_name: dumpClassName,
-                description: `MCP_RUNTIME_DUMP_${Date.now()}`,
-                all_procedural_units: true,
-                sql_trace: false,
-                max_time_for_tracing: 600,
-              },
-              async () => {
-                throw new Error(
-                  'Direct runtime run is not available in hard mode',
-                );
-              },
+          // Forced run on the trigger connection → HTTP 500 → real dump.
+          const triggerExecutor = new AdtExecutor(triggerConnection, logger);
+          try {
+            await triggerExecutor
+              .getClassExecutor()
+              .run({ className: dumpClassName });
+          } catch (runError: any) {
+            logger?.info(
+              `Expected failing run for dump generation: ${runError?.message || String(runError)}`,
             );
-            if (runResult.isError) {
-              logger?.info(
-                `Expected failing run for dump generation: ${extractHandlerErrorText(runResult)}`,
-              );
-            }
-          } else {
-            const executor = new AdtExecutor(context.connection, logger);
-            try {
-              await executor
-                .getClassExecutor()
-                .run({ className: dumpClassName });
-            } catch (runError: any) {
-              logger?.info(
-                `Expected failing run for dump generation: ${runError?.message || String(runError)}`,
-              );
+          } finally {
+            // Soft-mode HTTP has no network close; drop local session/cookie
+            // state best-effort and stop using the connection.
+            const resettable = triggerConnection as unknown as {
+              reset?: () => void;
+            };
+            if (typeof resettable.reset === 'function') {
+              resettable.reset();
             }
           }
 
@@ -803,11 +837,18 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             }
           }
 
+          const generatedDumpId = dumpIdFromGeneratedFailure;
           const dumpId =
-            dumpIdFromGeneratedFailure || context.params?.dump_id || undefined;
+            generatedDumpId || context.params?.dump_id || undefined;
           if (!dumpId) {
+            // We activated and executed a division-by-zero class, which MUST
+            // produce a runtime dump. Not finding it in the feed is a real
+            // failure (the run did not dump, or the feed lookup/extraction is
+            // broken) — fail, do NOT skip. `params.dump_id` is the explicit
+            // opt-out for read-only environments where self-generating a dump
+            // is not desired; only then is a missing generated dump tolerated.
             throw new Error(
-              'SKIP: no runtime dump found after forced division-by-zero run (set params.dump_id as fallback)',
+              'no runtime dump found in the feed after activating and executing the division-by-zero class — the forced run did not dump or the feed lookup is broken (set params.dump_id to read a pre-existing dump instead)',
             );
           }
           const dumpView =
@@ -845,6 +886,18 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(dumpData.dump_id).toBe(dumpId);
           expect(dumpData.view).toBe(dumpView);
 
+          // Bind a self-generated dump to THIS run: its content must reference
+          // the uniquely-named class we just dumped, so taking the newest feed
+          // entry cannot pass on an unrelated pre-existing dump. Skip this bind
+          // only for the explicit `params.dump_id` read-only path, where the
+          // dump is a pre-existing one unrelated to dumpClassName.
+          if (generatedDumpId) {
+            const dumpText = JSON.stringify(
+              dumpData.payload ?? dumpData,
+            ).toUpperCase();
+            expect(dumpText).toContain(dumpClassName.toUpperCase());
+          }
+
           const analyze = await invoke(
             'RuntimeGetDumpById',
             {
@@ -876,11 +929,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(analyzeData.summary).toBeDefined();
           expect(analyzeData.payload).toBeUndefined();
         } finally {
-          await deleteClassIfExists(
-            context,
-            dumpClassName,
-            tester.isHardMode() ? invoke : undefined,
-          );
+          await deleteClassIfExists(context, dumpClassName, undefined);
         }
       });
     },

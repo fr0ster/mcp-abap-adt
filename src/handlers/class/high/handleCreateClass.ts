@@ -52,6 +52,11 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Protected constructor. Default: false',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['class_name', 'package_name'],
   },
@@ -66,6 +71,7 @@ interface CreateClassArgs {
   final?: boolean;
   abstract?: boolean;
   create_protected?: boolean;
+  master_language?: string;
 }
 
 export async function handleCreateClass(
@@ -106,6 +112,7 @@ export async function handleCreateClass(
           abstract: args.abstract || false,
           createProtected: args.create_protected || false,
           sourceCode: undefined,
+          masterLanguage: args.master_language,
         },
         {
           activateOnCreate: false,

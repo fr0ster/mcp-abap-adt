@@ -16,24 +16,33 @@ Each module now owns its description via a constant `TOOL_DEFINITION` structure 
 ### 1. Handler Organization
 
 Handlers are organized into categorized subdirectories under `src/handlers/`:
-- `bdef/` - Behavior Definition handlers
+- `behavior_definition/` - Behavior Definition handlers
+- `behavior_implementation/` - Behavior Implementation handlers
 - `class/` - Class handlers
 - `common/` - Common handlers (activate, delete, check, lock, unlock, validate)
+- `compact/` - Compact facade handlers
 - `data_element/` - Data Element handlers
-- `ddlx/` - Metadata Extension handlers
+- `ddlx/` - DDLX (metadata extension) handlers
 - `domain/` - Domain handlers
 - `enhancement/` - Enhancement handlers
-- `function/` - Function handlers
+- `function/` - Function (function module) handlers
+- `function_group/` - Function Group handlers
+- `function_include/` - Function Include handlers
+- `function_module/` - Function Module handlers
 - `include/` - Include handlers
 - `interface/` - Interface handlers
+- `metadata_extension/` - Metadata Extension handlers
 - `package/` - Package handlers
 - `program/` - Program handlers
 - `search/` - Search handlers
+- `service_binding/` - Service Binding handlers
+- `service_definition/` - Service Definition handlers
 - `structure/` - Structure handlers
 - `system/` - System handlers
 - `table/` - Table handlers
 - `transport/` - Transport handlers
-- `view/` - View handlers
+- `unit_test/` - ABAP Unit test handlers
+- `view/` - View (CDS) handlers
 
 This organization improves code navigation, reduces merge conflicts, and makes the codebase more maintainable.
 
@@ -145,7 +154,6 @@ import { TOOL_DEFINITION as GetClass_Tool } from '../handlers/class/handleGetCla
 const DYNAMIC_IMPORT_TOOLS: ToolDefinition[] = [
   GetObjectsByType_Tool,
   GetObjectsList_Tool,
-  GetProgFullCode_Tool,
   GetObjectNodeFromCache_Tool,
   DescribeByList_Tool
 ];
@@ -206,7 +214,7 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
 ```
 
 **Note:** Most handlers are statically imported, but some use dynamic imports to avoid circular dependencies or improve startup performance:
-- `GetObjectsList`, `GetObjectsByType`, `GetProgFullCode`, `GetObjectNodeFromCache`, `DescribeByList` (marked in `DYNAMIC_IMPORT_TOOLS`)
+- `GetObjectsList`, `GetObjectsByType`, `GetObjectNodeFromCache`, `DescribeByList` (marked in `DYNAMIC_IMPORT_TOOLS`)
 - `GetAdtTypes`, `GetObjectStructure` (also use dynamic import but are in main `ALL_TOOLS` array)
 
 ## Benefits

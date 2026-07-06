@@ -33,9 +33,9 @@ Cline reads MCP server configurations from:
 
 If you installed via npm:
 ```bash
-npm install -g @fr0ster/mcp-abap-adt
+npm install -g @mcp-abap-adt/core
 # or
-npx @fr0ster/mcp-abap-adt
+npx @mcp-abap-adt/core
 ```
 
 Use the simpler configurations below (no need to specify full paths).
@@ -61,7 +61,7 @@ If you cloned the repository and are developing locally, use the full path confi
       "command": "npx",
       "args": [
         "-y",
-        "@fr0ster/mcp-abap-adt",
+        "@mcp-abap-adt/core",
         "--transport=stdio",
         "--env=/absolute/path/to/.env"
       ],
@@ -80,7 +80,7 @@ If you cloned the repository and are developing locally, use the full path confi
       "command": "npx",
       "args": [
         "-y",
-        "@fr0ster/mcp-abap-adt",
+        "@mcp-abap-adt/core",
         "--transport=stdio",
         "--env=/Users/username/.env"
       ],
@@ -99,7 +99,7 @@ If you cloned the repository and are developing locally, use the full path confi
       "command": "npx",
       "args": [
         "-y",
-        "@fr0ster/mcp-abap-adt",
+        "@mcp-abap-adt/core",
         "--transport=stdio",
         "--env=C:/Users/username/.env"
       ],
@@ -112,7 +112,7 @@ If you cloned the repository and are developing locally, use the full path confi
 
 #### B. Using Global Installation
 
-If you installed globally (`npm install -g @fr0ster/mcp-abap-adt`):
+If you installed globally (`npm install -g @mcp-abap-adt/core`):
 
 **With .env file:**
 ```json
@@ -192,12 +192,12 @@ Choose one method:
 
 **A. Using NPX** (recommended):
 ```bash
-npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000
+npx @mcp-abap-adt/core --transport=http --port=3000
 ```
 
 **B. Using Global Install**:
 ```bash
-mcp-abap-adt --transport=http --http-port=3000
+mcp-abap-adt --transport=http --port=3000
 ```
 
 **C. Using NPM Script** (local development):
@@ -258,12 +258,12 @@ Choose one method:
 
 **A. Using NPX** (recommended):
 ```bash
-npx @fr0ster/mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
+npx @mcp-abap-adt/core --transport=sse --port=3001 --env=/path/to/.env
 ```
 
 **B. Using Global Install**:
 ```bash
-mcp-abap-adt --transport=sse --sse-port=3001 --env=/path/to/.env
+mcp-abap-adt --transport=sse --port=3001 --env=/path/to/.env
 ```
 
 **C. Using NPM Script** (local development):
@@ -418,18 +418,10 @@ You can run multiple instances with different SAP systems:
 
 ```bash
 # HTTP
-node ./bin/mcp-abap-adt.js --transport=http --http-port=8080 --http-host=0.0.0.0
+node ./bin/mcp-abap-adt.js --transport=http --port=8080 --host=0.0.0.0
 
 # SSE
-node ./bin/mcp-abap-adt.js --transport=sse --sse-port=8081 --sse-host=0.0.0.0
-```
-
-### CORS Configuration
-
-```bash
-node ./bin/mcp-abap-adt.js --transport=http \
-  --http-allowed-origins=http://localhost:3000,https://example.com \
-  --http-enable-dns-protection
+node ./bin/mcp-abap-adt.js --transport=sse --port=8081 --host=0.0.0.0
 ```
 
 ### Environment Variables
@@ -466,7 +458,11 @@ Instead of command-line arguments, you can use environment variables:
 
 1. **Never commit** `.env` files with credentials to git
 2. **Use JWT authentication** for production environments
-3. **Enable DNS protection** for HTTP/SSE servers exposed to network
+3. **Enable DNS-rebinding protection** for HTTP/SSE servers exposed to network — use `--http-enable-dns-protection` with `--http-allowed-hosts` to restrict which Host headers are accepted. Example:
+   ```bash
+   mcp-abap-adt --transport=http --http-enable-dns-protection --http-allowed-hosts=localhost:3000
+   ```
+   This is Host/Origin allowlist validation, NOT browser CORS — no `Access-Control-Allow-Origin` headers are emitted. A non-allowlisted Host gets HTTP 403. The `--http-allowed-hosts` value must include the port (e.g. `localhost:3000`, not `localhost`).
 4. **Use HTTPS** in production (configure reverse proxy)
 
 ## Next Steps

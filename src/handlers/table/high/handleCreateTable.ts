@@ -42,6 +42,11 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['table_name', 'package_name'],
   },
@@ -52,6 +57,7 @@ interface CreateTableArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
+  master_language?: string;
 }
 
 /**
@@ -101,6 +107,7 @@ export async function handleCreateTable(
         description: createTableArgs.description || tableName,
         ddlCode: '',
         transportRequest: createTableArgs.transport_request,
+        masterLanguage: createTableArgs.master_language,
       });
 
       logger?.info(`Table created: ${tableName}`);

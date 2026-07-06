@@ -53,6 +53,15 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UnlockDataElementLow](#unlockdataelementlow-low-level-data-element)
     - [UpdateDataElementLow](#updatedataelementlow-low-level-data-element)
     - [ValidateDataElementLow](#validatedataelementlow-low-level-data-element)
+  - [Ddl](#low-level-ddl)
+    - [ActivateDdlLow](#activateddllow-low-level-ddl)
+    - [CheckDdlLow](#checkddllow-low-level-ddl)
+    - [CreateDdlLow](#createddllow-low-level-ddl)
+    - [DeleteDdlLow](#deleteddllow-low-level-ddl)
+    - [LockDdlLow](#lockddllow-low-level-ddl)
+    - [UnlockDdlLow](#unlockddllow-low-level-ddl)
+    - [UpdateDdlLow](#updateddllow-low-level-ddl)
+    - [ValidateDdlLow](#validateddllow-low-level-ddl)
   - [Ddlx](#low-level-ddlx)
     - [ActivateMetadataExtensionLow](#activatemetadataextensionlow-low-level-ddlx)
     - [CheckMetadataExtensionLow](#checkmetadataextensionlow-low-level-ddlx)
@@ -141,15 +150,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ValidateTableLow](#validatetablelow-low-level-table)
   - [Transport](#low-level-transport)
     - [CreateTransportLow](#createtransportlow-low-level-transport)
-  - [View](#low-level-view)
-    - [ActivateViewLow](#activateviewlow-low-level-view)
-    - [CheckViewLow](#checkviewlow-low-level-view)
-    - [CreateViewLow](#createviewlow-low-level-view)
-    - [DeleteViewLow](#deleteviewlow-low-level-view)
-    - [LockViewLow](#lockviewlow-low-level-view)
-    - [UnlockViewLow](#unlockviewlow-low-level-view)
-    - [UpdateViewLow](#updateviewlow-low-level-view)
-    - [ValidateViewLow](#validateviewlow-low-level-view)
 
 ---
 
@@ -193,7 +193,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Behavior Definition description.
-- `implementation_type` (string, required) - Implementation type: 
+- `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.
 - `name` (string, required) - Behavior Definition name (e.g., ZI_MY_BDEF).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY).
@@ -266,7 +266,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - BehaviorDefinition description. Required for validation.
-- `implementation_type` (string, required) - Implementation type: 
+- `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.
 - `name` (string, required) - BehaviorDefinition name to validate (e.g., ZI_MY_BDEF).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
 - `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY). Required for validation.
@@ -366,7 +366,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
 
 ---
 
@@ -409,7 +409,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleGetClassUnitTestResult.ts`
 
 **Parameters:**
-- `format` (string, optional) - Preferred response format. Defaults to 
+- `format` (string, optional) - Preferred response format. Defaults to 'abapunit'.
 - `run_id` (string, required) - Run identifier returned by RunClassUnitTestsLow.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -553,7 +553,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/common/low/handleActivateObject.ts`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
 
 ---
@@ -569,20 +569,20 @@ Generated from code in `src/handlers/**` (not from docs).
 - `object_type` (string, required) - Object type
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' or 'inactive' (default active)
 
 ---
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem/legacy only — calling it on ABAP Cloud will fail.
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type (class/program/interface/function_group/function_module/table/structure/view/domain/data_element/behavior_definition/metadata_extension)
+- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
 
 ---
@@ -626,9 +626,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `behavior_definition` (string, optional) - Optional behavior definition name (required for behavior_implementation validation)
 - `description` (string, optional) - Optional description for validation
-- `implementation_type` (string, optional) - Implementation type: 
+- `implementation_type` (string, optional) - Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)
 - `object_name` (string, required) - Object name to validate (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)
-- `object_type` (string, required) - Object type: 
+- `object_type` (string, required) - Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'
 - `package_name` (string, optional) - Optional package name for validation
 - `root_entity` (string, optional) - Root entity name (required for behavior_definition validation)
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -673,7 +673,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - DataElement name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `data_type` (string, optional) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 
+- `data_type` (string, optional) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'E' or 'domain'.
 - `decimals` (number, optional) - Decimal places (for predefinedAbapType or refToPredefinedAbapType)
 - `description` (string, required) - DataElement description.
 - `length` (number, optional) - Data type length (for predefinedAbapType or refToPredefinedAbapType)
@@ -681,8 +681,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `type_kind` (string, optional) - Type kind: 
-- `type_name` (string, optional) - Type name: domain name (when type_kind is 
+- `type_kind` (string, optional) - Type kind: 'E' for domain-based, 'P' for predefined type, etc.
+- `type_name` (string, optional) - Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')
 
 ---
 
@@ -755,6 +755,123 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="low-level-ddl"></a>
+### Low-Level / Ddl
+
+<a id="activateddllow-low-level-ddl"></a>
+#### ActivateDdlLow (Low-Level / Ddl)
+**Description:** Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., ZVW_MY_VIEW).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="checkddllow-low-level-ddl"></a>
+#### CheckDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
+
+**Source:** `src/handlers/ddl/low/handleCheckDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
+
+---
+
+<a id="createddllow-low-level-ddl"></a>
+#### CreateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Create a new ABAP DDL source. - use CreateDdl (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
+
+**Source:** `src/handlers/ddl/low/handleCreateDdl.ts`
+
+**Parameters:**
+- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
+- `ddl_name` (string, required) - DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `description` (string, required) - DDL source description.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="deleteddllow-low-level-ddl"></a>
+#### DeleteDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="lockddllow-low-level-ddl"></a>
+#### LockDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+
+**Source:** `src/handlers/ddl/low/handleLockDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="unlockddllow-low-level-ddl"></a>
+#### UnlockDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Unlock an ABAP DDL source after modification. Must use the same session_id and lock_handle from LockDdlLow operation.
+
+**Source:** `src/handlers/ddl/low/handleUnlockDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
+- `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
+- `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="updateddllow-low-level-ddl"></a>
+#### UpdateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
+
+**Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.
+- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
+- `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="validateddllow-low-level-ddl"></a>
+#### ValidateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Validate an ABAP DDL source name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Source:** `src/handlers/ddl/low/handleValidateDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, required) - DDL source description. Required for validation.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
 <a id="low-level-ddlx"></a>
 ### Low-Level / Ddlx
 
@@ -792,7 +909,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Metadata Extension description.
-- `master_language` (string, optional) - Master language (optional, e.g., 
+- `master_language` (string, optional) - Master language (optional, e.g., 'EN').
 - `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -1038,7 +1155,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FM)
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
 
 ---
 
@@ -1464,11 +1581,11 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/low/handleCreateProgram.ts`
 
 **Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: 
+- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
 - `description` (string, required) - Program description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `program_type` (string, optional) - Program type: 
+- `program_type` (string, optional) - Program type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -1603,7 +1720,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
 
 ---
 
@@ -1614,13 +1731,13 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/structure/low/handleCreateStructure.ts`
 
 **Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: 
+- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
 - `description` (string, required) - Structure description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `structure_type` (string, optional) - Structure type: 
+- `structure_type` (string, optional) - Structure type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
@@ -1704,9 +1821,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetNodeStructure.ts`
 
 **Parameters:**
-- `node_id` (string, optional (default: 0000" for root). Use to fetch child nodes.)) - Optional node ID (default: 
+- `node_id` (string, optional (default: 0000" for root). Use to fetch child nodes.)) - Optional node ID (default: "0000" for root). Use to fetch child nodes.
 - `parent_name` (string, required) - Parent object name
-- `parent_type` (string, required) - Parent object type (e.g., 
+- `parent_type` (string, required) - Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `with_short_descriptions` (boolean, optional (default: true)) - Include short descriptions in response
@@ -1720,8 +1837,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetObjectStructure.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name (e.g., 
-- `object_type` (string, required) - Object type (e.g., 
+- `object_name` (string, required) - Object name (e.g., "ZMY_CLASS", "ZMY_PROGRAM")
+- `object_type` (string, required) - Object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K", "DDLS/DF")
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1734,9 +1851,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetVirtualFolders.ts`
 
 **Parameters:**
-- `facet_order` (array, optional (default: ['package)) - Order of facets in response (e.g., [
+- `facet_order` (array, optional (default: ['package)) - Order of facets in response (e.g., ["package", "group", "type"]). Default: ["package", "group", "type"]
 - `ignore_short_descriptions` (boolean, optional (default: false)) - Ignore short descriptions in response
-- `object_search_pattern` (string, optional (default: *)) - Object search pattern (e.g., 
+- `object_search_pattern` (string, optional (default: *)) - Object search pattern (e.g., "*", "Z*", "ZCL_*"). Default: "*"
 - `preselection` (array, optional) - Optional preselection filters (facet-value pairs for filtering)
 - `with_versions` (boolean, optional (default: false)) - Include version information in response
 
@@ -1766,11 +1883,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `reporter` (string, optional) - Check reporter: 
+- `reporter` (string, optional) - Check reporter: 'tableStatusCheck' or 'abapCheckRun'. Default: abapCheckRun
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `table_name` (string, required) - Table name (e.g., Z_MY_TABLE)
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated), 'inactive' (current unsaved), or 'new' (for new code validation). Default: new
 
 ---
 
@@ -1870,126 +1987,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Transport request description.
-- `transport_type` (string, optional (default: workbench').)) - Transport type: 
+- `transport_type` (string, optional (default: workbench').)) - Transport type: 'workbench' or 'customizing' (optional, default: 'workbench').
 
 ---
 
-<a id="low-level-view"></a>
-### Low-Level / View
-
-<a id="activateviewlow-low-level-view"></a>
-#### ActivateViewLow (Low-Level / View)
-**Description:** Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/view/low/handleActivateView.ts`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., ZVW_MY_VIEW).
-
----
-
-<a id="checkviewlow-low-level-view"></a>
-#### CheckViewLow (Low-Level / View)
-**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
-
-**Source:** `src/handlers/view/low/handleCheckView.ts`
-
-**Parameters:**
-- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="createviewlow-low-level-view"></a>
-#### CreateViewLow (Low-Level / View)
-**Description:** [low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/view/low/handleCreateView.ts`
-
-**Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: 
-- `description` (string, required) - View description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_name` (string, required) - View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `view_type` (string, optional) - View type: 
-
----
-
-<a id="deleteviewlow-low-level-view"></a>
-#### DeleteViewLow (Low-Level / View)
-**Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
-
-**Source:** `src/handlers/view/low/handleDeleteView.ts`
-
-**Parameters:**
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="lockviewlow-low-level-view"></a>
-#### LockViewLow (Low-Level / View)
-**Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/view/low/handleLockView.ts`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="unlockviewlow-low-level-view"></a>
-#### UnlockViewLow (Low-Level / View)
-**Description:** [low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.
-
-**Source:** `src/handlers/view/low/handleUnlockView.ts`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockView operation.
-- `session_id` (string, required) - Session ID from LockView operation. Must be the same as used in LockView.
-- `session_state` (object, optional) - Session state from LockView (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="updateviewlow-low-level-view"></a>
-#### UpdateViewLow (Low-Level / View)
-**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/view/low/handleUpdateView.ts`
-
-**Parameters:**
-- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
-
----
-
-<a id="validateviewlow-low-level-view"></a>
-#### ValidateViewLow (Low-Level / View)
-**Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/view/low/handleValidateView.ts`
-
-**Parameters:**
-- `description` (string, required) - View description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name to validate (e.g., Z_MY_PROGRAM).
-
----
-
-*Last updated: 2026-06-01*
+*Last updated: 2026-07-05*

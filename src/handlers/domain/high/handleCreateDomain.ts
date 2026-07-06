@@ -106,6 +106,11 @@ export const TOOL_DEFINITION = {
           required: ['low', 'text'],
         },
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['domain_name'],
   },
@@ -126,6 +131,7 @@ interface DomainArgs {
   activate?: boolean;
   fixed_values?: Array<{ low: string; text: string }>;
   super_package?: string;
+  master_language?: string;
 }
 
 /**
@@ -177,6 +183,7 @@ export async function handleCreateDomain(
         description: typedArgs.description || domainName,
         packageName: typedArgs.package_name,
         transportRequest: typedArgs.transport_request,
+        masterLanguage: typedArgs.master_language,
       });
 
       // Lock

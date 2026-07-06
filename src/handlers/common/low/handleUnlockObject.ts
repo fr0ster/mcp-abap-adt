@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
           'function_module',
           'table',
           'structure',
-          'view',
+          'ddl',
           'domain',
           'data_element',
           'package',
@@ -107,7 +107,7 @@ export async function handleUnlockObject(
       'function_module',
       'table',
       'structure',
-      'view',
+      'ddl',
       'domain',
       'data_element',
       'package',
@@ -158,12 +158,22 @@ export async function handleUnlockObject(
             .getFunctionGroup()
             .unlock({ functionGroupName: objectName }, lock_handle);
           break;
-        case 'function_module':
-          return return_error(
-            new Error(
-              'Function module unlocking via UnlockObject is not supported. Use function-module-specific handler.',
-            ),
+        case 'function_module': {
+          if (!objectName.includes('|')) {
+            return return_error(
+              new Error('Function module name must be in format GROUP|FM_NAME'),
+            );
+          }
+          const [groupName, fmName] = objectName.split('|');
+          await client.getFunctionModule().unlock(
+            {
+              functionGroupName: groupName,
+              functionModuleName: fmName,
+            },
+            lock_handle,
           );
+          break;
+        }
         case 'table':
           await client
             .getTable()
@@ -174,8 +184,8 @@ export async function handleUnlockObject(
             .getStructure()
             .unlock({ structureName: objectName }, lock_handle);
           break;
-        case 'view':
-          await client.getView().unlock({ viewName: objectName }, lock_handle);
+        case 'ddl':
+          await client.getDdl().unlock({ ddlName: objectName }, lock_handle);
           break;
         case 'domain':
           await client

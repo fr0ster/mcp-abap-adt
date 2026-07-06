@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
           'function_group',
           'table',
           'structure',
-          'view',
+          'ddl',
           'domain',
           'data_element',
           'behavior_definition',
@@ -107,7 +107,7 @@ export async function handleCheckObject(
       'function_group',
       'table',
       'structure',
-      'view',
+      'ddl',
       'domain',
       'data_element',
       'behavior_definition',
@@ -172,10 +172,10 @@ export async function handleCheckObject(
             .getStructure()
             .check({ structureName: objectName }, checkVersion);
           break;
-        case 'view':
+        case 'ddl':
           checkState = await client
-            .getView()
-            .check({ viewName: objectName }, checkVersion);
+            .getDdl()
+            .check({ ddlName: objectName }, checkVersion);
           break;
         case 'domain':
           checkState = await client

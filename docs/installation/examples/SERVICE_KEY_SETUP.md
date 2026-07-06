@@ -40,13 +40,13 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ```bash
 # With NPX (recommended)
-npx @fr0ster/mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+npx @mcp-abap-adt/core --transport=http --port=3000 --auth-broker
 
 # Or with global install
-mcp-abap-adt --transport=http --http-port=3000 --auth-broker
+mcp-abap-adt --transport=http --port=3000 --auth-broker
 
 # With custom path for service keys and sessions
-mcp-abap-adt --transport=http --http-port=3000 --auth-broker --auth-broker-path=~/prj/tmp/
+mcp-abap-adt --transport=http --port=3000 --auth-broker --auth-broker-path=~/prj/tmp/
 ```
 
 **Why --auth-broker is required:**

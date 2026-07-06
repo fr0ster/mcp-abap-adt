@@ -18,7 +18,7 @@ After installation, you'll be able to:
 ## 🔧 Prerequisites
 
 All platforms require:
-- **Node.js** 18 or later
+- **Node.js** 22 or later
 - **npm** (comes with Node.js)
 - **Git**
 - Access to SAP ABAP system (on-premise or BTP)
@@ -36,14 +36,14 @@ Download and install from a pre-built `.tgz` package:
 # Or receive it from your administrator
 
 # Install globally (recommended)
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Or install locally in your project
-npm install ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install ./mcp-abap-adt-core-<version>.tgz
 ```
 
 After installation, you'll have access to:
-- `mcp-abap-adt` - MCP ABAP ADT Server (default: HTTP mode)
+- `mcp-abap-adt` - MCP ABAP ADT Server (default: stdio mode)
 - `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
 - `mcp-abap-adt --transport=http` - HTTP server transport
 - `mcp-abap-adt --transport=sse` - SSE transport
@@ -90,7 +90,7 @@ mcp-auth auth -k path/to/service-key.json
 
 **Run the server:**
 ```bash
-# Default HTTP mode (uses auth-broker by default, even if .env exists)
+# Default stdio mode (bare command starts stdio; HTTP/SSE require --transport=http/--transport=sse)
 # Note: auth-broker is available for stdio/SSE via `--mcp=<destination>` and for HTTP via destination headers
 mcp-abap-adt
 
@@ -111,7 +111,7 @@ mcp-abap-adt --env-path=/path/to/my.env
 mcp-abap-adt --env-path ~/configs/sap-dev.env
 
 # Start HTTP server on custom port
-mcp-abap-adt --transport=http --http-port=8080
+mcp-abap-adt --transport=http --port=8080
 ```
 
 **Environment File Priority:**
@@ -245,10 +245,10 @@ This project uses **npm workspaces** to manage multiple packages (`@mcp-abap-adt
 
 ### Installing from Pre-built Package
 
-The pre-built package (`fr0ster-mcp-abap-adt-<version>.tgz`) contains everything you need to run the server without building from source.
+The pre-built package (`mcp-abap-adt-core-<version>.tgz`) contains everything you need to run the server without building from source.
 
 #### Prerequisites
-- Node.js 18 or later
+- Node.js 22 or later
 - npm 9 or later
 
 #### Global Installation (Recommended)
@@ -257,7 +257,7 @@ Install globally to use commands from anywhere:
 
 ```bash
 # Install from local package file
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Verify installation
 mcp-abap-adt --help
@@ -268,7 +268,7 @@ mcp-abap-adt --transport=sse --help
 **Available commands after global installation:**
 
 ```bash
-# Default HTTP mode (uses auth-broker by default)
+# Default stdio mode (HTTP/SSE require --transport=http/--transport=sse)
 mcp-abap-adt
 
 # Force use of auth-broker (service keys), ignore .env file
@@ -281,10 +281,10 @@ mcp-abap-adt --transport=stdio
 mcp-abap-adt --env-path=/path/to/.env
 
 # HTTP server transport
-mcp-abap-adt --transport=http --http-port=3000
+mcp-abap-adt --transport=http --port=3000
 
 # SSE transport
-mcp-abap-adt --transport=sse --sse-port=3001
+mcp-abap-adt --transport=sse --port=3001
 ```
 
 **For JWT authentication with service keys**, install separately:
@@ -302,10 +302,10 @@ Install in your project directory:
 cd /path/to/your/project
 
 # Install the package
-npm install /path/to/fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install /path/to/mcp-abap-adt-core-<version>.tgz
 
 # Use via npx
-npx mcp-abap-adt --transport=http --port 3000
+npx mcp-abap-adt --transport=http --port=3000
 ```
 
 #### Configuration
@@ -375,7 +375,7 @@ EOF
 Or use a custom environment file:
 
 ```bash
-mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port 3000
+mcp-abap-adt --transport=http --env-path /path/to/custom/.env --port=3000
 ```
 
 #### Usage Examples
@@ -387,22 +387,22 @@ mcp-abap-adt --transport=http
 
 **Example 2: Start HTTP server on custom port**
 ```bash
-mcp-abap-adt --transport=http --port 8080
+mcp-abap-adt --transport=http --port=8080
 ```
 
 **Example 3: Start HTTP server accessible from network**
 ```bash
-mcp-abap-adt --transport=http --host 0.0.0.0 --port 3000
+mcp-abap-adt --transport=http --host=0.0.0.0 --port=3000
 ```
 
 **Example 4: Use custom environment file**
 ```bash
-mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port 8080
+mcp-abap-adt --transport=http --env-path /opt/config/.env.production --port=8080
 ```
 
 **Example 5: Start SSE server**
 ```bash
-mcp-abap-adt --transport=sse --port 3000
+mcp-abap-adt --transport=sse --port=3000
 ```
 
 #### Command Line Options
@@ -426,19 +426,22 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
 
 **HTTP Server Options (for `mcp-abap-adt --transport=http`):**
-- `--http-port=<port>` - HTTP server port (default: 3000)
-- `--http-host=<host>` - HTTP server host (default: 0.0.0.0)
+- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` - Server port (default: 3000 for http)
+- `--path=<path>` / `--http-path=<path>` (alias) - HTTP endpoint path (default: /mcp/stream/http)
 - `--http-json-response` - Enable JSON response format
-- `--http-allowed-origins=<list>` - Comma-separated allowed origins for CORS
-- `--http-allowed-hosts=<list>` - Comma-separated allowed hosts
-- `--http-enable-dns-protection` - Enable DNS rebinding protection
+- `--http-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3000`)
+- `--http-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
+- `--http-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
 **SSE Server Options (for `mcp-abap-adt --transport=sse`):**
-- `--sse-port=<port>` - SSE server port (default: 3001)
-- `--sse-host=<host>` - SSE server host (default: 0.0.0.0)
-- `--sse-allowed-origins=<list>` - Comma-separated allowed origins for CORS
-- `--sse-allowed-hosts=<list>` - Comma-separated allowed hosts
-- `--sse-enable-dns-protection` - Enable DNS rebinding protection
+- `--host=<host>` - Server host (default: 127.0.0.1; use 0.0.0.0 for all interfaces)
+- `--port=<port>` - Server port (default: 3001 for sse)
+- `--sse-path=<path>` - SSE connection path (default: /sse)
+- `--post-path=<path>` - SSE message post path (default: /messages)
+- `--sse-allowed-hosts=<list>` - Comma-separated exact Host header values for DNS-rebinding protection (includes port, e.g. `localhost:3001`)
+- `--sse-allowed-origins=<list>` - Comma-separated exact Origin header values for DNS-rebinding protection (includes scheme, e.g. `https://app.example.com`)
+- `--sse-enable-dns-protection` - Enable Host/Origin allowlist validation (NOT browser CORS — no Access-Control-Allow-Origin headers are emitted); needs at least one list set; non-allowlisted Host/Origin → HTTP 403
 
 **Environment Variables:**
 
@@ -450,8 +453,14 @@ You can also configure the server using environment variables.
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_HTTP_PORT` - Default HTTP port
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
+- `MCP_HTTP_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3000`)
+- `MCP_HTTP_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
+- `MCP_HTTP_ENABLE_DNS_PROTECTION` - Enable HTTP Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 - `MCP_SSE_PORT` - Default SSE port
 - `MCP_SSE_HOST` - Default SSE host (default: 127.0.0.1)
+- `MCP_SSE_ALLOWED_HOSTS` - Comma-separated exact Host header values (DNS-rebinding protection; includes port, e.g. `localhost:3001`)
+- `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
+- `MCP_SSE_ENABLE_DNS_PROTECTION` - Enable SSE Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 - `MCP_UNSAFE` - Disable connection validation (true|false)
 - `MCP_USE_AUTH_BROKER` - Force auth-broker usage (true|false)
 - `MCP_BROWSER` - Browser for OAuth2 flow (e.g., chrome, firefox)
@@ -491,12 +500,11 @@ mcp-abap-adt --help
 # Use custom .env from different location
 mcp-abap-adt --env=~/configs/sap-production.env
 
-# Start HTTP server with CORS configuration
-mcp-abap-adt --transport=http --http-port=8080 \
-  --http-allowed-origins=http://localhost:3000,https://myapp.com
+# Start HTTP server
+mcp-abap-adt --transport=http --port=8080
 
-# Start SSE with DNS protection
-mcp-abap-adt --transport=sse --sse-port=3001 --sse-enable-dns-protection
+# Start SSE server
+mcp-abap-adt --transport=sse --port=3001
 ```
 
 **Example 6: Use stdio transport (for MCP clients)**
@@ -510,10 +518,10 @@ To update to a newer version:
 
 ```bash
 # Uninstall old version
-npm uninstall -g @fr0ster/mcp-abap-adt
+npm uninstall -g @mcp-abap-adt/core
 
 # Install new version
-npm install -g ./fr0ster-mcp-abap-adt-1.2.0.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 ```
 
 #### Troubleshooting Package Installation
@@ -537,7 +545,7 @@ $env:PATH += ";$(npm config get prefix)"
 Solution:
 ```bash
 # Use sudo for global installation
-sudo npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+sudo npm install -g ./mcp-abap-adt-core-<version>.tgz
 
 # Or configure npm to use a different directory (recommended)
 mkdir ~/.npm-global
@@ -546,7 +554,7 @@ echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 
 # Then install without sudo
-npm install -g ./fr0ster-mcp-abap-adt-1.1.0.tgz
+npm install -g ./mcp-abap-adt-core-<version>.tgz
 ```
 
 ---

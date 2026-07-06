@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
           'function_module',
           'table',
           'structure',
-          'view',
+          'ddl',
           'domain',
           'data_element',
           'package',
@@ -111,7 +111,7 @@ export async function handleLockObject(
       'function_module',
       'table',
       'structure',
-      'view',
+      'ddl',
       'domain',
       'data_element',
       'package',
@@ -163,12 +163,19 @@ export async function handleLockObject(
             .getFunctionGroup()
             .lock({ functionGroupName: objectName });
           break;
-        case 'function_module':
-          return return_error(
-            new Error(
-              'Function module locking via LockObject is not supported. Use function-module-specific handler.',
-            ),
-          );
+        case 'function_module': {
+          if (!objectName.includes('|')) {
+            return return_error(
+              new Error('Function module name must be in format GROUP|FM_NAME'),
+            );
+          }
+          const [groupName, fmName] = objectName.split('|');
+          lockHandle = await client.getFunctionModule().lock({
+            functionGroupName: groupName,
+            functionModuleName: fmName,
+          });
+          break;
+        }
         case 'table':
           lockHandle = await client.getTable().lock({ tableName: objectName });
           break;
@@ -177,8 +184,8 @@ export async function handleLockObject(
             .getStructure()
             .lock({ structureName: objectName });
           break;
-        case 'view':
-          lockHandle = await client.getView().lock({ viewName: objectName });
+        case 'ddl':
+          lockHandle = await client.getDdl().lock({ ddlName: objectName });
           break;
         case 'domain':
           lockHandle = await client

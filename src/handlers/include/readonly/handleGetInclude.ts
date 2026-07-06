@@ -6,7 +6,6 @@ import {
   McpError,
   makeAdtRequestWithTimeout,
 } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 
 // TODO: Migrate to infrastructure module
 // This handler uses direct ADT endpoint: /sap/bc/adt/programs/includes/{name}/source/main
@@ -17,7 +16,7 @@ export const TOOL_DEFINITION = {
   name: 'GetInclude',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Retrieve source code of a specific ABAP include file.',
+    '[read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). This is the correct tool for include names (PROG/I) — ReadProgram does not read includes.',
   inputSchema: {
     include_name: z.string().describe('Name of the ABAP Include'),
   },
@@ -38,9 +37,6 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
       'default',
     );
     const plainText = response.data;
-    if (args.filePath) {
-      writeResultToFile(plainText, args.filePath);
-    }
     logger?.info(`✅ GetInclude completed: ${args.include_name}`);
     return {
       isError: false,

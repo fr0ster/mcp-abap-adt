@@ -2,7 +2,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ErrorCode, McpError } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
@@ -213,10 +212,6 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
           },
         ],
       };
-      if (args.filePath) {
-        logger?.debug(`Writing SQL query result to file: ${args.filePath}`);
-        writeResultToFile(result, args.filePath);
-      }
       return result;
     } else {
       throw new McpError(

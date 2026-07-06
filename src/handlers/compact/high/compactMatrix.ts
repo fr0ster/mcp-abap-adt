@@ -12,7 +12,7 @@ export const COMPACT_CRUD_MATRIX: Record<
   TRANSPORT: ['create'],
   TABLE: ['create', 'get', 'update', 'delete'],
   STRUCTURE: ['create', 'get', 'update', 'delete'],
-  VIEW: ['create', 'get', 'update', 'delete'],
+  DDL: ['create', 'get', 'update', 'delete'],
   SERVICE_DEFINITION: ['create', 'get', 'update', 'delete'],
   SERVICE_BINDING: ['create', 'get', 'update', 'delete'],
   CLASS: ['create', 'get', 'update', 'delete'],

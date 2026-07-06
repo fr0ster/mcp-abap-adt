@@ -3,16 +3,11 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 132
+- Total tools: 177
 
 ## Navigation
 
 - [High-Level Group](#high-level-group)
-  - [Atc](#high-level-atc)
-    - [GetATCFindings](#getatcfindings-high-level-atc)
-    - [GetATCRunStatus](#getatcrunstatus-high-level-atc)
-    - [ListATCCheckVariants](#listatccheckvariants-high-level-atc)
-    - [RunATC](#runatc-high-level-atc)
   - [Behavior Definition](#high-level-behavior-definition)
     - [CheckBehaviorDefinition](#checkbehaviordefinition-high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
@@ -44,6 +39,45 @@ Generated from code in `src/handlers/**` (not from docs).
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Common](#high-level-common)
     - [ActivateObjects](#activateobjects-high-level-common)
+    - [GetBehaviorDefinitionVersionDiff](#getbehaviordefinitionversiondiff-high-level-common)
+    - [GetBehaviorDefinitionVersions](#getbehaviordefinitionversions-high-level-common)
+    - [GetBehaviorDefinitionVersionSource](#getbehaviordefinitionversionsource-high-level-common)
+    - [GetClassVersionDiff](#getclassversiondiff-high-level-common)
+    - [GetClassVersions](#getclassversions-high-level-common)
+    - [GetClassVersionSource](#getclassversionsource-high-level-common)
+    - [GetDataElementVersionDiff](#getdataelementversiondiff-high-level-common)
+    - [GetDataElementVersions](#getdataelementversions-high-level-common)
+    - [GetDataElementVersionSource](#getdataelementversionsource-high-level-common)
+    - [GetDdlVersionDiff](#getddlversiondiff-high-level-common)
+    - [GetDdlVersions](#getddlversions-high-level-common)
+    - [GetDdlVersionSource](#getddlversionsource-high-level-common)
+    - [GetDomainVersionDiff](#getdomainversiondiff-high-level-common)
+    - [GetDomainVersions](#getdomainversions-high-level-common)
+    - [GetDomainVersionSource](#getdomainversionsource-high-level-common)
+    - [GetFunctionGroupVersionDiff](#getfunctiongroupversiondiff-high-level-common)
+    - [GetFunctionGroupVersions](#getfunctiongroupversions-high-level-common)
+    - [GetFunctionGroupVersionSource](#getfunctiongroupversionsource-high-level-common)
+    - [GetFunctionModuleVersionDiff](#getfunctionmoduleversiondiff-high-level-common)
+    - [GetFunctionModuleVersions](#getfunctionmoduleversions-high-level-common)
+    - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-high-level-common)
+    - [GetInterfaceVersionDiff](#getinterfaceversiondiff-high-level-common)
+    - [GetInterfaceVersions](#getinterfaceversions-high-level-common)
+    - [GetInterfaceVersionSource](#getinterfaceversionsource-high-level-common)
+    - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-high-level-common)
+    - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
+    - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
+    - [GetPackageVersionDiff](#getpackageversiondiff-high-level-common)
+    - [GetPackageVersions](#getpackageversions-high-level-common)
+    - [GetPackageVersionSource](#getpackageversionsource-high-level-common)
+    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
+    - [GetProgramVersions](#getprogramversions-high-level-common)
+    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
+    - [GetStructureVersionDiff](#getstructureversiondiff-high-level-common)
+    - [GetStructureVersions](#getstructureversions-high-level-common)
+    - [GetStructureVersionSource](#getstructureversionsource-high-level-common)
+    - [GetTableVersionDiff](#gettableversiondiff-high-level-common)
+    - [GetTableVersions](#gettableversions-high-level-common)
+    - [GetTableVersionSource](#gettableversionsource-high-level-common)
   - [Compact](#high-level-compact)
     - [HandlerActivate](#handleractivate-high-level-compact)
     - [HandlerCdsUnitTestResult](#handlercdsunittestresult-high-level-compact)
@@ -73,6 +107,12 @@ Generated from code in `src/handlers/**` (not from docs).
     - [DeleteDataElement](#deletedataelement-high-level-data-element)
     - [GetDataElement](#getdataelement-high-level-data-element)
     - [UpdateDataElement](#updatedataelement-high-level-data-element)
+  - [Ddl](#high-level-ddl)
+    - [CheckDdl](#checkddl-high-level-ddl)
+    - [CreateDdl](#createddl-high-level-ddl)
+    - [DeleteDdl](#deleteddl-high-level-ddl)
+    - [GetDdl](#getddl-high-level-ddl)
+    - [UpdateDdl](#updateddl-high-level-ddl)
   - [Ddlx](#high-level-ddlx)
     - [CheckMetadataExtension](#checkmetadataextension-high-level-ddlx)
     - [CreateMetadataExtension](#createmetadataextension-high-level-ddlx)
@@ -93,6 +133,10 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Function Group](#high-level-function-group)
     - [DeleteFunctionGroup](#deletefunctiongroup-high-level-function-group)
     - [GetFunctionGroup](#getfunctiongroup-high-level-function-group)
+  - [Function Include](#high-level-function-include)
+    - [CreateFunctionInclude](#createfunctioninclude-high-level-function-include)
+    - [DeleteFunctionInclude](#deletefunctioninclude-high-level-function-include)
+    - [UpdateFunctionInclude](#updatefunctioninclude-high-level-function-include)
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
@@ -102,6 +146,15 @@ Generated from code in `src/handlers/**` (not from docs).
     - [DeleteInterface](#deleteinterface-high-level-interface)
     - [GetInterface](#getinterface-high-level-interface)
     - [UpdateInterface](#updateinterface-high-level-interface)
+  - [Message Class](#high-level-message-class)
+    - [CreateMessageClass](#createmessageclass-high-level-message-class)
+    - [CreateMessageClassMessage](#createmessageclassmessage-high-level-message-class)
+    - [DeleteMessageClass](#deletemessageclass-high-level-message-class)
+    - [DeleteMessageClassMessage](#deletemessageclassmessage-high-level-message-class)
+    - [GetMessageClass](#getmessageclass-high-level-message-class)
+    - [GetMessageClassMessage](#getmessageclassmessage-high-level-message-class)
+    - [UpdateMessageClass](#updatemessageclass-high-level-message-class)
+    - [UpdateMessageClassMessage](#updatemessageclassmessage-high-level-message-class)
   - [Metadata Extension](#high-level-metadata-extension)
     - [DeleteMetadataExtension](#deletemetadataextension-high-level-metadata-extension)
     - [GetMetadataExtension](#getmetadataextension-high-level-metadata-extension)
@@ -154,75 +207,14 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
-    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
-  - [View](#high-level-view)
-    - [CheckView](#checkview-high-level-view)
-    - [CreateView](#createview-high-level-view)
-    - [DeleteView](#deleteview-high-level-view)
-    - [GetView](#getview-high-level-view)
-    - [UpdateView](#updateview-high-level-view)
 
 ---
 
 <a id="high-level-group"></a>
 ## High-Level Group
-
-<a id="high-level-atc"></a>
-### High-Level / Atc
-
-<a id="getatcfindings-high-level-atc"></a>
-#### GetATCFindings (High-Level / Atc)
-**Description:** Retrieve ATC findings for a completed worklist. The worklist_id is returned by 
-
-**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
-
-**Parameters:**
-- `format` (string, optional (default: xml)) - Findings format: 
-- `include_exempted_findings` (boolean, optional (default: false)) - Include exempted (suppressed) findings in the result.
-- `worklist_id` (string, required) - 32-character worklist GUID returned by RunATC.
-
----
-
-<a id="getatcrunstatus-high-level-atc"></a>
-#### GetATCRunStatus (High-Level / Atc)
-**Description:** Read the status of an asynchronous ATC run by run_id. Response body contains 
-
-**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by RunATC.
-- `with_long_polling` (boolean, optional (default: true)) - Use server-side long polling so the call returns sooner after the run finishes.
-
----
-
-<a id="listatccheckvariants-high-level-atc"></a>
-#### ListATCCheckVariants (High-Level / Atc)
-**Description:** List available ATC check variants on the SAP system. Returns the variants XML. 
-
-**Source:** `src/handlers/atc/high/handleListATCCheckVariants.ts`
-
-**Parameters:**
-- `max_item_count` (number, optional (default: 500).)) - Maximum number of variants to return (default: 500).
-- `name_pattern` (string, optional (default: *").)) - Name filter pattern, 
-
----
-
-<a id="runatc-high-level-atc"></a>
-#### RunATC (High-Level / Atc)
-**Description:** Start an asynchronous ATC (ABAP Test Cockpit) run for an ABAP object. 
-
-**Source:** `src/handlers/atc/high/handleRunATC.ts`
-
-**Parameters:**
-- `check_variant` (string, optional) - ATC check variant name. If omitted, uses the system
-- `max_findings` (number, optional (default: 100).)) - Maximum number of findings to return (default: 100).
-- `object_name` (string, required) - Name of the ABAP object to check (e.g., 
-- `object_type` (string, required) - Type of object to check. Use 
-
----
 
 <a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
@@ -247,7 +239,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
-- `implementation_type` (string, required) - Implementation type: 
+- `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', 'Projection'
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
 - `package_name` (string, required) - Package name
 - `root_entity` (string, required) - Root Entity name (CDS View name)
@@ -275,7 +268,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name (e.g., Z_MY_BEHAVIORDEFINITION).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -332,7 +325,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name (e.g., Z_MY_BEHAVIORIMPLEMENTATION).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -363,7 +356,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.
 
 ---
 
@@ -379,6 +372,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
 - `final` (boolean, optional) - Mark class as final. Default: false
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
 - `superclass` (string, optional) - Optional superclass name.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -457,7 +451,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -469,7 +463,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -481,7 +475,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -493,7 +487,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -505,7 +499,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -589,8 +583,451 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/common/high/handleActivateObjects.ts`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+
+---
+
+<a id="getbehaviordefinitionversiondiff-high-level-common"></a>
+#### GetBehaviorDefinitionVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two RAP behavior definition versions, by their content_uris (taken from GetBehaviorDefinitionVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetBehaviorDefinitionVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetBehaviorDefinitionVersions entry).
+
+---
+
+<a id="getbehaviordefinitionversions-high-level-common"></a>
+#### GetBehaviorDefinitionVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a RAP behavior definition. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetBehaviorDefinitionVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `behavior_definition_name` (string, required) - RAP behavior definition name.
+
+---
+
+<a id="getbehaviordefinitionversionsource-high-level-common"></a>
+#### GetBehaviorDefinitionVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific RAP behavior definition version by its content_uri (taken from a GetBehaviorDefinitionVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetBehaviorDefinitionVersions entry.
+
+---
+
+<a id="getclassversiondiff-high-level-common"></a>
+#### GetClassVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP class versions, by their content_uris (taken from GetClassVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetClassVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetClassVersions entry).
+
+---
+
+<a id="getclassversions-high-level-common"></a>
+#### GetClassVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetClassVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `class_name` (string, required) - ABAP class name.
+
+---
+
+<a id="getclassversionsource-high-level-common"></a>
+#### GetClassVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP class version by its content_uri (taken from a GetClassVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetClassVersions entry.
+
+---
+
+<a id="getdataelementversiondiff-high-level-common"></a>
+#### GetDataElementVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP data element versions, by their content_uris (taken from GetDataElementVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDataElementVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDataElementVersions entry).
+
+---
+
+<a id="getdataelementversions-high-level-common"></a>
+#### GetDataElementVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP data element. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDataElementVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `data_element_name` (string, required) - ABAP data element name.
+
+---
+
+<a id="getdataelementversionsource-high-level-common"></a>
+#### GetDataElementVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP data element version by its content_uri (taken from a GetDataElementVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDataElementVersions entry.
+
+---
+
+<a id="getddlversiondiff-high-level-common"></a>
+#### GetDdlVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two CDS view (DDL source) versions, by their content_uris (taken from GetDdlVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDdlVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDdlVersions entry).
+
+---
+
+<a id="getddlversions-high-level-common"></a>
+#### GetDdlVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDdlVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view (DDL source) name.
+
+---
+
+<a id="getddlversionsource-high-level-common"></a>
+#### GetDdlVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific CDS view (DDL source) version by its content_uri (taken from a GetDdlVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDdlVersions entry.
+
+---
+
+<a id="getdomainversiondiff-high-level-common"></a>
+#### GetDomainVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP domain versions, by their content_uris (taken from GetDomainVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDomainVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDomainVersions entry).
+
+---
+
+<a id="getdomainversions-high-level-common"></a>
+#### GetDomainVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP domain. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDomainVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `domain_name` (string, required) - ABAP domain name.
+
+---
+
+<a id="getdomainversionsource-high-level-common"></a>
+#### GetDomainVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP domain version by its content_uri (taken from a GetDomainVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDomainVersions entry.
+
+---
+
+<a id="getfunctiongroupversiondiff-high-level-common"></a>
+#### GetFunctionGroupVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP function group versions, by their content_uris (taken from GetFunctionGroupVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionGroupVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionGroupVersions entry).
+
+---
+
+<a id="getfunctiongroupversions-high-level-common"></a>
+#### GetFunctionGroupVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP function group. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionGroupVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - ABAP function group name.
+
+---
+
+<a id="getfunctiongroupversionsource-high-level-common"></a>
+#### GetFunctionGroupVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP function group version by its content_uri (taken from a GetFunctionGroupVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionGroupVersions entry.
+
+---
+
+<a id="getfunctionmoduleversiondiff-high-level-common"></a>
+#### GetFunctionModuleVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP function module versions, by their content_uris (taken from GetFunctionModuleVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionModuleVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionModuleVersions entry).
+
+---
+
+<a id="getfunctionmoduleversions-high-level-common"></a>
+#### GetFunctionModuleVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionModuleVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Owning function group name (required).
+- `function_module_name` (string, required) - ABAP function module name.
+
+---
+
+<a id="getfunctionmoduleversionsource-high-level-common"></a>
+#### GetFunctionModuleVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP function module version by its content_uri (taken from a GetFunctionModuleVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionModuleVersions entry.
+
+---
+
+<a id="getinterfaceversiondiff-high-level-common"></a>
+#### GetInterfaceVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP interface versions, by their content_uris (taken from GetInterfaceVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetInterfaceVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetInterfaceVersions entry).
+
+---
+
+<a id="getinterfaceversions-high-level-common"></a>
+#### GetInterfaceVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `interface_name` (string, required) - ABAP interface name.
+
+---
+
+<a id="getinterfaceversionsource-high-level-common"></a>
+#### GetInterfaceVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP interface version by its content_uri (taken from a GetInterfaceVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetInterfaceVersions entry.
+
+---
+
+<a id="getmetadataextensionversiondiff-high-level-common"></a>
+#### GetMetadataExtensionVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two CDS metadata extension versions, by their content_uris (taken from GetMetadataExtensionVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetMetadataExtensionVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetMetadataExtensionVersions entry).
+
+---
+
+<a id="getmetadataextensionversions-high-level-common"></a>
+#### GetMetadataExtensionVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a CDS metadata extension. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetMetadataExtensionVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `metadata_extension_name` (string, required) - CDS metadata extension name.
+
+---
+
+<a id="getmetadataextensionversionsource-high-level-common"></a>
+#### GetMetadataExtensionVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific CDS metadata extension version by its content_uri (taken from a GetMetadataExtensionVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetMetadataExtensionVersions entry.
+
+---
+
+<a id="getpackageversiondiff-high-level-common"></a>
+#### GetPackageVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP package versions, by their content_uris (taken from GetPackageVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetPackageVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetPackageVersions entry).
+
+---
+
+<a id="getpackageversions-high-level-common"></a>
+#### GetPackageVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP package. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetPackageVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `package_name` (string, required) - ABAP package name.
+
+---
+
+<a id="getpackageversionsource-high-level-common"></a>
+#### GetPackageVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP package version by its content_uri (taken from a GetPackageVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetPackageVersions entry.
+
+---
+
+<a id="getprogramversiondiff-high-level-common"></a>
+#### GetProgramVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP program versions, by their content_uris (taken from GetProgramVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetProgramVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetProgramVersions entry).
+
+---
+
+<a id="getprogramversions-high-level-common"></a>
+#### GetProgramVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetProgramVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `program_name` (string, required) - ABAP program name.
+
+---
+
+<a id="getprogramversionsource-high-level-common"></a>
+#### GetProgramVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP program version by its content_uri (taken from a GetProgramVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetProgramVersions entry.
+
+---
+
+<a id="getstructureversiondiff-high-level-common"></a>
+#### GetStructureVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP structure versions, by their content_uris (taken from GetStructureVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetStructureVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetStructureVersions entry).
+
+---
+
+<a id="getstructureversions-high-level-common"></a>
+#### GetStructureVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP structure. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetStructureVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `structure_name` (string, required) - ABAP structure name.
+
+---
+
+<a id="getstructureversionsource-high-level-common"></a>
+#### GetStructureVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP structure version by its content_uri (taken from a GetStructureVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetStructureVersions entry.
+
+---
+
+<a id="gettableversiondiff-high-level-common"></a>
+#### GetTableVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP table versions, by their content_uris (taken from GetTableVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetTableVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetTableVersions entry).
+
+---
+
+<a id="gettableversions-high-level-common"></a>
+#### GetTableVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP table. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetTableVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `table_name` (string, required) - ABAP table name.
+
+---
+
+<a id="gettableversionsource-high-level-common"></a>
+#### GetTableVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP table version by its content_uri (taken from a GetTableVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetTableVersions entry.
 
 ---
 
@@ -668,7 +1105,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercheckrun-high-level-compact"></a>
 #### HandlerCheckRun (High-Level / Compact)
-**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCheckRun.ts`
 
@@ -681,29 +1118,43 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate object after create.
 - `application` (string, optional) - Domain application area.
+- `behavior_definition` (string, optional) - Referenced behavior definition name (behavior implementation create).
+- `cds_view_name` (string, optional) - CDS view name to validate for unit test doubles.
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
+- `data_element_name` (string, optional) - Data element name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `decimals` (number, optional) - Decimal places.
 - `description` (string, optional) - Human-readable object description.
 - `domain_name` (string, optional) - ABAP domain name.
+- `fields` (array, optional) - Structure fields (for STRUCTURE create).
 - `fixed_values` (array, optional) - Domain fixed values list.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
+- `implementation_type` (string, optional) - Behavior definition implementation type.
+- `interface_name` (string, optional) - Interface name.
 - `length` (number, optional) - Length for typed artifacts.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `object_type` (any, required) - 
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
+- `root_entity` (string, optional) - Root CDS entity name (behavior definition create).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
 - `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `tests` (array, optional) - Container/test class pairs (for UNIT_TEST create).
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
@@ -711,17 +1162,28 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerdelete-high-level-compact"></a>
 #### HandlerDelete (High-Level / Compact)
-**Description:** Delete operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
 **Parameters:**
+- `behavior_definition_name` (string, optional) - Behavior definition name.
+- `behavior_implementation_name` (string, optional) - Behavior implementation name.
 - `class_name` (string, optional) - ABAP class name.
+- `data_element_name` (string, optional) - Data element name.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
 - `domain_name` (string, optional) - ABAP domain name.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
+- `interface_name` (string, optional) - Interface name.
+- `metadata_extension_name` (string, optional) - Metadata extension name.
 - `object_type` (any, required) - 
 - `program_name` (string, optional) - ABAP program name.
+- `run_id` (string, optional) - Unit test run id (UNIT_TEST delete).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
 - `transport_request` (string, optional) - Transport request id (if required by system).
 
 ---
@@ -754,7 +1216,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
-**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerGet.ts`
 
@@ -763,6 +1225,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `behavior_implementation_name` (string, optional) - Behavior implementation name.
 - `class_name` (string, optional) - Class name.
 - `data_element_name` (string, optional) - Data element name.
+- `ddl_name` (string, optional) - DDL source name.
 - `domain_name` (string, optional) - Domain name.
 - `function_group_name` (string, optional) - Function group name.
 - `function_module_name` (string, optional) - Function module name.
@@ -778,13 +1241,12 @@ Generated from code in `src/handlers/**` (not from docs).
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
 - `version` (any, optional) - 
-- `view_name` (string, optional) - View name.
 
 ---
 
 <a id="handlerlock-high-level-compact"></a>
 #### HandlerLock (High-Level / Compact)
-**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerLock.ts`
 
@@ -932,7 +1394,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerunlock-high-level-compact"></a>
 #### HandlerUnlock (High-Level / Compact)
-**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*), INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), VIEW(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
+**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*), INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), DDL(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUnlock.ts`
 
@@ -945,28 +1407,49 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerupdate-high-level-compact"></a>
 #### HandlerUpdate (High-Level / Compact)
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), VIEW(view_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*), INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate object after update.
+- `behavior_definition` (string, optional) - Referenced behavior definition name (behavior implementation update).
+- `binding_variant` (string, optional) - Service binding variant (service binding update).
 - `class_name` (string, optional) - ABAP class name.
 - `conversion_exit` (string, optional) - Conversion exit name.
+- `data_element_name` (string, optional) - Data element name.
 - `datatype` (string, optional) - ABAP data type.
+- `ddl_code` (string, optional) - Complete DDL source code (for TABLE/STRUCTURE update).
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `ddl_source` (string, optional) - Complete DDL source code (for DDL update).
 - `decimals` (number, optional) - Decimal places.
+- `definitions_code` (string, optional) - Updated source for class local definitions.
 - `description` (string, optional) - Human-readable object description.
+- `desired_publication_state` (string, optional) - Target publication state (service binding update).
 - `domain_name` (string, optional) - ABAP domain name.
 - `fixed_values` (array, optional) - Domain fixed values list.
 - `function_group_name` (string, optional) - ABAP function group name.
 - `function_module_name` (string, optional) - ABAP function module name.
+- `implementation_code` (string, optional) - Behavior implementation methods source code.
+- `interface_name` (string, optional) - Interface name.
 - `length` (number, optional) - Length for typed artifacts.
+- `local_types_code` (string, optional) - Updated source for class local types.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `macros_code` (string, optional) - Updated source for class local macros.
+- `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
 - `object_type` (any, required) - 
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
+- `run_id` (string, optional) - Unit test run id (UNIT_TEST update).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `service_name` (string, optional) - Published service name (service binding update).
 - `sign_exists` (boolean, optional) - Allow signed values (domain setting).
 - `source_code` (string, optional) - ABAP source code payload.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `test_class_code` (string, optional) - Updated source for the local test class.
+- `test_class_source` (string, optional) - Updated local test class source (CDS_UNIT_TEST update).
 - `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
@@ -974,7 +1457,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlervalidate-high-level-compact"></a>
 #### HandlerValidate (High-Level / Compact)
-**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), VIEW(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
+**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerValidate.ts`
 
@@ -983,7 +1466,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Optional object description used during validation.
 - `implementation_type` (string, optional) - Optional implementation type, used for behavior implementation validation.
 - `object_name` (string, required) - Required object name. For SERVICE_BINDING this is the service binding name.
-- `object_type` (string, required) - Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, VIEW, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
+- `object_type` (string, required) - Object type to validate before create. Supported: CLASS, PROGRAM, INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, PACKAGE, BEHAVIOR_DEFINITION, BEHAVIOR_IMPLEMENTATION, METADATA_EXTENSION, SERVICE_BINDING.
 - `package_name` (string, optional) - Optional package context for validation (especially for create scenarios).
 - `root_entity` (string, optional) - Optional CDS root entity name, used for behavior-related validation.
 - `service_binding_version` (string, optional) - Optional service binding version for SERVICE_BINDING.
@@ -1015,12 +1498,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions.
-- `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 
+- `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.
 - `decimals` (number, optional (default: 0)) - Decimal places. Usually inherited from domain.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
 - `heading_label` (string, optional) - Heading field label (max 55 chars). Applied during update step after creation.
 - `length` (number, optional (default: 100)) - Data type length. Usually inherited from domain.
 - `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `medium_label` (string, optional) - Medium field label (max 20 chars). Applied during update step after creation.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `search_help` (string, optional) - Search help name. Applied during update step after creation.
@@ -1028,8 +1512,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `set_get_parameter` (string, optional) - Set/Get parameter ID. Applied during update step after creation.
 - `short_label` (string, optional) - Short field label (max 10 chars). Applied during update step after creation.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `type_kind` (string, optional (default: domain)) - Type kind: 
-- `type_name` (string, optional) - Type name: domain name (when type_kind is 
+- `type_kind` (string, optional (default: domain)) - Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.
+- `type_name` (string, optional) - Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')
 
 ---
 
@@ -1053,7 +1537,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1084,6 +1568,75 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="high-level-ddl"></a>
+### High-Level / Ddl
+
+<a id="checkddl-high-level-ddl"></a>
+#### CheckDdl (High-Level / Ddl)
+**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view name to check, passed as ddl_name (e.g., ZI_MY_VIEW).
+- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
+
+---
+
+<a id="createddl-high-level-ddl"></a>
+#### CreateDdl (High-Level / Ddl)
+**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
+
+**Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `description` (string, optional) - Optional description (defaults to ddl_name).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
+
+---
+
+<a id="deleteddl-high-level-ddl"></a>
+#### DeleteDdl (High-Level / Ddl)
+**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="getddl-high-level-ddl"></a>
+#### GetDdl (High-Level / Ddl)
+**Description:** Retrieve ABAP DDL source definition. Supports reading active or inactive version.
+
+**Source:** `src/handlers/ddl/high/handleGetDdl.ts`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="updateddl-high-level-ddl"></a>
+#### UpdateDdl (High-Level / Ddl)
+**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
+
+**Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate after update. Default: false.
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002).
+- `ddl_source` (string, required) - Complete DDL source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
 <a id="high-level-ddlx"></a>
 ### High-Level / Ddlx
 
@@ -1107,6 +1660,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate after creation. Default: true
 - `description` (string, optional) - Description
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
 - `transport_request` (string, optional) - Transport request number
@@ -1158,6 +1712,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
 - `lowercase` (boolean, optional (default: false)) - (optional) Allow lowercase input
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, optional) - (optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `sign_exists` (boolean, optional (default: false)) - (optional) Field has sign (+/-)
 - `transport_request` (string, optional) - (optional) Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -1185,7 +1740,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name (e.g., Z_MY_DOMAIN).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1235,7 +1790,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: active.
 
 ---
 
@@ -1249,6 +1804,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
 - `function_group_name` (string, required) - Function group name (e.g., ZTEST_FG_001). Must follow SAP naming conventions (start with Z or Y, max 26 chars).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1270,7 +1826,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -1319,7 +1875,52 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_FUNCTIONGROUP).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="high-level-function-include"></a>
+### High-Level / Function Include
+
+<a id="createfunctioninclude-high-level-function-include"></a>
+#### CreateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+
+**Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
+
+**Parameters:**
+- `description` (string, optional) - Optional description for the include
+- `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
+- `include_name` (string, required) - Include name (e.g., LZTEST_FG_001F01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="deletefunctioninclude-high-level-function-include"></a>
+#### DeleteFunctionInclude (High-Level / Function Include)
+**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGF01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="updatefunctioninclude-high-level-function-include"></a>
+#### UpdateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+
+**Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
+
+**Parameters:**
+- `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
+- `function_group_name` (string, required) - Function group name containing the include (e.g., ZOK_FG_MCP01).
+- `include_name` (string, required) - Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.
+- `source_code` (string, required) - Complete ABAP include source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable includes.
 
 ---
 
@@ -1348,7 +1949,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).
 - `function_module_name` (string, required) - FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1375,6 +1976,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
 - `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -1400,7 +2002,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., Z_MY_INTERFACE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1415,6 +2017,117 @@ Generated from code in `src/handlers/**` (not from docs).
 - `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE). Must exist in the system.
 - `source_code` (string, required) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
+
+---
+
+<a id="high-level-message-class"></a>
+### High-Level / Message Class
+
+<a id="createmessageclass-high-level-message-class"></a>
+#### CreateMessageClass (High-Level / Message Class)
+**Description:** Operation: Create. Subject: Message Class (MSAG). Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+
+**Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
+
+**Parameters:**
+- `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
+- `master_language` (string, optional) - (optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS). Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name (e.g., ZMY_PKG, $TMP for local objects).
+- `transport_request` (string, optional) - (optional) Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="createmessageclassmessage-high-level-message-class"></a>
+#### CreateMessageClassMessage (High-Level / Message Class)
+**Description:** Operation: Create. Subject: a single message inside a Message Class (MSAG). Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
+
+**Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
+
+**Parameters:**
+- `description` (string, optional) - (optional) Long description for the message.
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
+- `msgtext` (string, required) - Message text. May contain placeholders &1 &2 &3 &4 (or &).
+- `self_explanatory` (boolean, optional (default: false)) - (optional) Mark the message as self-explanatory (no long text needed). Default: false.
+- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable objects.
+
+---
+
+<a id="deletemessageclass-high-level-message-class"></a>
+#### DeleteMessageClass (High-Level / Message Class)
+**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system. Includes a deletion check before the actual deletion. Transport request required for transportable objects, optional for local ($TMP).
+
+**Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects, optional for local ($TMP).
+
+---
+
+<a id="deletemessageclassmessage-high-level-message-class"></a>
+#### DeleteMessageClassMessage (High-Level / Message Class)
+**Description:** Operation: Delete. Subject: a single message inside a Message Class (MSAG). Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+
+**Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number to delete (e.g., "001").
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects, optional for local ($TMP).
+
+---
+
+<a id="getmessageclass-high-level-message-class"></a>
+#### GetMessageClass (High-Level / Message Class)
+**Description:** Retrieve an ABAP message class (MSAG/T100) with its messages: name, description, package, master language and the message list (msgno, msgtext, self-explanatory).
+
+**Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+
+---
+
+<a id="getmessageclassmessage-high-level-message-class"></a>
+#### GetMessageClassMessage (High-Level / Message Class)
+**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). Returns msgno, msgtext, self-explanatory flag and description.
+
+**Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
+
+**Parameters:**
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
+
+---
+
+<a id="updatemessageclass-high-level-message-class"></a>
+#### UpdateMessageClass (High-Level / Message Class)
+**Description:** Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
+
+**Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
+
+**Parameters:**
+- `description` (string, required) - New short description for the message class.
+- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable objects.
+
+---
+
+<a id="updatemessageclassmessage-high-level-message-class"></a>
+#### UpdateMessageClassMessage (High-Level / Message Class)
+**Description:** Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+
+**Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
+
+**Parameters:**
+- `description` (string, optional) - (optional) Long description for the message.
+- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `msgno` (string, required) - Message number (e.g., "001").
+- `msgtext` (string, required) - New message text. May contain placeholders &1 &2 &3 &4 (or &).
+- `self_explanatory` (boolean, optional) - (optional) Mark the message as self-explanatory.
+- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable objects.
 
 ---
 
@@ -1441,7 +2154,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name (e.g., Z_MY_METADATAEXTENSION).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1479,7 +2192,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1504,11 +2217,12 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
 **Parameters:**
-- `application` (string, optional) - Application area (e.g., 
+- `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).
-- `program_type` (string, optional) - Program type: 
+- `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
@@ -1533,7 +2247,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1564,6 +2278,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional (default: true)) - Activate service binding after create. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI)) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - ABAP package name.
 - `response_format` (string, optional (default: xml)) - 
 - `service_binding_name` (string, required) - Service binding name.
@@ -1594,7 +2309,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleGetServiceBinding.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - Preferred response format. 
+- `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
 - `service_binding_name` (string, required) - Service binding name (for example: ZUI_MY_BINDING). Case-insensitive.
 
 ---
@@ -1653,6 +2368,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `service_definition_name` (string, required) - Service definition name (e.g., ZSD_MY_SERVICE). Must follow SAP naming conventions (start with Z or Y).
 - `source_code` (string, optional) - Service definition source code (optional). If not provided, a minimal template will be created.
@@ -1680,7 +2396,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `service_definition_name` (string, required) - ServiceDefinition name (e.g., Z_MY_SERVICEDEFINITION).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1710,7 +2426,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `structure_name` (string, required) - Structure name (e.g., ZST_MY_STRUCTURE).
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
 
 ---
 
@@ -1725,6 +2441,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
 - `fields` (array, required (default: 0)) - Array of structure fields
 - `includes` (array, optional) - Include other structures in this structure
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -1751,7 +2468,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1763,7 +2480,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
-- `ddl_code` (string, required) - Complete DDL source code for structure. Example: 
+- `ddl_code` (string, required) - Complete DDL source code for structure. Example: '@EndUserText.label : \'My Structure\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'
 - `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
 
@@ -1783,7 +2500,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `include_descriptions` (boolean, optional (default: true)) - Include object descriptions in response. Default: true
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
-- `package_name` (string, required) - Package name (e.g., 
+- `package_name` (string, required) - Package name (e.g., "ZMY_PACKAGE")
 
 ---
 
@@ -1799,7 +2516,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `table_name` (string, required) - Table name (e.g., ZMCP_MY_TABLE).
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active', 'inactive', or 'new'. Default: new.
 
 ---
 
@@ -1811,6 +2528,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, optional) - Table description for validation and creation.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -1837,7 +2555,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1849,7 +2567,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
-- `ddl_code` (string, required) - Complete DDL source code for table. Example: 
+- `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
 - `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Table must already exist.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
 
@@ -1867,8 +2585,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, required) - Transport request description (mandatory)
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
-- `target_system` (string, optional) - Target system for transport (optional, e.g., 
-- `transport_type` (string, optional (default: workbench)) - Transport type: 
+- `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
+- `transport_type` (string, optional (default: workbench)) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
 
 ---
 
@@ -2001,20 +2719,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="runabapunit-high-level-unit-test"></a>
-#### RunAbapUnit (High-Level / Unit Test)
-**Description:** Run ABAP Unit tests for a single ABAP object synchronously and return a 
-
-**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
-
-**Parameters:**
-- `object_name` (string, required) - Name of the ABAP object to test (e.g., 
-- `object_type` (string, required) - Type of object to test. Use 
-- `test_scope` (string, optional (default: own_tests)) - Scope of test discovery: 
-- `with_coverage` (boolean, optional (default: false).)) - Include code coverage measurement (default: false).
-
----
-
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
@@ -2055,72 +2759,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="high-level-view"></a>
-### High-Level / View
-
-<a id="checkview-high-level-view"></a>
-#### CheckView (High-Level / View)
-**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
-
-**Source:** `src/handlers/view/high/handleCheckView.ts`
-
-**Parameters:**
-- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `version` (string, optional) - Version to check: 
-- `view_name` (string, required) - CDS view name (e.g., ZI_MY_VIEW).
-
----
-
-<a id="createview-high-level-view"></a>
-#### CreateView (High-Level / View)
-**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state.
-
-**Source:** `src/handlers/view/high/handleCreateView.ts`
-
-**Parameters:**
-- `description` (string, optional) - Optional description (defaults to view_name).
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (required for transportable packages).
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
-
----
-
-<a id="deleteview-high-level-view"></a>
-#### DeleteView (High-Level / View)
-**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
-
-**Source:** `src/handlers/view/high/handleDeleteView.ts`
-
-**Parameters:**
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-<a id="getview-high-level-view"></a>
-#### GetView (High-Level / View)
-**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
-
-**Source:** `src/handlers/view/high/handleGetView.ts`
-
-**Parameters:**
-- `version` (string, optional (default: active)) - Version to read: 
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-<a id="updateview-high-level-view"></a>
-#### UpdateView (High-Level / View)
-**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates.
-
-**Source:** `src/handlers/view/high/handleUpdateView.ts`
-
-**Parameters:**
-- `activate` (boolean, optional) - Activate after update. Default: false.
-- `ddl_source` (string, required) - Complete DDL source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
-
----
-
-*Last updated: 2026-06-01*
+*Last updated: 2026-07-05*

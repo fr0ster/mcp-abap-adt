@@ -37,7 +37,7 @@ const testsLogger = createTestLogger('shared-setup');
 
 /**
  * Force-save DDL source for a CDS view by bypassing syntax check.
- * Uses AdtClient.getView().lock() / update(lockHandle) / unlock() — public IAdtObject API.
+ * Uses AdtClient.getDdl().lock() / update(lockHandle) / unlock() — public IAdtObject API.
  * Needed for views with circular dependencies (RAP root/child composition)
  * that cannot pass checkView before the counterpart view is active.
  * Group activation handles the mutual refs once both have stored source.
@@ -48,14 +48,17 @@ async function forceSaveViewSource(
   ddlSource: string,
   transportRequest?: string,
 ): Promise<void> {
-  const lockHandle = await client.getView().lock({ viewName });
+  const lockHandle = await client.getDdl().lock({ ddlName: viewName });
   try {
     await client
-      .getView()
-      .update({ viewName, ddlSource, transportRequest }, { lockHandle });
+      .getDdl()
+      .update(
+        { ddlName: viewName, ddlSource, transportRequest },
+        { lockHandle },
+      );
   } finally {
     try {
-      await client.getView().unlock({ viewName }, lockHandle);
+      await client.getDdl().unlock({ ddlName: viewName }, lockHandle);
     } catch {
       // ignore unlock errors
     }
@@ -65,6 +68,7 @@ async function forceSaveViewSource(
 /** Map shared_dependencies section name to ADT object type code */
 const TYPE_CODES: Record<string, string> = {
   tables: 'TABL/DT',
+  structures: 'TABL/DS',
   views: 'DDLS/DF',
   behavior_definitions: 'BDEF/BDO',
   classes: 'CLAS/OC',
@@ -234,6 +238,100 @@ describe('Admin: Setup shared dependencies', () => {
         }
       }
 
+      // --- Structures ---
+      // Structures must be created SEQUENTIALLY with per-item activation:
+      // a base structure that contains `include <other>;` requires the
+      // included structure to already exist AND be active. Config lists the
+      // include first and the base second, so processing in list order with
+      // immediate activation satisfies the dependency. These are NOT added to
+      // the group-activation list (they are already active by this point).
+      const structures = sharedConfig.structures || [];
+      if (structures.length > 0) {
+        testsLogger?.info?.(
+          `Creating Structures (${structures.length}) sequentially with activation...`,
+        );
+        for (const item of structures) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(
+              `Skipping structure ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
+            continue;
+          }
+          try {
+            let exists = false;
+            try {
+              const readResult = await client
+                .getStructure()
+                .read({ structureName: item.name });
+              exists = readResult !== undefined;
+            } catch {
+              exists = false;
+            }
+
+            if (!exists) {
+              try {
+                // create() only builds the skeleton (does NOT apply ddlCode)
+                await client.getStructure().create({
+                  structureName: item.name,
+                  packageName,
+                  description: item.description || 'Shared test structure',
+                  transportRequest,
+                });
+                testsLogger?.info?.(`Created structure ${item.name}`);
+              } catch (createError: any) {
+                const cmsg =
+                  createError instanceof Error
+                    ? createError.message
+                    : String(createError);
+                if (
+                  cmsg.includes('409') ||
+                  cmsg.includes('already exist') ||
+                  cmsg.includes('NoAccess')
+                ) {
+                  testsLogger?.warn?.(
+                    `Structure ${item.name} create issue (may already exist): ${cmsg.substring(0, 120)}`,
+                  );
+                } else {
+                  throw createError;
+                }
+              }
+            }
+
+            // Apply the real DDL source, then activate immediately so that a
+            // later base structure can reference this one via `include`.
+            if (item.source) {
+              await client.getStructure().update(
+                {
+                  structureName: item.name,
+                  ddlCode: item.source,
+                  transportRequest,
+                },
+                { sourceCode: item.source },
+              );
+              testsLogger?.info?.(`Updated structure ${item.name} source`);
+            }
+            await client.getStructure().activate({ structureName: item.name });
+            testsLogger?.info?.(`Activated structure ${item.name}`);
+
+            results.push({
+              type: 'structures',
+              name: item.name,
+              status: exists ? 'existed' : 'created',
+            });
+          } catch (error: any) {
+            const msg = error instanceof Error ? error.message : String(error);
+            testsLogger?.error?.(
+              `Failed to setup structure ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: 'structures',
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
+          }
+        }
+      }
+
       // --- Views ---
       const views = sharedConfig.views || [];
       if (views.length > 0) {
@@ -251,16 +349,16 @@ describe('Admin: Setup shared dependencies', () => {
             let exists = false;
             try {
               const readResult = await client
-                .getView()
-                .read({ viewName: item.name });
+                .getDdl()
+                .read({ ddlName: item.name });
               exists = readResult !== undefined;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getView().create({
-                viewName: item.name,
+              await client.getDdl().create({
+                ddlName: item.name,
                 packageName,
                 description: item.description || 'Shared test view',
                 ddlSource: item.source,
@@ -271,9 +369,9 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (item.source) {
               try {
-                await client.getView().update(
+                await client.getDdl().update(
                   {
-                    viewName: item.name,
+                    ddlName: item.name,
                     ddlSource: item.source,
                     transportRequest,
                   },
@@ -817,9 +915,23 @@ describe('Admin: Setup shared dependencies', () => {
         }
       }
 
-      // 3. Group-activate all objects (retry to resolve circular dependencies)
+      // 3. Activate all objects.
+      //
+      // Preferred path: a single bulk group-activate (resolves cross-object
+      // dependency ordering in one activation run). On cloud, however,
+      // bulk-activating many objects can exceed the activation-run request
+      // timeout (adt-clients uses a fixed ~45s timeout that is NOT overridable
+      // via activateObjectsGroup). Retrying the full group after a timeout just
+      // burns another 45s, so on timeout we skip straight to the batched
+      // fallback: activate in small chunks (each chunk is one cheap activation
+      // run well under the limit), two passes to resolve ordering between
+      // dependents (pass 2 retries only what failed in pass 1).
       if (toActivate.length > 0) {
+        const isTimeout = (err: any) =>
+          err?.code === 'ECONNABORTED' || /timeout/i.test(err?.message || '');
+
         const maxActivationAttempts = 3;
+        let groupActivated = false;
         for (let attempt = 1; attempt <= maxActivationAttempts; attempt++) {
           testsLogger?.info?.(
             `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
@@ -847,13 +959,9 @@ describe('Admin: Setup shared dependencies', () => {
               testsLogger?.error?.(
                 `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
               );
-              results.push({
-                type: 'activation',
-                name: 'GROUP',
-                status: `FAILED: ${errors.length} activation error(s)`,
-              });
-            } else if (activationResult.activated && activationResult.checked) {
+            } else {
               testsLogger?.info?.('Group activation completed successfully');
+              groupActivated = true;
             }
             if (warnings.length > 0) {
               testsLogger?.warn?.(
@@ -862,18 +970,83 @@ describe('Admin: Setup shared dependencies', () => {
             }
             break; // Success or final attempt — stop retrying
           } catch (error: any) {
+            // Retrying the full group after a timeout wastes another ~45s and
+            // will time out again — go straight to the batched fallback.
+            if (isTimeout(error)) {
+              testsLogger?.warn?.(
+                `Group activation timed out (${error.message}); falling back to batched activation`,
+              );
+              break;
+            }
             if (attempt < maxActivationAttempts) {
               testsLogger?.warn?.(
                 `Activation attempt ${attempt} failed: ${error.message}, retrying...`,
               );
               continue;
             }
-            testsLogger?.error?.(`Group activation failed: ${error.message}`);
+            testsLogger?.warn?.(
+              `Group activation failed: ${error.message}; falling back to batched activation`,
+            );
+          }
+        }
+
+        // Fallback: bulk group-activate never succeeded (e.g. timed out on
+        // cloud). Activate in small chunks — far fewer activation runs than
+        // one-per-object, each well under the timeout. Two passes resolve
+        // ordering between dependents; pass 2 retries only the leftovers.
+        if (!groupActivated) {
+          const CHUNK_SIZE = 5;
+          let pending = toActivate;
+          let lastErrors = new Map<string, string>();
+
+          for (let pass = 1; pass <= 2 && pending.length > 0; pass++) {
+            testsLogger?.info?.(
+              `Fallback activation pass ${pass}/2: ${pending.length} object(s) in chunks of ${CHUNK_SIZE}...`,
+            );
+            const failedThisPass: typeof toActivate = [];
+            lastErrors = new Map();
+
+            for (let i = 0; i < pending.length; i += CHUNK_SIZE) {
+              const chunk = pending.slice(i, i + CHUNK_SIZE);
+              const recordFailure = (msg: string) => {
+                for (const obj of chunk) {
+                  failedThisPass.push(obj);
+                  lastErrors.set(`${obj.type} ${obj.name}`, msg);
+                }
+              };
+              try {
+                const resp = await client
+                  .getUtils()
+                  .activateObjectsGroup(chunk, true);
+                const r = parseActivationResponse(resp.data);
+                const errs = r.messages.filter(
+                  (m) => m.type === 'error' || m.type === 'E',
+                );
+                if (errs.length > 0) {
+                  recordFailure(
+                    errs.map((e: any) => e.shortText || e.text).join('; '),
+                  );
+                }
+              } catch (e: any) {
+                recordFailure(e?.message || String(e));
+              }
+            }
+            pending = failedThisPass;
+          }
+
+          if (pending.length > 0) {
+            testsLogger?.error?.(
+              `Fallback activation failed for:\n${[...lastErrors.entries()].map(([k, v]) => `  ${k}: ${v}`).join('\n')}`,
+            );
             results.push({
               type: 'activation',
-              name: 'GROUP',
-              status: `FAILED: ${error.message}`,
+              name: 'FALLBACK',
+              status: `FAILED: ${pending.length} object(s) not activated`,
             });
+          } else {
+            testsLogger?.info?.(
+              'Fallback activation completed successfully (batched group-activate)',
+            );
           }
         }
       }

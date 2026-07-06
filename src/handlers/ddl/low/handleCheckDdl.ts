@@ -1,0 +1,197 @@
+/**
+ * CheckDdlLow Handler - Syntax check for ABAP DDL Source
+ *
+ * Uses AdtClient.getDdl().check from @mcp-abap-adt/adt-clients.
+ * Low-level handler: single method call.
+ */
+
+import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { createAdtClient } from '../../../lib/clients';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type AxiosResponse,
+  restoreSessionInConnection,
+  return_error,
+  return_response,
+} from '../../../lib/utils';
+
+export const TOOL_DEFINITION = {
+  name: 'CheckDdlLow',
+  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  description:
+    '[low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      ddl_name: {
+        type: 'string',
+        description: 'DDL source name (e.g., Z_MY_PROGRAM).',
+      },
+      ddl_source: {
+        type: 'string',
+        description:
+          'Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.',
+      },
+      version: {
+        type: 'string',
+        description:
+          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive",
+        enum: ['active', 'inactive'],
+      },
+      session_id: {
+        type: 'string',
+        description:
+          'Session ID from GetSession. If not provided, a new session will be created.',
+      },
+      session_state: {
+        type: 'object',
+        description:
+          'Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+        properties: {
+          cookies: { type: 'string' },
+          csrf_token: { type: 'string' },
+          cookie_store: { type: 'object' },
+        },
+      },
+    },
+    required: ['ddl_name'],
+  },
+} as const;
+
+interface CheckDdlArgs {
+  ddl_name: string;
+  ddl_source?: string;
+  version?: string;
+  session_id?: string;
+  session_state?: {
+    cookies?: string;
+    csrf_token?: string;
+    cookie_store?: Record<string, string>;
+  };
+}
+
+/**
+ * Main handler for CheckDdl MCP tool
+ *
+ * Uses AdtClient.getDdl().check - low-level single method call
+ */
+export async function handleCheckDdl(
+  context: HandlerContext,
+  args: CheckDdlArgs,
+) {
+  const { connection, logger } = context;
+  try {
+    const {
+      ddl_name,
+      ddl_source,
+      version = 'inactive',
+      session_id,
+      session_state,
+    } = args as CheckDdlArgs;
+
+    // Validation
+    if (!ddl_name) {
+      return return_error(new Error('ddl_name is required'));
+    }
+
+    const client = createAdtClient(connection, logger);
+
+    // Restore session state if provided
+    if (session_id && session_state) {
+      await restoreSessionInConnection(connection, session_id, session_state);
+    } else {
+      // Ensure connection is established
+    }
+
+    const ddlName = ddl_name.toUpperCase();
+
+    const validVersions = ['active', 'inactive'];
+    const checkVersion =
+      version && validVersions.includes(version.toLowerCase())
+        ? (version.toLowerCase() as 'active' | 'inactive')
+        : 'inactive';
+
+    logger?.info(
+      `Starting DDL source check: ${ddlName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`,
+    );
+
+    try {
+      // Check DDL source with optional source code (for validating new/unsaved code)
+      // If ddl_source is provided, it will be base64 encoded in the request body
+      const checkState = await client
+        .getDdl()
+        .check({ ddlName: ddlName, ddlSource: ddl_source }, checkVersion);
+      const response = checkState.checkResult;
+
+      if (!response) {
+        throw new Error(
+          `Check did not return a response for DDL source ${ddlName}`,
+        );
+      }
+
+      // Parse check results
+      const checkResult = parseCheckRunResponse(response as AxiosResponse);
+
+      // Get updated session state after check
+
+      logger?.info(`✅ CheckDdlLow completed: ${ddlName}`);
+      logger?.info(`   Status: ${checkResult.status}`);
+      logger?.info(
+        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
+      );
+
+      return return_response({
+        data: JSON.stringify(
+          {
+            success: checkResult.success,
+            ddl_name: ddlName,
+            version: checkVersion,
+            check_result: checkResult,
+            session_id: session_id || null,
+            session_state: null, // Session state management is now handled by auth-broker,
+            message: checkResult.success
+              ? `DDL source ${ddlName} has no syntax errors`
+              : `DDL source ${ddlName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
+          },
+          null,
+          2,
+        ),
+      } as AxiosResponse);
+    } catch (error: any) {
+      logger?.error(
+        `Error checking DDL source ${ddlName}: ${error?.message || error}`,
+      );
+
+      // Parse error message
+      let errorMessage = `Failed to check DDL source: ${error.message || String(error)}`;
+
+      if (error.response?.status === 404) {
+        errorMessage = `DDL source ${ddlName} not found.`;
+      } else if (
+        error.response?.data &&
+        typeof error.response.data === 'string'
+      ) {
+        try {
+          const { XMLParser } = require('fast-xml-parser');
+          const parser = new XMLParser({
+            ignoreAttributes: false,
+            attributeNamePrefix: '@_',
+          });
+          const errorData = parser.parse(error.response.data);
+          const errorMsg =
+            errorData['exc:exception']?.message?.['#text'] ||
+            errorData['exc:exception']?.message;
+          if (errorMsg) {
+            errorMessage = `SAP Error: ${errorMsg}`;
+          }
+        } catch (_parseError) {
+          // Ignore parse errors
+        }
+      }
+
+      return return_error(new Error(errorMessage));
+    }
+  } catch (error: any) {
+    return return_error(error);
+  }
+}

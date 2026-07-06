@@ -11,9 +11,25 @@ import {
   TOOL_DEFINITION as ReadClass_Tool,
 } from '../../../handlers/class/readonly/handleReadClass';
 import {
+  TOOL_DEFINITION as GetObjectVersionDiff_Tool,
+  handleGetObjectVersionDiff,
+} from '../../../handlers/common/readonly/handleGetObjectVersionDiff';
+import {
+  TOOL_DEFINITION as GetObjectVersionSource_Tool,
+  handleGetObjectVersionSource,
+} from '../../../handlers/common/readonly/handleGetObjectVersionSource';
+import {
+  TOOL_DEFINITION as GetObjectVersions_Tool,
+  handleGetObjectVersions,
+} from '../../../handlers/common/readonly/handleGetObjectVersions';
+import {
   handleReadDataElement,
   TOOL_DEFINITION as ReadDataElement_Tool,
 } from '../../../handlers/data_element/readonly/handleReadDataElement';
+import {
+  handleReadDdl,
+  TOOL_DEFINITION as ReadDdl_Tool,
+} from '../../../handlers/ddl/readonly/handleReadDdl';
 import {
   handleReadDomain,
   TOOL_DEFINITION as ReadDomain_Tool,
@@ -35,6 +51,18 @@ import {
   TOOL_DEFINITION as ReadFunctionGroup_Tool,
 } from '../../../handlers/function_group/readonly/handleReadFunctionGroup';
 import {
+  handleListFunctionGroupIncludes,
+  TOOL_DEFINITION as ListFunctionGroupIncludes_Tool,
+} from '../../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
+import {
+  handleListFunctionModules,
+  TOOL_DEFINITION as ListFunctionModules_Tool,
+} from '../../../handlers/function_include/readonly/handleListFunctionModules';
+import {
+  handleReadFunctionInclude,
+  TOOL_DEFINITION as ReadFunctionInclude_Tool,
+} from '../../../handlers/function_include/readonly/handleReadFunctionInclude';
+import {
   handleReadFunctionModule,
   TOOL_DEFINITION as ReadFunctionModule_Tool,
 } from '../../../handlers/function_module/readonly/handleReadFunctionModule';
@@ -51,6 +79,14 @@ import {
   TOOL_DEFINITION as ReadInterface_Tool,
 } from '../../../handlers/interface/readonly/handleReadInterface';
 import {
+  handleReadMessageClass,
+  TOOL_DEFINITION as ReadMessageClass_Tool,
+} from '../../../handlers/message_class/readonly/handleReadMessageClass';
+import {
+  handleReadMessageClassMessage,
+  TOOL_DEFINITION as ReadMessageClassMessage_Tool,
+} from '../../../handlers/message_class/readonly/handleReadMessageClassMessage';
+import {
   handleReadMetadataExtension,
   TOOL_DEFINITION as ReadMetadataExtension_Tool,
 } from '../../../handlers/metadata_extension/readonly/handleReadMetadataExtension';
@@ -63,10 +99,6 @@ import {
   TOOL_DEFINITION as ReadPackage_Tool,
 } from '../../../handlers/package/readonly/handleReadPackage';
 import {
-  TOOL_DEFINITION as GetProgFullCode_Tool,
-  handleGetProgFullCode,
-} from '../../../handlers/program/readonly/handleGetProgFullCode';
-import {
   handleReadProgram,
   TOOL_DEFINITION as ReadProgram_Tool,
 } from '../../../handlers/program/readonly/handleReadProgram';
@@ -78,6 +110,10 @@ import {
   handleReadServiceDefinition,
   TOOL_DEFINITION as ReadServiceDefinition_Tool,
 } from '../../../handlers/service_definition/readonly/handleReadServiceDefinition';
+import {
+  TOOL_DEFINITION as GetStructuresList_Tool,
+  handleGetStructuresList,
+} from '../../../handlers/structure/readonly/handleGetStructuresList';
 import {
   handleReadStructure,
   TOOL_DEFINITION as ReadStructure_Tool,
@@ -98,10 +134,6 @@ import {
   handleListTransports,
   TOOL_DEFINITION as ListTransports_Tool,
 } from '../../../handlers/transport/readonly/handleListTransports';
-import {
-  handleReadView,
-  TOOL_DEFINITION as ReadView_Tool,
-} from '../../../handlers/view/readonly/handleReadView';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 import {
@@ -182,10 +214,6 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         toolDefinition: ListTransports_Tool,
         handler: (args: any) => handleListTransports(this.context, args),
       },
-      {
-        toolDefinition: GetProgFullCode_Tool,
-        handler: (args: any) => handleGetProgFullCode(this.context, args),
-      },
       // Read object source + metadata handlers
       {
         toolDefinition: ReadClass_Tool,
@@ -208,12 +236,38 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => handleReadStructure(this.context, args),
       },
       {
-        toolDefinition: ReadView_Tool,
-        handler: (args: any) => handleReadView(this.context, args),
+        toolDefinition: GetStructuresList_Tool,
+        handler: (args: any) => handleGetStructuresList(this.context, args),
+      },
+      {
+        toolDefinition: GetObjectVersions_Tool,
+        handler: (args: any) => handleGetObjectVersions(this.context, args),
+      },
+      {
+        toolDefinition: GetObjectVersionSource_Tool,
+        handler: (args: any) =>
+          handleGetObjectVersionSource(this.context, args),
+      },
+      {
+        toolDefinition: GetObjectVersionDiff_Tool,
+        handler: (args: any) => handleGetObjectVersionDiff(this.context, args),
+      },
+      {
+        toolDefinition: ReadDdl_Tool,
+        handler: (args: any) => handleReadDdl(this.context, args),
       },
       {
         toolDefinition: ReadDomain_Tool,
         handler: (args: any) => handleReadDomain(this.context, args),
+      },
+      {
+        toolDefinition: ReadMessageClass_Tool,
+        handler: (args: any) => handleReadMessageClass(this.context, args),
+      },
+      {
+        toolDefinition: ReadMessageClassMessage_Tool,
+        handler: (args: any) =>
+          handleReadMessageClassMessage(this.context, args),
       },
       {
         toolDefinition: ReadDataElement_Tool,
@@ -222,6 +276,19 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ReadFunctionModule_Tool,
         handler: (args: any) => handleReadFunctionModule(this.context, args),
+      },
+      {
+        toolDefinition: ReadFunctionInclude_Tool,
+        handler: (args: any) => handleReadFunctionInclude(this.context, args),
+      },
+      {
+        toolDefinition: ListFunctionGroupIncludes_Tool,
+        handler: (args: any) =>
+          handleListFunctionGroupIncludes(this.context, args),
+      },
+      {
+        toolDefinition: ListFunctionModules_Tool,
+        handler: (args: any) => handleListFunctionModules(this.context, args),
       },
       {
         toolDefinition: ReadFunctionGroup_Tool,

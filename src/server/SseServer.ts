@@ -7,7 +7,9 @@ import type { AuthBrokerFactory } from '../lib/auth/index.js';
 import type { TlsConfig } from '../lib/config/IServerConfig.js';
 import { noopLogger } from '../lib/handlerLogger.js';
 import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
+import { runWithRequestContext } from '../lib/requestContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
+import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import type {
   IHttpApplication,
   RouteRegistrationOptions,
@@ -64,11 +66,19 @@ export interface SseServerOptions {
    * @default false
    */
   allowDestinationHeader?: boolean;
+  /** Allowed Host header values (DNS-rebinding protection; exact, incl. port) */
+  allowedHosts?: string[];
+  /** Allowed Origin header values (DNS-rebinding protection; exact, incl. scheme) */
+  allowedOrigins?: string[];
+  /** Enable DNS-rebinding protection (requires allowedHosts and/or allowedOrigins) */
+  enableDnsRebindingProtection?: boolean;
 }
 
 type SessionEntry = {
   server: BaseMcpServer;
   transport: SSEServerTransport;
+  /** Per-session master language (x-sap-language), scoped around each POST dispatch (#110). */
+  masterLanguage?: string;
 };
 
 /**
@@ -91,6 +101,9 @@ export class SseServer {
   private standaloneServer?: HttpServer | HttpsServer;
   private readonly tls?: TlsConfig;
   private readonly allowDestinationHeader: boolean;
+  private readonly allowedHosts?: string[];
+  private readonly allowedOrigins?: string[];
+  private readonly enableDnsRebindingProtection?: boolean;
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -107,6 +120,9 @@ export class SseServer {
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
     this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;
+    this.allowedHosts = opts?.allowedHosts;
+    this.allowedOrigins = opts?.allowedOrigins;
+    this.enableDnsRebindingProtection = opts?.enableDnsRebindingProtection;
   }
 
   /**
@@ -131,14 +147,32 @@ export class SseServer {
       });
     }) as any);
 
-    app.get(this.ssePath, (async (req: any, res: any) => {
-      await this.handleGet(req, res);
-    }) as any);
+    const dnsOpts = {
+      enable: this.enableDnsRebindingProtection,
+      allowedHosts: this.allowedHosts,
+      allowedOrigins: this.allowedOrigins,
+    };
 
-    app.post(this.postPath, (async (req: any, res: any) => {
-      const url = new URL(req.originalUrl, `http://${req.headers.host}`);
-      await this.handlePost(req, res, url);
-    }) as any);
+    app.get(
+      this.ssePath,
+      withDnsRebindingProtection(
+        (async (req: any, res: any) => {
+          await this.handleGet(req, res);
+        }) as any,
+        dnsOpts,
+      ) as any,
+    );
+
+    app.post(
+      this.postPath,
+      withDnsRebindingProtection(
+        (async (req: any, res: any) => {
+          const url = new URL(req.originalUrl, `http://${req.headers.host}`);
+          await this.handlePost(req, res, url);
+        }) as any,
+        dnsOpts,
+      ) as any,
+    );
 
     console.error(`[SseServer] Routes registered on external app`);
     console.error(`[SseServer] SSE endpoint: ${this.ssePath}`);
@@ -278,7 +312,15 @@ export class SseServer {
     console.error(
       `[SSE GET] Created session ${sessionId} for destination ${destination}`,
     );
-    this.sessions.set(sessionId, { server, transport });
+    // Capture the per-session master language (x-sap-language) once at
+    // connection time; it is scoped around each POST dispatch below so it
+    // never leaks into other sessions via a process-global cache (#110).
+    const rawSseLang =
+      req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
+    const masterLanguage = Array.isArray(rawSseLang)
+      ? rawSseLang[0]
+      : rawSseLang;
+    this.sessions.set(sessionId, { server, transport, masterLanguage });
     console.error(
       `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
     );
@@ -340,7 +382,10 @@ export class SseServer {
     }
 
     try {
-      await entry.transport.handlePostMessage(req, res, req.body);
+      await runWithRequestContext(
+        { masterLanguage: entry.masterLanguage },
+        () => entry.transport.handlePostMessage(req, res, req.body),
+      );
       if (!isPing) {
         console.error(
           `[SSE POST] Successfully processed for session ${sessionId}`,

@@ -41,6 +41,11 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['interface_name', 'package_name'],
   },
@@ -51,6 +56,7 @@ interface CreateInterfaceArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
+  master_language?: string;
 }
 
 export async function handleCreateInterface(
@@ -90,6 +96,7 @@ export async function handleCreateInterface(
         description,
         packageName,
         transportRequest,
+        masterLanguage: args.master_language,
       });
 
       logger?.info(`Interface created: ${interfaceName}`);

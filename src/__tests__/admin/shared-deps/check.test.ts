@@ -21,16 +21,18 @@ import {
 /** Map dep_* param names to shared_dependencies section names */
 const DEP_PARAM_MAP: Record<string, string> = {
   dep_table_name: 'tables',
-  dep_view_name: 'views',
+  dep_ddl_name: 'views',
   dep_bdef_name: 'behavior_definitions',
 };
 
 /** Map generic param names to shared_dependencies section names */
 const PARAM_TO_TYPE: Record<string, string> = {
   table_name: 'tables',
-  view_name: 'views',
+  ddl_name: 'views',
   root_entity: 'views',
   behavior_definition: 'behavior_definitions',
+  structure_name: 'structures',
+  expected_include: 'structures',
 };
 
 /** Get all names (upper-cased) from a shared_dependencies section */
@@ -48,7 +50,7 @@ function buildAllSharedNamesSet(
   sharedConfig: Record<string, any>,
 ): Set<string> {
   const allNames = new Set<string>();
-  const sections = ['tables', 'views', 'behavior_definitions'];
+  const sections = ['tables', 'structures', 'views', 'behavior_definitions'];
   for (const section of sections) {
     for (const name of getSharedNames(sharedConfig, section)) {
       allNames.add(name);
@@ -249,6 +251,18 @@ describe('Config: shared_dependencies consistency', () => {
       }
     }
 
+    // Also collect names referenced via structure DDL ("include <name>")
+    for (const structure of sharedConfig.structures || []) {
+      if (typeof structure.source !== 'string') continue;
+      for (const m of structure.source.match(/include\s+(\w+)/gi) || []) {
+        const name = m
+          .replace(/include\s+/i, '')
+          .trim()
+          .toUpperCase();
+        if (allSharedNames.has(name)) referencedNames.add(name);
+      }
+    }
+
     // Also collect names referenced via bdef DDL
     for (const bdef of sharedConfig.behavior_definitions || []) {
       if (typeof bdef.source === 'string') {
@@ -268,7 +282,7 @@ describe('Config: shared_dependencies consistency', () => {
     }
 
     const orphans: string[] = [];
-    const sections = ['tables', 'views', 'behavior_definitions'];
+    const sections = ['tables', 'structures', 'views', 'behavior_definitions'];
     for (const type of sections) {
       for (const name of getSharedNames(sharedConfig, type)) {
         if (!referencedNames.has(name)) {

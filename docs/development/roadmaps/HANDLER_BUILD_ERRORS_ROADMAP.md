@@ -86,7 +86,7 @@ In `mcp_handlers.ts` lines 784-802, dynamic imports call handlers with only 1 ar
 return await handleXxx(args);  // Missing connection argument
 ```
 
-## Affected Files (73 total)
+## Affected Files (72 total)
 
 ### behavior_definition/low/ (3 files)
 - `handleLockBehaviorDefinition.ts`
@@ -147,14 +147,13 @@ return await handleXxx(args);  // Missing connection argument
 - `handleUnlockPackage.ts`
 - `handleValidatePackage.ts`
 
-### program/ (7 files)
+### program/ (6 files)
 - `low/handleActivateProgram.ts`
 - `low/handleCreateProgram.ts`
 - `low/handleDeleteProgram.ts`
 - `low/handleUnlockProgram.ts`
 - `low/handleUpdateProgram.ts`
 - `low/handleValidateProgram.ts`
-- `readonly/handleGetProgFullCode.ts`
 
 ### structure/ (8 files)
 - `high/handleCreateStructure.ts`

@@ -67,6 +67,11 @@ export const TOOL_DEFINITION = {
         enum: ['xml', 'json', 'plain'],
         default: 'xml',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: [
       'service_binding_name',
@@ -87,6 +92,7 @@ interface CreateServiceBindingArgs {
   transport_request?: string;
   activate?: boolean;
   response_format?: ServiceBindingResponseFormat;
+  master_language?: string;
 }
 
 export async function handleCreateServiceBinding(
@@ -130,6 +136,7 @@ export async function handleCreateServiceBinding(
         serviceVersion,
         bindingVariant,
         transportRequest: args.transport_request,
+        masterLanguage: args.master_language,
       },
       { activateOnCreate: args.activate !== false },
     );

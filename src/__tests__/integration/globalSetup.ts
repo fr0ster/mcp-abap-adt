@@ -19,9 +19,9 @@ function loadTestConfig(): any {
   for (const configPath of configPaths) {
     try {
       const fs = require('node:fs');
-      const yaml = require('yaml');
+      const yaml = require('js-yaml');
       const content = fs.readFileSync(configPath, 'utf8');
-      return yaml.parse(content);
+      return yaml.load(content);
     } catch {
       // try next
     }

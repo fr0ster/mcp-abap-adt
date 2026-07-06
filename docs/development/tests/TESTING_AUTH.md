@@ -47,7 +47,7 @@ EOF
 
 ```bash
 cd /home/okyslytsia/prj/mcp-abap-adt
-npm run dev:stdio
+npm run dev
 # or
 npm run dev:http
 # or
@@ -105,7 +105,7 @@ cat > TRIAL.json << 'EOF'
 EOF
 
 # Start server from this directory
-npm run dev:stdio
+npm run dev
 ```
 
 ## Debug Mode:
@@ -113,7 +113,7 @@ npm run dev:stdio
 To enable debug logs for auth-broker:
 
 ```bash
-DEBUG_AUTH_LOG=true npm run dev:stdio
+DEBUG_AUTH_LOG=true npm run dev
 ```
 
 ## Test Logging Switches

@@ -73,6 +73,12 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe('Application component (optional, e.g., BC-ABA)'),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
   },
 } as const;
 
@@ -86,6 +92,7 @@ interface CreatePackageArgs {
   transport_request?: string;
   record_changes?: boolean;
   application_component?: string;
+  master_language?: string;
 }
 
 /**
@@ -158,6 +165,9 @@ export async function handleCreatePackage(
       }
       if (typedArgs.application_component) {
         createConfig.applicationComponent = typedArgs.application_component;
+      }
+      if (typedArgs.master_language) {
+        createConfig.masterLanguage = typedArgs.master_language;
       }
 
       // DEBUG: Log softwareComponent at each step

@@ -47,6 +47,11 @@ export const TOOL_DEFINITION = {
         description:
           'Activate function group after creation. Default: true. Set to false for batch operations.',
       },
+      master_language: {
+        type: 'string',
+        description:
+          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      },
     },
     required: ['function_group_name', 'package_name'],
   },
@@ -58,6 +63,7 @@ interface CreateFunctionGroupArgs {
   package_name: string;
   transport_request?: string;
   activate?: boolean;
+  master_language?: string;
 }
 
 /**
@@ -223,6 +229,7 @@ export async function handleCreateFunctionGroup(
         description: typedArgs.description || functionGroupName,
         packageName: typedArgs.package_name,
         transportRequest: typedArgs.transport_request,
+        masterLanguage: typedArgs.master_language,
       });
 
       // Activate if requested

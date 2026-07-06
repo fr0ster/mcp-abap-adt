@@ -131,6 +131,7 @@ import {
   TOOL_DEFINITION as ActivateObjects_Tool,
   handleActivateObjects,
 } from '../../../handlers/common/high/handleActivateObjects';
+import { buildObjectVersionTools } from '../../../handlers/common/high/objectVersionTools';
 import {
   TOOL_DEFINITION as CheckDataElement_Tool,
   handleCheckDataElement,
@@ -155,6 +156,30 @@ import {
   TOOL_DEFINITION as ActivateDataElement_Tool,
   handleActivateDataElement,
 } from '../../../handlers/data_element/low/handleActivateDataElement';
+import {
+  TOOL_DEFINITION as CheckDdl_Tool,
+  handleCheckDdl,
+} from '../../../handlers/ddl/high/handleCheckDdl';
+import {
+  TOOL_DEFINITION as CreateDdl_Tool,
+  handleCreateDdl,
+} from '../../../handlers/ddl/high/handleCreateDdl';
+import {
+  TOOL_DEFINITION as DeleteDdl_Tool,
+  handleDeleteDdl,
+} from '../../../handlers/ddl/high/handleDeleteDdl';
+import {
+  TOOL_DEFINITION as GetDdl_Tool,
+  handleGetDdl,
+} from '../../../handlers/ddl/high/handleGetDdl';
+import {
+  handleUpdateDdl as handleUpdateDdlHigh,
+  TOOL_DEFINITION as UpdateDdlHigh_Tool,
+} from '../../../handlers/ddl/high/handleUpdateDdl';
+import {
+  TOOL_DEFINITION as ActivateDdl_Tool,
+  handleActivateDdl,
+} from '../../../handlers/ddl/low/handleActivateDdl';
 import {
   TOOL_DEFINITION as CheckMetadataExtension_Tool,
   handleCheckMetadataExtension,
@@ -236,6 +261,18 @@ import {
   handleGetFunctionGroup,
 } from '../../../handlers/function_group/high/handleGetFunctionGroup';
 import {
+  TOOL_DEFINITION as CreateFunctionInclude_Tool,
+  handleCreateFunctionInclude,
+} from '../../../handlers/function_include/high/handleCreateFunctionInclude';
+import {
+  TOOL_DEFINITION as DeleteFunctionInclude_Tool,
+  handleDeleteFunctionInclude,
+} from '../../../handlers/function_include/high/handleDeleteFunctionInclude';
+import {
+  handleUpdateFunctionInclude,
+  TOOL_DEFINITION as UpdateFunctionInclude_Tool,
+} from '../../../handlers/function_include/high/handleUpdateFunctionInclude';
+import {
   TOOL_DEFINITION as DeleteFunctionModule_Tool,
   handleDeleteFunctionModule,
 } from '../../../handlers/function_module/high/handleDeleteFunctionModule';
@@ -267,6 +304,38 @@ import {
   TOOL_DEFINITION as ActivateInterface_Tool,
   handleActivateInterface,
 } from '../../../handlers/interface/low/handleActivateInterface';
+import {
+  TOOL_DEFINITION as CreateMessageClass_Tool,
+  handleCreateMessageClass,
+} from '../../../handlers/message_class/high/handleCreateMessageClass';
+import {
+  TOOL_DEFINITION as CreateMessageClassMessage_Tool,
+  handleCreateMessageClassMessage,
+} from '../../../handlers/message_class/high/handleCreateMessageClassMessage';
+import {
+  TOOL_DEFINITION as DeleteMessageClass_Tool,
+  handleDeleteMessageClass,
+} from '../../../handlers/message_class/high/handleDeleteMessageClass';
+import {
+  TOOL_DEFINITION as DeleteMessageClassMessage_Tool,
+  handleDeleteMessageClassMessage,
+} from '../../../handlers/message_class/high/handleDeleteMessageClassMessage';
+import {
+  TOOL_DEFINITION as GetMessageClass_Tool,
+  handleGetMessageClass,
+} from '../../../handlers/message_class/high/handleGetMessageClass';
+import {
+  TOOL_DEFINITION as GetMessageClassMessage_Tool,
+  handleGetMessageClassMessage,
+} from '../../../handlers/message_class/high/handleGetMessageClassMessage';
+import {
+  handleUpdateMessageClass,
+  TOOL_DEFINITION as UpdateMessageClass_Tool,
+} from '../../../handlers/message_class/high/handleUpdateMessageClass';
+import {
+  handleUpdateMessageClassMessage,
+  TOOL_DEFINITION as UpdateMessageClassMessage_Tool,
+} from '../../../handlers/message_class/high/handleUpdateMessageClassMessage';
 import {
   TOOL_DEFINITION as DeleteMetadataExtension_Tool,
   handleDeleteMetadataExtension,
@@ -469,30 +538,6 @@ import {
   handleUpdateUnitTest,
   TOOL_DEFINITION as UpdateUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateUnitTest';
-import {
-  TOOL_DEFINITION as CheckView_Tool,
-  handleCheckView,
-} from '../../../handlers/view/high/handleCheckView';
-import {
-  TOOL_DEFINITION as CreateView_Tool,
-  handleCreateView,
-} from '../../../handlers/view/high/handleCreateView';
-import {
-  TOOL_DEFINITION as DeleteView_Tool,
-  handleDeleteView,
-} from '../../../handlers/view/high/handleDeleteView';
-import {
-  TOOL_DEFINITION as GetView_Tool,
-  handleGetView,
-} from '../../../handlers/view/high/handleGetView';
-import {
-  handleUpdateView as handleUpdateViewHigh,
-  TOOL_DEFINITION as UpdateViewHigh_Tool,
-} from '../../../handlers/view/high/handleUpdateView';
-import {
-  TOOL_DEFINITION as ActivateView_Tool,
-  handleActivateView,
-} from '../../../handlers/view/low/handleActivateView';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -558,12 +603,12 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       },
       {
         toolDefinition: {
-          ...ActivateView_Tool,
-          name: 'ActivateView',
+          ...ActivateDdl_Tool,
+          name: 'ActivateDdl',
           description:
-            'Activate a CDS view. Use after CreateView or UpdateView if the object remains inactive.',
+            'Activate a CDS view. Use after CreateDdl or UpdateDdl if the object remains inactive.',
         },
-        handler: withContext(handleActivateView),
+        handler: withContext(handleActivateDdl),
       },
       {
         toolDefinition: {
@@ -671,6 +716,38 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleDeleteDomain),
       },
       {
+        toolDefinition: GetMessageClass_Tool,
+        handler: withContext(handleGetMessageClass),
+      },
+      {
+        toolDefinition: CreateMessageClass_Tool,
+        handler: withContext(handleCreateMessageClass),
+      },
+      {
+        toolDefinition: UpdateMessageClass_Tool,
+        handler: withContext(handleUpdateMessageClass),
+      },
+      {
+        toolDefinition: DeleteMessageClass_Tool,
+        handler: withContext(handleDeleteMessageClass),
+      },
+      {
+        toolDefinition: GetMessageClassMessage_Tool,
+        handler: withContext(handleGetMessageClassMessage),
+      },
+      {
+        toolDefinition: CreateMessageClassMessage_Tool,
+        handler: withContext(handleCreateMessageClassMessage),
+      },
+      {
+        toolDefinition: UpdateMessageClassMessage_Tool,
+        handler: withContext(handleUpdateMessageClassMessage),
+      },
+      {
+        toolDefinition: DeleteMessageClassMessage_Tool,
+        handler: withContext(handleDeleteMessageClassMessage),
+      },
+      {
         toolDefinition: CreateDataElement_Tool,
         handler: withContext(handleCreateDataElement),
       },
@@ -723,20 +800,20 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleDeleteStructure),
       },
       {
-        toolDefinition: CreateView_Tool,
-        handler: withContext(handleCreateView),
+        toolDefinition: CreateDdl_Tool,
+        handler: withContext(handleCreateDdl),
       },
       {
-        toolDefinition: GetView_Tool,
-        handler: withContext(handleGetView),
+        toolDefinition: GetDdl_Tool,
+        handler: withContext(handleGetDdl),
       },
       {
-        toolDefinition: UpdateViewHigh_Tool,
-        handler: withContext(handleUpdateViewHigh),
+        toolDefinition: UpdateDdlHigh_Tool,
+        handler: withContext(handleUpdateDdlHigh),
       },
       {
-        toolDefinition: DeleteView_Tool,
-        handler: withContext(handleDeleteView),
+        toolDefinition: DeleteDdl_Tool,
+        handler: withContext(handleDeleteDdl),
       },
       {
         toolDefinition: CreateServiceDefinition_Tool,
@@ -979,6 +1056,18 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleDeleteFunctionModule),
       },
       {
+        toolDefinition: CreateFunctionInclude_Tool,
+        handler: withContext(handleCreateFunctionInclude),
+      },
+      {
+        toolDefinition: UpdateFunctionInclude_Tool,
+        handler: withContext(handleUpdateFunctionInclude),
+      },
+      {
+        toolDefinition: DeleteFunctionInclude_Tool,
+        handler: withContext(handleDeleteFunctionInclude),
+      },
+      {
         toolDefinition: CreateBdef_Tool,
         handler: withContext(handleCreateBehaviorDefinition),
       },
@@ -1076,9 +1165,16 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleCheckTable),
       },
       {
-        toolDefinition: CheckView_Tool,
-        handler: withContext(handleCheckView),
+        toolDefinition: CheckDdl_Tool,
+        handler: withContext(handleCheckDdl),
       },
+      // Per-object high-level version-history tools (#30): 13 types ×
+      // {Versions, VersionSource}. HighLevel-only (ReadOnly keeps the generic
+      // GetObjectVersions/GetObjectVersionSource).
+      ...buildObjectVersionTools().map((entry) => ({
+        toolDefinition: entry.toolDefinition,
+        handler: withContext(entry.handler),
+      })),
     ];
   }
 }

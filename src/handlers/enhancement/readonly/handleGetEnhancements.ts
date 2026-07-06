@@ -8,7 +8,6 @@ import {
   McpError,
   makeAdtRequestWithTimeout,
 } from '../../../lib/utils';
-import { writeResultToFile } from '../../../lib/writeResultToFile';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
   available_in: ['onprem', 'cloud'] as const,
@@ -668,9 +667,6 @@ export async function handleGetEnhancements(
           },
         ],
       };
-      if (args.filePath) {
-        writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-      }
       return result;
     }
 
@@ -769,9 +765,6 @@ export async function handleGetEnhancements(
           },
         ],
       };
-      if (args.filePath) {
-        writeResultToFile(fallbackResult, args.filePath);
-      }
       return fallbackResult;
     }
 
@@ -807,9 +800,6 @@ export async function handleGetEnhancements(
         },
       ],
     };
-    if (args.filePath) {
-      writeResultToFile(JSON.stringify(result, null, 2), args.filePath);
-    }
     return result;
   } catch (error) {
     // MCP-compliant error response: always return content[] with type "text"

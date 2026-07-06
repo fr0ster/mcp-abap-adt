@@ -5,18 +5,28 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 135
-- Read-Only: 12
-- High-Level: 63
-- Low-Level: 60
+- Total tools: 165
+- Read-Only: 18
+- High-Level: 86
+- Low-Level: 61
 
 ## Navigation
 
 - [Read-Only Group](#read-only-group)
   - [Class](#read-only-class)
     - [ReadClass](#readclass-read-only-class)
+  - [Common](#read-only-common)
+    - [GetObjectVersionDiff](#getobjectversiondiff-read-only-common)
+    - [GetObjectVersions](#getobjectversions-read-only-common)
+    - [GetObjectVersionSource](#getobjectversionsource-read-only-common)
+  - [Ddl](#read-only-ddl)
+    - [ReadDdl](#readddl-read-only-ddl)
   - [Function Group](#read-only-function-group)
     - [ReadFunctionGroup](#readfunctiongroup-read-only-function-group)
+  - [Function Include](#read-only-function-include)
+    - [ListFunctionGroupIncludes](#listfunctiongroupincludes-read-only-function-include)
+    - [ListFunctionModules](#listfunctionmodules-read-only-function-include)
+    - [ReadFunctionInclude](#readfunctioninclude-read-only-function-include)
   - [Function Module](#read-only-function-module)
     - [ReadFunctionModule](#readfunctionmodule-read-only-function-module)
   - [Include](#read-only-include)
@@ -28,18 +38,12 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetPackageContents](#getpackagecontents-read-only-package)
     - [ReadPackage](#readpackage-read-only-package)
   - [Program](#read-only-program)
-    - [GetProgFullCode](#getprogfullcode-read-only-program)
     - [ReadProgram](#readprogram-read-only-program)
+  - [Structure](#read-only-structure)
+    - [GetStructuresList](#getstructureslist-read-only-structure)
   - [System](#read-only-system)
     - [SearchSource](#searchsource-read-only-system)
-  - [View](#read-only-view)
-    - [ReadView](#readview-read-only-view)
 - [High-Level Group](#high-level-group)
-  - [Atc](#high-level-atc)
-    - [GetATCFindings](#getatcfindings-high-level-atc)
-    - [GetATCRunStatus](#getatcrunstatus-high-level-atc)
-    - [ListATCCheckVariants](#listatccheckvariants-high-level-atc)
-    - [RunATC](#runatc-high-level-atc)
   - [Class](#high-level-class)
     - [CheckClass](#checkclass-high-level-class)
     - [CreateClass](#createclass-high-level-class)
@@ -60,6 +64,38 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UpdateLocalTypes](#updatelocaltypes-high-level-class)
   - [Common](#high-level-common)
     - [ActivateObjects](#activateobjects-high-level-common)
+    - [GetClassVersionDiff](#getclassversiondiff-high-level-common)
+    - [GetClassVersions](#getclassversions-high-level-common)
+    - [GetClassVersionSource](#getclassversionsource-high-level-common)
+    - [GetDdlVersionDiff](#getddlversiondiff-high-level-common)
+    - [GetDdlVersions](#getddlversions-high-level-common)
+    - [GetDdlVersionSource](#getddlversionsource-high-level-common)
+    - [GetFunctionGroupVersionDiff](#getfunctiongroupversiondiff-high-level-common)
+    - [GetFunctionGroupVersions](#getfunctiongroupversions-high-level-common)
+    - [GetFunctionGroupVersionSource](#getfunctiongroupversionsource-high-level-common)
+    - [GetFunctionModuleVersionDiff](#getfunctionmoduleversiondiff-high-level-common)
+    - [GetFunctionModuleVersions](#getfunctionmoduleversions-high-level-common)
+    - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-high-level-common)
+    - [GetInterfaceVersionDiff](#getinterfaceversiondiff-high-level-common)
+    - [GetInterfaceVersions](#getinterfaceversions-high-level-common)
+    - [GetInterfaceVersionSource](#getinterfaceversionsource-high-level-common)
+    - [GetPackageVersionDiff](#getpackageversiondiff-high-level-common)
+    - [GetPackageVersions](#getpackageversions-high-level-common)
+    - [GetPackageVersionSource](#getpackageversionsource-high-level-common)
+    - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
+    - [GetProgramVersions](#getprogramversions-high-level-common)
+    - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
+  - [Compact](#high-level-compact)
+    - [HandlerCreate](#handlercreate-high-level-compact)
+    - [HandlerDelete](#handlerdelete-high-level-compact)
+    - [HandlerGet](#handlerget-high-level-compact)
+    - [HandlerUpdate](#handlerupdate-high-level-compact)
+  - [Ddl](#high-level-ddl)
+    - [CheckDdl](#checkddl-high-level-ddl)
+    - [CreateDdl](#createddl-high-level-ddl)
+    - [DeleteDdl](#deleteddl-high-level-ddl)
+    - [GetDdl](#getddl-high-level-ddl)
+    - [UpdateDdl](#updateddl-high-level-ddl)
   - [Function](#high-level-function)
     - [CheckFunctionGroup](#checkfunctiongroup-high-level-function)
     - [CheckFunctionModule](#checkfunctionmodule-high-level-function)
@@ -70,6 +106,10 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
   - [Function Group](#high-level-function-group)
     - [DeleteFunctionGroup](#deletefunctiongroup-high-level-function-group)
     - [GetFunctionGroup](#getfunctiongroup-high-level-function-group)
+  - [Function Include](#high-level-function-include)
+    - [CreateFunctionInclude](#createfunctioninclude-high-level-function-include)
+    - [DeleteFunctionInclude](#deletefunctioninclude-high-level-function-include)
+    - [UpdateFunctionInclude](#updatefunctioninclude-high-level-function-include)
   - [Function Module](#high-level-function-module)
     - [DeleteFunctionModule](#deletefunctionmodule-high-level-function-module)
     - [GetFunctionModule](#getfunctionmodule-high-level-function-module)
@@ -99,16 +139,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
-    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
-  - [View](#high-level-view)
-    - [CheckView](#checkview-high-level-view)
-    - [CreateView](#createview-high-level-view)
-    - [DeleteView](#deleteview-high-level-view)
-    - [GetView](#getview-high-level-view)
-    - [UpdateView](#updateview-high-level-view)
 - [Low-Level Group](#low-level-group)
   - [Class](#low-level-class)
     - [ActivateClassLow](#activateclasslow-low-level-class)
@@ -128,6 +161,16 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [ValidateClassLow](#validateclasslow-low-level-class)
   - [Common](#low-level-common)
     - [ActivateObjectLow](#activateobjectlow-low-level-common)
+    - [DeleteObjectLow](#deleteobjectlow-low-level-common)
+  - [Ddl](#low-level-ddl)
+    - [ActivateDdlLow](#activateddllow-low-level-ddl)
+    - [CheckDdlLow](#checkddllow-low-level-ddl)
+    - [CreateDdlLow](#createddllow-low-level-ddl)
+    - [DeleteDdlLow](#deleteddllow-low-level-ddl)
+    - [LockDdlLow](#lockddllow-low-level-ddl)
+    - [UnlockDdlLow](#unlockddllow-low-level-ddl)
+    - [UpdateDdlLow](#updateddllow-low-level-ddl)
+    - [ValidateDdlLow](#validateddllow-low-level-ddl)
   - [Function](#low-level-function)
     - [ActivateFunctionGroupLow](#activatefunctiongrouplow-low-level-function)
     - [ActivateFunctionModuleLow](#activatefunctionmodulelow-low-level-function)
@@ -168,15 +211,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [UnlockProgramLow](#unlockprogramlow-low-level-program)
     - [UpdateProgramLow](#updateprogramlow-low-level-program)
     - [ValidateProgramLow](#validateprogramlow-low-level-program)
-  - [View](#low-level-view)
-    - [ActivateViewLow](#activateviewlow-low-level-view)
-    - [CheckViewLow](#checkviewlow-low-level-view)
-    - [CreateViewLow](#createviewlow-low-level-view)
-    - [DeleteViewLow](#deleteviewlow-low-level-view)
-    - [LockViewLow](#lockviewlow-low-level-view)
-    - [UnlockViewLow](#unlockviewlow-low-level-view)
-    - [UpdateViewLow](#updateviewlow-low-level-view)
-    - [ValidateViewLow](#validateviewlow-low-level-view)
 
 ---
 
@@ -188,7 +222,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** Operation: Read, Create, Update. Subject: Class. Will be useful for reading, creating, or updating class. [read-only] Read ABAP class source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Class. Will be useful for reading, creating, or updating class. [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
@@ -196,7 +230,71 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-common"></a>
+### Read-Only / Common
+
+<a id="getobjectversiondiff-read-only-common"></a>
+#### GetObjectVersionDiff (Read-Only / Common)
+**Description:** [read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionDiff.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetObjectVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetObjectVersions entry).
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+
+---
+
+<a id="getobjectversions-read-only-common"></a>
+#### GetObjectVersions (Read-Only / Common)
+**Description:** [read-only] List the version history of an ABAP object. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version source via GetObjectVersionSource.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersions.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
+- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, ZIF_MY_INTERFACE, Z_MY_TABLE).
+- `object_type` (string, required) - Object type.
+
+---
+
+<a id="getobjectversionsource-read-only-common"></a>
+#### GetObjectVersionSource (Read-Only / Common)
+**Description:** [read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.
+
+**Source:** `src/handlers/common/readonly/handleGetObjectVersionSource.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetObjectVersions version entry.
+- `object_type` (string, required) - Object type (same value used in GetObjectVersions).
+
+---
+
+<a id="read-only-ddl"></a>
+### Read-Only / Ddl
+
+<a id="readddl-read-only-ddl"></a>
+#### ReadDdl (Read-Only / Ddl)
+**Description:** Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+
+**Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -205,7 +303,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readfunctiongroup-read-only-function-group"></a>
 #### ReadFunctionGroup (Read-Only / Function Group)
-**Description:** [read-only] Read ABAP function group source code and metadata. Answers: 
+**Description:** [read-only] Read ABAP function group source code and metadata. Answers: "show function group code", "display FUGR source", "view function group X", "get function group includes". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
 
@@ -213,7 +311,51 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-function-include"></a>
+### Read-Only / Function Include
+
+<a id="listfunctiongroupincludes-read-only-function-include"></a>
+#### ListFunctionGroupIncludes (Read-Only / Function Include)
+**Description:** [read-only] List the includes (TOP, custom) of an ABAP function group.
+
+**Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+
+---
+
+<a id="listfunctionmodules-read-only-function-include"></a>
+#### ListFunctionModules (Read-Only / Function Include)
+**Description:** [read-only] List the function modules of an ABAP function group.
+
+**Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+
+---
+
+<a id="readfunctioninclude-read-only-function-include"></a>
+#### ReadFunctionInclude (Read-Only / Function Include)
+**Description:** [read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.
+
+**Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGTOP, LZ_MY_FGU01).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -222,7 +364,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -231,7 +373,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_MY_FG).
 - `function_module_name` (string, required) - Function module name (e.g., Z_MY_FM).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -240,7 +382,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getinclude-read-only-include"></a>
 #### GetInclude (Read-Only / Include)
-**Description:** [read-only] Retrieve source code of a specific ABAP include file.
+**Description:** [read-only] Read ANY single ABAP include source by name, from anywhere in the repository (an include may live outside any single program tree). This is the correct tool for include names (PROG/I) — ReadProgram does not read includes.
 
 **Source:** `src/handlers/include/readonly/handleGetInclude.ts`
 
@@ -262,7 +404,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `detailed` (boolean, optional (default: false)) - [read-only] If true, returns structured JSON with metadata and raw XML.
 - `object_name` (string, required) - Name of the ABAP program or include
-- `object_type` (string, required) - [read-only] ADT object type (e.g. PROG/P, PROG/I, FUGR, CLAS/OC)
+- `object_type` (string, required) - [read-only] ADT object type of the parent. Only these four values are supported: 'PROG/P' (program), 'PROG/I' (include), 'FUGR' (function group), 'CLAS/OC' (class). Any other value is rejected by the schema.
 - `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 
 ---
@@ -272,7 +414,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** Operation: Read, Create, Update. Subject: Interface. Will be useful for reading, creating, or updating interface. [read-only] Read ABAP interface source code and metadata. Answers: 
+**Description:** Operation: Read, Create, Update. Subject: Interface. Will be useful for reading, creating, or updating interface. [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
@@ -280,7 +422,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -302,7 +444,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: 
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -310,30 +452,16 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
 <a id="read-only-program"></a>
 ### Read-Only / Program
 
-<a id="getprogfullcode-read-only-program"></a>
-#### GetProgFullCode (Read-Only / Program)
-**Description:** [read-only] Returns the full code for a program or function group, including all includes, in tree traversal order.
-
-**Source:** `src/handlers/program/readonly/handleGetProgFullCode.ts`
-
-**Available in:** `onprem`, `legacy`
-
-**Parameters:**
-- `name` (string, required) - [read-only] Technical name of the program or function group (e.g., 
-- `type` (string, required) - [read-only] 
-
----
-
 <a id="readprogram-read-only-program"></a>
 #### ReadProgram (Read-Only / Program)
-**Description:** Operation: Read, Create, Update. Subject: Program. Will be useful for reading, creating, or updating program. [read-only] Read ABAP program (report) source code and metadata. Answers: 
+**Description:** [read-only] Read a MAIN ABAP program (report) source code and metadata by name. Works ONLY for main programs (adtcore type PROG/P); NOT for includes — use GetInclude for include source. Include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
@@ -341,7 +469,26 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
+
+---
+
+<a id="read-only-structure"></a>
+### Read-Only / Structure
+
+<a id="getstructureslist-read-only-structure"></a>
+#### GetStructuresList (Read-Only / Structure)
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.
+
+**Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
+- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
+- `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
 
@@ -350,7 +497,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="searchsource-read-only-system"></a>
 #### SearchSource (Read-Only / System)
-**Description:** [read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). `packages` accepts `*` masks (Z*, ZFI_*, /NS/Z*) alongside exact names; mask resolution is best-effort and scoped to the ADT repository-search result window — there is no guarantee that every matching package is scanned. If you need certainty, pass concrete package names. When using masks, narrow the mask itself and use `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply after package resolution. Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `
+**Description:** [read-only] Search ABAP source text inside one or more packages (programs, function groups, classes). Onprem-only (cloud lacks an indexed source-search endpoint). `packages` accepts `*` masks (Z*, ZFI_*, /NS/Z*) alongside exact names; mask resolution is best-effort and scoped to the ADT repository-search result window — there is no guarantee that every matching package is scanned. If you need certainty, pass concrete package names. When using masks, narrow the mask itself and use `object_types`, `object_filter`, and `max_objects` as scan-target controls that apply after package resolution. Comments are searched by default; set exclude_comments=true to drop col-1 `*` and full-line `"` comments. The `version` parameter affects PROG and CLAS main include reads only — FUGR subinclude reads always go against the active version (the include endpoint exposes no version selector). `truncated.by_object_cap` means at least one object had MORE hits than `max_hits_per_object`, so that object's hits were capped — it is NOT a limit on the number of objects scanned. The object-count limit is `max_objects` (which sets `truncated.by_max_objects`). To avoid `by_object_cap`, raise `max_hits_per_object`. `concurrency` is capped at 16 per call. Run only ONE SearchSource per destination at a time — multiple parallel SearchSource calls against the same SAP system saturate the scan backend and can make all of them time out. Prefer combining terms into a single call over parallel calls.
 
 **Source:** `src/handlers/system/readonly/handleSearchSource.ts`
 
@@ -361,87 +508,8 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-<a id="read-only-view"></a>
-### Read-Only / View
-
-<a id="readview-read-only-view"></a>
-#### ReadView (Read-Only / View)
-**Description:** Operation: Read, Create, Update. Subject: View. Will be useful for reading, creating, or updating view. [read-only] Read ABAP CDS view source code and metadata. Answers: 
-
-**Source:** `src/handlers/view/readonly/handleReadView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `version` (string, optional (default: active)) - Version to read: 
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
 <a id="high-level-group"></a>
 ## High-Level Group
-
-<a id="high-level-atc"></a>
-### High-Level / Atc
-
-<a id="getatcfindings-high-level-atc"></a>
-#### GetATCFindings (High-Level / Atc)
-**Description:** Retrieve ATC findings for a completed worklist. The worklist_id is returned by 
-
-**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `format` (string, optional (default: xml)) - Findings format: 
-- `include_exempted_findings` (boolean, optional (default: false)) - Include exempted (suppressed) findings in the result.
-- `worklist_id` (string, required) - 32-character worklist GUID returned by RunATC.
-
----
-
-<a id="getatcrunstatus-high-level-atc"></a>
-#### GetATCRunStatus (High-Level / Atc)
-**Description:** Read the status of an asynchronous ATC run by run_id. Response body contains 
-
-**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by RunATC.
-- `with_long_polling` (boolean, optional (default: true)) - Use server-side long polling so the call returns sooner after the run finishes.
-
----
-
-<a id="listatccheckvariants-high-level-atc"></a>
-#### ListATCCheckVariants (High-Level / Atc)
-**Description:** List available ATC check variants on the SAP system. Returns the variants XML. 
-
-**Source:** `src/handlers/atc/high/handleListATCCheckVariants.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `max_item_count` (number, optional (default: 500).)) - Maximum number of variants to return (default: 500).
-- `name_pattern` (string, optional (default: *").)) - Name filter pattern, 
-
----
-
-<a id="runatc-high-level-atc"></a>
-#### RunATC (High-Level / Atc)
-**Description:** Start an asynchronous ATC (ABAP Test Cockpit) run for an ABAP object. 
-
-**Source:** `src/handlers/atc/high/handleRunATC.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `check_variant` (string, optional) - ATC check variant name. If omitted, uses the system
-- `max_findings` (number, optional (default: 100).)) - Maximum number of findings to return (default: 100).
-- `object_name` (string, required) - Name of the ABAP object to check (e.g., 
-- `object_type` (string, required) - Type of object to check. Use 
-
----
 
 <a id="high-level-class"></a>
 ### High-Level / Class
@@ -457,7 +525,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.
 
 ---
 
@@ -475,6 +543,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
 - `final` (boolean, optional) - Mark class as final. Default: false
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
 - `superclass` (string, optional) - Optional superclass name.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
@@ -565,7 +634,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -579,7 +648,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -593,7 +662,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -607,7 +676,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -621,7 +690,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -717,8 +786,531 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+
+---
+
+<a id="getclassversiondiff-high-level-common"></a>
+#### GetClassVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP class versions, by their content_uris (taken from GetClassVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetClassVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetClassVersions entry).
+
+---
+
+<a id="getclassversions-high-level-common"></a>
+#### GetClassVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP class. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetClassVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `class_name` (string, required) - ABAP class name.
+
+---
+
+<a id="getclassversionsource-high-level-common"></a>
+#### GetClassVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP class version by its content_uri (taken from a GetClassVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetClassVersions entry.
+
+---
+
+<a id="getddlversiondiff-high-level-common"></a>
+#### GetDdlVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two CDS view (DDL source) versions, by their content_uris (taken from GetDdlVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDdlVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDdlVersions entry).
+
+---
+
+<a id="getddlversions-high-level-common"></a>
+#### GetDdlVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a CDS view (DDL source). Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDdlVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view (DDL source) name.
+
+---
+
+<a id="getddlversionsource-high-level-common"></a>
+#### GetDdlVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific CDS view (DDL source) version by its content_uri (taken from a GetDdlVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetDdlVersions entry.
+
+---
+
+<a id="getfunctiongroupversiondiff-high-level-common"></a>
+#### GetFunctionGroupVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP function group versions, by their content_uris (taken from GetFunctionGroupVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionGroupVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionGroupVersions entry).
+
+---
+
+<a id="getfunctiongroupversions-high-level-common"></a>
+#### GetFunctionGroupVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP function group. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionGroupVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - ABAP function group name.
+
+---
+
+<a id="getfunctiongroupversionsource-high-level-common"></a>
+#### GetFunctionGroupVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP function group version by its content_uri (taken from a GetFunctionGroupVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionGroupVersions entry.
+
+---
+
+<a id="getfunctionmoduleversiondiff-high-level-common"></a>
+#### GetFunctionModuleVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP function module versions, by their content_uris (taken from GetFunctionModuleVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionModuleVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionModuleVersions entry).
+
+---
+
+<a id="getfunctionmoduleversions-high-level-common"></a>
+#### GetFunctionModuleVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP function module. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionModuleVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Owning function group name (required).
+- `function_module_name` (string, required) - ABAP function module name.
+
+---
+
+<a id="getfunctionmoduleversionsource-high-level-common"></a>
+#### GetFunctionModuleVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP function module version by its content_uri (taken from a GetFunctionModuleVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionModuleVersions entry.
+
+---
+
+<a id="getinterfaceversiondiff-high-level-common"></a>
+#### GetInterfaceVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP interface versions, by their content_uris (taken from GetInterfaceVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetInterfaceVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetInterfaceVersions entry).
+
+---
+
+<a id="getinterfaceversions-high-level-common"></a>
+#### GetInterfaceVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP interface. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetInterfaceVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `interface_name` (string, required) - ABAP interface name.
+
+---
+
+<a id="getinterfaceversionsource-high-level-common"></a>
+#### GetInterfaceVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP interface version by its content_uri (taken from a GetInterfaceVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetInterfaceVersions entry.
+
+---
+
+<a id="getpackageversiondiff-high-level-common"></a>
+#### GetPackageVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP package versions, by their content_uris (taken from GetPackageVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetPackageVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetPackageVersions entry).
+
+---
+
+<a id="getpackageversions-high-level-common"></a>
+#### GetPackageVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP package. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetPackageVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `package_name` (string, required) - ABAP package name.
+
+---
+
+<a id="getpackageversionsource-high-level-common"></a>
+#### GetPackageVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP package version by its content_uri (taken from a GetPackageVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetPackageVersions entry.
+
+---
+
+<a id="getprogramversiondiff-high-level-common"></a>
+#### GetProgramVersionDiff (High-Level / Common)
+**Description:** [read-only] Compute a unified diff between two ABAP program versions, by their content_uris (taken from GetProgramVersions entries).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetProgramVersions entry).
+- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetProgramVersions entry).
+
+---
+
+<a id="getprogramversions-high-level-common"></a>
+#### GetProgramVersions (High-Level / Common)
+**Description:** [read-only] List the SAP version history of a ABAP program. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetProgramVersionSource.
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `program_name` (string, required) - ABAP program name.
+
+---
+
+<a id="getprogramversionsource-high-level-common"></a>
+#### GetProgramVersionSource (High-Level / Common)
+**Description:** [read-only] Fetch the source of a specific ABAP program version by its content_uri (taken from a GetProgramVersions entry).
+
+**Source:** `src/handlers/common/high/objectVersionTools.ts`
+
+**Available in:** `onprem`, `legacy`
+
+**Parameters:**
+- `content_uri` (string, required) - Opaque content_uri taken from a GetProgramVersions entry.
+
+---
+
+<a id="high-level-compact"></a>
+### High-Level / Compact
+
+<a id="handlercreate-high-level-compact"></a>
+#### HandlerCreate (High-Level / Compact)
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
+
+**Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate object after create.
+- `application` (string, optional) - Domain application area.
+- `behavior_definition` (string, optional) - Referenced behavior definition name (behavior implementation create).
+- `cds_view_name` (string, optional) - CDS view name to validate for unit test doubles.
+- `class_name` (string, optional) - ABAP class name.
+- `conversion_exit` (string, optional) - Conversion exit name.
+- `data_element_name` (string, optional) - Data element name.
+- `datatype` (string, optional) - ABAP data type.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `decimals` (number, optional) - Decimal places.
+- `description` (string, optional) - Human-readable object description.
+- `domain_name` (string, optional) - ABAP domain name.
+- `fields` (array, optional) - Structure fields (for STRUCTURE create).
+- `fixed_values` (array, optional) - Domain fixed values list.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `implementation_type` (string, optional) - Behavior definition implementation type.
+- `interface_name` (string, optional) - Interface name.
+- `length` (number, optional) - Length for typed artifacts.
+- `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
+- `object_type` (any, required) - 
+- `package_name` (string, optional) - ABAP package name.
+- `program_name` (string, optional) - ABAP program name.
+- `program_type` (string, optional) - ABAP program type.
+- `root_entity` (string, optional) - Root CDS entity name (behavior definition create).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `tests` (array, optional) - Container/test class pairs (for UNIT_TEST create).
+- `transport_request` (string, optional) - Transport request id (if required by system).
+- `value_table` (string, optional) - Foreign key value table.
+
+---
+
+<a id="handlerdelete-high-level-compact"></a>
+#### HandlerDelete (High-Level / Compact)
+**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
+
+**Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `behavior_definition_name` (string, optional) - Behavior definition name.
+- `behavior_implementation_name` (string, optional) - Behavior implementation name.
+- `class_name` (string, optional) - ABAP class name.
+- `data_element_name` (string, optional) - Data element name.
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `domain_name` (string, optional) - ABAP domain name.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `interface_name` (string, optional) - Interface name.
+- `metadata_extension_name` (string, optional) - Metadata extension name.
+- `object_type` (any, required) - 
+- `program_name` (string, optional) - ABAP program name.
+- `run_id` (string, optional) - Unit test run id (UNIT_TEST delete).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `transport_request` (string, optional) - Transport request id (if required by system).
+
+---
+
+<a id="handlerget-high-level-compact"></a>
+#### HandlerGet (High-Level / Compact)
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+
+**Source:** `src/handlers/compact/high/handleHandlerGet.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `behavior_definition_name` (string, optional) - Behavior definition name.
+- `behavior_implementation_name` (string, optional) - Behavior implementation name.
+- `class_name` (string, optional) - Class name.
+- `data_element_name` (string, optional) - Data element name.
+- `ddl_name` (string, optional) - DDL source name.
+- `domain_name` (string, optional) - Domain name.
+- `function_group_name` (string, optional) - Function group name.
+- `function_module_name` (string, optional) - Function module name.
+- `interface_name` (string, optional) - Interface name.
+- `metadata_extension_name` (string, optional) - Metadata extension name.
+- `object_type` (any, required) - 
+- `package_name` (string, optional) - Package name.
+- `program_name` (string, optional) - Program name.
+- `response_format` (string, optional) - Response format for SERVICE_BINDING reads.
+- `run_id` (string, optional) - Unit test run id.
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `version` (any, optional) - 
+
+---
+
+<a id="handlerupdate-high-level-compact"></a>
+#### HandlerUpdate (High-Level / Compact)
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
+
+**Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate object after update.
+- `behavior_definition` (string, optional) - Referenced behavior definition name (behavior implementation update).
+- `binding_variant` (string, optional) - Service binding variant (service binding update).
+- `class_name` (string, optional) - ABAP class name.
+- `conversion_exit` (string, optional) - Conversion exit name.
+- `data_element_name` (string, optional) - Data element name.
+- `datatype` (string, optional) - ABAP data type.
+- `ddl_code` (string, optional) - Complete DDL source code (for TABLE/STRUCTURE update).
+- `ddl_name` (string, optional) - DDL source name (CDS view, AMDP table function, etc.).
+- `ddl_source` (string, optional) - Complete DDL source code (for DDL update).
+- `decimals` (number, optional) - Decimal places.
+- `definitions_code` (string, optional) - Updated source for class local definitions.
+- `description` (string, optional) - Human-readable object description.
+- `desired_publication_state` (string, optional) - Target publication state (service binding update).
+- `domain_name` (string, optional) - ABAP domain name.
+- `fixed_values` (array, optional) - Domain fixed values list.
+- `function_group_name` (string, optional) - ABAP function group name.
+- `function_module_name` (string, optional) - ABAP function module name.
+- `implementation_code` (string, optional) - Behavior implementation methods source code.
+- `interface_name` (string, optional) - Interface name.
+- `length` (number, optional) - Length for typed artifacts.
+- `local_types_code` (string, optional) - Updated source for class local types.
+- `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
+- `macros_code` (string, optional) - Updated source for class local macros.
+- `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
+- `object_type` (any, required) - 
+- `package_name` (string, optional) - ABAP package name.
+- `program_name` (string, optional) - ABAP program name.
+- `run_id` (string, optional) - Unit test run id (UNIT_TEST update).
+- `service_binding_name` (string, optional) - Service binding name.
+- `service_definition_name` (string, optional) - Service definition name.
+- `service_name` (string, optional) - Published service name (service binding update).
+- `sign_exists` (boolean, optional) - Allow signed values (domain setting).
+- `source_code` (string, optional) - ABAP source code payload.
+- `structure_name` (string, optional) - Structure name.
+- `table_name` (string, optional) - Table name.
+- `test_class_code` (string, optional) - Updated source for the local test class.
+- `test_class_source` (string, optional) - Updated local test class source (CDS_UNIT_TEST update).
+- `transport_request` (string, optional) - Transport request id (if required by system).
+- `value_table` (string, optional) - Foreign key value table.
+
+---
+
+<a id="high-level-ddl"></a>
+### High-Level / Ddl
+
+<a id="checkddl-high-level-ddl"></a>
+#### CheckDdl (High-Level / Ddl)
+**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
+
+**Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - CDS view name to check, passed as ddl_name (e.g., ZI_MY_VIEW).
+- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
+
+---
+
+<a id="createddl-high-level-ddl"></a>
+#### CreateDdl (High-Level / Ddl)
+**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
+
+**Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `description` (string, optional) - Optional description (defaults to ddl_name).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
+- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
+- `transport_request` (string, optional) - Transport request number (required for transportable packages).
+
+---
+
+<a id="deleteddl-high-level-ddl"></a>
+#### DeleteDdl (High-Level / Ddl)
+**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="getddl-high-level-ddl"></a>
+#### GetDdl (High-Level / Ddl)
+**Description:** Retrieve ABAP DDL source definition. Supports reading active or inactive version.
+
+**Source:** `src/handlers/ddl/high/handleGetDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="updateddl-high-level-ddl"></a>
+#### UpdateDdl (High-Level / Ddl)
+**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
+
+**Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional) - Activate after update. Default: false.
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002).
+- `ddl_source` (string, required) - Complete DDL source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
@@ -749,7 +1341,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: active.
 
 ---
 
@@ -765,6 +1357,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
 - `function_group_name` (string, required) - Function group name (e.g., ZTEST_FG_001). Must follow SAP naming conventions (start with Z or Y, max 26 chars).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -788,7 +1381,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updatefunctiongroup-high-level-function"></a>
 #### UpdateFunctionGroup (High-Level / Function)
-**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don
+**Description:** Update metadata (description) of an existing ABAP function group. Function groups are containers for function modules and don't have source code to update directly. Uses stateful session with proper lock/unlock mechanism.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionGroup.ts`
 
@@ -845,7 +1438,58 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_FUNCTIONGROUP).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
+
+---
+
+<a id="high-level-function-include"></a>
+### High-Level / Function Include
+
+<a id="createfunctioninclude-high-level-function-include"></a>
+#### CreateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+
+**Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `description` (string, optional) - Optional description for the include
+- `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
+- `include_name` (string, required) - Include name (e.g., LZTEST_FG_001F01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="deletefunctioninclude-high-level-function-include"></a>
+#### DeleteFunctionInclude (High-Level / Function Include)
+**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
+- `include_name` (string, required) - Include name (e.g., LZ_MY_FGF01).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="updatefunctioninclude-high-level-function-include"></a>
+#### UpdateFunctionInclude (High-Level / Function Include)
+**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+
+**Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
+- `function_group_name` (string, required) - Function group name containing the include (e.g., ZOK_FG_MCP01).
+- `include_name` (string, required) - Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.
+- `source_code` (string, required) - Complete ABAP include source code.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable includes.
 
 ---
 
@@ -878,7 +1522,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).
 - `function_module_name` (string, required) - FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -909,6 +1553,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
 - `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
@@ -938,7 +1583,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., Z_MY_INTERFACE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -985,7 +1630,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1014,11 +1659,12 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `legacy`
 
 **Parameters:**
-- `application` (string, optional) - Application area (e.g., 
+- `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
+- `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).
-- `program_type` (string, optional) - Program type: 
+- `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
@@ -1047,7 +1693,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
-- `version` (string, optional (default: active)) - Version to read: 
+- `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
@@ -1216,22 +1862,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-<a id="runabapunit-high-level-unit-test"></a>
-#### RunAbapUnit (High-Level / Unit Test)
-**Description:** Run ABAP Unit tests for a single ABAP object synchronously and return a 
-
-**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `object_name` (string, required) - Name of the ABAP object to test (e.g., 
-- `object_type` (string, required) - Type of object to test. Use 
-- `test_scope` (string, optional (default: own_tests)) - Scope of test discovery: 
-- `with_coverage` (boolean, optional (default: false).)) - Include code coverage measurement (default: false).
-
----
-
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
@@ -1275,84 +1905,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `run_id` (string, required) - Run identifier returned by CreateUnitTest/RunUnitTest.
-
----
-
-<a id="high-level-view"></a>
-### High-Level / View
-
-<a id="checkview-high-level-view"></a>
-#### CheckView (High-Level / View)
-**Description:** Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.
-
-**Source:** `src/handlers/view/high/handleCheckView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `version` (string, optional) - Version to check: 
-- `view_name` (string, required) - CDS view name (e.g., ZI_MY_VIEW).
-
----
-
-<a id="createview-high-level-view"></a>
-#### CreateView (High-Level / View)
-**Description:** Operation: Create. Subject: View. Will be useful for creating view. Create a new CDS View or Classic View in SAP system. Creates the view object in initial state.
-
-**Source:** `src/handlers/view/high/handleCreateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `description` (string, optional) - Optional description (defaults to view_name).
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (required for transportable packages).
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
-
----
-
-<a id="deleteview-high-level-view"></a>
-#### DeleteView (High-Level / View)
-**Description:** Delete an ABAP view from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
-
-**Source:** `src/handlers/view/high/handleDeleteView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-<a id="getview-high-level-view"></a>
-#### GetView (High-Level / View)
-**Description:** Retrieve ABAP view definition. Supports reading active or inactive version.
-
-**Source:** `src/handlers/view/high/handleGetView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `version` (string, optional (default: active)) - Version to read: 
-- `view_name` (string, required) - View name (e.g., Z_MY_VIEW).
-
----
-
-<a id="updateview-high-level-view"></a>
-#### UpdateView (High-Level / View)
-**Description:** Operation: Update, Create. Subject: View. Will be useful for updating or creating view. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates.
-
-**Source:** `src/handlers/view/high/handleUpdateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `activate` (boolean, optional) - Activate after update. Default: false.
-- `ddl_source` (string, required) - Complete DDL source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002).
 
 ---
 
@@ -1406,7 +1958,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
 
 ---
 
@@ -1455,7 +2007,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `format` (string, optional) - Preferred response format. Defaults to 
+- `format` (string, optional) - Preferred response format. Defaults to 'abapunit'.
 - `run_id` (string, required) - Run identifier returned by RunClassUnitTestsLow.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1619,8 +2171,157 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `objects` (array, required) - Array of objects to activate. Each object must have 
+- `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.
 - `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+
+---
+
+<a id="deleteobjectlow-low-level-common"></a>
+#### DeleteObjectLow (Low-Level / Common)
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem/legacy only — calling it on ABAP Cloud will fail.
+
+**Source:** `src/handlers/common/low/handleDeleteObject.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `function_group_name` (string, optional) - Required only for function_module type
+- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
+- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
+- `transport_request` (string, optional) - Transport request number
+
+---
+
+<a id="low-level-ddl"></a>
+### Low-Level / Ddl
+
+<a id="activateddllow-low-level-ddl"></a>
+#### ActivateDdlLow (Low-Level / Ddl)
+**Description:** Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., ZVW_MY_VIEW).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="checkddllow-low-level-ddl"></a>
+#### CheckDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
+
+**Source:** `src/handlers/ddl/low/handleCheckDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
+
+---
+
+<a id="createddllow-low-level-ddl"></a>
+#### CreateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Create a new ABAP DDL source. - use CreateDdl (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
+
+**Source:** `src/handlers/ddl/low/handleCreateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
+- `ddl_name` (string, required) - DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `description` (string, required) - DDL source description.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+
+---
+
+<a id="deleteddllow-low-level-ddl"></a>
+#### DeleteDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+
+**Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+
+---
+
+<a id="lockddllow-low-level-ddl"></a>
+#### LockDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Lock a DDL source for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+
+**Source:** `src/handlers/ddl/low/handleLockDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="unlockddllow-low-level-ddl"></a>
+#### UnlockDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Unlock an ABAP DDL source after modification. Must use the same session_id and lock_handle from LockDdlLow operation.
+
+**Source:** `src/handlers/ddl/low/handleUnlockDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
+- `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
+- `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="updateddllow-low-level-ddl"></a>
+#### UpdateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockDdlLow. - use UpdateDdl (high-level) for full workflow with lock/unlock/activate.
+
+**Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.
+- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
+- `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+
+---
+
+<a id="validateddllow-low-level-ddl"></a>
+#### ValidateDdlLow (Low-Level / Ddl)
+**Description:** [low-level] Validate an ABAP DDL source name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
+
+**Source:** `src/handlers/ddl/low/handleValidateDdl.ts`
+
+**Available in:** `onprem`, `cloud`, `legacy`
+
+**Parameters:**
+- `ddl_name` (string, required) - DDL source name to validate (e.g., Z_MY_PROGRAM).
+- `description` (string, required) - DDL source description. Required for validation.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
+- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 ---
 
@@ -1686,7 +2387,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FM)
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 
+- `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
 
 ---
 
@@ -2131,11 +2832,11 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `legacy`
 
 **Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: 
+- `application` (string, optional (default: *').)) - Application area (optional, default: '*').
 - `description` (string, required) - Program description.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `program_type` (string, optional) - Program type: 
+- `program_type` (string, optional) - Program type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -2221,138 +2922,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-<a id="low-level-view"></a>
-### Low-Level / View
-
-<a id="activateviewlow-low-level-view"></a>
-#### ActivateViewLow (Low-Level / View)
-**Description:** Operation: Activate, Create, Update. Subject: View. Will be useful for activating, creating, or updating view. [low-level] Activate an ABAP view (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/view/low/handleActivateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., ZVW_MY_VIEW).
-
----
-
-<a id="checkviewlow-low-level-view"></a>
-#### CheckViewLow (Low-Level / View)
-**Description:** [low-level] Perform syntax check on an ABAP view. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).
-
-**Source:** `src/handlers/view/low/handleCheckView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `version` (string, optional) - Version to check: 
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="createviewlow-low-level-view"></a>
-#### CreateViewLow (Low-Level / View)
-**Description:** [low-level] Create a new ABAP view. - use CreateView (high-level) for full workflow with validation, lock, update, check, unlock, and activate.
-
-**Source:** `src/handlers/view/low/handleCreateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `application` (string, optional (default: *').)) - Application area (optional, default: 
-- `description` (string, required) - View description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `view_name` (string, required) - View name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `view_type` (string, optional) - View type: 
-
----
-
-<a id="deleteviewlow-low-level-view"></a>
-#### DeleteViewLow (Low-Level / View)
-**Description:** [low-level] Delete an ABAP view from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
-
-**Source:** `src/handlers/view/low/handleDeleteView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="lockviewlow-low-level-view"></a>
-#### LockViewLow (Low-Level / View)
-**Description:** [low-level] Lock an ABAP view for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
-
-**Source:** `src/handlers/view/low/handleLockView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="unlockviewlow-low-level-view"></a>
-#### UnlockViewLow (Low-Level / View)
-**Description:** [low-level] Unlock an ABAP view after modification. Must use the same session_id and lock_handle from LockView operation.
-
-**Source:** `src/handlers/view/low/handleUnlockView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockView operation.
-- `session_id` (string, required) - Session ID from LockView operation. Must be the same as used in LockView.
-- `session_state` (object, optional) - Session state from LockView (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., Z_MY_PROGRAM).
-
----
-
-<a id="updateviewlow-low-level-view"></a>
-#### UpdateViewLow (Low-Level / View)
-**Description:** [low-level] Update DDL source code of an existing CDS View or Classic View. Requires lock handle from LockObject. - use UpdateView (high-level) for full workflow with lock/unlock/activate.
-
-**Source:** `src/handlers/view/low/handleUpdateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 
-- `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name (e.g., ZOK_R_TEST_0002). View must already exist.
-
----
-
-<a id="validateviewlow-low-level-view"></a>
-#### ValidateViewLow (Low-Level / View)
-**Description:** [low-level] Validate an ABAP view name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
-
-**Source:** `src/handlers/view/low/handleValidateView.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `description` (string, required) - View description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `view_name` (string, required) - View name to validate (e.g., Z_MY_PROGRAM).
-
----
-
-*Last updated: 2026-06-01*
+*Last updated: 2026-07-05*

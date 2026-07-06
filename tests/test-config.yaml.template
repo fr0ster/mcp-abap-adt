@@ -252,6 +252,32 @@ shared_dependencies:
           fld2          : abap.char(50);
         }
 
+  structures:
+    # Include structure MUST come first: the base structure embeds it via `include`,
+    # so it must already exist and be active before the base is created/activated.
+    - name: "ZMCP_SHR_STRU_INC"
+      description: "Shared struct include"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared struct include'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        define structure zmcp_shr_stru_inc {
+          inc_a : abap.char(10);
+          inc_b : abap.int4;
+        }
+
+    - name: "ZMCP_SHR_STRU"
+      description: "Shared base struct"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared base struct'
+        @AbapCatalog.enhancement.category : #EXTENSIBLE_ANY
+        define structure zmcp_shr_stru {
+          base_a : abap.char(5);
+          include zmcp_shr_stru_inc;
+          base_b : abap.numc(4);
+        }
+
   views:
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared root CDS view entity"
@@ -434,6 +460,9 @@ shared_dependencies:
     - name: "ZMCP_BLD_SHR_FGR"
       description: "Shared function group for read tests"
       available_in: ["onprem", "cloud", "legacy"]
+    - name: "ZMCP_SHR_FGRP"
+      description: "Shared FUGR for include/FM tests"
+      available_in: ["onprem", "cloud", "legacy"]
 
   function_modules:
     - name: "Z_MCP_BLD_SHR_FM"
@@ -442,6 +471,18 @@ shared_dependencies:
       available_in: ["onprem", "cloud", "legacy"]
       source: |
         FUNCTION Z_MCP_BLD_SHR_FM
+            IMPORTING
+               VALUE(IV_INPUT) TYPE  STRING
+            EXPORTING
+               VALUE(EV_OUTPUT) TYPE  STRING.
+          ev_output = |Echo: { iv_input }|.
+        ENDFUNCTION.
+    - name: "Z_MCP_SHR_FM"
+      group: "ZMCP_SHR_FGRP"
+      description: "Shared FM for include/FM tests"
+      available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        FUNCTION Z_MCP_SHR_FM
             IMPORTING
                VALUE(IV_INPUT) TYPE  STRING
             EXPORTING
@@ -1490,7 +1531,7 @@ create_transported_object:
 # Standard SAP objects registry for read-only tests
 
 # View (View)
-create_view:
+create_ddl:
   test_cases:
     - name: "builder_view"
       enabled: true
@@ -1499,7 +1540,7 @@ create_view:
       params:
         # package_name: "ZMCP_BLD_PKG01"
         table_name: "ZMCP_VIEW_TBL02"
-        view_name: "ZMCP_BLD_VIEW_H1"
+        ddl_name: "ZMCP_BLD_VIEW_H1"
         description: "ViewBuilder workflow view"
         transport_request: ""
         table_source: |
@@ -1534,7 +1575,7 @@ create_view:
       params:
         # package_name: "ZMCP_BLD_PKG01"
         table_name: "ZMCP_CDS_TBL02"
-        view_name: "ZMCP_BLD_CDSV_H1"
+        ddl_name: "ZMCP_BLD_CDSV_H1"
         description: "ViewBuilder CDS unit test view"
         transport_request: ""
         table_source: |
@@ -1590,14 +1631,14 @@ create_view:
 # Create Function Group
 
 # View (View - Low-Level)
-create_view_low:
+create_ddl_low:
   test_cases:
     - name: "full_workflow"
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
       description: "View low-level handler full workflow test"
       params:
-        view_name: "ZMCP_BLD_VIEW_L1"
+        ddl_name: "ZMCP_BLD_VIEW_L1"
         description: "View low-level handler test view"
         # package_name: "ZMCP_BLD_PKG01"
         # transport_request: ""
@@ -2060,15 +2101,15 @@ check_bdef_high:
       params:
         name: "ZI_MCP_SHR_ROOT"
 
-# CheckView
-check_view_high:
+# CheckDdl
+check_ddl_high:
   test_cases:
     - name: "check_existing"
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
       description: "Check an existing CDS view for syntax errors"
       params:
-        view_name: "ZI_MCP_SHR_ROOT"
+        ddl_name: "ZI_MCP_SHR_ROOT"
 
 # CheckDomain
 check_domain_high:
@@ -2161,6 +2202,69 @@ check_function_module_high:
       params:
         function_group_name: "ZMCP_SHR_FGRP"
         function_module_name: "Z_MCP_SHR_FM"
+
+# ReadFunctionInclude (read-only) — reads the generated TOP include of the shared FUGR
+read_function_include_readonly:
+  test_cases:
+    - name: "read_top_include"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Read the TOP include source/metadata of the shared function group"
+      params:
+        function_group_name: "ZMCP_SHR_FGRP"
+        include_name: "LZMCP_SHR_FGRPTOP"
+
+# ListFunctionGroupIncludes (read-only)
+list_function_group_includes_readonly:
+  test_cases:
+    - name: "list_includes"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "List the includes of the shared function group"
+      params:
+        function_group_name: "ZMCP_SHR_FGRP"
+
+# ListFunctionModules (read-only)
+list_function_modules_readonly:
+  test_cases:
+    - name: "list_modules"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "List the function modules of the shared function group"
+      params:
+        function_group_name: "ZMCP_SHR_FGRP"
+
+# GetStructuresList (read-only) — recursively lists structures embedded in a structure
+get_structures_list_readonly:
+  test_cases:
+    - name: "list_embedded_structures"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "List the structures embedded (include) and extending (append) the shared base structure"
+      params:
+        structure_name: "ZMCP_SHR_STRU"
+        expected_include: "ZMCP_SHR_STRU_INC"
+        # Extension (append) structure that `extend type ZMCP_SHR_STRU with …`.
+        # Created out-of-band (adt-clients cannot create `extend type` objects);
+        # leave empty to skip the append assertion on systems without it.
+        expected_append: "ZOK_S_APPEND"
+
+# FunctionInclude high-level lifecycle (create -> update -> read -> delete)
+# Uses a LETTER-suffix include name (not numeric) so ADT can delete it.
+function_include_high:
+  test_cases:
+    - name: "full_workflow_high"
+      enabled: true
+      available_in: ["onprem", "cloud", "legacy"]
+      description: "Create, update, read-back and delete a custom function group include"
+      params:
+        function_group_name: "ZMCP_SHR_FGRP"
+        include_name: "LZMCP_SHR_FGRPCUS"
+        description: "Custom include for high-level lifecycle tests"
+        # transport_request: ""  # uncomment / set for transportable packages
+        update_source_code: |
+          * Custom include for FunctionInclude high-level integration test
+          DATA gv_finc_test TYPE string VALUE 'function-include-roundtrip'.
 
 # CheckMetadataExtension
 check_metadata_extension_high:

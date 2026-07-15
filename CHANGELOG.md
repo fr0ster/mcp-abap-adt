@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [8.7.0] - 2026-07-16
+
+### Fixed
+- **Timeouts no longer leave objects locked and inactive.** A mutating tool (Create/Update/Delete) runs a stateful lock → modify → unlock chain as several separate ADT requests. On a slow system a short per-request timeout would abort one of them mid-flight; aborting the socket drops the stateful ADT session and orphans the lock handle, so the follow-up unlock has nothing to release — the object was left **locked and inactive** (whereas a normal error keeps the session alive, so unlock worked). Every high-level Create/Update/Delete handler (70 tools) is now wrapped in an **uninterruptible critical section**: `beginCriticalSection()` before it runs and `endCriticalSection()` in a `finally`, via `@mcp-abap-adt/connection` 1.10.0. While active, the connection raises the request timeout to a large ceiling (`SAP_TIMEOUT_CRITICAL`, default 600000 ms) so slow write requests run to completion instead of being interrupted. Feature-detected, so it degrades to a no-op on older connections.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/connection@^1.10.0`** (from `^1.9.1`), which adds the reference-counted `beginCriticalSection()` / `endCriticalSection()` primitives used above. Non-breaking.
+
 ## [8.6.1] - 2026-07-05
 
 ### Changed

@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.8.1] - 2026-07-16
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.2`** (from `^7.4.0`). Two correctness fixes to `update()`'s read-back: the post-update readiness poll and the final returned read now target the **inactive** version — the one the write just produced — instead of `'active'` (which 404s for a never-activated object and returns stale content for an existing one). So reading back the result of an `update()` (including the `CreateServiceDefinition` `create → update → activate` flow) now returns the freshly written source. `@mcp-abap-adt/interfaces` stays `^9.2.0`. Non-breaking; no tool contract changed.
+
 ## [8.8.0] - 2026-07-16
 
 ### Changed

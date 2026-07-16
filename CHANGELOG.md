@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.7.1] - 2026-07-16
+
+### Fixed
+- **`CreateServiceDefinition` created the object with an empty body.** The service-definition `create()` POST only registers the shell (metadata: name/description/package) — it does **not** persist the `define service … { … }` source, and the handler had no follow-up write step (a regression in the underlying `@mcp-abap-adt/adt-clients` create flow, which used to run create → lock → update → unlock). The handler now runs an explicit high-level `update()` (lock → write source → unlock) right after create whenever `source_code` is provided, then activates — so the service definition is created with its real body. (Root cause is in adt-clients' `AdtServiceDefinition.create()`; this handler-side fix restores correct behavior immediately.)
+
 ## [8.7.0] - 2026-07-16
 
 ### Fixed

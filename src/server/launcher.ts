@@ -71,6 +71,13 @@ function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
       'SAP_CLIENT',
       'SAP_CONNECTION_TYPE',
       'SAP_SYSTEM_TYPE',
+      // RFC transport parameters read by @mcp-abap-adt/connection buildRfcParams
+      'SAP_SAPROUTER',
+      'SAP_SYSNR',
+      // Per-request timeouts read by @mcp-abap-adt/connection/utils/timeouts
+      'SAP_TIMEOUT_DEFAULT',
+      'SAP_TIMEOUT_CSRF',
+      'SAP_TIMEOUT_LONG',
     ];
 
     for (const key of keys) {

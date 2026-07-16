@@ -148,6 +148,18 @@ export async function handleCreateServiceDefinition(
         );
       }
 
+      // Write the source body. The create() POST only registers the shell
+      // (metadata) and does NOT persist the `define service … { … }` source,
+      // so without this the object is created with an empty body. Run a full
+      // lock → update → unlock via the high-level update() to write it.
+      if (typedArgs.source_code) {
+        await client.getServiceDefinition().update({
+          serviceDefinitionName,
+          sourceCode: typedArgs.source_code,
+          transportRequest: typedArgs.transport_request,
+        });
+      }
+
       // Activate if requested
       if (shouldActivate) {
         const activateState = await client

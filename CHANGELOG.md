@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.8.0] - 2026-07-16
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.0`** (from `^7.3.1`). 7.4.0 adds a session-scoped lock registry with an `unlockAll()` safety net, which complements the uninterruptible critical sections from 8.7.0 by making orphaned locks recoverable. `@mcp-abap-adt/interfaces` stays `^9.2.0`. Non-breaking; no tool contract changed.
+
 ## [8.7.1] - 2026-07-16
 
 ### Fixed

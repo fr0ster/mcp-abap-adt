@@ -134,7 +134,9 @@ export async function handleCreateServiceDefinition(
         packageName: typedArgs.package_name.toUpperCase(),
         transportRequest: typedArgs.transport_request,
         masterLanguage: typedArgs.master_language,
-        ...(typedArgs.source_code && { sourceCode: typedArgs.source_code }),
+        // NB: source is NOT passed to create() — create() only makes the shell
+        // (adt-clients 7.4.3 dropped the no-op create source pass-through). The
+        // body is written by the update() call below when source_code is given.
       };
 
       const createState = await client

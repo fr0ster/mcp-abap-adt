@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [8.9.0] - 2026-07-17
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.4` and `@mcp-abap-adt/interfaces@^10.0.0`** (from `^7.4.2` / `^9.2.0`). interfaces 10.0.0 is a major bump whose only breaking change is removing the no-op `source_code` field from the low-level create-params (`ICreateAccessControl/ServiceDefinition/EnhancementParams`) — source is written via the update flow. This does **not** affect us: our handlers use the high-level config types (`IServiceDefinitionConfig.sourceCode`, unchanged), not the low-level create-params. adt-clients 7.4.3 dropped the matching dead create() pass-through.
+- **`CreateServiceDefinition`:** removed the now-dead `sourceCode` from the `create()` config (create makes the shell only; the body is still written by the follow-up `update()` from 8.7.1). No behavior change.
+
 ## [8.8.1] - 2026-07-16
 
 ### Changed

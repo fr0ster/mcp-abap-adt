@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [8.10.0] - 2026-07-21
+
+### Fixed
+- **Locked/failed activations no longer report a false `success:true`.** Migrated to `@mcp-abap-adt/adt-clients@^7.6.0`, which fixes the activation-masking bug (adt-clients #79): ADT's `/sap/bc/adt/activation` returns HTTP 200 even when activation fails (object locked in another session, syntax errors), and the shared `activateObjectInSession` helper previously returned that response unchecked. Every high-level `Update*`/`Activate*` tool built on it (`UpdateDomain`, and the whole family across domain, program, table, structure, class, interface, ddl, tabletype, functionModule, functionInclude, metadataExtension, behaviorDefinition, enhancement, unitTest) therefore returned `{"success":true,"...":"updated and activated successfully"}` on a locked object. With 7.6.0 the client now throws on an explicit activation-failure signal; the handler's catch maps it to a structured `McpError` (tool result `isError:true`), so consumers can finally tell the operation failed. Fixes #154.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.6.0` and `@mcp-abap-adt/interfaces@^11.2.0`** (from `^7.4.4` / `^10.0.0`). adt-clients 7.6.0 sources its public types from interfaces `^11.2.0`; bumping our direct interfaces range keeps a single top-level interfaces version aligned with the client. No handler API change.
+
 ## [8.9.0] - 2026-07-17
 
 ### Changed

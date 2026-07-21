@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "8.9.0",
+  "version": "8.10.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -137,13 +137,13 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^7.4.4",
+    "@mcp-abap-adt/adt-clients": "^7.6.0",
     "@mcp-abap-adt/auth-broker": "^1.0.5",
     "@mcp-abap-adt/auth-providers": "^1.0.5",
     "@mcp-abap-adt/auth-stores": "^1.0.4",
     "@mcp-abap-adt/connection": "^1.10.0",
     "@mcp-abap-adt/header-validator": "^0.1.8",
-    "@mcp-abap-adt/interfaces": "^10.0.0",
+    "@mcp-abap-adt/interfaces": "^11.2.0",
     "@mcp-abap-adt/logger": "^0.1.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.18.1",

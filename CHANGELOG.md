@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [8.12.0] - 2026-07-22
+
 ### Removed
 - **Version-history tools are no longer advertised for non-versioned object types.** `function_group`, `domain`, `data_element` and `package` were exposed by the version tools but their adt-clients handlers' `getVersions`/`getVersionSource` have always thrown "not supported" — the calls were dead on arrival. Removed from:
   - the `object_type` enum of the generic `GetObjectVersions` / `GetObjectVersionSource` / `GetObjectVersionDiff` (they now accept only the 9 genuinely versioned types: class, program, interface, function_module, table, structure, ddl, behavior_definition, metadata_extension);
@@ -11,6 +13,9 @@
 
 ### Changed
 - **Migrated to `@mcp-abap-adt/adt-clients@^8.0.0` and `@mcp-abap-adt/interfaces@^11.3.0`** (from `^7.6.0` / `^11.2.0`). adt-clients 8.0.0 is a breaking major that narrows every `AdtClient.getXxx()` return type from the fat `IAdtObject` to the honest capability composite each handler actually implements (`IAdtSourceObject`, `IAdtNonVersionedObject`, or an inline intersection); interfaces 11.3.0 adds those composites. Calling a capability a handler does not implement is now a compile error instead of a silent runtime throw — which is exactly what caught the version-tools defect above. Our direct interfaces range is bumped to `^11.3.0` to keep a single top-level interfaces version aligned with the client and re-export the current type surface.
+
+### Security
+- **Cleared two high-severity production advisories (#164).** `fast-xml-parser` 5.9.3–5.10.0 → 5.10.1 (GHSA-8r6m-32jq-jx6q, DOCTYPE entity-expansion reset) and `fast-uri` 3.0.0–3.1.3 → 3.1.4 (GHSA-v2hh-gcrm-f6hx, host confusion via backslash authority delimiter; transitive via `@modelcontextprotocol/sdk` → ajv), via `npm audit fix` (lockfile only, no `package.json` dependency edits). The CI `Security audit (production deps, high+)` gate now passes. Two remaining moderate `@hono/node-server` advisories require a breaking MCP SDK major and are tracked separately.
 
 ## [8.11.0] - 2026-07-22
 

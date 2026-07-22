@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Removed
+- **Version-history tools are no longer advertised for non-versioned object types.** `function_group`, `domain`, `data_element` and `package` were exposed by the version tools but their adt-clients handlers' `getVersions`/`getVersionSource` have always thrown "not supported" — the calls were dead on arrival. Removed from:
+  - the `object_type` enum of the generic `GetObjectVersions` / `GetObjectVersionSource` / `GetObjectVersionDiff` (they now accept only the 9 genuinely versioned types: class, program, interface, function_module, table, structure, ddl, behavior_definition, metadata_extension);
+  - the per-type high-level surface — the 12 tools `Get{FunctionGroup,Domain,DataElement,Package}{Versions,VersionSource,VersionDiff}` are gone (39 → 27 per-type version tools, total tool count 365 → 353).
+
+  Those object types remain fully supported by `LockObject` and every other tool — they are lockable, just not versioned. This surfaced from the adt-clients 8.0.0 migration below: the honest capability types turned an always-failing runtime call into a compile error. **Breaking to the tool surface** (removed enum values + removed tools) — a client that requested version history for these types received a runtime error before and now gets a schema/`Unsupported object_type` error instead.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^8.0.0` and `@mcp-abap-adt/interfaces@^11.3.0`** (from `^7.6.0` / `^11.2.0`). adt-clients 8.0.0 is a breaking major that narrows every `AdtClient.getXxx()` return type from the fat `IAdtObject` to the honest capability composite each handler actually implements (`IAdtSourceObject`, `IAdtNonVersionedObject`, or an inline intersection); interfaces 11.3.0 adds those composites. Calling a capability a handler does not implement is now a compile error instead of a silent runtime throw — which is exactly what caught the version-tools defect above. Our direct interfaces range is bumped to `^11.3.0` to keep a single top-level interfaces version aligned with the client and re-export the current type surface.
+
 ## [8.11.0] - 2026-07-22
 
 ### Fixed

@@ -3,11 +3,16 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 177
+- Total tools: 182
 
 ## Navigation
 
 - [High-Level Group](#high-level-group)
+  - [Atc](#high-level-atc)
+    - [GetATCFindings](#getatcfindings-high-level-atc)
+    - [GetATCRunStatus](#getatcrunstatus-high-level-atc)
+    - [ListATCCheckVariants](#listatccheckvariants-high-level-atc)
+    - [RunATC](#runatc-high-level-atc)
   - [Behavior Definition](#high-level-behavior-definition)
     - [CheckBehaviorDefinition](#checkbehaviordefinition-high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
@@ -207,6 +212,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunAbapUnit](#runabapunit-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
@@ -215,6 +221,60 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-group"></a>
 ## High-Level Group
+
+<a id="high-level-atc"></a>
+### High-Level / Atc
+
+<a id="getatcfindings-high-level-atc"></a>
+#### GetATCFindings (High-Level / Atc)
+**Description:** Retrieve ATC findings for a completed worklist. The worklist_id is returned by 
+
+**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
+
+**Parameters:**
+- `format` (string, optional (default: xml)) - Findings format: "xml" (native ATC worklist) or "checkstyle" (Checkstyle XML). Default: xml.
+- `include_exempted_findings` (boolean, optional (default: false)) - Include exempted (suppressed) findings in the result.
+- `worklist_id` (string, required) - 32-character worklist GUID returned by RunATC.
+
+---
+
+<a id="getatcrunstatus-high-level-atc"></a>
+#### GetATCRunStatus (High-Level / Atc)
+**Description:** Read the status of an asynchronous ATC run by run_id. Response body contains 
+
+**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
+
+**Parameters:**
+- `run_id` (string, required) - Run identifier returned by RunATC.
+- `with_long_polling` (boolean, optional (default: true)) - Use server-side long polling so the call returns sooner after the run finishes.
+
+---
+
+<a id="listatccheckvariants-high-level-atc"></a>
+#### ListATCCheckVariants (High-Level / Atc)
+**Description:** List available ATC check variants on the SAP system. Returns the variants XML. 
+
+**Source:** `src/handlers/atc/high/handleListATCCheckVariants.ts`
+
+**Parameters:**
+- `max_item_count` (number, optional (default: 500).)) - Maximum number of variants to return (default: 500).
+- `name_pattern` (string, optional (default: *").)) - Name filter pattern, "*" for all (default: "*").
+
+---
+
+<a id="runatc-high-level-atc"></a>
+#### RunATC (High-Level / Atc)
+**Description:** Start an asynchronous ATC (ABAP Test Cockpit) run for an ABAP object. 
+
+**Source:** `src/handlers/atc/high/handleRunATC.ts`
+
+**Parameters:**
+- `check_variant` (string, optional) - ATC check variant name. If omitted, uses the system's default check variant.
+- `max_findings` (number, optional (default: 100).)) - Maximum number of findings to return (default: 100).
+- `object_name` (string, required) - Name of the ABAP object to check (e.g., "ZCL_MY_CLASS", "ZMY_PACKAGE").
+- `object_type` (string, required) - Type of object to check. Use "package" to check all objects inside a package.
+
+---
 
 <a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
@@ -2719,6 +2779,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runabapunit-high-level-unit-test"></a>
+#### RunAbapUnit (High-Level / Unit Test)
+**Description:** Run ABAP Unit tests for a single ABAP object synchronously and return a 
+
+**Source:** `src/handlers/unit_test/high/handleRunAbapUnit.ts`
+
+**Parameters:**
+- `object_name` (string, required) - Name of the ABAP object to test (e.g., "ZCL_MY_CLASS").
+- `object_type` (string, required) - Type of object to test. Use "package" to run all tests in a package.
+- `test_scope` (string, optional (default: own_tests)) - Scope of test discovery: "own_tests" (default, tests in the same 
+- `with_coverage` (boolean, optional (default: false).)) - Include code coverage measurement (default: false).
+
+---
+
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
 **Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
@@ -2759,4 +2833,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-05*
+*Last updated: 2026-07-06*

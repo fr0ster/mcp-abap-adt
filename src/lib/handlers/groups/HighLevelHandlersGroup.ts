@@ -1,5 +1,21 @@
 // Per-type activate handlers (reused from low-level)
 import {
+  TOOL_DEFINITION as GetATCFindings_Tool,
+  handleGetATCFindings,
+} from '../../../handlers/atc/high/handleGetATCFindings';
+import {
+  TOOL_DEFINITION as GetATCRunStatus_Tool,
+  handleGetATCRunStatus,
+} from '../../../handlers/atc/high/handleGetATCRunStatus';
+import {
+  handleListATCCheckVariants,
+  TOOL_DEFINITION as ListATCCheckVariants_Tool,
+} from '../../../handlers/atc/high/handleListATCCheckVariants';
+import {
+  handleRunATC,
+  TOOL_DEFINITION as RunATC_Tool,
+} from '../../../handlers/atc/high/handleRunATC';
+import {
   TOOL_DEFINITION as CheckBehaviorDefinition_Tool,
   handleCheckBehaviorDefinition,
 } from '../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
@@ -507,6 +523,10 @@ import {
   handleGetUnitTestStatus,
 } from '../../../handlers/unit_test/high/handleGetUnitTestStatus';
 import {
+  handleRunAbapUnit,
+  TOOL_DEFINITION as RunAbapUnit_Tool,
+} from '../../../handlers/unit_test/high/handleRunAbapUnit';
+import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleRunUnitTest';
@@ -864,6 +884,10 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleRunUnitTest),
       },
       {
+        toolDefinition: RunAbapUnit_Tool,
+        handler: withContext(handleRunAbapUnit),
+      },
+      {
         toolDefinition: GetUnitTest_Tool,
         handler: withContext(handleGetUnitTest),
       },
@@ -906,6 +930,22 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: DeleteCdsUnitTest_Tool,
         handler: withContext(handleDeleteCdsUnitTest),
+      },
+      {
+        toolDefinition: RunATC_Tool,
+        handler: withContext(handleRunATC),
+      },
+      {
+        toolDefinition: GetATCRunStatus_Tool,
+        handler: withContext(handleGetATCRunStatus),
+      },
+      {
+        toolDefinition: GetATCFindings_Tool,
+        handler: withContext(handleGetATCFindings),
+      },
+      {
+        toolDefinition: ListATCCheckVariants_Tool,
+        handler: withContext(handleListATCCheckVariants),
       },
       {
         toolDefinition: GetLocalTestClass_Tool,

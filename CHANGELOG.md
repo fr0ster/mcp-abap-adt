@@ -10,6 +10,48 @@
   - `ListATCCheckVariants` — discover available ATC check variants on the system.
 - New `AdtClient.getAtc()` factory in `@mcp-abap-adt/adt-clients` returning `AdtAtc` (high-level wrapper) plus low-level helpers (`createAtcWorklist`, `startAtcRun`, `getAtcRunStatus`, `getAtcWorklistFindings`, `listAtcVariants`, `getAtcCustomizing`, `parseSystemDefaultVariant`, `extractAtcRunId`, `extractAtcWorklistId`) and parameter types in `@mcp-abap-adt/interfaces` (`IRunAtcParams`, `IGetAtcRunStatusParams`, `IGetAtcFindingsParams`, `IListAtcCheckVariantsParams`, `AtcObjectType`, `AtcFindingsFormat`).
 
+## [8.11.0] - 2026-07-22
+
+### Fixed
+- **Read handlers no longer mask a failed read as `success:true` + null (#159).** 17 readonly handlers (`ReadDomain`, `ReadClass`, `ReadInterface`, `ReadProgram`, `ReadTable`, `ReadStructure`, `ReadDdl`, `ReadDataElement`, `ReadFunctionGroup`, `ReadFunctionModule`, `ReadFunctionInclude`, `ReadPackage`, `ReadServiceDefinition`, `ReadServiceBinding`, `ReadMetadataExtension`, `ReadBehaviorDefinition`, `ReadBehaviorImplementation`) wrapped their `read`/`readMetadata` calls in inner `try/catch` blocks that only logged a `warn` and swallowed the error, then returned `success:true` with `source_code:null`/`metadata:null` regardless. A hard failure — expired token, network error, HTTP 5xx — or a genuinely non-existent object was thus delivered to the caller as a successful (but empty) read. The inner swallows are removed; read errors now propagate to the existing outer `catch → return_error`, so a failed read returns a structured failure (tool result `isError:true`). This is the READ-path sibling of the activation/deletion masking fixes. `GetStructuresList` was not affected — it already surfaces a root read failure via `return_error` and flags partial append issues explicitly.
+
+## [8.10.0] - 2026-07-21
+
+### Fixed
+- **Locked/failed activations no longer report a false `success:true`.** Migrated to `@mcp-abap-adt/adt-clients@^7.6.0`, which fixes the activation-masking bug (adt-clients #79): ADT's `/sap/bc/adt/activation` returns HTTP 200 even when activation fails (object locked in another session, syntax errors), and the shared `activateObjectInSession` helper previously returned that response unchecked. Every high-level `Update*`/`Activate*` tool built on it (`UpdateDomain`, and the whole family across domain, program, table, structure, class, interface, ddl, tabletype, functionModule, functionInclude, metadataExtension, behaviorDefinition, enhancement, unitTest) therefore returned `{"success":true,"...":"updated and activated successfully"}` on a locked object. With 7.6.0 the client now throws on an explicit activation-failure signal; the handler's catch maps it to a structured `McpError` (tool result `isError:true`), so consumers can finally tell the operation failed. Fixes #154.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.6.0` and `@mcp-abap-adt/interfaces@^11.2.0`** (from `^7.4.4` / `^10.0.0`). adt-clients 7.6.0 sources its public types from interfaces `^11.2.0`; bumping our direct interfaces range keeps a single top-level interfaces version aligned with the client. No handler API change.
+
+## [8.9.0] - 2026-07-17
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.4` and `@mcp-abap-adt/interfaces@^10.0.0`** (from `^7.4.2` / `^9.2.0`). interfaces 10.0.0 is a major bump whose only breaking change is removing the no-op `source_code` field from the low-level create-params (`ICreateAccessControl/ServiceDefinition/EnhancementParams`) — source is written via the update flow. This does **not** affect us: our handlers use the high-level config types (`IServiceDefinitionConfig.sourceCode`, unchanged), not the low-level create-params. adt-clients 7.4.3 dropped the matching dead create() pass-through.
+- **`CreateServiceDefinition`:** removed the now-dead `sourceCode` from the `create()` config (create makes the shell only; the body is still written by the follow-up `update()` from 8.7.1). No behavior change.
+
+## [8.8.1] - 2026-07-16
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.2`** (from `^7.4.0`). Two correctness fixes to `update()`'s read-back: the post-update readiness poll and the final returned read now target the **inactive** version — the one the write just produced — instead of `'active'` (which 404s for a never-activated object and returns stale content for an existing one). So reading back the result of an `update()` (including the `CreateServiceDefinition` `create → update → activate` flow) now returns the freshly written source. `@mcp-abap-adt/interfaces` stays `^9.2.0`. Non-breaking; no tool contract changed.
+
+## [8.8.0] - 2026-07-16
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.0`** (from `^7.3.1`). 7.4.0 adds a session-scoped lock registry with an `unlockAll()` safety net, which complements the uninterruptible critical sections from 8.7.0 by making orphaned locks recoverable. `@mcp-abap-adt/interfaces` stays `^9.2.0`. Non-breaking; no tool contract changed.
+
+## [8.7.1] - 2026-07-16
+
+### Fixed
+- **`CreateServiceDefinition` created the object with an empty body.** The service-definition `create()` POST only registers the shell (metadata: name/description/package) — it does **not** persist the `define service … { … }` source, and the handler had no follow-up write step (a regression in the underlying `@mcp-abap-adt/adt-clients` create flow, which used to run create → lock → update → unlock). The handler now runs an explicit high-level `update()` (lock → write source → unlock) right after create whenever `source_code` is provided, then activates — so the service definition is created with its real body. (Root cause is in adt-clients' `AdtServiceDefinition.create()`; this handler-side fix restores correct behavior immediately.)
+
+## [8.7.0] - 2026-07-16
+
+### Fixed
+- **Timeouts no longer leave objects locked and inactive.** A mutating tool (Create/Update/Delete) runs a stateful lock → modify → unlock chain as several separate ADT requests. On a slow system a short per-request timeout would abort one of them mid-flight; aborting the socket drops the stateful ADT session and orphans the lock handle, so the follow-up unlock has nothing to release — the object was left **locked and inactive** (whereas a normal error keeps the session alive, so unlock worked). Every high-level Create/Update/Delete handler (70 tools) is now wrapped in an **uninterruptible critical section**: `beginCriticalSection()` before it runs and `endCriticalSection()` in a `finally`, via `@mcp-abap-adt/connection` 1.10.0. While active, the connection raises the request timeout to a large ceiling (`SAP_TIMEOUT_CRITICAL`, default 600000 ms) so slow write requests run to completion instead of being interrupted. Feature-detected, so it degrades to a no-op on older connections.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/connection@^1.10.0`** (from `^1.9.1`), which adds the reference-counted `beginCriticalSection()` / `endCriticalSection()` primitives used above. Non-breaking.
+
 ## [8.6.1] - 2026-07-05
 
 ### Changed

@@ -29,8 +29,7 @@ export const TOOL_DEFINITION = {
     properties: {
       object_name: {
         type: 'string',
-        description:
-          'Name of the ABAP object to test (e.g., "ZCL_MY_CLASS").',
+        description: 'Name of the ABAP object to test (e.g., "ZCL_MY_CLASS").',
       },
       object_type: {
         type: 'string',

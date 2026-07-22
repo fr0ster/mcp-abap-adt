@@ -44,32 +44,24 @@ export async function handleReadPackage(
     const obj = client.getPackage();
 
     let source_code: string | null = null;
-    try {
-      const readResult = await obj.read(
-        { packageName },
-        version as 'active' | 'inactive',
-      );
-      if (readResult?.readResult?.data) {
-        source_code =
-          typeof readResult.readResult.data === 'string'
-            ? readResult.readResult.data
-            : safeStringify(readResult.readResult.data);
-      }
-    } catch (e: any) {
-      logger?.warn(`Could not read source for ${packageName}: ${e?.message}`);
+    const readResult = await obj.read(
+      { packageName },
+      version as 'active' | 'inactive',
+    );
+    if (readResult?.readResult?.data) {
+      source_code =
+        typeof readResult.readResult.data === 'string'
+          ? readResult.readResult.data
+          : safeStringify(readResult.readResult.data);
     }
 
     let metadata: string | null = null;
-    try {
-      const metaResult = await obj.readMetadata({ packageName });
-      if (metaResult?.metadataResult?.data) {
-        metadata =
-          typeof metaResult.metadataResult.data === 'string'
-            ? metaResult.metadataResult.data
-            : safeStringify(metaResult.metadataResult.data);
-      }
-    } catch (e: any) {
-      logger?.warn(`Could not read metadata for ${packageName}: ${e?.message}`);
+    const metaResult = await obj.readMetadata({ packageName });
+    if (metaResult?.metadataResult?.data) {
+      metadata =
+        typeof metaResult.metadataResult.data === 'string'
+          ? metaResult.metadataResult.data
+          : safeStringify(metaResult.metadataResult.data);
     }
 
     return return_response({

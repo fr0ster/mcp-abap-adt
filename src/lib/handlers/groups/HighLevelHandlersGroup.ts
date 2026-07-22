@@ -538,6 +538,10 @@ import {
   handleUpdateUnitTest,
   TOOL_DEFINITION as UpdateUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateUnitTest';
+import {
+  isMutatingToolName,
+  withCriticalSection,
+} from '../../criticalSection.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
 
@@ -558,7 +562,7 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       return (args: unknown) => handler(this.context, args as TArgs);
     };
 
-    return [
+    const entries: HandlerEntry[] = [
       // Common — group activation
       {
         toolDefinition: ActivateObjects_Tool,
@@ -1176,5 +1180,22 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(entry.handler),
       })),
     ];
+
+    // Mutating tools (Create/Update/Delete) run a stateful lock → modify →
+    // unlock chain in a single call. Wrap them in an uninterruptible critical
+    // section so a slow request is not aborted mid-flight, which would drop the
+    // stateful session and orphan the lock (leaving the object locked/inactive).
+    // No-op on connections older than @mcp-abap-adt/connection 1.10.0.
+    return entries.map((entry) =>
+      isMutatingToolName(entry.toolDefinition.name)
+        ? {
+            ...entry,
+            handler: withCriticalSection(
+              entry.handler,
+              () => this.context.connection,
+            ),
+          }
+        : entry,
+    );
   }
 }

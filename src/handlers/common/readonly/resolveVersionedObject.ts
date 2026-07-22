@@ -11,19 +11,21 @@
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 
-/** object_type values supported for version history (same set as LockObject). */
+/**
+ * object_type values supported for version history: the source-backed subset
+ * of LockObject's types. function_group, domain, data_element, and package
+ * have no /source/main and never supported version history (getVersions/
+ * getVersionSource always threw ADT_UNSUPPORTED_OPERATION at runtime); the
+ * adt-clients 8.0.0 capability narrowing now makes that a compile-time fact.
+ */
 export const VERSIONED_OBJECT_TYPES = [
   'class',
   'program',
   'interface',
-  'function_group',
   'function_module',
   'table',
   'structure',
   'ddl',
-  'domain',
-  'data_element',
-  'package',
   'behavior_definition',
   'metadata_extension',
 ] as const;
@@ -55,11 +57,6 @@ export function resolveVersionedObject(
       return { obj: client.getProgram(), config: { programName: name } };
     case 'interface':
       return { obj: client.getInterface(), config: { interfaceName: name } };
-    case 'function_group':
-      return {
-        obj: client.getFunctionGroup(),
-        config: { functionGroupName: name },
-      };
     case 'function_module': {
       // Identity is the FM name + its owning function group. The group can be
       // passed explicitly (function_group_name) or via GROUP|FM_NAME, as the
@@ -87,19 +84,10 @@ export function resolveVersionedObject(
       return { obj: client.getStructure(), config: { structureName: name } };
     case 'ddl':
       return { obj: client.getDdl(), config: { ddlName: name } };
-    case 'domain':
-      return { obj: client.getDomain(), config: { domainName: name } };
-    case 'data_element':
-      return {
-        obj: client.getDataElement(),
-        config: { dataElementName: name },
-      };
     case 'behavior_definition':
       return { obj: client.getBehaviorDefinition(), config: { name } };
     case 'metadata_extension':
       return { obj: client.getMetadataExtension(), config: { name } };
-    case 'package':
-      return { obj: client.getPackage(), config: { packageName: name } };
     default:
       return null;
   }

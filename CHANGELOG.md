@@ -1,5 +1,10 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
 
 ## [8.12.1] - 2026-07-22
@@ -2248,7 +2253,9 @@ _Documentation for this tag is intentionally minimal; see the Git tag `v1.1.8` f
   - Mirrors `dev-http.js` functionality for consistent development experience
   - Updated `npm run dev:sse` to use new development script
 
-## [Unreleased]
+## Legacy history (pre-fork upstream: mario-andreschak/mcp-abap-adt)
+
+> The entries below predate this fork's version renumbering and were never assigned release numbers under `fr0ster/mcp-abap-adt`. They are retained verbatim for provenance. Version numbers here (1.4.0 and below) belong to the original project and intentionally overlap with the renumbered releases above.
 
 > Package-specific changes (e.g., `@mcp-abap-adt/adt-clients`) are tracked in their respective repositories and npm packages.
 
@@ -2342,10 +2349,6 @@ _Documentation for this tag is intentionally minimal; see the Git tag `v1.1.8` f
   - Removed Smithery badge from README.md
   - Removed all references to `@mario-andreschak/mcp-abap-adt` package
 
-All notable changes to this project will be documented in this file.
-
-## [Unreleased]
-
 ### Added
 - New MCP tool: `DetectObjectTypeList`
   - Batch detection of ABAP object types by a list of names.
@@ -2358,9 +2361,6 @@ All notable changes to this project will be documented in this file.
 - All handler modules now use a unified in-memory caching mechanism via `objectsListCache`. This provides consistent, easily swappable cache logic across the codebase.
 - The `filePath` parameter and all file write logic have been removed from all handlers. Handler results are now only cached in memory, not written to disk.
 - This refactor improves maintainability, testability, and performance by eliminating redundant file operations and centralizing cache management.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.4.0] - 2025-07-08
 

@@ -27,7 +27,7 @@ Row 2 is the worst case. The handler threw `McpError(InvalidParams)` inside its 
 and `BaseMcpServer` wrapped that once more into `McpError(InternalError)`. The
 semantic code `-32602` was overwritten with `-32603`, and the prefix appeared twice.
 
-Four layers contribute prefixes:
+Five sites contribute prefixes:
 
 | Layer | Location | Prefix added | Reach |
 |---|---|---|---|
@@ -35,6 +35,20 @@ Four layers contribute prefixes:
 | 2 | 14 sites of `` text: `ADT error: ${String(error)}` `` | `ADT error: McpError: ` | 13 files |
 | 3 | 80 sites of `throw new McpError` | `MCP error -3260X: ` | 29 files |
 | 4 | `src/server/BaseMcpServer.ts:404-419` | `MCP error -32603: ` | all 193 tools |
+| 5 | `src/lib/handlers/base/BaseHandlerGroup.ts:81-91` | `MCP error -32603: ` | fallback registration path |
+
+Layer 5 is a near-verbatim duplicate of layer 4: `registerToolOnServer` (lines 77-108)
+mirrors the tail of `wrappedHandler` (lines 391-442), including the same throw. It is
+reached through the fallback branch of `registerHandlers`, which calls
+`handlersRegistry.registerAllTools(this)`.
+
+Prefixes are not always leading. 321 sites compose messages of the form
+`` `Failed to update package: ${error.message || String(error)}` ``, and
+`handleCreatePackage.ts:234` embeds one mid-sentence
+(`` `Authentication failed: ${error.message}. Please re-authenticate…` ``). When the
+caught value is an `McpError`, its `.message` already carries `MCP error -326XX: `,
+and `String(mcpError)` yields `McpError: MCP error -326XX: …`. Any check for
+leftover prefixes must therefore be position-independent.
 
 ## Goal
 
@@ -77,7 +91,21 @@ check, then return `{ content, isError: true }` instead of throwing. The dynamic
 `import('@modelcontextprotocol/sdk/types.js')` is removed. SDK output validation is
 unaffected: `validateToolOutput` early-returns when `result.isError` is set.
 
+Additionally, wrap `await handlerPromise` (and the preceding `getConnection()`) in
+`try/catch` and route the caught value through `return_error`. This is *not* needed
+to remove a prefix — a plain `Error` thrown from a handler already reaches the client
+clean, because the SDK uses `error.message` and only `McpError` bakes a prefix into
+its own message. It is needed for fidelity: an uncaught `AxiosError` currently
+surfaces as the terse `Request failed with status code 404`, whereas `return_error`
+extracts the ADT response body, which is where the actual diagnosis lives.
+
 One site, effect on all 193 tools.
+
+### Layer 5 — `src/lib/handlers/base/BaseHandlerGroup.ts:81-91`
+
+The same edit as layer 4, applied to the duplicated block. The two blocks should end
+up structurally identical; if one is later changed without the other, the fallback
+registration path silently regresses.
 
 ### Layer 1 — `src/lib/utils.ts:409`
 
@@ -99,7 +127,7 @@ become more informative, not merely cleaner.
 `throw new McpError(code, msg)` becomes `return return_error(msg)`. 12 of the 29
 files already import `return_error`; 17 need the import added.
 
-Total: 33 files (2 infrastructure + 31 handlers).
+Total: 34 files (3 infrastructure + 31 handlers).
 
 ## Risk
 
@@ -116,16 +144,39 @@ the `throw` stays but throws a plain `Error`, which the enclosing `catch` feeds 
 ## Verification
 
 **Wire contract test, runs in CI** — `src/__tests__/unit/toolErrorContract.test.ts`.
-Boots `BaseMcpServer` with a stub registry of three handlers (one returning
-`isError`, one throwing a plain `Error`, one returning multi-item `content`
-including a `type:'json'` element) and connects a `Client` over
-`InMemoryTransport.createLinkedPair()`. No SAP, no subprocess. Asserts:
+Boots `BaseMcpServer` with a stub registry of four handlers and connects a `Client`
+over `InMemoryTransport.createLinkedPair()`. No SAP, no subprocess. The stubs:
+
+1. returns `isError` with a plain message;
+2. throws a plain `Error`;
+3. returns multi-item `content` including a `type:'json'` element;
+4. throws an `AxiosError` carrying a `response.data` body, asserting that the new
+   `try/catch` surfaces the body rather than `Request failed with status code NNN`.
+
+Asserts:
 
 - `result.isError === true` and the promise does not reject;
-- `text` does not match `/^(MCP error -?\d+: |Error: |ADT error: )/`;
+- `text` does not match `/\b(?:McpError: )?MCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /`
+  — position-independent by design, per the nested-prefix note above;
 - multi-item `content` arrives with all items intact rather than collapsed into one
   string — this is the fidelity loss being fixed, and without the assertion it would
   quietly return.
+
+The same four cases run against `BaseHandlerGroup`'s registration path, since layer 5
+is a separate code path with an identical contract.
+
+The position-independent regex is deliberate but has a limit worth stating plainly:
+nothing in this change *sanitizes* text. The 321 composition sites of the form
+`` `Failed to update package: ${error.message}` `` are left untouched, and if an
+`McpError` ever reached one of them the prefix would appear mid-string and no runtime
+fix would remove it. What makes those sites safe is the absence of any producer:
+after layers 2, 3 and 5 there is no `throw new McpError` left in our code, so the only
+`McpError` in existence is the SDK's own, raised before a handler is ever entered.
+
+**Static guard** — the same test file asserts that invariant directly: a grep over
+`src/**` finds zero occurrences of `throw new McpError` outside `__tests__`. This is
+what actually protects the composition sites; the position-independent regex is the
+cheap second line of defence for anything that slips through.
 
 **`return_error` unit tests.** String input returns verbatim; `new Error('x')`
 returns `x`; an `AxiosError` carrying `response.data` returns the response body, not

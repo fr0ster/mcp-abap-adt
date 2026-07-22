@@ -5,9 +5,9 @@ Generated from code in `src/handlers/**` (not from docs).
 Tools available on legacy SAP systems (BASIS < 7.50).
 Legacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.
 
-- Total tools: 165
+- Total tools: 159
 - Read-Only: 18
-- High-Level: 86
+- High-Level: 80
 - Low-Level: 61
 
 ## Navigation
@@ -70,18 +70,12 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
     - [GetDdlVersionDiff](#getddlversiondiff-high-level-common)
     - [GetDdlVersions](#getddlversions-high-level-common)
     - [GetDdlVersionSource](#getddlversionsource-high-level-common)
-    - [GetFunctionGroupVersionDiff](#getfunctiongroupversiondiff-high-level-common)
-    - [GetFunctionGroupVersions](#getfunctiongroupversions-high-level-common)
-    - [GetFunctionGroupVersionSource](#getfunctiongroupversionsource-high-level-common)
     - [GetFunctionModuleVersionDiff](#getfunctionmoduleversiondiff-high-level-common)
     - [GetFunctionModuleVersions](#getfunctionmoduleversions-high-level-common)
     - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-high-level-common)
     - [GetInterfaceVersionDiff](#getinterfaceversiondiff-high-level-common)
     - [GetInterfaceVersions](#getinterfaceversions-high-level-common)
     - [GetInterfaceVersionSource](#getinterfaceversionsource-high-level-common)
-    - [GetPackageVersionDiff](#getpackageversiondiff-high-level-common)
-    - [GetPackageVersions](#getpackageversions-high-level-common)
-    - [GetPackageVersionSource](#getpackageversionsource-high-level-common)
     - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
     - [GetProgramVersions](#getprogramversions-high-level-common)
     - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
@@ -871,46 +865,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-<a id="getfunctiongroupversiondiff-high-level-common"></a>
-#### GetFunctionGroupVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP function group versions, by their content_uris (taken from GetFunctionGroupVersions entries).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionGroupVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionGroupVersions entry).
-
----
-
-<a id="getfunctiongroupversions-high-level-common"></a>
-#### GetFunctionGroupVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP function group. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionGroupVersionSource.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `function_group_name` (string, required) - ABAP function group name.
-
----
-
-<a id="getfunctiongroupversionsource-high-level-common"></a>
-#### GetFunctionGroupVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP function group version by its content_uri (taken from a GetFunctionGroupVersions entry).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionGroupVersions entry.
-
----
-
 <a id="getfunctionmoduleversiondiff-high-level-common"></a>
 #### GetFunctionModuleVersionDiff (High-Level / Common)
 **Description:** [read-only] Compute a unified diff between two ABAP function module versions, by their content_uris (taken from GetFunctionModuleVersions entries).
@@ -989,46 +943,6 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetInterfaceVersions entry.
-
----
-
-<a id="getpackageversiondiff-high-level-common"></a>
-#### GetPackageVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP package versions, by their content_uris (taken from GetPackageVersions entries).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetPackageVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetPackageVersions entry).
-
----
-
-<a id="getpackageversions-high-level-common"></a>
-#### GetPackageVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP package. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetPackageVersionSource.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `package_name` (string, required) - ABAP package name.
-
----
-
-<a id="getpackageversionsource-high-level-common"></a>
-#### GetPackageVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP package version by its content_uri (taken from a GetPackageVersions entry).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Available in:** `onprem`, `cloud`, `legacy`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetPackageVersions entry.
 
 ---
 
@@ -2922,4 +2836,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-07-05*
+*Last updated: 2026-07-22*

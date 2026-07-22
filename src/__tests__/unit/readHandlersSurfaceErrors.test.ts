@@ -4,7 +4,7 @@
  * the handler must return a structured failure (isError:true).
  *
  * SAP-free via a mocked AdtClient. Domain and Class stand in for the whole
- * family of 18 handlers that share the identical read+readMetadata structure.
+ * family of 17 handlers that share the identical read+readMetadata structure.
  */
 
 const mockDomainRead = jest.fn();

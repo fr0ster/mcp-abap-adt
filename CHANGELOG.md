@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [8.12.1] - 2026-07-22
+
 ### Security
 - **Cleared the two remaining moderate `@hono/node-server` advisories (GHSA-frvp-7c67-39w9) via an npm `override`.** `@hono/node-server` is a transitive dependency of `@modelcontextprotocol/sdk` (pulled in by the Streamable HTTP transport); even the latest SDK (1.29.0) still pins `^1.19.9`, so there is no in-range fix and `npm audit fix --force` would *downgrade* the SDK to 1.24.3. Pinning `@hono/node-server` to `^2.0.5` via `overrides` resolves 2.0.11 and takes `npm audit` to **0 vulnerabilities**. Safe because the SDK's `streamableHttp` uses only `getRequestListener` from the package (verified present and unchanged in 2.0.11); the vulnerable `serve-static` sub-path is never imported. This deliberately reintroduces a single override (all overrides were removed in #141) — justified here because in-range resolution is impossible until the MCP SDK bumps its own hono dependency. Build, `test:check`, and the SAP-free server/transport unit tests pass unchanged.
 

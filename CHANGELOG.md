@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [8.11.0] - 2026-07-22
+
+### Fixed
+- **Read handlers no longer mask a failed read as `success:true` + null (#159).** 17 readonly handlers (`ReadDomain`, `ReadClass`, `ReadInterface`, `ReadProgram`, `ReadTable`, `ReadStructure`, `ReadDdl`, `ReadDataElement`, `ReadFunctionGroup`, `ReadFunctionModule`, `ReadFunctionInclude`, `ReadPackage`, `ReadServiceDefinition`, `ReadServiceBinding`, `ReadMetadataExtension`, `ReadBehaviorDefinition`, `ReadBehaviorImplementation`) wrapped their `read`/`readMetadata` calls in inner `try/catch` blocks that only logged a `warn` and swallowed the error, then returned `success:true` with `source_code:null`/`metadata:null` regardless. A hard failure — expired token, network error, HTTP 5xx — or a genuinely non-existent object was thus delivered to the caller as a successful (but empty) read. The inner swallows are removed; read errors now propagate to the existing outer `catch → return_error`, so a failed read returns a structured failure (tool result `isError:true`). This is the READ-path sibling of the activation/deletion masking fixes. `GetStructuresList` was not affected — it already surfaces a root read failure via `return_error` and flags partial append issues explicitly.
+
 ## [8.10.0] - 2026-07-21
 
 ### Fixed

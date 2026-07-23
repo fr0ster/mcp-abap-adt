@@ -520,7 +520,7 @@ Append to `src/__tests__/unit/toolErrorContract.test.ts`:
 
 ```typescript
 describe('BaseHandlerGroup registration path honours the same contract (#155)', () => {
-  it('returns isError with unprefixed, uncollapsed content', async () => {
+  it('returns isError with unprefixed, uncollapsed content for all four cases', async () => {
     const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js');
     const { BaseHandlerGroup } = await import(
       '../../lib/handlers/base/BaseHandlerGroup'
@@ -531,7 +531,9 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
     class Group extends BaseHandlerGroup {
       protected groupName = 'stub-group';
       getHandlers() {
-        return [STUBS[0], STUBS[2]];
+        // All four stubs: the fallback path must honour the same contract,
+        // including the try/catch that routes throws through return_error.
+        return STUBS;
       }
     }
 
@@ -553,10 +555,26 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
     expect(single.isError).toBe(true);
     expect(single.content[0].text).toBe('Domain ZD_NOPE not found');
 
+    const thrown: any = await client.callTool({
+      name: 'StubThrowsPlainError',
+      arguments: {},
+    });
+    expect(thrown.isError).toBe(true);
+    expect(thrown.content[0].text).toBe('Failed to read class: ZZ not found');
+
     const multi: any = await client.callTool({ name: 'StubMultiItem', arguments: {} });
     expect(multi.content).toHaveLength(2);
-    for (const item of multi.content) {
-      expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
+    expect(multi.content[0].text).toBe('first item');
+    expect(multi.content[1].text).toBe(JSON.stringify({ second: 'item' }));
+
+    const axios: any = await client.callTool({ name: 'StubThrowsAxios', arguments: {} });
+    expect(axios.isError).toBe(true);
+    expect(axios.content[0].text).toContain('Resource not found');
+
+    for (const result of [single, thrown, multi, axios]) {
+      for (const item of result.content) {
+        expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
+      }
     }
 
     await client.close();
@@ -853,7 +871,11 @@ Add `return_error` to the existing `lib/utils` import in each file listed.
 npx tsx scripts/classify-mcperror-throws.ts | head -1
 ```
 
-Expected: `Total throw-new-McpError sites: 52` (80 − 28).
+Expected: `Total throw-new-McpError sites: 51`.
+
+The arithmetic: the classifier reported 80 before any task (74 handler-body + 5
+helper + 1 callback in `BaseHandlerGroup`). Task 3 removed the callback, leaving 79,
+so this task takes 79 − 28 = 51.
 
 - [ ] **Step 5: Build and test**
 
@@ -937,7 +959,7 @@ done
 npx tsx scripts/classify-mcperror-throws.ts | head -1
 ```
 
-Expected: `Total throw-new-McpError sites: 25` (52 − 27).
+Expected: `Total throw-new-McpError sites: 24` (51 − 27).
 
 - [ ] **Step 5: Build and test**
 
@@ -1021,7 +1043,7 @@ done
 npx tsx scripts/classify-mcperror-throws.ts
 ```
 
-Expected: `Total throw-new-McpError sites: 6` — the 5 helper sites plus the 1 callback in `BaseHandlerGroup`. Since Task 3 already removed the `BaseHandlerGroup` throw, expect exactly:
+Expected: `Total throw-new-McpError sites: 5` (24 − 19) — only the helper sites remain:
 
 ```
 Total throw-new-McpError sites: 5

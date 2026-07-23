@@ -201,12 +201,15 @@ chain. Layer 1 of the #155 error contract."
 ### Task 2: `BaseMcpServer` returns the error instead of throwing
 
 **Files:**
+- Create: `src/lib/toolResult.ts`
 - Modify: `src/server/BaseMcpServer.ts:357-443`
 - Test: `src/__tests__/unit/toolErrorContract.test.ts` (create)
 
 **Interfaces:**
 - Consumes: `return_error` from Task 1.
-- Produces: the wire contract every later task is measured against — a failing tool yields `{ isError: true, content }`, never a thrown `McpError`.
+- Produces:
+  - `normalizeToolContent(result: unknown): { type: 'text'; text: string }[]` from `src/lib/toolResult.ts` — Task 3 calls the same function.
+  - the wire contract every later task is measured against — a failing tool yields `{ isError: true, content }`, never a thrown `McpError`.
 
 **Context:** `wrappedHandler` currently flattens `content` into one string and throws `McpError(InternalError)`. The SDK catches that and turns it into an `isError` result whose text is prefixed `MCP error -32603: `. There is also no `try/catch` around `await handlerPromise`, so an uncaught `AxiosError` surfaces as the terse `Request failed with status code NNN` instead of the ADT response body.
 
@@ -366,7 +369,57 @@ npx jest src/__tests__/unit/toolErrorContract.test.ts
 
 Expected: FAIL. Texts arrive as `MCP error -32603: Domain ZD_NOPE not found`; the multi-item test reports `content` of length 1; the Axios test reports `Request failed with status code 404`.
 
-- [ ] **Step 3: Import `return_error` in `BaseMcpServer`**
+- [ ] **Step 3: Extract the shared content normalizer**
+
+`BaseMcpServer` and `BaseHandlerGroup` (Task 3) each carry their own copy of this
+logic, and the copies have already drifted: `BaseMcpServer` uses
+`item?.text !== undefined ? String(item.text) : …` while `BaseHandlerGroup` uses
+`item?.text || …`, so an item with `text: ''` normalizes differently on the two
+registration paths. One function removes both the duplication and the drift.
+
+Create `src/lib/toolResult.ts`:
+
+```typescript
+/**
+ * Shape a handler returns. `content` items may carry a custom `json` type that
+ * the MCP SDK does not know about.
+ */
+export interface ToolContentItem {
+  type?: string;
+  json?: unknown;
+  text?: unknown;
+}
+
+export interface ToolResultLike {
+  isError?: boolean;
+  content?: ToolContentItem[];
+}
+
+/**
+ * Normalizes handler content into what the MCP SDK accepts: `json` items are
+ * serialized to text, everything else is coerced to a text item.
+ *
+ * Used by both registration paths (BaseMcpServer and BaseHandlerGroup) so they
+ * cannot drift apart. The `!== undefined` test is deliberate: an item with
+ * `text: ''` must normalize to an empty string, not to a stringified object.
+ */
+export function normalizeToolContent(
+  result: unknown,
+): { type: 'text'; text: string }[] {
+  const items = (result as ToolResultLike | undefined)?.content || [];
+  return items.map((item) => {
+    if (item?.type === 'json' && item.json !== undefined) {
+      return { type: 'text' as const, text: JSON.stringify(item.json) };
+    }
+    return {
+      type: 'text' as const,
+      text: item?.text !== undefined ? String(item.text) : String(item || ''),
+    };
+  });
+}
+```
+
+- [ ] **Step 4: Import `return_error` in `BaseMcpServer`**
 
 `src/server/BaseMcpServer.ts` line 16 currently reads:
 
@@ -380,7 +433,16 @@ Change to:
 import { registerAuthBroker, return_error } from '../lib/utils.js';
 ```
 
-- [ ] **Step 4: Rewrite the handler wrapper**
+and add the normalizer import beside it:
+
+```typescript
+import {
+  normalizeToolContent,
+  type ToolResultLike,
+} from '../lib/toolResult.js';
+```
+
+- [ ] **Step 5: Rewrite the handler wrapper**
 
 Replace the whole body of `wrappedHandler` (lines 357-443) with:
 
@@ -422,39 +484,13 @@ Replace the whole body of `wrappedHandler` (lines 357-443) with:
 
               const result = await handlerPromise;
 
-              type ContentItem = {
-                type?: string;
-                json?: unknown;
-                text?: unknown;
-              };
-              type ToolResult = {
-                isError?: boolean;
-                content?: ContentItem[];
-              };
-
-              // Normalize content: SDK expects text/image/audio/resource, convert custom json to text
-              const content = (
-                (result as ToolResult | undefined)?.content || []
-              ).map((item) => {
-                if (item?.type === 'json' && item.json !== undefined) {
-                  return {
-                    type: 'text' as const,
-                    text: JSON.stringify(item.json),
-                  };
-                }
-                // Ensure all items have proper text type structure
-                return {
-                  type: 'text' as const,
-                  text:
-                    item?.text !== undefined
-                      ? String(item.text)
-                      : String(item || ''),
-                };
-              });
+              // Shared with BaseHandlerGroup so the two registration paths
+              // cannot drift apart.
+              const content = normalizeToolContent(result);
 
               // A failed tool returns an isError result — it does not throw.
               // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
-              if ((result as ToolResult | undefined)?.isError) {
+              if ((result as ToolResultLike | undefined)?.isError) {
                 return { content, isError: true };
               }
 
@@ -473,7 +509,7 @@ Replace the whole body of `wrappedHandler` (lines 357-443) with:
 
 Note the `HandlerFnWithContext` / `HandlerFnArgsOnly` type aliases declared just above `wrappedHandler` (lines 351-355) stay where they are — they are outside the replaced body.
 
-- [ ] **Step 5: Run the test to verify it passes**
+- [ ] **Step 6: Run the test to verify it passes**
 
 ```bash
 npx jest src/__tests__/unit/toolErrorContract.test.ts
@@ -481,7 +517,7 @@ npx jest src/__tests__/unit/toolErrorContract.test.ts
 
 Expected: PASS, 4 tests.
 
-- [ ] **Step 6: Build and run the full suite**
+- [ ] **Step 7: Build and run the full suite**
 
 ```bash
 npm run build && npm test
@@ -489,10 +525,10 @@ npm run build && npm test
 
 Expected: both succeed. The dynamic `import('@modelcontextprotocol/sdk/types.js')` is gone, so `tsc` no longer needs it here.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
-git add src/server/BaseMcpServer.ts src/__tests__/unit/toolErrorContract.test.ts
+git add src/lib/toolResult.ts src/server/BaseMcpServer.ts src/__tests__/unit/toolErrorContract.test.ts
 git commit -m "fix(server): return isError result instead of throwing McpError
 
 Normalization now runs before the isError check, so multi-item content
@@ -509,10 +545,10 @@ return_error. Layer 4 of the #155 error contract."
 - Test: `src/__tests__/unit/toolErrorContract.test.ts` (extend)
 
 **Interfaces:**
-- Consumes: `return_error` from Task 1.
+- Consumes: `return_error` from Task 1, `normalizeToolContent` from Task 2.
 - Produces: identical contract on the fallback registration path.
 
-**Context:** `registerToolOnServer` (lines 77-108) is a near-verbatim copy of the block fixed in Task 2, reached through the fallback branch of `BaseMcpServer.registerHandlers` (`handlersRegistry.registerAllTools(this)`). Left alone it silently regresses the contract on that path.
+**Context:** `registerToolOnServer` (lines 77-108) is a near-verbatim copy of the block fixed in Task 2, reached through the fallback branch of `BaseMcpServer.registerHandlers` (`handlersRegistry.registerAllTools(this)`). Left alone it silently regresses the contract on that path. This task consumes `normalizeToolContent` from Task 2 rather than repeating the logic.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -616,6 +652,7 @@ import type {
   IHandlerGroup,
   ToolHandler,
 } from '../interfaces.js';
+import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import { jsonSchemaToZod } from '../utils/schemaUtils.js';
 ```
@@ -629,19 +666,11 @@ Replace lines 77-109 (the `async (args: any) => { … }` callback passed to `ser
         try {
           const result = await handler(this.context, args);
 
-          // Convert content to MCP format - JSON items become text
-          const content = (result.content || []).map((item: any) => {
-            if (item?.type === 'json' && item.json !== undefined) {
-              return {
-                type: 'text' as const,
-                text: JSON.stringify(item.json),
-              };
-            }
-            return {
-              type: 'text' as const,
-              text: item?.text || String(item || ''),
-            };
-          });
+          // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.
+          // Note this also fixes a pre-existing divergence: the old inline copy
+          // used `item?.text || …`, so an item with `text: ''` normalized to a
+          // stringified object here but to an empty string on the other path.
+          const content = normalizeToolContent(result);
 
           // A failed tool returns an isError result — it does not throw.
           if (result.isError) {

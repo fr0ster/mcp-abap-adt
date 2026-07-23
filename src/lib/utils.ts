@@ -272,7 +272,10 @@ export function return_error(error: any) {
   let errorText: string;
 
   try {
-    if (error instanceof AxiosError) {
+    if (typeof error === 'string') {
+      // Validation sites pass a ready message; this is the shortest path.
+      errorText = error;
+    } else if (error instanceof AxiosError) {
       // Check for DNS/network errors first
       const errorCode = (error as any).code;
       const errorMessage = error.message || '';
@@ -370,8 +373,6 @@ export function return_error(error: any) {
       } else {
         errorText = errorMessage;
       }
-    } else if (typeof error === 'string') {
-      errorText = error;
     } else {
       // For other types, try safe stringify
       try {
@@ -407,7 +408,7 @@ export function return_error(error: any) {
     content: [
       {
         type: 'text',
-        text: `Error: ${errorText}`,
+        text: errorText,
       },
     ],
   };

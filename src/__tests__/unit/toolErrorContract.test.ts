@@ -124,6 +124,7 @@ describe('tool error wire contract (#155)', () => {
     ]) {
       const result: any = await client.callTool({ name, arguments: {} });
       expect(result.isError).toBe(true);
+      expect(result.content.length).toBeGreaterThan(0);
       for (const item of result.content) {
         expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
       }

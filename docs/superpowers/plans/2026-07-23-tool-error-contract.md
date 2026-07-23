@@ -744,21 +744,32 @@ Replace the returned object with a `return_error` call, keeping any logging:
     }
 ```
 
-- [ ] **Step 3: Add the import where missing**
+- [ ] **Step 3: Add the import to these 12 files**
 
-For each of the 12 files, check whether `return_error` is already imported:
+Do not try to discover this list at run time. A `grep` for the old text finds nothing once Step 2 has run, and a `grep` for `return_error` matches the calls you just wrote regardless of whether the import exists. The list below was computed from the import declarations before any transformation:
 
-```bash
-for f in $(grep -rln 'text: `ADT error:' src/handlers --include='*.ts'); do
-  grep -q 'return_error' "$f" || echo "NEEDS IMPORT: $f"
-done
+```
+src/handlers/search/readonly/handleGetObjectsList.ts
+src/handlers/search/readonly/handleGetObjectsByType.ts
+src/handlers/search/readonly/handleSearchObject.ts
+src/handlers/table/readonly/handleGetTableContents.ts
+src/handlers/system/readonly/handleGetWhereUsed.ts
+src/handlers/system/readonly/handleGetObjectStructure.ts
+src/handlers/system/readonly/handleGetSqlQuery.ts
+src/handlers/system/readonly/handleGetAllTypes.ts
+src/handlers/system/readonly/handleGetTypeInfo.ts
+src/handlers/enhancement/readonly/handleGetEnhancements.ts
+src/handlers/enhancement/readonly/handleGetEnhancementSpot.ts
+src/handlers/enhancement/readonly/handleGetEnhancementImpl.ts
 ```
 
-For each file listed, add `return_error` to the existing `from '../../../lib/utils'` import. Example — `src/handlers/system/readonly/handleGetAllTypes.ts`:
+Every one of the 12 already imports something from `lib/utils`; add `return_error` to that existing named-import list. Example — `src/handlers/system/readonly/handleGetAllTypes.ts`:
 
 ```typescript
 import { return_error, return_response } from '../../../lib/utils';
 ```
+
+`npm run build` in Step 5 is the backstop: an unresolved `return_error` is a compile error, not a silent failure.
 
 - [ ] **Step 4: Verify no site remains**
 
@@ -848,22 +859,17 @@ becomes:
       return return_error(`Domain ${domainName} does not exist`);
 ```
 
-- [ ] **Step 3: Add the import where missing**
+- [ ] **Step 3: Add the import to one file**
 
-```bash
-for f in src/handlers/data_element/high/handleCreateDataElement.ts \
-         src/handlers/data_element/high/handleUpdateDataElement.ts \
-         src/handlers/domain/high/handleCreateDomain.ts \
-         src/handlers/domain/high/handleUpdateDomain.ts \
-         src/handlers/include/readonly/handleGetInclude.ts \
-         src/handlers/include/readonly/handleGetIncludesList.ts \
-         src/handlers/message_class/high/handleCreateMessageClass.ts \
-         src/handlers/message_class/high/handleCreateMessageClassMessage.ts; do
-  grep -q 'return_error' "$f" || echo "NEEDS IMPORT: $f"
-done
+Of this task's 8 files, exactly one lacks a `return_error` import:
+
+```
+src/handlers/include/readonly/handleGetInclude.ts
 ```
 
-Add `return_error` to the existing `lib/utils` import in each file listed.
+Add `return_error` to its existing `lib/utils` named-import list. The other 7 already import it.
+
+Do not attempt run-time discovery with `grep -q 'return_error'` — after Step 2 every file contains the call, so the check always passes and finds nothing.
 
 - [ ] **Step 4: Verify the count dropped by 28**
 
@@ -938,20 +944,13 @@ becomes:
       return return_error(`Package ${packageName} already exists`);
 ```
 
-- [ ] **Step 3: Add the import where missing**
+- [ ] **Step 3: Add the import to one file**
 
-```bash
-for f in src/handlers/package/high/handleCreatePackage.ts \
-         src/handlers/package/readonly/handleGetPackageContents.ts \
-         src/handlers/search/readonly/handleGetObjectsByType.ts \
-         src/handlers/search/readonly/handleGetObjectsList.ts \
-         src/handlers/search/readonly/handleSearchObject.ts \
-         src/handlers/structure/high/handleCreateStructure.ts \
-         src/handlers/table/high/handleCreateTable.ts \
-         src/handlers/table/readonly/handleGetTableContents.ts; do
-  grep -q 'return_error' "$f" || echo "NEEDS IMPORT: $f"
-done
 ```
+src/handlers/package/readonly/handleGetPackageContents.ts
+```
+
+Four other files in this task's list — `handleGetObjectsByType.ts`, `handleGetObjectsList.ts`, `handleSearchObject.ts`, `handleGetTableContents.ts` — also lacked the import originally, but **Task 4 already added it** to all four. Adding it again produces a duplicate-identifier compile error.
 
 - [ ] **Step 4: Verify the count dropped by 27**
 
@@ -1029,13 +1028,18 @@ becomes:
     }
 ```
 
-- [ ] **Step 3: Add the import where missing**
+- [ ] **Step 3: Add the import to these 4 files**
 
-```bash
-for f in $(npx tsx scripts/classify-mcperror-throws.ts --json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{[...new Set(JSON.parse(s).filter(x=>x.kind==='handler').map(x=>x.file))].forEach(f=>console.log(f))})"); do
-  grep -q 'return_error' "$f" || echo "NEEDS IMPORT: $f"
-done
 ```
+src/handlers/system/readonly/handleGetAbapAST.ts
+src/handlers/system/readonly/handleGetAbapSemanticAnalysis.ts
+src/handlers/system/readonly/handleGetAbapSystemSymbols.ts
+src/handlers/system/readonly/handleGetObjectInfo.ts
+```
+
+Six more of this task's files — `handleGetWhereUsed.ts`, `handleGetSqlQuery.ts`, `handleGetTypeInfo.ts`, `handleGetEnhancementImpl.ts`, `handleGetEnhancementSpot.ts`, `handleGetEnhancements.ts` — received the import in **Task 4**; do not add it twice. Both transport files already imported it before any task ran.
+
+Deriving this list from the classifier at run time would return nothing: by the time Step 2 finishes, no handler-body throws remain for it to report.
 
 - [ ] **Step 4: Verify only the helper sites remain**
 

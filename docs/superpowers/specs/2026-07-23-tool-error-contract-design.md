@@ -279,6 +279,25 @@ gives stronger coverage using tooling already present (`typescript` 6.0.2 is a
 devDependency, and `scripts/classify-mcperror-throws.ts` already demonstrates the
 traversal).
 
+**`return_error` unit tests.** String input returns verbatim; `new Error('x')`
+returns `x`; an `AxiosError` carrying `response.data` returns the response body, not
+`[object Object]`; an `AxiosError` with `code: 'ENOTFOUND'` keeps its DNS
+diagnostics. The last two guard behaviour that must survive the edit — layer 1 moves
+the string branch to the top of the chain and drops the `Error: ` prefix, and the
+Axios and DNS branches must come through untouched.
+
+**Live probe on trial.** `scripts/probe-tool-error.ts` reruns the same four cases
+that established the baseline: `GetWhereUsed` with no arguments, `GetWhereUsed` with
+a bogus `enable_only_types`, `GetInclude` on a missing include, `GetClass` on a
+missing class. The last three must come back clean; case 1 (SDK schema validation)
+must stay unchanged, per the exception in Goal. The baseline is recorded in the #155
+comment thread.
+
+**Done means:** all verification levels green, `npm run build` and lint clean,
+`npm test` without regressions, the classifier reporting zero sites, and
+`extractErrorMessage` (`testHelpers.ts:76`) confirmed to have become a no-op without
+breaking the integration tests that use it.
+
 ## Out of scope
 
 `hardMode.ts:109` passes `--exposition=readonly,high,low`, which `validateExposition`

@@ -126,6 +126,10 @@ registration path silently regresses.
 (currently at line 372) moves to the top of the chain so that
 `return_error('Object name is required')` reads plainly.
 
+Once layers 3-5 land, the `McpError` import (line 12) and its re-export (line 85)
+have no consumers and are removed. That re-export is why handlers import `McpError`
+from `'../../../lib/utils'` rather than from the SDK.
+
 One site, effect on 271 handlers.
 
 ### Layer 2 — 13 sites in 12 files
@@ -144,6 +148,15 @@ A 14th occurrence sits inside the commented-out block of `handleGetTransaction.t
 74 sites inside a handler body. The 5 helper sites throw a plain `Error` instead; see
 Risk for why the difference is load-bearing. 12 of the 28 files already import
 `return_error`; 16 need the import added.
+
+Two further removals belong to this layer, without which the symbol survives:
+
+- **12 `if (error instanceof McpError) { throw error; }` blocks**, one per file, which
+  re-throw an `McpError` past the handler's own `catch`. Once nothing constructs an
+  `McpError`, the branch is unreachable; left in place it would keep the import alive
+  and defeat the absence guard.
+- the now-unused `McpError` / `ErrorCode` imports in all 29 handler files that
+  reference the symbol.
 
 The raw grep reports 80 sites in 29 files; one of those is the commented-out line in
 `handleGetTransaction.ts:54`, which is deleted rather than converted.
@@ -205,8 +218,10 @@ over `InMemoryTransport.createLinkedPair()`. No SAP, no subprocess. The stubs:
 Asserts:
 
 - `result.isError === true` and the promise does not reject;
-- `text` does not match `/\b(?:McpError: )?MCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /`
-  — position-independent by design, per the nested-prefix note above;
+- `text` does not match
+  `/\bMcpError:\s|\bMCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /` — position-independent,
+  and with `McpError: ` as its own alternative rather than an optional prefix of
+  `MCP error`, so a bare `McpError: operation failed` is caught too;
 - multi-item `content` arrives with all items intact rather than collapsed into one
   string — this is the fidelity loss being fixed, and without the assertion it would
   quietly return.
@@ -219,59 +234,50 @@ nothing in this change *sanitizes* text. The 321 composition sites of the form
 `` `Failed to update package: ${error.message}` `` are left untouched, and if an
 `McpError` ever reached one of them the prefix would appear mid-string and no runtime
 fix would remove it. What makes those sites safe is the absence of any producer:
-after layers 2, 3 and 5 there is no `throw new McpError` left in our code, so the only
+after layers 1-5 the symbol `McpError` is gone from `src/` entirely, so the only
 `McpError` in existence is the SDK's own, raised before a handler is ever entered.
 
-**Static guard** — the same test file asserts that invariant directly: zero `throw`
-statements constructing an `McpError` anywhere in `src/**` outside `__tests__`. This
-is what actually protects the composition sites; the position-independent regex is
-the cheap second line of defence for anything that slips through.
+**Static guard** — the same test file asserts the invariant in its strongest form:
+**zero references to the identifier `McpError` anywhere under `src/**` outside
+`__tests__`**.
 
-The guard walks the TypeScript AST (`typescript` 6.0.2 is already a devDependency)
-looking for a `ThrowStatement` whose expression is a `NewExpression` whose identifier
-is bound, in that file's import declarations, to `McpError` — including under an
-alias (`import { McpError as E }` registers `E`). This is import-binding resolution,
-not full `TypeChecker` symbol resolution; the distinction matters and is stated below.
+This is stronger than checking the shape of a `throw`, and it is available because
+after all five layers nothing in `src/` needs the symbol at all:
 
-Crucially, the binding scan must **not** be filtered by module specifier. `McpError`
-is re-exported from `src/lib/utils.ts:85`, and handlers import it from
-`'../../../lib/utils'`, not from the SDK. A guard keyed to `@modelcontextprotocol`
-finds 1 site instead of 80 — this was observed while building the classifier.
+| Module | References today | Removed by |
+|---|---|---|
+| `src/handlers/**` (29 files) | imports, 79 throws, 12 `instanceof` re-throws | layer 3 |
+| `src/server/BaseMcpServer.ts` | 393, 405, 419 | layer 4 |
+| `src/lib/handlers/base/BaseHandlerGroup.ts` | 2, 91 | layer 5 |
+| `src/lib/utils.ts` | 12 (import), 85 (re-export) | layer 1, once unused |
 
-A text grep is rejected for two reasons: it matches commented-out code, and it misses
-aliases. Both are real — `handleGetTransaction.ts:52-72` is a fully commented-out
-block containing `throw new McpError(...)` on line 54, and a grep-based guard would
-fail on it the day it is written.
+An absent symbol cannot be constructed directly, indirectly, or under an alias, so
+the whole class of evasions disappears rather than being chased: `throw makeMcpError()`
+has no `McpError` to wrap, and `const E = McpError` has nothing to bind. No
+`TypeChecker` pass is required — a plain AST identifier scan suffices, and it is
+exact because the target count is zero rather than "zero of a particular shape".
 
-**Stated limit:** the guard proves the absence of a direct `throw new McpError`. It
-does not catch indirect construction such as `throw makeMcpError()` or
-`const E = McpError; throw new E()`. Catching those needs `TypeChecker` symbol
-resolution over a full `ts.Program`, which is slower and heavier than the invariant
-warrants: no such indirection exists in the codebase today, and the contract being
-enforced is specifically that handlers stop throwing MCP errors directly. If an
-indirect form ever appears, the wire-contract test is what catches its effect.
+An earlier draft claimed the wire-contract test would catch indirect construction.
+It would not: that test exercises four stub handlers, not the 193 production ones, so
+an indirect throw added to a real handler would never enter its code paths. The claim
+is withdrawn; the absence guard is what provides this coverage.
 
-That dead block is deleted as part of this work; it is the only commented-out throw in
-the repo, and leaving it means the guard has to be weakened to accommodate it.
+The guard's scope is `src/`. Tests may still construct `McpError`, which is how the
+wire-contract test builds its fixtures.
+
+It is implemented as an AST identifier scan rather than a text grep, because a grep
+matches commented-out code: `handleGetTransaction.ts:52-72` is a fully commented-out
+block containing `throw new McpError(...)` on line 54 and an `ADT error:` string on
+line 68. That block is deleted as part of this work — it is the only commented-out
+throw in the repo, and leaving it would force the guard to be weakened to tolerate it.
 
 An ESLint `no-restricted-syntax` rule was considered and rejected: this repo has no
 ESLint (Biome 2.4.10 is the only linter, `biome.json`), and Biome has no
 `noRestrictedSyntax` rule — `biome explain noRestrictedSyntax` reports it as
 unrecognized. Adding ESLint solely for this check is disproportionate; the AST test
-gives the same coverage using tooling already present.
-
-**`return_error` unit tests.** String input returns verbatim; `new Error('x')`
-returns `x`; an `AxiosError` carrying `response.data` returns the response body, not
-`[object Object]`; an `AxiosError` with `code: 'ENOTFOUND'` keeps its DNS
-diagnostics. The last two guard behaviour that must survive the edit.
-
-**Live probe on trial.** `scripts/probe-tool-error.ts` reruns the same four cases.
-Three must come back clean; case 1 (schema validation) must stay unchanged. The
-baseline is recorded in the #155 comment thread.
-
-**Done means:** all three levels green, `npm run build` and lint clean, `npm test`
-without regressions, and `extractErrorMessage` (`testHelpers.ts:76`) confirmed to
-have become a no-op without breaking the integration tests that use it.
+gives stronger coverage using tooling already present (`typescript` 6.0.2 is a
+devDependency, and `scripts/classify-mcperror-throws.ts` already demonstrates the
+traversal).
 
 ## Out of scope
 

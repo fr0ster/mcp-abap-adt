@@ -140,8 +140,10 @@ A 14th occurrence sits inside the commented-out block of `handleGetTransaction.t
 
 ### Layer 3 — 79 sites in 28 files
 
-`throw new McpError(code, msg)` becomes `return return_error(msg)`. 12 of the 28
-files already import `return_error`; 16 need the import added.
+`throw new McpError(code, msg)` becomes `return return_error(msg)` — but only at the
+74 sites inside a handler body. The 5 helper sites throw a plain `Error` instead; see
+Risk for why the difference is load-bearing. 12 of the 28 files already import
+`return_error`; 16 need the import added.
 
 The raw grep reports 80 sites in 29 files; one of those is the commented-out line in
 `handleGetTransaction.ts:54`, which is deleted rather than converted.
@@ -155,15 +157,38 @@ Total: 34 files — 3 infrastructure, 30 handlers with live error paths, plus
 
 ## Risk
 
-15 of the 79 throw sites sit at an indentation depth suggesting they are inside
-nested callbacks (`.map`, `.forEach`, IIFE), where `return` would exit the callback
-rather than the handler. A mechanical replacement there would silently break control
-flow. Concentrations: `handleCreatePackage.ts` (3), `handleUpdateDomain.ts` (2),
-`handleUpdateDataElement.ts` (2).
+`return return_error(...)` is only valid where `return` leaves the **tool handler**.
+In a helper with its own return contract the same edit does not fail loudly — it
+substitutes a tool result for domain data. `handleGetTransport.ts:232` does
+`const transportData = parseTransportXml(...)` and lines 241-243 spread it into
+`{ success: true, ...transportData }`. Converting the throw inside `parseTransportXml`
+would emit `success: true` carrying `isError: true` in its own body: an error
+reported as a success. That is the same false-success class as #154, and it is why
+this cannot be a mechanical sweep.
 
-Each of those 15 is checked individually. Where `return` does not exit the handler,
-the `throw` stays but throws a plain `Error`, which the enclosing `catch` feeds into
-`return_error`. The remaining 64 sites are a mechanical replacement.
+Every site was therefore classified by its enclosing function via the TypeScript AST
+(`scripts/classify-mcperror-throws.ts`, committed with this spec):
+
+| Enclosing scope | Sites | Action |
+|---|---|---|
+| The exported handler itself | 74 | `return return_error(...)` — safe |
+| A helper with its own contract | 5 | must **not** return a tool result |
+| Callback | 1 | this is `BaseHandlerGroup`, i.e. layer 5 |
+
+The five helper sites are: `parseTransportXml` in `handleGetTransport.ts` (1),
+`determineObjectTypeAndPath` (3) and `getEnhancementsForSingleObject` (1) in
+`handleGetEnhancements.ts`. These keep throwing, but throw a plain `Error`; the
+enclosing handler's `catch` then routes it through `return_error`, which is exactly
+the path layer 4's new `try/catch` guarantees.
+
+An earlier draft of this section guessed at the boundary from indentation depth and
+claimed 15 sites were inside nested callbacks. The AST disproves it: no `throw` in
+any handler sits inside a callback. Deep indentation came from ordinary `if` blocks,
+which `return` exits correctly. Indentation was a bad proxy for a functional
+boundary; the classifier is the authority.
+
+The classifier is re-run after the edit as a completeness check: it must report zero
+sites outside `__tests__`.
 
 ## Verification
 
@@ -203,11 +228,28 @@ is what actually protects the composition sites; the position-independent regex 
 the cheap second line of defence for anything that slips through.
 
 The guard walks the TypeScript AST (`typescript` 6.0.2 is already a devDependency)
-looking for a `ThrowStatement` whose expression is a `NewExpression` on `McpError`.
+looking for a `ThrowStatement` whose expression is a `NewExpression` whose identifier
+is bound, in that file's import declarations, to `McpError` — including under an
+alias (`import { McpError as E }` registers `E`). This is import-binding resolution,
+not full `TypeChecker` symbol resolution; the distinction matters and is stated below.
+
+Crucially, the binding scan must **not** be filtered by module specifier. `McpError`
+is re-exported from `src/lib/utils.ts:85`, and handlers import it from
+`'../../../lib/utils'`, not from the SDK. A guard keyed to `@modelcontextprotocol`
+finds 1 site instead of 80 — this was observed while building the classifier.
+
 A text grep is rejected for two reasons: it matches commented-out code, and it misses
-aliased imports (`import { McpError as E }`). Both are real — `handleGetTransaction.ts:52-72`
-is a fully commented-out block containing `throw new McpError(...)` on line 54, and a
-grep-based guard would fail on it the day it is written.
+aliases. Both are real — `handleGetTransaction.ts:52-72` is a fully commented-out
+block containing `throw new McpError(...)` on line 54, and a grep-based guard would
+fail on it the day it is written.
+
+**Stated limit:** the guard proves the absence of a direct `throw new McpError`. It
+does not catch indirect construction such as `throw makeMcpError()` or
+`const E = McpError; throw new E()`. Catching those needs `TypeChecker` symbol
+resolution over a full `ts.Program`, which is slower and heavier than the invariant
+warrants: no such indirection exists in the codebase today, and the contract being
+enforced is specifically that handlers stop throwing MCP errors directly. If an
+indirect form ever appears, the wire-contract test is what catches its effect.
 
 That dead block is deleted as part of this work; it is the only commented-out throw in
 the repo, and leaving it means the guard has to be weakened to accommodate it.

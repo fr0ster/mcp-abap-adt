@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError } from 'axios';
 import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
@@ -60,6 +61,20 @@ const STUBS: HandlerEntry[] = [
         data: '<exc:exception>Resource not found</exc:exception>',
       };
       throw err;
+    },
+  },
+  {
+    // A custom/external handler group is free to throw the SDK's own McpError,
+    // whose `.message` is `MCP error <code>: <text>`. The boundary must strip
+    // that prefix so external handlers get the same clean contract as built-in
+    // ones. (Built-in handlers no longer throw McpError — see noMcpErrorInSrc.)
+    toolDefinition: {
+      name: 'StubThrowsMcpError',
+      description: 'throws an SDK McpError, as an external handler group might',
+      inputSchema: { type: 'object', properties: {} },
+    },
+    handler: async () => {
+      throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
     },
   },
 ];
@@ -123,6 +138,7 @@ describe('tool error wire contract (#155)', () => {
       'StubThrowsPlainError',
       'StubMultiItem',
       'StubThrowsAxios',
+      'StubThrowsMcpError',
     ]) {
       const result: any = await client.callTool({ name, arguments: {} });
       expect(result.isError).toBe(true);
@@ -156,10 +172,23 @@ describe('tool error wire contract (#155)', () => {
     expect(result.content[0].text).toContain('Resource not found');
     await close();
   });
+
+  it('an SDK McpError thrown by a handler arrives stripped of its code prefix', async () => {
+    const { client, close } = await connect();
+    const result: any = await client.callTool({
+      name: 'StubThrowsMcpError',
+      arguments: {},
+    });
+    expect(result.isError).toBe(true);
+    // McpError.message is `MCP error -32602: object_name is required`; the
+    // boundary must deliver the bare text.
+    expect(result.content[0].text).toBe('object_name is required');
+    await close();
+  });
 });
 
 describe('BaseHandlerGroup registration path honours the same contract (#155)', () => {
-  it('returns isError with unprefixed, uncollapsed content for all four cases', async () => {
+  it('returns isError with unprefixed, uncollapsed content for all five cases', async () => {
     // Note: BaseHandlerGroup/McpServer are imported statically at module scope
     // above, not via dynamic import() — ts-jest's CommonJS transpilation of this
     // project (see tsconfig.test.json, no "type": "module") does not support
@@ -173,7 +202,7 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
     class Group extends BaseHandlerGroup {
       protected groupName = 'stub-group';
       getHandlers() {
-        // All four stubs: the fallback path must honour the same contract,
+        // All five stubs: the fallback path must honour the same contract,
         // including the try/catch that routes throws through return_error.
         return STUBS;
       }
@@ -231,7 +260,14 @@ describe('BaseHandlerGroup registration path honours the same contract (#155)', 
     expect(axios.isError).toBe(true);
     expect(axios.content[0].text).toContain('Resource not found');
 
-    for (const result of [single, thrown, multi, axios]) {
+    const mcp: any = await client.callTool({
+      name: 'StubThrowsMcpError',
+      arguments: {},
+    });
+    expect(mcp.isError).toBe(true);
+    expect(mcp.content[0].text).toBe('object_name is required');
+
+    for (const result of [single, thrown, multi, axios, mcp]) {
       for (const item of result.content) {
         expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
       }

@@ -80,6 +80,12 @@ export function getAuthBroker(destination: string): any | undefined {
   return authBrokerRegistry.get(destination);
 }
 
+// Compatibility re-export: `@mcp-abap-adt/core/utils` exposed the SDK's McpError /
+// ErrorCode before #155. Internal code no longer throws McpError (enforced by
+// noMcpErrorInSrc.test.ts, which permits the symbol only in import/export
+// declarations), but the public subpath keeps re-exporting them so external
+// consumers do not break. New code should import these from the SDK directly.
+export { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 export type { AxiosResponse };
 export { getTimeout, getTimeoutConfig, logger };
 
@@ -401,6 +407,15 @@ export function return_error(error: any) {
     // Fallback if all else fails
     errorText = 'An error occurred (failed to serialize error details)';
   }
+
+  // Strip SDK McpError prefixes that a custom/external handler group may have
+  // baked into a thrown error's message (e.g. `MCP error -32602: bad`, or the
+  // stacked `McpError: MCP error -32602: bad`). Our own handlers no longer throw
+  // McpError, but the package accepts external handler groups, and both
+  // registration paths route any thrown error through here. Schema-validation
+  // errors are unaffected: the SDK raises those before our code runs and never
+  // reaches return_error.
+  errorText = errorText.replace(/^(?:McpError: |MCP error -?\d+: )+/, '');
 
   return {
     isError: true,

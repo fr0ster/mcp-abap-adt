@@ -82,9 +82,10 @@ export function getAuthBroker(destination: string): any | undefined {
 
 // Compatibility re-export: `@mcp-abap-adt/core/utils` exposed the SDK's McpError /
 // ErrorCode before #155. Internal code no longer throws McpError (enforced by
-// noMcpErrorInSrc.test.ts, which permits the symbol only in import/export
-// declarations), but the public subpath keeps re-exporting them so external
-// consumers do not break. New code should import these from the SDK directly.
+// noMcpErrorInSrc.test.ts, which permits the identifier only in this one export
+// declaration and forbids every import or use elsewhere in src), but the public
+// subpath keeps re-exporting them so external consumers do not break. New code
+// should import these from the SDK directly.
 export { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 export type { AxiosResponse };
 export { getTimeout, getTimeoutConfig, logger };

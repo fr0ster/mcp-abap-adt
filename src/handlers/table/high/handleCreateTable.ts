@@ -73,10 +73,10 @@ export async function handleCreateTable(
 
     // Validate required parameters
     if (!createTableArgs?.table_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
+      return return_error('Table name is required');
     }
     if (!createTableArgs?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     // Validate transport_request: required for non-$TMP packages
@@ -131,8 +131,7 @@ export async function handleCreateTable(
         error.message?.includes('already exists') ||
         error.response?.status === 409
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `Table ${tableName} already exists. Please delete it first or use a different name.`,
         );
       }
@@ -143,8 +142,7 @@ export async function handleCreateTable(
           : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to create table ${tableName}: ${errorMessage}`,
       );
     }

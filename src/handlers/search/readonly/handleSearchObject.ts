@@ -59,7 +59,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
   try {
     const { object_name, object_type, maxResults } = args;
     if (!object_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
+      return return_error('object_name is required');
     }
 
     const client = createAdtClient(connection, logger);

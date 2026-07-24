@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
@@ -41,7 +41,7 @@ export async function handleGetPackageContents(
   const { connection, logger } = context;
   try {
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     const client = createAdtClient(connection, logger);

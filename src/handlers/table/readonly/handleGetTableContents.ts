@@ -25,7 +25,7 @@ export async function handleGetTableContents(
   const { connection, logger } = context;
   try {
     if (!args?.table_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
+      return return_error('Table name is required');
     }
 
     const tableName = args.table_name;
@@ -62,8 +62,7 @@ export async function handleGetTableContents(
         ],
       };
     } else {
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to read table contents. Status: ${response.status}`,
       );
     }

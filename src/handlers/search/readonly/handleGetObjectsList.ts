@@ -152,8 +152,7 @@ export async function handleGetObjectsList(context: HandlerContext, args: any) {
       typeof parent_name !== 'string' ||
       parent_name.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "parent_name" (string) is required and cannot be empty.',
       );
     }
@@ -162,8 +161,7 @@ export async function handleGetObjectsList(context: HandlerContext, args: any) {
       typeof parent_tech_name !== 'string' ||
       parent_tech_name.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "parent_tech_name" (string) is required and cannot be empty.',
       );
     }
@@ -172,8 +170,7 @@ export async function handleGetObjectsList(context: HandlerContext, args: any) {
       typeof parent_type !== 'string' ||
       parent_type.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "parent_type" (string) is required and cannot be empty.',
       );
     }

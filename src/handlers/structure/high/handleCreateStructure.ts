@@ -171,10 +171,10 @@ export async function handleCreateStructure(
 
     // Validate required parameters
     if (!createStructureArgs?.structure_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Structure name is required');
+      return return_error('Structure name is required');
     }
     if (!createStructureArgs?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     // Validate transport_request: required for non-$TMP packages
@@ -188,10 +188,7 @@ export async function handleCreateStructure(
       !Array.isArray(createStructureArgs.fields) ||
       createStructureArgs.fields.length === 0
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'At least one field is required',
-      );
+      return return_error('At least one field is required');
     }
 
     const structureName = createStructureArgs.structure_name.toUpperCase();
@@ -212,10 +209,7 @@ export async function handleCreateStructure(
         connectionError instanceof Error
           ? connectionError.message
           : String(connectionError);
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to create connection: ${errorMessage}`,
-      );
+      return return_error(`Failed to create connection: ${errorMessage}`);
     }
 
     try {
@@ -325,8 +319,7 @@ export async function handleCreateStructure(
         error.message?.includes('already exists') ||
         error.response?.status === 409
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `Structure ${structureName} already exists. Please delete it first or use a different name.`,
         );
       }
@@ -337,8 +330,7 @@ export async function handleCreateStructure(
           : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to create structure ${structureName}: ${errorMessage}`,
       );
     }

@@ -149,13 +149,10 @@ export async function handleUpdateDataElement(
   const { connection, logger } = context;
   try {
     if (!args?.data_element_name) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Data element name is required',
-      );
+      return return_error('Data element name is required');
     }
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     // Validate transport_request: required for non-$TMP packages
@@ -324,15 +321,11 @@ export async function handleUpdateDataElement(
         error.message?.includes('not found') ||
         error.response?.status === 404
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Data element ${dataElementName} not found.`,
-        );
+        return return_error(`Data element ${dataElementName} not found.`);
       }
 
       if (error.message?.includes('locked') || error.response?.status === 403) {
-        throw new McpError(
-          ErrorCode.InternalError,
+        return return_error(
           `Data element ${dataElementName} is locked by another user or session. Please try again later.`,
         );
       }
@@ -343,8 +336,7 @@ export async function handleUpdateDataElement(
           : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to update data element ${dataElementName}: ${errorMessage}`,
       );
     }

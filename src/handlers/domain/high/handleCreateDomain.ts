@@ -148,10 +148,10 @@ export async function handleCreateDomain(
   try {
     // Validate required parameters
     if (!args?.domain_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
+      return return_error('Domain name is required');
     }
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     // Validate transport_request: required for non-$TMP, non-ZLOCAL packages
@@ -270,8 +270,7 @@ export async function handleCreateDomain(
         error.message?.includes('already exists') ||
         error.response?.data?.includes('ExceptionResourceAlreadyExists')
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `Domain ${domainName} already exists. Please delete it first or use a different name.`,
         );
       }
@@ -286,8 +285,7 @@ export async function handleCreateDomain(
         errorMessage = error.message || String(error);
       }
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to create domain ${domainName}: ${errorMessage}`,
       );
     }

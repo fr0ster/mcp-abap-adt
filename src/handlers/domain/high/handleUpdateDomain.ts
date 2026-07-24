@@ -132,10 +132,10 @@ export async function handleUpdateDomain(
   const { connection, logger } = context;
   try {
     if (!args?.domain_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Domain name is required');
+      return return_error('Domain name is required');
     }
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     // Validate transport_request: required for non-$TMP packages
@@ -256,15 +256,11 @@ export async function handleUpdateDomain(
         error.message?.includes('not found') ||
         error.response?.status === 404
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
-          `Domain ${domainName} not found.`,
-        );
+        return return_error(`Domain ${domainName} not found.`);
       }
 
       if (error.message?.includes('locked') || error.response?.status === 403) {
-        throw new McpError(
-          ErrorCode.InternalError,
+        return return_error(
           `Domain ${domainName} is locked by another user or session. Please try again later.`,
         );
       }
@@ -275,8 +271,7 @@ export async function handleUpdateDomain(
           : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to update domain ${domainName}: ${errorMessage}`,
       );
     }

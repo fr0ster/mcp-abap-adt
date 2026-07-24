@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Tool failures now reach the client as a plain message, with no service prefixes.** Previously a failed tool call arrived prefixed with `MCP error -32603: ` — and in the worst case double-wrapped as `MCP error -32603: ADT error: McpError: MCP error -32602: …`, with the truthful `-32602` (invalid arguments) overwritten by a generic `-32603`. Multi-item `content` was also collapsed into a single string on the error path. Root causes removed across five layers: `return_error` no longer prepends `Error: `; `BaseMcpServer` and `BaseHandlerGroup` return the `{ isError: true, content }` result instead of throwing `McpError` (which the SDK re-prefixes); 87 handler-level `throw new McpError` and `ADT error:` sites were routed through `return_error` (74 + 13); and the `McpError` symbol is now absent from `src/` entirely, enforced by a static test. Helper functions that feed a success payload keep throwing (a local `Error` type) so an error can never surface as `{ success: true }`. Argument-validation errors keep their `MCP error -32602: ` prefix by design — that code is SDK-generated and correct. Verified end to end against a live trial system. ([#155](https://github.com/fr0ster/mcp-abap-adt/issues/155))
+
 ## [8.12.1] - 2026-07-22
 
 ### Security

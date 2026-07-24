@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 import { parseSqlQueryXml } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
@@ -69,14 +69,6 @@ export async function handleGetTableContents(
     }
   } catch (error) {
     logger?.error('Failed to read table contents', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

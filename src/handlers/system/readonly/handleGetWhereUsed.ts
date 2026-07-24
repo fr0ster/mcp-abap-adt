@@ -7,7 +7,7 @@
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
@@ -162,14 +162,6 @@ export async function handleGetWhereUsed(
     return mcpResult;
   } catch (error) {
     logger?.error('Failed to resolve where-used references', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

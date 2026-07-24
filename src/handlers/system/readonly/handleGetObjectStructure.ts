@@ -5,6 +5,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   available_in: ['onprem', 'cloud'] as const,
@@ -145,14 +146,6 @@ export async function handleGetObjectStructure(
       `Failed to fetch object structure for ${args?.objecttype ?? args?.object_type}/${args?.objectname ?? args?.object_name}`,
       error,
     );
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

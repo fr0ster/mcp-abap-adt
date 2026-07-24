@@ -16,6 +16,7 @@ import {
   encodeSapObjectName,
   McpError,
   makeAdtRequestWithTimeout,
+  return_error,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -175,16 +176,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
     }
   } catch (error) {
     logger?.error('Invalid parameters for GetTypeInfo', error as any);
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 
   try {
@@ -267,14 +259,6 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
       `Failed to resolve type info for ${args.type_name}`,
       error as any,
     );
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

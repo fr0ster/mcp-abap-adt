@@ -5,6 +5,7 @@ import {
   logger,
   McpError,
   makeAdtRequestWithTimeout,
+  return_error,
 } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementImpl',
@@ -211,15 +212,6 @@ export async function handleGetEnhancementImpl(
       }
     }
   } catch (error) {
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

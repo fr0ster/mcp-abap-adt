@@ -9,12 +9,7 @@
 
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  ErrorCode,
-  McpError,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransport',
@@ -191,9 +186,6 @@ export async function handleCreateTransport(
       return return_error(`Failed to create transport: ${errorMessage}`);
     }
   } catch (error: any) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

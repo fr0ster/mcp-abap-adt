@@ -12,8 +12,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  ErrorCode,
-  McpError,
   return_error,
   return_response,
   safeCheckOperation,
@@ -276,9 +274,6 @@ export async function handleUpdateDomain(
       );
     }
   } catch (error: any) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

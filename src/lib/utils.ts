@@ -9,7 +9,6 @@ import {
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -82,7 +81,7 @@ export function getAuthBroker(destination: string): any | undefined {
 }
 
 export type { AxiosResponse };
-export { ErrorCode, getTimeout, getTimeoutConfig, logger, McpError };
+export { getTimeout, getTimeoutConfig, logger };
 
 /**
  * Encodes SAP object names for use in URLs.

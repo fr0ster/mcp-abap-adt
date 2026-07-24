@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';

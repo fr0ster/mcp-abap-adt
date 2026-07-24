@@ -12,9 +12,7 @@ import { XMLParser } from 'fast-xml-parser';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  ErrorCode,
   encodeSapObjectName,
-  McpError,
   makeAdtRequestWithTimeout,
   return_error,
 } from '../../../lib/utils';

@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetAbapAST',
   available_in: ['onprem', 'cloud'] as const,

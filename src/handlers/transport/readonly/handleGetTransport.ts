@@ -17,7 +17,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  McpError,
   makeAdtRequestWithTimeout,
   return_error,
   return_response,
@@ -248,9 +247,6 @@ export async function handleGetTransport(
       config: response.config,
     });
   } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

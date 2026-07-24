@@ -9,8 +9,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  ErrorCode,
-  McpError,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -129,9 +127,6 @@ export async function handleCreateMessageClass(
       );
     }
   } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

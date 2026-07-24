@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
 
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 /**
  * Parses every SEU_ADT_REPOSITORY_OBJ_NODE element from the XML and returns objects with the required fields

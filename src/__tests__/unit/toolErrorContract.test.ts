@@ -1,6 +1,8 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { AxiosError } from 'axios';
+import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
 import { BaseMcpServer } from '../../server/BaseMcpServer';
@@ -153,5 +155,88 @@ describe('tool error wire contract (#155)', () => {
     expect(result.isError).toBe(true);
     expect(result.content[0].text).toContain('Resource not found');
     await close();
+  });
+});
+
+describe('BaseHandlerGroup registration path honours the same contract (#155)', () => {
+  it('returns isError with unprefixed, uncollapsed content for all four cases', async () => {
+    // Note: BaseHandlerGroup/McpServer are imported statically at module scope
+    // above, not via dynamic import() — ts-jest's CommonJS transpilation of this
+    // project (see tsconfig.test.json, no "type": "module") does not support
+    // `await import()` without the `--experimental-vm-modules` Node flag, which
+    // this repo's jest setup does not enable. Static import carries the same
+    // module instances the runtime uses, so the test still exercises the real
+    // registration path.
+
+    // BaseHandlerGroup declares `protected abstract groupName: string` and takes
+    // a HandlerContext in its constructor; both must be satisfied.
+    class Group extends BaseHandlerGroup {
+      protected groupName = 'stub-group';
+      getHandlers() {
+        // All four stubs: the fallback path must honour the same contract,
+        // including the try/catch that routes throws through return_error.
+        return STUBS;
+      }
+    }
+
+    const server = new McpServer({ name: 'group-test', version: '1.0.0' });
+    const group = new Group({
+      connection: {} as any,
+      logger: undefined as any,
+    });
+    // Drive registration through the registry — this is the branch production
+    // actually takes (BaseMcpServer.registerHandlers falls back to
+    // handlersRegistry.registerAllTools(this), which calls
+    // group.registerHandlers(server) internally).
+    const registry = new CompositeHandlersRegistry([group]);
+    registry.registerAllTools(server);
+
+    const [clientTransport, serverTransport] =
+      InMemoryTransport.createLinkedPair();
+    const client = new Client(
+      { name: 'test', version: '1.0.0' },
+      { capabilities: {} },
+    );
+    await Promise.all([
+      server.connect(serverTransport),
+      client.connect(clientTransport),
+    ]);
+
+    const single: any = await client.callTool({
+      name: 'StubReturnsIsError',
+      arguments: {},
+    });
+    expect(single.isError).toBe(true);
+    expect(single.content[0].text).toBe('Domain ZD_NOPE not found');
+
+    const thrown: any = await client.callTool({
+      name: 'StubThrowsPlainError',
+      arguments: {},
+    });
+    expect(thrown.isError).toBe(true);
+    expect(thrown.content[0].text).toBe('Failed to read class: ZZ not found');
+
+    const multi: any = await client.callTool({
+      name: 'StubMultiItem',
+      arguments: {},
+    });
+    expect(multi.content).toHaveLength(2);
+    expect(multi.content[0].text).toBe('first item');
+    expect(multi.content[1].text).toBe(JSON.stringify({ second: 'item' }));
+
+    const axios: any = await client.callTool({
+      name: 'StubThrowsAxios',
+      arguments: {},
+    });
+    expect(axios.isError).toBe(true);
+    expect(axios.content[0].text).toContain('Resource not found');
+
+    for (const result of [single, thrown, multi, axios]) {
+      for (const item of result.content) {
+        expect(item.text).not.toMatch(FORBIDDEN_PREFIX);
+      }
+    }
+
+    await client.close();
   });
 });

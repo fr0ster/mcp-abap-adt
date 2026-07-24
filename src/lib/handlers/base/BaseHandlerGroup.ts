@@ -1,6 +1,7 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import { normalizeToolContent } from '../../toolResult.js';
+import { return_error } from '../../utils.js';
 import type {
   HandlerEntry,
   IHandlerGroup,
@@ -75,37 +76,27 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
         inputSchema: zodSchema,
       },
       async (args: any) => {
-        const result = await handler(this.context, args);
+        try {
+          const result = await handler(this.context, args);
 
-        // If error, throw it
-        if (result.isError) {
-          const errorText =
-            result.content
-              ?.map((item: any) => {
-                if (item?.type === 'json' && item.json !== undefined) {
-                  return JSON.stringify(item.json);
-                }
-                return item?.text || String(item);
-              })
-              .join('\n') || 'Unknown error';
-          throw new McpError(ErrorCode.InternalError, errorText);
-        }
+          // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.
+          // Note this also fixes a pre-existing divergence: the old inline copy
+          // used `item?.text || …`, so an item with `text: ''` normalized to a
+          // stringified object here but to an empty string on the other path.
+          const content = normalizeToolContent(result);
 
-        // Convert content to MCP format - JSON items become text
-        const content = (result.content || []).map((item: any) => {
-          if (item?.type === 'json' && item.json !== undefined) {
-            return {
-              type: 'text' as const,
-              text: JSON.stringify(item.json),
-            };
+          // A failed tool returns an isError result — it does not throw.
+          if (result.isError) {
+            return { content, isError: true };
           }
-          return {
-            type: 'text' as const,
-            text: item?.text || String(item || ''),
-          };
-        });
 
-        return { content };
+          return { content };
+        } catch (error) {
+          return return_error(error) as {
+            isError: true;
+            content: { type: 'text'; text: string }[];
+          };
+        }
       },
     );
   }

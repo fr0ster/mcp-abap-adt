@@ -172,7 +172,7 @@ export async function handleGetTypeInfo(context: HandlerContext, args: any) {
   const includeStructureFallback = args?.include_structure_fallback !== false;
   try {
     if (!args?.type_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Type name is required');
+      return return_error('Type name is required');
     }
   } catch (error) {
     logger?.error('Invalid parameters for GetTypeInfo', error as any);

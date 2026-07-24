@@ -184,10 +184,7 @@ export async function handleGetTransport(
   try {
     // Validate required parameters
     if (!args?.transport_number) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Transport number is required',
-      );
+      return return_error('Transport number is required');
     }
 
     const typedArgs = args as GetTransportArgs;

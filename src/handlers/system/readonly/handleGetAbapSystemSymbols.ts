@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 import { handleGetClass } from '../../class/high/handleGetClass';
 import { handleGetFunctionModule } from '../../function_module/high/handleGetFunctionModule';
 import { handleGetInterface } from '../../interface/high/handleGetInterface';
@@ -740,7 +740,7 @@ export async function handleGetAbapSystemSymbols(
   const { logger } = context;
   try {
     if (!args?.code) {
-      throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
+      return return_error('ABAP code is required');
     }
     logger?.debug('Running semantic analysis and system symbol resolution');
 

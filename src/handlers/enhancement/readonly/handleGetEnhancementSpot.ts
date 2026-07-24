@@ -132,10 +132,7 @@ export async function handleGetEnhancementSpot(
     logger?.info('handleGetEnhancementSpot called with args:', args);
 
     if (!args?.enhancement_spot) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Enhancement spot is required',
-      );
+      return return_error('Enhancement spot is required');
     }
 
     const enhancementSpot = args.enhancement_spot;
@@ -177,8 +174,7 @@ export async function handleGetEnhancementSpot(
       };
       return result;
     } else {
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to retrieve metadata for enhancement spot ${enhancementSpot}. Status: ${response.status}`,
       );
     }

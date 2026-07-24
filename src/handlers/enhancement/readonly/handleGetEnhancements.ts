@@ -619,7 +619,7 @@ export async function handleGetEnhancements(
     logger?.info('handleGetEnhancements called with args:', args);
 
     if (!args?.object_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Object name is required');
+      return return_error('Object name is required');
     }
 
     const objectName = args.object_name;

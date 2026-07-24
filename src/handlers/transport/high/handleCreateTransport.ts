@@ -70,10 +70,7 @@ export async function handleCreateTransport(
   try {
     // Validate required parameters
     if (!args?.description) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Transport description is required',
-      );
+      return return_error('Transport description is required');
     }
 
     const typedArgs = args as CreateTransportArgs;
@@ -191,10 +188,7 @@ export async function handleCreateTransport(
           : JSON.stringify(error.response.data)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
-        `Failed to create transport: ${errorMessage}`,
-      );
+      return return_error(`Failed to create transport: ${errorMessage}`);
     }
   } catch (error: any) {
     if (error instanceof McpError) {

@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { ErrorCode, McpError, return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetAbapAST',
   available_in: ['onprem', 'cloud'] as const,
@@ -158,7 +158,7 @@ export async function handleGetAbapAST(context: HandlerContext, args: any) {
   const { connection, logger } = context;
   try {
     if (!args?.code) {
-      throw new McpError(ErrorCode.InvalidParams, 'ABAP code is required');
+      return return_error('ABAP code is required');
     }
 
     const astGenerator = new SimpleAbapASTGenerator();

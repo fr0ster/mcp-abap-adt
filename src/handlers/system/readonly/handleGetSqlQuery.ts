@@ -175,7 +175,7 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
     logger?.info('handleGetSqlQuery called');
 
     if (!args?.sql_query) {
-      throw new McpError(ErrorCode.InvalidParams, 'SQL query is required');
+      return return_error('SQL query is required');
     }
 
     const sqlQuery = args.sql_query;
@@ -214,8 +214,7 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
       };
       return result;
     } else {
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to execute SQL query. Status: ${response.status}`,
       );
     }

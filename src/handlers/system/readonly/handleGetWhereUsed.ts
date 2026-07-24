@@ -70,11 +70,11 @@ export async function handleGetWhereUsed(
   try {
     // Validate required parameters
     if (!args?.object_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Object name is required');
+      return return_error('Object name is required');
     }
 
     if (!args?.object_type) {
-      throw new McpError(ErrorCode.InvalidParams, 'Object type is required');
+      return return_error('Object type is required');
     }
 
     const typedArgs = args as WhereUsedArgs;
@@ -109,8 +109,7 @@ export async function handleGetWhereUsed(
         (t) => !available.has(t),
       );
       if (unknown.length > 0) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `enable_only_types contains object type(s) not searchable in the where-used scope of ${typedArgs.object_type}/${typedArgs.object_name}: ${unknown.join(', ')}. ` +
             `Supported types for this object: ${[...available].sort().join(', ')}.`,
         );

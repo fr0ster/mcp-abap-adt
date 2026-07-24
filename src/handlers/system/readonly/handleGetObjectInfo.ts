@@ -2,7 +2,7 @@ import { XMLParser } from 'fast-xml-parser';
 import convert from 'xml-js';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
 export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
@@ -91,11 +91,9 @@ async function enrichNodeWithSearchObject(
         attributeNamePrefix: '',
       });
       for (const entry of searchResult.content) {
-        if (
-          'text' in entry &&
-          typeof entry.text === 'string' &&
-          !entry.text.trim().startsWith('Error: <?xml')
-        ) {
+        // The `Error: <?xml` guard that used to live here keyed on a prefix
+        // removed in #155; the `!searchResult.isError` gate above covers it.
+        if ('text' in entry && typeof entry.text === 'string') {
           const parsed = parser.parse(entry.text);
           const refs =
             parsed?.['adtcore:objectReferences']?.['adtcore:objectReference'];
@@ -255,10 +253,7 @@ export async function handleGetObjectInfo(
   const { logger } = context;
   try {
     if (!args?.parent_type || !args?.parent_name) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'parent_type and parent_name are required',
-      );
+      return return_error('parent_type and parent_name are required');
     }
     logger?.info(
       `Building object info tree for ${args.parent_type}/${args.parent_name}`,

@@ -1,7 +1,7 @@
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { parseSqlQueryXml } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
@@ -25,7 +25,7 @@ export async function handleGetTableContents(
   const { connection, logger } = context;
   try {
     if (!args?.table_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Table name is required');
+      return return_error('Table name is required');
     }
 
     const tableName = args.table_name;
@@ -62,21 +62,12 @@ export async function handleGetTableContents(
         ],
       };
     } else {
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to read table contents. Status: ${response.status}`,
       );
     }
   } catch (error) {
     logger?.error('Failed to read table contents', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

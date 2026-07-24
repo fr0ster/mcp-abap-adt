@@ -1,7 +1,7 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
@@ -175,7 +175,7 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
     logger?.info('handleGetSqlQuery called');
 
     if (!args?.sql_query) {
-      throw new McpError(ErrorCode.InvalidParams, 'SQL query is required');
+      return return_error('SQL query is required');
     }
 
     const sqlQuery = args.sql_query;
@@ -214,22 +214,12 @@ export async function handleGetSqlQuery(context: HandlerContext, args: any) {
       };
       return result;
     } else {
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to execute SQL query. Status: ${response.status}`,
       );
     }
   } catch (error) {
     logger?.error('Failed to execute SQL query', error as any);
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

@@ -2,7 +2,7 @@ import type { SearchObjectsParams } from '@mcp-abap-adt/adt-clients';
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError, return_response } from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'SearchObject',
@@ -54,7 +54,7 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
   try {
     const { object_name, object_type, maxResults } = args;
     if (!object_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'object_name is required');
+      return return_error('object_name is required');
     }
 
     const client = createAdtClient(connection, logger);
@@ -139,15 +139,6 @@ export async function handleSearchObject(context: HandlerContext, args: any) {
       ],
     };
   } catch (error) {
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

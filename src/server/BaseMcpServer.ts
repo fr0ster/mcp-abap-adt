@@ -13,7 +13,11 @@ import type {
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import { resolveSystemContext } from '../lib/systemContext.js';
-import { registerAuthBroker } from '../lib/utils.js';
+import {
+  normalizeToolContent,
+  type ToolResultLike,
+} from '../lib/toolResult.js';
+import { registerAuthBroker, return_error } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
 /**
@@ -355,91 +359,62 @@ export abstract class BaseMcpServer extends McpServer {
           type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
 
           const wrappedHandler = async (args: unknown) => {
-            // Get connection from context (this.connectionContext)
-            // Token will be automatically refreshed via AuthBroker if needed
-            const context: HandlerContext = {
-              connection: await this.getConnection(),
-              logger: this.logger,
-            };
-
-            // If handler expects context+args (preferred), pass both.
-            // Otherwise, update group context and call with args only for backward compatibility.
-            // NOTE: Always await the handler result to ensure we get the resolved value for normalization
-            let handlerPromise: Promise<unknown>;
-            if ((entry.handler as HandlerFnWithContext).length >= 2) {
-              handlerPromise = (entry.handler as HandlerFnWithContext)(
-                context,
-                args,
-              );
-            } else {
-              try {
-                const contextAwareGroup = group as Partial<{
-                  setContext: (ctx: HandlerContext) => void;
-                  context: HandlerContext;
-                }>;
-                if (typeof contextAwareGroup.setContext === 'function') {
-                  contextAwareGroup.setContext(context);
-                } else {
-                  contextAwareGroup.context = context;
-                }
-              } catch {
-                // ignore if group doesn't expose context setter
-              }
-              handlerPromise = (entry.handler as HandlerFnArgsOnly)(args);
-            }
-
-            const result = await handlerPromise;
-
-            // Handle errors: if handler returns isError, throw McpError
-            type ContentItem = {
-              type?: string;
-              json?: unknown;
-              text?: unknown;
-            };
-            type ToolResult = {
-              isError?: boolean;
-              content?: ContentItem[];
-            };
-
-            if ((result as ToolResult | undefined)?.isError) {
-              const { ErrorCode, McpError } = await import(
-                '@modelcontextprotocol/sdk/types.js'
-              );
-              const errorText =
-                ((result as ToolResult | undefined)?.content || [])
-                  .map((item) => {
-                    if (item?.type === 'json' && item.json !== undefined) {
-                      return JSON.stringify(item.json);
-                    }
-                    return item?.text !== undefined
-                      ? String(item.text)
-                      : String(item);
-                  })
-                  .join('\n') || 'Unknown error';
-              throw new McpError(ErrorCode.InternalError, errorText);
-            }
-
-            // Normalize content: SDK expects text/image/audio/resource, convert custom json to text
-            const content = (
-              (result as ToolResult | undefined)?.content || []
-            ).map((item) => {
-              if (item?.type === 'json' && item.json !== undefined) {
-                return {
-                  type: 'text' as const,
-                  text: JSON.stringify(item.json),
-                };
-              }
-              // Ensure all items have proper text type structure
-              return {
-                type: 'text' as const,
-                text:
-                  item?.text !== undefined
-                    ? String(item.text)
-                    : String(item || ''),
+            try {
+              // Get connection from context (this.connectionContext)
+              // Token will be automatically refreshed via AuthBroker if needed
+              const context: HandlerContext = {
+                connection: await this.getConnection(),
+                logger: this.logger,
               };
-            });
 
-            return { content };
+              // If handler expects context+args (preferred), pass both.
+              // Otherwise, update group context and call with args only for backward compatibility.
+              // NOTE: Always await the handler result to ensure we get the resolved value for normalization
+              let handlerPromise: Promise<unknown>;
+              if ((entry.handler as HandlerFnWithContext).length >= 2) {
+                handlerPromise = (entry.handler as HandlerFnWithContext)(
+                  context,
+                  args,
+                );
+              } else {
+                try {
+                  const contextAwareGroup = group as Partial<{
+                    setContext: (ctx: HandlerContext) => void;
+                    context: HandlerContext;
+                  }>;
+                  if (typeof contextAwareGroup.setContext === 'function') {
+                    contextAwareGroup.setContext(context);
+                  } else {
+                    contextAwareGroup.context = context;
+                  }
+                } catch {
+                  // ignore if group doesn't expose context setter
+                }
+                handlerPromise = (entry.handler as HandlerFnArgsOnly)(args);
+              }
+
+              const result = await handlerPromise;
+
+              // Shared with BaseHandlerGroup so the two registration paths
+              // cannot drift apart.
+              const content = normalizeToolContent(result);
+
+              // A failed tool returns an isError result — it does not throw.
+              // Throwing would make the SDK re-wrap the text with "MCP error -32603: ".
+              if ((result as ToolResultLike | undefined)?.isError) {
+                return { content, isError: true };
+              }
+
+              return { content };
+            } catch (error) {
+              // An uncaught throw (connection setup, handler, transport) becomes a
+              // structured result. return_error extracts the ADT response body,
+              // which the SDK's own error.message would discard.
+              return return_error(error) as {
+                isError: true;
+                content: { type: 'text'; text: string }[];
+              };
+            }
           };
 
           // Convert JSON Schema to Zod if needed, otherwise pass as-is

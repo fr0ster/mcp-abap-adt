@@ -53,6 +53,14 @@ const EMPTY_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?>
   <tm:workbench tm:parent_name=""/>
 </tm:root>`;
 
+/**
+ * CAPTURED, not reconstructed: the verbatim response of
+ * `GET /sap/bc/adt/cts/transportrequests?user=` from an SAP BTP ABAP
+ * environment (us10 trial) that owns no transport requests, 2026-07-28.
+ * An empty result is a bare self-closing root with no status containers at all.
+ */
+const CAPTURED_NO_TRANSPORTS = `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="CB9980008038" adtcore:changedAt="2026-07-28T13:53:59Z" adtcore:createdAt="2026-07-28T13:53:59Z" adtcore:changedBy="CB9980008038" adtcore:createdBy="CB9980008038" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core"/>`;
+
 describe('parseTransportListXml — transportorganizertree shape (#168)', () => {
   it('finds requests nested under status containers, in every branch', () => {
     const numbers = parseTransportListXml(TREE_PAYLOAD).map((t) => t.number);
@@ -102,6 +110,12 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   it('returns an empty list for an empty tree and for empty input', () => {
     expect(parseTransportListXml(EMPTY_PAYLOAD)).toEqual([]);
     expect(parseTransportListXml('')).toEqual([]);
+  });
+
+  it('reports nothing for a captured response from a system with no requests', () => {
+    // Guards the honest-empty case: `count: 0` must stay 0 when it is true,
+    // not become noise once the parser walks the whole tree.
+    expect(parseTransportListXml(CAPTURED_NO_TRANSPORTS)).toEqual([]);
   });
 
   it('collapses a request reachable through more than one branch', () => {

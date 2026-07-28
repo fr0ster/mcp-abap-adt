@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **`ListTransports` no longer reports an empty list while the user owns transport requests.** The tool returned `{"success": true, "count": 0, "transports": []}` for every input — any user, any `modifiable_only` — on a system where the queried user owned 55 modifiable requests, while `GetSqlQuery` against `E070` and `GetTransport` on the same connection both returned the data. The endpoint negotiates `application/vnd.sap.adt.transportorganizertree.v1+xml`, a *tree*: requests sit under status containers one level below the category (`tm:root > tm:workbench > tm:modifiable > tm:request`), `tm:workbench` repeats once per transport target, and there is a parallel `tm:customizing` branch. The parser looked for `tm:request` only directly under the root or directly under `tm:workbench`, so every lookup missed and the list came back empty — silently, with `success: true`. Requests are now collected from anywhere in the tree (the flatter shapes keep working), deduplicated by request number, and a request with no `tm:status` inherits the status of its container. `modifiable_only` is additionally enforced client-side, because the tree carries released requests too and it is not established that the endpoint honours the `status` query parameter. Unit-tested against a reconstructed tree payload; `scripts/probe-transport-list.ts` dumps the raw payload from a real system so the fixture can be replaced with a capture. ([#168](https://github.com/fr0ster/mcp-abap-adt/issues/168))
+
+### Added
+- **Diagnostic script `scripts/probe-transport-list.ts`** — dumps the raw `/sap/bc/adt/cts/transportrequests` payload for a given user and env file, so the transport-list parser can be checked against the shape a system actually returns.
+
 ## [8.13.0] - 2026-07-24
 
 ### Fixed

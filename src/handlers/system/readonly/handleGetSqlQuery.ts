@@ -110,12 +110,20 @@ export function parseSqlQueryXml(
       columnSections.forEach((section, index) => {
         if (index < columns.length) {
           const columnName = columns[index].name;
+          // ADT emits a blank cell as a self-closing <dataPreview:data/>, so
+          // that alternative has to be matched explicitly — skipping it would
+          // shift every later value up and attach it to the wrong row.
+          // The name needs a boundary after "data" as well: "<dataPreview:data[^>]*>"
+          // also matches the enclosing "<dataPreview:dataSet>" opening tag.
           const dataMatches = section.match(
-            /<dataPreview:data[^>]*>(.*?)<\/dataPreview:data>/g,
+            /<dataPreview:data(?:\s[^>]*)?\/>|<dataPreview:data(?:\s[^>]*)?>.*?<\/dataPreview:data>/gs,
           );
 
           if (dataMatches) {
             columnData[columnName] = dataMatches.map((match) => {
+              if (match.endsWith('/>')) {
+                return null;
+              }
               const content = match.replace(/<[^>]+>/g, '');
               return content || null;
             });

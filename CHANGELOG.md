@@ -21,9 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **Diagnostic script `scripts/probe-transport-list.ts`** — dumps the raw `/sap/bc/adt/cts/transportrequests` payload for a given user and env file, so the transport-list parser can be checked against the shape a system actually returns.
 
+### Security
+- **`npm audit` is back to 0.** Four advisories had accumulated in production dependencies since 8.12.1 — `js-yaml` (GHSA-5p4m-2wfm-xmqj, high), `ip-address` via `express-rate-limit` (high), `fast-uri` via the MCP SDK's `ajv` (high) and `hono` via the MCP SDK (moderate) — enough to fail CI's `npm audit --omit=dev --audit-level=high` gate on `main` as well, independently of this migration. All four resolved in-range: `npm audit fix` without `--force`, touching only `package-lock.json`. No `overrides` entry and no direct-dependency range change was needed.
+
 ### Notes
 - adt-clients 10.1.0 changes one path that used to "succeed": an update passing `super_package` for a root package changed nothing and reported success, and now actually moves the package. A caller of `UpdatePackage` relying on the old no-op will see a real move.
-- `npm audit` reports 5 advisories (brace-expansion, fast-uri, hono, ip-address, js-yaml). All five are present on `main` with the previous dependency set — this migration neither introduces nor resolves them.
 
 ## [8.13.0] - 2026-07-24
 

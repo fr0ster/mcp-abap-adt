@@ -7,11 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients` `^10.1.0` and `@mcp-abap-adt/interfaces` `^13.1.0`** (from `^8.0.0` / `^11.3.0`), plus `auth-providers` `^1.2.0`, `auth-broker` `^1.0.8` and `connection` `^1.10.2`. Two adt-clients majors are crossed; no MCP tool was added, removed or renamed, and no tool schema changed.
+  - **Config, state and shared types are imported from `interfaces` instead of `adt-clients`**, which stopped re-exporting them — 22 handler modules. Two were also renamed: `ObjectReference` → `IObjectReference`, `SearchObjectsParams` → `ISearchObjectsParams`.
+  - **A package contents item exposes `type`, not `adtType`** (interfaces 13 unified the shape as `IAdtObjectHit`). `PackageContentItem` in `lib/search-source/packageEnumerator.ts` is now an alias of `IPackageContentItem` rather than a hand-maintained copy, so it cannot drift again.
+  - **`UpdateUnitTest` and `DeleteUnitTest` refuse locally instead of asking the server.** ADT exposes no resource for updating or deleting a *test run*; the client method these handlers called threw that refusal from the inside, and adt-clients 9.0.0 dropped it from the declared contract. The tools are unchanged in name, schema and outcome — their descriptions already said "will return an error" — they simply no longer make a round trip to be told no.
+  - **`UpdateCdsUnitTest` and `DeleteCdsUnitTest` keep working through a narrow, documented cast.** These are real operations — update writes the local test class source, delete removes the global class, both implemented by `AdtCdsUnitTest` — but `getCdsUnitTest()` now returns a capability set that omits them, and the class is not exported. `CdsUnitTestWrites` describes exactly the two methods the class declares; it should be deleted once the accessor's type covers them.
+
 ### Fixed
+- **Removed two NUL bytes committed inside a template literal** in `lib/search-source/packageEnumerator.ts`, where the dedup key's separators were `\0` instead of spaces. Harmless at runtime — a NUL separates as well as a space — but it made the file register as binary, so `grep` reported "binary file matches" and skipped it instead of showing the line.
 - **`ListTransports` no longer reports an empty list while the user owns transport requests.** The tool returned `{"success": true, "count": 0, "transports": []}` for every input — any user, any `modifiable_only` — on a system where the queried user owned 55 modifiable requests, while `GetSqlQuery` against `E070` and `GetTransport` on the same connection both returned the data. The endpoint negotiates `application/vnd.sap.adt.transportorganizertree.v1+xml`, a *tree*: requests sit under status containers one level below the category (`tm:root > tm:workbench > tm:modifiable > tm:request`), `tm:workbench` repeats once per transport target, and there is a parallel `tm:customizing` branch. The parser looked for `tm:request` only directly under the root or directly under `tm:workbench`, so every lookup missed and the list came back empty — silently, with `success: true`. Requests are now collected from anywhere in the tree (the flatter shapes keep working), deduplicated by request number, and a request with no `tm:status` inherits the status of its container. `modifiable_only` is additionally enforced client-side, because the tree carries released requests too and it is not established that the endpoint honours the `status` query parameter. Unit-tested against a reconstructed tree payload; `scripts/probe-transport-list.ts` dumps the raw payload from a real system so the fixture can be replaced with a capture. ([#168](https://github.com/fr0ster/mcp-abap-adt/issues/168))
 
 ### Added
 - **Diagnostic script `scripts/probe-transport-list.ts`** — dumps the raw `/sap/bc/adt/cts/transportrequests` payload for a given user and env file, so the transport-list parser can be checked against the shape a system actually returns.
+
+### Notes
+- adt-clients 10.1.0 changes one path that used to "succeed": an update passing `super_package` for a root package changed nothing and reported success, and now actually moves the package. A caller of `UpdatePackage` relying on the old no-op will see a real move.
+- `npm audit` reports 5 advisories (brace-expansion, fast-uri, hono, ip-address, js-yaml). All five are present on `main` with the previous dependency set — this migration neither introduces nor resolves them.
 
 ## [8.13.0] - 2026-07-24
 

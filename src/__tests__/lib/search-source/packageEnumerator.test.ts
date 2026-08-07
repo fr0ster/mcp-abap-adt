@@ -6,11 +6,11 @@ import {
 
 function item(
   name: string,
-  adtType: string,
+  type: string,
   packageName: string,
   isPackage = false,
 ): PackageContentItem {
-  return { name, adtType, packageName, isPackage };
+  return { name, type, packageName, isPackage };
 }
 
 describe('enumerateScanTargets', () => {

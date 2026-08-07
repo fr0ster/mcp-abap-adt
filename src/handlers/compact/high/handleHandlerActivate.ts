@@ -1,4 +1,4 @@
-import type { ObjectReference } from '@mcp-abap-adt/adt-clients';
+import type { IObjectReference } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleActivateObject } from '../../common/low/handleActivateObject';
 import type { CompactObjectType } from './compactObjectTypes';
@@ -16,7 +16,7 @@ type HandlerActivateArgs = {
   object_type?: CompactObjectType;
   object_name?: string;
   object_adt_type?: string;
-  objects?: Array<ObjectReference & { uri?: string }>;
+  objects?: Array<IObjectReference & { uri?: string }>;
   preaudit?: boolean;
 };
 

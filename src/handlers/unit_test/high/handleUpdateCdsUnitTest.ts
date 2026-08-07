@@ -12,6 +12,7 @@ import {
   return_error,
   return_response,
 } from '../../../lib/utils';
+import type { CdsUnitTestWrites } from './cdsUnitTestWrites';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
@@ -67,7 +68,9 @@ export async function handleUpdateCdsUnitTest(
     const className = class_name.toUpperCase();
 
     const client = createAdtClient(connection, logger);
-    const cdsUnitTest = client.getCdsUnitTest();
+    // See CdsUnitTestWrites: the accessor's declared type omits update/delete,
+    // which AdtCdsUnitTest implements.
+    const cdsUnitTest = client.getCdsUnitTest() as unknown as CdsUnitTestWrites;
 
     logger?.info(`Updating CDS unit test class source: ${className}`);
 

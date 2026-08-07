@@ -4,7 +4,7 @@
  * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
  */
 
-import type { IClassState } from '@mcp-abap-adt/adt-clients';
+import type { IClassState } from '@mcp-abap-adt/interfaces';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

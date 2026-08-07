@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> check
  */
 
-import type { IPackageConfig } from '@mcp-abap-adt/adt-clients';
+import type { IPackageConfig } from '@mcp-abap-adt/interfaces';
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

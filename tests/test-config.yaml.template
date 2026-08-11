@@ -47,6 +47,11 @@ test_settings:
   max_retries: 1
   cleanup_after_test: false
   # Timeouts for different operations (in milliseconds)
+  # `default`, `long`, `csrf` and `critical` are exported to SAP_TIMEOUT_* at
+  # config load, because that environment is the only thing the adt-clients and
+  # connection libraries read for their request budgets. They therefore bound the
+  # HTTP request itself, not just the jest test. An explicitly exported
+  # SAP_TIMEOUT_* wins over the value here. The remaining keys are test-side only.
   timeouts:
     default: 120000
     long: 600000  # Long timeout for complex operations (group activation, shared setup, etc.)

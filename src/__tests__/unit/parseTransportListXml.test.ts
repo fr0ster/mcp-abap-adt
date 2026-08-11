@@ -1,46 +1,41 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   isModifiableStatus,
   parseTransportListXml,
 } from '../../handlers/transport/readonly/handleListTransports';
 
 /**
- * Guard for #168: `ListTransports` reported `count: 0` on a system where the
- * queried user owned 55 requests, because the parser looked for `tm:request`
- * only directly under the root or directly under `tm:workbench`.
+ * Guard for #168: `ListTransports` reported `count: 0` while the queried user
+ * owned requests, because the parser looked for `tm:request` only directly
+ * under the root or directly under `tm:workbench`.
  *
- * The endpoint negotiates `application/vnd.sap.adt.transportorganizertree.v1+xml`,
- * where requests sit under status containers one level deeper and `tm:workbench`
- * repeats per transport target.
+ * The tree below is CAPTURED, not reconstructed — the verbatim body of
  *
- * NOTE: the tree fixture below is RECONSTRUCTED from that representation, not
- * captured from a live system — the reporter could not dump the payload and no
- * on-premise system was reachable here. `scripts/probe-transport-list.ts` dumps
- * the real thing; replace this fixture with a capture once one is available.
+ *   GET /sap/bc/adt/cts/transportrequests?targets=true&configUri=<href>
+ *   Accept: application/vnd.sap.adt.transportorganizer.v1+xml,
+ *           application/vnd.sap.adt.transportorganizertree.v1+xml
+ *
+ * from an SAP BTP ABAP environment on 2026-08-11.
+ *
+ * It is one level deeper than the reconstruction it replaces:
+ *
+ *   tm:root > tm:workbench > tm:target > tm:modifiable > tm:request > tm:task
+ *
+ * The earlier fixture had no `tm:target`. Collecting requests from anywhere in
+ * the tree is what carries the parser across that difference — a fixed path,
+ * however carefully reasoned, would have missed by exactly one level again.
+ *
+ * Note what the capture also settles: the request is reached only when the URL
+ * carries `configUri`. The same endpoint with `user=` and `status=` returns a
+ * 309-byte empty root, which is why the tool reported nothing even after the
+ * parser was fixed. That part is not this parser's business — see
+ * fr0ster/mcp-abap-adt-clients#105.
  */
-const TREE_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?>
-<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="">
-  <tm:workbench tm:parent_name="">
-    <tm:modifiable tm:parent_name="">
-      <tm:request tm:number="SIDK905635" tm:desc="Feature work" tm:type="K" tm:status="D" tm:owner="DEVELOPER" tm:target="/SIDTOQAS/">
-        <tm:task tm:number="SIDK905636" tm:desc="Task of 905635" tm:type="S" tm:status="D" tm:owner="DEVELOPER"/>
-      </tm:request>
-      <tm:request tm:number="SIDK905640" tm:desc="Protected request" tm:type="K" tm:status="L" tm:owner="DEVELOPER" tm:target="/SIDTOQAS/"/>
-    </tm:modifiable>
-    <tm:released tm:parent_name="">
-      <tm:request tm:number="SIDK905600" tm:desc="Shipped last week" tm:type="K" tm:status="R" tm:owner="DEVELOPER" tm:target="/SIDTOQAS/"/>
-    </tm:released>
-  </tm:workbench>
-  <tm:workbench tm:parent_name="">
-    <tm:modifiable tm:parent_name="">
-      <tm:request tm:number="SIDK905700" tm:desc="Second target" tm:type="K" tm:owner="DEVELOPER" tm:target="/SIDTODEV/"/>
-    </tm:modifiable>
-  </tm:workbench>
-  <tm:customizing tm:parent_name="">
-    <tm:modifiable tm:parent_name="">
-      <tm:request tm:number="SIDK905800" tm:desc="Customizing" tm:type="W" tm:status="D" tm:owner="DEVELOPER" tm:target="/SIDTOQAS/"/>
-    </tm:modifiable>
-  </tm:customizing>
-</tm:root>`;
+const TREE_PAYLOAD = fs.readFileSync(
+  path.resolve(__dirname, '../../../tests/fixtures/transport-list-tree.xml'),
+  'utf8',
+);
 
 /** The shape the previous parser expected. It must keep working. */
 const FLAT_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?>
@@ -61,9 +56,65 @@ const EMPTY_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?>
  */
 const CAPTURED_NO_TRANSPORTS = `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="CB9980008038" adtcore:changedAt="2026-07-28T13:53:59Z" adtcore:createdAt="2026-07-28T13:53:59Z" adtcore:changedBy="CB9980008038" adtcore:createdBy="CB9980008038" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core"/>`;
 
-describe('parseTransportListXml — transportorganizertree shape (#168)', () => {
-  it('finds requests nested under status containers, in every branch', () => {
+/**
+ * Modelled on the captured shape above — same `tm:target` level — but carrying
+ * the branches one trial system with a single local request cannot show: a
+ * second target, a released request, a customizing branch, and a request whose
+ * own `tm:status` is absent.
+ */
+const SYNTHETIC_TREE = `<?xml version="1.0" encoding="UTF-8"?>
+<tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="DEVELOPER">
+  <tm:workbench tm:category="Workbench">
+    <tm:target tm:name="SIDTOQAS" tm:desc="QA">
+      <tm:modifiable tm:status="Modifiable">
+        <tm:request tm:number="SIDK905635" tm:owner="DEVELOPER" tm:desc="Feature work" tm:type="K" tm:status="D" tm:target="/SIDTOQAS/">
+          <tm:task tm:number="SIDK905636" tm:owner="DEVELOPER" tm:desc="Task of 905635" tm:type="S" tm:status="D"/>
+        </tm:request>
+        <tm:request tm:number="SIDK905640" tm:owner="DEVELOPER" tm:desc="Protected request" tm:type="K" tm:status="L" tm:target="/SIDTOQAS/"/>
+      </tm:modifiable>
+      <tm:released tm:status="Released">
+        <tm:request tm:number="SIDK905600" tm:owner="DEVELOPER" tm:desc="Shipped last week" tm:type="K" tm:status="R" tm:target="/SIDTOQAS/"/>
+      </tm:released>
+    </tm:target>
+    <tm:target tm:name="SIDTODEV" tm:desc="Dev">
+      <tm:modifiable tm:status="Modifiable">
+        <tm:request tm:number="SIDK905700" tm:owner="DEVELOPER" tm:desc="No status of its own" tm:type="K" tm:target="/SIDTODEV/"/>
+      </tm:modifiable>
+    </tm:target>
+  </tm:workbench>
+  <tm:customizing tm:category="Customizing">
+    <tm:target tm:name="SIDTOQAS" tm:desc="QA">
+      <tm:modifiable tm:status="Modifiable">
+        <tm:request tm:number="SIDK905800" tm:owner="DEVELOPER" tm:desc="Customizing" tm:type="W" tm:status="D" tm:target="/SIDTOQAS/"/>
+      </tm:modifiable>
+    </tm:target>
+  </tm:customizing>
+</tm:root>`;
+
+describe('parseTransportListXml — captured payload (#168)', () => {
+  it('finds the request through workbench > target > modifiable', () => {
+    expect(parseTransportListXml(TREE_PAYLOAD)).toEqual([
+      {
+        number: 'TRLK900438',
+        description: 'Test',
+        type: 'K',
+        status: 'D',
+        owner: 'CB9980006582',
+        target: '',
+      },
+    ]);
+  });
+
+  it('does not report the nested task as a request', () => {
     const numbers = parseTransportListXml(TREE_PAYLOAD).map((t) => t.number);
+
+    expect(numbers).not.toContain('TRLK900439');
+  });
+});
+
+describe('parseTransportListXml — branches beyond the capture', () => {
+  it('finds requests in every branch and target', () => {
+    const numbers = parseTransportListXml(SYNTHETIC_TREE).map((t) => t.number);
 
     expect(numbers).toEqual([
       'SIDK905635',
@@ -75,7 +126,7 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   });
 
   it('maps the request attributes', () => {
-    const first = parseTransportListXml(TREE_PAYLOAD)[0];
+    const first = parseTransportListXml(SYNTHETIC_TREE)[0];
 
     expect(first).toEqual({
       number: 'SIDK905635',
@@ -88,13 +139,13 @@ describe('parseTransportListXml — transportorganizertree shape (#168)', () => 
   });
 
   it('does not report tasks as requests', () => {
-    const numbers = parseTransportListXml(TREE_PAYLOAD).map((t) => t.number);
+    const numbers = parseTransportListXml(SYNTHETIC_TREE).map((t) => t.number);
 
     expect(numbers).not.toContain('SIDK905636');
   });
 
   it('falls back to the container status when the request has none', () => {
-    const entry = parseTransportListXml(TREE_PAYLOAD).find(
+    const entry = parseTransportListXml(SYNTHETIC_TREE).find(
       (t) => t.number === 'SIDK905700',
     );
 

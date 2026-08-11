@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Tests
+- **The transport-list fixture is now a real captured payload, and it is one level deeper than the reconstruction it replaces.** `tests/fixtures/transport-list-tree.xml` is the verbatim body of `GET /sap/bc/adt/cts/transportrequests?targets=true&configUri=<href>` from an SAP BTP ABAP environment on 2026-08-11. The live shape is `tm:root > tm:workbench > tm:target > tm:modifiable > tm:request > tm:task` — the reconstructed fixture had no `tm:target`, so the tests had been asserting one level short of reality. Collecting requests from anywhere in the tree is what carries the parser across that gap unchanged; a fixed path would have missed by exactly one level a second time. Branches a single-request trial cannot show — a second target, a released request, a customizing branch, a request with no `tm:status` of its own — stay covered by a synthetic payload now modelled on the captured shape. ([#168](https://github.com/fr0ster/mcp-abap-adt/issues/168))
+
+  The capture also settles why the tool still returns nothing on that system: the request appears only when the URL carries `configUri`, pointing at a saved search configuration. The same endpoint with `user=` and `status=` — what the client library sends — answers with a 309-byte empty root. That is a client-side contract matter, tracked in [fr0ster/mcp-abap-adt-clients#105](https://github.com/fr0ster/mcp-abap-adt-clients/issues/105), and is not fixable in this parser.
+
 ### Changed
 - **Migrated to `@mcp-abap-adt/adt-clients` `^10.1.0` and `@mcp-abap-adt/interfaces` `^13.1.0`** (from `^8.0.0` / `^11.3.0`), plus `auth-providers` `^1.2.0`, `auth-broker` `^1.0.8` and `connection` `^1.10.2`. Two adt-clients majors are crossed; no MCP tool was added, removed or renamed, and no tool schema changed.
   - **Config, state and shared types are imported from `interfaces` instead of `adt-clients`**, which stopped re-exporting them — 22 handler modules. Two were also renamed: `ObjectReference` → `IObjectReference`, `SearchObjectsParams` → `ISearchObjectsParams`.

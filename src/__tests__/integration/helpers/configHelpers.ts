@@ -13,6 +13,7 @@ import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
 import { createTestLogger } from './loggerHelpers';
+import { applyClientTimeoutEnv } from './timeoutEnv';
 
 const configLogger = createTestLogger('config');
 
@@ -253,6 +254,7 @@ export function loadTestConfig(): any {
   if (fs.existsSync(configPath)) {
     const configContent = fs.readFileSync(configPath, 'utf8');
     cachedConfig = (yaml.load(configContent) as Record<string, unknown>) || {};
+    applyClientTimeoutEnv(cachedConfig, (m) => configLogger?.warn(`⚠️ ${m}`));
     return cachedConfig;
   }
 
@@ -263,6 +265,7 @@ export function loadTestConfig(): any {
     const templateContent = fs.readFileSync(templatePath, 'utf8');
     cachedConfig =
       (yaml.load(templateContent) as Record<string, unknown>) || {};
+    applyClientTimeoutEnv(cachedConfig, (m) => configLogger?.warn(`⚠️ ${m}`));
     return cachedConfig;
   }
 

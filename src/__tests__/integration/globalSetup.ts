@@ -10,6 +10,7 @@
 
 import * as path from 'node:path';
 import { AuthBrokerFactory } from '../../lib/auth/brokerFactory';
+import { applyClientTimeoutEnv } from './helpers/timeoutEnv';
 
 function loadTestConfig(): any {
   const configPaths = [
@@ -34,6 +35,11 @@ export default async function globalSetup(): Promise<void> {
   if (!config) {
     return;
   }
+
+  // Set here as well as in the helper: workers are forked after globalSetup and
+  // inherit this environment, so the budget is in place even for a code path
+  // that reaches the client before it loads the test config (#174).
+  applyClientTimeoutEnv(config);
 
   const destination =
     config?.auth_broker?.abap?.destination ||

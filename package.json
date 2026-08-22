@@ -40,7 +40,7 @@
     }
   },
   "scripts": {
-    "postinstall": "patch-package",
+    "postinstall": "node scripts/apply-saprouter-patch.js",
     "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
@@ -167,7 +167,7 @@
   "files": [
     "dist/",
     "bin/",
-    "patches/",
+    "scripts/apply-saprouter-patch.js",
     "docs/",
     "README.md",
     "LICENSE",

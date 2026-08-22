@@ -67,6 +67,19 @@ function renderEnvFile(env) {
 }
 
 /**
+ * One value from the extension settings form.
+ *
+ * A field the person left blank comes back either empty or as the literal
+ * ${user_config.<field>} — Claude Desktop does not always substitute optional
+ * fields. Treating that placeholder as a user name would write a profile that
+ * ListSystems then offers and that can never log in, so read it as blank.
+ */
+function setting(name) {
+  const value = process.env[name] || '';
+  return /^\$\{[^}]*\}$/.test(value.trim()) ? '' : value;
+}
+
+/**
  * Write one .env.<name> per system the person supplied credentials for.
  * Returns the names actually written.
  */
@@ -84,8 +97,8 @@ function writeProfiles(systems) {
 
   for (const [name, system] of Object.entries(systems)) {
     const key = system.credentialsKey;
-    const username = (process.env[`MCPB_${key}_USERNAME`] || '').trim();
-    const password = process.env[`MCPB_${key}_PASSWORD`] || '';
+    const username = setting(`MCPB_${key}_USERNAME`).trim();
+    const password = setting(`MCPB_${key}_PASSWORD`);
 
     if (!username || !password) {
       continue; // person does not use this system

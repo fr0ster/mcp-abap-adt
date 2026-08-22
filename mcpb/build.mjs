@@ -225,6 +225,38 @@ run(
   { cwd: STAGE, env: installEnv },
 );
 
+step('verifying the server itself made it into the bundle');
+
+// The core package publishes only what its "files" list matches, and dist/ is
+// built by its prepare script. If that build is skipped the install still
+// succeeds — it just packs a core with no dist/, and the bundle ships a server
+// that exits on the first message. Fail here instead, while the cause is still
+// on screen.
+{
+  const launcher = path.join(
+    STAGE,
+    'node_modules',
+    '@mcp-abap-adt',
+    'core',
+    'dist',
+    'server',
+    'launcher.js',
+  );
+
+  if (!fs.existsSync(launcher)) {
+    console.error(
+      [
+        `${launcher} is missing, so @mcp-abap-adt/core was installed without its`,
+        'compiled dist/. Its prepare script did not run the TypeScript build.',
+        'Check the "prepare" output in the install log above — npm runs scripts',
+        'through cmd.exe on Windows, where a script chained as "a || b && c"',
+        'silently skips c.',
+      ].join('\n'),
+    );
+    process.exit(1);
+  }
+}
+
 if (WITH_RFC) {
   step('verifying the bundle can actually do RFC');
 

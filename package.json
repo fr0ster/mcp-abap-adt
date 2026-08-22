@@ -92,7 +92,8 @@
     "docker:rebuild": "npm run docker:down && npm run docker:build && npm run docker:up",
     "docker:rebuild:package": "npm run docker:down:package && npm run docker:build:package && npm run docker:up:package",
     "docker:rebuild:headerless": "npm run docker:down:headerless && npm run docker:build:headerless && npm run docker:up:headerless",
-    "prepare": "husky || true && npm run build:fast"
+    "prepare:husky": "husky || exit 0",
+    "prepare": "npm run prepare:husky && npm run build:fast"
   },
   "keywords": [
     "abap",

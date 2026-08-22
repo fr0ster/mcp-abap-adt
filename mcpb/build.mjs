@@ -48,9 +48,16 @@ step('checking the SAP NW RFC SDK');
 const sdkHome = process.env.SAPNWRFC_HOME;
 if (!sdkHome || !fs.existsSync(sdkHome)) {
   console.error(
-    'SAPNWRFC_HOME is not set or does not exist.\n' +
-      'Point it at the unpacked nwrfcsdk directory, e.g.\n' +
-      '  set SAPNWRFC_HOME=C:\\sap\\nwrfcsdk',
+    sdkHome
+      ? `SAPNWRFC_HOME points at ${sdkHome}, which does not exist.`
+      : 'SAPNWRFC_HOME is not set.',
+  );
+  console.error('\nPoint it at the unpacked nwrfcsdk directory:');
+  console.error('  PowerShell:  $env:SAPNWRFC_HOME = "C:\\sap\\nwrfcsdk"');
+  console.error('  cmd.exe:     set SAPNWRFC_HOME=C:\\sap\\nwrfcsdk');
+  console.error(
+    '\nIn PowerShell `set` is an alias for Set-Variable and does NOT set an\n' +
+      'environment variable — use the $env: form above.',
   );
   process.exit(1);
 }
@@ -58,6 +65,22 @@ if (!sdkHome || !fs.existsSync(sdkHome)) {
 const sdkLib = path.join(sdkHome, 'lib');
 if (!fs.existsSync(sdkLib)) {
   console.error(`${sdkLib} not found — is SAPNWRFC_HOME pointing one level too high?`);
+  console.error('It should be the directory that contains lib/, bin/ and include/.');
+  process.exit(1);
+}
+
+// A Linux SDK in a win32 bundle produces a file that fails on every
+// consultant's machine, so catch the wrong download here rather than there.
+const expectedLib = { win32: 'sapnwrfc.dll', darwin: 'libsapnwrfc.dylib' }[process.platform] ?? 'libsapnwrfc.so';
+if (!fs.existsSync(path.join(sdkLib, expectedLib))) {
+  console.error(
+    `${expectedLib} is missing from ${sdkLib}.\n\n` +
+      `This looks like an SDK for a different operating system. The bundle is\n` +
+      `built for ${process.platform}, so you need the ${process.platform} download of the\n` +
+      `SAP NW RFC SDK — a Linux SDK (libsapnwrfc.so) cannot go into a Windows\n` +
+      `bundle. Get the matching one from the SAP Software Download Center.\n\n` +
+      `Found instead: ${fs.readdirSync(sdkLib).slice(0, 8).join(', ')}`,
+  );
   process.exit(1);
 }
 

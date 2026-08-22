@@ -102,6 +102,24 @@ something broken — it aborts if `sap-rfc-lite` was silently dropped (it is an
 `optionalDependency`, so npm discards it without erroring when the native build
 fails) or if the SAProuter fix did not get applied.
 
+### No Windows SDK? Build without RFC
+
+The Windows NW RFC SDK needs an S-user with software-download authorisation,
+which not everyone has. Build an HTTP-only bundle instead — no SDK, no C++
+toolchain, no native compile:
+
+```cmd
+npm run build:mcpb:http
+```
+
+or, from inside this directory, `node build.mjs --no-rfc`.
+
+Produces `mcpb/sap-abap-adt-http-only.mcpb` (a separate file name, so the two
+bundles never get mixed up). Every system reached over plain ADT/HTTP works
+exactly as it does in the full bundle. Systems whose `systems.json` profile
+sets `SAP_CONNECTION_TYPE=rfc` — currently `kalog` and `swi.sim` — cannot
+connect from it; the build prints that list before it starts.
+
 By default it installs from the GitHub fork. To build from a local checkout:
 
 ```cmd

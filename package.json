@@ -58,6 +58,7 @@
     "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "build:mcpb": "node mcpb/build.mjs",
+    "build:mcpb:http": "node mcpb/build.mjs --no-rfc",
     "check-todos": "node tools/check-todos.js",
     "start": "node ./bin/mcp-abap-adt.js",
     "start:http": "node ./bin/mcp-abap-adt.js --transport=http",

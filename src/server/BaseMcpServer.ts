@@ -4,8 +4,12 @@ import {
   createAbapConnection,
 } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import {
+  McpServer,
+  type RegisteredTool,
+} from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { notifyConnectionResetListeners } from '../lib/connectionEvents.js';
 import type {
   IHandlersRegistry,
   SapEnvironment,
@@ -13,6 +17,7 @@ import type {
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import { resolveSystemContext } from '../lib/systemContext.js';
+import { currentSapEnvironment } from '../lib/systems/activeSystem.js';
 import { registerAuthBroker } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
@@ -47,15 +52,47 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly systemType?: SapEnvironment;
 
+  /**
+   * When true, tools are registered regardless of `available_in` and toggled
+   * on/off as the active system changes (see applyToolAvailability). Required
+   * for runtime system switching, where a legacy and a cloud system expose
+   * different tool sets within one process.
+   */
+  protected readonly dynamicSystem: boolean;
+
+  /**
+   * Registered tools keyed by tool name, with their environment restriction.
+   * Used to enable/disable tools after a system switch.
+   */
+  private readonly registeredTools = new Map<
+    string,
+    { tool: RegisteredTool; availableIn?: readonly SapEnvironment[] }
+  >();
+
+  /** Coalesces the per-tool notifications the SDK emits on enable/disable. */
+  private suppressToolListChanged = false;
+  private deferredToolListChanged = false;
+
   constructor(options: {
     name: string;
     version?: string;
     logger?: Logger;
     systemType?: SapEnvironment;
+    dynamicSystem?: boolean;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
     this.systemType = options.systemType;
+    this.dynamicSystem = options.dynamicSystem ?? false;
+  }
+
+  /**
+   * SAP environment currently in effect for `available_in` filtering.
+   * An explicit per-instance systemType wins; otherwise the active system
+   * (which follows SwitchSystem) decides.
+   */
+  protected resolveEnvironment(): SapEnvironment {
+    return this.systemType ?? currentSapEnvironment();
   }
 
   /**
@@ -330,6 +367,88 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
+   * Drops the cached connection so the next request builds a fresh one.
+   *
+   * RFC connections hold a real SAP session and expose close(); HTTP ones do
+   * not. Listeners (system-context cache, ...) are notified either way.
+   */
+  protected async resetConnection(): Promise<void> {
+    const connection = this.cachedConnection;
+    this.cachedConnection = null;
+    this.connectionContext = null;
+
+    if (connection) {
+      const closable = connection as unknown as {
+        close?: () => Promise<void>;
+      };
+      if (typeof closable.close === 'function') {
+        try {
+          await closable.close();
+        } catch (error) {
+          this.logger.debug(
+            `[BaseMcpServer] Ignoring error while closing connection: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+        }
+      }
+    }
+
+    notifyConnectionResetListeners();
+  }
+
+  /**
+   * The SDK fires tools/list_changed on every single enable()/disable(). A
+   * system switch toggles a hundred-plus tools at once, so notifications are
+   * collected and sent as one (see applyToolAvailability).
+   */
+  override sendToolListChanged(): void {
+    if (this.suppressToolListChanged) {
+      this.deferredToolListChanged = true;
+      return;
+    }
+    super.sendToolListChanged();
+  }
+
+  /**
+   * Enable/disable registered tools to match the active SAP environment.
+   * Only meaningful in dynamicSystem mode, where all tools are registered
+   * upfront. Emits a single tools/list_changed when the set actually changed.
+   */
+  protected applyToolAvailability(): void {
+    if (!this.dynamicSystem) return;
+
+    const currentEnv = this.resolveEnvironment();
+    this.suppressToolListChanged = true;
+    try {
+      for (const [name, entry] of this.registeredTools) {
+        const allowed =
+          !entry.availableIn ||
+          entry.availableIn.length === 0 ||
+          entry.availableIn.includes(currentEnv);
+
+        if (allowed === entry.tool.enabled) continue;
+
+        if (allowed) {
+          entry.tool.enable();
+        } else {
+          entry.tool.disable();
+        }
+        this.logger.debug(
+          `[BaseMcpServer] Tool ${name} ${allowed ? 'enabled' : 'disabled'} for env ${currentEnv}`,
+        );
+      }
+    } finally {
+      this.suppressToolListChanged = false;
+    }
+
+    if (this.deferredToolListChanged) {
+      this.deferredToolListChanged = false;
+      super.sendToolListChanged();
+    }
+  }
+
+  /**
    * Registers handlers from registry
    * Wraps handlers to inject connection as first parameter
    *
@@ -354,7 +473,25 @@ export abstract class BaseMcpServer extends McpServer {
           ) => Promise<unknown>;
           type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
 
+          const availableIn = entry.toolDefinition.available_in;
+
           const wrappedHandler = async (args: unknown) => {
+            // Guard at call time as well as at registration: with runtime
+            // system switching the active environment can change after the
+            // client has cached the tool list.
+            if (availableIn && availableIn.length > 0) {
+              const currentEnv = this.resolveEnvironment();
+              if (!availableIn.includes(currentEnv)) {
+                const { ErrorCode, McpError } = await import(
+                  '@modelcontextprotocol/sdk/types.js'
+                );
+                throw new McpError(
+                  ErrorCode.InvalidRequest,
+                  `Tool ${entry.toolDefinition.name} is not available on the active SAP system (${currentEnv}). Supported: ${availableIn.join(', ')}.`,
+                );
+              }
+            }
+
             // Get connection from context (this.connectionContext)
             // Token will be automatically refreshed via AuthBroker if needed
             const context: HandlerContext = {
@@ -451,28 +588,26 @@ export abstract class BaseMcpServer extends McpServer {
               ? jsonSchemaToZod(entry.toolDefinition.inputSchema)
               : entry.toolDefinition.inputSchema;
 
-          // Skip tools not available in the current SAP environment
-          const availableIn = entry.toolDefinition.available_in;
-          if (availableIn && availableIn.length > 0) {
-            const resolvedType =
-              this.systemType ?? process.env.SAP_SYSTEM_TYPE?.toLowerCase();
-            const currentEnv: SapEnvironment =
-              resolvedType === 'legacy'
-                ? 'legacy'
-                : resolvedType === 'onprem'
-                  ? 'onprem'
-                  : 'cloud';
-            if (!availableIn.includes(currentEnv)) {
-              this.logger.debug(
-                `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${currentEnv}, source=${this.systemType ? 'option' : 'env'}, SAP_SYSTEM_TYPE=${process.env.SAP_SYSTEM_TYPE || '(not set)'}`,
-              );
-              continue;
-            }
+          // Skip tools not available in the current SAP environment.
+          // In dynamicSystem mode nothing is skipped — every tool is
+          // registered and then enabled/disabled by applyToolAvailability(),
+          // because the active system (and with it the allowed set) can change
+          // while the process is running.
+          if (
+            !this.dynamicSystem &&
+            availableIn &&
+            availableIn.length > 0 &&
+            !availableIn.includes(this.resolveEnvironment())
+          ) {
+            this.logger.debug(
+              `[BaseMcpServer] Skipping tool ${entry.toolDefinition.name}: available_in=${JSON.stringify(availableIn)}, currentEnv=${this.resolveEnvironment()}, source=${this.systemType ? 'option' : 'env'}, SAP_SYSTEM_TYPE=${process.env.SAP_SYSTEM_TYPE || '(not set)'}`,
+            );
+            continue;
           }
 
           // Register wrapped handler via SDK registerTool
           // Note: connection is NOT part of MCP tool signature
-          this.registerTool(
+          const registered = this.registerTool(
             entry.toolDefinition.name,
             {
               description: entry.toolDefinition.description,
@@ -480,6 +615,10 @@ export abstract class BaseMcpServer extends McpServer {
             },
             wrappedHandler,
           );
+          this.registeredTools.set(entry.toolDefinition.name, {
+            tool: registered,
+            availableIn,
+          });
         }
       }
     } else {

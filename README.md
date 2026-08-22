@@ -173,6 +173,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper
 - **🔑 Destination-Based Authentication**: Service key-based authentication with automatic token management (see [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication))
 - **💾 Freestyle SQL**: `GetSqlQuery` - Execute custom SQL queries via ADT Data Preview API
+- **🔀 Runtime System Switching**: `ListSystems`, `SwitchSystem` - Point the running server at another SAP system without restarting the MCP client (see [Switching SAP Systems at Runtime](#switching-sap-systems-at-runtime))
 
 > ℹ️ **ABAP Cloud limitation**: Direct ADT data preview of database tables is blocked by SAP BTP backend policies. The server returns a descriptive error when attempting such operations. On-premise systems continue to support data preview.
 
@@ -353,6 +354,46 @@ This will automatically create/update `.env` file with JWT tokens and connection
 Inline comments are not parsed, so keep comments on separate lines.
 
 **Claude recommendation:** place the service key in the service-keys directory and use `--mcp=<destination>` (avoid manual JWT tokens).
+
+### Switching SAP Systems at Runtime
+
+Working across several systems no longer means editing `.env` and restarting the
+MCP client. Keep one `.env` file per system and switch with a tool call:
+
+```
+.env            → system "default"
+.env.kalog      → system "kalog"
+.env.swi.sim    → system "swi.sim"
+kalog.env       → system "kalog"   (sessions folder convention)
+```
+
+Two tools do the work:
+
+- **`ListSystems`** — every discovered profile with its URL, client, system type
+  (`cloud`/`onprem`/`legacy`), connection type (`http`/`rfc`) and master system.
+  Credentials are never returned.
+- **`SwitchSystem`** — takes a name from `ListSystems` (or a path to a `.env`
+  file), closes the current connection, loads the new profile, reconnects and
+  verifies it. If the new system is unreachable, the previous one is restored.
+
+```
+> switch to kalog and read table ZKAI_LOG
+```
+
+Profiles are looked up in the directory of the launch `.env`, the current
+working directory, and the standard sessions folder. Set `MCP_SYSTEMS_PATH`
+(colon/semicolon separated) to search additional directories.
+
+Notes:
+
+- **stdio only.** HTTP/SSE serve multiple clients from one process, where a
+  process-wide system switch would leak across sessions; use the
+  `x-sap-*` headers or `--mcp=<destination>` there instead.
+- Requires a `.env`-based launch (`--env-path` / `--env` / cwd `.env`).
+  `--mcp=<destination>` stays on its single destination.
+- **The tool list changes with the system.** Tools restricted via `available_in`
+  (e.g. `GetSqlQuery` is not available on legacy systems) are disabled on
+  switch, and the server emits `tools/list_changed`.
 
 ### Command-Line Options
 

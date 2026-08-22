@@ -111,6 +111,9 @@ ENVIRONMENT VARIABLES:
     MCP_SSE_HOST                   SSE server host (default: 127.0.0.1)
     MCP_SSE_PORT                   SSE server port (default: 3001)
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
+    MCP_SYSTEMS_PATH               Extra directories scanned for .env connection
+                                   profiles by ListSystems/SwitchSystem
+                                   (colon/semicolon separated)
     MCP_UNSAFE                     Disable connection validation (true|false)
     MCP_USE_AUTH_BROKER            Force auth-broker usage (true|false)
     MCP_BROWSER                    Browser for OAuth2 flow (e.g., chrome, firefox)
@@ -165,6 +168,12 @@ SAP CONNECTION (.env file):
                                    create/update — ensures correct transport request binding.
                                    Cloud systems resolve this automatically via API.
     SAP_RESPONSIBLE                Responsible user (optional, falls back to SAP_USERNAME)
+
+  Runtime System Switching (stdio + .env only):
+    ListSystems / SwitchSystem tools point the running server at another .env
+    connection profile without restarting the client. Profiles are discovered in
+    the launch .env directory, the current directory, the sessions folder, and
+    MCP_SYSTEMS_PATH. Not available with --mcp=<destination> or on HTTP/SSE.
 
   HTTP/SSE Headers (System Context):
     x-sap-master-system              Per-request SAP system ID (overrides SAP_MASTER_SYSTEM)
@@ -362,6 +371,15 @@ async function main() {
 
     const server = new StdioServer(handlersRegistry, broker!, {
       logger: loggerForTransport,
+      // Runtime system switching: only with a real .env-backed broker.
+      // --mcp destinations and inspection-only mode keep the single system.
+      ...(configuredBroker && config.envFile && !config.mcpDestination
+        ? {
+            authBrokerFactory,
+            envFilePath: config.envFile,
+            authBrokerPath: config.authBrokerPath,
+          }
+        : {}),
     });
     activeServer = server;
     await server.start(brokerKey);

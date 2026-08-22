@@ -95,3 +95,7 @@ desktop.ini
 .claude/settings.local.json
 .codex
 .worktrees/
+
+# Claude Desktop bundle build output
+mcpb/build/
+mcpb/*.mcpb

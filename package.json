@@ -111,7 +111,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+    "url": "git+https://github.com/anggakharisma/mcp-abap-adt.git"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",

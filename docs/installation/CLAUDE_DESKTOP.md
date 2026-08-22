@@ -97,6 +97,12 @@ Update it in the extension settings too — see the section above.
 Ask it directly: *"Use the SAP tools to check this."* If the extension is off,
 you will see it greyed out in Settings → Extensions.
 
+**ABL works but kalog or swi says it cannot connect**
+Those two use a different connection method that needs a Windows component
+called the *Visual C++ 2013 Redistributable (x64)*. Most machines already have
+it. If yours does not, ask IT to install it — you cannot fix this one from the
+extension settings.
+
 **Everything worked yesterday and stopped today**
 Restart Claude Desktop first. If it still fails, your SAP user may be locked
 after too many wrong password attempts — check with SAP GUI.

@@ -52,6 +52,26 @@ winget install Python.Python.3.12
 Open a **new** terminal afterwards so `PATH` picks them up. Consultants do not
 need any of this — only whoever builds the bundle does.
 
+You also need the **Windows** SAP NW RFC SDK, which is a different download
+from the Linux one. See [SAP Note 2573790](https://launchpad.support.sap.com/#/notes/2573790)
+for the current location, or navigate the Software Download Center:
+
+```
+Support Packages and Patches -> By Category -> SAP CONNECTORS
+  -> SAP NW RFC SDK -> SAP NW RFC SDK 7.50 -> WINDOWS ON X64 64BIT
+```
+
+`SAPNWRFC_HOME` points at the unpacked folder containing `lib/`, `bin/` and
+`include/`.
+
+### What consultant machines need
+
+Almost nothing — but not quite nothing. The SDK 7.50 Windows binaries link
+against the **64-bit Visual C++ 2013 Redistributable**. The bundle carries
+`sapnwrfc.dll`, not that runtime, so a machine without it fails to load RFC
+while HTTP systems keep working. Check whether your laptop image already has
+it; if not, have IT deploy it alongside the bundle.
+
 **Build on Windows.** The bundle embeds the compiled `sap-rfc-lite` binary and
 the NW RFC SDK libraries — both platform-specific, and `manifest.json` declares
 `win32`. Building on Linux or macOS produces a bundle that fails on the

@@ -43,10 +43,25 @@ the NW RFC SDK libraries — both platform-specific, and `manifest.json` declare
 `win32`. Building on Linux or macOS produces a bundle that fails on the
 consultant's machine.
 
+From the **repository root**:
+
 ```cmd
 set SAPNWRFC_HOME=C:\sap\nwrfcsdk
-node mcpb\build.mjs
+npm run build:mcpb
 ```
+
+Or from **inside this `mcpb` directory**:
+
+```cmd
+set SAPNWRFC_HOME=C:\sap\nwrfcsdk
+node build.mjs
+```
+
+(`node mcpb\build.mjs` only works from the repository root — from in here it
+looks for `mcpb\mcpb\build.mjs`.)
+
+In PowerShell, set the variable with `$env:SAPNWRFC_HOME = "C:\sap\nwrfcsdk"`
+instead of `set`.
 
 Produces `mcpb/sap-abap-adt.mcpb`. The script fails loudly rather than shipping
 something broken — it aborts if `sap-rfc-lite` was silently dropped (it is an

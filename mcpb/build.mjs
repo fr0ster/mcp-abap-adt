@@ -7,7 +7,8 @@
  * platform-specific. manifest.json declares win32, so build it on Windows.
  *
  *   set SAPNWRFC_HOME=C:\path\to\nwrfcsdk
- *   node mcpb\build.mjs
+ *   npm run build:mcpb          (from the repository root)
+ *   node build.mjs              (from inside mcpb/)
  *
  * Output: mcpb/sap-abap-adt.mcpb — hand that single file to a consultant.
  */
@@ -26,11 +27,14 @@ const SOURCE =
 
 function run(command, args, options = {}) {
   console.log(`> ${command} ${args.join(' ')}`);
-  execFileSync(command, args, {
-    stdio: 'inherit',
-    shell: process.platform === 'win32',
-    ...options,
-  });
+  // npm/npx are .cmd shims on Windows, so they need a shell — but a shell does
+  // no quoting for us, and paths like C:\Users\First Last\... would split.
+  const shell = process.platform === 'win32';
+  const finalArgs = shell
+    ? args.map((arg) => (/\s/.test(arg) ? `"${arg}"` : arg))
+    : args;
+
+  execFileSync(command, finalArgs, { stdio: 'inherit', shell, ...options });
 }
 
 function step(message) {

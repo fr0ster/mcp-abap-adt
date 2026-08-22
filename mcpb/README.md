@@ -38,6 +38,20 @@ Step 6 matters: the package's `exports` map does not publish
 
 ## Building
 
+### Prerequisites on the build machine
+
+`sap-rfc-lite` publishes no prebuilt binaries, so it is compiled from source at
+install time. The build machine needs a C++ toolchain — this is the single most
+common reason a build fails:
+
+```powershell
+winget install Microsoft.VisualStudio.2022.BuildTools   # "Desktop development with C++"
+winget install Python.Python.3.12
+```
+
+Open a **new** terminal afterwards so `PATH` picks them up. Consultants do not
+need any of this — only whoever builds the bundle does.
+
 **Build on Windows.** The bundle embeds the compiled `sap-rfc-lite` binary and
 the NW RFC SDK libraries — both platform-specific, and `manifest.json` declares
 `win32`. Building on Linux or macOS produces a bundle that fails on the

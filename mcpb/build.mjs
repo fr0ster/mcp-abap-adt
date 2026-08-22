@@ -116,13 +116,18 @@ step('installing the server and its dependencies');
 
 // The install compiles sap-rfc-lite against the SDK and runs the SAProuter
 // postinstall, so SAPNWRFC_HOME must be visible to it.
-run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund'], {
+const installEnv = {
+  ...process.env,
+  SAPNWRFC_HOME: sdkHome,
+  LD_LIBRARY_PATH: `${sdkLib}${path.delimiter}${process.env.LD_LIBRARY_PATH || ''}`,
+  PATH: `${sdkLib}${path.delimiter}${process.env.PATH || ''}`,
+};
+
+// --foreground-scripts so the native build's output is visible; without it a
+// failed compile scrolls past as a single npm warning.
+run('npm', ['install', '--omit=dev', '--no-audit', '--no-fund', '--foreground-scripts'], {
   cwd: STAGE,
-  env: {
-    ...process.env,
-    SAPNWRFC_HOME: sdkHome,
-    LD_LIBRARY_PATH: `${sdkLib}${path.delimiter}${process.env.LD_LIBRARY_PATH || ''}`,
-  },
+  env: installEnv,
 });
 
 step('verifying the bundle can actually do RFC');
@@ -130,12 +135,50 @@ step('verifying the bundle can actually do RFC');
 const rfcLite = path.join(STAGE, 'node_modules', '@mcp-abap-adt', 'sap-rfc-lite');
 if (!fs.existsSync(rfcLite)) {
   console.error(
-    'sap-rfc-lite is missing from the bundle. It is an optionalDependency, so\n' +
-      'npm dropped it silently when the native build failed. RFC systems would\n' +
-      'not work. Check that SAPNWRFC_HOME points at a matching SDK for this\n' +
-      'platform and architecture, then rebuild.',
+    '\nsap-rfc-lite is missing — it is an optionalDependency, so npm dropped it\n' +
+      'silently when its native build failed. Reinstalling it directly to show\n' +
+      'the real error:\n',
   );
-  process.exit(1);
+
+  // Not optional when named explicitly, so this fails loudly with the cause.
+  try {
+    run(
+      'npm',
+      [
+        'install',
+        '@mcp-abap-adt/sap-rfc-lite',
+        '--no-save',
+        '--no-audit',
+        '--no-fund',
+        '--foreground-scripts',
+      ],
+      { cwd: STAGE, env: installEnv },
+    );
+  } catch {
+    // the output above is the point
+  }
+
+  if (!fs.existsSync(rfcLite)) {
+    console.error(
+      '\n' +
+        'sap-rfc-lite ships no prebuilt binaries, so it is compiled from source\n' +
+        'on install. That needs a C++ toolchain:\n' +
+        '\n' +
+        '  Windows:  Visual Studio Build Tools with the "Desktop development\n' +
+        '            with C++" workload, plus Python 3.\n' +
+        '            winget install Microsoft.VisualStudio.2022.BuildTools\n' +
+        '            winget install Python.Python.3.12\n' +
+        '            Then open a NEW terminal so PATH picks them up.\n' +
+        '  macOS:    xcode-select --install\n' +
+        '  Linux:    build-essential and python3\n' +
+        '\n' +
+        'The compiler also needs the SDK headers, which is why SAPNWRFC_HOME\n' +
+        `must point at a ${process.platform} SDK — currently ${sdkHome}\n`,
+    );
+    process.exit(1);
+  }
+
+  console.log('\nsap-rfc-lite built on the retry — continuing.');
 }
 
 const rfcConnection = path.join(

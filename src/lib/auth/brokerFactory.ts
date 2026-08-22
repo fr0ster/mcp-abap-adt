@@ -623,6 +623,33 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   }
 
   /**
+   * Create (or re-create) a broker that reads its connection profile from an
+   * arbitrary .env file. Used by runtime system switching.
+   *
+   * The broker is always rebuilt so edits to the .env file are picked up, and
+   * so a stale in-memory session from a previous switch cannot survive.
+   */
+  async createEnvFileBroker(
+    brokerKey: string,
+    envFilePath: string,
+  ): Promise<AuthBroker> {
+    this.authBrokers.delete(brokerKey);
+    await this.createBrokerWithEnvFileStore(
+      brokerKey,
+      envFilePath,
+      this.config.logger,
+    );
+
+    const broker = this.authBrokers.get(brokerKey);
+    if (!broker) {
+      throw new Error(
+        `Failed to create auth broker for .env file: ${envFilePath}`,
+      );
+    }
+    return broker;
+  }
+
+  /**
    * Create broker using EnvFileSessionStore directly
    * Used for --env=path option (Variant 2)
    *

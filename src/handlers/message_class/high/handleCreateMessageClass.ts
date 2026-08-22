@@ -9,8 +9,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  ErrorCode,
-  McpError,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -68,13 +66,10 @@ export async function handleCreateMessageClass(
   const { connection, logger } = context;
   try {
     if (!args?.message_class_name) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'message_class_name is required',
-      );
+      return return_error('message_class_name is required');
     }
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'package_name is required');
+      return return_error('package_name is required');
     }
 
     // Transport required for transportable (non-$TMP/non-local) packages
@@ -116,8 +111,7 @@ export async function handleCreateMessageClass(
         error.message?.includes('already exists') ||
         error.response?.data?.includes?.('ExceptionResourceAlreadyExists')
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `Message class ${name} already exists. Delete it first or use a different name.`,
         );
       }
@@ -128,15 +122,11 @@ export async function handleCreateMessageClass(
           : String(error.response.data).substring(0, 500)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to create message class ${name}: ${errorMessage}`,
       );
     }
   } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

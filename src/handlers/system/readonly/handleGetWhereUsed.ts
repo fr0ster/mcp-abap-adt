@@ -7,7 +7,7 @@
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetWhereUsed',
@@ -70,11 +70,11 @@ export async function handleGetWhereUsed(
   try {
     // Validate required parameters
     if (!args?.object_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Object name is required');
+      return return_error('Object name is required');
     }
 
     if (!args?.object_type) {
-      throw new McpError(ErrorCode.InvalidParams, 'Object type is required');
+      return return_error('Object type is required');
     }
 
     const typedArgs = args as WhereUsedArgs;
@@ -109,8 +109,7 @@ export async function handleGetWhereUsed(
         (t) => !available.has(t),
       );
       if (unknown.length > 0) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `enable_only_types contains object type(s) not searchable in the where-used scope of ${typedArgs.object_type}/${typedArgs.object_name}: ${unknown.join(', ')}. ` +
             `Supported types for this object: ${[...available].sort().join(', ')}.`,
         );
@@ -162,14 +161,6 @@ export async function handleGetWhereUsed(
     return mcpResult;
   } catch (error) {
     logger?.error('Failed to resolve where-used references', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

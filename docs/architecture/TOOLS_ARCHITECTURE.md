@@ -248,7 +248,14 @@ this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
    } as const;
 
    export async function handleYourTool(args: any) {
-     // Handler implementation
+     try {
+       // Handler implementation — return a success result here.
+     } catch (error) {
+       // Signal failure by RETURNING the error, never by throwing McpError.
+       // return_error yields { isError: true, content } with a bare message.
+       // See docs/development/ASSISTANT_GUIDELINES.md → "Tool error contract".
+       return return_error(error);
+     }
    }
    ```
 

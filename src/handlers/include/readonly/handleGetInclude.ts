@@ -1,10 +1,9 @@
 import * as z from 'zod';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  ErrorCode,
   encodeSapObjectName,
-  McpError,
   makeAdtRequestWithTimeout,
+  return_error,
 } from '../../../lib/utils';
 
 // TODO: Migrate to infrastructure module
@@ -26,7 +25,7 @@ export async function handleGetInclude(context: HandlerContext, args: any) {
   const { connection, logger } = context;
   try {
     if (!args?.include_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Include name is required');
+      return return_error('Include name is required');
     }
     const url = `/sap/bc/adt/programs/includes/${encodeSapObjectName(args.include_name)}/source/main`;
     logger?.info(`Fetching include: ${args.include_name}`);

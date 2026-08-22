@@ -2,12 +2,19 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  ErrorCode,
   encodeSapObjectName,
   logger,
-  McpError,
   makeAdtRequestWithTimeout,
+  return_error,
 } from '../../../lib/utils';
+
+/**
+ * Raised deliberately by the enhancement helpers. Distinguishes "I decided this
+ * input is unusable" from "something unexpected failed", which the helpers'
+ * catch blocks need in order to avoid double-wrapping a message.
+ */
+class EnhancementInputError extends Error {}
+
 export const TOOL_DEFINITION = {
   name: 'GetEnhancements',
   available_in: ['onprem', 'cloud'] as const,
@@ -250,8 +257,7 @@ async function determineObjectTypeAndPath(
             `Found auto-determined context for include ${objectName}: ${context}`,
           );
         } else {
-          throw new McpError(
-            ErrorCode.InvalidParams,
+          throw new EnhancementInputError(
             `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`,
           );
         }
@@ -264,17 +270,15 @@ async function determineObjectTypeAndPath(
       };
     }
 
-    throw new McpError(
-      ErrorCode.InvalidParams,
+    throw new EnhancementInputError(
       `Could not determine object type for: ${objectName}. Object is neither a valid class, program, nor include.`,
     );
   } catch (error) {
-    if (error instanceof McpError) {
+    if (error instanceof EnhancementInputError) {
       throw error;
     }
     logger?.error(`Failed to determine object type for ${objectName}:`, error);
-    throw new McpError(
-      ErrorCode.InvalidParams,
+    throw new EnhancementInputError(
       `Failed to determine object type for: ${objectName}. ${error instanceof Error ? error.message : String(error)}`,
     );
   }
@@ -533,8 +537,7 @@ async function getEnhancementsForSingleObject(
 
     return enhancementResponse;
   } else {
-    throw new McpError(
-      ErrorCode.InternalError,
+    throw new EnhancementInputError(
       `Failed to retrieve enhancements for ${objectName}. Status: ${response.status}`,
     );
   }
@@ -618,7 +621,7 @@ export async function handleGetEnhancements(
     logger?.info('handleGetEnhancements called with args:', args);
 
     if (!args?.object_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Object name is required');
+      return return_error('Object name is required');
     }
 
     const objectName = args.object_name;
@@ -802,16 +805,7 @@ export async function handleGetEnhancements(
     };
     return result;
   } catch (error) {
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }
 

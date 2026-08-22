@@ -117,6 +117,30 @@ This project has specific rules in `.clinerules/` directory:
 - **User-facing errors**: Can be translated based on user's language preference
 - **Technical errors**: Always in English for debugging
 
+### Tool error contract (#155)
+
+A tool that fails **returns** its error; it never throws one.
+
+- **Signal failure by returning `return_error(err)`** (from `lib/utils`), which yields
+  `{ isError: true, content: [{ type: 'text', text }] }`. Pass the caught error (or a
+  plain message string) — `return_error` extracts the message and, for an `AxiosError`,
+  the ADT response body. Do not hand-build the result, and do not prepend `Error: `,
+  `ADT error: `, or any `MCP error -N: ` text — the client must receive the bare message.
+- **Never `throw new McpError(...)` from a handler.** The registration layer catches a
+  thrown error and routes it through `return_error`, but a thrown `McpError` carries a
+  `MCP error -N: ` prefix in its own `.message`. A static test,
+  `src/__tests__/unit/noMcpErrorInSrc.test.ts`, forbids the `McpError` identifier
+  anywhere in `src/` (imports and uses alike) except one compatibility re-export in
+  `lib/utils.ts` — so `throw new McpError`, or importing it, fails `npm test` (and CI).
+- **Helpers throw a plain `Error`, they do not return a tool result.** When a function's
+  return value is spread into a success payload (e.g. `{ success: true, ...data }`),
+  returning `return_error(...)` there would emit an error *as* a success. Such helpers
+  `throw new Error(msg)` (or a file-local `Error` subclass); the enclosing handler's
+  `catch` routes it through `return_error`.
+- **The one prefix kept by design** is the SDK's own argument-validation message
+  (`MCP error -32602: Input validation error: …`). The SDK raises it before handler code
+  runs, so it never reaches `return_error`; that code is correct and is left as-is.
+
 ## Code Review Checklist
 
 When reviewing code or documentation:

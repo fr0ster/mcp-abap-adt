@@ -214,7 +214,7 @@ shared_dependencies:
           key client : abap.clnt not null;
           key id     : abap.char(10) not null;
           name       : abap.char(50);
-          value      : abap.dec(10,2);
+          value      : abap.char(10);
           created_at : abap.dats;
         }
 

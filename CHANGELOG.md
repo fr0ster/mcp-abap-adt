@@ -1,6 +1,84 @@
 # Changelog
 
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
+
+### Fixed
+- **`ListTransports` no longer reports an empty list while the user owns transport requests.** The tool returned `{"success": true, "count": 0, "transports": []}` for every input — any user, any `modifiable_only` — on a system where the queried user owned 55 modifiable requests, while `GetSqlQuery` against `E070` and `GetTransport` on the same connection both returned the data. The endpoint negotiates `application/vnd.sap.adt.transportorganizertree.v1+xml`, a *tree*: requests sit under status containers one level below the category (`tm:root > tm:workbench > tm:modifiable > tm:request`), `tm:workbench` repeats once per transport target, and there is a parallel `tm:customizing` branch. The parser looked for `tm:request` only directly under the root or directly under `tm:workbench`, so every lookup missed and the list came back empty — silently, with `success: true`. Requests are now collected from anywhere in the tree (the flatter shapes keep working), deduplicated by request number, and a request with no `tm:status` inherits the status of its container. `modifiable_only` is additionally enforced client-side, because the tree carries released requests too and it is not established that the endpoint honours the `status` query parameter. Unit-tested against a reconstructed tree payload; `scripts/probe-transport-list.ts` dumps the raw payload from a real system so the fixture can be replaced with a capture. ([#168](https://github.com/fr0ster/mcp-abap-adt/issues/168))
+
+### Added
+- **Diagnostic script `scripts/probe-transport-list.ts`** — dumps the raw `/sap/bc/adt/cts/transportrequests` payload for a given user and env file, so the transport-list parser can be checked against the shape a system actually returns.
+
+## [8.13.0] - 2026-07-24
+
+### Fixed
+- **Tool failures now reach the client as a plain message, with no service prefixes.** Previously a failed tool call arrived prefixed with `MCP error -32603: ` — and in the worst case double-wrapped as `MCP error -32603: ADT error: McpError: MCP error -32602: …`, with the truthful `-32602` (invalid arguments) overwritten by a generic `-32603`. Multi-item `content` was also collapsed into a single string on the error path. Root causes removed across five layers: `return_error` no longer prepends `Error: `; `BaseMcpServer` and `BaseHandlerGroup` return the `{ isError: true, content }` result instead of throwing `McpError` (which the SDK re-prefixes); 87 handler-level `throw new McpError` and `ADT error:` sites were routed through `return_error` (74 + 13); and the `McpError` symbol is now barred from `src/` except a single backward-compatibility re-export in `lib/utils.ts`, enforced by a static AST test that forbids every import and use of it elsewhere. Helper functions that feed a success payload keep throwing (a local `Error` type) so an error can never surface as `{ success: true }`. A custom/external handler group that throws the SDK's `McpError` is also handled: `return_error` strips the `MCP error -N: ` prefix at the boundary. Argument-validation errors keep their `MCP error -32602: ` prefix by design — the SDK raises those before our code runs, that code is correct, and they never reach `return_error`. Verified end to end against a live trial system. ([#155](https://github.com/fr0ster/mcp-abap-adt/issues/155))
+
+## [8.12.1] - 2026-07-22
+
+### Security
+- **Cleared the two remaining moderate `@hono/node-server` advisories (GHSA-frvp-7c67-39w9) via an npm `override`.** `@hono/node-server` is a transitive dependency of `@modelcontextprotocol/sdk` (pulled in by the Streamable HTTP transport); even the latest SDK (1.29.0) still pins `^1.19.9`, so there is no in-range fix and `npm audit fix --force` would *downgrade* the SDK to 1.24.3. Pinning `@hono/node-server` to `^2.0.5` via `overrides` resolves 2.0.11 and takes `npm audit` to **0 vulnerabilities**. Safe because the SDK's `streamableHttp` uses only `getRequestListener` from the package (verified present and unchanged in 2.0.11); the vulnerable `serve-static` sub-path is never imported. This deliberately reintroduces a single override (all overrides were removed in #141) — justified here because in-range resolution is impossible until the MCP SDK bumps its own hono dependency. Build, `test:check`, and the SAP-free server/transport unit tests pass unchanged.
+
+## [8.12.0] - 2026-07-22
+
+### Removed
+- **Version-history tools are no longer advertised for non-versioned object types.** `function_group`, `domain`, `data_element` and `package` were exposed by the version tools but their adt-clients handlers' `getVersions`/`getVersionSource` have always thrown "not supported" — the calls were dead on arrival. Removed from:
+  - the `object_type` enum of the generic `GetObjectVersions` / `GetObjectVersionSource` / `GetObjectVersionDiff` (they now accept only the 9 genuinely versioned types: class, program, interface, function_module, table, structure, ddl, behavior_definition, metadata_extension);
+  - the per-type high-level surface — the 12 tools `Get{FunctionGroup,Domain,DataElement,Package}{Versions,VersionSource,VersionDiff}` are gone (39 → 27 per-type version tools, total tool count 365 → 353).
+
+  Those object types remain fully supported by `LockObject` and every other tool — they are lockable, just not versioned. This surfaced from the adt-clients 8.0.0 migration below: the honest capability types turned an always-failing runtime call into a compile error. **Breaking to the tool surface** (removed enum values + removed tools) — a client that requested version history for these types received a runtime error before and now gets a schema/`Unsupported object_type` error instead.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^8.0.0` and `@mcp-abap-adt/interfaces@^11.3.0`** (from `^7.6.0` / `^11.2.0`). adt-clients 8.0.0 is a breaking major that narrows every `AdtClient.getXxx()` return type from the fat `IAdtObject` to the honest capability composite each handler actually implements (`IAdtSourceObject`, `IAdtNonVersionedObject`, or an inline intersection); interfaces 11.3.0 adds those composites. Calling a capability a handler does not implement is now a compile error instead of a silent runtime throw — which is exactly what caught the version-tools defect above. Our direct interfaces range is bumped to `^11.3.0` to keep a single top-level interfaces version aligned with the client and re-export the current type surface.
+
+### Security
+- **Cleared two high-severity production advisories (#164).** `fast-xml-parser` 5.9.3–5.10.0 → 5.10.1 (GHSA-8r6m-32jq-jx6q, DOCTYPE entity-expansion reset) and `fast-uri` 3.0.0–3.1.3 → 3.1.4 (GHSA-v2hh-gcrm-f6hx, host confusion via backslash authority delimiter; transitive via `@modelcontextprotocol/sdk` → ajv), via `npm audit fix` (lockfile only, no `package.json` dependency edits). The CI `Security audit (production deps, high+)` gate now passes. Two remaining moderate `@hono/node-server` advisories require a breaking MCP SDK major and are tracked separately.
+
+## [8.11.0] - 2026-07-22
+
+### Fixed
+- **Read handlers no longer mask a failed read as `success:true` + null (#159).** 17 readonly handlers (`ReadDomain`, `ReadClass`, `ReadInterface`, `ReadProgram`, `ReadTable`, `ReadStructure`, `ReadDdl`, `ReadDataElement`, `ReadFunctionGroup`, `ReadFunctionModule`, `ReadFunctionInclude`, `ReadPackage`, `ReadServiceDefinition`, `ReadServiceBinding`, `ReadMetadataExtension`, `ReadBehaviorDefinition`, `ReadBehaviorImplementation`) wrapped their `read`/`readMetadata` calls in inner `try/catch` blocks that only logged a `warn` and swallowed the error, then returned `success:true` with `source_code:null`/`metadata:null` regardless. A hard failure — expired token, network error, HTTP 5xx — or a genuinely non-existent object was thus delivered to the caller as a successful (but empty) read. The inner swallows are removed; read errors now propagate to the existing outer `catch → return_error`, so a failed read returns a structured failure (tool result `isError:true`). This is the READ-path sibling of the activation/deletion masking fixes. `GetStructuresList` was not affected — it already surfaces a root read failure via `return_error` and flags partial append issues explicitly.
+
+## [8.10.0] - 2026-07-21
+
+### Fixed
+- **Locked/failed activations no longer report a false `success:true`.** Migrated to `@mcp-abap-adt/adt-clients@^7.6.0`, which fixes the activation-masking bug (adt-clients #79): ADT's `/sap/bc/adt/activation` returns HTTP 200 even when activation fails (object locked in another session, syntax errors), and the shared `activateObjectInSession` helper previously returned that response unchecked. Every high-level `Update*`/`Activate*` tool built on it (`UpdateDomain`, and the whole family across domain, program, table, structure, class, interface, ddl, tabletype, functionModule, functionInclude, metadataExtension, behaviorDefinition, enhancement, unitTest) therefore returned `{"success":true,"...":"updated and activated successfully"}` on a locked object. With 7.6.0 the client now throws on an explicit activation-failure signal; the handler's catch maps it to a structured `McpError` (tool result `isError:true`), so consumers can finally tell the operation failed. Fixes #154.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.6.0` and `@mcp-abap-adt/interfaces@^11.2.0`** (from `^7.4.4` / `^10.0.0`). adt-clients 7.6.0 sources its public types from interfaces `^11.2.0`; bumping our direct interfaces range keeps a single top-level interfaces version aligned with the client. No handler API change.
+
+## [8.9.0] - 2026-07-17
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.4` and `@mcp-abap-adt/interfaces@^10.0.0`** (from `^7.4.2` / `^9.2.0`). interfaces 10.0.0 is a major bump whose only breaking change is removing the no-op `source_code` field from the low-level create-params (`ICreateAccessControl/ServiceDefinition/EnhancementParams`) — source is written via the update flow. This does **not** affect us: our handlers use the high-level config types (`IServiceDefinitionConfig.sourceCode`, unchanged), not the low-level create-params. adt-clients 7.4.3 dropped the matching dead create() pass-through.
+- **`CreateServiceDefinition`:** removed the now-dead `sourceCode` from the `create()` config (create makes the shell only; the body is still written by the follow-up `update()` from 8.7.1). No behavior change.
+
+## [8.8.1] - 2026-07-16
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.2`** (from `^7.4.0`). Two correctness fixes to `update()`'s read-back: the post-update readiness poll and the final returned read now target the **inactive** version — the one the write just produced — instead of `'active'` (which 404s for a never-activated object and returns stale content for an existing one). So reading back the result of an `update()` (including the `CreateServiceDefinition` `create → update → activate` flow) now returns the freshly written source. `@mcp-abap-adt/interfaces` stays `^9.2.0`. Non-breaking; no tool contract changed.
+
+## [8.8.0] - 2026-07-16
+
+### Changed
+- **Migrated to `@mcp-abap-adt/adt-clients@^7.4.0`** (from `^7.3.1`). 7.4.0 adds a session-scoped lock registry with an `unlockAll()` safety net, which complements the uninterruptible critical sections from 8.7.0 by making orphaned locks recoverable. `@mcp-abap-adt/interfaces` stays `^9.2.0`. Non-breaking; no tool contract changed.
+
+## [8.7.1] - 2026-07-16
+
+### Fixed
+- **`CreateServiceDefinition` created the object with an empty body.** The service-definition `create()` POST only registers the shell (metadata: name/description/package) — it does **not** persist the `define service … { … }` source, and the handler had no follow-up write step (a regression in the underlying `@mcp-abap-adt/adt-clients` create flow, which used to run create → lock → update → unlock). The handler now runs an explicit high-level `update()` (lock → write source → unlock) right after create whenever `source_code` is provided, then activates — so the service definition is created with its real body. (Root cause is in adt-clients' `AdtServiceDefinition.create()`; this handler-side fix restores correct behavior immediately.)
+
+## [8.7.0] - 2026-07-16
+
+### Fixed
+- **Timeouts no longer leave objects locked and inactive.** A mutating tool (Create/Update/Delete) runs a stateful lock → modify → unlock chain as several separate ADT requests. On a slow system a short per-request timeout would abort one of them mid-flight; aborting the socket drops the stateful ADT session and orphans the lock handle, so the follow-up unlock has nothing to release — the object was left **locked and inactive** (whereas a normal error keeps the session alive, so unlock worked). Every high-level Create/Update/Delete handler (70 tools) is now wrapped in an **uninterruptible critical section**: `beginCriticalSection()` before it runs and `endCriticalSection()` in a `finally`, via `@mcp-abap-adt/connection` 1.10.0. While active, the connection raises the request timeout to a large ceiling (`SAP_TIMEOUT_CRITICAL`, default 600000 ms) so slow write requests run to completion instead of being interrupted. Feature-detected, so it degrades to a no-op on older connections.
+
+### Changed
+- **Migrated to `@mcp-abap-adt/connection@^1.10.0`** (from `^1.9.1`), which adds the reference-counted `beginCriticalSection()` / `endCriticalSection()` primitives used above. Non-breaking.
 
 ## [8.6.1] - 2026-07-05
 
@@ -2186,7 +2264,9 @@ _Documentation for this tag is intentionally minimal; see the Git tag `v1.1.8` f
   - Mirrors `dev-http.js` functionality for consistent development experience
   - Updated `npm run dev:sse` to use new development script
 
-## [Unreleased]
+## Legacy history (pre-fork upstream: mario-andreschak/mcp-abap-adt)
+
+> The entries below predate this fork's version renumbering and were never assigned release numbers under `fr0ster/mcp-abap-adt`. They are retained verbatim for provenance. Version numbers here (1.4.0 and below) belong to the original project and intentionally overlap with the renumbered releases above.
 
 > Package-specific changes (e.g., `@mcp-abap-adt/adt-clients`) are tracked in their respective repositories and npm packages.
 
@@ -2280,10 +2360,6 @@ _Documentation for this tag is intentionally minimal; see the Git tag `v1.1.8` f
   - Removed Smithery badge from README.md
   - Removed all references to `@mario-andreschak/mcp-abap-adt` package
 
-All notable changes to this project will be documented in this file.
-
-## [Unreleased]
-
 ### Added
 - New MCP tool: `DetectObjectTypeList`
   - Batch detection of ABAP object types by a list of names.
@@ -2296,9 +2372,6 @@ All notable changes to this project will be documented in this file.
 - All handler modules now use a unified in-memory caching mechanism via `objectsListCache`. This provides consistent, easily swappable cache logic across the codebase.
 - The `filePath` parameter and all file write logic have been removed from all handlers. Handler results are now only cached in memory, not written to disk.
 - This refactor improves maintainability, testability, and performance by eliminating redundant file operations and centralizing cache management.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [1.4.0] - 2025-07-08
 

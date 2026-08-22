@@ -13,8 +13,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  ErrorCode,
-  McpError,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -109,13 +107,10 @@ export async function handleCreatePackage(
   try {
     // Validate required parameters
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
     if (!args?.super_package) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Super package (parent package) is required',
-      );
+      return return_error('Super package (parent package) is required');
     }
 
     const typedArgs = args;
@@ -229,8 +224,7 @@ export async function handleCreatePackage(
         error.message?.includes('JWT token has expired') ||
         error.message?.includes('Please re-authenticate')
       ) {
-        throw new McpError(
-          ErrorCode.InvalidRequest,
+        return return_error(
           `Authentication failed: ${error.message}. Please re-authenticate using the authentication tool or update your credentials.`,
         );
       }
@@ -249,8 +243,7 @@ export async function handleCreatePackage(
         errorDataLower.includes('exceptionresourcealreadyexists') ||
         error.response?.status === 409
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `Package ${packageName} already exists. Please delete it first or use a different name.`,
         );
       }
@@ -261,7 +254,7 @@ export async function handleCreatePackage(
           error.response?.status === 401
             ? 'Unauthorized: Authentication failed. Please check your credentials and re-authenticate.'
             : 'Forbidden: Access denied. Please check your permissions.';
-        throw new McpError(ErrorCode.InvalidRequest, authError);
+        return return_error(authError);
       }
 
       const errorMessage = error.response?.data
@@ -311,15 +304,11 @@ export async function handleCreatePackage(
         }
       }
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to create package ${packageName}: ${errorMessage}`,
       );
     }
   } catch (error: any) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

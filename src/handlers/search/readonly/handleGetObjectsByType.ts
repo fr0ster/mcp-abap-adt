@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError, return_response } from '../../../lib/utils';
+import { return_error, return_response } from '../../../lib/utils';
 
 /**
  * Parses XML response to extract object names from node structure
@@ -117,8 +117,7 @@ export async function handleGetObjectsByType(
       typeof parent_name !== 'string' ||
       parent_name.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "parent_name" (string) is required and cannot be empty.',
       );
     }
@@ -128,8 +127,7 @@ export async function handleGetObjectsByType(
       typeof parent_tech_name !== 'string' ||
       parent_tech_name.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "parent_tech_name" (string) is required and cannot be empty.',
       );
     }
@@ -139,15 +137,13 @@ export async function handleGetObjectsByType(
       typeof parent_type !== 'string' ||
       parent_type.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "parent_type" (string) is required and cannot be empty.',
       );
     }
 
     if (!node_id || typeof node_id !== 'string' || node_id.trim() === '') {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "node_id" (string) is required and cannot be empty.',
       );
     }
@@ -254,15 +250,6 @@ export async function handleGetObjectsByType(
     objectsListCache.setCache(finalResult);
     return finalResult;
   } catch (error) {
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

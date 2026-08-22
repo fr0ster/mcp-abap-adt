@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 365
+- Total tools: 353
 - Read-only tools: 64
-- High-level tools: 177
+- High-level tools: 165
 - Low-level tools: 124
 
 - Compact tools: 22 (included in High-level group)
@@ -148,18 +148,9 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetClassVersionDiff](#getclassversiondiff-high-level-common)
     - [GetClassVersions](#getclassversions-high-level-common)
     - [GetClassVersionSource](#getclassversionsource-high-level-common)
-    - [GetDataElementVersionDiff](#getdataelementversiondiff-high-level-common)
-    - [GetDataElementVersions](#getdataelementversions-high-level-common)
-    - [GetDataElementVersionSource](#getdataelementversionsource-high-level-common)
     - [GetDdlVersionDiff](#getddlversiondiff-high-level-common)
     - [GetDdlVersions](#getddlversions-high-level-common)
     - [GetDdlVersionSource](#getddlversionsource-high-level-common)
-    - [GetDomainVersionDiff](#getdomainversiondiff-high-level-common)
-    - [GetDomainVersions](#getdomainversions-high-level-common)
-    - [GetDomainVersionSource](#getdomainversionsource-high-level-common)
-    - [GetFunctionGroupVersionDiff](#getfunctiongroupversiondiff-high-level-common)
-    - [GetFunctionGroupVersions](#getfunctiongroupversions-high-level-common)
-    - [GetFunctionGroupVersionSource](#getfunctiongroupversionsource-high-level-common)
     - [GetFunctionModuleVersionDiff](#getfunctionmoduleversiondiff-high-level-common)
     - [GetFunctionModuleVersions](#getfunctionmoduleversions-high-level-common)
     - [GetFunctionModuleVersionSource](#getfunctionmoduleversionsource-high-level-common)
@@ -169,9 +160,6 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetMetadataExtensionVersionDiff](#getmetadataextensionversiondiff-high-level-common)
     - [GetMetadataExtensionVersions](#getmetadataextensionversions-high-level-common)
     - [GetMetadataExtensionVersionSource](#getmetadataextensionversionsource-high-level-common)
-    - [GetPackageVersionDiff](#getpackageversiondiff-high-level-common)
-    - [GetPackageVersions](#getpackageversions-high-level-common)
-    - [GetPackageVersionSource](#getpackageversionsource-high-level-common)
     - [GetProgramVersionDiff](#getprogramversiondiff-high-level-common)
     - [GetProgramVersions](#getprogramversions-high-level-common)
     - [GetProgramVersionSource](#getprogramversionsource-high-level-common)
@@ -1836,40 +1824,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="getdataelementversiondiff-high-level-common"></a>
-#### GetDataElementVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP data element versions, by their content_uris (taken from GetDataElementVersions entries).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDataElementVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDataElementVersions entry).
-
----
-
-<a id="getdataelementversions-high-level-common"></a>
-#### GetDataElementVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP data element. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDataElementVersionSource.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `data_element_name` (string, required) - ABAP data element name.
-
----
-
-<a id="getdataelementversionsource-high-level-common"></a>
-#### GetDataElementVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP data element version by its content_uri (taken from a GetDataElementVersions entry).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetDataElementVersions entry.
-
----
-
 <a id="getddlversiondiff-high-level-common"></a>
 #### GetDdlVersionDiff (High-Level / Common)
 **Description:** [read-only] Compute a unified diff between two CDS view (DDL source) versions, by their content_uris (taken from GetDdlVersions entries).
@@ -1901,74 +1855,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetDdlVersions entry.
-
----
-
-<a id="getdomainversiondiff-high-level-common"></a>
-#### GetDomainVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP domain versions, by their content_uris (taken from GetDomainVersions entries).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetDomainVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetDomainVersions entry).
-
----
-
-<a id="getdomainversions-high-level-common"></a>
-#### GetDomainVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP domain. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetDomainVersionSource.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `domain_name` (string, required) - ABAP domain name.
-
----
-
-<a id="getdomainversionsource-high-level-common"></a>
-#### GetDomainVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP domain version by its content_uri (taken from a GetDomainVersions entry).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetDomainVersions entry.
-
----
-
-<a id="getfunctiongroupversiondiff-high-level-common"></a>
-#### GetFunctionGroupVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP function group versions, by their content_uris (taken from GetFunctionGroupVersions entries).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetFunctionGroupVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetFunctionGroupVersions entry).
-
----
-
-<a id="getfunctiongroupversions-high-level-common"></a>
-#### GetFunctionGroupVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP function group. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetFunctionGroupVersionSource.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `function_group_name` (string, required) - ABAP function group name.
-
----
-
-<a id="getfunctiongroupversionsource-high-level-common"></a>
-#### GetFunctionGroupVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP function group version by its content_uri (taken from a GetFunctionGroupVersions entry).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetFunctionGroupVersions entry.
 
 ---
 
@@ -2072,40 +1958,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `content_uri` (string, required) - Opaque content_uri taken from a GetMetadataExtensionVersions entry.
-
----
-
-<a id="getpackageversiondiff-high-level-common"></a>
-#### GetPackageVersionDiff (High-Level / Common)
-**Description:** [read-only] Compute a unified diff between two ABAP package versions, by their content_uris (taken from GetPackageVersions entries).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri_from` (string, required) - Opaque content_uri of the OLD/base version (from a GetPackageVersions entry).
-- `content_uri_to` (string, required) - Opaque content_uri of the NEW/compare version (from a GetPackageVersions entry).
-
----
-
-<a id="getpackageversions-high-level-common"></a>
-#### GetPackageVersions (High-Level / Common)
-**Description:** [read-only] List the SAP version history of a ABAP package. Returns each version with its versionId, author, updatedAt, title, the transportRequest (and transportDescription) that produced it when available, and an opaque content_uri to fetch that version's source via GetPackageVersionSource.
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `package_name` (string, required) - ABAP package name.
-
----
-
-<a id="getpackageversionsource-high-level-common"></a>
-#### GetPackageVersionSource (High-Level / Common)
-**Description:** [read-only] Fetch the source of a specific ABAP package version by its content_uri (taken from a GetPackageVersions entry).
-
-**Source:** `src/handlers/common/high/objectVersionTools.ts`
-
-**Parameters:**
-- `content_uri` (string, required) - Opaque content_uri taken from a GetPackageVersions entry.
 
 ---
 
@@ -5777,4 +5629,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-05*
+*Last updated: 2026-07-22*

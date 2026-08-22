@@ -54,6 +54,13 @@ interface VersionedTypeRow {
 /**
  * One row per versioned object_type. `available_in` is copied from each type's
  * existing high-level Get<X> handler (src/handlers/<type>/high/handleGet<X>.ts).
+ *
+ * Only object types whose adt-clients handler implements version history
+ * (IAdtSourceObject) appear here — same supported set as VERSIONED_OBJECT_TYPES
+ * in resolveVersionedObject. Non-versioned lockable types (function_group,
+ * domain, data_element, package) are deliberately excluded: their
+ * getVersions/getVersionSource throw "not supported", so per-type version tools
+ * for them would always error.
  */
 export const VERSIONED_TYPES: VersionedTypeRow[] = [
   {
@@ -75,13 +82,6 @@ export const VERSIONED_TYPES: VersionedTypeRow[] = [
     display: 'Interface',
     nameParam: 'interface_name',
     label: 'ABAP interface',
-    available_in: ['onprem', 'cloud', 'legacy'],
-  },
-  {
-    object_type: 'function_group',
-    display: 'FunctionGroup',
-    nameParam: 'function_group_name',
-    label: 'ABAP function group',
     available_in: ['onprem', 'cloud', 'legacy'],
   },
   {
@@ -110,27 +110,6 @@ export const VERSIONED_TYPES: VersionedTypeRow[] = [
     display: 'Ddl',
     nameParam: 'ddl_name',
     label: 'CDS view (DDL source)',
-    available_in: ['onprem', 'cloud', 'legacy'],
-  },
-  {
-    object_type: 'domain',
-    display: 'Domain',
-    nameParam: 'domain_name',
-    label: 'ABAP domain',
-    available_in: ['onprem', 'cloud'],
-  },
-  {
-    object_type: 'data_element',
-    display: 'DataElement',
-    nameParam: 'data_element_name',
-    label: 'ABAP data element',
-    available_in: ['onprem', 'cloud'],
-  },
-  {
-    object_type: 'package',
-    display: 'Package',
-    nameParam: 'package_name',
-    label: 'ABAP package',
     available_in: ['onprem', 'cloud', 'legacy'],
   },
   {
@@ -395,7 +374,7 @@ function buildVersionDiffTool(row: VersionedTypeRow): ObjectVersionToolEntry {
 }
 
 /**
- * Build all 39 high-level per-object version tools (13 types ×
+ * Build all 27 high-level per-object version tools (9 versioned types ×
  * {Versions, VersionSource, VersionDiff}). The handlers take (context, args);
  * the registering group wraps each with withContext.
  */

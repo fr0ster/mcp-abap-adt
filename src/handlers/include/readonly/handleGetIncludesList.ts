@@ -1,6 +1,6 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { ErrorCode, McpError, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
@@ -201,16 +201,12 @@ export async function handleGetIncludesList(
       typeof object_name !== 'string' ||
       object_name.trim() === ''
     ) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
+      return return_error(
         'Parameter "object_name" (string) is required and cannot be empty.',
       );
     }
     if (!object_type || typeof object_type !== 'string') {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Parameter "object_type" (string) is required.',
-      );
+      return return_error('Parameter "object_type" (string) is required.');
     }
 
     // Default timeout: 30 seconds

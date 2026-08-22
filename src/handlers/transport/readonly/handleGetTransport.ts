@@ -17,8 +17,6 @@
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  ErrorCode,
-  McpError,
   makeAdtRequestWithTimeout,
   return_error,
   return_response,
@@ -80,10 +78,10 @@ function parseTransportXml(
   const root = result['tm:root'] || result.root;
 
   if (!root) {
-    throw new McpError(
-      ErrorCode.InternalError,
-      'Invalid transport XML structure - no tm:root found',
-    );
+    // A helper must not return a tool result: its value is spread into a
+    // success payload at the call site. Throw, and let the handler's catch
+    // route it through return_error.
+    throw new Error('Invalid transport XML structure - no tm:root found');
   }
 
   // Get detailed transport info from tm:request inside tm:root
@@ -184,10 +182,7 @@ export async function handleGetTransport(
   try {
     // Validate required parameters
     if (!args?.transport_number) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Transport number is required',
-      );
+      return return_error('Transport number is required');
     }
 
     const typedArgs = args as GetTransportArgs;
@@ -252,9 +247,6 @@ export async function handleGetTransport(
       config: response.config,
     });
   } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

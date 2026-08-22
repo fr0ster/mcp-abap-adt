@@ -44,36 +44,24 @@ export async function handleReadDataElement(
     const obj = client.getDataElement();
 
     let source_code: string | null = null;
-    try {
-      const readResult = await obj.read(
-        { dataElementName },
-        version as 'active' | 'inactive',
-      );
-      if (readResult?.readResult?.data) {
-        source_code =
-          typeof readResult.readResult.data === 'string'
-            ? readResult.readResult.data
-            : safeStringify(readResult.readResult.data);
-      }
-    } catch (e: any) {
-      logger?.warn(
-        `Could not read source for ${dataElementName}: ${e?.message}`,
-      );
+    const readResult = await obj.read(
+      { dataElementName },
+      version as 'active' | 'inactive',
+    );
+    if (readResult?.readResult?.data) {
+      source_code =
+        typeof readResult.readResult.data === 'string'
+          ? readResult.readResult.data
+          : safeStringify(readResult.readResult.data);
     }
 
     let metadata: string | null = null;
-    try {
-      const metaResult = await obj.readMetadata({ dataElementName });
-      if (metaResult?.metadataResult?.data) {
-        metadata =
-          typeof metaResult.metadataResult.data === 'string'
-            ? metaResult.metadataResult.data
-            : safeStringify(metaResult.metadataResult.data);
-      }
-    } catch (e: any) {
-      logger?.warn(
-        `Could not read metadata for ${dataElementName}: ${e?.message}`,
-      );
+    const metaResult = await obj.readMetadata({ dataElementName });
+    if (metaResult?.metadataResult?.data) {
+      metadata =
+        typeof metaResult.metadataResult.data === 'string'
+          ? metaResult.metadataResult.data
+          : safeStringify(metaResult.metadataResult.data);
     }
 
     return return_response({

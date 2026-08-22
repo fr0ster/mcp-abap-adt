@@ -3,8 +3,11 @@
  *  - Get<Display>Versions dispatches to the right client accessor per type and
  *    forwards the natural name param as the resolver config;
  *  - Get<Display>VersionSource forwards content_uri to getVersionSource;
- *  - the factory registers all 26 expected tool names with the per-type
- *    available_in copied from each high-level Get<X> (program is onprem/legacy).
+ *  - the factory registers all 27 expected tool names (9 versioned types ×
+ *    {Versions, VersionSource, VersionDiff}) with the per-type available_in
+ *    copied from each high-level Get<X> (program is onprem/legacy);
+ *  - non-versioned types (function_group, domain, data_element, package) get
+ *    no version tools.
  * SAP-free via a mocked AdtClient.
  */
 
@@ -120,20 +123,16 @@ describe('per-object high-level version tools (#30)', () => {
     expect(data.source).toBe('DEFINE TABLE zmy_table.');
   });
 
-  it('registers all 39 expected tool names', () => {
+  it('registers all 27 expected tool names', () => {
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
     const displays = [
       'Class',
       'Program',
       'Interface',
-      'FunctionGroup',
       'FunctionModule',
       'Table',
       'Structure',
       'Ddl',
-      'Domain',
-      'DataElement',
-      'Package',
       'BehaviorDefinition',
       'MetadataExtension',
     ];
@@ -143,10 +142,21 @@ describe('per-object high-level version tools (#30)', () => {
       `Get${d}VersionDiff`,
     ]);
     expect(names.sort()).toEqual(expected.sort());
-    expect(new Set(names).size).toBe(39);
+    expect(new Set(names).size).toBe(27);
   });
 
-  it('the registered HighLevel group contains all 39 version tools (no dups)', () => {
+  it('does not register version tools for non-versioned types', () => {
+    const names = new Set(
+      buildObjectVersionTools().map((e) => e.toolDefinition.name),
+    );
+    for (const d of ['FunctionGroup', 'Domain', 'DataElement', 'Package']) {
+      expect(names.has(`Get${d}Versions`)).toBe(false);
+      expect(names.has(`Get${d}VersionSource`)).toBe(false);
+      expect(names.has(`Get${d}VersionDiff`)).toBe(false);
+    }
+  });
+
+  it('the registered HighLevel group contains all 27 version tools (no dups)', () => {
     const group = new HighLevelHandlersGroup({
       connection: {},
       logger: undefined,

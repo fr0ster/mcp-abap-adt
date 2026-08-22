@@ -1,4 +1,3 @@
-// import { McpError, ErrorCode } from '../../../lib/utils';
 import { XMLParser } from 'fast-xml-parser';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 // import { createAdtClient } from '../../../lib/clients';
@@ -49,27 +48,6 @@ export async function handleGetTransaction(
   _args: any,
 ) {
   const { connection, logger } = context;
-  // try {
-  //     if (!args?.transaction_name) {
-  //         throw new McpError(ErrorCode.InvalidParams, 'Transaction name is required');
-  //     }
-  //     logger?.info(`Fetching transaction info for ${args.transaction_name}`);
-  //     const client = createAdtClient(connection, logger);
-  //     const result = await client.readTransaction(args.transaction_name);
-  //     return result;
-  // } catch (error) {
-  //     logger?.error(`Failed to fetch transaction ${args?.transaction_name}`, error as any);
-  //     // MCP-compliant error response: always return content[] with type "text"
-  //     return {
-  //         isError: true,
-  //         content: [
-  //             {
-  //                 type: "text",
-  //                 text: `ADT error: ${String(error)}`
-  //             }
-  //         ]
-  //     };
-  // }
   return {
     isError: false,
     content: [{ type: 'json', json: { message: 'Not implemented' } }],

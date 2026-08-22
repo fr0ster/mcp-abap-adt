@@ -173,11 +173,11 @@ describe('version diff tools (#30)', () => {
     expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
   });
 
-  it('the factory builds 13 VersionDiff tools (39 total) and they register in High', () => {
+  it('the factory builds 9 VersionDiff tools (27 total) and they register in High', () => {
     const names = buildObjectVersionTools().map((e) => e.toolDefinition.name);
     const diffNames = names.filter((n) => n.endsWith('VersionDiff'));
-    expect(diffNames.length).toBe(13);
-    expect(names.length).toBe(39);
+    expect(diffNames.length).toBe(9);
+    expect(names.length).toBe(27);
 
     const group = new HighLevelHandlersGroup({
       connection: {},

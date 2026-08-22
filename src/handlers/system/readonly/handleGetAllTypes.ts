@@ -5,6 +5,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
@@ -96,14 +97,6 @@ export async function handleGetAdtTypes(context: HandlerContext, _args: any) {
     };
   } catch (error) {
     logger?.error('Failed to fetch ADT object types', error as any);
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

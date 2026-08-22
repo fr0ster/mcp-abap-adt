@@ -11,8 +11,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  ErrorCode,
-  McpError,
   return_error,
   return_response,
   safeCheckOperation,
@@ -164,13 +162,10 @@ export async function handleCreateDataElement(
   try {
     // Validate required parameters
     if (!args?.data_element_name) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Data element name is required',
-      );
+      return return_error('Data element name is required');
     }
     if (!args?.package_name) {
-      throw new McpError(ErrorCode.InvalidParams, 'Package name is required');
+      return return_error('Package name is required');
     }
 
     // Validate transport_request: required for non-$TMP packages
@@ -302,8 +297,7 @@ export async function handleCreateDataElement(
         error.message?.includes('already exists') ||
         error.response?.data?.includes('ExceptionResourceAlreadyExists')
       ) {
-        throw new McpError(
-          ErrorCode.InvalidParams,
+        return return_error(
           `Data element ${dataElementName} already exists. Please delete it first or use a different name.`,
         );
       }
@@ -314,15 +308,11 @@ export async function handleCreateDataElement(
           : String(error.response.data).substring(0, 500)
         : error.message || String(error);
 
-      throw new McpError(
-        ErrorCode.InternalError,
+      return return_error(
         `Failed to create data element ${dataElementName}: ${errorMessage}`,
       );
     }
   } catch (error: any) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

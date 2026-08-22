@@ -2,28 +2,31 @@
  * Shared object_type → IAdtObject resolver for the read-only version-history
  * handlers (GetObjectVersions / GetObjectVersionSource).
  *
- * Mirrors the switch in handleLockObject EXACTLY: the SAME object_type values,
- * the SAME client.getX() accessors, and the SAME config name keys. Instead of
- * calling .lock(...), callers use the returned IAdtObject to call
- * .getVersions(config) / .getVersionSource(contentUri).
+ * Uses the SAME client.getX() accessors and config name keys as handleLockObject,
+ * but only for the object types that actually support version history
+ * (IAdtSourceObject). Callers use the returned handler to call
+ * .getVersions(config) / .getVersionSource(contentUri). Non-versioned lockable
+ * types (function_group, domain, data_element, package) are deliberately absent.
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAdtObject } from '@mcp-abap-adt/interfaces';
 
 /** object_type values supported for version history (same set as LockObject). */
+// Only object types whose adt-clients handler actually implements version
+// history (IAdtSourceObject) belong here. function_group, domain, data_element
+// and package are IAdtNonVersionedObject — their getVersions/getVersionSource
+// throw "not supported", so exposing them here advertised a capability that
+// never worked. The lock switch (handleLockObject) is intentionally wider:
+// those types ARE lockable, just not versioned.
 export const VERSIONED_OBJECT_TYPES = [
   'class',
   'program',
   'interface',
-  'function_group',
   'function_module',
   'table',
   'structure',
   'ddl',
-  'domain',
-  'data_element',
-  'package',
   'behavior_definition',
   'metadata_extension',
 ] as const;
@@ -55,11 +58,6 @@ export function resolveVersionedObject(
       return { obj: client.getProgram(), config: { programName: name } };
     case 'interface':
       return { obj: client.getInterface(), config: { interfaceName: name } };
-    case 'function_group':
-      return {
-        obj: client.getFunctionGroup(),
-        config: { functionGroupName: name },
-      };
     case 'function_module': {
       // Identity is the FM name + its owning function group. The group can be
       // passed explicitly (function_group_name) or via GROUP|FM_NAME, as the
@@ -87,19 +85,10 @@ export function resolveVersionedObject(
       return { obj: client.getStructure(), config: { structureName: name } };
     case 'ddl':
       return { obj: client.getDdl(), config: { ddlName: name } };
-    case 'domain':
-      return { obj: client.getDomain(), config: { domainName: name } };
-    case 'data_element':
-      return {
-        obj: client.getDataElement(),
-        config: { dataElementName: name },
-      };
     case 'behavior_definition':
       return { obj: client.getBehaviorDefinition(), config: { name } };
     case 'metadata_extension':
       return { obj: client.getMetadataExtension(), config: { name } };
-    case 'package':
-      return { obj: client.getPackage(), config: { packageName: name } };
     default:
       return null;
   }

@@ -9,7 +9,6 @@ import {
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -81,8 +80,15 @@ export function getAuthBroker(destination: string): any | undefined {
   return authBrokerRegistry.get(destination);
 }
 
+// Compatibility re-export: `@mcp-abap-adt/core/utils` exposed the SDK's McpError /
+// ErrorCode before #155. Internal code no longer throws McpError (enforced by
+// noMcpErrorInSrc.test.ts, which permits the identifier only in this one export
+// declaration and forbids every import or use elsewhere in src), but the public
+// subpath keeps re-exporting them so external consumers do not break. New code
+// should import these from the SDK directly.
+export { ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 export type { AxiosResponse };
-export { ErrorCode, getTimeout, getTimeoutConfig, logger, McpError };
+export { getTimeout, getTimeoutConfig, logger };
 
 /**
  * Encodes SAP object names for use in URLs.
@@ -272,7 +278,10 @@ export function return_error(error: any) {
   let errorText: string;
 
   try {
-    if (error instanceof AxiosError) {
+    if (typeof error === 'string') {
+      // Validation sites pass a ready message; this is the shortest path.
+      errorText = error;
+    } else if (error instanceof AxiosError) {
       // Check for DNS/network errors first
       const errorCode = (error as any).code;
       const errorMessage = error.message || '';
@@ -370,8 +379,6 @@ export function return_error(error: any) {
       } else {
         errorText = errorMessage;
       }
-    } else if (typeof error === 'string') {
-      errorText = error;
     } else {
       // For other types, try safe stringify
       try {
@@ -402,12 +409,21 @@ export function return_error(error: any) {
     errorText = 'An error occurred (failed to serialize error details)';
   }
 
+  // Strip SDK McpError prefixes that a custom/external handler group may have
+  // baked into a thrown error's message (e.g. `MCP error -32602: bad`, or the
+  // stacked `McpError: MCP error -32602: bad`). Our own handlers no longer throw
+  // McpError, but the package accepts external handler groups, and both
+  // registration paths route any thrown error through here. Schema-validation
+  // errors are unaffected: the SDK raises those before our code runs and never
+  // reaches return_error.
+  errorText = errorText.replace(/^(?:McpError: |MCP error -?\d+: )+/, '');
+
   return {
     isError: true,
     content: [
       {
         type: 'text',
-        text: `Error: ${errorText}`,
+        text: errorText,
       },
     ],
   };

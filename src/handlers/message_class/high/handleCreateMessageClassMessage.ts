@@ -11,8 +11,6 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type AxiosResponse,
-  ErrorCode,
-  McpError,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -74,16 +72,13 @@ export async function handleCreateMessageClassMessage(
   const { connection, logger } = context;
   try {
     if (!args?.message_class_name) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'message_class_name is required',
-      );
+      return return_error('message_class_name is required');
     }
     if (!args?.msgno) {
-      throw new McpError(ErrorCode.InvalidParams, 'msgno is required');
+      return return_error('msgno is required');
     }
     if (args?.msgtext === undefined || args?.msgtext === null) {
-      throw new McpError(ErrorCode.InvalidParams, 'msgtext is required');
+      return return_error('msgtext is required');
     }
 
     const client = createAdtClient(connection, logger);
@@ -115,9 +110,6 @@ export async function handleCreateMessageClassMessage(
       }),
     } as AxiosResponse);
   } catch (error) {
-    if (error instanceof McpError) {
-      throw error;
-    }
     return return_error(error);
   }
 }

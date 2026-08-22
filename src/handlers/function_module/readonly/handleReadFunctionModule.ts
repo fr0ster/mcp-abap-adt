@@ -64,23 +64,15 @@ export async function handleReadFunctionModule(
     // the group segment in the URL, so we must verify ownership from metadata
     // (<adtcore:containerRef/>) before trusting any source payload.
     let metadata: string | null = null;
-    try {
-      const metaResult = await obj.readMetadata({
-        functionModuleName,
-        functionGroupName,
-      });
-      if (metaResult?.metadataResult?.data) {
-        metadata =
-          typeof metaResult.metadataResult.data === 'string'
-            ? metaResult.metadataResult.data
-            : safeStringify(metaResult.metadataResult.data);
-      }
-    } catch (e: any) {
-      return return_error(
-        new Error(
-          `Could not read metadata for ${functionModuleName} in group ${functionGroupName}: ${e?.message ?? e}`,
-        ),
-      );
+    const metaResult = await obj.readMetadata({
+      functionModuleName,
+      functionGroupName,
+    });
+    if (metaResult?.metadataResult?.data) {
+      metadata =
+        typeof metaResult.metadataResult.data === 'string'
+          ? metaResult.metadataResult.data
+          : safeStringify(metaResult.metadataResult.data);
     }
 
     const realGroup = assertFunctionGroupMatches(
@@ -90,21 +82,15 @@ export async function handleReadFunctionModule(
     );
 
     let source_code: string | null = null;
-    try {
-      const readResult = await obj.read(
-        { functionModuleName, functionGroupName: realGroup },
-        version as 'active' | 'inactive',
-      );
-      if (readResult?.readResult?.data) {
-        source_code =
-          typeof readResult.readResult.data === 'string'
-            ? readResult.readResult.data
-            : safeStringify(readResult.readResult.data);
-      }
-    } catch (e: any) {
-      logger?.warn(
-        `Could not read source for ${functionModuleName}: ${e?.message}`,
-      );
+    const readResult = await obj.read(
+      { functionModuleName, functionGroupName: realGroup },
+      version as 'active' | 'inactive',
+    );
+    if (readResult?.readResult?.data) {
+      source_code =
+        typeof readResult.readResult.data === 'string'
+          ? readResult.readResult.data
+          : safeStringify(readResult.readResult.data);
     }
 
     return return_response({

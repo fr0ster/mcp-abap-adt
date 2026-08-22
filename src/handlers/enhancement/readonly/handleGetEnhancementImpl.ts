@@ -1,10 +1,9 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  ErrorCode,
   encodeSapObjectName,
   logger,
-  McpError,
   makeAdtRequestWithTimeout,
+  return_error,
 } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementImpl',
@@ -106,17 +105,11 @@ export async function handleGetEnhancementImpl(
     logger?.info('handleGetEnhancementByName called with args:', args);
 
     if (!args?.enhancement_spot) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Enhancement spot is required',
-      );
+      return return_error('Enhancement spot is required');
     }
 
     if (!args?.enhancement_name) {
-      throw new McpError(
-        ErrorCode.InvalidParams,
-        'Enhancement name is required',
-      );
+      return return_error('Enhancement name is required');
     }
 
     const enhancementSpot = args.enhancement_spot;
@@ -204,22 +197,12 @@ export async function handleGetEnhancementImpl(
         };
         return fallbackResult;
       } else {
-        throw new McpError(
-          ErrorCode.InternalError,
+        return return_error(
           `Failed to retrieve enhancement ${enhancementName} from spot ${enhancementSpot}. Status: ${response.status}. Fallback to retrieve spot metadata also failed. Status: ${spotResponse.status}`,
         );
       }
     }
   } catch (error) {
-    // MCP-compliant error response: always return content[] with type "text"
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: `ADT error: ${String(error)}`,
-        },
-      ],
-    };
+    return return_error(error);
   }
 }

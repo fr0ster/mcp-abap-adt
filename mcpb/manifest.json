@@ -1,0 +1,91 @@
+{
+  "manifest_version": "0.3",
+  "name": "sap-abap-adt",
+  "display_name": "SAP ABAP ADT",
+  "version": "8.13.0",
+  "description": "Read and analyse SAP ABAP systems from Claude — CDS views, tables, classes, data preview and where-used, across several SAP systems.",
+  "long_description": "Connects Claude to your SAP systems through ADT. Ask about CDS views, preview table data, trace where an object is used, and read ABAP source. Supports several systems at once — ask Claude to \"list systems\" and \"switch to kalog\" to move between them in one conversation. Each person signs in with their own SAP user, so SAP's own authorisations and audit log apply exactly as they do in SAP GUI.",
+  "author": {
+    "name": "Angga Kharisma",
+    "url": "https://github.com/anggakharisma/mcp-abap-adt"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anggakharisma/mcp-abap-adt"
+  },
+  "server": {
+    "type": "node",
+    "entry_point": "server/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/server/index.js"],
+      "env": {
+        "MCPB_DIR": "${__dirname}",
+        "MCPB_DEFAULT_SYSTEM": "${user_config.default_system}",
+        "MCPB_ABL_USERNAME": "${user_config.abl_username}",
+        "MCPB_ABL_PASSWORD": "${user_config.abl_password}",
+        "MCPB_KALOG_USERNAME": "${user_config.kalog_username}",
+        "MCPB_KALOG_PASSWORD": "${user_config.kalog_password}",
+        "MCPB_SWI_USERNAME": "${user_config.swi_username}",
+        "MCPB_SWI_PASSWORD": "${user_config.swi_password}"
+      }
+    }
+  },
+  "user_config": {
+    "default_system": {
+      "type": "string",
+      "title": "Start on which system?",
+      "description": "abl, kalog or swi — the system Claude connects to when it starts. You can switch later just by asking.",
+      "default": "abl",
+      "required": true
+    },
+    "abl_username": {
+      "type": "string",
+      "title": "ABL — your SAP user",
+      "description": "Your own user on ABL (fiori-dev.abl.co.id). Leave blank if you do not use this system.",
+      "required": false
+    },
+    "abl_password": {
+      "type": "string",
+      "title": "ABL — your SAP password",
+      "description": "Stored only on this computer, never sent anywhere except to ABL.",
+      "sensitive": true,
+      "required": false
+    },
+    "kalog_username": {
+      "type": "string",
+      "title": "KAD (kalog) — your SAP user",
+      "description": "Your own user on KAD. Leave blank if you do not use this system.",
+      "required": false
+    },
+    "kalog_password": {
+      "type": "string",
+      "title": "KAD (kalog) — your SAP password",
+      "description": "Stored only on this computer, never sent anywhere except to KAD.",
+      "sensitive": true,
+      "required": false
+    },
+    "swi_username": {
+      "type": "string",
+      "title": "PEP (swi) — your SAP user",
+      "description": "Your own user on PEP. Leave blank if you do not use this system.",
+      "required": false
+    },
+    "swi_password": {
+      "type": "string",
+      "title": "PEP (swi) — your SAP password",
+      "description": "Stored only on this computer, never sent anywhere except to PEP.",
+      "sensitive": true,
+      "required": false
+    }
+  },
+  "compatibility": {
+    "claude_desktop": ">=0.10.0",
+    "platforms": ["win32"],
+    "runtimes": {
+      "node": ">=22.0.0"
+    }
+  },
+  "keywords": ["sap", "abap", "adt", "cds", "rap"],
+  "license": "MIT"
+}

@@ -74,6 +74,26 @@ SAP_CONNECTION_TYPE=rfc
 - `SAP_AUTH_TYPE` — authentication method (`basic` or `jwt`). RFC uses basic auth with username/password.
 - `SAP_CONNECTION_TYPE` — transport layer (`http` or `rfc`).
 
+### Connecting Through SAProuter
+
+If the SAP system is only reachable via SAProuter, add the `SAP_SAPROUTER` variable with the SAProuter route string:
+
+```env
+SAP_URL=http://saphost:8000
+SAP_CONNECTION_TYPE=rfc
+SAP_SAPROUTER=/H/saprouter.example.com/H/
+```
+
+- `SAP_SAPROUTER` — standard SAProuter route string (e.g. `/H/routerhost/H/`). The RFC SDK uses this to tunnel the connection through the SAProuter.
+
+To override the auto-derived system number (port 80XX → sysnr XX), set `SAP_SYSNR`:
+
+```env
+SAP_SYSNR=30
+```
+
+Both `SAP_SAPROUTER` and `SAP_SYSNR` are read by `buildRfcParams()` in `@mcp-abap-adt/connection`.
+
 ## How It Works
 
 1. `SAP_CONNECTION_TYPE=rfc` tells the server to create an `RfcAbapConnection` instead of HTTP

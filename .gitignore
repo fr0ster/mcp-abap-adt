@@ -17,6 +17,12 @@ coverage/
 .env.local
 .env.*.local
 *.env
+# Per-system connection profiles (.env.abl, .env.kalog, ...) hold plaintext
+# SAP credentials. The bare rules above do NOT match these — they end in the
+# system name, not ".env".
+.env.*
+!.env.example
+!.env.*.template
 .mcpregistry_github_token
 .mcpregistry_registry_token
 
@@ -89,3 +95,7 @@ desktop.ini
 .claude/settings.local.json
 .codex
 .worktrees/
+
+# Claude Desktop bundle build output
+mcpb/build/
+mcpb/*.mcpb

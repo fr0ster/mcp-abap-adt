@@ -1,0 +1,56 @@
+{
+  "_comment": [
+    "Connection profiles for the Claude Desktop bundle. Everything here is",
+    "non-secret: hostnames, clients and routes. Credentials are never stored",
+    "in this file — each person types their own into the extension settings,",
+    "and server/index.js merges them in at startup.",
+    "",
+    "To add a system: add an entry, give it a credentialsKey, then add matching",
+    "MCPB_<KEY>_USERNAME / MCPB_<KEY>_PASSWORD fields to manifest.json's",
+    "user_config and mcp_config.env."
+  ],
+  "systems": {
+    "abl": {
+      "credentialsKey": "ABL",
+      "label": "ABL — S/4HANA development",
+      "env": {
+        "SAP_URL": "https://fiori-dev.abl.co.id:7777/",
+        "SAP_CLIENT": "120",
+        "SAP_AUTH_TYPE": "basic",
+        "SAP_SYSTEM_TYPE": "onprem",
+        "SAP_LANGUAGE": "en",
+        "TLS_REJECT_UNAUTHORIZED": "0",
+        "SAP_TIMEOUT_DEFAULT": "45000",
+        "SAP_TIMEOUT_CSRF": "15000",
+        "SAP_TIMEOUT_LONG": "60000"
+      }
+    },
+    "kalog": {
+      "credentialsKey": "KALOG",
+      "label": "KAD — ECC6 EhP7, via SAProuter",
+      "env": {
+        "SAP_URL": "http://172.16.2.111:8030",
+        "SAP_CLIENT": "100",
+        "SAP_AUTH_TYPE": "basic",
+        "SAP_CONNECTION_TYPE": "rfc",
+        "SAP_SYSTEM_TYPE": "onprem",
+        "SAP_MASTER_SYSTEM": "KAD",
+        "SAP_SAPROUTER": "/H/sr2.kereta-api.co.id/H/"
+      }
+    },
+    "swi.sim": {
+      "credentialsKey": "SWI",
+      "label": "PEP — legacy, via SAProuter",
+      "env": {
+        "SAP_URL": "http://172.10.20.14:8000",
+        "SAP_CLIENT": "100",
+        "SAP_AUTH_TYPE": "basic",
+        "SAP_CONNECTION_TYPE": "rfc",
+        "SAP_SYSTEM_TYPE": "legacy",
+        "SAP_MASTER_SYSTEM": "PEP",
+        "SAP_SAPROUTER": "/H/ppa.sapcloud.id/H/",
+        "SAP_SYSNR": "00"
+      }
+    }
+  }
+}

@@ -7,7 +7,7 @@
  * Workflow: validate -> create -> (activate)
  */
 
-import type { IServiceDefinitionConfig } from '@mcp-abap-adt/adt-clients';
+import type { IServiceDefinitionConfig } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

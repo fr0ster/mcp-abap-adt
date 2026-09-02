@@ -2,7 +2,7 @@
  * ActivateObject Handler - Universal ABAP Object Activation via ADT API
  */
 
-import type { ObjectReference } from '@mcp-abap-adt/adt-clients';
+import type { IObjectReference } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-interface ActivationObject extends ObjectReference {
+interface ActivationObject extends IObjectReference {
   uri?: string;
 }
 

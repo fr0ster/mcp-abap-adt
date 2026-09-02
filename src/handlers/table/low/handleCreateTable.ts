@@ -5,7 +5,7 @@
  * Low-level handler: single method call.
  */
 
-import type { ITableConfig } from '@mcp-abap-adt/adt-clients';
+import type { ITableConfig } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {

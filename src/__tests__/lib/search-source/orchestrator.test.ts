@@ -18,7 +18,7 @@ function pkg(
   return async () =>
     items.map((it) => ({
       name: it.name ?? '',
-      adtType: it.adtType ?? 'PROG/P',
+      type: it.type ?? 'PROG/P',
       packageName: it.packageName ?? 'ZPKG',
       isPackage: it.isPackage ?? false,
     }));
@@ -62,9 +62,9 @@ describe('runSearchSource', () => {
   it('aggregates hits across packages and types, sorts by (devclass, object_name, include, line)', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'ZB_PROG', adtType: 'PROG/P', packageName: 'ZB' },
-        { name: 'ZA_CLAS', adtType: 'CLAS/OC', packageName: 'ZA' },
-        { name: 'ZA_PROG', adtType: 'PROG/P', packageName: 'ZA' },
+        { name: 'ZB_PROG', type: 'PROG/P', packageName: 'ZB' },
+        { name: 'ZA_CLAS', type: 'CLAS/OC', packageName: 'ZA' },
+        { name: 'ZA_PROG', type: 'PROG/P', packageName: 'ZA' },
       ]),
       sourceReader: sourceFor({
         'PROG:ZB_PROG': 'no\nmarker here\nmore',
@@ -88,7 +88,7 @@ describe('runSearchSource', () => {
   it('caps hits per object and flips truncated.by_object_cap', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_PROG', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3\nmarker 4\nmarker 5',
@@ -107,7 +107,7 @@ describe('runSearchSource', () => {
   it('does not flip truncated.by_object_cap when an object has exactly max_hits_per_object matches', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_PROG', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_PROG': 'marker 1\nno match\nstill no match',
@@ -125,7 +125,7 @@ describe('runSearchSource', () => {
   it('probes later source units and flips truncated.by_object_cap when matches are omitted after the per-object budget is filled', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_FG', adtType: 'FUGR/F', packageName: 'ZPKG' },
+        { name: 'Z_FG', type: 'FUGR/F', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'FUGRSTR:Z_FG': 'FUGR/FF|Z_FM_A\nFUGR/FF|Z_FM_B',
@@ -145,9 +145,9 @@ describe('runSearchSource', () => {
   it('caps enumerated targets via max_objects and flips truncated.by_max_objects', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P3', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P1', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P3', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_P1': 'marker',
@@ -168,8 +168,8 @@ describe('runSearchSource', () => {
   it('emit_no_hits=true emits a separate entry for zero-hit targets and never mixes them into results', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_HIT', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_MISS', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_HIT', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_MISS', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_HIT': 'marker line',
@@ -192,8 +192,8 @@ describe('runSearchSource — scanned.packages reflects resolved count', () => {
   it('counts resolved packages, not raw input, when patterns expand', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'ZA_PROG', adtType: 'PROG/P', packageName: 'ZA' },
-        { name: 'ZB_PROG', adtType: 'PROG/P', packageName: 'ZB' },
+        { name: 'ZA_PROG', type: 'PROG/P', packageName: 'ZA' },
+        { name: 'ZB_PROG', type: 'PROG/P', packageName: 'ZB' },
       ]),
       sourceReader: sourceFor({
         'PROG:ZA_PROG': 'marker',
@@ -281,9 +281,9 @@ describe('runSearchSource — time budget (Fix A)', () => {
 
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P3', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P1', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P3', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_P1': 'marker here',
@@ -312,8 +312,8 @@ describe('runSearchSource — time budget (Fix A)', () => {
   it('returns truncated.by_timeout=false and full results when no time_budget_ms is set', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P1', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_P1': 'marker here',
@@ -336,8 +336,8 @@ describe('runSearchSource — time budget (Fix A)', () => {
 
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P1', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: {
         async readProgram() {
@@ -385,8 +385,8 @@ describe('runSearchSource — time budget (Fix A)', () => {
 
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_P1', adtType: 'PROG/P', packageName: 'ZPKG' },
-        { name: 'Z_P2', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P1', type: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_P2', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_P1': 'marker here\nmarker again',
@@ -413,7 +413,7 @@ describe('runSearchSource — default max_hits_per_object=100 (Fix B)', () => {
   it('returns all hits when count is below default 100 cap, and by_object_cap stays false', async () => {
     const deps: OrchestratorDeps = {
       fetchPackageContents: pkg([
-        { name: 'Z_PROG', adtType: 'PROG/P', packageName: 'ZPKG' },
+        { name: 'Z_PROG', type: 'PROG/P', packageName: 'ZPKG' },
       ]),
       sourceReader: sourceFor({
         'PROG:Z_PROG': 'marker 1\nmarker 2\nmarker 3',

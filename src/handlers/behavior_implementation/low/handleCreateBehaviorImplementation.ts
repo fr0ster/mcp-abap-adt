@@ -5,7 +5,7 @@
  * Low-level handler: full workflow (create, lock, update main source, update implementations, unlock, activate).
  */
 
-import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/adt-clients';
+import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {

@@ -40,7 +40,7 @@
     }
   },
   "scripts": {
-    "postinstall": "node scripts/apply-saprouter-patch.js",
+    "postinstall": "node scripts/apply-saprouter-patch.js && node scripts/apply-include-activation-patch.js && node scripts/apply-checkprogram-fix.js",
     "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",

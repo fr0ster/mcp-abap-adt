@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [9.0.0] - 2026-09-03
+
 ### Licence
 
 - **This tool is now `GPL-3.0-only`.** It was MIT up to and including 8.13.0, and

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Licence
+
+- **This tool is now `GPL-3.0-only`.** It was MIT up to and including 8.13.0, and
+  those versions stay MIT — a licence change is not retroactive.
+
+  A finished tool rather than a library to build on, so it takes the full GPL
+  rather than the LGPL its own dependencies carry: running it and using it on your
+  own data carries no conditions, while distributing it — or a modified version —
+  means passing on the same freedoms, source included.
+
+  Copyright © 2025 Oleksii Kyslytsia.
+
+
 ### Changed
 - **Migrated to `@mcp-abap-adt/adt-clients` `^10.1.0` and `@mcp-abap-adt/interfaces` `^13.1.0`** (from `^8.0.0` / `^11.3.0`), plus `auth-providers` `^1.2.0`, `auth-broker` `^1.0.8` and `connection` `^1.10.2`. Two adt-clients majors are crossed; no MCP tool was added, removed or renamed, and no tool schema changed.
   - **Config, state and shared types are imported from `interfaces` instead of `adt-clients`**, which stopped re-exporting them — 22 handler modules. Two were also renamed: `ObjectReference` → `IObjectReference`, `SearchObjectsParams` → `ISearchObjectsParams`.

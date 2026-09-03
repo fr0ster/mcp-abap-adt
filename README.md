@@ -419,3 +419,25 @@ Thank you to all contributors! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the co
 ---
 
 **Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.
+
+## License
+
+**GNU General Public License v3.0 only** (`GPL-3.0-only`).
+Earlier published versions were MIT and stay MIT — a licence change is not
+retroactive.
+
+Copyright © 2025 Oleksii Kyslytsia
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU General Public License as published by the Free Software
+Foundation, version 3.
+
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+PURPOSE. See [`LICENSE`](LICENSE) for the full text.
+
+**What this means.** Running it, and using it on your own data, carries no
+conditions at all. Distributing it, or a modified version of it, means passing on
+the same freedoms — including the source. This is a finished tool rather than a
+library to build on; the libraries it is built from are LGPL, so they can be
+linked from programs under any licence.

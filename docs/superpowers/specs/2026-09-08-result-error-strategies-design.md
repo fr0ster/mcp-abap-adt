@@ -73,6 +73,7 @@ that removes it is a single adapter, and it is part of this work:
 export function return_answer<T>(
   answer: IAdtResponse<T, IAdtError>,
   project: (value: T) => unknown,
+  ctx: { tool: string; detail: 'terse' | 'full' | 'raw' },
 ): McpResult;
 ```
 
@@ -96,7 +97,8 @@ whose projection found nothing where something was expected, and turning the sec
 So the terse write projection **says** it: it returns the string `'SUCCESS'`. A
 projection that returns `undefined` has failed to read its own document, and the adapter
 answers `isError: true` with `origin: 'connection'` — the reading is ours, not the
-server's — and a message naming the tool and the level that produced nothing.
+server's — and a message naming `ctx.tool` and `ctx.detail`, which is why the adapter
+takes them.
 
 **On failure.** `isError: true` and one `text` content item holding
 `JSON.stringify(payload, null, 2)`. The payload is an **allowlist**, not the error
@@ -119,26 +121,31 @@ state and have no business in a tool answer, and it may hold circular references
 Undefined optional fields are omitted rather than emitted as `null`.
 
 **The body is still reachable on a failure, and has to be.** A result strategy runs only
-on the success half, so `detail: 'raw'` alone would leave the troubleshooting case — the
-one where the body matters most — with nothing. The error strategy receives the same
-wire answer, so when the call asked for `detail: 'raw'` the payload carries one more
-field:
+on the success half, so without this the troubleshooting case — the one where the body
+matters most — would have nothing.
+
+**The adapter does this, not the error strategy.** The strategy stays independent of
+`detail` and fills everything it can, including `error.response`. The adapter holds
+`ctx.detail`, and it is the only place that decides what reaches the caller:
 
 | field | when |
 |---|---|
-| `raw_body` | `detail: 'raw'` **and** the wire body is a string — the body verbatim, nothing else from the response |
+| `raw_body` | `ctx.detail === 'raw'` **and** `error.response.data` is a string — that string verbatim |
 
-At any other `detail`, and for a body the transport had already parsed into an object,
-`raw_body` is absent. It is the body and only the body: no status, no headers, no
-cookies.
+Anywhere else — any other `detail`, a body the transport had already parsed into an
+object, or no response at all — `raw_body` is absent. It is never a serialisation of an
+object: on the failure path there is no reading to fall back on, and inventing one would
+put a shape in front of a reader who asked for the document. The response object itself
+is still never serialised: no status, no headers, no cookies.
 
 This keeps the server's classification — `code`, `adtType`, `namespace` — which the
 single line `getError().message` threw away, and it does not reintroduce what issue #155
 removed: no service prefix and no double-wrapping.
 
 A handler therefore reads: pick the strategy set for the requested `detail`, call the
-member, hand the answer to `return_answer` with the projection for that level. There is
-no `if (!answer.ok)` in a handler.
+member, hand the answer to `return_answer` with the projection for that level and the
+context — its own tool name and the level asked for. There is no `if (!answer.ok)` in a
+handler.
 
 `return_response` and `return_error` stay for the paths that do not go through a client
 member at all.
@@ -209,6 +216,9 @@ source is the answer. Only the structured group uses all three.
 **The error strategy does not depend on `detail`.** It always returns everything the
 contract offers — `origin`, `message`, `request`, the server's classification. Terse
 applies to results; a failure is where a caller needs the most, not the least.
+
+`detail` is applied once, in the adapter, and only to decide whether `raw_body` is
+included. That is the single place in this design where a level touches a failure.
 
 Classification is read from the document, not from HTTP status. ADT answers `200` and
 refuses in the body — that is the root of the three masking defects this repository has
@@ -401,10 +411,12 @@ migrated twice. They are the first candidates for stage 4.
   whose document carries messages delivers **all** of them — through the result when it
   succeeded, through `getError().messages` when an `E` made it a failure — and answers
   `isError: true` in the second case.
-- `detail: 'raw'` returns the value of `answer.data` character-for-character, unmodified
-  — and a faithful serialisation where the transport had already parsed the body into an
-  object. On a failure it is the `raw_body` field of the error payload, under the same
-  rule, so the troubleshooting level is not lost exactly where it is needed.
+- On success, `detail: 'raw'` returns the value of `answer.data`
+  character-for-character, unmodified — and a faithful serialisation where the transport
+  had already parsed the body into an object.
+- On failure, `detail: 'raw'` puts the wire body in `raw_body` when it is a string, and
+  omits the field otherwise. The troubleshooting level is not lost where it is needed,
+  and nothing is serialised in its place.
 - A projection that produces `undefined` is answered as a failure. Nothing in the adapter
   turns an absent value into SUCCESS.
 - Every field dropped from a tool's default output, and every input parameter removed,
@@ -415,4 +427,6 @@ migrated twice. They are the first candidates for stage 4.
   expand — package names for the two package tools, frontier node ids for
   GetObjectsList — so every bounded answer can be continued. No answer is silently
   partial.
-- A failure payload never contains the wire response: no headers, no cookies, no body.
+- A failure payload never contains the response object: no status, no headers, no
+  cookies. The body appears only as `raw_body`, only at `detail: 'raw'`, and only when it
+  is a string.

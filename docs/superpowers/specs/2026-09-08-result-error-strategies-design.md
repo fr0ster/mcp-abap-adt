@@ -76,10 +76,36 @@ export function return_answer<T>(
 ): McpResult;
 ```
 
-On success it returns `project(answer.getResult().value)` as content. On failure it
-returns `isError: true` carrying the whole error the strategy produced — `origin`,
-`message`, `request`, and `messages` where the form has them — rather than the single
-line `getError().message` that the abandoned migration was writing a hundred times.
+This adapter decides the public output of every handler, so its wire contract is part of
+the design rather than a detail of the implementation.
+
+**On success.** One `text` content item. What goes in it depends on what the projection
+returned, and the rule is exactly three lines:
+
+| projection returns | content text |
+|---|---|
+| a `string` | that string, verbatim — no quoting and no JSON wrapper, so source code and `detail: 'raw'` come back as themselves |
+| `undefined` | `SUCCESS` — the terse write answer, so a projection with nothing to add returns nothing rather than inventing a shape |
+| anything else | `JSON.stringify(value, null, 2)` |
+
+**On failure.** `isError: true` and one `text` content item holding
+`JSON.stringify(payload, null, 2)`, where `payload` is the error the strategy produced
+with its undefined optional fields omitted:
+
+```jsonc
+{
+  "message": "…",           // always present, SAP's wording verbatim
+  "origin": "refusal",      // always present: 'connection' | 'refusal'
+  "request": { "method": "POST", "url": "…" },   // when the strategy filled it
+  "messages": [ { "type": "E", "text": "…" } ]   // when the form carries messages
+}
+```
+
+`message` and `origin` are always there; `request` and `messages` appear only when the
+strategy supplied them. This keeps the whole error rather than the single line
+`getError().message` that the abandoned migration was writing a hundred times, and it
+does not reintroduce what issue #155 removed: there is no service prefix and no
+double-wrapping — the payload is the error itself.
 
 A handler therefore reads: pick the strategy set for the requested `detail`, call the
 member, hand the answer to `return_answer` with the projection for that level. There is
@@ -253,7 +279,11 @@ For the two package tools, `depth` means:
 |---|---|
 | `1` | the named package only — equivalent to `include_subpackages: false` today |
 | `n > 1` | the package and `n − 1` levels of subpackages below it |
-| omitted | the whole tree |
+| omitted | as deep as the tree goes, **up to the safety bound below** |
+
+`omitted` is not a promise of the whole tree, and the spec does not pretend it is: it
+means "do not stop at a level I chose", while the bound still applies. A caller who
+receives a bounded answer knows it, because the payload says so.
 
 In both package tools `include_subpackages: false` becomes `depth: 1` and `max_depth: 5`
 becomes `depth: 5`. Both old parameters are removed rather than kept alongside, because
@@ -267,6 +297,14 @@ traversal is bounded and **says so in the answer**: when a bound stops it, the p
 carries what stopped it and where. Stage 1 fixes the bound for all three tools; it is a
 number, not a principle, and belongs with the inventory that shows how large real
 packages are.
+
+**Resuming after the bound: by name, not by cursor.** When the traversal stops, the
+payload lists the packages it did not expand. A caller continues by calling the same tool
+on one of those names — an address it already holds, valid for as long as the package
+exists. No cursor or resume token is introduced: a token would need server-side or
+session state to mean anything, both of which outlive the request they belong to and
+neither of which this server keeps. Naming what was skipped costs nothing and cannot go
+stale.
 
 ## Stages
 
@@ -300,8 +338,9 @@ migrated twice. They are the first candidates for stage 4.
   whose document carries messages delivers **all** of them — through the result when it
   succeeded, through `getError().messages` when an `E` made it a failure — and answers
   `isError: true` in the second case.
-- `detail: 'raw'` returns byte-for-byte what the endpoint sent for text and XML answers,
-  and a faithful serialisation where the transport had already parsed the body.
+- `detail: 'raw'` returns the value of `answer.data` character-for-character, unmodified
+  — and a faithful serialisation where the transport had already parsed the body into an
+  object.
 - Every field dropped from a tool's default output appears in the compatibility table,
   with its justification. A field not in the table is not dropped.
 - A traversal stopped by its bound says so in the payload; no answer is silently partial.

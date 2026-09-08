@@ -85,8 +85,18 @@ returned, and the rule is exactly three lines:
 | projection returns | content text |
 |---|---|
 | a `string` | that string, verbatim — no quoting and no JSON wrapper, so source code and `detail: 'raw'` come back as themselves |
-| `undefined` | `SUCCESS` — the terse write answer, so a projection with nothing to add returns nothing rather than inventing a shape |
 | anything else | `JSON.stringify(value, null, 2)` |
+| `undefined` | **a failure**, not a success — see below |
+
+**`undefined` is never `SUCCESS`.** An earlier draft had the adapter read it that way, so
+that a terse write could return nothing. The adapter cannot tell that apart from a read
+whose projection found nothing where something was expected, and turning the second into
+`SUCCESS` is the masking defect this repository has spent three fixes removing.
+
+So the terse write projection **says** it: it returns the string `'SUCCESS'`. A
+projection that returns `undefined` has failed to read its own document, and the adapter
+answers `isError: true` with `origin: 'connection'` — the reading is ours, not the
+server's — and a message naming the tool and the level that produced nothing.
 
 **On failure.** `isError: true` and one `text` content item holding
 `JSON.stringify(payload, null, 2)`. The payload is an **allowlist**, not the error
@@ -104,9 +114,23 @@ references:
 | `request` | `request` | when present — `method` and `url` only |
 | `messages` | our `IAdtMessageFailure` | when the form carries messages |
 
-`response` is **never serialised.** Its body, when a reader needs it, is what
-`detail: 'raw'` is for; its headers and cookies are transport state and have no business
-in a tool answer. Undefined optional fields are omitted rather than emitted as `null`.
+`response` is **never serialised** as an object: its headers and cookies are transport
+state and have no business in a tool answer, and it may hold circular references.
+Undefined optional fields are omitted rather than emitted as `null`.
+
+**The body is still reachable on a failure, and has to be.** A result strategy runs only
+on the success half, so `detail: 'raw'` alone would leave the troubleshooting case — the
+one where the body matters most — with nothing. The error strategy receives the same
+wire answer, so when the call asked for `detail: 'raw'` the payload carries one more
+field:
+
+| field | when |
+|---|---|
+| `raw_body` | `detail: 'raw'` **and** the wire body is a string — the body verbatim, nothing else from the response |
+
+At any other `detail`, and for a body the transport had already parsed into an object,
+`raw_body` is absent. It is the body and only the body: no status, no headers, no
+cookies.
 
 This keeps the server's classification — `code`, `adtType`, `namespace` — which the
 single line `getError().message` threw away, and it does not reintroduce what issue #155
@@ -258,7 +282,7 @@ old ones**.
 The policy is **reject by name**, not silent translation. A call passing `max_depth: 5`
 is answered with an error saying that the parameter is gone and `depth` replaces it. The
 alternative — quietly mapping the old pair onto `depth` — would turn `max_depth: 5` into
-a bounded-unlimited traversal for anyone who omitted it, which is a behaviour change the
+a bound-limited traversal for anyone who omitted it, which is a behaviour change the
 caller never sees. An explicit refusal is a one-line fix for them and no surprise for
 anyone.
 
@@ -271,10 +295,12 @@ A strategy reads one answer. Recursion is a sequence of requests, so walking a p
 tree belongs to the handler: the strategy parses a node, the handler decides where to go
 next.
 
-`depth` defaults to the whole tree. A caller that needs one level passes `depth: 1`. The
-default is full because a caller who receives one level almost always asks for the next,
-and two round trips cost more than one answer; the parameter exists because a caller who
-genuinely needs one level should not pay for the whole tree in context.
+Omitting `depth` means **as deep as the tree goes within the mandatory safety bound**
+— never "unlimited", which is not a thing this server can promise. A caller that needs one
+level passes `depth: 1`. The default goes as deep as it may because a caller who receives
+one level almost always asks for the next, and two round trips cost more than one answer;
+the parameter exists because a caller who genuinely needs one level should not pay for the
+rest in context.
 
 ### What `depth` replaces, and what it means
 
@@ -318,16 +344,16 @@ For the two package tools, `depth` means:
 | `n > 1` | the package and `n − 1` levels of subpackages below it |
 | omitted | as deep as the tree goes, **up to the safety bound below** |
 
-`omitted` is not a promise of the whole tree, and the spec does not pretend it is: it
-means "do not stop at a level I chose", while the bound still applies. A caller who
-receives a bounded answer knows it, because the payload says so.
+`omitted` means "do not stop at a level I chose". The bound still applies, and it is
+mandatory — there is no value of `depth`, and no way to omit it, that removes the bound.
+A caller who receives a bounded answer knows it, because the payload says so.
 
 In both package tools `include_subpackages: false` becomes `depth: 1` and `max_depth: 5`
 becomes `depth: 5`. Both old parameters are removed rather than kept alongside, because
 two knobs governing one traversal is how the current pair became ambiguous. `depth: 0` is refused by name — an
 argument that asks for nothing is a caller's mistake, not a shape to invent an answer for.
 
-**The default changes from 5 to unlimited, which is a behavioural change with a real
+**The default changes from 5 to bound-limited, which is a behavioural change with a real
 cost**: a root package can be hundreds of subpackages and as many round trips. Silent
 truncation is not an option — it is the masking problem applied to data — so the
 traversal is bounded and **says so in the answer**: when a bound stops it, the payload
@@ -377,7 +403,10 @@ migrated twice. They are the first candidates for stage 4.
   `isError: true` in the second case.
 - `detail: 'raw'` returns the value of `answer.data` character-for-character, unmodified
   — and a faithful serialisation where the transport had already parsed the body into an
-  object.
+  object. On a failure it is the `raw_body` field of the error payload, under the same
+  rule, so the troubleshooting level is not lost exactly where it is needed.
+- A projection that produces `undefined` is answered as a failure. Nothing in the adapter
+  turns an absent value into SUCCESS.
 - Every field dropped from a tool's default output, and every input parameter removed,
   appears in the compatibility table with its justification. Neither is dropped without a
   row. A call passing a removed parameter is refused by name, never silently

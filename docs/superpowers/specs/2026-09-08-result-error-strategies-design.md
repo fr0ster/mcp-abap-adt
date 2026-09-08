@@ -53,6 +53,41 @@ behavioural fixes among them re-applied deliberately: the three masking closures
 (read, deletion, activation), the transport rewrite, the profiling contract, the
 removed dead inputs. The churn is not.
 
+## The library transforms nothing
+
+adt-clients does not shape an answer on its own: **every transformation is a strategy's**,
+and the strategies are ours to supply. The shipped sets are defaults we may take, not
+behaviour the library imposes. That is why the parsing this repository does today moves
+into strategies rather than being expected from the client, and why the client cannot be
+asked to "return it differently".
+
+## The adapter: what actually removes the repetition
+
+Strategies produce both halves of `IAdtResponse`. They do not, by themselves, save a
+handler from checking `ok`, calling `getResult()` or `getError()`, and turning either
+into an MCP result — which is the repetition this design exists to remove. The piece
+that removes it is a single adapter, and it is part of this work:
+
+```ts
+// src/lib/utils.ts
+export function return_answer<T>(
+  answer: IAdtResponse<T, IAdtError>,
+  project: (value: T) => unknown,
+): McpResult;
+```
+
+On success it returns `project(answer.getResult().value)` as content. On failure it
+returns `isError: true` carrying the whole error the strategy produced — `origin`,
+`message`, `request`, and `messages` where the form has them — rather than the single
+line `getError().message` that the abandoned migration was writing a hundred times.
+
+A handler therefore reads: pick the strategy set for the requested `detail`, call the
+member, hand the answer to `return_answer` with the projection for that level. There is
+no `if (!answer.ok)` in a handler.
+
+`return_response` and `return_error` stay for the paths that do not go through a client
+member at all.
+
 ## Grouping: by the shape of the exchange
 
 Strategies are grouped by **what goes in and what comes out**, not by object family.
@@ -95,14 +130,19 @@ Levels, and what they mean per group:
 - **full** — JSON. The whole parsed structure.
 - **raw** — the body as the transport delivered it. This is the troubleshooting level.
 
-  **The guarantee is bounded, deliberately.** For a `text/*` or XML answer — which is
-  every ADT document this server reads — `raw` is byte-for-byte what the endpoint sent.
-  For an answer the transport has already turned into an object (JSON), it cannot be:
-  the strategy is handed `IAdtWireResponse`, and re-serialising an object does not
-  restore whitespace, key order or number formatting. There, `raw` means a faithful
-  serialisation of what arrived, not the original bytes. Promising more would require
-  changing the connection contract to keep the untouched body, which is out of scope
-  here.
+  **The guarantee is character-for-character, not byte-for-byte.** A strategy is handed
+  `IAdtWireResponse`, whose body the transport has already decoded into a JavaScript
+  string — so the encoding it arrived in, a BOM, and any invalid byte sequence were
+  resolved before we see it. What `raw` promises is therefore exact: **the value of
+  `answer.data`, unmodified by us** — no parse, no reserialisation, no reformatting.
+
+  Where the transport has already turned the body into an object, even that is not
+  available, and `raw` is a faithful serialisation of the object rather than the text
+  that produced it.
+
+  Byte-for-byte would require the connection layer to keep the undecoded body — a
+  `Buffer` alongside the string — which is a change to that contract and out of scope
+  here. If a case ever needs it, that is where it belongs.
 
 Not every group has three distinct answers. For a **write**, `full` and `raw` are the
 same document — there is no intermediate structure between `SUCCESS` and what the
@@ -194,11 +234,20 @@ genuinely needs one level should not pay for the whole tree in context.
 
 ### What `depth` replaces, and what it means
 
-Two tools traverse today, and both already have parameters for it:
-`GetPackageTree` and `GetObjectsList`. `GetPackageTree` takes `max_depth` (**default 5**)
-and `include_subpackages`, and the recursion is governed by both.
+Three tools traverse today, and they do not traverse the same thing. Each gets its own
+contract; conflating them is what made the first draft of this section wrong.
 
-`depth` replaces both:
+**`GetPackageTree`** and **`GetPackageContents`** both walk *packages*, and both already
+carry `include_subpackages` and `max_depth` (**default 5**), with the recursion governed
+by the pair. `depth` replaces both parameters in both tools.
+
+**`GetObjectsList`** walks *ADT node ids* inside one object's structure, guarded by a
+`visited` set. It has neither parameter today, and node depth is not package depth — a
+level there is a node expansion, not a subpackage. It therefore keeps its own traversal
+and does **not** take `depth`. What it gains from this work is the same honesty
+requirement as the others: a bound, and a payload that says when the bound stopped it.
+
+For the two package tools, `depth` means:
 
 | value | meaning |
 |---|---|
@@ -206,17 +255,18 @@ and `include_subpackages`, and the recursion is governed by both.
 | `n > 1` | the package and `n − 1` levels of subpackages below it |
 | omitted | the whole tree |
 
-`include_subpackages: false` becomes `depth: 1`; `max_depth: 5` becomes `depth: 5`. Both
-old parameters are removed rather than kept alongside, because two knobs governing one
-traversal is how the current pair became ambiguous. `depth: 0` is refused by name — an
+In both package tools `include_subpackages: false` becomes `depth: 1` and `max_depth: 5`
+becomes `depth: 5`. Both old parameters are removed rather than kept alongside, because
+two knobs governing one traversal is how the current pair became ambiguous. `depth: 0` is refused by name — an
 argument that asks for nothing is a caller's mistake, not a shape to invent an answer for.
 
 **The default changes from 5 to unlimited, which is a behavioural change with a real
 cost**: a root package can be hundreds of subpackages and as many round trips. Silent
 truncation is not an option — it is the masking problem applied to data — so the
 traversal is bounded and **says so in the answer**: when a bound stops it, the payload
-carries what stopped it and where. Stage 1 fixes the bound; it is a number, not a
-principle, and belongs with the inventory that shows how large real packages are.
+carries what stopped it and where. Stage 1 fixes the bound for all three tools; it is a
+number, not a principle, and belongs with the inventory that shows how large real
+packages are.
 
 ## Stages
 

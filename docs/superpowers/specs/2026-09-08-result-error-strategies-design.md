@@ -89,23 +89,28 @@ returned, and the rule is exactly three lines:
 | anything else | `JSON.stringify(value, null, 2)` |
 
 **On failure.** `isError: true` and one `text` content item holding
-`JSON.stringify(payload, null, 2)`, where `payload` is the error the strategy produced
-with its undefined optional fields omitted:
+`JSON.stringify(payload, null, 2)`. The payload is an **allowlist**, not the error
+object — serialising `IAdtError` wholesale would carry `response`, which is an
+`IAdtWireResponse` with headers, cookies, possibly a large body and possibly circular
+references:
 
-```jsonc
-{
-  "message": "…",           // always present, SAP's wording verbatim
-  "origin": "refusal",      // always present: 'connection' | 'refusal'
-  "request": { "method": "POST", "url": "…" },   // when the strategy filled it
-  "messages": [ { "type": "E", "text": "…" } ]   // when the form carries messages
-}
-```
+| field | from `IAdtError` | when |
+|---|---|---|
+| `message` | `message` | always — SAP's wording verbatim |
+| `origin` | `origin` | always — `connection` or `refusal` |
+| `code` | `code` | when present — the server's own code |
+| `adt_type` | `adtType` | when present |
+| `namespace` | `namespace` | when present |
+| `request` | `request` | when present — `method` and `url` only |
+| `messages` | our `IAdtMessageFailure` | when the form carries messages |
 
-`message` and `origin` are always there; `request` and `messages` appear only when the
-strategy supplied them. This keeps the whole error rather than the single line
-`getError().message` that the abandoned migration was writing a hundred times, and it
-does not reintroduce what issue #155 removed: there is no service prefix and no
-double-wrapping — the payload is the error itself.
+`response` is **never serialised.** Its body, when a reader needs it, is what
+`detail: 'raw'` is for; its headers and cookies are transport state and have no business
+in a tool answer. Undefined optional fields are omitted rather than emitted as `null`.
+
+This keeps the server's classification — `code`, `adtType`, `namespace` — which the
+single line `getError().message` threw away, and it does not reintroduce what issue #155
+removed: no service prefix and no double-wrapping.
 
 A handler therefore reads: pick the strategy set for the requested `detail`, call the
 member, hand the answer to `return_answer` with the projection for that level. There is
@@ -244,8 +249,21 @@ kept. The rule for judging: a field the caller needs to make the next call — a
 name it did not already have, a transport number it must quote — stays in `terse`; a
 field that only describes what just happened goes to `full`.
 
+**Inputs are in the same table, and for the same reason.** Removing
+`include_subpackages` and `max_depth` from the two package tools is a schema-breaking
+change to the public surface, and it is not covered by a table about outputs. The row
+therefore also carries **current inputs → new inputs → what happens to a call using the
+old ones**.
+
+The policy is **reject by name**, not silent translation. A call passing `max_depth: 5`
+is answered with an error saying that the parameter is gone and `depth` replaces it. The
+alternative — quietly mapping the old pair onto `depth` — would turn `max_depth: 5` into
+a bounded-unlimited traversal for anyone who omitted it, which is a behaviour change the
+caller never sees. An explicit refusal is a one-line fix for them and no surprise for
+anyone.
+
 The table is part of the spec's output and is reviewed before stage 3 begins. No tool
-loses a field that is not in it.
+loses an input or an output field that is not in it.
 
 ## Package traversal stays in the handler
 
@@ -272,6 +290,25 @@ by the pair. `depth` replaces both parameters in both tools.
 level there is a node expansion, not a subpackage. It therefore keeps its own traversal
 and does **not** take `depth`. What it gains from this work is the same honesty
 requirement as the others: a bound, and a payload that says when the bound stopped it.
+
+Its continuation cannot be by name, and needs its own contract. The traversal always
+starts at node `000000`, so repeating the call repeats the same walk and stops in the
+same place. So when the bound stops it, the payload carries **the frontier**: the node
+ids it reached but did not expand.
+
+```jsonc
+{
+  "objects": [ … ],
+  "stopped_at_bound": true,
+  "frontier": ["000123", "000456"]
+}
+```
+
+The tool gains an optional `start_node_ids` input. Given it, the traversal starts from
+those nodes instead of `000000` — so a caller continues exactly where the previous answer
+stopped, by handing back what it was given. No state is kept between calls: a node id is
+an address on the server, and the `visited` set is rebuilt from the nodes reached in that
+call.
 
 For the two package tools, `depth` means:
 
@@ -341,6 +378,12 @@ migrated twice. They are the first candidates for stage 4.
 - `detail: 'raw'` returns the value of `answer.data` character-for-character, unmodified
   — and a faithful serialisation where the transport had already parsed the body into an
   object.
-- Every field dropped from a tool's default output appears in the compatibility table,
-  with its justification. A field not in the table is not dropped.
-- A traversal stopped by its bound says so in the payload; no answer is silently partial.
+- Every field dropped from a tool's default output, and every input parameter removed,
+  appears in the compatibility table with its justification. Neither is dropped without a
+  row. A call passing a removed parameter is refused by name, never silently
+  reinterpreted.
+- A traversal stopped by its bound says so in the payload and carries what it did not
+  expand — package names for the two package tools, frontier node ids for
+  GetObjectsList — so every bounded answer can be continued. No answer is silently
+  partial.
+- A failure payload never contains the wire response: no headers, no cookies, no body.

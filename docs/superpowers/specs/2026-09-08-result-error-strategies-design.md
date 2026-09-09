@@ -1,6 +1,6 @@
 # Result and error strategies on adt-clients 18 — design
 
-**Status:** approved 2026-09-08. Supersedes the ad-hoc migration on
+**Status:** approved 2026-09-09, after review. Supersedes the ad-hoc migration on
 `chore/bump-current-stack`, which stays as a reference branch and is not merged.
 
 ## The problem

@@ -70,9 +70,10 @@ after, in plans written from it.
 - [ ] **Step 1: Enumerate the tools, not the files**
 
 A file is not a tool. `src/handlers/common/high/objectVersionTools.ts` has no
-`TOOL_DEFINITION` of its own: it loops over `VERSIONED_TYPES` and generates two tools per
-type. Counting files would give it one unreadable row and lose the eighteen contracts it
-generates, and any other factory added since would vanish the same way.
+`TOOL_DEFINITION` of its own: `buildObjectVersionTools()` walks `VERSIONED_TYPES` and
+generates three tools for each of the nine types — Versions, VersionSource, VersionDiff.
+Counting files would give it one unreadable row and lose all twenty-seven contracts, and
+any other factory added since would vanish the same way.
 
 And one `HandlerExporter` run is not the answer either. Its constructor
 (`src/lib/handlers/HandlerExporter.ts:104-122`) turns read-only, high, low, system and
@@ -142,15 +143,105 @@ Read `src/lib/handlers/interfaces.ts` and `src/lib/handlers/groups/index.ts` bef
 running and use what they actually expose — today `IHandlerGroup.getHandlers()` returning
 `HandlerEntry { toolDefinition, handler }` — rather than trusting this snippet's names.
 
-Both snippets in this step were compiled against the repository's own `tsconfig.json`
+All three snippets in this step were compiled against the repository's own `tsconfig.json`
 (`strict: true`, `module: node16`) and run on `main`; every number quoted below is
 their output, not an estimate. Still read the two files above before running — if the
 group API has moved since, fix the snippet rather than working around it.
 
 **One row per (tool, group) pair, not per name.** Even with the names partitioned, the
 group is what decides whether a row is reachable, so it belongs on the row rather than in
-a heading. `HandlerEntry` does not name the file — resolve it with
-`grep -rln "name: '<ToolName>'" src/handlers` and put the path in the row.
+a heading.
+
+`HandlerEntry` carries no file, and grepping for the tool name does not recover one:
+twenty-seven names exist only as strings built inside `buildObjectVersionTools()`, and
+fourteen more are invented in the group file, where `HighLevelHandlersGroup` spreads a
+low-level definition and overrides its name —
+`{ ...ActivateDomain_Tool, name: 'ActivateDomain' }` at
+`src/lib/handlers/groups/HighLevelHandlersGroup.ts:552-560`, whose handler lives in
+`src/handlers/domain/low/handleActivateDomain.ts` under the name `ActivateDomainLow`. A
+name grep leaves the first group unmatched and points the second at the group file.
+
+Resolve provenance from the modules instead, in three tiers, and fail loudly rather than
+leaving a blank cell:
+
+```ts
+// scripts/tool-provenance.ts — joins to the rows from list-tools.ts by name
+import { readdirSync, statSync } from 'node:fs';
+import { join } from 'node:path';
+
+const walk = (dir: string): string[] =>
+  readdirSync(dir).flatMap((n) => {
+    const p = join(dir, n);
+    return statSync(p).isDirectory() ? walk(p) : p.endsWith('.ts') ? [p] : [];
+  });
+
+const isToolDef = (v: unknown): v is { name: string } =>
+  !!v && typeof v === 'object' && typeof (v as { name?: unknown }).name === 'string' &&
+  'inputSchema' in (v as object);
+
+const provenance = new Map<string, Set<string>>();
+const add = (name: string, file: string) => {
+  const at = provenance.get(name) ?? new Set<string>();
+  at.add(file);
+  provenance.set(name, at);
+};
+
+for (const file of walk('src/handlers')) {
+  let mod: Record<string, unknown>;
+  try { mod = require(`../${file}`) as Record<string, unknown>; } catch { continue; }
+
+  for (const value of Object.values(mod)) {
+    // Tier 1: an exported TOOL_DEFINITION, or an exported array of definitions/entries.
+    if (isToolDef(value)) { add(value.name, file); continue; }
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        if (isToolDef(item)) add(item.name, file);
+        else if (item && isToolDef((item as { toolDefinition?: unknown }).toolDefinition)) {
+          add(((item as { toolDefinition: { name: string } }).toolDefinition).name, file);
+        }
+      }
+      continue;
+    }
+    // Tier 2: a zero-argument build* factory. Call it and take the names it produces —
+    // this is the only way to attribute a generated name to the file that generates it.
+    if (typeof value === 'function' && value.length === 0 && /^build/.test(value.name)) {
+      try {
+        const out = (value as () => unknown)();
+        if (Array.isArray(out)) {
+          for (const item of out) {
+            const td = (item as { toolDefinition?: unknown })?.toolDefinition;
+            if (isToolDef(td)) add(td.name, file);
+          }
+        }
+      } catch { /* not a tool factory; ignore */ }
+    }
+  }
+}
+
+for (const [name, files] of provenance) {
+  if (files.size > 1) console.error('AMBIGUOUS', name, [...files].join(', '));
+}
+console.log(JSON.stringify([...provenance].map(([name, f]) => ({ name, files: [...f] })), null, 2));
+```
+
+Run on `main`, tiers 1 and 2 resolve **348 of the 362 rows** with no name claimed by two
+files, including all twenty-seven from `objectVersionTools.ts`. The remaining fourteen are
+exactly the high-level renames, and they are tier 3:
+
+```
+ActivateDomain, ActivateDataElement, ActivateTable, ActivateStructure, ActivateDdl,
+ActivateClass, ActivateInterface, ActivateProgram, ActivateFunctionModule,
+ActivateFunctionGroup, ActivateBehaviorDefinition, ActivateMetadataExtension,
+ActivateServiceDefinition, ActivateServiceBinding
+```
+
+For those, grep the group file for `name: '<ToolName>'`, read the `...X_Tool` it spreads,
+follow that import, and record **two** paths in the row: the group file, which owns the
+name and the description the model reads, and the handler file, which owns the behaviour.
+They matter separately here — the same handler is also registered in the low group under
+its own name, so a migration touching the handler changes two rows, while one touching the
+description changes one. If a run leaves any row outside these three tiers, stop and
+extend the script; a blank file cell is a row nobody can migrate.
 
 The launcher never exposes all of that at once, and the inventory must say what each
 exposition actually shows. `src/server/launcher.ts:203-241` builds high, low or compact
@@ -258,7 +349,7 @@ which is a finding about dead handlers rather than a check on the enumeration.
 | tool | the `name` from `TOOL_DEFINITION` |
 | group | the handler group the row came from — readonly, high, low, compact, system, search |
 | file | the file that implements *this* row, from the `grep` in Step 1 |
-| visible in | which of the three real expositions actually expose this row, from the second snippet in Step 1 — a read-only row suppressed under every exposition is a finding, not a row to migrate silently |
+| visible in | which of the **six** supported expositions expose this row — `readonly`, `high`, `low`, `readonly,high`, `readonly,low`, `compact` — taken from the six sets the second snippet in Step 1 writes out, not from the summary table. A row visible in none of them is a finding, not a row to migrate silently |
 | current inputs | every property of `inputSchema`, and which are required |
 | current default output | the exact object the handler returns today, field by field |
 | transformation today | how it turns the ADT answer into that output — name the parser it calls, or "returns the document" |

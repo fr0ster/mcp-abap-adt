@@ -26,11 +26,79 @@ const groups = {
   search: new SearchHandlersGroup(ctx),
 };
 
+// Two input-schema shapes exist among the 362 tools (a codebase finding, not a script
+// bug — see the document): most `inputSchema`s are plain JSON Schema
+// (`{ type: 'object', properties: {...}, required: [...] }`), but five handlers
+// (CreatePackage, GetPackageContents, GetTableContents, GetInclude, SearchSource) declare
+// a bare zod raw shape instead — a plain object whose values are zod schema instances,
+// with no `type`/`properties`/`required` wrapper at all. Reading `.properties`/`.required`
+// on that shape silently returns `undefined`, which previously rendered as "(none)" — the
+// exact "empty cell reads as checked" failure the brief warns about, one level below the
+// column. Detect the shape instead of hardcoding the five names, so a sixth handler
+// written in either style lands correctly with no script edit.
+type ParamInfo = { name: string; required: 'yes' | 'no' | 'unknown' };
+
+const isJsonSchemaObject = (
+  v: unknown,
+): v is {
+  type: 'object';
+  properties: Record<string, unknown>;
+  required?: string[];
+} =>
+  !!v &&
+  typeof v === 'object' &&
+  (v as { type?: unknown }).type === 'object' &&
+  typeof (v as { properties?: unknown }).properties === 'object' &&
+  (v as { properties?: unknown }).properties !== null;
+
+const hasIsOptional = (v: unknown): v is { isOptional: () => boolean } =>
+  !!v &&
+  typeof v === 'object' &&
+  typeof (v as { isOptional?: unknown }).isOptional === 'function';
+
+const describeInputs = (schema: unknown): ParamInfo[] => {
+  if (isJsonSchemaObject(schema)) {
+    const required = new Set(schema.required ?? []);
+    return Object.keys(schema.properties).map((name) => ({
+      name,
+      required: required.has(name) ? 'yes' : 'no',
+    }));
+  }
+  if (schema && typeof schema === 'object') {
+    // Not JSON Schema: a bare zod raw shape. Its own keys are the parameter names;
+    // whether each is required is read from the zod type itself via `isOptional()`
+    // rather than guessed. If a value doesn't expose that (not a zod type at all),
+    // the row says so explicitly instead of defaulting to yes or no.
+    return Object.entries(schema as Record<string, unknown>).map(
+      ([name, value]) => ({
+        name,
+        required: hasIsOptional(value)
+          ? value.isOptional()
+            ? 'no'
+            : 'yes'
+          : 'unknown',
+      }),
+    );
+  }
+  return [];
+};
+
+const formatInputs = (params: ParamInfo[]): string => {
+  if (params.length === 0) return '(none)';
+  return params
+    .map((p) => {
+      if (p.required === 'yes') return `${p.name}*`;
+      if (p.required === 'unknown') return `${p.name} (required: unknown)`;
+      return p.name;
+    })
+    .join(', ');
+};
+
 const rows = Object.entries(groups).flatMap(([group, instance]) =>
   instance.getHandlers().map((entry) => ({
     group,
     name: entry.toolDefinition.name,
-    schema: entry.toolDefinition.inputSchema,
+    inputs: formatInputs(describeInputs(entry.toolDefinition.inputSchema)),
   })),
 );
 

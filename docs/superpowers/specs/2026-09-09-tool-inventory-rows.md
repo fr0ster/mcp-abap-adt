@@ -143,13 +143,55 @@ brief. This is not a bound on the 362 (factories push the tool count above the f
 the five dead handlers above push it below, and the two effects don't cancel) — used here
 only to corroborate the dead-handler finding above.
 
+### Two `inputSchema` conventions exist in the codebase
+
+Not a table artifact — a finding about the handlers themselves, and one the later migration
+tasks need before they touch these files. 357 of the 362 tools declare `inputSchema` as
+JSON Schema: `{ type: 'object', properties: {...}, required: [...] }`. Five declare it as a
+**bare zod raw shape** instead — a plain object whose own values are zod schema instances,
+with no `type`/`properties`/`required` wrapper:
+
+| tool | group | file |
+|---|---|---|
+| `CreatePackage` | high | `src/handlers/package/high/handleCreatePackage.ts:25` |
+| `GetPackageContents` | readonly | `src/handlers/package/readonly/handleGetPackageContents.ts:11` |
+| `GetTableContents` | readonly | `src/handlers/table/readonly/handleGetTableContents.ts:12` |
+| `GetInclude` | readonly | `src/handlers/include/readonly/handleGetInclude.ts:19` |
+| `SearchSource` | search | `src/handlers/system/readonly/handleSearchSource.ts:14` |
+
+This list was produced by running the same shape check `scripts/list-tools.ts` uses
+(`type: 'object'` + a `properties` object → JSON Schema; otherwise, if the value is still an
+object, a zod raw shape) against all 362 loaded `inputSchema` values, not by trusting the
+five names above — a sixth handler written in the zod style would be caught the same way.
+
+Reading the `inputSchema` cell requires knowing which shape a given row uses:
+`inputSchema.properties`/`inputSchema.required` answer it for the 357 JSON-Schema rows and
+are simply absent (`undefined`) on these five, which is what let an earlier pass of this
+table read them as taking no input at all — the exact "empty cell reads as checked, nothing
+there" failure the brief warns about, one level below the column rather than the row.
+`scripts/list-tools.ts` now detects the shape itself and computes the "current inputs" cell
+directly (function `describeInputs`), so this column no longer depends on a second,
+uncommitted script reading `.properties` — the four-column table is now fully reproducible
+from the two committed scripts alone.
+
+For the zod-shape rows, "required" is read from the zod value itself via `isOptional()`
+(available on every zod schema instance) rather than guessed; across all 362 rows, every
+field resolved to a definite required/optional answer — none needed the "required: unknown"
+fallback the script also supports, for a field whose value doesn't expose `isOptional()` at
+all (e.g. a non-zod object slipped into the shape).
+
 ## Table
 
-362 rows. `*` after a property name in "current inputs" marks it required
-(`inputSchema.required`). "visible in" lists only the six CLI-launcher expositions that
-include this (tool, group) row; a tool visible under a different group's row (e.g. a
-`readonly` row suppressed by dedup while its `high` sibling is exposed) is listed on that
-sibling's own row, not here.
+362 rows. `*` after a parameter name in "current inputs" marks it required. For the 357
+JSON-Schema rows that comes from `inputSchema.required`; for the five zod-raw-shape rows
+above it comes from the zod field's own `isOptional()` (see the finding above) — both are
+folded into the same `*` convention in this column since the distinction is about the
+source file's convention, not about what the table reports. A parameter with neither
+marking is optional; `(required: unknown)` would mark a field the script could not
+classify (none occurred in this run). "visible in" lists only the six CLI-launcher
+expositions that include this (tool, group) row; a tool visible under a different group's
+row (e.g. a `readonly` row suppressed by dedup while its `high` sibling is exposed) is
+listed on that sibling's own row, not here.
 
 | tool | group | implementation files | visible in | current inputs |
 |---|---|---|---|---|
@@ -234,7 +276,7 @@ sibling's own row, not here.
 | CreateMessageClassMessage | high | `src/handlers/message_class/high/handleCreateMessageClassMessage.ts` | high, readonly,high | message_class_name*, msgno*, msgtext*, self_explanatory, description, transport_request |
 | CreateMetadataExtension | high | `src/handlers/ddlx/high/handleCreateMetadataExtension.ts` | high, readonly,high | name*, description, package_name*, transport_request, activate, master_language |
 | CreateMetadataExtensionLow | low | `src/handlers/ddlx/low/handleCreateMetadataExtension.ts` | low, readonly,low | name*, description*, package_name*, transport_request, master_language, session_id, session_state |
-| CreatePackage | high | `src/handlers/package/high/handleCreatePackage.ts` | high, readonly,high | (none) |
+| CreatePackage | high | `src/handlers/package/high/handleCreatePackage.ts` | high, readonly,high | package_name*, description, super_package*, package_type, software_component, transport_layer, transport_request, record_changes, application_component, master_language |
 | CreatePackageLow | low | `src/handlers/package/low/handleCreatePackage.ts` | low, readonly,low | package_name*, super_package*, description*, package_type, software_component, transport_layer, transport_request, record_changes, application_component, session_id, session_state |
 | CreateProgram | high | `src/handlers/program/high/handleCreateProgram.ts` | high, readonly,high | program_name*, description, package_name*, transport_request, program_type, application, master_language |
 | CreateProgramLow | low | `src/handlers/program/low/handleCreateProgram.ts` | low, readonly,low | program_name*, description*, package_name*, transport_request, program_type, application, session_id, session_state |
@@ -318,7 +360,7 @@ sibling's own row, not here.
 | GetFunctionModuleVersions | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | function_module_name*, function_group_name* |
 | GetFunctionModuleVersionSource | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | content_uri* |
 | GetInactiveObjects | system | `src/handlers/system/readonly/handleGetInactiveObjects.ts` | readonly, readonly,high, readonly,low | (none) |
-| GetInclude | readonly | `src/handlers/include/readonly/handleGetInclude.ts` | readonly, readonly,high, readonly,low | (none) |
+| GetInclude | readonly | `src/handlers/include/readonly/handleGetInclude.ts` | readonly, readonly,high, readonly,low | include_name* |
 | GetIncludesList | readonly | `src/handlers/include/readonly/handleGetIncludesList.ts` | readonly, readonly,high, readonly,low | object_name*, object_type*, detailed, timeout |
 | GetInterface | high | `src/handlers/interface/high/handleGetInterface.ts` | high, readonly,high | interface_name*, version |
 | GetInterfaceVersionDiff | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | content_uri_from*, content_uri_to* |
@@ -345,7 +387,7 @@ sibling's own row, not here.
 | GetObjectVersions | readonly | `src/handlers/common/readonly/handleGetObjectVersions.ts` | readonly, readonly,high, readonly,low | object_type*, object_name*, function_group_name |
 | GetObjectVersionSource | readonly | `src/handlers/common/readonly/handleGetObjectVersionSource.ts` | readonly, readonly,high, readonly,low | object_type*, content_uri* |
 | GetPackage | high | `src/handlers/package/high/handleGetPackage.ts` | high, readonly,high | package_name*, version |
-| GetPackageContents | readonly | `src/handlers/package/readonly/handleGetPackageContents.ts` | readonly, readonly,high, readonly,low | (none) |
+| GetPackageContents | readonly | `src/handlers/package/readonly/handleGetPackageContents.ts` | readonly, readonly,high, readonly,low | package_name*, include_subpackages, max_depth, include_descriptions |
 | GetPackageTree | system | `src/handlers/system/high/handleGetPackageTree.ts` | readonly, readonly,high, readonly,low | package_name*, include_subpackages, max_depth, include_descriptions, debug |
 | GetProgram | high | `src/handlers/program/high/handleGetProgram.ts` | high, readonly,high | program_name*, version |
 | GetProgramVersionDiff | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | content_uri_from*, content_uri_to* |
@@ -361,7 +403,7 @@ sibling's own row, not here.
 | GetStructureVersions | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | structure_name* |
 | GetStructureVersionSource | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | content_uri* |
 | GetTable | high | `src/handlers/table/high/handleGetTable.ts` | high, readonly,high | table_name*, version |
-| GetTableContents | readonly | `src/handlers/table/readonly/handleGetTableContents.ts` | readonly, readonly,high, readonly,low | (none) |
+| GetTableContents | readonly | `src/handlers/table/readonly/handleGetTableContents.ts` | readonly, readonly,high, readonly,low | table_name*, max_rows |
 | GetTableVersionDiff | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | content_uri_from*, content_uri_to* |
 | GetTableVersions | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | table_name* |
 | GetTableVersionSource | high | `src/handlers/common/high/objectVersionTools.ts` | high, readonly,high | content_uri* |
@@ -448,7 +490,7 @@ sibling's own row, not here.
 | RuntimeRunProgramWithProfiling | system | `src/handlers/system/readonly/handleRuntimeRunProgramWithProfiling.ts` | readonly, readonly,high, readonly,low | program_name*, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing |
 | RunUnitTest | high | `src/handlers/unit_test/high/handleRunUnitTest.ts` | high, readonly,high | tests*, title, context, scope, risk_level, duration |
 | SearchObject | search | `src/handlers/search/readonly/handleSearchObject.ts` | readonly, high, low, readonly,high, readonly,low, compact | object_name*, object_type, maxResults |
-| SearchSource | search | `src/handlers/system/readonly/handleSearchSource.ts` | readonly, high, low, readonly,high, readonly,low, compact | (none) |
+| SearchSource | search | `src/handlers/system/readonly/handleSearchSource.ts` | readonly, high, low, readonly,high, readonly,low, compact | query*, query2, exclude, packages*, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, emit_no_hits, max_objects, concurrency, version, time_budget_ms |
 | UnlockBehaviorDefinitionLow | low | `src/handlers/behavior_definition/low/handleUnlockBehaviorDefinition.ts` | low, readonly,low | name*, lock_handle*, session_id*, session_state |
 | UnlockClassLow | low | `src/handlers/class/low/handleUnlockClass.ts` | low, readonly,low | class_name*, lock_handle* |
 | UnlockClassTestClassesLow | low | `src/handlers/class/low/handleUnlockClassTestClasses.ts` | low, readonly,low | class_name*, lock_handle*, session_id, session_state |
@@ -515,4 +557,3 @@ sibling's own row, not here.
 | ValidateServiceBinding | high | `src/handlers/service_binding/high/handleValidateServiceBinding.ts` | high, readonly,high | service_binding_name*, description, service_definition_name*, package_name, service_binding_version |
 | ValidateStructureLow | low | `src/handlers/structure/low/handleValidateStructure.ts` | low, readonly,low | structure_name*, package_name*, description*, session_id, session_state |
 | ValidateTableLow | low | `src/handlers/table/low/handleValidateTable.ts` | low, readonly,low | table_name*, package_name*, description*, session_id, session_state |
-

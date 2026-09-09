@@ -94,11 +94,29 @@ that a terse write could return nothing. The adapter cannot tell that apart from
 whose projection found nothing where something was expected, and turning the second into
 `SUCCESS` is the masking defect this repository has spent three fixes removing.
 
-So the terse write projection **says** it: it returns the string `'SUCCESS'`. A
-projection that returns `undefined` has failed to read its own document, and the adapter
-answers `isError: true` with `origin: 'connection'` — the reading is ours, not the
-server's — and a message naming `ctx.tool` and `ctx.detail`, which is why the adapter
-takes them.
+So the terse write projection **says** it: it returns the string `'SUCCESS'`.
+
+A projection that returns `undefined` has failed to read its own document. That is a
+defect in this server, not an answer from SAP, and it **does not borrow an
+`AdtFailureOrigin`**: `connection` means unreachable host, expired session or missing
+authority, and a caller told that will go and reauthenticate over a parser bug. The
+contract deliberately has no origin for "our reading broke", and inventing one by reuse
+is the same class of lie as reporting a refusal as success.
+
+It is therefore answered on a separate local path, with a payload that is visibly not an
+ADT failure:
+
+```jsonc
+{
+  "error": "projection_failed",
+  "tool": "GetClass",
+  "detail": "terse",
+  "message": "the terse projection produced no value for GetClass"
+}
+```
+
+`ctx.tool` and `ctx.detail` are what make that message possible, which is why the
+adapter takes them.
 
 **On failure.** `isError: true` and one `text` content item holding
 `JSON.stringify(payload, null, 2)`. The payload is an **allowlist**, not the error
@@ -110,7 +128,7 @@ references:
 |---|---|---|
 | `message` | `message` | always — SAP's wording verbatim |
 | `origin` | `origin` | always — `connection` or `refusal` |
-| `code` | `code` | when present — the server's own code |
+| `code` | `code` | when present — the **strategy's** code, e.g. `AdtObjectErrorCodes.UNSUPPORTED_OPERATION` |
 | `adt_type` | `adtType` | when present |
 | `namespace` | `namespace` | when present |
 | `request` | `request` | when present — `method` and `url` only |
@@ -138,9 +156,12 @@ object: on the failure path there is no reading to fall back on, and inventing o
 put a shape in front of a reader who asked for the document. The response object itself
 is still never serialised: no status, no headers, no cookies.
 
-This keeps the server's classification — `code`, `adtType`, `namespace` — which the
-single line `getError().message` threw away, and it does not reintroduce what issue #155
-removed: no service prefix and no double-wrapping.
+This keeps what the single line `getError().message` threw away, and the two kinds are
+not conflated: `adtType` and `namespace` are the **server's** classification of the
+object it refused about, while `code` is the **strategy's** — a named condition like
+`UNSUPPORTED_OPERATION` or `LOCK_FAILED` that a caller can branch on without parsing a
+message. It does not reintroduce what issue #155 removed: no service prefix and no
+double-wrapping.
 
 A handler therefore reads: pick the strategy set for the requested `detail`, call the
 member, hand the answer to `return_answer` with the projection for that level and the
@@ -417,8 +438,10 @@ migrated twice. They are the first candidates for stage 4.
 - On failure, `detail: 'raw'` puts the wire body in `raw_body` when it is a string, and
   omits the field otherwise. The troubleshooting level is not lost where it is needed,
   and nothing is serialised in its place.
-- A projection that produces `undefined` is answered as a failure. Nothing in the adapter
-  turns an absent value into SUCCESS.
+- A projection that produces `undefined` is answered as a failure on the local path —
+  `error: "projection_failed"`, with no `origin` — so a defect in our reading is never
+  reported as a connection or a refusal. Nothing in the adapter turns an absent value
+  into SUCCESS.
 - Every field dropped from a tool's default output, and every input parameter removed,
   appears in the compatibility table with its justification. Neither is dropped without a
   row. A call passing a removed parameter is refused by name, never silently

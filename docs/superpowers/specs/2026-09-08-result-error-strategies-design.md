@@ -192,7 +192,7 @@ different code:
 
 | `error` | what threw |
 |---|---|
-| `strategy_threw` | the client member — a strategy or parser inside adt-clients |
+| `client_threw` | the client member, for any reason — a strategy, a parser, an argument it refuses, an invariant it keeps. The adapter sees a rejected promise and cannot tell which, so the name does not claim to |
 | `projection_threw` | our projection, while shaping the value for this `detail` |
 
 ```jsonc
@@ -292,7 +292,7 @@ included. That is the single place in this design where a level touches a failur
 `connection` is no usable answer — unreachable host, expired session, missing authority.
 Neither covers **our own** side failing, whether the projection returned nothing
 (`projection_failed`), the projection threw (`projection_threw`), or the client member
-threw (`strategy_threw`); those take the local path with no `origin` at all. Collapsing the third into either of the first two is what makes a caller
+threw (`client_threw`); those take the local path with no `origin` at all. Collapsing the third into either of the first two is what makes a caller
 act on the wrong system.
 
 Classification is read from the document, not from HTTP status. ADT answers `200` and
@@ -537,8 +537,8 @@ migrated twice. They are the first candidates for stage 4.
   reported as a connection or a refusal. Nothing in the adapter turns an absent value
   into SUCCESS.
 - An exception thrown anywhere in the pipeline is caught by the adapter and answered on
-  the local path with no `origin`: `strategy_threw` when it came out of the client
-  member, `projection_threw` when our projection raised it. Neither becomes a refusal or
+  the local path with no `origin`: `client_threw` for anything the client member rejected
+  with, `projection_threw` when our projection raised it. Neither becomes a refusal or
   a connection failure, and neither escapes a handler unwrapped.
 - Every field dropped from a tool's default output, and every input parameter removed,
   appears in the compatibility table with its justification. Neither is dropped without a

@@ -443,10 +443,23 @@ number the design deliberately left to the inventory.
 
 - [ ] **Step 4: Commit**
 
+Name the files. `npm run lint` covers `src/` only, so the new scripts are formatted by
+hand — but **only the ones this task wrote**. `biome check --write scripts/` would
+reformat six probe scripts that already live there and have never been linted
+(`list-dumps.ts` and `list-traces.ts` carry format diagnostics today), and
+`git add scripts/` would sweep them, plus anything else untracked, into a commit that
+claims to hold inventory artifacts. Drop the third line if Step 3 wrote no probe.
+
 ```bash
-npx biome check --write scripts/   # 'npm run lint' only covers src/, so do it by hand
-git status --short scripts/        # every line here must be staged below, probe included
-git add docs/superpowers/specs/2026-09-09-tool-inventory.md scripts/
+npx biome check --write scripts/list-tools.ts scripts/tool-provenance.ts
+npx biome check --write scripts/probe-package-contents.ts   # only if Step 3 wrote it
+
+git add docs/superpowers/specs/2026-09-09-tool-inventory.md \
+        scripts/list-tools.ts scripts/tool-provenance.ts
+git add scripts/probe-package-contents.ts                   # only if Step 3 wrote it
+
+git status --short scripts/   # read it: anything unstaged here is a file this task
+                              # did not write. Leave it alone; do not add it.
 git commit -m "docs(spec): the stage-1 tool inventory
 
 One row per (tool, group) pair — 362 registered tools, of which 18 read-only
@@ -466,7 +479,10 @@ Includes the traversal bound, measured rather than guessed.
 The two enumeration scripts ship with the table. Every count in it is their
 output, and a table nobody can re-derive is a table nobody can check."
 
-git status --short scripts/   # now empty: nothing written in Steps 1-3 was left behind
+git status --short scripts/list-tools.ts scripts/tool-provenance.ts \
+                       scripts/probe-package-contents.ts 2>/dev/null
+# Empty: the files this task wrote are committed. Anything else still listed by
+# `git status --short scripts/` belongs to someone else and stays untouched.
 ```
 
 - [ ] **Step 5: Stop and ask for review**

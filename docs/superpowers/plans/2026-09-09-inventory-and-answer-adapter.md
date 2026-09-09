@@ -60,9 +60,17 @@ after, in plans written from it.
 
 **Files:**
 - Create: `docs/superpowers/specs/2026-09-09-tool-inventory.md`
+- Create: `scripts/list-tools.ts` — enumeration and the six-mode visibility sets
+- Create: `scripts/tool-provenance.ts` — the three-tier name-to-file map
+- Create: `scripts/probe-package-contents.ts` — only if Step 3 finds no existing probe
+
+All three are committed, not scratch. Every number in the inventory comes out of them, and
+a reviewer who cannot re-run them cannot check the table; they are also what keeps the
+inventory refreshable after handlers move. Keep them next to the probes already in
+`scripts/`, in the same shape.
 
 **Interfaces:**
-- Consumes: nothing. This task reads `main` and writes a document.
+- Consumes: nothing. This task reads `main`, writes two scripts and a document.
 - Produces: the compatibility table every later plan is written from — one row per
   **(tool, group)** pair, carrying the columns listed in Step 2. Nothing downstream may
   drop a field or an input that does not appear in it.
@@ -348,7 +356,7 @@ which is a finding about dead handlers rather than a check on the enumeration.
 |---|---|
 | tool | the `name` from `TOOL_DEFINITION` |
 | group | the handler group the row came from — readonly, high, low, compact, system, search |
-| file | the file that implements *this* row, from the `grep` in Step 1 |
+| implementation files | the file(s) that own this row, from `scripts/tool-provenance.ts` — tier 1 or 2 gives one path; a tier-3 high-level rename gives **two**, the group file that owns the name and description and the handler file that owns the behaviour, and both go in the cell |
 | visible in | which of the **six** supported expositions expose this row — `readonly`, `high`, `low`, `readonly,high`, `readonly,low`, `compact` — taken from the six sets the second snippet in Step 1 writes out, not from the summary table. A row visible in none of them is a finding, not a row to migrate silently |
 | current inputs | every property of `inputSchema`, and which are required |
 | current default output | the exact object the handler returns today, field by field |
@@ -387,7 +395,8 @@ walk costs:
 npx tsx scripts/probe-transport-list.ts --env trial.env   # pattern for a probe script
 ```
 
-Write a probe in the same shape for package contents if none exists. Where a name is
+If no probe covers package contents, write `scripts/probe-package-contents.ts` in the
+same shape and commit it in Step 4 with the others. Where a name is
 carried by more than one group, measure the one the default exposition exposes. Fix the safety bound
 from the measurement and write both the number and the measurement down. This is the one
 number the design deliberately left to the inventory.
@@ -395,7 +404,9 @@ number the design deliberately left to the inventory.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/superpowers/specs/2026-09-09-tool-inventory.md
+git add docs/superpowers/specs/2026-09-09-tool-inventory.md \
+        scripts/list-tools.ts scripts/tool-provenance.ts
+git status --short scripts/   # must be empty: a probe written in Step 3 goes in too
 git commit -m "docs(spec): the stage-1 tool inventory
 
 One row per (tool, group) pair — 362 registered tools, of which 18 read-only
@@ -410,7 +421,10 @@ ReadProgram rejects a PROG/I by reading the metadata, ReadFunctionModule checks
 the module belongs to its group — and a migration that did not know that would
 delete both.
 
-Includes the traversal bound, measured rather than guessed."
+Includes the traversal bound, measured rather than guessed.
+
+The two enumeration scripts ship with the table. Every count in it is their
+output, and a table nobody can re-derive is a table nobody can check."
 ```
 
 - [ ] **Step 5: Stop and ask for review**

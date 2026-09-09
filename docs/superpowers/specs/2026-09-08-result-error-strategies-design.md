@@ -317,6 +317,28 @@ a bound-limited traversal for anyone who omitted it, which is a behaviour change
 caller never sees. An explicit refusal is a one-line fix for them and no surprise for
 anyone.
 
+**A policy without a mechanism is not implementable, so the mechanism is part of it.**
+Simply deleting the keys from the schema does not produce that error: depending on how
+the validation layer treats unknown properties, the call is either rejected before a
+handler runs — with a generic schema message that names neither the replacement nor the
+reason — or the key is accepted and ignored, which is the silent behaviour change this
+policy exists to prevent.
+
+So the two keys **stay in the schema for one release**, marked deprecated in their
+descriptions, and the handler refuses them:
+
+```jsonc
+{
+  "error": "parameter_removed",
+  "parameter": "max_depth",
+  "replacement": "depth",
+  "message": "max_depth was removed; use depth. depth: 5 is the old default."
+}
+```
+
+They are deleted from the schema in the release after, by which time a caller has been
+told by name. Which release that is belongs to the plan, not here.
+
 The table is part of the spec's output and is reviewed before stage 3 begins. No tool
 loses an input or an output field that is not in it.
 
@@ -384,9 +406,27 @@ becomes `depth: 5`. Both old parameters are removed rather than kept alongside, 
 two knobs governing one traversal is how the current pair became ambiguous. `depth: 0` is refused by name — an
 argument that asks for nothing is a caller's mistake, not a shape to invent an answer for.
 
-**The default changes from 5 to bound-limited, which is a behavioural change with a real
-cost**: a root package can be hundreds of subpackages and as many round trips. Silent
-truncation is not an option — it is the masking problem applied to data — so the
+**The two package tools do not have the same default today, and the change is bigger for
+one of them.** The spec named only the tree's, which understated it:
+
+| tool | traversal today when nothing is passed | after |
+|---|---|---|
+| `GetPackageTree` | `include_subpackages` true, `max_depth` 5 — five levels | as deep as the bound allows |
+| `GetPackageContents` | `include_subpackages` **false** — the package only, one level | as deep as the bound allows |
+
+For `GetPackageContents` that is not a deeper limit, it is recursion where there was
+none: a caller that passed nothing got one package and will now get a subtree. The cost
+in round trips and in answer size is the larger of the two changes, and it gets its own
+row in the compatibility table rather than hiding behind the tree's.
+
+`depth` keeps one meaning across both tools, because two tools answering the same
+question with opposite defaults is the defect that made the old pair ambiguous in the
+first place. A caller who wants the old `GetPackageContents` behaviour passes
+`depth: 1`, and the table says so.
+
+**A behavioural change with a real cost**: a root package can be hundreds of subpackages
+and as many round trips. Silent truncation is not an option — it is the masking problem
+applied to data — so the
 traversal is bounded and **says so in the answer**: when a bound stops it, the payload
 carries what stopped it and where. Stage 1 fixes the bound for all three tools; it is a
 number, not a principle, and belongs with the inventory that shows how large real

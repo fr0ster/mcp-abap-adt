@@ -380,9 +380,14 @@ Three edges belong in the inventory as findings rather than as rows:
 - `EmbeddableMcpServer` is a second entry point with different rules
   (`src/server/EmbeddableMcpServer.ts:53-59, 185-220`): its exposition vocabulary also
   takes `'system'` and `'search'` as explicit opt-ins, it never calls
-  `validateExposition`, and its `readOnlyDedupStrategy` may be omitted, in which case
-  `overridingToolNames` stays empty and nothing is suppressed. The matrix above describes
-  the launcher. Note per row where the embeddable path would differ; do not enumerate its
+  `validateExposition`, and it gates `SystemHandlersGroup` and `SearchHandlersGroup` on
+  those opt-ins rather than on `readonly`. Suppression, however, behaves the same as the
+  launcher's: `readOnlyDedupStrategy` is a **defaulted parameter**
+  (`= new ReadVsGetDedupStrategy()`), so omitting it does not disable the dedup — the
+  `if (readOnlyDedupStrategy)` guard at `:198` cannot see an omission, only an explicit
+  falsy value forced past the optional type. An earlier draft of this plan claimed
+  omission left `overridingToolNames` empty; it does not. The matrix above describes the
+  launcher. Note per row where the embeddable path would differ; do not enumerate its
   combinations, since it accepts ones the CLI rejects.
 
 The file count — `grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l`, 327

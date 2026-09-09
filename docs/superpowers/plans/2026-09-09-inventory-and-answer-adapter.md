@@ -46,11 +46,36 @@ after, in plans written from it.
   stopped the compiler — see `docs/development/TROUBLESHOOTING.md`.
 - **The whole-repository typecheck will not be clean during this plan, and that is
   expected.** Task 2 raises the dependency stack, and every handler still speaks the old
-  contract; the migration plans bring the count back to zero. The gate for Tasks 3-5 is
-  therefore scoped: `grep -c 'src/lib/answer.ts\|answerSuccess\|answerFailure\|answerBoundary' /tmp/tsc.log`
-  must print `0`, and the syntax check above must print `0`. Record the total after
+  contract; the migration plans bring the count back to zero. Record the total after
   Task 2 so a later task can tell whether it made things worse.
-- Unit tests run without SAP: `npx jest src/__tests__/unit`.
+- **Therefore commits from Task 2 onward use `git commit --no-verify`.**
+  `.husky/pre-commit` runs `npx lint-staged`, then `npm run build`, and `build` is
+  `biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json` — a
+  whole-repository typecheck. From the moment the stack goes up it exits non-zero, so
+  the hook would block every remaining commit in this plan. Skipping it is deliberate and
+  temporary; the last migration plan restores a clean build and the hook with it. Task 1
+  commits normally, before the stack moves.
+- Skipping the hook removes two checks, so each of those steps runs them by hand: the
+  `npx biome check --write` already in every commit step, and this scoped gate in place
+  of the full typecheck:
+  ```bash
+  npx tsc --noEmit -p tsconfig.json > /tmp/tsc.log 2>&1
+  grep -c 'src/lib/answer.ts' /tmp/tsc.log   # must print 0
+  grep -c 'TS1128\|TS1005' /tmp/tsc.log      # must print 0
+  ```
+  It greps for `src/lib/answer.ts` and nothing else, because `tsconfig.json` excludes
+  `src/__tests__` — a test file's path never appears in that log, and a gate naming one
+  would pass whatever the tests did. The tests are typechecked by ts-jest instead, which
+  transforms them against `tsconfig.test.json` with diagnostics on, so a type error in a
+  test **fails the jest run**. Running the suite is the test-side gate; there is no other.
+- Unit tests need no SAP system, but `npx jest` is not offline. `package.json` sets
+  `globalSetup` to `src/__tests__/integration/globalSetup.ts`, which runs for **every**
+  jest invocation, unit runs included. Without `tests/test-config.yaml` it returns
+  immediately and never throws. With one, it opens a session for the configured
+  destination and prints `[globalSetup] Session ready for "<dest>"`. If that turns into
+  an interactive browser OAuth prompt, **stop and ask the user** rather than letting a
+  browser flow fire unannounced; auth failure is not fatal — globalSetup catches and
+  continues.
 - **No handler is modified by this plan.** A task that finds itself editing
   `src/handlers/` has gone outside its scope.
 
@@ -64,16 +89,31 @@ after, in plans written from it.
 - Create: `scripts/tool-provenance.ts` — the three-tier name-to-file map
 - Create: `scripts/probe-package-contents.ts` — only if Step 3 finds no existing probe
 
-All three are committed, not scratch. Every number in the inventory comes out of them, and
-a reviewer who cannot re-run them cannot check the table; they are also what keeps the
-inventory refreshable after handlers move. Keep them next to the probes already in
-`scripts/`, in the same shape.
+The first two are always written; the third only if Step 3 finds nothing that already
+covers package contents. All of them are committed, not scratch: every number in the
+inventory comes out of them, a reviewer who cannot re-run them cannot check the table, and
+they are what keeps the inventory refreshable after handlers move. Keep them next to the
+probes already in `scripts/`, in the same shape.
 
 **Interfaces:**
-- Consumes: nothing. This task reads `main`, writes two scripts and a document.
+- Consumes: nothing. This task reads `main`, writes the scripts above and a document.
 - Produces: the compatibility table every later plan is written from — one row per
   **(tool, group)** pair, carrying the columns listed in Step 2. Nothing downstream may
   drop a field or an input that does not appear in it.
+
+- [ ] **Step 0: Create the branch**
+
+Nothing else in this plan does, and the constraint above forbids committing to `main`.
+
+```bash
+git checkout main && git pull --ff-only
+git checkout -b feat/answer-adapter
+git branch --show-current   # must print feat/answer-adapter
+```
+
+One branch carries all five tasks. Task 1 writes only a document and scripts, but it is
+the reason the later tasks look the way they do, and splitting it off would put the table
+and the code that follows from it in different histories.
 
 - [ ] **Step 1: Enumerate the tools, not the files**
 
@@ -404,9 +444,9 @@ number the design deliberately left to the inventory.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add docs/superpowers/specs/2026-09-09-tool-inventory.md \
-        scripts/list-tools.ts scripts/tool-provenance.ts
-git status --short scripts/   # must be empty: a probe written in Step 3 goes in too
+npx biome check --write scripts/   # 'npm run lint' only covers src/, so do it by hand
+git status --short scripts/        # every line here must be staged below, probe included
+git add docs/superpowers/specs/2026-09-09-tool-inventory.md scripts/
 git commit -m "docs(spec): the stage-1 tool inventory
 
 One row per (tool, group) pair — 362 registered tools, of which 18 read-only
@@ -425,6 +465,8 @@ Includes the traversal bound, measured rather than guessed.
 
 The two enumeration scripts ship with the table. Every count in it is their
 output, and a table nobody can re-derive is a table nobody can check."
+
+git status --short scripts/   # now empty: nothing written in Steps 1-3 was left behind
 ```
 
 - [ ] **Step 5: Stop and ask for review**
@@ -457,6 +499,16 @@ compiles until the local factory is in place.
 npm install @mcp-abap-adt/adt-clients@^18.0.1 @mcp-abap-adt/interfaces@^39.0.1 \
             @mcp-abap-adt/connection@^8.0.1 @mcp-abap-adt/logger@^0.3.1
 ```
+
+The lockfile will show **adt-clients 18.0.2** — that is the current publish and the caret
+allows it. Do not pin it back to 18.0.1.
+
+If npm answers `ERESOLVE`, it will be the auth packages, which depend on an older
+`interfaces`. **Do not add an `overrides` block and do not pass `--force`.** Overrides
+are the crutch this repository has a standing rule against: the fix is a direct-dependency
+bump or an in-range resolution, and if neither works the auth packages need a release
+first. Record what npm said and stop — that is a finding for the user, not a decision for
+this task.
 
 - [ ] **Step 2: Verify one interfaces copy in the core chain**
 
@@ -496,8 +548,9 @@ worse.
 - [ ] **Step 5: Commit**
 
 ```bash
+npx biome check --write src/lib/connectionFactory.ts
 git add package.json package-lock.json src/lib/connectionFactory.ts
-git commit -m "chore(deps): raise the stack to adt-clients 18, interfaces 39, connection 8
+git commit --no-verify -m "chore(deps): raise the stack to adt-clients 18, interfaces 39, connection 8
 
 The adapter cannot be written against interfaces 13: IAdtResponse has no ok and
 no getResult() there. connection 8 removed createAbapConnection, so the local
@@ -506,7 +559,11 @@ which system is dialled, which the library now requires of its caller.
 
 The repository does not typecheck after this and is not meant to: every handler
 still speaks the old contract, and the migration plans bring it back to zero.
-Errors after this commit: <N>."
+Errors after this commit: <N>.
+
+Committed with --no-verify: .husky/pre-commit runs npm run build, which
+typechecks the whole repository, and from here it cannot pass. Biome ran by
+hand above."
 ```
 
 ---
@@ -654,8 +711,10 @@ Expected: PASS, 3 tests.
 
 ```bash
 npx biome check --write src/lib/answer.ts src/__tests__/unit/answerSuccess.test.ts
+npx tsc --noEmit -p tsconfig.json > /tmp/tsc.log 2>&1
+grep -c 'src/lib/answer.ts' /tmp/tsc.log   # must print 0
 git add src/lib/answer.ts src/__tests__/unit/answerSuccess.test.ts
-git commit -m "feat(answer): the adapter's success half
+git commit --no-verify -m "feat(answer): the adapter's success half
 
 A string projection goes back verbatim, so source and raw stay themselves;
 anything else is indented JSON. An undefined projection is a failure on the
@@ -861,8 +920,10 @@ Expected: PASS, 8 tests.
 
 ```bash
 npx biome check --write src/lib/answer.ts src/__tests__/unit/answerFailure.test.ts
+npx tsc --noEmit -p tsconfig.json > /tmp/tsc.log 2>&1
+grep -c 'src/lib/answer.ts' /tmp/tsc.log   # must print 0
 git add src/lib/answer.ts src/__tests__/unit/answerFailure.test.ts
-git commit -m "feat(answer): the failure half, as an allowlist
+git commit --no-verify -m "feat(answer): the failure half, as an allowlist
 
 message and origin always; code, adt_type, namespace, request and messages when
 the strategy filled them. The response object is never serialised — headers,
@@ -1019,8 +1080,10 @@ git status --short src/handlers   # must print nothing
 
 ```bash
 npx biome check --write src/lib/answer.ts src/__tests__/unit/answerBoundary.test.ts
+npx tsc --noEmit -p tsconfig.json > /tmp/tsc.log 2>&1
+grep -c 'src/lib/answer.ts' /tmp/tsc.log   # must print 0
 git add src/lib/answer.ts src/__tests__/unit/answerBoundary.test.ts
-git commit -m "feat(answer): an exception boundary over the whole pipeline
+git commit --no-verify -m "feat(answer): an exception boundary over the whole pipeline
 
 A handler will have no try. adt-clients throws from more than its readings, and
 a projection can throw on a shape it did not expect; both are caught and named

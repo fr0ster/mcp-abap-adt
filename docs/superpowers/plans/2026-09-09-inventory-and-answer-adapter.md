@@ -81,25 +81,27 @@ after, in plans written from it.
 
 ---
 
-### Task 1: The tool inventory
+### Task 1a: The enumeration
+
+The inventory is two jobs with different shapes, and they are two tasks. This one is
+mechanical: the scripts decide every cell in it, and a reviewer checks it by re-running
+them. Task 1b is 362 handler reads and no script can do it.
 
 **Files:**
-- Create: `docs/superpowers/specs/2026-09-09-tool-inventory.md`
 - Create: `scripts/list-tools.ts` — enumeration and the six-mode visibility sets
 - Create: `scripts/tool-provenance.ts` — the three-tier name-to-file map
-- Create: `scripts/probe-package-contents.ts` — only if Step 3 finds no existing probe
+- Create: `docs/superpowers/specs/2026-09-09-tool-inventory-rows.md` — the skeleton
 
-The first two are always written; the third only if Step 3 finds nothing that already
-covers package contents. All of them are committed, not scratch: every number in the
-inventory comes out of them, a reviewer who cannot re-run them cannot check the table, and
-they are what keeps the inventory refreshable after handlers move. Keep them next to the
-probes already in `scripts/`, in the same shape.
+The scripts are committed, not scratch: every number in the inventory comes out of them, a
+reviewer who cannot re-run them cannot check the table, and they are what keeps it
+refreshable after handlers move. Keep them next to the probes already in `scripts/`, in
+the same shape.
 
 **Interfaces:**
-- Consumes: nothing. This task reads `main`, writes the scripts above and a document.
-- Produces: the compatibility table every later plan is written from — one row per
-  **(tool, group)** pair, carrying the columns listed in Step 2. Nothing downstream may
-  drop a field or an input that does not appear in it.
+- Consumes: nothing. This task reads `main` and writes two scripts and one document.
+- Produces: `2026-09-09-tool-inventory-rows.md` — one row per **(tool, group)** pair with
+  the four columns a script can fill, plus the six-mode matrix and the findings named in
+  Step 1. Task 1b adds columns to these rows and adds no rows.
 
 - [ ] **Step 0: Create the branch**
 
@@ -390,15 +392,96 @@ this plan was wrong to use it as one: factories push the tool count above the fi
 cancel. Use it for one thing only — listing files whose tool names appear in no group,
 which is a finding about dead handlers rather than a check on the enumeration.
 
-- [ ] **Step 2: Fill one row per (tool, group) pair**
+- [ ] **Step 2: Write the skeleton**
+
+`docs/superpowers/specs/2026-09-09-tool-inventory-rows.md`. One row per (tool, group)
+pair — 362 of them — and only the columns the scripts decide:
 
 | column | what goes in it |
 |---|---|
-| tool | the `name` from `TOOL_DEFINITION` |
-| group | the handler group the row came from — readonly, high, low, compact, system, search |
-| implementation files | the file(s) that own this row, from `scripts/tool-provenance.ts` — tier 1 or 2 gives one path; a tier-3 high-level rename gives **two**, the group file that owns the name and description and the handler file that owns the behaviour, and both go in the cell |
-| visible in | which of the **six** supported expositions expose this row — `readonly`, `high`, `low`, `readonly,high`, `readonly,low`, `compact` — taken from the six sets the second snippet in Step 1 writes out, not from the summary table. A row visible in none of them is a finding, not a row to migrate silently |
+| tool | the `name` from the enumeration |
+| group | readonly, high, low, compact, system, search |
+| implementation files | from `scripts/tool-provenance.ts` — tier 1 or 2 gives one path; a tier-3 high-level rename gives **two**, the group file that owns the name and description and the handler file that owns the behaviour, and both go in the cell |
+| visible in | which of the **six** supported expositions expose this row — `readonly`, `high`, `low`, `readonly,high`, `readonly,low`, `compact` — taken from the six sets the second snippet writes out, not from the summary table. A row visible in none of them is a finding, not a row to migrate silently |
 | current inputs | every property of `inputSchema`, and which are required |
+
+Leave the other eight columns out of this document entirely — Task 1b adds them. Do not
+guess at them, and do not add a placeholder column: an empty cell in a committed table
+reads as "checked, nothing there".
+
+Above the table, put what the runs produced:
+
+- the six-mode matrix, as counts and composition;
+- the three edge findings from Step 1 — the empty exposition, the CLI help that advertises
+  a combination `validateExposition` rejects, and `EmbeddableMcpServer`'s different rules;
+- any name a group registers that the provenance tiers could not place, and any file with a
+  `TOOL_DEFINITION` whose tools no group registers. Both lists should be empty on `main`
+  today; if either is not, say so rather than dropping the rows.
+
+State the totals in the same place: 362 rows, 362 distinct names, 348 placed by tiers 1-2,
+14 by tier 3. If a run disagrees with a number in this plan, the run is right and the
+disagreement goes in the document — the plan was measured on `main` on 2026-09-09.
+
+- [ ] **Step 3: Commit**
+
+Name the files. `npm run lint` covers `src/` only, so the new scripts are formatted by
+hand — but **only the ones this task wrote**. `biome check --write scripts/` would
+reformat six probe scripts that already live there and have never been linted
+(`list-dumps.ts` and `list-traces.ts` carry format diagnostics today), and
+`git add scripts/` would sweep them, plus anything else untracked, into a commit that
+claims to hold inventory artifacts.
+
+```bash
+npx biome check --write scripts/list-tools.ts scripts/tool-provenance.ts
+
+git add docs/superpowers/specs/2026-09-09-tool-inventory-rows.md \
+        scripts/list-tools.ts scripts/tool-provenance.ts
+
+git status --short scripts/   # read it: anything unstaged here is a file this task
+                              # did not write. Leave it alone; do not add it.
+git commit -m "docs(spec): enumerate the tools, one row per (tool, group)
+
+362 registered tools across six handler groups, with the file that implements
+each and the expositions that expose it. 348 rows are placed by an exported
+definition or by calling a build* factory; the other 14 are high-level renames,
+where the group file owns the name and a low-level file owns the behaviour, and
+both paths are in the row.
+
+The two scripts ship with the table. Every count in it is their output, and a
+table nobody can re-derive is a table nobody can check.
+
+Columns that need a handler read — output, transformation, error decision,
+guarantees, and the proposed projection — are Task 1b's, and are absent rather
+than blank."
+
+git status --short scripts/list-tools.ts scripts/tool-provenance.ts 2>/dev/null
+# Empty: the files this task wrote are committed. Anything else still listed by
+# `git status --short scripts/` belongs to someone else and stays untouched.
+```
+
+---
+
+### Task 1b: The inventory
+
+**Files:**
+- Create: `docs/superpowers/specs/2026-09-09-tool-inventory.md`
+- Create: `scripts/probe-package-contents.ts` — only if Step 2 finds no existing probe
+- Read: `docs/superpowers/specs/2026-09-09-tool-inventory-rows.md` (from Task 1a)
+
+**Interfaces:**
+- Consumes: the skeleton from Task 1a — 362 rows, each with tool, group, implementation
+  files, visible in, and current inputs.
+- Produces: the compatibility table every later plan is written from. Nothing downstream
+  may drop a field or an input that does not appear in it.
+
+Carry every skeleton row across unchanged and add the eight columns below. **Do not
+re-derive the rows** — if a row looks wrong, that is a finding about Task 1a's scripts,
+and it goes in the document rather than being silently corrected here.
+
+- [ ] **Step 1: Fill the remaining columns, one group at a time**
+
+| column | what goes in it |
+|---|---|
 | current default output | the exact object the handler returns today, field by field |
 | transformation today | how it turns the ADT answer into that output — name the parser it calls, or "returns the document" |
 | error decision today | what it treats as a failure — an HTTP status, a thrown error, a field in the document |
@@ -425,7 +508,15 @@ find the rest:
 A guarantee that depends on a field is a reason that field stays, or a reason the
 guarantee moves somewhere it still holds. Either is a decision, and it goes in the row.
 
-- [ ] **Step 3: Record the traversal bound**
+**Work group by group and commit after each**, in this order: system and search (34), then
+readonly (34), then compact (22), then high (156), then low (116). Each commit is
+`docs(spec): tool inventory — <group>`, and the document says at the top which groups are
+filled. 362 rows do not fit one sitting, and a half-finished table in the working tree is
+lost work; a half-finished table in git is a starting point. Do not summarise a group
+you have not read handler by handler — a row asserting an output nobody checked is worse
+than a missing row, because the migration plans will trust it.
+
+- [ ] **Step 2: Record the traversal bound**
 
 For `GetPackageTree`, `GetPackageContents` and `GetObjectsList`, run each against a real
 package on the trial system and record how many objects and how many round trips a full
@@ -436,59 +527,41 @@ npx tsx scripts/probe-transport-list.ts --env trial.env   # pattern for a probe 
 ```
 
 If no probe covers package contents, write `scripts/probe-package-contents.ts` in the
-same shape and commit it in Step 4 with the others. Where a name is
-carried by more than one group, measure the one the default exposition exposes. Fix the safety bound
-from the measurement and write both the number and the measurement down. This is the one
-number the design deliberately left to the inventory.
+same shape and commit it in Step 3. Where a name is carried by more than one group,
+measure the one the default exposition exposes. Fix the safety bound from the measurement
+and write both the number and the measurement down. This is the one number the design
+deliberately left to the inventory.
 
-- [ ] **Step 4: Commit**
+This step talks to a real SAP system. If the session needs an interactive browser login,
+**stop and ask the user** rather than letting a browser flow fire unannounced.
 
-Name the files. `npm run lint` covers `src/` only, so the new scripts are formatted by
-hand — but **only the ones this task wrote**. `biome check --write scripts/` would
-reformat six probe scripts that already live there and have never been linted
-(`list-dumps.ts` and `list-traces.ts` carry format diagnostics today), and
-`git add scripts/` would sweep them, plus anything else untracked, into a commit that
-claims to hold inventory artifacts. Drop the third line if Step 3 wrote no probe.
+- [ ] **Step 3: Commit**
 
 ```bash
-npx biome check --write scripts/list-tools.ts scripts/tool-provenance.ts
-npx biome check --write scripts/probe-package-contents.ts   # only if Step 3 wrote it
+npx biome check --write scripts/probe-package-contents.ts   # only if Step 2 wrote it
 
-git add docs/superpowers/specs/2026-09-09-tool-inventory.md \
-        scripts/list-tools.ts scripts/tool-provenance.ts
-git add scripts/probe-package-contents.ts                   # only if Step 3 wrote it
-
-git status --short scripts/   # read it: anything unstaged here is a file this task
-                              # did not write. Leave it alone; do not add it.
+git add docs/superpowers/specs/2026-09-09-tool-inventory.md
+git add scripts/probe-package-contents.ts                   # only if Step 2 wrote it
 git commit -m "docs(spec): the stage-1 tool inventory
 
-One row per (tool, group) pair — 362 registered tools, of which 18 read-only
-ones are suppressed under the default exposition rather than removed — with
-current inputs and output, how it transforms an answer today, how it decides an
-error, and what it guarantees beyond reading. Then the
-proposed terse projection and every field that would be dropped, each with its
-justification.
+Every row from the enumeration, with what the handler returns today, how it
+transforms the ADT answer, how it decides an error, and what it guarantees
+beyond reading. Then the proposed terse projection and every field that would be
+dropped, each with its justification.
 
 The guarantees column exists because two readers earn their envelopes —
 ReadProgram rejects a PROG/I by reading the metadata, ReadFunctionModule checks
 the module belongs to its group — and a migration that did not know that would
 delete both.
 
-Includes the traversal bound, measured rather than guessed.
-
-The two enumeration scripts ship with the table. Every count in it is their
-output, and a table nobody can re-derive is a table nobody can check."
-
-git status --short scripts/list-tools.ts scripts/tool-provenance.ts \
-                       scripts/probe-package-contents.ts 2>/dev/null
-# Empty: the files this task wrote are committed. Anything else still listed by
-# `git status --short scripts/` belongs to someone else and stays untouched.
+Includes the traversal bound, measured rather than guessed."
 ```
 
-- [ ] **Step 5: Stop and ask for review**
+- [ ] **Step 4: Stop and ask for review**
 
 The design makes this table a precondition: no handler moves until it is reviewed. Post
-the table and wait. Do not begin any migration plan on your own authority.
+the table and wait. Do not begin any migration plan on your own authority. Tasks 2-5 build
+the adapter and touch no handler, so they may proceed while the table is in review.
 
 ---
 

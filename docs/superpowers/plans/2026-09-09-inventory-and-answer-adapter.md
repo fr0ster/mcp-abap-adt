@@ -63,44 +63,151 @@ after, in plans written from it.
 
 **Interfaces:**
 - Consumes: nothing. This task reads `main` and writes a document.
-- Produces: the compatibility table every later plan is written from — one row per tool,
-  carrying the columns listed in Step 2. Nothing downstream may drop a field or an input
-  that does not appear in it.
+- Produces: the compatibility table every later plan is written from — one row per
+  **(tool, group)** pair, carrying the columns listed in Step 2. Nothing downstream may
+  drop a field or an input that does not appear in it.
 
 - [ ] **Step 1: Enumerate the tools, not the files**
 
 A file is not a tool. `src/handlers/common/high/objectVersionTools.ts` has no
 `TOOL_DEFINITION` of its own: it loops over `VERSIONED_TYPES` and generates two tools per
-type. Counting files would give it one unreadable row and lose eighteen contracts, and
-any other factory added since would vanish the same way.
+type. Counting files would give it one unreadable row and lose the eighteen contracts it
+generates, and any other factory added since would vanish the same way.
 
-Enumerate what the server actually registers:
+And one `HandlerExporter` run is not the answer either. Its constructor
+(`src/lib/handlers/HandlerExporter.ts:104-122`) turns read-only, high, low, system and
+search on unless switched off, but leaves **compact off unless explicitly asked for**
+(`includeCompact === true`). That default is a combination the server never runs:
+`validateExposition` (`src/lib/config/validateExposition.ts`) rejects `high` together with
+`low`, and rejects `compact` alongside anything at all. So a single default run would miss
+every compact tool, and would report a read-only surface the default exposition does not
+actually show.
+
+Enumerate **per group**, and keep the group on the row:
 
 ```ts
 // scripts/list-tools.ts — write it, run it, keep it
-import { HandlerExporter } from '../src/lib/handlers/HandlerExporter';
+import type { HandlerContext } from '../src/handlers/interfaces.js';
+import {
+  CompactHandlersGroup,
+  HighLevelHandlersGroup,
+  LowLevelHandlersGroup,
+  ReadOnlyHandlersGroup,
+  SearchHandlersGroup,
+  SystemHandlersGroup,
+} from '../src/lib/handlers/groups/index.js';
 
-const tools = new HandlerExporter().getAllTools();
-console.log(JSON.stringify(tools.map((t) => ({ name: t.name, schema: t.inputSchema })), null, 2));
+// Groups only read `connection` when a handler runs; listing never runs one.
+const ctx = { connection: null, logger: undefined } as unknown as HandlerContext;
+
+const groups = {
+  // Default arguments on purpose: an empty overriding set and NoDedupStrategy,
+  // so this is the full read-only surface before any exposition hides part of it.
+  readonly: new ReadOnlyHandlersGroup(ctx),
+  high: new HighLevelHandlersGroup(ctx),
+  low: new LowLevelHandlersGroup(ctx),
+  compact: new CompactHandlersGroup(ctx),
+  system: new SystemHandlersGroup(ctx),
+  search: new SearchHandlersGroup(ctx),
+};
+
+const rows = Object.entries(groups).flatMap(([group, instance]) =>
+  instance.getHandlers().map((entry) => ({
+    group,
+    name: entry.toolDefinition.name,
+    schema: entry.toolDefinition.inputSchema,
+  })),
+);
+
+console.log(JSON.stringify(rows, null, 2));
 ```
 
 ```bash
 npx tsx scripts/list-tools.ts > /tmp/tools.json
-node -e "console.log(require('/tmp/tools.json').length)"
+node -e "const r=require('/tmp/tools.json');
+console.log('rows', r.length, '/ distinct names', new Set(r.map(x=>x.name)).size);
+const by={}; for (const x of r) (by[x.name] ||= []).push(x.group);
+console.log('names carried by more than one group:');
+for (const [n,g] of Object.entries(by)) if (g.length>1) console.log(' ', n, g.join('+'));"
 ```
 
-Check the exporter's own accessor name before running — read
-`src/lib/handlers/HandlerExporter.ts` and use whatever it exposes to list registered
-tools. One row per entry in that output. Cross-check the count against
-`grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l` (327 files today): the
-registered count must be **higher**, and the difference is the factories. If it is not
-higher, the enumeration is wrong and the inventory would be built on it.
+Run on `main` while writing this plan, that prints **362 rows, 362 distinct names**, and
+no name carried by more than one group. Two things follow. The first is the count: 362
+registered tools against 327 files with a `TOOL_DEFINITION`, and the difference is the
+factories. The second is that the groups partition the names today — so if this ever
+prints a name in two groups, that is a finding to write up before continuing, not a
+duplicate to collapse.
 
-- [ ] **Step 2: Fill one row per tool**
+Read `src/lib/handlers/interfaces.ts` and `src/lib/handlers/groups/index.ts` before
+running and use what they actually expose — today `IHandlerGroup.getHandlers()` returning
+`HandlerEntry { toolDefinition, handler }` — rather than trusting this snippet's names.
+
+**One row per (tool, group) pair, not per name.** Even with the names partitioned, the
+group is what decides whether a row is reachable, so it belongs on the row rather than in
+a heading. `HandlerEntry` does not name the file — resolve it with
+`grep -rln "name: '<ToolName>'" src/handlers` and put the path in the row.
+
+The launcher never exposes all of that at once, and the inventory must say what each
+exposition actually shows. `src/server/launcher.ts:203-241` builds high, low or compact
+first, collects their tool names into `overridingToolNames`, then constructs
+`ReadOnlyHandlersGroup(ctx, overridingToolNames, new ReadVsGetDedupStrategy())` — so a
+read-only handler paired with an exposed one is **suppressed, not merged**.
+Note also that the launcher only adds `SystemHandlersGroup` when the exposition includes
+`readonly`, while `SearchHandlersGroup` is always added. Record, for each of the three
+real expositions — `['readonly','high']` (the default), `['readonly','low']` and
+`['compact']` — which read-only rows survive. Because the names are partitioned, this
+suppression runs entirely through `ReadVsGetDedupStrategy`'s `Read<X>`/`Get<X>` pairing,
+not through exact collisions:
+
+```ts
+// append to scripts/list-tools.ts
+import { ReadVsGetDedupStrategy } from '../src/lib/handlers/groups/strategies/index.js';
+
+for (const exposition of [['readonly','high'], ['readonly','low'], ['compact']]) {
+  const overriding = new Set(
+    exposition.filter((e) => e !== 'readonly')
+      .flatMap((e) => groups[e].getHandlers().map((h) => h.toolDefinition.name)),
+  );
+  const visible = exposition.includes('readonly')
+    ? new ReadOnlyHandlersGroup(ctx, overriding, new ReadVsGetDedupStrategy()).getHandlers()
+    : [];
+  console.error(exposition.join('+'), 'readonly visible:', visible.length,
+    'withheld:', groups.readonly.getHandlers().length - visible.length);
+}
+```
+
+Run on `main` while writing this plan, that prints:
+
+```
+readonly+high  readonly visible: 16  withheld: 18
+readonly+low   readonly visible: 34  withheld: 0
+compact        readonly visible: 0   withheld: 34
+```
+
+The three lines are withheld for two different reasons, and the inventory should not
+blur them. Under `readonly+high`, **eighteen of the thirty-four read-only tools are
+suppressed by the dedup strategy** because `high` exposes their `Get<X>` counterpart;
+under `compact` the read-only group is not constructed at all, so all thirty-four are
+simply absent. Either way those handlers are still in the repository, still compiled, and
+still carry whatever guarantee they make. They are rows in the inventory like any other,
+marked with where they are visible; a later plan may decide some are dead, but this one
+only records the fact.
+
+The file count — `grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l`, 327
+today — is **not** a lower bound to check the enumeration against, and an earlier draft of
+this plan was wrong to use it as one: factories push the tool count above the file count
+(362 against 327), files whose tools no group registers push it below, and the two do not
+cancel. Use it for one thing only — listing files whose tool names appear in no group,
+which is a finding about dead handlers rather than a check on the enumeration.
+
+- [ ] **Step 2: Fill one row per (tool, group) pair**
 
 | column | what goes in it |
 |---|---|
 | tool | the `name` from `TOOL_DEFINITION` |
+| group | the handler group the row came from — readonly, high, low, compact, system, search |
+| file | the file that implements *this* row, from the `grep` in Step 1 |
+| visible in | which of the three real expositions actually expose this row, from the second snippet in Step 1 — a read-only row suppressed under every exposition is a finding, not a row to migrate silently |
 | current inputs | every property of `inputSchema`, and which are required |
 | current default output | the exact object the handler returns today, field by field |
 | transformation today | how it turns the ADT answer into that output — name the parser it calls, or "returns the document" |
@@ -138,7 +245,8 @@ walk costs:
 npx tsx scripts/probe-transport-list.ts --env trial.env   # pattern for a probe script
 ```
 
-Write a probe in the same shape for package contents if none exists. Fix the safety bound
+Write a probe in the same shape for package contents if none exists. Where a name is
+carried by more than one group, measure the one the default exposition exposes. Fix the safety bound
 from the measurement and write both the number and the measurement down. This is the one
 number the design deliberately left to the inventory.
 
@@ -148,8 +256,10 @@ number the design deliberately left to the inventory.
 git add docs/superpowers/specs/2026-09-09-tool-inventory.md
 git commit -m "docs(spec): the stage-1 tool inventory
 
-One row per tool: current inputs and output, how it transforms an answer today,
-how it decides an error, and what it guarantees beyond reading. Then the
+One row per (tool, group) pair — 362 registered tools, of which 18 read-only
+ones are suppressed under the default exposition rather than removed — with
+current inputs and output, how it transforms an answer today, how it decides an
+error, and what it guarantees beyond reading. Then the
 proposed terse projection and every field that would be dropped, each with its
 justification.
 

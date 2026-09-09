@@ -142,6 +142,11 @@ Read `src/lib/handlers/interfaces.ts` and `src/lib/handlers/groups/index.ts` bef
 running and use what they actually expose — today `IHandlerGroup.getHandlers()` returning
 `HandlerEntry { toolDefinition, handler }` — rather than trusting this snippet's names.
 
+Both snippets in this step were compiled against the repository's own `tsconfig.json`
+(`strict: true`, `module: node16`) and run on `main`; every number quoted below is
+their output, not an estimate. Still read the two files above before running — if the
+group API has moved since, fix the snippet rather than working around it.
+
 **One row per (tool, group) pair, not per name.** Even with the names partitioned, the
 group is what decides whether a row is reachable, so it belongs on the row rather than in
 a heading. `HandlerEntry` does not name the file — resolve it with
@@ -151,47 +156,93 @@ The launcher never exposes all of that at once, and the inventory must say what 
 exposition actually shows. `src/server/launcher.ts:203-241` builds high, low or compact
 first, collects their tool names into `overridingToolNames`, then constructs
 `ReadOnlyHandlersGroup(ctx, overridingToolNames, new ReadVsGetDedupStrategy())` — so a
-read-only handler paired with an exposed one is **suppressed, not merged**.
-Note also that the launcher only adds `SystemHandlersGroup` when the exposition includes
-`readonly`, while `SearchHandlersGroup` is always added. Record, for each of the three
-real expositions — `['readonly','high']` (the default), `['readonly','low']` and
-`['compact']` — which read-only rows survive. Because the names are partitioned, this
-suppression runs entirely through `ReadVsGetDedupStrategy`'s `Read<X>`/`Get<X>` pairing,
-not through exact collisions:
+read-only handler paired with an exposed one is **suppressed, not merged**. Note also that
+the launcher adds `SystemHandlersGroup` only when the exposition includes `readonly`,
+while `SearchHandlersGroup` is always added.
+
+**Cover every exposition the server accepts, not a chosen few.** `HandlerSet` is
+`'readonly' | 'high' | 'low' | 'compact'` (`src/lib/config/IServerConfig.ts:22`) and
+`validateExposition` rejects exactly two things: `compact` with anything else, and `high`
+together with `low`. That leaves six supported modes, and standalone `high` and `low` are
+among them — they get no system and no read-only group at all, which no three-mode sample
+would have shown:
 
 ```ts
 // append to scripts/list-tools.ts
 import { ReadVsGetDedupStrategy } from '../src/lib/handlers/groups/strategies/index.js';
 
-for (const exposition of [['readonly','high'], ['readonly','low'], ['compact']]) {
-  const overriding = new Set(
-    exposition.filter((e) => e !== 'readonly')
-      .flatMap((e) => groups[e].getHandlers().map((h) => h.toolDefinition.name)),
+type GroupKey = keyof typeof groups;
+
+// Annotated rather than inferred: without this the array widens to string[][] and
+// groups[e] indexes an object with no index signature, which strict mode rejects.
+const EXPOSITIONS: ReadonlyArray<readonly GroupKey[]> = [
+  ['readonly'],
+  ['high'],
+  ['low'],
+  ['readonly', 'high'], // the default
+  ['readonly', 'low'],
+  ['compact'],
+];
+
+// Mirrors launcher.ts:203-241: overriding groups first, then a read-only group that has
+// seen their names, system only alongside readonly, search always.
+for (const exposition of EXPOSITIONS) {
+  const overriding = exposition.filter((e) => e !== 'readonly');
+  const overridingNames = new Set<string>(
+    overriding.flatMap((e) => groups[e].getHandlers().map((h) => h.toolDefinition.name)),
   );
-  const visible = exposition.includes('readonly')
-    ? new ReadOnlyHandlersGroup(ctx, overriding, new ReadVsGetDedupStrategy()).getHandlers()
-    : [];
-  console.error(exposition.join('+'), 'readonly visible:', visible.length,
-    'withheld:', groups.readonly.getHandlers().length - visible.length);
+
+  const visible: { group: GroupKey; name: string }[] = [];
+  const take = (group: GroupKey, entries: { toolDefinition: { name: string } }[]) => {
+    for (const e of entries) visible.push({ group, name: e.toolDefinition.name });
+  };
+
+  if (exposition.includes('readonly')) {
+    take('readonly',
+      new ReadOnlyHandlersGroup(ctx, overridingNames, new ReadVsGetDedupStrategy()).getHandlers());
+    take('system', groups.system.getHandlers());
+  }
+  for (const e of overriding) take(e, groups[e].getHandlers());
+  take('search', groups.search.getHandlers());
+
+  console.error(exposition.join(','), visible.length);
+  // Write `visible` out per mode: the "visible in" column is built from these six sets.
 }
 ```
 
-Run on `main` while writing this plan, that prints:
+Run on `main` while writing this plan, the six modes come out as:
 
-```
-readonly+high  readonly visible: 16  withheld: 18
-readonly+low   readonly visible: 34  withheld: 0
-compact        readonly visible: 0   withheld: 34
-```
+| exposition | tools | composition |
+|---|---|---|
+| `readonly` | 68 | readonly 34/34 + system 30 + search 4 |
+| `high` | 160 | high 156 + search 4 |
+| `low` | 120 | low 116 + search 4 |
+| `readonly,high` *(default)* | 206 | readonly 16/34 + system 30 + high 156 + search 4 |
+| `readonly,low` | 184 | readonly 34/34 + system 30 + low 116 + search 4 |
+| `compact` | 26 | compact 22 + search 4 |
 
-The three lines are withheld for two different reasons, and the inventory should not
-blur them. Under `readonly+high`, **eighteen of the thirty-four read-only tools are
-suppressed by the dedup strategy** because `high` exposes their `Get<X>` counterpart;
-under `compact` the read-only group is not constructed at all, so all thirty-four are
-simply absent. Either way those handlers are still in the repository, still compiled, and
-still carry whatever guarantee they make. They are rows in the inventory like any other,
-marked with where they are visible; a later plan may decide some are dead, but this one
-only records the fact.
+Read this as a coverage statement, not a summary. A read-only tool is withheld for two
+different reasons and the inventory must not blur them: under `readonly,high` **eighteen
+of the thirty-four are suppressed by the dedup strategy**, because `high` exposes their
+`Get<X>` counterpart; under `high`, `low` and `compact` the read-only group is never
+constructed, so all thirty-four are absent along with all thirty system tools. Only
+`search` is in every mode. A row visible in no mode at all is a finding to write up.
+
+Three edges belong in the inventory as findings rather than as rows:
+
+- `validateExposition([])` does not throw, and `config.exposition` of `[]` is truthy, so
+  an empty exposition survives `launcher.ts:204` and starts a server exposing the four
+  search tools and nothing else.
+- The CLI help (`src/lib/config/ServerConfigManager.ts:239-245`) advertises
+  `--exposition=readonly,high,low (all handlers)`, which `validateExposition` rejects.
+  The help is wrong; record it, do not act on it here.
+- `EmbeddableMcpServer` is a second entry point with different rules
+  (`src/server/EmbeddableMcpServer.ts:53-59, 185-220`): its exposition vocabulary also
+  takes `'system'` and `'search'` as explicit opt-ins, it never calls
+  `validateExposition`, and its `readOnlyDedupStrategy` may be omitted, in which case
+  `overridingToolNames` stays empty and nothing is suppressed. The matrix above describes
+  the launcher. Note per row where the embeddable path would differ; do not enumerate its
+  combinations, since it accepts ones the CLI rejects.
 
 The file count — `grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l`, 327
 today — is **not** a lower bound to check the enumeration against, and an earlier draft of

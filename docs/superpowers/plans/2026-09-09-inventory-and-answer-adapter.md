@@ -44,6 +44,12 @@ after, in plans written from it.
   `npx tsc --noEmit -p tsconfig.json > /tmp/tsc.log 2>&1; grep -c 'TS1128\|TS1005' /tmp/tsc.log`
   must print `0`. A sudden drop in the total error count usually means a parse failure
   stopped the compiler — see `docs/development/TROUBLESHOOTING.md`.
+- **The whole-repository typecheck will not be clean during this plan, and that is
+  expected.** Task 2 raises the dependency stack, and every handler still speaks the old
+  contract; the migration plans bring the count back to zero. The gate for Tasks 3-5 is
+  therefore scoped: `grep -c 'src/lib/answer.ts\|answerSuccess\|answerFailure\|answerBoundary' /tmp/tsc.log`
+  must print `0`, and the syntax check above must print `0`. Record the total after
+  Task 2 so a later task can tell whether it made things worse.
 - Unit tests run without SAP: `npx jest src/__tests__/unit`.
 - **No handler is modified by this plan.** A task that finds itself editing
   `src/handlers/` has gone outside its scope.
@@ -61,15 +67,34 @@ after, in plans written from it.
   carrying the columns listed in Step 2. Nothing downstream may drop a field or an input
   that does not appear in it.
 
-- [ ] **Step 1: Enumerate the tools**
+- [ ] **Step 1: Enumerate the tools, not the files**
 
-```bash
-grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | sort > /tmp/tools.txt
-wc -l /tmp/tools.txt
+A file is not a tool. `src/handlers/common/high/objectVersionTools.ts` has no
+`TOOL_DEFINITION` of its own: it loops over `VERSIONED_TYPES` and generates two tools per
+type. Counting files would give it one unreadable row and lose eighteen contracts, and
+any other factory added since would vanish the same way.
+
+Enumerate what the server actually registers:
+
+```ts
+// scripts/list-tools.ts — write it, run it, keep it
+import { HandlerExporter } from '../src/lib/handlers/HandlerExporter';
+
+const tools = new HandlerExporter().getAllTools();
+console.log(JSON.stringify(tools.map((t) => ({ name: t.name, schema: t.inputSchema })), null, 2));
 ```
 
-Each file is one row. Read its `TOOL_DEFINITION` for the name and the input schema, and
-its handler body for the rest.
+```bash
+npx tsx scripts/list-tools.ts > /tmp/tools.json
+node -e "console.log(require('/tmp/tools.json').length)"
+```
+
+Check the exporter's own accessor name before running — read
+`src/lib/handlers/HandlerExporter.ts` and use whatever it exposes to list registered
+tools. One row per entry in that output. Cross-check the count against
+`grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l` (327 files today): the
+registered count must be **higher**, and the difference is the factories. If it is not
+higher, the enumeration is wrong and the inventory would be built on it.
 
 - [ ] **Step 2: Fill one row per tool**
 
@@ -143,7 +168,84 @@ the table and wait. Do not begin any migration plan on your own authority.
 
 ---
 
-### Task 2: The adapter's success half
+### Task 2: Raise the dependency stack
+
+**Files:**
+- Modify: `package.json`, `package-lock.json`
+- Create: `src/lib/connectionFactory.ts` (cherry-picked)
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces: `createAbapConnection(config, logger?, sessionId?, tokenRefresher?): IAbapConnection`
+  from `src/lib/connectionFactory.ts`, which is what the rest of the repository already
+  imports; and the `IAdtResponse` shape Tasks 3-5 are written against.
+
+The repository is on adt-clients 10, interfaces 13 and connection 1 today. The adapter
+cannot be written against those: `IAdtResponse` has a different shape there, with no
+`ok` and no `getResult()`. connection 8 also removed `createAbapConnection`, so nothing
+compiles until the local factory is in place.
+
+- [ ] **Step 1: Install the stack**
+
+```bash
+npm install @mcp-abap-adt/adt-clients@^18.0.1 @mcp-abap-adt/interfaces@^39.0.1 \
+            @mcp-abap-adt/connection@^8.0.1 @mcp-abap-adt/logger@^0.3.1
+```
+
+- [ ] **Step 2: Verify one interfaces copy in the core chain**
+
+```bash
+npm ls @mcp-abap-adt/interfaces
+```
+
+Expected: `adt-clients`, `connection`, `logger` and the top level all show `39.0.1`, three
+of them `deduped`. The auth packages carry their own older copies; that is known and does
+not affect the core chain. If any of the four shows a different version, stop — two
+structurally identical types do not compare equal, and the errors read as impossible.
+
+- [ ] **Step 3: Take the connection factory from the reference branch**
+
+```bash
+git checkout chore/bump-current-stack -- src/lib/connectionFactory.ts
+```
+
+Read it before continuing. It is the one place in the server that decides which system is
+being dialled, because connection 8 removed the factory that used to guess: cloud takes
+`AdtCloudConnector` with `TokenAuthProvider`, on-prem takes `AdtOnPremConnector` with a
+provider per auth type, RFC takes `RfcTransport`, and kerberos is refused by name because
+6.0 removed it without a replacement.
+
+- [ ] **Step 4: Record where the compiler stands**
+
+```bash
+npx tsc --noEmit -p tsconfig.json > /tmp/tsc-after-bump.log 2>&1
+grep -c 'error TS' /tmp/tsc-after-bump.log      # expect several hundred; write it down
+grep -c 'TS1128\|TS1005' /tmp/tsc-after-bump.log # must print 0
+```
+
+Hundreds of errors are the expected state: every handler still speaks the old contract.
+Put the number in the commit message so a later task can tell whether it made things
+worse.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add package.json package-lock.json src/lib/connectionFactory.ts
+git commit -m "chore(deps): raise the stack to adt-clients 18, interfaces 39, connection 8
+
+The adapter cannot be written against interfaces 13: IAdtResponse has no ok and
+no getResult() there. connection 8 removed createAbapConnection, so the local
+factory comes across from the reference branch — it is the one place that states
+which system is dialled, which the library now requires of its caller.
+
+The repository does not typecheck after this and is not meant to: every handler
+still speaks the old contract, and the migration plans bring it back to zero.
+Errors after this commit: <N>."
+```
+
+---
+
+### Task 3: The adapter's success half
 
 **Files:**
 - Create: `src/lib/answer.ts`
@@ -298,14 +400,14 @@ masking defect this repository has removed three times."
 
 ---
 
-### Task 3: The adapter's failure half
+### Task 4: The adapter's failure half
 
 **Files:**
 - Modify: `src/lib/answer.ts`
 - Test: `src/__tests__/unit/answerFailure.test.ts`
 
 **Interfaces:**
-- Consumes: `return_answer`, `AnswerContext`, `McpResult` from Task 2.
+- Consumes: `return_answer`, `AnswerContext`, `McpResult` from Task 3.
 - Produces: the failure payload shape — `{ message, origin, code?, adt_type?, namespace?, request?, messages?, raw_body? }`.
 
 - [ ] **Step 1: Write the failing test**
@@ -504,14 +606,14 @@ detail: 'raw', and only when it is a string."
 
 ---
 
-### Task 4: The exception boundary
+### Task 5: The exception boundary
 
 **Files:**
 - Modify: `src/lib/answer.ts`
 - Test: `src/__tests__/unit/answerBoundary.test.ts`
 
 **Interfaces:**
-- Consumes: `return_answer`, `AnswerContext`, `McpResult` from Tasks 2-3.
+- Consumes: `return_answer`, `AnswerContext`, `McpResult` from Tasks 3-4.
 - Produces: `function answer<T>(ctx: AnswerContext, call: () => Promise<IAdtResponse<T, IAdtError>>, project: (value: T) => unknown): Promise<McpResult>` — the single entry point every handler will use.
 
 - [ ] **Step 1: Write the failing test**
@@ -557,15 +659,33 @@ describe('answer — the boundary covers the whole pipeline', () => {
     expect(payload.origin).toBeUndefined();
   });
 
-  it('names a throw from our projection projection_threw', async () => {
+  it('names a throw from anything after the call adapter_threw', async () => {
     const result = await answer(ctx, async () => success('source'), () => {
       throw new Error('unexpected shape');
     });
 
     const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('projection_threw');
+    expect(payload.error).toBe('adapter_threw');
     expect(payload.message).toBe('unexpected shape');
     expect(payload.origin).toBeUndefined();
+  });
+
+  it('names a throw from reading the failure adapter_threw too', async () => {
+    const exploding = {
+      ok: false,
+      getResult: () => {
+        throw new Error('not a success');
+      },
+      getError: () => {
+        throw new Error('the strategy could not build its error');
+      },
+    } as unknown as IAdtResponse<string, IAdtError>;
+
+    const result = await answer(ctx, async () => exploding, (v) => v);
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toBe('adapter_threw');
+    expect(payload.message).toBe('the strategy could not build its error');
   });
 });
 ```
@@ -609,7 +729,11 @@ export async function answer<T>(
   try {
     return return_answer(response, project, ctx);
   } catch (thrown) {
-    return local('projection_threw', ctx, messageOf(thrown));
+    // Deliberately broader than the projection. This catch also covers getError(),
+    // building the failure payload and serialising it — everything the adapter does
+    // after the call returns. Naming it projection_threw would point a reader at the
+    // projection for a defect that may be in any of them.
+    return local('adapter_threw', ctx, messageOf(thrown));
   }
 }
 ```
@@ -617,7 +741,7 @@ export async function answer<T>(
 - [ ] **Step 4: Run all three adapter suites**
 
 Run: `npx jest src/__tests__/unit/answer`
-Expected: PASS, 11 tests.
+Expected: PASS, 12 tests.
 
 - [ ] **Step 5: Confirm no handler was touched**
 
@@ -634,8 +758,11 @@ git commit -m "feat(answer): an exception boundary over the whole pipeline
 
 A handler will have no try. adt-clients throws from more than its readings, and
 a projection can throw on a shape it did not expect; both are caught and named
-apart — client_threw and projection_threw — with no origin, because connection
-and refusal are claims about the server and neither is true here.
+apart — client_threw for the call, adapter_threw for everything after it — with
+no origin, because connection and refusal are claims about the server and
+neither is true here. The second name is deliberately broad: that catch covers
+the projection, reading the failure and serialising it, and pointing a reader at
+the projection for a defect in any of them would send them to the wrong code.
 
 Nothing calls this yet: handlers move in the plans written from the inventory."
 ```
@@ -651,4 +778,4 @@ written from the table — come next, and each carries the guarantees the invent
 rather than assuming a handler only reads.
 
 `src/lib/connectionFactory.ts` is cherry-picked from `chore/bump-current-stack` as
-infrastructure before Task 2, since nothing compiles against connection 8 without it.
+infrastructure in Task 2, since nothing compiles against connection 8 without it.

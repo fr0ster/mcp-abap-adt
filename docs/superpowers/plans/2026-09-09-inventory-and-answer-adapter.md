@@ -749,7 +749,9 @@ masking defect this repository has removed three times."
 
 **Interfaces:**
 - Consumes: `return_answer`, `AnswerContext`, `McpResult` from Task 3.
-- Produces: the failure payload shape — `{ message, origin, code?, adt_type?, namespace?, request?, messages?, raw_body? }`.
+- Produces: the failure payload shape — `{ message, origin, code?, adt_type?, namespace?, request?, messages?, raw_body? }`,
+  where `request` is `{ method?, url? }` rebuilt field by field rather than the object
+  the strategy supplied.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -808,6 +810,48 @@ describe('return_answer — failure', () => {
       method: 'POST',
       url: '/sap/bc/adt/oo/classes',
     });
+  });
+
+  it('copies method and url out of request and drops everything else', () => {
+    const result = return_answer(
+      failure({
+        message: 'No authorization',
+        origin: 'refusal',
+        request: {
+          method: 'POST',
+          url: '/sap/bc/adt/oo/classes',
+          headers: { authorization: 'Bearer secret-token', cookie: 'SAP_SESSIONID=x' },
+          data: '<class/>',
+        } as never,
+      }),
+      project,
+      { tool: 'CreateClass', detail: 'raw' },
+    );
+
+    // Not on the object, and not anywhere in the text either: a nested leak that
+    // toEqual would catch on request alone could still ride out on another field.
+    expect(JSON.parse(result.content[0].text).request).toEqual({
+      method: 'POST',
+      url: '/sap/bc/adt/oo/classes',
+    });
+    expect(result.content[0].text).not.toContain('Bearer');
+    expect(result.content[0].text).not.toContain('SAP_SESSIONID');
+  });
+
+  it('omits request entirely when it carries neither method nor url', () => {
+    const result = return_answer(
+      failure({
+        message: 'boom',
+        origin: 'connection',
+        request: { headers: { authorization: 'Bearer secret-token' } } as never,
+      }),
+      project,
+      { tool: 'GetClass', detail: 'terse' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.request).toBeUndefined();
+    expect(result.content[0].text).not.toContain('Bearer');
   });
 
   it('never serialises the response object', () => {
@@ -904,7 +948,19 @@ function failurePayload(
   if (error.code !== undefined) payload.code = error.code;
   if (error.adtType !== undefined) payload.adt_type = error.adtType;
   if (error.namespace !== undefined) payload.namespace = error.namespace;
-  if (error.request !== undefined) payload.request = error.request;
+  // Two fields, copied by name — not the object. The contract types `request` as
+  // `{ method?, url? }`, but a type is not a filter: TypeScript accepts a wider object
+  // structurally, and a strategy that puts its transport config here would send
+  // headers, an Authorization bearer and cookies straight to the model. This is the
+  // same leak `response` is kept out of the payload for.
+  const method = error.request?.method;
+  const url = error.request?.url;
+  if (typeof method === 'string' || typeof url === 'string') {
+    const request: Record<string, string> = {};
+    if (typeof method === 'string') request.method = method;
+    if (typeof url === 'string') request.url = url;
+    payload.request = request;
+  }
   if (error.messages !== undefined) payload.messages = error.messages;
 
   const body = (error.response as { data?: unknown } | undefined)?.data;
@@ -930,7 +986,7 @@ and replace the `if (!answer.ok)` branch inside `return_answer` with:
 - [ ] **Step 4: Run both adapter suites**
 
 Run: `npx jest src/__tests__/unit/answerSuccess.test.ts src/__tests__/unit/answerFailure.test.ts`
-Expected: PASS, 8 tests.
+Expected: PASS, 10 tests.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -944,7 +1000,13 @@ git commit --no-verify -m "feat(answer): the failure half, as an allowlist
 message and origin always; code, adt_type, namespace, request and messages when
 the strategy filled them. The response object is never serialised — headers,
 cookies, possibly circular — and its body appears only as raw_body, only at
-detail: 'raw', and only when it is a string."
+detail: 'raw', and only when it is a string.
+
+request gets the same treatment one level down: method and url are copied by
+name, never the object. The contract types it as { method?, url? }, but a type
+is not a filter — a strategy handing over its transport config would put an
+Authorization bearer and cookies in front of the model through a field that
+looks safe."
 ```
 
 ---
@@ -1084,7 +1146,7 @@ export async function answer<T>(
 - [ ] **Step 4: Run all three adapter suites**
 
 Run: `npx jest src/__tests__/unit/answer`
-Expected: PASS, 12 tests.
+Expected: PASS, 14 tests.
 
 - [ ] **Step 5: Confirm no handler was touched**
 

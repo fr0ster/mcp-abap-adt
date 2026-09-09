@@ -163,10 +163,46 @@ object it refused about, while `code` is the **strategy's** — a named conditio
 message. It does not reintroduce what issue #155 removed: no service prefix and no
 double-wrapping.
 
-A handler therefore reads: pick the strategy set for the requested `detail`, call the
-member, hand the answer to `return_answer` with the projection for that level and the
-context — its own tool name and the level asked for. There is no `if (!answer.ok)` in a
-handler.
+### Not every call reaches the adapter
+
+`IAdtResponse` covers what the server said. It does not cover a strategy that throws —
+and the library says so itself: what an implementation does when its own reading fails is
+its business, and it may throw. A parser blowing up inside adt-clients therefore
+propagates to us as an exception, past `ok`, past `getError()`, past `return_answer`.
+
+So the boundary is part of the adapter rather than repeated in every handler, and the
+handler calls one thing:
+
+```ts
+export async function answer<T>(
+  ctx: { tool: string; detail: 'terse' | 'full' | 'raw' },
+  call: () => Promise<IAdtResponse<T, IAdtError>>,
+  project: (value: T) => unknown,
+): Promise<McpResult>;
+```
+
+It invokes `call`, adapts the answer as above, and catches what `call` throws. **A thrown
+error is never reclassified as a SAP failure.** It did not come from SAP: it is the same
+category as a projection that produced nothing, and it takes the same local path —
+
+```jsonc
+{
+  "error": "strategy_threw",
+  "tool": "GetClass",
+  "detail": "full",
+  "message": "<the thrown error's message>"
+}
+```
+
+— with no `origin`, because `connection` and `refusal` are both claims about the server
+and neither is true here. Reporting a parser defect as an expired session sends a caller
+to reauthenticate over a bug in this process.
+
+A handler therefore reads: pick the strategy set for the requested `detail`, and hand
+`answer` the call, the projection for that level, and its context. There is no
+`if (!answer.ok)` in a handler, and no `try` either.
+
+`return_answer` remains as the adapter's inner half, for an answer already in hand.
 
 `return_response` and `return_error` stay for the paths that do not go through a client
 member at all.
@@ -240,6 +276,13 @@ applies to results; a failure is where a caller needs the most, not the least.
 
 `detail` is applied once, in the adapter, and only to decide whether `raw_body` is
 included. That is the single place in this design where a level touches a failure.
+
+**Three origins of failure, and they stay apart.** `refusal` is SAP saying no.
+`connection` is no usable answer — unreachable host, expired session, missing authority.
+Neither covers **our own** reading failing, whether it returned nothing
+(`projection_failed`) or threw (`strategy_threw`); those take the local path with no
+`origin` at all. Collapsing the third into either of the first two is what makes a caller
+act on the wrong system.
 
 Classification is read from the document, not from HTTP status. ADT answers `200` and
 refuses in the body — that is the root of the three masking defects this repository has
@@ -482,6 +525,10 @@ migrated twice. They are the first candidates for stage 4.
   `error: "projection_failed"`, with no `origin` — so a defect in our reading is never
   reported as a connection or a refusal. Nothing in the adapter turns an absent value
   into SUCCESS.
+- An exception thrown out of a client member — a strategy or parser failing inside
+  adt-clients — is caught by the adapter and answered as `error: "strategy_threw"` with no
+  `origin`. It never becomes a refusal or a connection failure, and it never escapes a
+  handler unwrapped.
 - Every field dropped from a tool's default output, and every input parameter removed,
   appears in the compatibility table with its justification. Neither is dropped without a
   row. A call passing a removed parameter is refused by name, never silently

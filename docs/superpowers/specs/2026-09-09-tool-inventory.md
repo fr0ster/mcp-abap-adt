@@ -1,7 +1,9 @@
 # Tool inventory — the stage-1 compatibility table
 
-**Status: Step 1 complete — all five groups filled (362 rows). Step 2 (the traversal bound)
-is NOT done: no authenticated SAP system was reachable — see "The traversal bound" below.**
+**Status: complete. All five groups filled (362 rows), and the traversal bound measured on a
+real system — see "The traversal bound". Two decisions are deliberately left open and marked
+as such: `response_format` on the service-binding tools, and whether the eighteen `low` tools
+that declare no session parameters should.**
 
 Groups filled: **system and search (34)**, **readonly (34)**,
 **compact (22)**, **high (156)**, **low (116)**.
@@ -134,58 +136,109 @@ truncation is not an option — it is the masking problem applied to data."* Thr
 | `GetEnhancements` | source over 500 characters cut to 200 with `…[truncated]`, and includes dropped from the nested walk on failure |
 | `DescribeByList` | objects dropped from the answer by an empty `catch {}` |
 
+**And one found by measurement rather than by reading** (see *The traversal bound*):
+
+| tool | the masking |
+|---|---|
+| `GetPackageContents`, `GetObjectsList` | a package that **does not exist** is answered `[]` / `total_objects: 0` with `isError: false` — measured against `ZMCP_SHR_PKG` on the trial system, where `GetPackageTree` correctly refused with `Package ZMCP_SHR_PKG not found`. A non-existent package is indistinguishable from an empty one on two of the three walking tools |
+
 
 ## The traversal bound
 
-**Not measured. This is the one thing Step 1 owes the design and does not yet deliver.**
-
-The design leaves the bound to this inventory on purpose: *"Stage 1 fixes the bound for all
-three tools; it is a number, not a principle, and belongs with the inventory that shows how
-large real packages are."* Three rows above — `GetPackageTree`, `GetPackageContents` and
-`GetObjectsList` — say `stopped_at_bound` and `not_expanded` / `frontier` are added to their
-`terse` projections. The bound those fields report is still blank.
-
-**Why it is blank.** Measuring it means walking a real package on a real system, and no
-authenticated SAP system was reachable from this working copy:
-
-| env file | result of a read-only probe (`npx tsx scripts/probe-transport-list.ts --env <file>`) |
-|---|---|
-| `trial.env` | `JWT token has expired. Please re-authenticate.` |
-| `mdd.env` | an HTML/SVG identity-provider page instead of an ADT payload — not authenticated |
-| `sk.env` | the same identity-provider page |
-
-No authentication command was run and no browser flow was triggered, per the task's own
-instruction. Guessing a number would have been worse than leaving it out: every later plan is
-written from this document, and a bound nobody measured would be implemented as if it had
-been.
-
-**What it takes to fill it in.** One authenticated session against any system carrying a real
-package tree, and one command:
+**Measured, not guessed.** Five packages on the SAP BTP ABAP trial system named by
+`tests/test-config.yaml` (destination `trial`, client 100, `isLegacy=false`), on 2026-09-10.
 
 ```bash
-npx tsx scripts/probe-package-contents.ts --env <file> --package <A REAL ROOT PACKAGE>
+npx tsx scripts/probe-package-contents.ts --env ~/.config/mcp-abap-adt/sessions/trial.env \
+  --package <PKG> [--max-depth 99]
 ```
 
-`scripts/probe-package-contents.ts` is committed alongside this document. It follows
-`scripts/probe-transport-list.ts`'s shape, is read-only, and runs all four measurements in
-one pass — `GetPackageTree`, `GetPackageContents` at its one-level default, `GetPackageContents`
-recursive, and `GetObjectsList` — reporting per tool:
+Round trips are counted by wrapping **`getAxiosInstance()`**, the single funnel every HTTP
+call goes through — including `fetchCsrfToken`'s GET and the 403-retry path, which
+`makeAdtRequest` never sees. `connect()` is awaited before instrumenting, so the one-off
+discovery/CSRF handshake is not charged to whichever tool ran first. `GetPackageTree`'s totals
+include the one existence pre-check its handler makes before walking.
 
-- **round trips**, counted by wrapping the connection's own request methods, so the number is
-  what was actually issued rather than what the handler believes it issued (this matters: the
-  two package tools do their walking inside adt-clients, where the handler cannot see it);
-- **objects returned**;
-- **elapsed milliseconds**.
+**"count" is a different metric per tool** — tree nodes, flat-list entries, and
+`total_objects` respectively — so compare a tool to itself on another package, never to its
+neighbours.
 
-The script has been type-checked and linted but **has never been executed**, for the reason
-above. Its output shape should be checked on first run before its numbers are trusted.
+| package | tool | round trips | count | ms |
+|---|---|---|---|---|
+| `ZADT_BLD_PKG03` (2 subpackages, 4 objects) | `GetPackageTree` | **7** | 7 nodes | 5462 |
+| | `GetPackageContents` (default, one level) | **4** | 6 entries | 2482 |
+| | `GetPackageContents` (recursive) | **6** | 6 entries | 5276 |
+| | `GetObjectsList` | **7** | 8 objects | 4308 |
+| `ZABAPCLOUD01` | `GetPackageTree` | **7** | 11 nodes | 5024 |
+| | `GetPackageContents` (default) | **2** | 3 entries | 1424 |
+| | `GetPackageContents` (recursive) | **6** | 10 entries | 3725 |
+| | `GetObjectsList` | **4** | 4 objects | 2477 |
+| `Z192_RAP` | `GetPackageTree` | **13** | 15 nodes | 8582 |
+| | `GetPackageContents` (default) | **12** | 14 entries | 7361 |
+| | `GetPackageContents` (recursive) | **12** | 14 entries | 7597 |
+| | `GetObjectsList` | **23** | 14 objects | 14767 |
+| `ZABAP_RAP` (largest measured) | `GetPackageTree` | **17** | 43 nodes | 11187 |
+| | `GetPackageContents` (default) | **16** | 42 entries | 9591 |
+| | `GetPackageContents` (recursive) | **16** | 42 entries | 10061 |
+| | `GetObjectsList` | **31** | 42 objects | 18798 |
+| `ZMCP_SHR_PKG` (**does not exist on this system**) | `GetPackageTree` | 1 | — refused | 548 |
+| | `GetPackageContents` (default) | 1 | **0 entries, `isError: false`** | 579 |
+| | `GetPackageContents` (recursive) | 1 | **0 entries, `isError: false`** | 536 |
+| | `GetObjectsList` | 1 | **0 objects, `isError: false`** | 564 |
 
-**What to record here once it has run**, so a reviewer can judge the bound rather than accept
-it: the system and the package it was measured on, the four rows of the table, and then the
-chosen bound with the sentence that justifies it — for example *"N round trips, because the
-largest package measured cost M and a bound must leave room for a larger one without becoming
-a licence to walk forever."* Both package tools and `GetObjectsList` need the number; per the
-design they need not share it, since a node expansion is not a subpackage.
+### What the numbers say
+
+- **Latency is ~600 ms per round trip on this system**, steady across all four tools
+  (11187/17 = 658; 18798/31 = 606; 8582/13 = 660). The bound is therefore a wall-clock bound
+  in disguise, and that is the number a caller feels.
+- **Cost scales with what is returned, roughly one round trip per one to three items** for
+  the package tools.
+- **`GetObjectsList` is the expensive one**: 23 round trips for 14 objects on `Z192_RAP`,
+  1.6 per object, because it expands node ids rather than packages. This is exactly why the
+  design refuses it a `depth` and gives it a frontier instead.
+- **`max_depth: 99` changed nothing** on `ZADT_BLD_PKG03` — identical 7/4/6/7 — because that
+  tree is two levels deep. Depth is not the binding constraint on a shallow package; the
+  request count is.
+
+### The bound
+
+**200 round trips, per call, for all three tools.**
+
+The reasoning, so it can be argued with rather than inherited:
+
+- It is **≈6× the largest real package measured** (31), so nothing in the sampled range is
+  truncated, and a package an order of magnitude larger than `ZABAP_RAP` still completes.
+- At the measured 0.6 s per round trip it caps one call at **≈2 minutes**. That is long, but
+  it is the honest ceiling for a tool that walks; a caller who cannot wait passes `depth`,
+  which is what the parameter is for.
+- It is one number for all three rather than three, because the unit — a round trip — is the
+  same for all three and the counts are not. A per-tool bound would have to be justified per
+  tool, and nothing in the measurement asks for that yet.
+- **It is not a truncation.** When the bound stops a walk the payload says so
+  (`stopped_at_bound`) and carries what was not expanded — package names for the two package
+  tools, frontier node ids for `GetObjectsList` — so the answer is continuable and never
+  silently partial.
+
+**What would move it.** These five packages are small; the largest customer root package on a
+real system may be far larger. If a later measurement shows a realistic package exceeding 200
+round trips, the bound moves — and because a bounded answer says so, that will surface as a
+`stopped_at_bound: true` a caller reports, not as a silent short list.
+
+### A masking case the measurement found
+
+`ZMCP_SHR_PKG`, which `tests/test-config.yaml` names as the shared-objects package, **does not
+exist on this trial system**. The four tools disagreed about that:
+
+- `GetPackageTree` **refused** — `Package ZMCP_SHR_PKG not found` — which is its
+  `// Verify package exists before building tree (fixes #38)` pre-check earning its round trip,
+  observed rather than inferred.
+- `GetPackageContents` answered `[]` with `isError: false`, twice.
+- `GetObjectsList` answered `total_objects: 0` with `isError: false`.
+
+So a package that does not exist is indistinguishable from an empty one on two of the three
+tools. That is the masking shape, and it is added to the masking table above. The fix is the
+one `GetPackageTree` already implements: a walk that cannot find its root refuses instead of
+returning nothing.
 
 ## `response_format` on the service-binding tools — an open decision
 

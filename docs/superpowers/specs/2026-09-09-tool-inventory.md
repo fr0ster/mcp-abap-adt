@@ -76,6 +76,58 @@ From **system and search**:
 | `GetObjectInfo` | enrichment failure is swallowed by `catch (_e) {}`, leaving `OBJECT_DESCRIPTION` and `OBJECT_PACKAGE` `undefined` on every node. Since the enrichment call is itself broken (see Findings), this is the *only* outcome |
 | `RuntimeRunClass`, `RuntimeRunProgram` | `output` is `response.data` when it is a string **and the empty string when it is not** — a body the handler did not recognise becomes `output: ''` alongside `success: true` |
 
+## The traversal bound
+
+**Not measured. This is the one thing Step 1 owes the design and does not yet deliver.**
+
+The design leaves the bound to this inventory on purpose: *"Stage 1 fixes the bound for all
+three tools; it is a number, not a principle, and belongs with the inventory that shows how
+large real packages are."* Three rows above — `GetPackageTree`, `GetPackageContents` and
+`GetObjectsList` — say `stopped_at_bound` and `not_expanded` / `frontier` are added to their
+`terse` projections. The bound those fields report is still blank.
+
+**Why it is blank.** Measuring it means walking a real package on a real system, and no
+authenticated SAP system was reachable from this working copy:
+
+| env file | result of a read-only probe (`npx tsx scripts/probe-transport-list.ts --env <file>`) |
+|---|---|
+| `trial.env` | `JWT token has expired. Please re-authenticate.` |
+| `mdd.env` | an HTML/SVG identity-provider page instead of an ADT payload — not authenticated |
+| `sk.env` | the same identity-provider page |
+
+No authentication command was run and no browser flow was triggered, per the task's own
+instruction. Guessing a number would have been worse than leaving it out: every later plan is
+written from this document, and a bound nobody measured would be implemented as if it had
+been.
+
+**What it takes to fill it in.** One authenticated session against any system carrying a real
+package tree, and one command:
+
+```bash
+npx tsx scripts/probe-package-contents.ts --env <file> --package <A REAL ROOT PACKAGE>
+```
+
+`scripts/probe-package-contents.ts` is committed alongside this document. It follows
+`scripts/probe-transport-list.ts`'s shape, is read-only, and runs all four measurements in
+one pass — `GetPackageTree`, `GetPackageContents` at its one-level default, `GetPackageContents`
+recursive, and `GetObjectsList` — reporting per tool:
+
+- **round trips**, counted by wrapping the connection's own request methods, so the number is
+  what was actually issued rather than what the handler believes it issued (this matters: the
+  two package tools do their walking inside adt-clients, where the handler cannot see it);
+- **objects returned**;
+- **elapsed milliseconds**.
+
+The script has been type-checked and linted but **has never been executed**, for the reason
+above. Its output shape should be checked on first run before its numbers are trusted.
+
+**What to record here once it has run**, so a reviewer can judge the bound rather than accept
+it: the system and the package it was measured on, the four rows of the table, and then the
+chosen bound with the sentence that justifies it — for example *"N round trips, because the
+largest package measured cost M and a bound must leave room for a larger one without becoming
+a licence to walk forever."* Both package tools and `GetObjectsList` need the number; per the
+design they need not share it, since a node expansion is not a subpackage.
+
 ## Findings about the handlers
 
 Recorded, not corrected — this task writes one document and touches no `src/`.

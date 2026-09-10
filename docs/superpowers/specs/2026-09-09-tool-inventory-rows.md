@@ -130,18 +130,35 @@ that no `HandlerGroup` references:
 
 Confirmed by reading `src/lib/handlers/groups/LowLevelHandlersGroup.ts`: the imports and
 handler-entry blocks for all five are present but **commented out**
-(`LowLevelHandlersGroup.ts:5-9, 142-146, ~300-333`) — these are dead, deliberately disabled
-handlers, not an enumeration gap. They contribute no rows to the table below since no group
-registers them; `grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l` still
-reports 327 files (matching the brief), because the file count was never meant as a bound on
-the 362 — see the brief's own caveat about that number.
+(`LowLevelHandlersGroup.ts:5-9, 142-146, ~300-333`), so none of the five **tools** is
+registered and none contributes a row to the table below.
+`grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l` still reports 327 files
+(matching the brief), because the file count was never meant as a bound on the 362 — see the
+brief's own caveat about that number.
+
+> **Correction (Task 1b, fix round 1).** The sentence that stood here — *"these are dead,
+> deliberately disabled handlers"* — is right about the five **tools** and wrong about four of
+> the five **handler functions**. The `compact` group imports and calls them directly:
+>
+> | file | called by |
+> |---|---|
+> | `handleCheckObject` | `HandlerCheckRun` (`src/handlers/compact/high/handleHandlerCheckRun.ts`) |
+> | `handleLockObject` | `HandlerLock` |
+> | `handleUnlockObject` | `HandlerUnlock` |
+> | `handleValidateObject` | `HandlerValidate` |
+> | `handleDeleteObject` | **nothing** — the only one of the five that is genuinely unused |
+>
+> Four of these files are therefore on the live path in the `compact` exposition and must be
+> migrated with it. Only their `TOOL_DEFINITION` exports are dead. This correction is written
+> here, and not only in `2026-09-09-tool-inventory.md`, because the wrong claim is the one a
+> reader hits first and it names deletable code.
 
 ### The file-count sanity check
 
 `grep -rl 'TOOL_DEFINITION' src/handlers --include='*.ts' | wc -l` → **327**, matching the
 brief. This is not a bound on the 362 (factories push the tool count above the file count;
-the five dead handlers above push it below, and the two effects don't cancel) — used here
-only to corroborate the dead-handler finding above.
+the five unregistered tools above push it below, and the two effects don't cancel) — used
+here only to corroborate the finding above.
 
 ### Two `inputSchema` conventions exist in the codebase
 

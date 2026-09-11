@@ -15,6 +15,7 @@ export type {
 export { buildRuntimeConfig } from './runtimeConfig.js';
 // Server configuration manager
 export { ServerConfigManager } from './ServerConfigManager.js';
+export { validateExposition } from './validateExposition.js';
 export type { YamlConfig } from './yamlConfig.js';
 // YAML configuration
 export {
@@ -25,4 +26,3 @@ export {
   parseConfigArg,
   validateYamlConfig,
 } from './yamlConfig.js';
-export { validateExposition } from './validateExposition.js';

@@ -1,0 +1,111 @@
+{
+  "name": "@mcp-abap-adt/core",
+  "version": "10.0.0",
+  "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports.",
+  "license": "AGPL-3.0-only",
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "keywords": [
+    "abap",
+    "sap",
+    "adt",
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "abap-cloud",
+    "sap-btp",
+    "xsuaa",
+    "jwt-auth",
+    "service-key",
+    "crud"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./launcher": {
+      "types": "./dist/launcher.d.ts",
+      "import": "./dist/launcher.js",
+      "require": "./dist/launcher.js"
+    }
+  },
+  "bin": {
+    "mcp-abap-adt": "./bin/mcp-abap-adt.js"
+  },
+  "files": [
+    "dist/",
+    "bin/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "jest --passWithNoTests",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build",
+    "start": "node ./bin/mcp-abap-adt.js",
+    "start:http": "node ./bin/mcp-abap-adt.js --transport=http",
+    "start:sse": "node ./bin/mcp-abap-adt.js --transport=sse",
+    "dev": "npm run build && npx @modelcontextprotocol/inspector node ./dist/server/launcher.js --transport=stdio",
+    "dev:http": "npm run build && node ./tools/dev-http-v2.js",
+    "dev:sse": "npm run build && node ./tools/dev-sse-v2.js",
+    "smoke:mcp:crud": "node ./tools/mcp-crud-smoke.js",
+    "smoke:mcp:matrix": "node ./tools/mcp-crud-matrix.js",
+    "kill-ports": "lsof -ti:3000,3001,4000,4001,5000,6274,6277 | xargs -r kill -9 2>/dev/null || true",
+    "docker:pack": "npm pack && mkdir -p docker/packages && mv *.tgz docker/packages/",
+    "docker:build": "cd docker && docker-compose build",
+    "docker:build:package": "npm run docker:pack && cd docker && docker-compose -f docker-compose.package.yml build",
+    "docker:build:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml build",
+    "docker:up": "cd docker && docker-compose up -d",
+    "docker:up:package": "npm run docker:pack && cd docker && docker-compose -f docker-compose.package.yml up -d",
+    "docker:up:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml up -d",
+    "docker:down": "cd docker && docker-compose down",
+    "docker:down:package": "cd docker && docker-compose -f docker-compose.package.yml down",
+    "docker:down:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml down",
+    "docker:logs": "cd docker && docker-compose logs -f",
+    "docker:logs:package": "cd docker && docker-compose -f docker-compose.package.yml logs -f",
+    "docker:logs:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml logs -f",
+    "docker:rebuild": "npm run docker:down && npm run docker:build && npm run docker:up",
+    "docker:rebuild:package": "npm run docker:down:package && npm run docker:build:package && npm run docker:up:package",
+    "docker:rebuild:headerless": "npm run docker:down:headerless && npm run docker:build:headerless && npm run docker:up:headerless"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/lib": "^10.0.0",
+    "@mcp-abap-adt/auth-broker": "^1.0.8",
+    "@mcp-abap-adt/interfaces": "^13.1.0",
+    "@mcp-abap-adt/logger": "^0.1.4",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "dotenv": "^17.4.0",
+    "express": "^5.1.0"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/src"
+    ],
+    "testMatch": [
+      "**/__tests__/**/*.test.ts"
+    ]
+  },
+  "devDependencies": {
+    "@types/express": "*",
+    "@types/jest": "*",
+    "@types/node": "*",
+    "jest": "*",
+    "ts-jest": "*",
+    "typescript": "*"
+  }
+}

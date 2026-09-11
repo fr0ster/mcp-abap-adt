@@ -5,7 +5,7 @@ error strategies (`docs/superpowers/specs/2026-09-08-result-error-strategies-des
 can be written against documents someone has actually seen. Writing a parser first
 and meeting the document later is how the transport-tree parser broke in #168.
 
-44 cases, 56 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
+46 cases, 55 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
 ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
 ## Layout
@@ -78,6 +78,22 @@ exchanges address the same endpoint and differ only in `params`.
 | `refusal-package-not-found-objectslist-empty` | nodestructure on the same | **200**, zero-byte body |
 | `refusal-package-not-found-hierarchy-direct` | hierarchy walk on the same | **200**, zero-byte body |
 | `read-empty-package-contents` | both walkers on `ZMCP_BLD_PKG01`, which **exists and is empty** | **200**, zero-byte body |
+
+## A delete is one request on adt-clients 18, not two
+
+The chain used to be `POST /deletion/check` then `POST /deletion/delete`. On 18
+the member sends the delete alone. Both documents are still here, under their
+own case names rather than as steps of a chain that no longer exists:
+
+| case | document |
+|---|---|
+| `deletion-check-allows` | `del:checkResponse`, `isDeletable="true"` |
+| `refusal-deletion-check-refuses` | `del:checkResponse`, `isDeletable="false"` |
+| `delete-success` | `del:deletionResult`, `isDeleted="true"` |
+| `refusal-delete-refused` | `del:deletionResult`, `isDeleted="false"` |
+
+`/deletion/check` is still a live endpoint and its document is a distinct shape,
+so a handler that wants the verdict before deleting still has something to read.
 
 ## Create is not one shape either, and one create answers nothing
 

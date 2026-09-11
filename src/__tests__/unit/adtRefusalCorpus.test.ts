@@ -149,36 +149,36 @@ describe('shape 2 — a boolean attribute carries the refusal, under HTTP 200', 
   });
 
   it('a REFUSED delete is HTTP 200 with isDeleted=false', () => {
-    const name = 'refusal-delete-refused--02-deletion-delete';
+    const name = 'refusal-delete-refused--01-deletion-delete';
     expect(sidecar(name).response.status).toBe(200);
     expect(xml(name).deletionResult.object['@isDeleted']).toBe('false');
   });
 
   it('a SUCCESSFUL delete is HTTP 200 with isDeleted=true', () => {
-    const name = 'delete-success--02-deletion-delete';
+    const name = 'delete-success--01-deletion-delete';
     expect(sidecar(name).response.status).toBe(200);
     expect(xml(name).deletionResult.object['@isDeleted']).toBe('true');
   });
 
   it('the deletion pre-check answers isDeletable, not a status code', () => {
     expect(
-      sidecar('refusal-delete-refused--01-deletion-check').response.status,
+      sidecar('refusal-deletion-check-refuses--01-deletion-check').response.status,
     ).toBe(200);
     expect(
-      xml('refusal-delete-refused--01-deletion-check').checkResponse.object[
+      xml('refusal-deletion-check-refuses--01-deletion-check').checkResponse.object[
         '@isDeletable'
       ],
     ).toBe('false');
     expect(
-      xml('delete-success--01-deletion-check').checkResponse.object[
+      xml('deletion-check-allows--01-deletion-check').checkResponse.object[
         '@isDeletable'
       ],
     ).toBe('true');
   });
 
   it('presence of del:message is NOT a refusal signal — a success carries one too', () => {
-    const ok = xml('delete-success--02-deletion-delete').deletionResult.object;
-    const refused = xml('refusal-delete-refused--02-deletion-delete')
+    const ok = xml('delete-success--01-deletion-delete').deletionResult.object;
+    const refused = xml('refusal-delete-refused--01-deletion-delete')
       .deletionResult.object;
     expect(ok.message).toBeDefined();
     expect(refused.message).toBeDefined();
@@ -188,10 +188,10 @@ describe('shape 2 — a boolean attribute carries the refusal, under HTTP 200', 
   });
 
   it('the refused delete states the reason in text; the successful one leaves it empty', () => {
-    const refused = xml('refusal-delete-refused--02-deletion-delete')
+    const refused = xml('refusal-delete-refused--01-deletion-delete')
       .deletionResult.object;
     expect(String(refused.message.text)).toContain('ZMCP_BLD_ANSCH01');
-    const ok = xml('delete-success--02-deletion-delete').deletionResult.object;
+    const ok = xml('delete-success--01-deletion-delete').deletionResult.object;
     expect(String(ok.message.text ?? '')).toBe('');
   });
 });

@@ -812,6 +812,68 @@ async function main(): Promise<void> {
   const needCreateWrites = CREATE_CASES.some((c) => recorder.selected(c));
   let scratchClassCreated = false;
 
+  /**
+   * Take a lock, do something, release it — whatever happens in between.
+   *
+   * Every lock in this script goes through here. The one that did not left
+   * ZMCP_BLD_CRT_CLS locked on a live session with the handle lost: the case
+   * unlocked at the end of its body, the write in the middle threw, and the
+   * unlock never ran. A lock nobody holds the handle for cannot be released
+   * from outside, so the object had to be abandoned.
+   *
+   * `lock` answers an IAdtResponse on 18, not a bare handle, so the value is
+   * unwrapped here once instead of at five call sites.
+   */
+  /**
+   * Locks this run is holding, so the teardown can release what a case did not.
+   * A lock whose handle is lost cannot be released from outside at all, so the
+   * handle is registered the moment it exists rather than when it is used.
+   */
+  const heldLocks = new Map<string, string>();
+
+  const takeLock = async (className: string): Promise<string> => {
+    const answer = (await client.getClass().lock({ className })) as unknown as
+      | string
+      | { ok: boolean; getResult: () => { value: string } };
+    const lockHandle =
+      typeof answer === 'string' ? answer : answer.getResult().value;
+    heldLocks.set(className, lockHandle);
+    return lockHandle;
+  };
+
+  const releaseLock = async (className: string): Promise<void> => {
+    const lockHandle = heldLocks.get(className);
+    if (!lockHandle) return;
+    heldLocks.delete(className);
+    try {
+      await client.getClass().unlock({ className }, lockHandle);
+    } catch (error) {
+      console.error(
+        `  WARNING: ${className} could not be unlocked — ${(error as Error).message}. ` +
+          'The handle is gone; the object stays locked until the session ends.',
+      );
+    }
+  };
+
+  /** Release anything still held, whatever happened to the run. */
+  const releaseAllLocks = async (): Promise<void> => {
+    if (heldLocks.size === 0) return;
+    track(`teardown: releasing ${heldLocks.size} lock(s) still held`);
+    for (const className of [...heldLocks.keys()]) await releaseLock(className);
+  };
+
+  const withLock = async (
+    className: string,
+    fn: (lockHandle: string) => Promise<void>,
+  ): Promise<void> => {
+    const lockHandle = await takeLock(className);
+    try {
+      await fn(lockHandle);
+    } finally {
+      await releaseLock(className);
+    }
+  };
+
   /** Does the scratch class exist right now? Not recorded — plumbing. */
   const scratchExists = async (): Promise<boolean> => {
     try {
@@ -979,37 +1041,36 @@ async function main(): Promise<void> {
       scratchClassCreated = true;
       console.log('  created (inactive, valid source, not yet activated)');
 
-      let lockHandle: string | undefined;
-
+      // Deliberately held across three cases — lock, refuse a second lock,
+      // unlock — so it cannot use withLock. It registers instead, and the
+      // teardown releases it if a case in between aborts the run.
       await withCase('lock-success', async () => {
-        lockHandle = await client
-          .getClass()
-          .lock({ className: SCRATCH_CLASS_NAME });
+        await takeLock(SCRATCH_CLASS_NAME);
       });
 
       await withCase('refusal-lock-held-by-other', async () => {
         // Same session, second LOCK while the first is still held — not a
         // second user. Documents whatever SAP actually does with that, on
         // the wire, rather than assuming it matches "locked by another user".
+        //
+        // Deliberately NOT through takeLock: this lock is expected to be
+        // refused, so there is no handle to register, and registering a
+        // failure would make the teardown try to release a lock nobody holds.
         await client.getClass().lock({ className: SCRATCH_CLASS_NAME });
       });
 
       await withCase('unlock-success', async () => {
-        if (lockHandle) {
-          await client
-            .getClass()
-            .unlock({ className: SCRATCH_CLASS_NAME }, lockHandle);
-        }
+        await releaseLock(SCRATCH_CLASS_NAME);
       });
-      lockHandle = undefined;
 
       await withCase('refusal-write-not-locked', async () => {
-        await client
-          .getClass()
-          .update(
-            { className: SCRATCH_CLASS_NAME, sourceCode: MINIMAL_VALID_SOURCE },
-            { lockHandle: 'ZZ_INVALID_LOCK_HANDLE_0001' },
-          );
+        await client.getClass().update(
+          { className: SCRATCH_CLASS_NAME },
+          {
+            lockHandle: 'ZZ_INVALID_LOCK_HANDLE_0001',
+            sourceCode: MINIMAL_VALID_SOURCE,
+          },
+        );
       });
 
       await withCase('refusal-syntax-check', async () => {
@@ -1024,19 +1085,16 @@ async function main(): Promise<void> {
       });
 
       track('setup: persist broken source into the scratch class');
-      const brokenLock = await client
-        .getClass()
-        .lock({ className: SCRATCH_CLASS_NAME });
-      // A raw PUT never syntax-checks; it saves whatever bytes it is given.
-      await client
-        .getClass()
-        .update(
-          { className: SCRATCH_CLASS_NAME, sourceCode: BROKEN_SOURCE },
-          { lockHandle: brokenLock },
-        );
-      await client
-        .getClass()
-        .unlock({ className: SCRATCH_CLASS_NAME }, brokenLock);
+      await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
+        // A raw PUT never syntax-checks; it saves whatever bytes it is given.
+        // `sourceCode` is an option, not config — config.sourceCode is check's.
+        await client
+          .getClass()
+          .update(
+            { className: SCRATCH_CLASS_NAME },
+            { lockHandle, sourceCode: BROKEN_SOURCE },
+          );
+      });
       console.log('  broken source saved as the inactive version, unlocked');
 
       // THE big one #1: SAP answers HTTP 200 with the refusal inside the body.
@@ -1045,43 +1103,27 @@ async function main(): Promise<void> {
       });
 
       track('setup: lock scratch class before attempting delete');
-      const deleteLock = await client
-        .getClass()
-        .lock({ className: SCRATCH_CLASS_NAME });
-      // THE big one #2: deletion refusal, expected (per project history) to
-      // also be HTTP 200 with a refusal (`isDeleted=false` + `del:message`)
-      // rather than a 4xx.
-      await withCase('refusal-delete-refused', async () => {
-        await client.getClass().delete({ className: SCRATCH_CLASS_NAME });
+      await withLock(SCRATCH_CLASS_NAME, async () => {
+        // THE big one #2: a refused deletion, answered HTTP 200 with
+        // `isDeleted="false"` and a `del:message` rather than a 4xx.
+        await withCase('refusal-delete-refused', async () => {
+          await client.getClass().delete({ className: SCRATCH_CLASS_NAME });
+        });
       });
-      try {
-        await client
-          .getClass()
-          .unlock({ className: SCRATCH_CLASS_NAME }, deleteLock);
-        console.log('  unlocked after the refused delete attempt');
-      } catch (error) {
-        console.log(
-          `  unlock after refused delete failed (object may already be gone): ${(error as Error).message}`,
-        );
-      }
 
       // The last scratch case: put valid source back, then capture what a
       // successful activation looks like.
       track(
         'setup: restore valid source before the activation-success capture',
       );
-      const restoreLock = await client
-        .getClass()
-        .lock({ className: SCRATCH_CLASS_NAME });
-      await client
-        .getClass()
-        .update(
-          { className: SCRATCH_CLASS_NAME, sourceCode: MINIMAL_VALID_SOURCE },
-          { lockHandle: restoreLock },
-        );
-      await client
-        .getClass()
-        .unlock({ className: SCRATCH_CLASS_NAME }, restoreLock);
+      await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
+        await client
+          .getClass()
+          .update(
+            { className: SCRATCH_CLASS_NAME },
+            { lockHandle, sourceCode: MINIMAL_VALID_SOURCE },
+          );
+      });
 
       await withCase('activation-success-verdict', async () => {
         await client.getClass().activate({ className: SCRATCH_CLASS_NAME });
@@ -1135,35 +1177,21 @@ async function main(): Promise<void> {
       // The corpus had a PUT that was refused with 423 and no PUT that worked,
       // so nothing recorded what a successful write actually answers.
       await withCase('update-source-success', async () => {
-        // `lock` answers an IAdtResponse on 18, not a bare handle. Passing the
-        // response straight through produces `lockHandle=[object Object]` and a
-        // 423, which is what this capture did on the first attempt. Every
-        // handler that locks meets this.
-        const locked = (await client
-          .getClass()
-          .lock({ className: CREATE_CLASS_NAME })) as unknown as {
-          ok: boolean;
-          getResult: () => { value: string };
-        };
-        const lock =
-          typeof locked === 'string' ? locked : locked.getResult().value;
-        // `sourceCode` goes in OPTIONS, not the config. adt-clients 18 made
-        // `config.sourceCode` belong to `check` alone — a syntax check compiles
-        // a source that is not on the server yet, so it has nowhere else to
-        // arrive — and an update that puts it in the config is told "Source
-        // code is required for update". The handler migration meets this at
-        // every call to `update`.
-        await client.getClass().update(
-          { className: CREATE_CLASS_NAME },
-          {
-            lockHandle: lock,
-            sourceCode:
-              MINIMAL_VALID_SOURCE.split(SCRATCH_CLASS_NAME).join(
-                CREATE_CLASS_NAME,
-              ),
-          },
-        );
-        await client.getClass().unlock({ className: CREATE_CLASS_NAME }, lock);
+        await withLock(CREATE_CLASS_NAME, async (lockHandle) => {
+          // `sourceCode` goes in OPTIONS, not the config. adt-clients 18 made
+          // `config.sourceCode` belong to `check` alone, and an update that
+          // puts it in the config is told "Source code is required for update".
+          await client.getClass().update(
+            { className: CREATE_CLASS_NAME },
+            {
+              lockHandle,
+              sourceCode:
+                MINIMAL_VALID_SOURCE.split(SCRATCH_CLASS_NAME).join(
+                  CREATE_CLASS_NAME,
+                ),
+            },
+          );
+        });
       });
 
       await withCase('create-domain', async () => {
@@ -1340,6 +1368,7 @@ async function main(): Promise<void> {
     // Teardown belongs here, not at the end of the happy path. The previous
     // shape left the scratch class stranded on the system whenever a run was
     // cut short, which is exactly when it is hardest to notice.
+    await releaseAllLocks();
     await teardownScratch();
     await teardownCreated();
   }

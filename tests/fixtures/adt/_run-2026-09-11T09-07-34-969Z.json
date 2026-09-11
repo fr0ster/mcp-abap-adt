@@ -1,0 +1,229 @@
+{
+  "startedAt": "2026-09-11T09:07:34.968Z",
+  "finishedAt": "2026-09-11T09:07:55.813Z",
+  "substitutions": [
+    "REDACTED",
+    "REDACTED",
+    "SAPUSER01"
+  ],
+  "cases": [
+    {
+      "case": "refusal-object-not-found",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-check-nonexistent-object",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-tree",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-contents-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-objectslist-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-hierarchy-direct",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "lock-success",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:40.086Z",
+      "endedAt": "2026-09-11T09:07:40.843Z"
+    },
+    {
+      "case": "refusal-lock-held-by-other",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:40.843Z",
+      "endedAt": "2026-09-11T09:07:41.441Z"
+    },
+    {
+      "case": "unlock-success",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:41.443Z",
+      "endedAt": "2026-09-11T09:07:41.959Z"
+    },
+    {
+      "case": "refusal-write-not-locked",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:41.959Z",
+      "endedAt": "2026-09-11T09:07:42.537Z"
+    },
+    {
+      "case": "refusal-syntax-check",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:42.537Z",
+      "endedAt": "2026-09-11T09:07:43.212Z"
+    },
+    {
+      "case": "refusal-activation-fails",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:46.038Z",
+      "endedAt": "2026-09-11T09:07:47.120Z"
+    },
+    {
+      "case": "refusal-delete-refused",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:47.687Z",
+      "endedAt": "2026-09-11T09:07:48.229Z"
+    },
+    {
+      "case": "activation-success-verdict",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:50.739Z",
+      "endedAt": "2026-09-11T09:07:52.941Z"
+    },
+    {
+      "case": "read-class-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-function-module-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "check-success-verdict",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-table-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-package-contents-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-function-group",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-function-module",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-behavior-definition",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-service-definition",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-package",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-domain",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-table",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-table",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-functiongroup",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-empty-package-contents",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-object-tree-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-where-used-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-transport-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "delete-success",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T09:07:52.944Z",
+      "endedAt": "2026-09-11T09:07:55.813Z"
+    }
+  ]
+}

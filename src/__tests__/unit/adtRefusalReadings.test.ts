@@ -138,16 +138,16 @@ describe('form 2a — activation', () => {
 describe('form 2b — deletion', () => {
   it('the refused delete is a refusal at both steps', () => {
     expect(
-      readDeletionRefusal(body('refusal-delete-refused--01-deletion-check')),
+      readDeletionRefusal(body('refusal-deletion-check-refuses--01-deletion-check')),
     ).not.toBeNull();
     expect(
-      readDeletionRefusal(body('refusal-delete-refused--02-deletion-delete')),
+      readDeletionRefusal(body('refusal-delete-refused--01-deletion-delete')),
     ).not.toBeNull();
   });
 
   it('the refusal repeats what SAP said', () => {
     const refusal = readDeletionRefusal(
-      body('refusal-delete-refused--02-deletion-delete'),
+      body('refusal-delete-refused--01-deletion-delete'),
     );
     expect(refusal?.message).toContain('ZMCP_BLD_ANSCH01');
     expect(refusal?.message).toContain('already editing');
@@ -155,24 +155,24 @@ describe('form 2b — deletion', () => {
 
   it('the successful delete is NOT a refusal at either step', () => {
     expect(
-      readDeletionRefusal(body('delete-success--01-deletion-check')),
+      readDeletionRefusal(body('deletion-check-allows--01-deletion-check')),
     ).toBeNull();
     expect(
-      readDeletionRefusal(body('delete-success--02-deletion-delete')),
+      readDeletionRefusal(body('delete-success--01-deletion-delete')),
     ).toBeNull();
   });
 
   it('a del:message of type S on a success does not trip the reading', () => {
     // The regression this guards: keying on the presence of del:message rather
     // than on the attribute. delete-success--02 carries one.
-    const document = body('delete-success--02-deletion-delete');
+    const document = body('delete-success--01-deletion-delete');
     expect(document).toContain('del:message');
     expect(document).toContain('del:type="S"');
     expect(readDeletionRefusal(document)).toBeNull();
   });
 
   it('the deletionResult is read by isDeleted, not by the check attribute', () => {
-    const document = body('delete-success--02-deletion-delete');
+    const document = body('delete-success--01-deletion-delete');
     expect(document).not.toContain('isDeletable');
     // A reader that looked for isDeletable and defaulted a missing one to false
     // would call this refused. This is the adt-clients deletionRefusal hazard.
@@ -196,22 +196,22 @@ describe("the hazard in adt-clients' own deletion parser, measured not assumed",
 
   it('reads the deletion CHECK correctly — that is what it is for', () => {
     expect(
-      refusedByTheirStrategy(body('delete-success--01-deletion-check')),
+      refusedByTheirStrategy(body('deletion-check-allows--01-deletion-check')),
     ).toBe(false);
     expect(
-      refusedByTheirStrategy(body('refusal-delete-refused--01-deletion-check')),
+      refusedByTheirStrategy(body('refusal-deletion-check-refuses--01-deletion-check')),
     ).toBe(true);
   });
 
   it('calls a SUCCESSFUL delete refused when handed the deletionResult', () => {
     expect(
-      refusedByTheirStrategy(body('delete-success--02-deletion-delete')),
+      refusedByTheirStrategy(body('delete-success--01-deletion-delete')),
     ).toBe(true);
   });
 
   it('our reading gets that same document right', () => {
     expect(
-      readDeletionRefusal(body('delete-success--02-deletion-delete')),
+      readDeletionRefusal(body('delete-success--01-deletion-delete')),
     ).toBeNull();
   });
 });
@@ -383,7 +383,7 @@ describe('the dispatcher picks the right reading for each document', () => {
   it.each([
     ['refusal-object-not-found--01-read-source', 'exception'],
     ['refusal-activation-fails--01-activation', 'activation'],
-    ['refusal-delete-refused--02-deletion-delete', 'deletion'],
+    ['refusal-delete-refused--01-deletion-delete', 'deletion'],
     ['refusal-syntax-check--01-checkrun', 'checkrun'],
   ])('%s is read as form %s', (name, form) => {
     expect(readAdtRefusal(body(name))?.form).toBe(form);
@@ -392,8 +392,8 @@ describe('the dispatcher picks the right reading for each document', () => {
   it.each([
     'activation-success-verdict--01-activation',
     'check-success-verdict--01-checkrun',
-    'delete-success--01-deletion-check',
-    'delete-success--02-deletion-delete',
+    'deletion-check-allows--01-deletion-check',
+    'delete-success--01-deletion-delete',
     'lock-success--01-lock',
     'read-class-source-text--01-read-source',
     'read-package-contents-structure--01-nodestructure',

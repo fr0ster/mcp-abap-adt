@@ -1,8 +1,8 @@
 {
-  "case": "delete-success",
-  "step": 2,
+  "case": "refusal-delete-refused",
+  "step": 1,
   "stepTag": "deletion-delete",
-  "capturedAt": "2026-09-11T06:12:36.974Z",
+  "capturedAt": "2026-09-11T09:07:47.687Z",
   "request": {
     "method": "POST",
     "url": "/sap/bc/adt/deletion/delete",
@@ -19,17 +19,17 @@
     "status": 200,
     "statusText": "OK",
     "headers": {
-      "set-cookie": "REDACTED",
       "content-type": "application/vnd.sap.adt.deletion.response.v1+xml; charset=utf-8",
-      "content-length": "427",
+      "content-length": "441",
       "sap-authenticated": "true",
+      "sap-adt-saplb": "appserver-dgm9s",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=4009319",
+      "x-sap-adt-profiling": "server-time=18527",
       "sap-server": "true",
-      "sap-perf-fesrec": "4026127.000000",
+      "sap-perf-fesrec": "20163.000000",
       "connection": "close"
     },
-    "bodyFile": "delete-success--02-deletion-delete.body.xml"
+    "bodyFile": "refusal-delete-refused--01-deletion-delete.body.xml"
   }
 }

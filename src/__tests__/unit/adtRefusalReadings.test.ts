@@ -1,5 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { deletionRefusal } from '@mcp-abap-adt/adt-clients';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import {
   isIndeterminateWalkAnswer,
   readActivationRefusal,
@@ -175,6 +177,42 @@ describe('form 2b — deletion', () => {
     // A reader that looked for isDeletable and defaulted a missing one to false
     // would call this refused. This is the adt-clients deletionRefusal hazard.
     expect(readDeletionRefusal(document)).toBeNull();
+  });
+});
+
+describe("the hazard in adt-clients' own deletion parser, measured not assumed", () => {
+  /**
+   * `deletionRefusal` is shipped for the deletion CHECK step. Its
+   * `parseDeletionCheck` looks for `isDeletable` with a regex and defaults a
+   * missing one to false. A `deletionResult` has no such attribute.
+   *
+   * This was first written down as reasoning from their source. It is a test
+   * now because reasoning is not measurement, and because the consequence —
+   * wiring their strategy onto the delete step turns every successful delete
+   * into a refusal — has to be true to be worth saying.
+   */
+  const refusedByTheirStrategy = (xml: string): boolean =>
+    deletionRefusal(ADT_NO_FAILURE, { data: xml } as never) !== ADT_NO_FAILURE;
+
+  it('reads the deletion CHECK correctly — that is what it is for', () => {
+    expect(
+      refusedByTheirStrategy(body('delete-success--01-deletion-check')),
+    ).toBe(false);
+    expect(
+      refusedByTheirStrategy(body('refusal-delete-refused--01-deletion-check')),
+    ).toBe(true);
+  });
+
+  it('calls a SUCCESSFUL delete refused when handed the deletionResult', () => {
+    expect(
+      refusedByTheirStrategy(body('delete-success--02-deletion-delete')),
+    ).toBe(true);
+  });
+
+  it('our reading gets that same document right', () => {
+    expect(
+      readDeletionRefusal(body('delete-success--02-deletion-delete')),
+    ).toBeNull();
   });
 });
 

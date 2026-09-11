@@ -74,6 +74,7 @@
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",
     "format": "npx biome format --write src",
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",

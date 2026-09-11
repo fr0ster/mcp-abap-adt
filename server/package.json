@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/core",
-  "version": "10.0.0",
+  "version": "10.0.1",
   "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -41,6 +41,13 @@
       "types": "./dist/launcher.d.ts",
       "import": "./dist/launcher.js",
       "require": "./dist/launcher.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "launcher": [
+        "dist/launcher.d.ts"
+      ]
     }
   },
   "bin": {

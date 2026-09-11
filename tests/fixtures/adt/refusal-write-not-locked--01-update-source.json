@@ -1,0 +1,30 @@
+{
+  "case": "refusal-write-not-locked",
+  "step": 1,
+  "stepTag": "update-source",
+  "capturedAt": "2026-09-11T05:40:40.726Z",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main?lockHandle=ZZ_INVALID_LOCK_HANDLE_0001",
+    "headers": {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Accept": "text/plain"
+    },
+    "body": "CLASS ZMCP_BLD_ANSCH01 DEFINITION\n  PUBLIC\n  FINAL\n  CREATE PUBLIC .\n\n  PUBLIC SECTION.\n    METHODS say_hello\n      RETURNING VALUE(rv_text) TYPE string.\n  PROTECTED SECTION.\n  PRIVATE SECTION.\nENDCLASS.\n\nCLASS ZMCP_BLD_ANSCH01 IMPLEMENTATION.\n  METHOD say_hello.\n    rv_text = |Hello from the answer-adapter corpus scratch class|.\n  ENDMETHOD.\nENDCLASS."
+  },
+  "response": {
+    "status": 423,
+    "statusText": "Locked",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "707",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "54351.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-write-not-locked--01-update-source.body.xml"
+  }
+}

@@ -1,0 +1,111 @@
+{
+  "startedAt": "2026-09-11T06:12:21.440Z",
+  "finishedAt": "2026-09-11T06:12:41.502Z",
+  "substitutions": [
+    "REDACTED",
+    "REDACTED",
+    "SAPUSER01"
+  ],
+  "cases": [
+    {
+      "case": "refusal-object-not-found",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-check-nonexistent-object",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-tree",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:23.549Z",
+      "endedAt": "2026-09-11T06:12:24.169Z"
+    },
+    {
+      "case": "refusal-package-not-found-contents-empty",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:24.169Z",
+      "endedAt": "2026-09-11T06:12:24.773Z"
+    },
+    {
+      "case": "refusal-package-not-found-objectslist-empty",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:24.774Z",
+      "endedAt": "2026-09-11T06:12:25.402Z"
+    },
+    {
+      "case": "refusal-package-not-found-hierarchy-direct",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:25.402Z",
+      "endedAt": "2026-09-11T06:12:25.988Z"
+    },
+    {
+      "case": "read-class-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-function-module-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "check-success-verdict",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-table-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-package-contents-structure",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:25.991Z",
+      "endedAt": "2026-09-11T06:12:26.594Z"
+    },
+    {
+      "case": "read-empty-package-contents",
+      "outcome": "completed",
+      "exchanges": 2,
+      "startedAt": "2026-09-11T06:12:26.594Z",
+      "endedAt": "2026-09-11T06:12:27.707Z"
+    },
+    {
+      "case": "read-object-tree-structure",
+      "outcome": "completed",
+      "exchanges": 8,
+      "startedAt": "2026-09-11T06:12:27.707Z",
+      "endedAt": "2026-09-11T06:12:32.761Z"
+    },
+    {
+      "case": "read-where-used-list-structure",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:32.761Z",
+      "endedAt": "2026-09-11T06:12:34.704Z"
+    },
+    {
+      "case": "read-transport-list-structure",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T06:12:34.704Z",
+      "endedAt": "2026-09-11T06:12:35.432Z"
+    },
+    {
+      "case": "delete-success",
+      "outcome": "completed",
+      "exchanges": 2,
+      "startedAt": "2026-09-11T06:12:35.432Z",
+      "endedAt": "2026-09-11T06:12:41.502Z"
+    }
+  ]
+}

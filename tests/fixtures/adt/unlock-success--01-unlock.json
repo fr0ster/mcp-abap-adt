@@ -1,0 +1,27 @@
+{
+  "case": "unlock-success",
+  "step": 1,
+  "stepTag": "unlock",
+  "capturedAt": "2026-09-11T05:40:40.106Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/classes/zmcp_bld_ansch01?_action=UNLOCK&lockHandle=B845DBE071B0AD9222E30F4F029AD50A9A26848B",
+    "headers": {},
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=4182",
+      "sap-server": "true",
+      "sap-perf-fesrec": "18995.000000",
+      "connection": "close"
+    },
+    "bodyFile": "unlock-success--01-unlock.body.txt"
+  }
+}

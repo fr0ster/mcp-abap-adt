@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"><chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/sap/bc/adt/oo/classes/zmcp_bld_nope_cls99" chkrun:status="notProcessed" chkrun:statusText="Resource CLASS ZMCP_BLD_NOPE_CLS99 does not exist."/></chkrun:checkRunReports>

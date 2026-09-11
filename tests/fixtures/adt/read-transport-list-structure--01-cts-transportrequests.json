@@ -1,0 +1,32 @@
+{
+  "case": "read-transport-list-structure",
+  "step": 1,
+  "stepTag": "cts-transportrequests",
+  "capturedAt": "2026-09-11T06:12:34.704Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/cts/transportrequests?user=SAPUSER01",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/cts/transportrequests?user=SAPUSER01",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.transportorganizertree.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.transportorganizertree.v1+xml; charset=utf-8",
+      "content-length": "309",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "201098.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-transport-list-structure--01-cts-transportrequests.body.xml"
+  }
+}

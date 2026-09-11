@@ -1,0 +1,30 @@
+{
+  "case": "check-success-verdict",
+  "step": 1,
+  "stepTag": "checkrun",
+  "capturedAt": "2026-09-11T05:40:54.572Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.checkmessages+xml",
+      "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+    },
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/oo/classes/zbp_mcp_shr_i_root\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.checkmessages+xml; charset=utf-8",
+      "content-length": "340",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "154188.000000",
+      "connection": "close"
+    },
+    "bodyFile": "check-success-verdict--01-checkrun.body.xml"
+  }
+}

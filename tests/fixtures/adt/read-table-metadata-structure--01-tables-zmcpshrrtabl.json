@@ -1,0 +1,31 @@
+{
+  "case": "read-table-metadata-structure",
+  "step": 1,
+  "stepTag": "tables-zmcpshrrtabl",
+  "capturedAt": "2026-09-11T05:40:55.223Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/tables/ZMCP_SHR_RTABL",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.blues.v1+xml, application/vnd.sap.adt.tables.v2+xml"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.tables.v2+xml; charset=utf-8",
+      "content-length": "741",
+      "sap-authenticated": "true",
+      "etag": "20260910152546001application/vnd.sap.adt.tables.v2+xmlECTiXa8gKfUN/drdhOelkHeGy2o=",
+      "last-modified": "Thu, 10 Sep 2026 15:25:46 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "152972.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-table-metadata-structure--01-tables-zmcpshrrtabl.body.xml"
+  }
+}

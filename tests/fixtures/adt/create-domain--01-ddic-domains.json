@@ -1,0 +1,37 @@
+{
+  "case": "create-domain",
+  "step": 1,
+  "stepTag": "ddic-domains",
+  "capturedAt": "2026-09-11T08:57:15.546Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/domains",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/domains",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.domains.v2+xml, application/vnd.sap.adt.domains.v1+xml",
+      "Content-Type": "application/vnd.sap.adt.domains.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><doma:domain xmlns:doma=\"http://www.sap.com/dictionary/domain\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"corpus create capture (safe to delete)\" adtcore:language=\"EN\" adtcore:name=\"ZMCP_BLD_CRT_DOM\" adtcore:type=\"DOMA/DD\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"TRL\" adtcore:responsible=\"SAPUSER01\">\n  <adtcore:packageRef adtcore:name=\"ZADT_BLD_PKG03\"/>\n</doma:domain>"
+  },
+  "response": {
+    "status": 201,
+    "statusText": "Created",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.domains.v2+xml; charset=utf-8",
+      "content-length": "653",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "appserver-dgm9s",
+      "etag": "20260911085716000application/vnd.sap.adt.domains.v2+xmlwAYD+HuGuob7NBf3sIW6Uo1YFcE=",
+      "location": "/sap/bc/adt/ddic/domains/zmcp_bld_crt_dom",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=563678",
+      "sap-server": "true",
+      "sap-perf-fesrec": "565746.000000",
+      "connection": "close"
+    },
+    "bodyFile": "create-domain--01-ddic-domains.body.xml"
+  }
+}

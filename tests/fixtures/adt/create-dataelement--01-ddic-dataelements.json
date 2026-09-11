@@ -1,0 +1,37 @@
+{
+  "case": "create-dataelement",
+  "step": 1,
+  "stepTag": "ddic-dataelements",
+  "capturedAt": "2026-09-11T08:59:36.850Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/dataelements",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/dataelements",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.dataelements.v1+xml, application/vnd.sap.adt.dataelements.v2+xml",
+      "Content-Type": "application/vnd.sap.adt.dataelements.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><blue:wbobj xmlns:blue=\"http://www.sap.com/wbobj/dictionary/dtel\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"corpus create capture (safe to delete)\" adtcore:language=\"EN\" adtcore:name=\"ZMCP_BLD_CRT_DTEL\" adtcore:type=\"DTEL/DE\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"TRL\" adtcore:responsible=\"SAPUSER01\">\n  <adtcore:packageRef adtcore:name=\"ZADT_BLD_PKG03\"/>\n</blue:wbobj>"
+  },
+  "response": {
+    "status": 201,
+    "statusText": "Created",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8",
+      "content-length": "518",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "appserver-dgm9s",
+      "etag": "20260911085937000application/vnd.sap.adt.dataelements.v2+xml4+r0hyZb55SWtCPTarK7f8g8Moc=",
+      "location": "/sap/bc/adt/ddic/dataelements/zmcp_bld_crt_dtel",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=611979",
+      "sap-server": "true",
+      "sap-perf-fesrec": "613778.000000",
+      "connection": "close"
+    },
+    "bodyFile": "create-dataelement--01-ddic-dataelements.body.xml"
+  }
+}

@@ -5,7 +5,7 @@ error strategies (`docs/superpowers/specs/2026-09-08-result-error-strategies-des
 can be written against documents someone has actually seen. Writing a parser first
 and meeting the document later is how the transport-tree parser broke in #168.
 
-40 cases, 50 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
+44 cases, 56 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
 ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
 ## Layout
@@ -78,6 +78,23 @@ exchanges address the same endpoint and differ only in `params`.
 | `refusal-package-not-found-objectslist-empty` | nodestructure on the same | **200**, zero-byte body |
 | `refusal-package-not-found-hierarchy-direct` | hierarchy walk on the same | **200**, zero-byte body |
 | `read-empty-package-contents` | both walkers on `ZMCP_BLD_PKG01`, which **exists and is empty** | **200**, zero-byte body |
+
+## Create is not one shape either, and one create answers nothing
+
+| family | status | body |
+|---|---|---|
+| class | **200** | **0 bytes, no content-type** |
+| domain | **201 Created** | 1878 bytes, `domains.v2+xml` |
+| data element | **201 Created** | 1345 bytes, `dataelements.v2+xml` |
+
+A class create answers nothing at all: the outcome is the status and there is no
+document to read. The two DDIC creates answer the full metadata of what they
+made. A single "create" result strategy would be wrong for one of them whichever
+way it was written.
+
+A successful source write is the same: `PUT .../source/main` answers **200 with
+zero bytes**. The corpus previously held only the refused write (423), so
+nothing recorded that a write that works says nothing.
 
 ## Metadata is not one shape
 

@@ -1,0 +1,34 @@
+{
+  "case": "create-class",
+  "step": 1,
+  "stepTag": "oo-classes",
+  "capturedAt": "2026-09-11T09:00:49.576Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/classes",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.oo.classes.v4+xml",
+      "Content-Type": "application/vnd.sap.adt.oo.classes.v4+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><class:abapClass xmlns:class=\"http://www.sap.com/adt/oo/classes\" xmlns:adtcore=\"http://www.sap.com/adt/core\" adtcore:description=\"corpus create capture (safe to delete)\" adtcore:language=\"EN\" adtcore:name=\"ZMCP_BLD_CRT_CL2\" adtcore:type=\"CLAS/OC\" adtcore:masterLanguage=\"EN\" adtcore:masterSystem=\"TRL\" adtcore:responsible=\"SAPUSER01\" class:final=\"false\" class:visibility=\"public\">\n\n\n\n  <adtcore:packageRef adtcore:name=\"ZADT_BLD_PKG03\"/>\n\n\n\n  \n\n\n\n\n\n  <class:include adtcore:name=\"CLAS/OC\" adtcore:type=\"CLAS/OC\" class:includeType=\"testclasses\"/>\n\n\n\n  <class:superClassRef/>\n\n\n\n</class:abapClass>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=2047149",
+      "sap-server": "true",
+      "sap-perf-fesrec": "2052649.000000",
+      "connection": "close"
+    },
+    "bodyFile": "create-class--01-oo-classes.body.txt"
+  }
+}

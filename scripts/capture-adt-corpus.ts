@@ -124,6 +124,21 @@ const FREE_CLASS_NAME = 'ZMCP_BLD_FREE_X1';
 const FREE_TABLE_NAME = 'ZMCP_BLD_FREE_T1';
 
 /**
+ * Scratch objects for the create cases, one per family, all in the dev package
+ * and all removed in the teardown. `createResult` accounts for 16 compile
+ * errors across 16 families and the corpus held no create document at all —
+ * writing a create strategy against nothing is the thing the corpus exists to
+ * prevent.
+ *
+ * Three families, three different endpoints. Not sixteen: each one is a write,
+ * and a family whose create needs a payload this script would have to invent is
+ * a family whose capture would be measuring the invention.
+ */
+const CREATE_CLASS_NAME = 'ZMCP_BLD_CRT_CL2';
+const CREATE_DOMAIN_NAME = 'ZMCP_BLD_CRT_DOM';
+const CREATE_DTEL_NAME = 'ZMCP_BLD_CRT_DTEL';
+
+/**
  * One real object per family in the shared polygon, read from its own node in
  * the package tree rather than assumed. Metadata is NOT one shape repeated:
  * every family negotiates its own media type — `oo.classes.v4`, `blues.v1`,
@@ -788,6 +803,13 @@ async function main(): Promise<void> {
   // actually selected. `delete-success` alone reuses whatever a previous
   // aborted run left behind — which is also how that leftover gets removed.
   const needScratchWrites = [...WRITE_CASES].some((c) => recorder.selected(c));
+  const CREATE_CASES = [
+    'create-class',
+    'update-source-success',
+    'create-domain',
+    'create-dataelement',
+  ];
+  const needCreateWrites = CREATE_CASES.some((c) => recorder.selected(c));
   let scratchClassCreated = false;
 
   /** Does the scratch class exist right now? Not recorded — plumbing. */
@@ -840,6 +862,46 @@ async function main(): Promise<void> {
     } else {
       console.log(`  ${SCRATCH_CLASS_NAME} deleted.`);
       scratchClassCreated = false;
+    }
+  };
+
+  /** Remove the create-case objects, whatever happened to the run. */
+  const teardownCreated = async (): Promise<void> => {
+    if (!needCreateWrites) return;
+    track('teardown: remove the create-case scratch objects');
+    const removals: Array<[string, () => Promise<unknown>]> = [
+      [
+        CREATE_CLASS_NAME,
+        () => client.getClass().delete({ className: CREATE_CLASS_NAME }),
+      ],
+      [
+        CREATE_DOMAIN_NAME,
+        () => client.getDomain().delete({ domainName: CREATE_DOMAIN_NAME }),
+      ],
+      [
+        CREATE_DTEL_NAME,
+        () =>
+          client.getDataElement().delete({ dataElementName: CREATE_DTEL_NAME }),
+      ],
+    ];
+    // Do not believe the delete. ADT answers a refused deletion with HTTP 200
+    // and `isDeleted="false"`, so a call that does not throw has not told you
+    // the object is gone — this teardown printed "deleted" for a class that was
+    // still there and locked, which is the very masking the corpus documents.
+    // Read it back instead.
+    for (const [name, remove, stillThere] of removals) {
+      try {
+        await remove();
+      } catch (error) {
+        console.error(`  ${name}: delete threw — ${(error as Error).message}`);
+      }
+      if (await stillThere()) {
+        console.error(
+          `  WARNING: ${name} is STILL PRESENT in ${devPackage} — delete it by hand.`,
+        );
+      } else {
+        console.log(`  ${name} confirmed gone.`);
+      }
     }
   };
 
@@ -1057,6 +1119,76 @@ async function main(): Promise<void> {
     });
 
     // -----------------------------------------------------------------
+    // CREATE, and the successful UPDATE the corpus never had. Writes.
+    // Everything here is removed in the teardown.
+    // -----------------------------------------------------------------
+
+    if (needCreateWrites) {
+      await withCase('create-class', async () => {
+        await client.getClass().create({
+          className: CREATE_CLASS_NAME,
+          packageName: devPackage,
+          description: 'corpus create capture (safe to delete)',
+        });
+      });
+
+      // The corpus had a PUT that was refused with 423 and no PUT that worked,
+      // so nothing recorded what a successful write actually answers.
+      await withCase('update-source-success', async () => {
+        // `lock` answers an IAdtResponse on 18, not a bare handle. Passing the
+        // response straight through produces `lockHandle=[object Object]` and a
+        // 423, which is what this capture did on the first attempt. Every
+        // handler that locks meets this.
+        const locked = (await client
+          .getClass()
+          .lock({ className: CREATE_CLASS_NAME })) as unknown as {
+          ok: boolean;
+          getResult: () => { value: string };
+        };
+        const lock =
+          typeof locked === 'string' ? locked : locked.getResult().value;
+        // `sourceCode` goes in OPTIONS, not the config. adt-clients 18 made
+        // `config.sourceCode` belong to `check` alone — a syntax check compiles
+        // a source that is not on the server yet, so it has nowhere else to
+        // arrive — and an update that puts it in the config is told "Source
+        // code is required for update". The handler migration meets this at
+        // every call to `update`.
+        await client.getClass().update(
+          { className: CREATE_CLASS_NAME },
+          {
+            lockHandle: lock,
+            sourceCode:
+              MINIMAL_VALID_SOURCE.split(SCRATCH_CLASS_NAME).join(
+                CREATE_CLASS_NAME,
+              ),
+          },
+        );
+        await client.getClass().unlock({ className: CREATE_CLASS_NAME }, lock);
+      });
+
+      await withCase('create-domain', async () => {
+        await client.getDomain().create({
+          domainName: CREATE_DOMAIN_NAME,
+          packageName: devPackage,
+          description: 'corpus create capture (safe to delete)',
+          datatype: 'CHAR',
+          length: 10,
+        });
+      });
+
+      await withCase('create-dataelement', async () => {
+        await client.getDataElement().create({
+          dataElementName: CREATE_DTEL_NAME,
+          packageName: devPackage,
+          description: 'corpus create capture (safe to delete)',
+          typeKind: 'predefinedAbapType',
+          dataType: 'CHAR',
+          length: 10,
+        });
+      });
+    }
+
+    // -----------------------------------------------------------------
     // METADATA, one family at a time. The 70 compile errors on
     // `metadataResult` span seventeen families and the corpus had one.
     // -----------------------------------------------------------------
@@ -1209,6 +1341,7 @@ async function main(): Promise<void> {
     // shape left the scratch class stranded on the system whenever a run was
     // cut short, which is exactly when it is hardest to notice.
     await teardownScratch();
+    await teardownCreated();
   }
 
   printSummary(recorder);

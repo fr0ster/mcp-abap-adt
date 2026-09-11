@@ -447,9 +447,17 @@ Both are published from this repository with one command, in the order the
 dependency requires:
 
 ```bash
-npm run release:dry    # builds and packs both, publishes nothing
-npm run release        # @mcp-abap-adt/lib, then @mcp-abap-adt/core
+npm run release:dry        # rehearses both, touches nothing
+npm run release:publish    # @mcp-abap-adt/lib, then @mcp-abap-adt/core
 ```
+
+`release:publish` skips a version already on the registry, so re-running after
+a failure resumes rather than starting over. It aborts on the first failure
+instead of publishing the server on top of a library that is not there.
+
+Note that `npm publish` and `npm run` are different commands. `npm publish
+release` asks npm to publish a package *named* `release`, which is somebody
+else's package on the registry.
 
 Copyright © 2025–2026 Oleksii Kyslytsia
 

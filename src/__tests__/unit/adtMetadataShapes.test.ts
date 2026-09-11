@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 
 /**
  * Metadata is not one shape repeated per object type.
@@ -13,16 +14,6 @@ import * as path from 'node:path';
  * This test exists to keep that fact in the repository rather than in a
  * conversation. It asserts the divergence, not any particular parse.
  */
-
-const CORPUS = path.join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'tests',
-  'fixtures',
-  'adt',
-);
 
 interface Sidecar {
   case: string;
@@ -39,17 +30,17 @@ function metadataFixtures(): Array<{
   body: string;
 }> {
   return fs
-    .readdirSync(CORPUS)
+    .readdirSync(ADT_CORPUS_DIR)
     .filter((f) => f.startsWith('read-metadata-') && f.endsWith('.json'))
     .map((f) => {
       const sidecar: Sidecar = JSON.parse(
-        fs.readFileSync(path.join(CORPUS, f), 'utf-8'),
+        fs.readFileSync(path.join(ADT_CORPUS_DIR, f), 'utf-8'),
       );
       return {
         family: sidecar.case.replace('read-metadata-', ''),
         sidecar,
         body: fs.readFileSync(
-          path.join(CORPUS, sidecar.response.bodyFile),
+          path.join(ADT_CORPUS_DIR, sidecar.response.bodyFile),
           'utf-8',
         ),
       };

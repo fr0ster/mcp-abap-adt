@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import { readAdtRefusal } from '../../lib/adtRefusal';
 import { return_answer } from '../../lib/answer';
 
@@ -13,36 +14,10 @@ import { return_answer } from '../../lib/answer';
  * field that survives the reading and is dropped by the allowlist would show.
  */
 
-const CORPUS = path.join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'tests',
-  'fixtures',
-  'adt',
-);
-
-function sidecar(name: string) {
-  return JSON.parse(
-    fs.readFileSync(path.join(CORPUS, `${name}.json`), 'utf-8'),
-  ) as {
-    request: { method: string; url: string };
-    response: { status: number | string; bodyFile: string };
-  };
-}
-
-function body(name: string): string {
-  return fs.readFileSync(
-    path.join(CORPUS, sidecar(name).response.bodyFile),
-    'utf-8',
-  );
-}
-
 /** A failure as a strategy would hand it over, from a real document. */
 function failureFrom(name: string): IAdtResponse<never, IAdtError> {
-  const meta = sidecar(name);
-  const document = body(name);
+  const meta = corpusSidecar(name);
+  const document = corpusBody(name);
   const refusal = readAdtRefusal(document);
   if (!refusal) throw new Error(`${name} was not read as a refusal`);
   return {
@@ -144,7 +119,7 @@ describe('a real refusal, read and then answered', () => {
         detail: 'raw',
       }).content[0].text,
     );
-    expect(raw.raw_body).toBe(body(name));
+    expect(raw.raw_body).toBe(corpusBody(name));
 
     const terse = JSON.parse(
       return_answer(failureFrom(name), (v) => v, {

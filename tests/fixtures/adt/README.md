@@ -402,6 +402,37 @@ response, so no strategy can recover one. Only the extra existence round trip
 that `GetPackageTree` already pays can tell the two apart. This settles the open
 question about whether `GetPackageContents` and `GetObjectsList` should pay it.
 
+## Moving this out
+
+The readings in `src/lib/adtRefusal.ts` and this corpus are meant to leave
+together, into a package of their own in the adt-clients repository, with this
+file as the documentation of why the readings look the way they do.
+
+**What makes that cheap, and is maintained deliberately:**
+
+- `adtRefusal.ts` imports `fast-xml-parser` and nothing else. No MCP type, no
+  handler, no config, nothing from this repository.
+- The corpus is plain files. No generator, no build step.
+- The fixture location is spelled once, in `src/lib/adtCorpus.ts`. Every test
+  asks that module. Moving the corpus is one edit, not one per test file.
+
+**What goes:** `src/lib/adtRefusal.ts`, `src/lib/adtCorpus.ts`,
+`tests/fixtures/adt/` entire, `src/__tests__/unit/adtRefusalReadings.test.ts`,
+`adtRefusalCorpus.test.ts`, `adtMetadataShapes.test.ts`, and this README.
+
+**What stays:** `src/lib/answer.ts` and its tests. That is the MCP adapter —
+it turns an answer into an `McpResult`, which is this server's business and not
+a strategy's. `answerFromCorpus.test.ts` stays with it and keeps reading the
+corpus from wherever it ends up.
+
+**What has to be decided before it is published:** the fixtures carry this
+system's own object names — `ZMCP_SHR_*`, `ZADT_BLD_*`, `ZMCP_BLD_*` — and its
+package names. They are this project's test polygon rather than anyone's
+business data, and the SAP user id is already a placeholder, so nothing here is
+sensitive. But they are noise in a public package, and renaming them would break
+the byte-for-byte promise that makes the corpus worth having. Renaming, or
+keeping them and saying why, is a decision for the move.
+
 ## Regenerating
 
 ```bash

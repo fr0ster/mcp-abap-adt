@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { deletionRefusal } from '@mcp-abap-adt/adt-clients';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   isIndeterminateWalkAnswer,
   readActivationRefusal,
@@ -24,31 +25,6 @@ import {
  * No network, no session. The fixtures are files.
  */
 
-const CORPUS = path.join(
-  __dirname,
-  '..',
-  '..',
-  '..',
-  'tests',
-  'fixtures',
-  'adt',
-);
-
-function sidecar(name: string): {
-  response: { status: number | string; bodyFile: string };
-} {
-  return JSON.parse(
-    fs.readFileSync(path.join(CORPUS, `${name}.json`), 'utf-8'),
-  );
-}
-
-function body(name: string): string {
-  return fs.readFileSync(
-    path.join(CORPUS, sidecar(name).response.bodyFile),
-    'utf-8',
-  );
-}
-
 describe('form 1 — exc:exception', () => {
   it.each([
     ['refusal-object-not-found--01-read-source', 'ExceptionResourceNotFound'],
@@ -62,7 +38,7 @@ describe('form 1 — exc:exception', () => {
       'ExceptionResourceInvalidLockHandle',
     ],
   ])('%s is read as a refusal carrying the server classification', (name, adtType) => {
-    const refusal = readExceptionRefusal(body(name));
+    const refusal = readExceptionRefusal(corpusBody(name));
     expect(refusal).not.toBeNull();
     expect(refusal?.adtType).toBe(adtType);
     expect(refusal?.namespace).toBe('com.sap.adt');
@@ -71,7 +47,7 @@ describe('form 1 — exc:exception', () => {
 
   it('keeps the message SAP wrote, including the user holding the lock', () => {
     const refusal = readExceptionRefusal(
-      body('refusal-lock-held-by-other--01-lock'),
+      corpusBody('refusal-lock-held-by-other--01-lock'),
     );
     expect(refusal?.message).toContain('SAPUSER01');
     expect(refusal?.message).toContain('ZMCP_BLD_ANSCH01');
@@ -79,7 +55,7 @@ describe('form 1 — exc:exception', () => {
 
   it('carries the T100 key on the message, code and placeholders included', () => {
     const refusal = readExceptionRefusal(
-      body('refusal-object-not-found--01-read-source'),
+      corpusBody('refusal-object-not-found--01-read-source'),
     );
     const [first] = refusal?.messages ?? [];
     expect(first.t100).toEqual({
@@ -92,7 +68,9 @@ describe('form 1 — exc:exception', () => {
 
   it('does not fire on a document that is not an exception', () => {
     expect(
-      readExceptionRefusal(body('activation-success-verdict--01-activation')),
+      readExceptionRefusal(
+        corpusBody('activation-success-verdict--01-activation'),
+      ),
     ).toBeNull();
     expect(readExceptionRefusal('')).toBeNull();
   });
@@ -126,13 +104,13 @@ describe('every refusal reduces to a severity and a sentence', () => {
   ];
 
   it.each(refusals)('%s gives at least one message', (name) => {
-    const refusal = readAdtRefusal(body(name));
+    const refusal = readAdtRefusal(corpusBody(name));
     expect(refusal).not.toBeNull();
     expect(refusal?.messages.length).toBeGreaterThan(0);
   });
 
   it.each(refusals)('%s states a severity and a non-empty sentence', (name) => {
-    for (const m of readAdtRefusal(body(name))?.messages ?? []) {
+    for (const m of readAdtRefusal(corpusBody(name))?.messages ?? []) {
       expect(['E', 'W', 'I', 'S']).toContain(m.type);
       expect(m.text.trim().length).toBeGreaterThan(0);
     }
@@ -140,22 +118,24 @@ describe('every refusal reduces to a severity and a sentence', () => {
 
   it('normalises the word ERROR to the letter E', () => {
     const refusal = readAdtRefusal(
-      body('refusal-validation-name-taken-ddl--01-ddl-validation'),
+      corpusBody('refusal-validation-name-taken-ddl--01-ddl-validation'),
     );
     expect(
-      body('refusal-validation-name-taken-ddl--01-ddl-validation'),
+      corpusBody('refusal-validation-name-taken-ddl--01-ddl-validation'),
     ).toContain('<SEVERITY>ERROR</SEVERITY>');
     expect(refusal?.messages[0].type).toBe('E');
   });
 
   it('supplies a severity where the document states none', () => {
     // An exc:exception has no severity field at all.
-    const exception = body('refusal-object-not-found--01-read-source');
+    const exception = corpusBody('refusal-object-not-found--01-read-source');
     expect(exception).not.toMatch(/type="[EWIS]"/);
     expect(readAdtRefusal(exception)?.messages[0].type).toBe('E');
 
     // A check that never ran carries no message list.
-    const notProcessed = body('refusal-check-nonexistent-object--01-checkrun');
+    const notProcessed = corpusBody(
+      'refusal-check-nonexistent-object--01-checkrun',
+    );
     expect(notProcessed).not.toContain('checkMessage');
     const messages = readAdtRefusal(notProcessed)?.messages ?? [];
     expect(messages).toHaveLength(1);
@@ -165,12 +145,12 @@ describe('every refusal reduces to a severity and a sentence', () => {
 
   it('the identity is enrichment — present on one form, absent on the rest', () => {
     const withKey = readAdtRefusal(
-      body('refusal-write-not-locked--01-update-source'),
+      corpusBody('refusal-write-not-locked--01-update-source'),
     );
     expect(withKey?.messages[0].t100?.id).toBe('SADT_RESOURCE');
 
     const withoutKey = readAdtRefusal(
-      body('refusal-delete-refused--01-deletion-delete'),
+      corpusBody('refusal-delete-refused--01-deletion-delete'),
     );
     expect(withoutKey?.messages[0].t100).toBeUndefined();
     // and it still has the two things every form has
@@ -182,7 +162,7 @@ describe('every refusal reduces to a severity and a sentence', () => {
 describe('form 2a — activation', () => {
   it('a failed activation is a refusal', () => {
     const refusal = readActivationRefusal(
-      body('refusal-activation-fails--01-activation'),
+      corpusBody('refusal-activation-fails--01-activation'),
     );
     expect(refusal).not.toBeNull();
     expect(refusal?.message).toContain('STRONG_BUT_NOT_A_REAL_TYPE');
@@ -190,13 +170,15 @@ describe('form 2a — activation', () => {
 
   it('a successful activation is NOT a refusal', () => {
     expect(
-      readActivationRefusal(body('activation-success-verdict--01-activation')),
+      readActivationRefusal(
+        corpusBody('activation-success-verdict--01-activation'),
+      ),
     ).toBeNull();
   });
 
   it('every message reaches the caller, not only the errors', () => {
     const refusal = readActivationRefusal(
-      body('refusal-activation-fails--01-activation'),
+      corpusBody('refusal-activation-fails--01-activation'),
     );
     expect(refusal?.messages?.length).toBeGreaterThan(0);
     expect(refusal?.messages?.map((m) => m.type)).toContain('E');
@@ -215,7 +197,9 @@ describe('form 2a — activation', () => {
   });
 
   it('a warning on an activation that DID execute is not a refusal', () => {
-    const warned = body('activation-success-verdict--01-activation').replace(
+    const warned = corpusBody(
+      'activation-success-verdict--01-activation',
+    ).replace(
       '/>',
       '/><msg objDescr="x" type="W" line="1"><shortText><txt>careful</txt></shortText></msg>',
     );
@@ -227,17 +211,19 @@ describe('form 2b — deletion', () => {
   it('the refused delete is a refusal at both steps', () => {
     expect(
       readDeletionRefusal(
-        body('refusal-deletion-check-refuses--01-deletion-check'),
+        corpusBody('refusal-deletion-check-refuses--01-deletion-check'),
       ),
     ).not.toBeNull();
     expect(
-      readDeletionRefusal(body('refusal-delete-refused--01-deletion-delete')),
+      readDeletionRefusal(
+        corpusBody('refusal-delete-refused--01-deletion-delete'),
+      ),
     ).not.toBeNull();
   });
 
   it('the refusal repeats what SAP said', () => {
     const refusal = readDeletionRefusal(
-      body('refusal-delete-refused--01-deletion-delete'),
+      corpusBody('refusal-delete-refused--01-deletion-delete'),
     );
     expect(refusal?.message).toContain('ZMCP_BLD_ANSCH01');
     expect(refusal?.message).toContain('already editing');
@@ -245,24 +231,26 @@ describe('form 2b — deletion', () => {
 
   it('the successful delete is NOT a refusal at either step', () => {
     expect(
-      readDeletionRefusal(body('deletion-check-allows--01-deletion-check')),
+      readDeletionRefusal(
+        corpusBody('deletion-check-allows--01-deletion-check'),
+      ),
     ).toBeNull();
     expect(
-      readDeletionRefusal(body('delete-success--01-deletion-delete')),
+      readDeletionRefusal(corpusBody('delete-success--01-deletion-delete')),
     ).toBeNull();
   });
 
   it('a del:message of type S on a success does not trip the reading', () => {
     // The regression this guards: keying on the presence of del:message rather
     // than on the attribute. delete-success--02 carries one.
-    const document = body('delete-success--01-deletion-delete');
+    const document = corpusBody('delete-success--01-deletion-delete');
     expect(document).toContain('del:message');
     expect(document).toContain('del:type="S"');
     expect(readDeletionRefusal(document)).toBeNull();
   });
 
   it('the deletionResult is read by isDeleted, not by the check attribute', () => {
-    const document = body('delete-success--01-deletion-delete');
+    const document = corpusBody('delete-success--01-deletion-delete');
     expect(document).not.toContain('isDeletable');
     // A reader that looked for isDeletable and defaulted a missing one to false
     // would call this refused. This is the adt-clients deletionRefusal hazard.
@@ -286,31 +274,35 @@ describe("the hazard in adt-clients' own deletion parser, measured not assumed",
 
   it('reads the deletion CHECK correctly — that is what it is for', () => {
     expect(
-      refusedByTheirStrategy(body('deletion-check-allows--01-deletion-check')),
+      refusedByTheirStrategy(
+        corpusBody('deletion-check-allows--01-deletion-check'),
+      ),
     ).toBe(false);
     expect(
       refusedByTheirStrategy(
-        body('refusal-deletion-check-refuses--01-deletion-check'),
+        corpusBody('refusal-deletion-check-refuses--01-deletion-check'),
       ),
     ).toBe(true);
   });
 
   it('calls a SUCCESSFUL delete refused when handed the deletionResult', () => {
     expect(
-      refusedByTheirStrategy(body('delete-success--01-deletion-delete')),
+      refusedByTheirStrategy(corpusBody('delete-success--01-deletion-delete')),
     ).toBe(true);
   });
 
   it('our reading gets that same document right', () => {
     expect(
-      readDeletionRefusal(body('delete-success--01-deletion-delete')),
+      readDeletionRefusal(corpusBody('delete-success--01-deletion-delete')),
     ).toBeNull();
   });
 });
 
 describe('form 3 — check runs', () => {
   it('a check that never ran is a refusal, and is given the message it lacks', () => {
-    const document = body('refusal-check-nonexistent-object--01-checkrun');
+    const document = corpusBody(
+      'refusal-check-nonexistent-object--01-checkrun',
+    );
     // The document itself has no message list — the reason is in an attribute.
     expect(document).not.toContain('checkMessage');
 
@@ -327,7 +319,7 @@ describe('form 3 — check runs', () => {
 
   it('a syntax error on a check that DID run is a refusal', () => {
     const refusal = readCheckRunRefusal(
-      body('refusal-syntax-check--01-checkrun'),
+      corpusBody('refusal-syntax-check--01-checkrun'),
     );
     expect(refusal).not.toBeNull();
     expect(refusal?.message).toContain('STRONG_BUT_NOT_A_REAL_TYPE');
@@ -335,14 +327,16 @@ describe('form 3 — check runs', () => {
 
   it('a clean check is NOT a refusal', () => {
     expect(
-      readCheckRunRefusal(body('check-success-verdict--01-checkrun')),
+      readCheckRunRefusal(corpusBody('check-success-verdict--01-checkrun')),
     ).toBeNull();
   });
 
   it('the status is read before the messages, or a missing object reads as clean', () => {
     // Stated as a test because it is the whole point of the ordering: the
     // notProcessed document has no checkMessageList to find an E in.
-    const document = body('refusal-check-nonexistent-object--01-checkrun');
+    const document = corpusBody(
+      'refusal-check-nonexistent-object--01-checkrun',
+    );
     expect(document).not.toContain('checkMessage');
     expect(readCheckRunRefusal(document)).not.toBeNull();
   });
@@ -365,7 +359,7 @@ describe('form 5 — validation asks whether the NAME is admissible', () => {
    */
 
   it('an admissible class name is not a refusal', () => {
-    const document = body(
+    const document = corpusBody(
       'validation-name-free-class--01-validation-objectname',
     );
     expect(document).toContain('CHECK_RESULT');
@@ -375,21 +369,21 @@ describe('form 5 — validation asks whether the NAME is admissible', () => {
   it('an admissible table name is not a refusal', () => {
     expect(
       readValidationRefusal(
-        body('validation-name-free-table--01-tables-validation'),
+        corpusBody('validation-name-free-table--01-tables-validation'),
       ),
     ).toBeNull();
   });
 
   it('an admissible DDL name answers SEVERITY OK, and is not a refusal', () => {
-    const document = body('validation-name-free-ddl--01-ddl-validation');
+    const document = corpusBody('validation-name-free-ddl--01-ddl-validation');
     expect(document).toContain('<SEVERITY>OK</SEVERITY>');
     expect(readValidationRefusal(document)).toBeNull();
   });
 
   it('a taken DDL name is a refusal, inside HTTP 200', () => {
     const name = 'refusal-validation-name-taken-ddl--01-ddl-validation';
-    expect(sidecar(name).response.status).toBe(200);
-    const refusal = readValidationRefusal(body(name));
+    expect(corpusSidecar(name).response.status).toBe(200);
+    const refusal = readValidationRefusal(corpusBody(name));
     expect(refusal?.form).toBe('validation');
     expect(refusal?.message).toContain('already exists');
   });
@@ -397,8 +391,8 @@ describe('form 5 — validation asks whether the NAME is admissible', () => {
   it('a taken function group name is a refusal, inside HTTP 200', () => {
     const name =
       'refusal-validation-name-taken-functiongroup--01-functions-validation';
-    expect(sidecar(name).response.status).toBe(200);
-    expect(readValidationRefusal(body(name))?.message).toContain(
+    expect(corpusSidecar(name).response.status).toBe(200);
+    expect(readValidationRefusal(corpusBody(name))?.message).toContain(
       'already exists',
     );
   });
@@ -417,15 +411,17 @@ describe('form 5 — validation asks whether the NAME is admissible', () => {
       'InvalidObjName',
     ],
   ])('%s refuses with the status instead, and is form 1', (name, adtType) => {
-    expect(sidecar(name).response.status).toBe(400);
-    const refusal = readAdtRefusal(body(name));
+    expect(corpusSidecar(name).response.status).toBe(400);
+    const refusal = readAdtRefusal(corpusBody(name));
     expect(refusal?.form).toBe('exception');
     expect(refusal?.adtType).toBe(adtType);
   });
 
   it('the presence of SEVERITY is not the signal — its value is', () => {
-    const free = body('validation-name-free-ddl--01-ddl-validation');
-    const taken = body('refusal-validation-name-taken-ddl--01-ddl-validation');
+    const free = corpusBody('validation-name-free-ddl--01-ddl-validation');
+    const taken = corpusBody(
+      'refusal-validation-name-taken-ddl--01-ddl-validation',
+    );
     expect(free).toContain('SEVERITY');
     expect(taken).toContain('SEVERITY');
     expect(readValidationRefusal(free)).toBeNull();
@@ -434,22 +430,22 @@ describe('form 5 — validation asks whether the NAME is admissible', () => {
 
   it('a check-run document is never read as a validation verdict', () => {
     expect(
-      readValidationRefusal(body('refusal-syntax-check--01-checkrun')),
+      readValidationRefusal(corpusBody('refusal-syntax-check--01-checkrun')),
     ).toBeNull();
     expect(
-      readValidationRefusal(body('check-success-verdict--01-checkrun')),
+      readValidationRefusal(corpusBody('check-success-verdict--01-checkrun')),
     ).toBeNull();
   });
 
   it('a validation document is never read as a check run', () => {
     expect(
       readCheckRunRefusal(
-        body('refusal-validation-name-taken-ddl--01-ddl-validation'),
+        corpusBody('refusal-validation-name-taken-ddl--01-ddl-validation'),
       ),
     ).toBeNull();
     expect(
       readCheckRunRefusal(
-        body('validation-name-free-class--01-validation-objectname'),
+        corpusBody('validation-name-free-class--01-validation-objectname'),
       ),
     ).toBeNull();
   });
@@ -465,28 +461,28 @@ describe('form 6 — a unit test run, where only the third document tells you', 
     'refusal-unittest-run-failing--03-results-fa53c505dd7b1fd1abb859f1193d5d44';
 
   it('the run itself answers 201 with nothing, and the id is in a header', () => {
-    const s = sidecar(RUN);
+    const s = corpusSidecar(RUN);
     expect(s.response.status).toBe(201);
-    expect(body(RUN)).toBe('');
+    expect(corpusBody(RUN)).toBe('');
     expect(s.response.headers.location).toMatch(/abapunit\/runs\//);
   });
 
   it('the status document is the same whether the run passed or failed', () => {
     // It reports progress, not verdict. Reading pass/fail from it would call
     // every completed run a success.
-    const statusBody = body(STATUS);
+    const statusBody = corpusBody(STATUS);
     expect(statusBody).toContain('status="FINISHED"');
     expect(statusBody).not.toContain('alert');
     expect(readAdtRefusal(statusBody)).toBeNull();
   });
 
   it('a passing result is not a refusal', () => {
-    expect(body(PASSED)).not.toContain('<alerts>');
-    expect(readUnitTestRefusal(body(PASSED))).toBeNull();
+    expect(corpusBody(PASSED)).not.toContain('<alerts>');
+    expect(readUnitTestRefusal(corpusBody(PASSED))).toBeNull();
   });
 
   it('a failing result is, and reduces to the same severity and sentence', () => {
-    const refusal = readUnitTestRefusal(body(FAILED));
+    const refusal = readUnitTestRefusal(corpusBody(FAILED));
     expect(refusal?.form).toBe('unittest');
     expect(refusal?.messages).toHaveLength(1);
     expect(refusal?.messages[0].type).toBe('E');
@@ -495,8 +491,8 @@ describe('form 6 — a unit test run, where only the third document tells you', 
   });
 
   it("maps ABAP Unit's own severity scale onto the usual letters", () => {
-    expect(body(FAILED)).toContain('severity="critical"');
-    expect(readUnitTestRefusal(body(FAILED))?.messages[0].type).toBe('E');
+    expect(corpusBody(FAILED)).toContain('severity="critical"');
+    expect(readUnitTestRefusal(corpusBody(FAILED))?.messages[0].type).toBe('E');
   });
 });
 
@@ -505,19 +501,19 @@ describe('form 4 — the walkers, where no reading is possible', () => {
   const empty = 'read-empty-package-contents--01-nodestructure';
 
   it('a missing package and an empty package are the same bytes', () => {
-    expect(body(empty)).toBe(body(missing));
+    expect(corpusBody(empty)).toBe(corpusBody(missing));
   });
 
   it('both are indeterminate, and no reading claims otherwise', () => {
-    expect(isIndeterminateWalkAnswer(body(missing))).toBe(true);
-    expect(isIndeterminateWalkAnswer(body(empty))).toBe(true);
-    expect(readAdtRefusal(body(missing))).toBeNull();
+    expect(isIndeterminateWalkAnswer(corpusBody(missing))).toBe(true);
+    expect(isIndeterminateWalkAnswer(corpusBody(empty))).toBe(true);
+    expect(readAdtRefusal(corpusBody(missing))).toBeNull();
   });
 
   it('a populated package is not indeterminate', () => {
     expect(
       isIndeterminateWalkAnswer(
-        body('read-package-contents-structure--01-nodestructure'),
+        corpusBody('read-package-contents-structure--01-nodestructure'),
       ),
     ).toBe(false);
   });
@@ -530,7 +526,7 @@ describe('the dispatcher picks the right reading for each document', () => {
     ['refusal-delete-refused--01-deletion-delete', 'deletion'],
     ['refusal-syntax-check--01-checkrun', 'checkrun'],
   ])('%s is read as form %s', (name, form) => {
-    expect(readAdtRefusal(body(name))?.form).toBe(form);
+    expect(readAdtRefusal(corpusBody(name))?.form).toBe(form);
   });
 
   it.each([
@@ -545,6 +541,6 @@ describe('the dispatcher picks the right reading for each document', () => {
     'read-transport-list-structure--01-cts-transportrequests',
     'read-table-metadata-structure--01-tables-zmcpshrrtabl',
   ])('%s is not read as a refusal by any of the four', (name) => {
-    expect(readAdtRefusal(body(name))).toBeNull();
+    expect(readAdtRefusal(corpusBody(name))).toBeNull();
   });
 });

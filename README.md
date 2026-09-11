@@ -466,6 +466,14 @@ LGPL does not reach your own code, but its terms do travel with those four
 packages whatever this project is licensed as. Plan for that, not for the
 notice on this repository.
 
+**Other terms are possible.** Apache-2.0 is what the library is offered under
+publicly, not the only way it can be offered. The copyright holder may license
+the same code separately to a party who needs different terms; that takes
+nothing away from anyone who received it under Apache-2.0, which is permanent.
+[`CONTRIBUTORS.md`](CONTRIBUTORS.md#licensing) records what keeps that option
+open, including the rule that no LGPL code from the packages underneath is ever
+copied into this tree.
+
 **History.** Releases through 8.13.0 were MIT and stay MIT; 9.x was
 `GPL-3.0-only`. A licence change is not retroactive — anyone may still take an
 earlier release under the licence it carried. See [`CONTRIBUTORS.md`](CONTRIBUTORS.md#licensing)

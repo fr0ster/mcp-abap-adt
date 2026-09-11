@@ -6,12 +6,12 @@
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "8.13.0",
+  "version": "10.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/core",
-      "version": "8.13.0",
+      "version": "10.0.0",
       "transport": {
         "type": "stdio"
       },
@@ -27,14 +27,21 @@
           "name": "SAP_AUTH_TYPE",
           "description": "Authentication method: 'xsuaa' for JWT/OAuth2 (BTP ABAP Cloud) or 'basic' for username/password (on-prem).",
           "format": "string",
-          "choices": ["xsuaa", "basic"],
+          "choices": [
+            "xsuaa",
+            "basic"
+          ],
           "default": "xsuaa"
         },
         {
           "name": "SAP_SYSTEM_TYPE",
           "description": "System type, controls which tools are available (e.g. Programs are onprem-only).",
           "format": "string",
-          "choices": ["cloud", "onprem", "legacy"],
+          "choices": [
+            "cloud",
+            "onprem",
+            "legacy"
+          ],
           "default": "cloud"
         },
         {

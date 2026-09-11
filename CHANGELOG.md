@@ -28,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   because a licence change is not retroactive. `CONTRIBUTORS.md` carries the full
   account of why each change was lawful.
 
+  **Other terms remain possible.** Apache-2.0 is what the library is offered
+  under publicly, not the only way it may be offered. Every inbound contribution
+  so far arrived under MIT or Apache-2.0, both of which grant the right to
+  sublicense, so the copyright holder can still offer the same code separately
+  to a party who needs different terms. Nobody loses what they already received.
+  `CONTRIBUTORS.md` records the three conditions that keep that open — chiefly
+  that no code from the LGPL packages underneath is ever pasted into this tree.
+
   **The four libraries underneath stay `LGPL-3.0-only`** — `adt-clients`,
   `connection`, `interfaces` and `logger` — and the library links all four at
   runtime. Their terms travel with any distribution regardless of the notice on

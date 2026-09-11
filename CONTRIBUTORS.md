@@ -75,6 +75,37 @@ embeds the ADT tools would have taken on AGPL section 13 obligations because the
 same package also carried a launcher it never ran. Splitting them means
 installing the library never puts the server in your dependency tree.
 
+**The option of other terms is deliberately kept open.** Apache-2.0 is what the
+library is offered under publicly; it is not a statement that it can only ever
+be offered that way. The copyright holder may additionally license the same code
+to a particular party under different terms — the usual reason being a party who
+cannot accept even Apache's notice and attribution conditions, or who wants
+warranties an open licence explicitly disclaims. Offering a second licence takes
+nothing away from the first: everyone who received the code under Apache-2.0
+keeps it under Apache-2.0, permanently.
+
+Three things keep that option open, and all three are conditions on how this
+repository is maintained rather than legal theory:
+
+1. **Substantially all the copyright is held by one person.** You cannot offer
+   terms on someone else's code without their permission.
+2. **Every inbound contribution has arrived under a licence that permits
+   sublicensing.** MIT says so in as many words, and Apache-2.0 grants the right
+   to "reproduce, prepare Derivative Works of, publicly display, publicly
+   perform, **sublicense**, and distribute". A contribution offered under a
+   copyleft licence would not carry that permission, and accepting one would
+   close the option for whatever it touched.
+3. **No copyleft code has been copied into this tree.** This is the one that
+   needs active care, because the four packages underneath — `adt-clients`,
+   `connection`, `interfaces` and `logger` — are LGPL-3.0-only and share an
+   author with this repository. Linking them is fine and is what the library
+   does. Pasting a function out of one of them into a file here would make that
+   file LGPL-encumbered, make the Apache notice on it untrue, and take that file
+   out of anything the copyright holder could offer separately.
+
+If that ever stops being true for a file, the honest fix is to say so on the
+file, not to leave the notice standing.
+
 **The libraries underneath stay LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
 `connection`, `interfaces` and `logger`. The library links all four at runtime,
 so their terms travel with any distribution regardless of what this repository

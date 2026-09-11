@@ -1,0 +1,157 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { readAdtRefusal } from '../../lib/adtRefusal';
+import { return_answer } from '../../lib/answer';
+
+/**
+ * The two halves composed, against documents SAP actually sent.
+ *
+ * Everything else tests one side: the readings against fixtures, the adapter
+ * against fabricated errors. This is the join — a real document goes in, a
+ * strategy reads it, the adapter decides what a caller may see. It is where a
+ * field that survives the reading and is dropped by the allowlist would show.
+ */
+
+const CORPUS = path.join(
+  __dirname,
+  '..',
+  '..',
+  '..',
+  'tests',
+  'fixtures',
+  'adt',
+);
+
+function sidecar(name: string) {
+  return JSON.parse(
+    fs.readFileSync(path.join(CORPUS, `${name}.json`), 'utf-8'),
+  ) as {
+    request: { method: string; url: string };
+    response: { status: number | string; bodyFile: string };
+  };
+}
+
+function body(name: string): string {
+  return fs.readFileSync(
+    path.join(CORPUS, sidecar(name).response.bodyFile),
+    'utf-8',
+  );
+}
+
+/** A failure as a strategy would hand it over, from a real document. */
+function failureFrom(name: string): IAdtResponse<never, IAdtError> {
+  const meta = sidecar(name);
+  const document = body(name);
+  const refusal = readAdtRefusal(document);
+  if (!refusal) throw new Error(`${name} was not read as a refusal`);
+  return {
+    ok: false,
+    getResult: () => {
+      throw new Error('not a success');
+    },
+    getError: () => ({
+      origin: 'refusal',
+      message: refusal.message,
+      adtType: refusal.adtType,
+      namespace: refusal.namespace,
+      messages: refusal.messages,
+      // Deliberately wider than the contract, the way a strategy might.
+      request: {
+        method: meta.request.method,
+        url: meta.request.url,
+        headers: { authorization: 'Bearer MUST-NOT-APPEAR' },
+      },
+      response: { data: document },
+    }),
+  } as unknown as IAdtResponse<never, IAdtError>;
+}
+
+const REFUSALS = [
+  'refusal-write-not-locked--01-update-source',
+  'refusal-object-not-found--01-read-source',
+  'refusal-lock-held-by-other--01-lock',
+  'refusal-activation-fails--01-activation',
+  'refusal-syntax-check--01-checkrun',
+  'refusal-check-nonexistent-object--01-checkrun',
+  'refusal-delete-refused--01-deletion-delete',
+  'refusal-validation-name-taken-ddl--01-ddl-validation',
+];
+
+describe('a real refusal, read and then answered', () => {
+  it.each(REFUSALS)('%s comes back as an error with a sentence', (name) => {
+    const result = return_answer(failureFrom(name), (v) => v, {
+      tool: 'AnyTool',
+      detail: 'terse',
+    });
+
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.origin).toBe('refusal');
+    expect(typeof payload.message).toBe('string');
+    expect(payload.message.length).toBeGreaterThan(0);
+    expect(payload.messages.length).toBeGreaterThan(0);
+    expect(['E', 'W', 'I', 'S']).toContain(payload.messages[0].type);
+  });
+
+  it.each(
+    REFUSALS,
+  )('%s never leaks a credential the strategy attached', (name) => {
+    for (const detail of ['terse', 'full', 'raw'] as const) {
+      const text = return_answer(failureFrom(name), (v) => v, {
+        tool: 'AnyTool',
+        detail,
+      }).content[0].text;
+      expect(text).not.toContain('Bearer');
+      expect(text).not.toContain('authorization');
+    }
+  });
+
+  it('keeps the T100 key where the document had one', () => {
+    const payload = JSON.parse(
+      return_answer(
+        failureFrom('refusal-write-not-locked--01-update-source'),
+        (v) => v,
+        { tool: 'UpdateClass', detail: 'terse' },
+      ).content[0].text,
+    );
+
+    expect(payload.messages[0].t100).toEqual({
+      id: 'SADT_RESOURCE',
+      no: '026',
+      values: ['CLASS', 'ZMCP_BLD_ANSCH01', 'ZZ_INVALID_LOCK_HANDLE_0001'],
+    });
+  });
+
+  it('omits the key where the carrier never had one, without inventing it', () => {
+    const payload = JSON.parse(
+      return_answer(
+        failureFrom('refusal-delete-refused--01-deletion-delete'),
+        (v) => v,
+        { tool: 'DeleteClass', detail: 'terse' },
+      ).content[0].text,
+    );
+
+    expect(payload.messages[0].t100).toBeUndefined();
+    expect(payload.messages[0].text).toContain('already editing');
+  });
+
+  it('gives the document back at detail raw, and only there', () => {
+    const name = 'refusal-activation-fails--01-activation';
+    const raw = JSON.parse(
+      return_answer(failureFrom(name), (v) => v, {
+        tool: 'ActivateClass',
+        detail: 'raw',
+      }).content[0].text,
+    );
+    expect(raw.raw_body).toBe(body(name));
+
+    const terse = JSON.parse(
+      return_answer(failureFrom(name), (v) => v, {
+        tool: 'ActivateClass',
+        detail: 'terse',
+      }).content[0].text,
+    );
+    expect(terse.raw_body).toBeUndefined();
+  });
+});

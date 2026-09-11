@@ -69,11 +69,15 @@ The failure payload allowlist in the plan is
 The readings produce a `messages[]` whose entries carry `type`, `text`, `code`,
 `t100`, `line`, `uri`.
 
-**`t100` has no home.** It is the message class and number with the substituted
-placeholders — `SADT_RESOURCE` `026` with `CLASS`, the object name, the bad lock
-handle — and it is the only thing in the whole corpus a caller can match on
-without reading English. Either the allowlist grows a field or the key is
-dropped. This has to be settled before Task 4 is written, not after.
+**`t100` was added to the allowlist** (decided 2026-09-11). It is the message
+class and number with the substituted placeholders — `SADT_RESOURCE` `026` with
+`CLASS`, the object name, the bad lock handle — and the only thing in the whole
+corpus a caller can match on without reading English.
+
+It travels on the message it belongs to, not beside the failure, and `no` stays
+the zero-padded string SAP sent: `SADT_RESOURCE/26` is a key no system knows.
+Messages are rebuilt field by field on the way out, the same as `request`, so a
+strategy that attaches something else does not have it forwarded.
 
 ## Rows that are thin
 

@@ -34,12 +34,56 @@ const parser = new XMLParser({
   removeNSPrefix: true,
 });
 
-/** One message SAP attached to its verdict. `W` and `I` are kept, not filtered. */
+/**
+ * One message SAP attached to its verdict, in the one shape every form reduces
+ * to: **a severity and a sentence.**
+ *
+ * That reduction is the whole point. The forms carry wildly different amounts —
+ * a T100 key and its placeholders at one end, a bare sentence in an attribute at
+ * the other — but every refusal that carries anything at all carries those two.
+ * A strategy can rest on them; everything else is enrichment that may be absent.
+ *
+ * `W` and `I` are kept, not filtered: the caller decides what a warning means.
+ */
 export interface AdtMessage {
+  /** Normalised to a single letter: `E`, `W`, `I`, `S`. */
   readonly type: string;
+  /** The sentence, as SAP rendered it. Always present. */
   readonly text: string;
-  readonly line?: string;
+  /**
+   * The server's own identifier for this message, where the carrier gave one.
+   * Two unrelated things wear this: an `exc:exception` names a class like
+   * `ExceptionResourceNotFound`, a syntax finding names the compiler's
+   * `MESSAGE(GTH)`. Neither is a T100 key.
+   */
   readonly code?: string;
+  /**
+   * The ABAP message key, where the carrier kept it — `SADT_RESOURCE` `026`
+   * with the values that were substituted into the text. Only `exc:exception`
+   * has ever supplied this; the same message arriving through another carrier
+   * comes as the sentence alone.
+   */
+  readonly t100?: {
+    readonly id: string;
+    readonly no: string;
+    readonly values?: ReadonlyArray<string>;
+  };
+  readonly line?: string;
+  readonly uri?: string;
+}
+
+/** SAP spells severity three ways. One letter out. */
+function severity(raw: unknown): string {
+  const s = String(raw ?? '')
+    .trim()
+    .toUpperCase();
+  if (!s) return 'E';
+  if (s.startsWith('ERROR') || s === 'E') return 'E';
+  if (s.startsWith('WARN') || s === 'W') return 'W';
+  if (s.startsWith('INFO') || s === 'I') return 'I';
+  if (s.startsWith('SUCCESS') || s === 'S') return 'S';
+  if (s === 'OK') return 'S';
+  return s;
 }
 
 /**
@@ -58,10 +102,15 @@ export interface AdtRefusal {
   readonly adtType?: string;
   /** `<namespace id="…">`, where the document names one. */
   readonly namespace?: string;
-  /** The T100 message key, where the document carries one: `SADT_RESOURCE/002`. */
-  readonly t100?: { readonly id: string; readonly no: string };
-  /** Every message in the document, `E`, `W` and `I` alike. */
-  readonly messages?: ReadonlyArray<AdtMessage>;
+  /**
+   * Every message in the document, `E`, `W` and `I` alike, normalised.
+   *
+   * Never empty. A form that states no severity gets one inferred — an
+   * `exc:exception` IS the refusal, and a check that never ran says so in its
+   * status — because a caller that has to ask "did this carrier happen to
+   * include a severity" is back to handling five shapes.
+   */
+  readonly messages: ReadonlyArray<AdtMessage>;
   /** Which form this was read from, for diagnosis. */
   readonly form:
     | 'exception'
@@ -135,20 +184,39 @@ export function readExceptionRefusal(document: unknown): AdtRefusal | null {
 
   const id = properties.get('T100KEY-ID');
   const no = properties.get('T100KEY-NO');
+  const values = [...properties.entries()]
+    .filter(([key]) => /^T100KEY-V\d+$/.test(key))
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([, value]) => value);
+  const text =
+    textOf(root.message) ||
+    textOf(root.localizedMessage) ||
+    'ADT refused the request';
+  const adtType =
+    typeof root.type?.['@id'] === 'string' ? root.type['@id'] : undefined;
 
   return {
     form: 'exception',
-    message:
-      textOf(root.message) ||
-      textOf(root.localizedMessage) ||
-      'ADT refused the request',
-    adtType:
-      typeof root.type?.['@id'] === 'string' ? root.type['@id'] : undefined,
+    message: text,
+    adtType,
     namespace:
       typeof root.namespace?.['@id'] === 'string'
         ? root.namespace['@id']
         : undefined,
-    t100: id && no ? { id, no } : undefined,
+    // The severity is not in the document: an exc:exception IS the refusal and
+    // the HTTP status carries the verdict. It is stated here anyway so that the
+    // richest form reduces to the same {severity, text} as the poorest.
+    messages: [
+      {
+        type: 'E',
+        text,
+        code: adtType,
+        t100:
+          id && no
+            ? { id, no, values: values.length ? values : undefined }
+            : undefined,
+      },
+    ],
   };
 }
 
@@ -181,7 +249,7 @@ export function readActivationRefusal(document: unknown): AdtRefusal | null {
   if (!root) return null;
 
   const messages: AdtMessage[] = asArray(root.msg).map((msg: any) => ({
-    type: String(msg?.['@type'] ?? 'I'),
+    type: severity(msg?.['@type']),
     text:
       textOf(msg?.shortText?.txt) ||
       textOf(msg?.shortText) ||
@@ -263,9 +331,9 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
   return {
     form: 'deletion',
     message: `ADT refuses to delete ${name}: ${reason}`,
-    messages: message
-      ? [{ type: messageType || 'E', text: messageText || reason }]
-      : undefined,
+    messages: [
+      { type: severity(messageType || 'E'), text: messageText || reason },
+    ],
   };
 }
 
@@ -314,11 +382,17 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   }));
 
   if (status !== 'processed') {
+    // A check that never ran carries no message list at all: the reason sits in
+    // an attribute and no severity is stated anywhere. One is supplied, so this
+    // form reduces to {severity, text} like every other.
+    const text =
+      statusText || `Check did not run (status: ${status || 'unstated'})`;
     return {
       form: 'checkrun',
-      message:
-        statusText || `Check did not run (status: ${status || 'unstated'})`,
-      messages,
+      message: text,
+      messages: messages.length
+        ? messages
+        : [{ type: 'E', text, code: status }],
     };
   }
 
@@ -386,21 +460,16 @@ export function readValidationRefusal(document: unknown): AdtRefusal | null {
   // The admissible-name answer. Present means "yes"; there is nothing to refuse.
   if (data.CHECK_RESULT !== undefined) return null;
 
-  const severity = textOf(data.SEVERITY).toUpperCase();
-  if (!severity || severity === 'OK') return null;
+  const rawSeverity = textOf(data.SEVERITY).toUpperCase();
+  if (!rawSeverity || rawSeverity === 'OK') return null;
 
   const shortText = textOf(data.SHORT_TEXT);
   const longText = textOf(data.LONG_TEXT);
 
   return {
     form: 'validation',
-    message: shortText || longText || `Validation answered ${severity}`,
-    messages: [
-      {
-        type: severity === 'ERROR' ? 'E' : severity,
-        text: shortText || longText,
-      },
-    ],
+    message: shortText || longText || `Validation answered ${rawSeverity}`,
+    messages: [{ type: severity(rawSeverity), text: shortText || longText }],
   };
 }
 

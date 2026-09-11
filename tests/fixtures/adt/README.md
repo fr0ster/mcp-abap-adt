@@ -214,6 +214,30 @@ One name in these fixtures is worth explaining. The taken-domain case uses
 as "taken" would have invented a masking defect that is not there — which is
 what the first attempt did before the name was checked.
 
+## What a strategy can rest on: a severity and a sentence
+
+Every refusal that carries anything at all carries those two. The forms differ
+in how much they add and in whether the severity is stated or has to be
+supplied, but the reduction holds:
+
+| form | severity | how |
+|---|---|---|
+| activation `msg` | `type="E"` | read |
+| checkrun `checkMessage` | `chkrun:type="E"` | read |
+| deletion `del:message` | `del:type="E"` | read |
+| validation | `SEVERITY=ERROR` | read, normalised `ERROR` → `E` |
+| `exc:exception` | — | **supplied**: the document is the refusal, the status is the verdict |
+| checkrun, not processed | — | **supplied**: `status != "processed"`, reason in `statusText` |
+| the package walkers | — | nothing to reduce: empty body |
+
+`src/lib/adtRefusal.ts` makes that the contract. Every reading returns a
+non-empty `messages`, each entry a normalised letter and the sentence. The two
+forms that state no severity get one, because a caller who has to ask which
+carriers happened to include one is back to handling five shapes.
+
+Everything above that line is enrichment and may be absent: the T100 key and its
+placeholders, a `code`, a line and a URI.
+
 ## Where the text comes from: SAP's own messages, rendered
 
 Before the fields, the more useful question — **is the text a message from SAP,

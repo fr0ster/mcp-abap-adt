@@ -76,11 +76,17 @@ describe('form 1 — exc:exception', () => {
     expect(refusal?.message).toContain('ZMCP_BLD_ANSCH01');
   });
 
-  it('carries the T100 key, so a caller can act on the code not the sentence', () => {
+  it('carries the T100 key on the message, code and placeholders included', () => {
     const refusal = readExceptionRefusal(
       body('refusal-object-not-found--01-read-source'),
     );
-    expect(refusal?.t100).toEqual({ id: 'SADT_RESOURCE', no: '002' });
+    const [first] = refusal?.messages ?? [];
+    expect(first.t100).toEqual({
+      id: 'SADT_RESOURCE',
+      no: '002',
+      values: ['CLASS', 'ZMCP_BLD_NOPE_CLS99'],
+    });
+    expect(first.code).toBe('ExceptionResourceNotFound');
   });
 
   it('does not fire on a document that is not an exception', () => {
@@ -88,6 +94,87 @@ describe('form 1 — exc:exception', () => {
       readExceptionRefusal(body('activation-success-verdict--01-activation')),
     ).toBeNull();
     expect(readExceptionRefusal('')).toBeNull();
+  });
+});
+
+describe('every refusal reduces to a severity and a sentence', () => {
+  /**
+   * The forms carry wildly different amounts, but each one that carries
+   * anything at all carries those two. That reduction is what a strategy rests
+   * on; everything else is enrichment that may be absent.
+   *
+   * Two forms state no severity and have one supplied: an exc:exception IS the
+   * refusal, and a check that never ran says so in its status. A caller that
+   * had to ask which carriers happened to include a severity would be back to
+   * handling five shapes.
+   */
+  const refusals: Array<[string, string]> = [
+    ['refusal-object-not-found--01-read-source', 'exception'],
+    ['refusal-write-not-locked--01-update-source', 'exception'],
+    ['refusal-lock-held-by-other--01-lock', 'exception'],
+    ['refusal-activation-fails--01-activation', 'activation'],
+    ['refusal-syntax-check--01-checkrun', 'checkrun'],
+    ['refusal-check-nonexistent-object--01-checkrun', 'checkrun'],
+    ['refusal-delete-refused--01-deletion-delete', 'deletion'],
+    ['refusal-deletion-check-refuses--01-deletion-check', 'deletion'],
+    ['refusal-validation-name-taken-ddl--01-ddl-validation', 'validation'],
+    [
+      'refusal-validation-name-taken-functiongroup--01-functions-validation',
+      'validation',
+    ],
+  ];
+
+  it.each(refusals)('%s gives at least one message', (name) => {
+    const refusal = readAdtRefusal(body(name));
+    expect(refusal).not.toBeNull();
+    expect(refusal?.messages.length).toBeGreaterThan(0);
+  });
+
+  it.each(refusals)('%s states a severity and a non-empty sentence', (name) => {
+    for (const m of readAdtRefusal(body(name))?.messages ?? []) {
+      expect(['E', 'W', 'I', 'S']).toContain(m.type);
+      expect(m.text.trim().length).toBeGreaterThan(0);
+    }
+  });
+
+  it('normalises the word ERROR to the letter E', () => {
+    const refusal = readAdtRefusal(
+      body('refusal-validation-name-taken-ddl--01-ddl-validation'),
+    );
+    expect(
+      body('refusal-validation-name-taken-ddl--01-ddl-validation'),
+    ).toContain('<SEVERITY>ERROR</SEVERITY>');
+    expect(refusal?.messages[0].type).toBe('E');
+  });
+
+  it('supplies a severity where the document states none', () => {
+    // An exc:exception has no severity field at all.
+    const exception = body('refusal-object-not-found--01-read-source');
+    expect(exception).not.toMatch(/type="[EWIS]"/);
+    expect(readAdtRefusal(exception)?.messages[0].type).toBe('E');
+
+    // A check that never ran carries no message list.
+    const notProcessed = body('refusal-check-nonexistent-object--01-checkrun');
+    expect(notProcessed).not.toContain('checkMessage');
+    const messages = readAdtRefusal(notProcessed)?.messages ?? [];
+    expect(messages).toHaveLength(1);
+    expect(messages[0].type).toBe('E');
+    expect(messages[0].text).toContain('does not exist');
+  });
+
+  it('the identity is enrichment — present on one form, absent on the rest', () => {
+    const withKey = readAdtRefusal(
+      body('refusal-write-not-locked--01-update-source'),
+    );
+    expect(withKey?.messages[0].t100?.id).toBe('SADT_RESOURCE');
+
+    const withoutKey = readAdtRefusal(
+      body('refusal-delete-refused--01-deletion-delete'),
+    );
+    expect(withoutKey?.messages[0].t100).toBeUndefined();
+    // and it still has the two things every form has
+    expect(withoutKey?.messages[0].type).toBe('E');
+    expect(withoutKey?.messages[0].text).toContain('already editing');
   });
 });
 
@@ -138,7 +225,9 @@ describe('form 2a — activation', () => {
 describe('form 2b — deletion', () => {
   it('the refused delete is a refusal at both steps', () => {
     expect(
-      readDeletionRefusal(body('refusal-deletion-check-refuses--01-deletion-check')),
+      readDeletionRefusal(
+        body('refusal-deletion-check-refuses--01-deletion-check'),
+      ),
     ).not.toBeNull();
     expect(
       readDeletionRefusal(body('refusal-delete-refused--01-deletion-delete')),
@@ -199,7 +288,9 @@ describe("the hazard in adt-clients' own deletion parser, measured not assumed",
       refusedByTheirStrategy(body('deletion-check-allows--01-deletion-check')),
     ).toBe(false);
     expect(
-      refusedByTheirStrategy(body('refusal-deletion-check-refuses--01-deletion-check')),
+      refusedByTheirStrategy(
+        body('refusal-deletion-check-refuses--01-deletion-check'),
+      ),
     ).toBe(true);
   });
 
@@ -217,13 +308,20 @@ describe("the hazard in adt-clients' own deletion parser, measured not assumed",
 });
 
 describe('form 3 — check runs', () => {
-  it('a check that never ran is a refusal, though it carries no messages', () => {
-    const refusal = readCheckRunRefusal(
-      body('refusal-check-nonexistent-object--01-checkrun'),
-    );
+  it('a check that never ran is a refusal, and is given the message it lacks', () => {
+    const document = body('refusal-check-nonexistent-object--01-checkrun');
+    // The document itself has no message list — the reason is in an attribute.
+    expect(document).not.toContain('checkMessage');
+
+    const refusal = readCheckRunRefusal(document);
     expect(refusal).not.toBeNull();
     expect(refusal?.message).toContain('does not exist');
-    expect(refusal?.messages).toHaveLength(0);
+    // One is supplied, so this form reduces like the others.
+    expect(refusal?.messages).toHaveLength(1);
+    expect(refusal?.messages[0]).toMatchObject({
+      type: 'E',
+      code: 'notProcessed',
+    });
   });
 
   it('a syntax error on a check that DID run is a refusal', () => {

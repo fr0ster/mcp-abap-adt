@@ -74,10 +74,10 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '../src/lib/connectionFactory';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
+import { createAbapConnection } from '../src/lib/connectionFactory';
 import { resolveSystemContext } from '../src/lib/systemContext';
 
 // ---------------------------------------------------------------------------
@@ -122,6 +122,68 @@ const SHARED_DDL = 'ZMCP_SHR_I_ROOT';
 const STANDARD_DOMAIN = 'MANDT';
 const FREE_CLASS_NAME = 'ZMCP_BLD_FREE_X1';
 const FREE_TABLE_NAME = 'ZMCP_BLD_FREE_T1';
+
+/**
+ * One real object per family in the shared polygon, read from its own node in
+ * the package tree rather than assumed. Metadata is NOT one shape repeated:
+ * every family negotiates its own media type — `oo.classes.v4`, `blues.v1`,
+ * `structures.v2`, `ddlSource`, `functions.groups.v2`, `ddic.srvd.v1` — so a
+ * reading proved against a table says nothing about a class.
+ */
+const METADATA_TARGETS: Array<{
+  family: string;
+  url: string;
+  accept: string;
+}> = [
+  {
+    family: 'class',
+    url: '/sap/bc/adt/oo/classes/ZBP_MCP_SHR_I_ROOT',
+    accept:
+      'application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml',
+  },
+  {
+    family: 'ddl',
+    url: '/sap/bc/adt/ddic/ddl/sources/ZMCP_SHR_I_ROOT',
+    accept:
+      'application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource+xml',
+  },
+  {
+    family: 'function-group',
+    url: '/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP',
+    // The client sends `*/*` here and so do we. Asking for v2/v1 explicitly
+    // gets a 406 from this system, which serves v3 — a reminder that the
+    // constant named ACCEPT_FUNCTION_GROUP is not what the read actually uses.
+    accept: '*/*',
+  },
+  {
+    family: 'function-module',
+    url: '/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP/fmodules/Z_MCP_SHR_FM',
+    accept:
+      'application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml',
+  },
+  {
+    family: 'structure',
+    url: '/sap/bc/adt/ddic/structures/ZMCP_SHR_STRU',
+    accept:
+      'application/vnd.sap.adt.structures.v2+xml, application/vnd.sap.adt.structures.v1+xml',
+  },
+  {
+    family: 'behavior-definition',
+    url: '/sap/bc/adt/bo/behaviordefinitions/zmcp_shr_i_root?version=active',
+    accept: 'application/vnd.sap.adt.blues.v1+xml, application/xml',
+  },
+  {
+    family: 'service-definition',
+    url: '/sap/bc/adt/ddic/srvd/sources/ZMCP_SHR_SRVD01',
+    accept: 'application/vnd.sap.adt.ddic.srvd.v1+xml, application/xml',
+  },
+  {
+    family: 'package',
+    url: '/sap/bc/adt/packages/ZMCP_SHR_PKG?version=active',
+    accept:
+      'application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml',
+  },
+];
 
 /**
  * Cases that need the scratch class to exist. `delete-success` is deliberately
@@ -993,6 +1055,22 @@ async function main(): Promise<void> {
     await withCase('read-package-contents-structure', async () => {
       await utils.getPackageContents(SHARED_PACKAGE);
     });
+
+    // -----------------------------------------------------------------
+    // METADATA, one family at a time. The 70 compile errors on
+    // `metadataResult` span seventeen families and the corpus had one.
+    // -----------------------------------------------------------------
+
+    for (const target of METADATA_TARGETS) {
+      await withCase(`read-metadata-${target.family}`, async () => {
+        await connection.makeAdtRequest({
+          url: target.url,
+          method: 'GET',
+          timeout: 30000,
+          headers: { Accept: target.accept },
+        });
+      });
+    }
 
     // -----------------------------------------------------------------
     // VALIDATION — may this name be created here? Read-only: it asks, it

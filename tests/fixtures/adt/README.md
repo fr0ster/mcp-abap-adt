@@ -5,7 +5,7 @@ error strategies (`docs/superpowers/specs/2026-09-08-result-error-strategies-des
 can be written against documents someone has actually seen. Writing a parser first
 and meeting the document later is how the transport-tree parser broke in #168.
 
-32 cases, 42 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
+40 cases, 50 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
 ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
 ## Layout
@@ -78,6 +78,31 @@ exchanges address the same endpoint and differ only in `params`.
 | `refusal-package-not-found-objectslist-empty` | nodestructure on the same | **200**, zero-byte body |
 | `refusal-package-not-found-hierarchy-direct` | hierarchy walk on the same | **200**, zero-byte body |
 | `read-empty-package-contents` | both walkers on `ZMCP_BLD_PKG01`, which **exists and is empty** | **200**, zero-byte body |
+
+## Metadata is not one shape
+
+Eight families read off one system, and they answered eight different media
+types and seven different root elements:
+
+| family | media type | root |
+|---|---|---|
+| class | `oo.classes.v4+xml` | `class:abapClass` |
+| function group | `functions.groups.v3+xml` | `group:abapFunctionGroup` |
+| function module | `functions.fmodules.v3+xml` | `fmodule:abapFunctionModule` |
+| DDL | `ddlSource+xml` | `ddl:ddlSource` |
+| service definition | `ddic.srvd.v1+xml` | `srvd:srvdSource` |
+| package | `packages.v2+xml` | `pak:package` |
+| structure | `structures.v2+xml` | `blue:blueSource` |
+| behavior definition | `blues.v1+xml` | `blue:blueSource` |
+
+A reading proved against a table says nothing about a class. The one shared root
+is DDIC's generic envelope, and even there the media types differ — which is
+what a reading would have to dispatch on.
+
+The function group is worth a note: asking for `functions.groups.v2+xml`, the
+value of the constant named `ACCEPT_FUNCTION_GROUP`, gets a **406** from this
+system, which serves v3. The client's own read sends `*/*`, and so does the
+capture.
 
 ## Validation is not a check run
 

@@ -214,6 +214,59 @@ One name in these fixtures is worth explaining. The taken-domain case uses
 as "taken" would have invented a masking defect that is not there — which is
 what the first attempt did before the name was checked.
 
+## Where the text comes from: SAP's own messages, rendered
+
+Before the fields, the more useful question — **is the text a message from SAP,
+or prose the ADT layer wrote?** Across the seventeen refusals captured, it is
+SAP's own message every time. Nothing here looks invented by the HTTP layer.
+
+What differs is whether the carrier keeps the message's **identity** or only its
+rendered text.
+
+**The proof is a text that appears twice.** "Resource CLASS ZMCP_BLD_NOPE_CLS99
+does not exist." arrives in two documents:
+
+| case | carrier | identity kept |
+|---|---|---|
+| `refusal-object-not-found` | `exc:exception/message` | **`SADT_RESOURCE` / `002`**, with `V1=CLASS`, `V2=<name>` |
+| `refusal-check-nonexistent-object` | `chkrun:statusText` | none — the sentence alone |
+
+Same SAP message, two carriers, and only one of them says which message it is.
+
+**Every key the corpus has is a real ABAP message class.**
+
+| key | message | seen in |
+|---|---|---|
+| `OO` / `002` | "Class & already exists" | class validation |
+| `SWB_TOOL` / `016` | "& with the name & already exists" | domain and table validation — `V1` is the object type |
+| `SWB_TOOL` / `025` | "Error while importing object & from the database" | package read |
+| `SADT_RESOURCE` / `002` | "Resource & & does not exist." | object read |
+| `SADT_RESOURCE` / `026` | "Resource & & is not locked (invalid lock handle: &)" | write without a lock |
+| `EU` / `510` | "User & is currently editing &" | lock held |
+
+`SWB_TOOL/016` serving both a domain and a table, with the object type in `V1`,
+is the placeholder mechanism in plain view: one message, two renderings.
+
+**Texts that arrive with no identity anywhere in the corpus.** "Data definition
+X already exists", "Function group X already exists", "You are already editing
+X", "Object X has been checked". Each is almost certainly a T100 message too —
+compare "Class X already exists", which *does* come with `OO/002` — but the
+carriers that deliver them do not say so, so from the wire alone they cannot be
+told from prose.
+
+**One family genuinely is not T100.** Syntax findings —
+`Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.` — carry
+`code="MESSAGE(GTH)"` instead. That is the ABAP compiler's own identifier, not a
+message class and number, and it arrives identically from an activation and from
+a check run.
+
+**What this means for a strategy.** Keep the sentence always, because it is the
+only thing every carrier has. Keep the identity where it exists, because it is
+the only thing a caller can match on without reading English — and note that
+`IAdtError` has `code`, `adtType` and `namespace` but no home for a T100 key, so
+carrying `SADT_RESOURCE/026` needs a decision. Never assume a carrier that
+dropped the identity had none to give.
+
 ## What carries the error, field by field
 
 This is the question the corpus exists to answer for error handling: **not how

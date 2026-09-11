@@ -148,3 +148,40 @@ export function return_answer<T>(
 
   return typeof projected === 'string' ? text(projected) : json(projected);
 }
+
+function messageOf(thrown: unknown): string {
+  return thrown instanceof Error ? thrown.message : String(thrown);
+}
+
+/**
+ * The single entry point a handler uses.
+ *
+ * `IAdtResponse` covers what the server said; it does not cover a throw.
+ * adt-clients throws from more than its readings — argument validation,
+ * unsupported-operation checks, its own invariants — and our projection can
+ * throw on a shape it did not expect. Both are caught here and named apart, and
+ * neither borrows an `AdtFailureOrigin`: a parser defect reported as an expired
+ * session sends a caller to reauthenticate over a bug in this process.
+ */
+export async function answer<T>(
+  ctx: AnswerContext,
+  call: () => Promise<IAdtResponse<T, IAdtError>>,
+  project: (value: T) => unknown,
+): Promise<McpResult> {
+  let response: IAdtResponse<T, IAdtError>;
+  try {
+    response = await call();
+  } catch (thrown) {
+    return local('client_threw', ctx, messageOf(thrown));
+  }
+
+  try {
+    return return_answer(response, project, ctx);
+  } catch (thrown) {
+    // Deliberately broader than the projection. This catch also covers
+    // getError(), building the failure payload and serialising it — everything
+    // the adapter does after the call returns. Naming it projection_threw would
+    // point a reader at the projection for a defect that may be in any of them.
+    return local('adapter_threw', ctx, messageOf(thrown));
+  }
+}

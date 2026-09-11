@@ -3,6 +3,9 @@
   "version": "10.0.0",
   "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports.",
   "license": "AGPL-3.0-only",
+  "publishConfig": {
+    "access": "public"
+  },
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
   "repository": {
     "type": "git",

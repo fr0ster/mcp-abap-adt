@@ -106,6 +106,9 @@
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
   "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP. The standalone server is @mcp-abap-adt/core.",
   "license": "Apache-2.0",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"

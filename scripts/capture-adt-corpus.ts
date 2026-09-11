@@ -139,6 +139,50 @@ const CREATE_DOMAIN_NAME = 'ZMCP_BLD_CRT_DOM';
 const CREATE_DTEL_NAME = 'ZMCP_BLD_CRT_DTEL';
 
 /**
+ * A scratch class carrying a local test class, for the unit-test run.
+ * `runId`, `runStatus`, `runResult` and `testClassState` account for 22 compile
+ * errors and the corpus had none of the three documents a run produces.
+ *
+ * Its own object, not the polygon's `ZMCP_BLD_CLSUT_L1`: the shared objects are
+ * read, never written.
+ */
+const UNIT_TEST_CLASS_NAME = 'ZMCP_BLD_UT01';
+
+const UNIT_TEST_MAIN_SOURCE = `CLASS ${UNIT_TEST_CLASS_NAME} DEFINITION
+  PUBLIC
+  FINAL
+  CREATE PUBLIC .
+  PUBLIC SECTION.
+  PROTECTED SECTION.
+  PRIVATE SECTION.
+ENDCLASS.
+
+CLASS ${UNIT_TEST_CLASS_NAME} IMPLEMENTATION.
+ENDCLASS.`;
+
+const testInclude = (
+  assertion: string,
+): string => `CLASS ltc_probe DEFINITION FINAL
+  FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+  PRIVATE SECTION.
+    METHODS test_method FOR TESTING.
+ENDCLASS.
+CLASS ltc_probe IMPLEMENTATION.
+  METHOD test_method.
+    ${assertion}
+  ENDMETHOD.
+ENDCLASS.`;
+
+/** Passes. */
+const UNIT_TEST_PASSING = testInclude(
+  'cl_abap_unit_assert=>assert_true( abap_true ).',
+);
+/** Fails, on purpose, so the failing result document is captured too. */
+const UNIT_TEST_FAILING = testInclude(
+  "cl_abap_unit_assert=>assert_true( act = abap_false msg = 'deliberate failure for the corpus' ).",
+);
+
+/**
  * One real object per family in the shared polygon, read from its own node in
  * the package tree rather than assumed. Metadata is NOT one shape repeated:
  * every family negotiates its own media type — `oo.classes.v4`, `blues.v1`,
@@ -810,6 +854,11 @@ async function main(): Promise<void> {
     'create-dataelement',
   ];
   const needCreateWrites = CREATE_CASES.some((c) => recorder.selected(c));
+  const UNIT_TEST_CASES = [
+    'unittest-run-passing',
+    'refusal-unittest-run-failing',
+  ];
+  const needUnitTestWrites = UNIT_TEST_CASES.some((c) => recorder.selected(c));
   let scratchClassCreated = false;
 
   /**
@@ -929,7 +978,7 @@ async function main(): Promise<void> {
 
   /** Remove the create-case objects, whatever happened to the run. */
   const teardownCreated = async (): Promise<void> => {
-    if (!needCreateWrites) return;
+    if (!needCreateWrites && !needUnitTestWrites) return;
     track('teardown: remove the create-case scratch objects');
     const removals: Array<[string, () => Promise<unknown>]> = [
       [
@@ -939,6 +988,14 @@ async function main(): Promise<void> {
       [
         CREATE_DOMAIN_NAME,
         () => client.getDomain().delete({ domainName: CREATE_DOMAIN_NAME }),
+      ],
+      [
+        UNIT_TEST_CLASS_NAME,
+        () => client.getClass().delete({ className: UNIT_TEST_CLASS_NAME }),
+        () =>
+          present(
+            `/sap/bc/adt/oo/classes/${UNIT_TEST_CLASS_NAME.toLowerCase()}`,
+          ),
       ],
       [
         CREATE_DTEL_NAME,
@@ -1214,6 +1271,65 @@ async function main(): Promise<void> {
           length: 10,
         });
       });
+    }
+
+    // -----------------------------------------------------------------
+    // UNIT TEST RUN — three documents per run: the run, its status, its
+    // result. Captured passing and failing, because a result strategy has to
+    // tell them apart. Writes; removed in the teardown.
+    // -----------------------------------------------------------------
+
+    if (needUnitTestWrites) {
+      const writeTestInclude = async (source: string): Promise<void> => {
+        await withLock(UNIT_TEST_CLASS_NAME, async (lockHandle) => {
+          await connection.makeAdtRequest({
+            url: `/sap/bc/adt/oo/classes/${UNIT_TEST_CLASS_NAME.toLowerCase()}/includes/testclasses?lockHandle=${encodeURIComponent(lockHandle)}`,
+            method: 'PUT',
+            timeout: 30000,
+            data: source,
+            headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+          });
+        });
+        await client.getClass().activate({ className: UNIT_TEST_CLASS_NAME });
+      };
+
+      track(`setup: create ${UNIT_TEST_CLASS_NAME} with a local test class`);
+      await client.getClass().create({
+        className: UNIT_TEST_CLASS_NAME,
+        packageName: devPackage,
+        description: 'corpus unit-test capture (safe to delete)',
+      });
+      await withLock(UNIT_TEST_CLASS_NAME, async (lockHandle) => {
+        await client
+          .getClass()
+          .update(
+            { className: UNIT_TEST_CLASS_NAME },
+            { lockHandle, sourceCode: UNIT_TEST_MAIN_SOURCE },
+          );
+      });
+      await writeTestInclude(UNIT_TEST_PASSING);
+
+      const captureRun = async (label: string): Promise<void> => {
+        await withCase(label, async () => {
+          const unitTest = client.getUnitTest();
+          await unitTest.run([
+            {
+              containerClass: UNIT_TEST_CLASS_NAME,
+              testClass: 'LTC_PROBE',
+            },
+          ]);
+          const runId = unitTest.getRunId();
+          if (!runId) return;
+          await unitTest.getStatus(runId, true);
+          await unitTest.getResult(runId);
+        });
+      };
+
+      await captureRun('unittest-run-passing');
+
+      track('setup: replace the assertion with one that fails');
+      await writeTestInclude(UNIT_TEST_FAILING);
+      await captureRun('refusal-unittest-run-failing');
     }
 
     // -----------------------------------------------------------------

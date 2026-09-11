@@ -9,6 +9,7 @@ import {
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
+  readUnitTestRefusal,
   readValidationRefusal,
 } from '../../lib/adtRefusal';
 
@@ -451,6 +452,51 @@ describe('form 5 — validation asks whether the NAME is admissible', () => {
         body('validation-name-free-class--01-validation-objectname'),
       ),
     ).toBeNull();
+  });
+});
+
+describe('form 6 — a unit test run, where only the third document tells you', () => {
+  const RUN = 'unittest-run-passing--01-abapunit-runs';
+  const STATUS =
+    'unittest-run-passing--02-runs-fa53c505dd7b1fd1abb8599833a05d44';
+  const PASSED =
+    'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44';
+  const FAILED =
+    'refusal-unittest-run-failing--03-results-fa53c505dd7b1fd1abb859f1193d5d44';
+
+  it('the run itself answers 201 with nothing, and the id is in a header', () => {
+    const s = sidecar(RUN);
+    expect(s.response.status).toBe(201);
+    expect(body(RUN)).toBe('');
+    expect(s.response.headers.location).toMatch(/abapunit\/runs\//);
+  });
+
+  it('the status document is the same whether the run passed or failed', () => {
+    // It reports progress, not verdict. Reading pass/fail from it would call
+    // every completed run a success.
+    const statusBody = body(STATUS);
+    expect(statusBody).toContain('status="FINISHED"');
+    expect(statusBody).not.toContain('alert');
+    expect(readAdtRefusal(statusBody)).toBeNull();
+  });
+
+  it('a passing result is not a refusal', () => {
+    expect(body(PASSED)).not.toContain('<alerts>');
+    expect(readUnitTestRefusal(body(PASSED))).toBeNull();
+  });
+
+  it('a failing result is, and reduces to the same severity and sentence', () => {
+    const refusal = readUnitTestRefusal(body(FAILED));
+    expect(refusal?.form).toBe('unittest');
+    expect(refusal?.messages).toHaveLength(1);
+    expect(refusal?.messages[0].type).toBe('E');
+    expect(refusal?.messages[0].text).toContain('deliberate failure');
+    expect(refusal?.messages[0].code).toBe('failedAssertion');
+  });
+
+  it("maps ABAP Unit's own severity scale onto the usual letters", () => {
+    expect(body(FAILED)).toContain('severity="critical"');
+    expect(readUnitTestRefusal(body(FAILED))?.messages[0].type).toBe('E');
   });
 });
 

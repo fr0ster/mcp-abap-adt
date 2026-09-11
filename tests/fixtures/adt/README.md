@@ -16,7 +16,7 @@ So read the coverage table below as: which endpoint, in which state, answered
 what. Where an endpoint has one row, one state has been observed and the others
 are unknown.
 
-46 cases, 55 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
+48 cases, 61 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
 ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
 ## Layout
@@ -214,6 +214,32 @@ One name in these fixtures is worth explaining. The taken-domain case uses
 as "taken" would have invented a masking defect that is not there — which is
 what the first attempt did before the name was checked.
 
+## A unit test run: three exchanges, and the answer is in a header
+
+| step | answer |
+|---|---|
+| `POST /abapunit/runs` | **201, zero bytes.** The run id is in the `Location` header and nowhere else |
+| `GET /abapunit/runs/<id>` | `aunit:run`, `progress status="FINISHED"` — **identical whether the run passed or failed** |
+| `GET /abapunit/results/<id>` | `aunit:runResult`; a method that failed carries `alerts` |
+
+Two things follow. A result strategy is handed the whole answer rather than the
+body because here the body is empty and the answer is a header. And the status
+document reports progress, not verdict — reading pass/fail from it would call
+every completed run a success.
+
+The alert itself is the same pair as everywhere else:
+
+```xml
+<alert kind="failedAssertion" severity="critical">
+  <title>Critical Assertion Error: 'deliberate failure for the corpus'</title>
+  <details><detail text="True expected"/></details>
+  <stack><stackEntry adtcore:uri=".../includes/testclasses#start=8,0;end=8,0"/></stack>
+</alert>
+```
+
+ABAP Unit grades on its own scale — `critical`, `fatal`, `tolerable` — which the
+reading maps onto the usual letters.
+
 ## What a strategy can rest on: a severity and a sentence
 
 Every refusal that carries anything at all carries those two. The forms differ
@@ -228,6 +254,7 @@ supplied, but the reduction holds:
 | validation | `SEVERITY=ERROR` | read, normalised `ERROR` → `E` |
 | `exc:exception` | — | **supplied**: the document is the refusal, the status is the verdict |
 | checkrun, not processed | — | **supplied**: `status != "processed"`, reason in `statusText` |
+| unit test `alert` | `severity="critical"` | read, normalised `critical`/`fatal` → `E`, `tolerable` → `W` |
 | the package walkers | — | nothing to reduce: empty body |
 
 `src/lib/adtRefusal.ts` makes that the contract. Every reading returns a

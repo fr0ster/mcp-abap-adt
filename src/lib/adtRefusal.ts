@@ -83,6 +83,9 @@ function severity(raw: unknown): string {
   if (s.startsWith('INFO') || s === 'I') return 'I';
   if (s.startsWith('SUCCESS') || s === 'S') return 'S';
   if (s === 'OK') return 'S';
+  // ABAP Unit grades its alerts on its own scale.
+  if (s === 'CRITICAL' || s === 'FATAL') return 'E';
+  if (s === 'TOLERABLE') return 'W';
   return s;
 }
 
@@ -117,7 +120,8 @@ export interface AdtRefusal {
     | 'activation'
     | 'deletion'
     | 'checkrun'
-    | 'validation';
+    | 'validation'
+    | 'unittest';
 }
 
 // ---------------------------------------------------------------------------
@@ -474,6 +478,66 @@ export function readValidationRefusal(document: unknown): AdtRefusal | null {
 }
 
 // ---------------------------------------------------------------------------
+// Form 6 — a unit test run: alerts on the method that failed
+// ---------------------------------------------------------------------------
+
+/**
+ * `aunit:runResult`, what `GET /abapunit/results/<id>` answers.
+ *
+ * A run is three exchanges and only the third says anything about the outcome:
+ *
+ * 1. `POST /abapunit/runs` answers **201 with a zero-byte body**. The run id is
+ *    in the `Location` header, and nowhere else. This is why a result strategy
+ *    is handed the whole answer rather than the body — here the body is empty
+ *    and the answer is a header.
+ * 2. `GET /abapunit/runs/<id>` answers `aunit:run` with
+ *    `aunit:progress status="FINISHED"`. **It is byte-identical for a run that
+ *    passed and one that failed** — it reports progress, not verdict. Reading
+ *    pass/fail from it would call every completed run a success.
+ * 3. `GET /abapunit/results/<id>` answers this document.
+ *
+ * A method that passed is a bare `testMethod`. A method that failed carries
+ * `alerts`, and the alert is the same pair as everywhere else: a severity and a
+ * sentence. ABAP Unit grades on its own scale — `critical`, `fatal`,
+ * `tolerable` — which `severity` maps onto the usual letters.
+ *
+ * Fixtures: `unittest-run-passing` and `refusal-unittest-run-failing`.
+ */
+export function readUnitTestRefusal(document: unknown): AdtRefusal | null {
+  const root = parseXml(document)?.runResult;
+  if (!root) return null;
+
+  const messages: AdtMessage[] = [];
+  for (const program of asArray(root.program)) {
+    for (const testClass of asArray(program?.testClasses?.testClass)) {
+      for (const method of asArray(testClass?.testMethods?.testMethod)) {
+        for (const alert of asArray(method?.alerts?.alert)) {
+          const details = asArray(alert?.details?.detail)
+            .map((d: any) => textOf(d?.['@text']))
+            .filter(Boolean);
+          messages.push({
+            type: severity(alert?.['@severity']),
+            text: textOf(alert?.title) || details[0] || 'unit test alert',
+            code: textOf(alert?.['@kind']) || undefined,
+            uri:
+              typeof method?.['@uri'] === 'string' ? method['@uri'] : undefined,
+          });
+        }
+      }
+    }
+  }
+
+  const failures = messages.filter((m) => m.type === 'E');
+  if (failures.length === 0) return null;
+
+  return {
+    form: 'unittest',
+    message: failures.map((m) => m.text).join('; '),
+    messages,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Form 4 — the one no reading can decide
 // ---------------------------------------------------------------------------
 
@@ -519,6 +583,7 @@ export function readAdtRefusal(document: unknown): AdtRefusal | null {
     readActivationRefusal(document) ??
     readDeletionRefusal(document) ??
     readCheckRunRefusal(document) ??
-    readValidationRefusal(document)
+    readValidationRefusal(document) ??
+    readUnitTestRefusal(document)
   );
 }

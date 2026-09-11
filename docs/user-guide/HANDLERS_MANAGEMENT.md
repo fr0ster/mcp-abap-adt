@@ -275,7 +275,7 @@ To add handlers to a specific set:
 import {
   EmbeddableMcpServer,
   ReadVsGetDedupStrategy,
-} from '@mcp-abap-adt/core/server';
+} from '@mcp-abap-adt/lib/embeddable';
 
 const server = new EmbeddableMcpServer({
   connection,
@@ -287,7 +287,7 @@ const server = new EmbeddableMcpServer({
 });
 ```
 
-**Shipped implementations** (importable from `@mcp-abap-adt/core/handlers` or `@mcp-abap-adt/core/server`):
+**Shipped implementations** (importable from `@mcp-abap-adt/lib/handlers` or `@mcp-abap-adt/lib/embeddable`):
 
 | Strategy | Behavior |
 |---|---|
@@ -300,7 +300,7 @@ const server = new EmbeddableMcpServer({
 import type {
   HandlerEntry,
   IReadOnlyDedupStrategy,
-} from '@mcp-abap-adt/core/handlers';
+} from '@mcp-abap-adt/lib/handlers';
 
 class RoleAwareDedup implements IReadOnlyDedupStrategy {
   constructor(private readonly role: 'viewer' | 'editor') {}

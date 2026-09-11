@@ -20,7 +20,7 @@ npm install @mcp-abap-adt/core
 
 ```typescript
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { HandlerExporter } from "@mcp-abap-adt/core/handlers";
+import { HandlerExporter } from "@mcp-abap-adt/lib/handlers";
 import { createAbapConnection } from "@mcp-abap-adt/connection";
 
 // Create your MCP server
@@ -138,7 +138,7 @@ for (const entry of entries) {
 If you're using v2 server classes directly:
 
 ```typescript
-import { StreamableHttpServer } from "@mcp-abap-adt/core/server/v2";
+import { StreamableHttpServer } from "@mcp-abap-adt/core";
 
 const exporter = new HandlerExporter();
 const registry = exporter.createRegistry();
@@ -196,7 +196,7 @@ const server = new mcp_abap_adt_server({ connection });
 await server.run();
 
 // New way (recommended for embedding)
-import { HandlerExporter } from "@mcp-abap-adt/core/handlers";
+import { HandlerExporter } from "@mcp-abap-adt/lib/handlers";
 const exporter = new HandlerExporter();
 exporter.registerOnServer(yourMcpServer, () => connection);
 ```

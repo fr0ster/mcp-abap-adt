@@ -7,6 +7,97 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.0] - 2026-09-11
+
+### Licence
+
+- **Two packages now, under two licences.** The project ships a library and a
+  server, and licensing them together forced the stricter of the two onto both.
+  A network service embedding the ADT tools took on AGPL-style obligations
+  because the same tarball also carried a launcher it never ran.
+
+  | Package | Licence | What it is |
+  |---|---|---|
+  | `@mcp-abap-adt/lib` | `Apache-2.0` | handlers, registries and the embeddable MCP server — no transport |
+  | `@mcp-abap-adt/core` | `AGPL-3.0-only` | stdio, SSE and streamable HTTP, the launcher, TLS and the `mcp-abap-adt` CLI |
+
+  Installing the library never puts the server in your dependency tree. That is
+  the whole point of the split.
+
+  9.x was `GPL-3.0-only` and 8.13.0 and earlier were MIT; both stay as published,
+  because a licence change is not retroactive. `CONTRIBUTORS.md` carries the full
+  account of why each change was lawful.
+
+  **The four libraries underneath stay `LGPL-3.0-only`** — `adt-clients`,
+  `connection`, `interfaces` and `logger` — and the library links all four at
+  runtime. Their terms travel with any distribution regardless of the notice on
+  this repository, so plan against those, not against this line.
+
+### Changed
+
+- **BREAKING: `@mcp-abap-adt/core` is the standalone server and nothing else.**
+  Everything a consumer imported from it moved to `@mcp-abap-adt/lib`. The CLI,
+  the transports and `npm install -g @mcp-abap-adt/core` are unchanged.
+
+  | Before | After |
+  |---|---|
+  | `@mcp-abap-adt/core/handlers` | `@mcp-abap-adt/lib/handlers` |
+  | `@mcp-abap-adt/core/utils` | `@mcp-abap-adt/lib/utils` |
+  | `@mcp-abap-adt/core/server` | `@mcp-abap-adt/lib/embeddable` |
+
+  Four subpaths are new, for what the server needed and a consumer may want:
+  `/config`, `/auth`, `/logger` and `/request-context`. The library's root entry
+  works for the first time (see Fixed).
+
+- **No MCP tool changed.** No tool was added, removed or renamed, no schema
+  moved, and no handler behaviour is different. This release is the licence
+  boundary and the packaging that expresses it.
+
+- **`src/server` is `src/embeddable`**, so the source tree says which licence a
+  file is under. Internal only; nothing importable moved because of it.
+
+- **The library's version line continues at 10.0.0** rather than restarting at
+  1.0.0. It is the same codebase under a new name, and a continuous line is
+  easier to reason about than two.
+
+### Fixed
+
+- **The package's own root entry resolves.** `main` pointed at `dist/index.js`
+  and no `src/index.ts` existed, so `require('@mcp-abap-adt/core')` had never
+  worked — only the subpaths did. `@mcp-abap-adt/lib` has a barrel.
+
+- **`express` and `dotenv` are real dependencies of the server.** Both are
+  imported at the top of `SseServer`, `StreamableHttpServer` and `launcher`, and
+  both were listed only under `devDependencies`, so a published install had
+  nothing to start an HTTP or SSE transport with.
+
+### Migration
+
+A consumer on 9.x that only ran the server has nothing to do: install
+`@mcp-abap-adt/core@10` and the CLI behaves as before.
+
+A consumer that imported from the package changes two things — the dependency
+and the specifiers:
+
+```diff
+-  "@mcp-abap-adt/core": "^9.0.0"
++  "@mcp-abap-adt/lib": "^10.0.0"
+```
+```diff
+-import { HandlerExporter } from '@mcp-abap-adt/core/handlers';
+-import { setSystemContext } from '@mcp-abap-adt/core/utils';
+-import { EmbeddableMcpServer } from '@mcp-abap-adt/core/server';
++import { HandlerExporter } from '@mcp-abap-adt/lib/handlers';
++import { setSystemContext } from '@mcp-abap-adt/lib/utils';
++import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
+```
+
+Nothing else changes: the exported names, their signatures and their behaviour
+are the same objects from the same code. If you were embedding, dropping
+`@mcp-abap-adt/core` is the point — it is what takes the AGPL server out of your
+dependency tree.
+
+
 ## [9.0.0] - 2026-09-03
 
 ### Licence

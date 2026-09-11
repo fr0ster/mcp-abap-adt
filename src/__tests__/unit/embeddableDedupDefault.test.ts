@@ -16,8 +16,8 @@
  * Run: npm test -- --testPathPatterns=unit/embeddableDedupDefault
  */
 
+import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import { NoDedupStrategy } from '../../lib/handlers/groups/strategies/index';
-import { EmbeddableMcpServer } from '../../server/EmbeddableMcpServer';
 
 type RegisteredToolsMap = Record<string, unknown>;
 

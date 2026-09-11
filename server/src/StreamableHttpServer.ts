@@ -3,17 +3,17 @@ import type { Server as HttpsServer } from 'node:https';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
-import type { AuthBrokerFactory } from '../lib/auth/index.js';
-import type { TlsConfig } from '../lib/config/IServerConfig.js';
-import { noopLogger } from '../lib/handlerLogger.js';
-import type { IHandlersRegistry } from '../lib/handlers/interfaces.js';
-import { runWithRequestContext } from '../lib/requestContext.js';
-import { BaseMcpServer } from './BaseMcpServer.js';
+import type { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import type { TlsConfig } from '@mcp-abap-adt/lib/config';
+import { noopLogger } from '@mcp-abap-adt/lib/logger';
+import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import type {
   IHttpApplication,
   RouteRegistrationOptions,
-} from './IHttpApplication.js';
+} from '@mcp-abap-adt/lib/embeddable';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';

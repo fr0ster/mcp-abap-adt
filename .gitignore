@@ -80,7 +80,13 @@ fr0ster-mcp-abap-adt-*.tgz
 *.d.ts
 *.d.ts.map
 mdd.json
+# A bare pattern matches at any depth, so this hides every package.json in the
+# tree, not the one it was written for. The root manifest survives only because
+# it was tracked before the rule existed; server/package.json was created after
+# and silently never committed — the server package had no manifest in git.
 package.json
+!/package.json
+!/server/package.json
 .npm-cache/**
 SAP_ADT.json
 dev.json

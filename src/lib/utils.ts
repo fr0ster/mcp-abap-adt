@@ -80,7 +80,7 @@ export function getAuthBroker(destination: string): any | undefined {
   return authBrokerRegistry.get(destination);
 }
 
-// Compatibility re-export: `@mcp-abap-adt/core/utils` exposed the SDK's McpError /
+// Compatibility re-export: `@mcp-abap-adt/lib/utils` exposes the SDK's McpError /
 // ErrorCode before #155. Internal code no longer throws McpError (enforced by
 // noMcpErrorInSrc.test.ts, which permits the identifier only in this one export
 // declaration and forbids every import or use elsewhere in src), but the public

@@ -73,7 +73,17 @@ For full details (paths, `.env`, direct headers), see [Authentication & Destinat
 
 ## Architecture
 
-The project provides two main usage patterns:
+The project ships as **two packages**, because the two usage patterns want
+different licences. Embedding the tools in a network service should not drag in
+the obligations of a server that service never runs.
+
+| Package | Licence | What it is |
+|---|---|---|
+| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib) | Apache-2.0 | The ADT tool handlers and the embeddable MCP server. No transport: the host supplies one. |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone server — stdio, SSE and streamable HTTP, the launcher and the `mcp-abap-adt` CLI. Depends on the library. |
+
+Install `@mcp-abap-adt/core` to run a server. Install `@mcp-abap-adt/lib` to
+embed the tools in your own application.
 
 ### 1. Standalone MCP Server (Default)
 Run as a standalone MCP server with stdio, HTTP, or SSE transport:
@@ -84,12 +94,16 @@ mcp-abap-adt --transport=sse           # SSE mode
 ```
 
 ### 2. Embeddable Server (For Integration)
-Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express):
+Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express).
+This needs `@mcp-abap-adt/lib` only — not the AGPL server:
+```bash
+npm install @mcp-abap-adt/lib
+```
 ```typescript
 import {
   EmbeddableMcpServer,
   NoDedupStrategy, // optional: expose both Read<X> and Get<X>
-} from '@mcp-abap-adt/core/server';
+} from '@mcp-abap-adt/lib/embeddable';
 
 const server = new EmbeddableMcpServer({
   connection,              // Your AbapConnection instance
@@ -422,22 +436,37 @@ Thank you to all contributors! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the co
 
 ## License
 
-**GNU General Public License v3.0 only** (`GPL-3.0-only`).
-Earlier published versions were MIT and stay MIT — a licence change is not
-retroactive.
+**Two packages, two licences.** Which one applies depends on which you install.
+
+| Package | Licence | |
+|---|---|---|
+| `@mcp-abap-adt/lib` | Apache-2.0 | [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) |
+| `@mcp-abap-adt/core` | AGPL-3.0-only | [`server/LICENSE`](server/LICENSE) |
 
 Copyright © 2025–2026 Oleksii Kyslytsia
 
-This program is free software: you can redistribute it and/or modify it under the
-terms of the GNU General Public License as published by the Free Software
-Foundation, version 3.
+Both are distributed in the hope that they will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
 
-It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
-without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
-PURPOSE. See [`LICENSE`](LICENSE) for the full text.
+**What this means.** Running either, on your own data, carries no conditions.
 
-**What this means.** Running it, and using it on your own data, carries no
-conditions at all. Distributing it, or a modified version of it, means passing on
-the same freedoms — including the source. This is a finished tool rather than a
-library to build on; the libraries it is built from are LGPL, so they can be
-linked from programs under any licence.
+Embedding the library in your own application carries no obligation to open your
+application: Apache-2.0 asks for the notice and the licence text to travel with
+it, and nothing more.
+
+Distributing the standalone server, or running a modified version of it as a
+network service, means passing on the same freedoms under AGPL section 13 —
+including the source. That is why the two are separate packages: installing the
+library never puts the server in your dependency tree.
+
+**The libraries underneath are LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
+`connection`, `interfaces` and `logger` — and the library links them at runtime.
+LGPL does not reach your own code, but its terms do travel with those four
+packages whatever this project is licensed as. Plan for that, not for the
+notice on this repository.
+
+**History.** Releases through 8.13.0 were MIT and stay MIT; 9.x was
+`GPL-3.0-only`. A licence change is not retroactive — anyone may still take an
+earlier release under the licence it carried. See [`CONTRIBUTORS.md`](CONTRIBUTORS.md#licensing)
+for the full account of how the relicensing was lawful.

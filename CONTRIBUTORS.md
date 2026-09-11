@@ -36,28 +36,49 @@ records where the project started.
 
 ## Licensing
 
-The project was **MIT** through 8.13.0 and is **GPL-3.0-only** from the next
-release onward. Two separate things make that lawful, and it is worth keeping
-them apart:
+The project ships as two packages under two licences, and which one applies
+depends on which you install:
+
+| Package | Licence | From |
+|---|---|---|
+| `@mcp-abap-adt/lib` | Apache-2.0 | 10.0.0 |
+| `@mcp-abap-adt/core` | AGPL-3.0-only | 10.0.0 |
+
+Before 10.0.0 there was one package, `@mcp-abap-adt/core`. It was **MIT**
+through 8.13.0 and **GPL-3.0-only** for 9.x.
+
+Two separate things make every one of those changes lawful, and it is worth
+keeping them apart:
 
 **The mechanism is the MIT grant, not the ownership share.** Every outside
 contribution above was made under MIT, which grants permission "to use, copy,
-modify, merge, publish, distribute, **sublicense**, and/or sell copies". MIT is
-GPL-compatible, so MIT-licensed code may be redistributed as part of a GPL work.
-No contributor's separate permission is required for this, and no threshold of
-authorship would have been required either — a project that was 1% one author's
+modify, merge, publish, distribute, **sublicense**, and/or sell copies".
+Sublicensing is exactly what placing that code under a different licence is, so
+no contributor's separate permission is required — and no threshold of
+authorship would have been required either. A project that was 1% one author's
 work could relicense on the same basis.
 
 **The ownership share is context.** 99.9% of the current tree is Oleksii
 Kyslytsia's work, so in practice the relicensed body of code is almost entirely
 his own to place under whichever licence he chooses outright.
 
-Neither of these takes anything away from the contributors above. The MIT grant
-they gave, and received, for every version up to and including 8.13.0 stands
-unchanged and is not revoked by a later release carrying a different licence;
-anyone may still take 8.13.0 or earlier under MIT. Copyright in their lines
-remains theirs — the licence on the combined work changed, not the authorship of
-any part of it.
+Neither of these takes anything away from the contributors above. Every grant
+they gave, and received, for the versions they contributed to stands unchanged
+and is not revoked by a later release carrying a different licence; anyone may
+still take 8.13.0 or earlier under MIT, or a 9.x release under GPL-3.0-only.
+Copyright in their lines remains theirs — the licence on the combined work
+changed, not the authorship of any part of it.
+
+**Why two licences.** The project is a library and a server, and licensing them
+together forces the stricter of the two onto both. A network service that
+embeds the ADT tools would have taken on AGPL section 13 obligations because the
+same package also carried a launcher it never ran. Splitting them means
+installing the library never puts the server in your dependency tree.
+
+**The libraries underneath stay LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
+`connection`, `interfaces` and `logger`. The library links all four at runtime,
+so their terms travel with any distribution regardless of what this repository
+is licensed as.
 
 ---
 

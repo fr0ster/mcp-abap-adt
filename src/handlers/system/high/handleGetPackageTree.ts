@@ -2,11 +2,12 @@
  * GetPackageTree Handler - High-level handler for package tree structure
  *
  * Builds a complete tree of package contents (subpackages + objects)
- * using AdtClient.getPackageHierarchy() from @mcp-abap-adt/adt-clients.
+ * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -96,12 +97,21 @@ export async function handleGetPackageTree(
       throw readError;
     }
 
-    // Use the optimized and fixed hierarchy builder from adt-clients
-    const packageTree = await utils.getPackageHierarchy(packageName, {
-      includeSubpackages,
-      maxDepth,
-      includeDescriptions,
-    });
+    // Walked here, not in the client. `getPackageHierarchy` makes one request
+    // per object type plus a walk into subpackages, so `IResultStrategy`, which
+    // reads ONE answer, cannot be given to it — and between it and
+    // `getPackageContentsList` the library had already chosen the shape for us.
+    // `fetchNodeStructure` is one request and takes our reading, so the walk is
+    // composed of steps we can read and the assembly is ours.
+    // See mcp-abap-adt-clients#141.
+    const packageTree = assembleTree(
+      packageName,
+      await walkPackage(utils as never, packageName, {
+        includeSubpackages,
+        maxDepth,
+        includeDescriptions,
+      }),
+    );
 
     if (!packageTree) {
       return return_error(

@@ -214,6 +214,50 @@ One name in these fixtures is worth explaining. The taken-domain case uses
 as "taken" would have invented a masking defect that is not there — which is
 what the first attempt did before the name was checked.
 
+## What carries the error, field by field
+
+This is the question the corpus exists to answer for error handling: **not how
+many errors there are, but in what fields the information arrives.** Six forms,
+and they carry very different amounts.
+
+| form | sentence | severity | classification | message key | location |
+|---|---|---|---|---|---|
+| `exc:exception` | `message` | — (the status is the verdict) | `type@id` | **`T100KEY-ID` + `T100KEY-NO` + `V1..V3`** | — |
+| activation `msg` | `shortText/txt` | `type` (`E`) | `code` | — | `line`, `href` |
+| checkrun `checkMessage` | `chkrun:shortText` | `chkrun:type` | `chkrun:code` | not in our sample | `chkrun:uri` |
+| checkrun, no message | `chkrun:statusText` | — | `chkrun:status` | — | — |
+| deletion `del:message` | `del:text` | `del:type` (`S`/`E`) | — | — | — |
+| validation `SEVERITY` | `SHORT_TEXT` | `SEVERITY` (`OK`/`ERROR`) | — | — | — |
+| the walkers | — | — | — | — | — |
+
+**Only `exc:exception` gives the full SAP triple.** A worked example:
+
+```xml
+<type id="ExceptionResourceInvalidLockHandle"/>
+<message lang="EN">Resource CLASS ZMCP_BLD_ANSCH01 is not locked (invalid lock handle: ZZ_INVALID_LOCK_HANDLE_0001)</message>
+<entry key="T100KEY-ID">SADT_RESOURCE</entry>
+<entry key="T100KEY-NO">026</entry>
+<entry key="T100KEY-V1">CLASS</entry>
+<entry key="T100KEY-V2">ZMCP_BLD_ANSCH01</entry>
+<entry key="T100KEY-V3">ZZ_INVALID_LOCK_HANDLE_0001</entry>
+```
+
+Message class, message number, and the placeholders that were substituted into
+the sentence. From those the message can be rebuilt in any language, and matched
+on without reading English. Note `T100KEY-NO` is `"026"` — zero-padded, and a
+parser that coerces numeric text turns it into `26`, a key no system knows.
+
+**Everywhere else it degrades.** Activation and check runs give a severity, a
+sentence and a `code` shaped like `MESSAGE(GTH)` — useful, but not a T100
+number. Deletion and validation give a severity and a sentence and nothing
+machine-readable at all. A check that never ran gives a sentence in an
+attribute, with no severity anywhere. The package walkers give nothing.
+
+**One variant is known to exist and is not here.** adt-clients' check-run parser
+reads `chkrun:t100Key` with `msgid`/`msgno`, so some check message somewhere
+carries the key. None of ours does. That is a gap in the catalogue, tracked in
+issue #200.
+
 ## The five refusal shapes
 
 Where an error strategy should look differs by document. A message with

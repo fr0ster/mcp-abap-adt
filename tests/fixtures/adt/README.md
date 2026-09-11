@@ -5,6 +5,17 @@ error strategies (`docs/superpowers/specs/2026-09-08-result-error-strategies-des
 can be written against documents someone has actually seen. Writing a parser first
 and meeting the document later is how the transport-tree parser broke in #168.
 
+**What this is: a catalogue of response variants.** One endpoint answers
+differently depending on the state it is asked about — a name that is free or
+taken, an object locked or not, a package populated, empty or absent, a source
+that compiles or does not. Those are not contradictions to be resolved; they are
+the variants a strategy has to survive. The corpus exists to enumerate them, and
+a gap here is a state nobody has seen the answer for, not a disagreement.
+
+So read the coverage table below as: which endpoint, in which state, answered
+what. Where an endpoint has one row, one state has been observed and the others
+are unknown.
+
 46 cases, 55 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
 ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
@@ -79,6 +90,35 @@ exchanges address the same endpoint and differ only in `params`.
 | `refusal-package-not-found-hierarchy-direct` | hierarchy walk on the same | **200**, zero-byte body |
 | `read-empty-package-contents` | both walkers on `ZMCP_BLD_PKG01`, which **exists and is empty** | **200**, zero-byte body |
 
+## Coverage: endpoint by state
+
+27 endpoints so far. Fifteen of them have exactly one observed state — that is
+where the corpus is thin, not where it is wrong.
+
+**Two or more states observed**
+
+| endpoint | states seen |
+|---|---|
+| `/oo/classes/<obj>/source/main` | read, written, refused unlocked (423), absent (404) |
+| `/repository/nodestructure` | populated, empty package, absent package, eight tree levels |
+| `/oo/classes/<obj>` | locked, lock refused (403), unlocked, written |
+| `/checkruns` | clean, syntax error, object absent |
+| `/activation` | activated, refused |
+| `/deletion/delete` | deleted, refused |
+| `/deletion/check` | deletable, not deletable |
+| `/oo/validation/objectname` | name free, name taken (400) |
+| `/ddic/tables/validation` | name free, name taken (400) |
+| `/ddic/ddl/validation` | name free, name taken (200 + `SEVERITY`) |
+| `/packages/<obj>` | read, absent (404) |
+
+**One state observed — the thin part**
+
+`/ddic/domains/validation` (taken only) · `/functions/validation` (taken only) ·
+`/oo/classes` create · `/ddic/domains` create · `/ddic/dataelements` create ·
+`/cts/transportrequests` (empty list only) ·
+`/repository/informationsystem/usageReferences` (one hit only) · and the seven
+metadata reads, one object each.
+
 ## A delete is one request on adt-clients 18, not two
 
 The chain used to be `POST /deletion/check` then `POST /deletion/delete`. On 18
@@ -95,7 +135,7 @@ own case names rather than as steps of a chain that no longer exists:
 `/deletion/check` is still a live endpoint and its document is a distinct shape,
 so a handler that wants the verdict before deleting still has something to read.
 
-## Create is not one shape either, and one create answers nothing
+## Create: three variants, one of which is silence
 
 | family | status | body |
 |---|---|---|
@@ -103,19 +143,21 @@ so a handler that wants the verdict before deleting still has something to read.
 | domain | **201 Created** | 1878 bytes, `domains.v2+xml` |
 | data element | **201 Created** | 1345 bytes, `dataelements.v2+xml` |
 
-A class create answers nothing at all: the outcome is the status and there is no
-document to read. The two DDIC creates answer the full metadata of what they
-made. A single "create" result strategy would be wrong for one of them whichever
-way it was written.
+Three endpoints, three answers. A class create answers nothing at all, so the
+outcome is the status; the DDIC creates answer the full metadata of what they
+made. A create strategy has to cope with a body that may not be there. Thirteen
+more families are unrecorded, and a refused create — a name already taken,
+reaching the endpoint rather than the validation — is unrecorded for all of
+them.
 
 A successful source write is the same: `PUT .../source/main` answers **200 with
 zero bytes**. The corpus previously held only the refused write (423), so
 nothing recorded that a write that works says nothing.
 
-## Metadata is not one shape
+## Metadata: one variant per family, eight families
 
-Eight families read off one system, and they answered eight different media
-types and seven different root elements:
+Eight families read off one system. Each negotiates its own media type, and
+seven distinct root elements came back:
 
 | family | media type | root |
 |---|---|---|
@@ -128,9 +170,10 @@ types and seven different root elements:
 | structure | `structures.v2+xml` | `blue:blueSource` |
 | behavior definition | `blues.v1+xml` | `blue:blueSource` |
 
-A reading proved against a table says nothing about a class. The one shared root
-is DDIC's generic envelope, and even there the media types differ — which is
-what a reading would have to dispatch on.
+A reading proved against a table has not been proved against a class. The one
+shared root is DDIC's generic envelope, and even there the media types differ —
+which is what a reading would dispatch on. Only the active version of each has
+been read; inactive, and an object that does not exist, are unrecorded.
 
 The function group is worth a note: asking for `functions.groups.v2+xml`, the
 value of the constant named `ACCEPT_FUNCTION_GROUP`, gets a **406** from this
@@ -151,7 +194,7 @@ The element `CHECK_RESULT` belongs to this document.
 **`check`** asks whether **source** is correct. One endpoint for everything:
 `POST /checkruns`. The document is `chkrun:checkRunReports`.
 
-The families do not answer validation the same way, measured here rather than
+Each family answers the same question in its own way, measured here rather than
 taken from anyone's notes:
 
 | family | name taken | name free |
@@ -162,7 +205,7 @@ taken from anyone's notes:
 | DDL | **200** `SEVERITY` `ERROR` + `SHORT_TEXT` | 200 `SEVERITY` `OK` |
 | function group | **200** `SEVERITY` `ERROR` + `SHORT_TEXT` | — |
 
-Three refuse with the status; two answer 200 with the refusal in the body. The
+Three answer a taken name with the status; two answer 200 with the verdict in the body. The
 discriminator in the second kind is the **value** of `SEVERITY`, not its
 presence: a free name answers `OK`.
 

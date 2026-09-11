@@ -1,109 +1,91 @@
-# Which strategy each operation gets
+# What the strategies are actually keyed on
 
-**Status:** drafted 2026-09-11 from the corpus. Every row cites a fixture in
-`tests/fixtures/adt/` or says plainly that it is unbacked.
+**Status:** rewritten 2026-09-11 after a correction that changed the axis.
 
-This is the step between capturing the corpus and writing the adapter's failure
-half. Without it the handler migration makes this choice 204 times, once per
-file, and the same document ends up with three readings in three handlers.
+An earlier draft of this table was keyed on the operation — a row for `create`,
+a row for `delete`, a row for `activate`. That was wrong, and wrong in a way
+that inflated the count: it produced fourteen rows where there are two or three
+real choices.
 
-## The two axes are not the same shape
+**A result strategy is keyed on the transformation**: what the response has to
+become so the handler can return it. Not on which member produced it, and not on
+which object type it belongs to.
 
-They are injected differently, and a table that treats them alike will be wrong
-about half of it.
+**An error strategy is keyed on the encoding principle**: how the refusal is
+written into the answer. Also not on the operation — an activation and a
+deletion encode differently, but a deletion and its pre-check encode the same
+way, and a class create and a class read encode the same way as each other.
 
-**Result strategies are constructed, per object type.** `new AdtClient(conn,
-…, { class: classDocuments, table: tableDocuments, … })` — a set per type, one
-entry per member. So the choice is made once, at client construction, and every
-handler for that type inherits it.
+## The result axis: three transformations, and mostly one
 
-**`analyse` is passed per call.** `client.getClass().activate(cfg, { analyse })`
-is an option on `IAdtOperationOptions`. So the choice is made at the call site,
-which is the handler.
+| transformation | strategy | when |
+|---|---|---|
+| **hand the body through** | `verbatim` | the tool's answer carries the document as text. Source is obvious; **metadata is the same** — it is XML and the tools return JSON, but they put the XML in a JSON field as a string. `handleReadClass` has never parsed it. |
+| **parse into named structure** | `structured` | only where a tool promises named fields out of the document: a check's message list, an activation's verdict, a node walk. |
+| **there is no body** | `statusOnly` | a class create answers 200 with zero bytes; so does a successful write. The status is the whole answer. |
 
-One consequence worth stating: **a result strategy cannot be chosen per tool.**
-If `GetClass` wants the document and `ReadClass` wants the source text, they
-cannot both be served by one client instance unless the strategy returns both
-and the projection picks.
+The first covers most of what the tools do. The eight media types and seven root
+elements the corpus found in metadata demand nothing, because nothing promises
+named fields out of them. They would matter the day a tool did, and that is a
+change to the tool surface rather than to a strategy.
 
-## The table
+## What the consumer needs differs by direction, and that is the projection
 
-`detail` is the tool's parameter; the projection in `return_answer` uses it.
-"analyse" names a reading from `src/lib/adtRefusal.ts`.
+This is the part that varies, and it varies by **read versus write**, not by
+operation:
 
-| operation | calls | result strategy | analyse | corpus |
-|---|---:|---|---|---|
-| `read` (source) | 106 | `verbatim` — the source IS the answer | `analyseException` | `read-class-source-text`, `read-function-module-source-text`, `refusal-object-not-found` |
-| `readMetadata` | 18 | `verbatim` — the tools carry the XML through as a string | `analyseException` | `read-metadata-*`, 8 families |
-| `create` | 30 | `statusOnly` — a class answers 200/empty, a domain 201/doc; the useful information in a failure is the refusal | `analyseException` | `create-class` 200/empty, `create-domain` and `create-dataelement` 201/doc |
-| `lock` | 28 | the lock handle | `analyseException` | `lock-success`, `refusal-lock-held-by-other` (403) |
-| `unlock` | 22 | `statusOnly` — 200, zero bytes | `analyseException` | `unlock-success` |
-| `update` | 23 | `statusOnly` — 200, zero bytes | `analyseException` | `update-source-success`, `refusal-write-not-locked` (423) |
-| `validate` | 23 | `structured` + `terseValidation` | **`analyseValidation`** (and the 400 families fall to the same enrichment) | `validation-*`, 8 cases |
-| `activate` | 21 | `structured` + `terseActivation` | **`analyseActivation`** | `activation-success-verdict`, `refusal-activation-fails` |
-| `check` | 17 | `structured` + `terseCheck` | **`analyseCheck`** | `check-success-verdict`, `refusal-syntax-check`, `refusal-check-nonexistent-object` |
-| `delete` | 15 | `structured` + `terseDeletion` | **`analyseDeletion`** | `delete-success`, `refusal-delete-refused`, and the two check-step documents |
-| unit test run | — | `structured` | **`analyseUnitTest`** | `unittest-run-passing`, `refusal-unittest-run-failing` |
-| node walk | 8 | `structured` | **none possible** — see below | `read-object-tree-structure`, `read-package-contents-structure`, `read-empty-package-contents`, three missing-package cases |
-| where-used | 2 | `structured` | `analyseException` | `read-where-used-list-structure` — one hit only |
-| transport list | 1 | `structured` | `analyseException` | `read-transport-list-structure` — empty only |
+| | the result the consumer wants | what they want when it fails |
+|---|---|---|
+| **reading** | the payload — that is the whole point of the call | that it failed, and why |
+| **writing** | a short confirmation. `SUCCESS` and nothing else | **everything.** What went wrong is the valuable half of a write |
 
-## How few there turned out to be
+So a write pairs a nearly empty result projection with the fullest error
+strategy available, and a read pairs a full result with the same error strategy.
+The asymmetry is in the projection, not in the reading.
 
-Three readings — `verbatim`, `structured`, `statusOnly` — and five terse
-projections cover **289 slots across 30 result sets**. The slot name does not
-select a different reading; it selects a different projection, and most of the
-time not even that.
+`terseWrite` answers the string `'SUCCESS'`, never `undefined`: the adapter
+cannot tell a write with nothing to add from a read that found nothing, and
+reading the second as success is the masking defect this repository has removed
+three times.
 
-Metadata is the case that looked hardest and is not. It answers eight media
-types and seven root elements, which seemed to demand eight readings. It demands
-none: the tools return JSON with the XML carried through as a string, and
-`handleReadClass` has never parsed it. Those eight shapes would only start to
-matter the day a tool promised named fields out of them — which is a change to
-the tool surface, not to a strategy.
+## The error axis: six encoding principles
 
-Seven `analyse` strategies, one per document form plus a dispatcher:
-`analyseException`, `analyseActivation`, `analyseDeletion`, `analyseCheck`,
-`analyseValidation`, `analyseUnitTest`, `analyseAny`.
+Each is how a refusal is written into an answer, measured from the corpus.
 
-`analyseAny` dispatches on the root element and can stand in wherever the
-specific form is not worth naming. Prefer a named one where the form is known in
-advance, because a dispatcher that meets an unexpected document answers `null`,
-and `null` from an `analyse` means "not a failure".
+| principle | strategy | documents |
+|---|---|---|
+| the HTTP status carries it, the document explains it | `analyseException` | `exc:exception` — a read, a create, a lock, a write, three of the five validations |
+| a boolean attribute carries it, under 200 | `analyseActivation`, `analyseDeletion` | `activationExecuted`, `isDeleted`, `isDeletable` |
+| a status attribute, then the messages | `analyseCheck` | `chkrun:status`, then `checkMessage` |
+| a name verdict in a value block | `analyseValidation` | `CHECK_RESULT`, or `SEVERITY` + `SHORT_TEXT` |
+| alerts on the thing that failed | `analyseUnitTest` | `aunit:runResult` |
+| **nothing carries it** | none, deliberately | the package walkers: a missing package and an empty one answer the same sha256 |
 
-## The walkers get no analyse, deliberately
+`analyseAny` dispatches on the root element, for where the form is not known in
+advance. Prefer a named one where it is: a dispatcher that meets an unrecognised
+document answers `null`, and `null` from an `analyse` means "not a failure".
 
-A package that does not exist and a package that is empty answer the same
-sha256: HTTP 200, no content-type, zero bytes. There is no signal to read, so
-any `analyse` here would be inventing one. The existence question is a separate
-round trip, which `GetPackageTree` already pays and the other two do not.
+## How the two axes meet, in numbers
 
-That is an open decision for the tool surface, not for the strategy.
+They are injected differently and that is why the counts differ so much.
 
-## What this exposes about the adapter
+**Result strategies are constructed, once.** 289 slots across 30 result sets,
+filled from three readings. The slot name selects a projection, not a reading.
 
-The failure payload allowlist in the plan is
-`{ message, origin, code, adt_type, namespace, request, messages, raw_body }`.
-The readings produce a `messages[]` whose entries carry `type`, `text`, `code`,
-`t100`, `line`, `uri`.
+**`analyse` is passed per call.** 275 call sites in 174 handler files, and
+two-thirds of them — 178 — take `analyseException`, because `read`, `create`,
+`update`, `lock`, `unlock` and `readMetadata` all encode a refusal the same way.
+The remaining third splits across four forms: `analyseDeletion` 35,
+`analyseValidation` 23, `analyseActivation` 22, `analyseCheck` 17.
 
-**`t100` was added to the allowlist** (decided 2026-09-11). It is the message
-class and number with the substituted placeholders — `SADT_RESOURCE` `026` with
-`CLASS`, the object name, the bad lock handle — and the only thing in the whole
-corpus a caller can match on without reading English.
-
-It travels on the message it belongs to, not beside the failure, and `no` stays
-the zero-padded string SAP sent: `SADT_RESOURCE/26` is a key no system knows.
-Messages are rebuilt field by field on the way out, the same as `request`, so a
-strategy that attaches something else does not have it forwarded.
+So the error side is the larger migration, and the most mechanical part of it is
+larger still.
 
 ## Rows that are thin
 
 - `where-used` has only ever answered one hit; no empty result, no refusal.
 - `transport list` has only ever answered empty.
-- `readMetadata` has been read only in the active version, never inactive and
-  never for an absent object.
 - A refused `create` — a name already taken, reaching the create endpoint rather
   than validation — is unrecorded for every family.
-- `check` has no captured message carrying `chkrun:t100Key`, which adt-clients'
-  parser reads, so that variant exists somewhere and is not here. Issue #200.
+- No captured check message carries `chkrun:t100Key`, which adt-clients' parser
+  reads, so that variant exists somewhere and is not here. Issue #200.

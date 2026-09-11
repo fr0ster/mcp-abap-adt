@@ -4,6 +4,12 @@ import { XMLParser } from 'fast-xml-parser';
 /**
  * What a result strategy of ours answers.
  *
+ * **A result strategy is keyed on the transformation, not on the operation and
+ * not on the object type.** There are three: hand the body through, parse it
+ * into named structure, or there is no body at all. Which member produced the
+ * answer does not change that, and neither does whether it was a class or a
+ * domain. What varies per member is the projection, and mostly not even that.
+ *
  * **Both halves, because the strategy cannot know which one is wanted.** A
  * result strategy is injected once, when the client is constructed; `detail` is
  * a parameter of the call. So a strategy that returned only the parse could

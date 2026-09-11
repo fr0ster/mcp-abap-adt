@@ -3,6 +3,14 @@ import type { AdtReading } from './reading';
 /**
  * What `detail` picks out of a reading.
  *
+ * **The asymmetry worth knowing is read versus write, not operation.** A read
+ * is made for its payload, so terse gives the payload. A write is made to
+ * change something, so when it works a short confirmation is all a caller
+ * needs — and when it does not, what went wrong is the valuable half of the
+ * call. So a write pairs a nearly empty projection with the fullest error
+ * strategy available. The asymmetry lives here, in the projection, and not in
+ * the reading.
+ *
  * One parse, three answers. The parse happened once, in the strategy; `detail`
  * decides how much of it a caller sees. It never chooses a different parse.
  *

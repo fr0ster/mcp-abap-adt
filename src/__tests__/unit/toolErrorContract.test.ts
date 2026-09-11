@@ -6,7 +6,7 @@ import { AxiosError } from 'axios';
 import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
-import { BaseMcpServer } from '../../server/BaseMcpServer';
+import { BaseMcpServer } from '../../embeddable/BaseMcpServer';
 
 const FORBIDDEN_PREFIX =
   /\bMcpError:\s|\bMCP error -?\d+: |(?:^|\s)(?:Error|ADT error): /;

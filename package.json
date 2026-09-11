@@ -1,7 +1,7 @@
 {
-  "name": "@mcp-abap-adt/core",
+  "name": "@mcp-abap-adt/lib",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "9.0.0",
+  "version": "10.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -20,10 +20,30 @@
       "import": "./dist/lib/utils.js",
       "require": "./dist/lib/utils.js"
     },
-    "./server": {
-      "types": "./dist/server/index.d.ts",
-      "import": "./dist/server/index.js",
-      "require": "./dist/server/index.js"
+    "./embeddable": {
+      "types": "./dist/embeddable/index.d.ts",
+      "import": "./dist/embeddable/index.js",
+      "require": "./dist/embeddable/index.js"
+    },
+    "./config": {
+      "types": "./dist/lib/config/index.d.ts",
+      "import": "./dist/lib/config/index.js",
+      "require": "./dist/lib/config/index.js"
+    },
+    "./auth": {
+      "types": "./dist/lib/auth/index.d.ts",
+      "import": "./dist/lib/auth/index.js",
+      "require": "./dist/lib/auth/index.js"
+    },
+    "./logger": {
+      "types": "./dist/lib/handlerLogger.d.ts",
+      "import": "./dist/lib/handlerLogger.js",
+      "require": "./dist/lib/handlerLogger.js"
+    },
+    "./request-context": {
+      "types": "./dist/lib/requestContext.d.ts",
+      "import": "./dist/lib/requestContext.js",
+      "require": "./dist/lib/requestContext.js"
     }
   },
   "typesVersions": {
@@ -40,7 +60,7 @@
     }
   },
   "scripts": {
-    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
+    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' \u2014 edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
@@ -57,38 +77,13 @@
     "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
-    "start": "node ./bin/mcp-abap-adt.js",
-    "start:http": "node ./bin/mcp-abap-adt.js --transport=http",
-    "start:sse": "node ./bin/mcp-abap-adt.js --transport=sse",
-    "dev": "npm run build && npx @modelcontextprotocol/inspector node ./dist/server/launcher.js --transport=stdio",
-    "dev:http": "npm run build && node ./tools/dev-http-v2.js",
-    "dev:sse": "npm run build && node ./tools/dev-sse-v2.js",
-    "kill-ports": "lsof -ti:3000,3001,4000,4001,5000,6274,6277 | xargs -r kill -9 2>/dev/null || true",
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "chrono": "./tools/version-stats.sh",
-    "smoke:mcp:crud": "node ./tools/mcp-crud-smoke.js",
-    "smoke:mcp:matrix": "node ./tools/mcp-crud-matrix.js",
     "docs:tools": "node ./tools/generate-tools-docs.js",
     "prepublishOnly": "npm run build",
     "package": "npm pack",
     "package:build": "npm run build && npm pack",
-    "docker:pack": "npm pack && mkdir -p docker/packages && mv *.tgz docker/packages/",
-    "docker:build": "cd docker && docker-compose build",
-    "docker:build:package": "npm run docker:pack && cd docker && docker-compose -f docker-compose.package.yml build",
-    "docker:build:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml build",
-    "docker:up": "cd docker && docker-compose up -d",
-    "docker:up:package": "npm run docker:pack && cd docker && docker-compose -f docker-compose.package.yml up -d",
-    "docker:up:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml up -d",
-    "docker:down": "cd docker && docker-compose down",
-    "docker:down:package": "cd docker && docker-compose -f docker-compose.package.yml down",
-    "docker:down:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml down",
-    "docker:logs": "cd docker && docker-compose logs -f",
-    "docker:logs:package": "cd docker && docker-compose -f docker-compose.package.yml logs -f",
-    "docker:logs:headerless": "cd docker && docker-compose -f docker-compose.headerless.yml logs -f",
-    "docker:rebuild": "npm run docker:down && npm run docker:build && npm run docker:up",
-    "docker:rebuild:package": "npm run docker:down:package && npm run docker:build:package && npm run docker:up:package",
-    "docker:rebuild:headerless": "npm run docker:down:headerless && npm run docker:build:headerless && npm run docker:up:headerless",
     "prepare": "husky"
   },
   "keywords": [
@@ -106,8 +101,8 @@
     "crud"
   ],
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
-  "description": "SAP ABAP ADT MCP server with full CRUD for on-prem and ABAP Cloud (BTP), plus JWT/XSUAA and service-key destination auth",
-  "license": "GPL-3.0-only",
+  "description": "ADT tool handlers and an embeddable MCP server for SAP ABAP. The standalone server is @mcp-abap-adt/core.",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
@@ -164,16 +159,13 @@
   },
   "files": [
     "dist/",
-    "bin/",
     "docs/",
     "README.md",
     "LICENSE",
+    "NOTICE",
     "CONTRIBUTORS.md",
     "CHANGELOG.md"
   ],
-  "bin": {
-    "mcp-abap-adt": "./bin/mcp-abap-adt.js"
-  },
   "jest": {
     "preset": "ts-jest",
     "testEnvironment": "node",

@@ -1,7 +1,7 @@
 import {
   checkDnsRebinding,
   withDnsRebindingProtection,
-} from '../../server/dnsRebindingProtection';
+} from '../dnsRebindingProtection.js';
 
 describe('checkDnsRebinding', () => {
   it('returns null when protection is disabled', () => {

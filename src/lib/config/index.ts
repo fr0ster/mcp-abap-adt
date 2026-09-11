@@ -5,7 +5,12 @@
 
 export { ArgumentsParser, type ParsedArguments } from './ArgumentsParser.js';
 export { ConfigLoader } from './ConfigLoader.js';
-export type { HandlerSet, IServerConfig, Transport } from './IServerConfig.js';
+export type {
+  HandlerSet,
+  IServerConfig,
+  TlsConfig,
+  Transport,
+} from './IServerConfig.js';
 // Runtime configuration
 export { buildRuntimeConfig } from './runtimeConfig.js';
 // Server configuration manager
@@ -20,3 +25,4 @@ export {
   parseConfigArg,
   validateYamlConfig,
 } from './yamlConfig.js';
+export { validateExposition } from './validateExposition.js';

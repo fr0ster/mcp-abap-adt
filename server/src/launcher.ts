@@ -1,9 +1,9 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
-import { AuthBrokerFactory } from '../lib/auth/index.js';
-import { ServerConfigManager } from '../lib/config/index.js';
-import { validateExposition } from '../lib/config/validateExposition.js';
+import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
+import { validateExposition } from '@mcp-abap-adt/lib/config';
 import {
   CompactHandlersGroup,
   HighLevelHandlersGroup,
@@ -11,17 +11,17 @@ import {
   ReadOnlyHandlersGroup,
   SearchHandlersGroup,
   SystemHandlersGroup,
-} from '../lib/handlers/groups/index.js';
-import { ReadVsGetDedupStrategy } from '../lib/handlers/groups/strategies/index.js';
+} from '@mcp-abap-adt/lib/handlers';
+import { ReadVsGetDedupStrategy } from '@mcp-abap-adt/lib/handlers';
 import type {
   HandlerContext,
   IHandlerGroup,
-} from '../lib/handlers/interfaces.js';
-import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+} from '@mcp-abap-adt/lib/handlers';
+import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
-} from '../lib/utils.js';
+} from '@mcp-abap-adt/lib/utils';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
 import { StdioServer } from './StdioServer.js';
@@ -327,7 +327,7 @@ async function main() {
       brokerKey = configuredBrokerKey!;
     } else {
       // Inspection-only mode: no connection parameters provided
-      const { MockAbapConnection } = await import('./MockAbapConnection.js');
+      const { MockAbapConnection } = await import('@mcp-abap-adt/lib/embeddable');
       const mockConnection = new MockAbapConnection();
       broker = {
         getSession: async () => ({

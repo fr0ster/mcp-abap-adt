@@ -1,10 +1,10 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import express from 'express';
-import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
-import type { IHttpApplication } from '../../server/IHttpApplication';
-import { SseServer } from '../../server/SseServer';
-import { StreamableHttpServer } from '../../server/StreamableHttpServer';
+import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
+import { SseServer } from '../SseServer.js';
+import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 // Empty registry — health endpoint doesn't need any handlers
 const emptyRegistry = new CompositeHandlersRegistry([]);

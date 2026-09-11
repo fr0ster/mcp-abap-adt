@@ -4,8 +4,8 @@
  */
 
 import type { ILogger } from '@mcp-abap-adt/interfaces';
-import type { IAuthBrokerFactoryConfig } from '../lib/auth/IAuthBrokerFactoryConfig.js';
-import type { IServerConfig } from './IServerConfig.js';
+import type { IAuthBrokerFactoryConfig } from '@mcp-abap-adt/lib/auth';
+import type { IServerConfig } from '@mcp-abap-adt/lib/config';
 
 export class AuthBrokerConfig implements IAuthBrokerFactoryConfig {
   defaultMcpDestination?: string;

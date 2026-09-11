@@ -17,7 +17,7 @@
  */
 
 import { NoDedupStrategy } from '../../lib/handlers/groups/strategies/index';
-import { EmbeddableMcpServer } from '../../server/EmbeddableMcpServer';
+import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 
 type RegisteredToolsMap = Record<string, unknown>;
 

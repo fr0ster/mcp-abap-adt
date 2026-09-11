@@ -7,6 +7,7 @@ import {
   readCheckRunRefusal,
   readDeletionRefusal,
   readExceptionRefusal,
+  readValidationRefusal,
 } from '../../lib/adtRefusal';
 
 /**
@@ -30,11 +31,19 @@ const CORPUS = path.join(
   'adt',
 );
 
-function body(name: string): string {
-  const sidecar = JSON.parse(
+function sidecar(name: string): {
+  response: { status: number | string; bodyFile: string };
+} {
+  return JSON.parse(
     fs.readFileSync(path.join(CORPUS, `${name}.json`), 'utf-8'),
   );
-  return fs.readFileSync(path.join(CORPUS, sidecar.response.bodyFile), 'utf-8');
+}
+
+function body(name: string): string {
+  return fs.readFileSync(
+    path.join(CORPUS, sidecar(name).response.bodyFile),
+    'utf-8',
+  );
 }
 
 describe('form 1 — exc:exception', () => {
@@ -208,6 +217,104 @@ describe('form 3 — check runs', () => {
       '<chkrun:checkMessageList><chkrun:checkMessage chkrun:type="E" chkrun:shortText="Object ZX has been checked"/>' +
       '</chkrun:checkMessageList></chkrun:checkReport></chkrun:checkRunReports>';
     expect(readCheckRunRefusal(echoed)).toBeNull();
+  });
+});
+
+describe('form 5 — validation asks whether the NAME is admissible', () => {
+  /**
+   * Validation is not a check run. It looks at a name, never at source, and
+   * "already exists" is the only refusal it has been observed to give. The
+   * element called CHECK_RESULT belongs to this document, not to /checkruns.
+   */
+
+  it('an admissible class name is not a refusal', () => {
+    const document = body(
+      'validation-name-free-class--01-validation-objectname',
+    );
+    expect(document).toContain('CHECK_RESULT');
+    expect(readValidationRefusal(document)).toBeNull();
+  });
+
+  it('an admissible table name is not a refusal', () => {
+    expect(
+      readValidationRefusal(
+        body('validation-name-free-table--01-tables-validation'),
+      ),
+    ).toBeNull();
+  });
+
+  it('an admissible DDL name answers SEVERITY OK, and is not a refusal', () => {
+    const document = body('validation-name-free-ddl--01-ddl-validation');
+    expect(document).toContain('<SEVERITY>OK</SEVERITY>');
+    expect(readValidationRefusal(document)).toBeNull();
+  });
+
+  it('a taken DDL name is a refusal, inside HTTP 200', () => {
+    const name = 'refusal-validation-name-taken-ddl--01-ddl-validation';
+    expect(sidecar(name).response.status).toBe(200);
+    const refusal = readValidationRefusal(body(name));
+    expect(refusal?.form).toBe('validation');
+    expect(refusal?.message).toContain('already exists');
+  });
+
+  it('a taken function group name is a refusal, inside HTTP 200', () => {
+    const name =
+      'refusal-validation-name-taken-functiongroup--01-functions-validation';
+    expect(sidecar(name).response.status).toBe(200);
+    expect(readValidationRefusal(body(name))?.message).toContain(
+      'already exists',
+    );
+  });
+
+  it.each([
+    [
+      'refusal-validation-name-taken-class--01-validation-objectname',
+      'InvalidClifName',
+    ],
+    [
+      'refusal-validation-name-taken-domain--01-domains-validation',
+      'InvalidObjName',
+    ],
+    [
+      'refusal-validation-name-taken-table--01-tables-validation',
+      'InvalidObjName',
+    ],
+  ])('%s refuses with the status instead, and is form 1', (name, adtType) => {
+    expect(sidecar(name).response.status).toBe(400);
+    const refusal = readAdtRefusal(body(name));
+    expect(refusal?.form).toBe('exception');
+    expect(refusal?.adtType).toBe(adtType);
+  });
+
+  it('the presence of SEVERITY is not the signal — its value is', () => {
+    const free = body('validation-name-free-ddl--01-ddl-validation');
+    const taken = body('refusal-validation-name-taken-ddl--01-ddl-validation');
+    expect(free).toContain('SEVERITY');
+    expect(taken).toContain('SEVERITY');
+    expect(readValidationRefusal(free)).toBeNull();
+    expect(readValidationRefusal(taken)).not.toBeNull();
+  });
+
+  it('a check-run document is never read as a validation verdict', () => {
+    expect(
+      readValidationRefusal(body('refusal-syntax-check--01-checkrun')),
+    ).toBeNull();
+    expect(
+      readValidationRefusal(body('check-success-verdict--01-checkrun')),
+    ).toBeNull();
+  });
+
+  it('a validation document is never read as a check run', () => {
+    expect(
+      readCheckRunRefusal(
+        body('refusal-validation-name-taken-ddl--01-ddl-validation'),
+      ),
+    ).toBeNull();
+    expect(
+      readCheckRunRefusal(
+        body('validation-name-free-class--01-validation-objectname'),
+      ),
+    ).toBeNull();
   });
 });
 

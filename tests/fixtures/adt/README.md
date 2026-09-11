@@ -5,7 +5,7 @@ error strategies (`docs/superpowers/specs/2026-09-08-result-error-strategies-des
 can be written against documents someone has actually seen. Writing a parser first
 and meeting the document later is how the transport-tree parser broke in #168.
 
-24 cases, 34 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
+32 cases, 42 exchanges. Captured by `scripts/capture-adt-corpus.ts` against the
 ABAP trial system, package `ZMCP_SHR_PKG` and its 29 restored polygon objects.
 
 ## Layout
@@ -79,7 +79,41 @@ exchanges address the same endpoint and differ only in `params`.
 | `refusal-package-not-found-hierarchy-direct` | hierarchy walk on the same | **200**, zero-byte body |
 | `read-empty-package-contents` | both walkers on `ZMCP_BLD_PKG01`, which **exists and is empty** | **200**, zero-byte body |
 
-## The four refusal shapes
+## Validation is not a check run
+
+Two different questions, two different documents, and the word "check" appears
+in both — which is what makes them easy to confuse.
+
+**`validate`** asks whether a **name** is admissible for an object of this type
+in this package. It never looks at source. Endpoints are per family:
+`/oo/validation/objectname`, `/ddic/domains/validation`,
+`/ddic/tables/validation`, `/ddic/ddl/validation`, `/functions/validation`.
+The element `CHECK_RESULT` belongs to this document.
+
+**`check`** asks whether **source** is correct. One endpoint for everything:
+`POST /checkruns`. The document is `chkrun:checkRunReports`.
+
+The families do not answer validation the same way, measured here rather than
+taken from anyone's notes:
+
+| family | name taken | name free |
+|---|---|---|
+| class | **400** `exc:exception` `InvalidClifName` | 200 `CHECK_RESULT` `X` |
+| domain | **400** `exc:exception` `InvalidObjName` | 200 `CHECK_RESULT` `X` |
+| table | **400** `exc:exception` `InvalidObjName` | 200 `CHECK_RESULT` `X` |
+| DDL | **200** `SEVERITY` `ERROR` + `SHORT_TEXT` | 200 `SEVERITY` `OK` |
+| function group | **200** `SEVERITY` `ERROR` + `SHORT_TEXT` | — |
+
+Three refuse with the status; two answer 200 with the refusal in the body. The
+discriminator in the second kind is the **value** of `SEVERITY`, not its
+presence: a free name answers `OK`.
+
+One name in these fixtures is worth explaining. The taken-domain case uses
+`MANDT`, one of SAP's own. An invented `Z` name answers "free", and reading that
+as "taken" would have invented a masking defect that is not there — which is
+what the first attempt did before the name was checked.
+
+## The five refusal shapes
 
 Where an error strategy should look differs by document. A message with
 `type="E"` is the right signal in exactly one of the four.
@@ -106,6 +140,11 @@ ran at all and `chkrun:statusText` says why; there is no message list to inspect
 `chkrun:checkMessage chkrun:type="E"` mean the object is broken. This is the one
 place where "a message with type E" is the correct signal, and it is only correct
 after the status check.
+
+**5. A name verdict in an `asx:abap` block.** Validation, for the families that
+answer 200. `SEVERITY` other than `OK` is the refusal and `SHORT_TEXT` is the
+sentence. Do not reach for this reading on a check-run document, or the other
+way round.
 
 **4. Nothing carries it.** The three package walkers answer HTTP 200 with a
 zero-byte body and no content-type when the package does not exist. An existing

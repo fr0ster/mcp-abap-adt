@@ -62,8 +62,13 @@ export interface AdtRefusal {
   readonly t100?: { readonly id: string; readonly no: string };
   /** Every message in the document, `E`, `W` and `I` alike. */
   readonly messages?: ReadonlyArray<AdtMessage>;
-  /** Which of the four forms this was read from, for diagnosis. */
-  readonly form: 'exception' | 'activation' | 'deletion' | 'checkrun';
+  /** Which form this was read from, for diagnosis. */
+  readonly form:
+    | 'exception'
+    | 'activation'
+    | 'deletion'
+    | 'checkrun'
+    | 'validation';
 }
 
 // ---------------------------------------------------------------------------
@@ -283,11 +288,13 @@ export function readDeletionRefusal(document: unknown): AdtRefusal | null {
  * messages. This is the single form of the four where "a message of type E" is
  * the correct test, and it is only correct second.
  *
- * **The echo.** adt-clients measured that SAP sometimes repeats `statusText` as
- * a message of type `E` on a report that passed — "Object Z has been checked" —
- * and filters it by comparing the text. That case is absent from the corpus, so
- * the rule is adopted from their measurement rather than confirmed here; it can
- * only ever suppress a message identical to the status line.
+ * **The echo, and a debt.** The rule that a message of type `E` whose text
+ * equals `statusText` is not an error came from a note in adt-clients, not from
+ * anything measured here. Notes in that package describe the strategies IT
+ * ships; ours are injected and are ours to establish. The rule is kept because
+ * it can only ever suppress a message identical to the status line, which is
+ * inert when the echo does not happen — but it is unverified, and the corpus
+ * needs a capture of a check that produces one before it counts as measured.
  */
 export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
   const parsed = parseXml(document);
@@ -326,6 +333,74 @@ export function readCheckRunRefusal(document: unknown): AdtRefusal | null {
     form: 'checkrun',
     message: errors.map((m) => m.text).join('; '),
     messages,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Form 5 — validation: is the NAME admissible. Not a check run.
+// ---------------------------------------------------------------------------
+
+/**
+ * Name admissibility, and nothing else.
+ *
+ * **`validate` is not `check`, and the two must not be read into each other.**
+ * Validation asks one narrow question: *is this name admissible for an object
+ * of this type in this package* — in practice, is it free and well-formed. It
+ * never looks at source, and it says nothing about whether the object would be
+ * correct. That is `check`'s job, at `POST /checkruns`, which is form 3 above
+ * and a different document entirely.
+ *
+ * The endpoints say so themselves: `.../validation/objectname`, answering
+ * `com.sap.adt.oo.clifname.check` and `com.sap.adt.wb.objname.check` — *name*
+ * checks. An element called `CHECK_RESULT` lives in this document and belongs
+ * to validation, not to a check run; the word is what made this easy to confuse
+ * and is exactly why it is written down here.
+ *
+ * Measured on the trial system, ours rather than taken from anyone's notes, and
+ * every row has a fixture:
+ *
+ * | family | name taken | name free |
+ * |---|---|---|
+ * | class | **400** `exc:exception` `InvalidClifName` | 200 `CHECK_RESULT` `X` |
+ * | domain | **400** `exc:exception` `InvalidObjName` | 200 `CHECK_RESULT` `X` |
+ * | table | **400** `exc:exception` `InvalidObjName` | 200 `CHECK_RESULT` `X` |
+ * | DDL | **200** `SEVERITY` `ERROR` + `SHORT_TEXT` | 200 `SEVERITY` `OK` |
+ * | function group | **200** `SEVERITY` `ERROR` + `SHORT_TEXT` | — |
+ *
+ * Three families refuse with the HTTP status and are already form 1; two answer
+ * 200 with the refusal in the body. This reading covers the second kind. The
+ * only refusal reason observed is "already exists", which is what a question
+ * about a name can answer.
+ *
+ * **The discriminator is the value of `SEVERITY`, not its presence.** A free
+ * DDL name answers `<SEVERITY>OK</SEVERITY>` with an empty `SHORT_TEXT`, so a
+ * rule that fired on the element being there would refuse every admissible
+ * name. Only `OK` and `ERROR` have been seen; anything else is treated as a
+ * refusal, because a verdict this reading does not recognise is not one it may
+ * report as permission to create.
+ */
+export function readValidationRefusal(document: unknown): AdtRefusal | null {
+  const data = parseXml(document)?.abap?.values?.DATA;
+  if (!data || typeof data !== 'object') return null;
+
+  // The admissible-name answer. Present means "yes"; there is nothing to refuse.
+  if (data.CHECK_RESULT !== undefined) return null;
+
+  const severity = textOf(data.SEVERITY).toUpperCase();
+  if (!severity || severity === 'OK') return null;
+
+  const shortText = textOf(data.SHORT_TEXT);
+  const longText = textOf(data.LONG_TEXT);
+
+  return {
+    form: 'validation',
+    message: shortText || longText || `Validation answered ${severity}`,
+    messages: [
+      {
+        type: severity === 'ERROR' ? 'E' : severity,
+        text: shortText || longText,
+      },
+    ],
   };
 }
 
@@ -374,6 +449,7 @@ export function readAdtRefusal(document: unknown): AdtRefusal | null {
     readExceptionRefusal(document) ??
     readActivationRefusal(document) ??
     readDeletionRefusal(document) ??
-    readCheckRunRefusal(document)
+    readCheckRunRefusal(document) ??
+    readValidationRefusal(document)
   );
 }

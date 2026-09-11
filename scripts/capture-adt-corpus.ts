@@ -74,7 +74,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { AdtClient } from '@mcp-abap-adt/adt-clients';
-import { createAbapConnection } from '@mcp-abap-adt/connection';
+import { createAbapConnection } from '../src/lib/connectionFactory';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
@@ -93,6 +93,11 @@ const SHARED_CLASS = 'ZBP_MCP_SHR_I_ROOT';
 const SHARED_TABLE = 'ZMCP_SHR_RTABL';
 const SHARED_FGRP = 'ZMCP_SHR_FGRP';
 const SHARED_FM = 'Z_MCP_SHR_FM';
+
+/** What each validation endpoint negotiates; taken from adt-clients' constants. */
+const ACCEPT_VALIDATION = 'application/vnd.sap.as+xml';
+const ACCEPT_VALIDATION_CLASS =
+  'application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check';
 /**
  * A package that EXISTS but holds nothing. Verified read-only against trial:
  * `getPackage().read()` succeeds, `getPackageContents()` answers HTTP 200 with
@@ -103,6 +108,20 @@ const SHARED_FM = 'Z_MCP_SHR_FM';
  * --empty-package if this name ever gains content.
  */
 const DEFAULT_EMPTY_PACKAGE_NAME = 'ZMCP_BLD_PKG01';
+
+/**
+ * Names for the validation cases. `validate` asks one question — may an object
+ * of this type be created under this name in this package — and the answer
+ * splits by object family in a way nothing in this repository had captured.
+ *
+ * The taken names must be objects that genuinely exist, which is why two are
+ * SAP's own domains: a name invented for the occasion answers "free", and
+ * reading that as "taken" would invent a masking defect that is not there.
+ */
+const SHARED_DDL = 'ZMCP_SHR_I_ROOT';
+const STANDARD_DOMAIN = 'MANDT';
+const FREE_CLASS_NAME = 'ZMCP_BLD_FREE_X1';
+const FREE_TABLE_NAME = 'ZMCP_BLD_FREE_T1';
 
 /**
  * Cases that need the scratch class to exist. `delete-success` is deliberately
@@ -973,6 +992,77 @@ async function main(): Promise<void> {
 
     await withCase('read-package-contents-structure', async () => {
       await utils.getPackageContents(SHARED_PACKAGE);
+    });
+
+    // -----------------------------------------------------------------
+    // VALIDATION — may this name be created here? Read-only: it asks, it
+    // does not create. Captured per family because the families disagree.
+    // -----------------------------------------------------------------
+
+    await withCase('validation-name-free-class', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/oo/validation/objectname?objname=${FREE_CLASS_NAME}&objtype=CLAS%2FOC&packagename=${devPackage}`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION_CLASS },
+      });
+    });
+
+    await withCase('refusal-validation-name-taken-class', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/oo/validation/objectname?objname=${SHARED_CLASS}&objtype=CLAS%2FOC&packagename=${SHARED_PACKAGE}`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION_CLASS },
+      });
+    });
+
+    await withCase('refusal-validation-name-taken-domain', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/ddic/domains/validation?objname=${STANDARD_DOMAIN}&packagename=${devPackage}&description=x`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION },
+      });
+    });
+
+    await withCase('validation-name-free-table', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/ddic/tables/validation?objname=${FREE_TABLE_NAME}&packagename=${devPackage}&description=x`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION },
+      });
+    });
+
+    await withCase('refusal-validation-name-taken-table', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/ddic/tables/validation?objname=${SHARED_TABLE}&packagename=${SHARED_PACKAGE}&description=x`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION },
+      });
+    });
+
+    // The two that answer 200 with the refusal in the body — the shape the
+    // 400-answering families never produce.
+    await withCase('refusal-validation-name-taken-ddl', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/ddic/ddl/validation?objname=${SHARED_DDL}&packagename=${SHARED_PACKAGE}&description=x`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION },
+      });
+    });
+
+    await withCase('refusal-validation-name-taken-functiongroup', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/functions/validation?objname=${SHARED_FGRP}&objtype=FUGR%2FF&packagename=${SHARED_PACKAGE}&description=x`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION },
+      });
+    });
+
+    await withCase('validation-name-free-ddl', async () => {
+      await connection.makeAdtRequest({
+        url: `/sap/bc/adt/ddic/ddl/validation?objname=ZMCP_BLD_FREE_V1&packagename=${devPackage}&description=x`,
+        method: 'POST',
+        headers: { Accept: ACCEPT_VALIDATION },
+      });
     });
 
     // The discriminator the walkers hang on: a package that EXISTS but holds

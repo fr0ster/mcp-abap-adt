@@ -33,25 +33,43 @@ and the projection picks.
 
 | operation | calls | result strategy | analyse | corpus |
 |---|---:|---|---|---|
-| `read` (source) | 106 | `rawDocument` — the source IS the answer | `readExceptionRefusal` | `read-class-source-text`, `read-function-module-source-text`, `refusal-object-not-found` |
-| `readMetadata` | 18 | **per type** — the document differs by family | `readExceptionRefusal` | `read-metadata-*`, 8 families |
-| `create` | 30 | `wireItself` — the body may be empty and the status is the verdict | `readExceptionRefusal` | `create-class` 200/empty, `create-domain` and `create-dataelement` 201/doc |
-| `lock` | 28 | the lock handle | `readExceptionRefusal` | `lock-success`, `refusal-lock-held-by-other` (403) |
-| `unlock` | 22 | `nothing` — 200, zero bytes | `readExceptionRefusal` | `unlock-success` |
-| `update` | 23 | `nothing` — 200, zero bytes | `readExceptionRefusal` | `update-source-success`, `refusal-write-not-locked` (423) |
-| `validate` | 23 | the verdict | **`readValidationRefusal`**, and `readExceptionRefusal` for the families that answer 400 | `validation-*`, 8 cases |
-| `activate` | 21 | the verdict | **`readActivationRefusal`** | `activation-success-verdict`, `refusal-activation-fails` |
-| `check` | 17 | the message list | **`readCheckRunRefusal`** | `check-success-verdict`, `refusal-syntax-check`, `refusal-check-nonexistent-object` |
-| `delete` | 15 | the verdict | **`readDeletionRefusal`** | `delete-success`, `refusal-delete-refused`, and the two check-step documents |
-| unit test run | — | the result document | **`readUnitTestRefusal`** | `unittest-run-passing`, `refusal-unittest-run-failing` |
-| node walk | 8 | the parsed tree | **none possible** — see below | `read-object-tree-structure`, `read-package-contents-structure`, `read-empty-package-contents`, three missing-package cases |
-| where-used | 2 | the reference list | `readExceptionRefusal` | `read-where-used-list-structure` — one hit only |
-| transport list | 1 | the tree | `readExceptionRefusal` | `read-transport-list-structure` — empty only |
+| `read` (source) | 106 | `verbatim` — the source IS the answer | `analyseException` | `read-class-source-text`, `read-function-module-source-text`, `refusal-object-not-found` |
+| `readMetadata` | 18 | `verbatim` — the tools carry the XML through as a string | `analyseException` | `read-metadata-*`, 8 families |
+| `create` | 30 | `statusOnly` — a class answers 200/empty, a domain 201/doc; the useful information in a failure is the refusal | `analyseException` | `create-class` 200/empty, `create-domain` and `create-dataelement` 201/doc |
+| `lock` | 28 | the lock handle | `analyseException` | `lock-success`, `refusal-lock-held-by-other` (403) |
+| `unlock` | 22 | `statusOnly` — 200, zero bytes | `analyseException` | `unlock-success` |
+| `update` | 23 | `statusOnly` — 200, zero bytes | `analyseException` | `update-source-success`, `refusal-write-not-locked` (423) |
+| `validate` | 23 | `structured` + `terseValidation` | **`analyseValidation`** (and the 400 families fall to the same enrichment) | `validation-*`, 8 cases |
+| `activate` | 21 | `structured` + `terseActivation` | **`analyseActivation`** | `activation-success-verdict`, `refusal-activation-fails` |
+| `check` | 17 | `structured` + `terseCheck` | **`analyseCheck`** | `check-success-verdict`, `refusal-syntax-check`, `refusal-check-nonexistent-object` |
+| `delete` | 15 | `structured` + `terseDeletion` | **`analyseDeletion`** | `delete-success`, `refusal-delete-refused`, and the two check-step documents |
+| unit test run | — | `structured` | **`analyseUnitTest`** | `unittest-run-passing`, `refusal-unittest-run-failing` |
+| node walk | 8 | `structured` | **none possible** — see below | `read-object-tree-structure`, `read-package-contents-structure`, `read-empty-package-contents`, three missing-package cases |
+| where-used | 2 | `structured` | `analyseException` | `read-where-used-list-structure` — one hit only |
+| transport list | 1 | `structured` | `analyseException` | `read-transport-list-structure` — empty only |
 
-`readAdtRefusal` dispatches on the root element and can stand in wherever the
-specific reading is not worth naming. The specific ones are named above where
-the form is known in advance, because a dispatcher that meets an unexpected
-document answers `null`, and `null` from an `analyse` means "not a failure".
+## How few there turned out to be
+
+Three readings — `verbatim`, `structured`, `statusOnly` — and five terse
+projections cover **289 slots across 30 result sets**. The slot name does not
+select a different reading; it selects a different projection, and most of the
+time not even that.
+
+Metadata is the case that looked hardest and is not. It answers eight media
+types and seven root elements, which seemed to demand eight readings. It demands
+none: the tools return JSON with the XML carried through as a string, and
+`handleReadClass` has never parsed it. Those eight shapes would only start to
+matter the day a tool promised named fields out of them — which is a change to
+the tool surface, not to a strategy.
+
+Seven `analyse` strategies, one per document form plus a dispatcher:
+`analyseException`, `analyseActivation`, `analyseDeletion`, `analyseCheck`,
+`analyseValidation`, `analyseUnitTest`, `analyseAny`.
+
+`analyseAny` dispatches on the root element and can stand in wherever the
+specific form is not worth naming. Prefer a named one where the form is known in
+advance, because a dispatcher that meets an unexpected document answers `null`,
+and `null` from an `analyse` means "not a failure".
 
 ## The walkers get no analyse, deliberately
 

@@ -114,8 +114,25 @@ export function reading<T>(
 /** The structured reading: parse the body, keep it beside the parse. */
 export const structured = reading((answer) => parseStructure(rawOf(answer)));
 
-/** The source reading: the text is the answer, and parsing it would be a lie. */
-export const sourceText = reading((answer) => rawOf(answer));
+/**
+ * The document, handed through unchanged.
+ *
+ * **This is the right reading for more members than it looks.** Source is
+ * obvious: the text is the answer and parsing it would be a lie. Metadata is
+ * the one worth saying out loud — it is XML, and the tools return JSON, but
+ * they carry the XML through as a string inside that JSON. `handleReadClass`
+ * puts `metadataResult.data` in a `metadata` field verbatim and has never
+ * parsed it.
+ *
+ * So the eight media types and seven root elements the corpus found in metadata
+ * need no reading at all under the current tool interface. They would only
+ * start to matter the day a tool promised named fields out of them, and that
+ * day is a change to the tool surface, not to a strategy.
+ */
+export const verbatim = reading((answer) => rawOf(answer));
+
+/** @deprecated Use {@link verbatim}. Kept so the name reads at the call site. */
+export const sourceText = verbatim;
 
 /**
  * For a member whose answer is the status and nothing else — a class create

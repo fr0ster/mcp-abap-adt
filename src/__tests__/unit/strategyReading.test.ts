@@ -2,9 +2,9 @@ import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   parseStructure,
-  sourceText,
   statusOnly,
   structured,
+  verbatim,
 } from '../../lib/strategies/reading';
 
 /**
@@ -96,7 +96,7 @@ describe('a reading carries the document beside the parse', () => {
 
   it('source text is the answer, not something parsed out of it', () => {
     const name = 'read-class-source-text--01-read-source';
-    const result = sourceText(wire(name));
+    const result = verbatim(wire(name));
     expect(result.value).toBe(corpusBody(name));
     expect(result.value).toContain('CLASS');
   });

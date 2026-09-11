@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.0.1] - 2026-09-11
+
+### Fixed
+
+- **Types resolve for every exported subpath, not just two of them.** The split
+  renamed `./server` to `./embeddable` and added `/config`, `/auth`, `/logger`
+  and `/request-context`. `exports` was updated; `typesVersions` was not, so it
+  still pointed `server` at a `dist/server` the build no longer produces and
+  named none of the new entries.
+
+  This is invisible on modern resolution, where TypeScript reads `exports`. On
+  the classic `moduleResolution: "node"` — which a great deal of CAP and Node
+  tooling still uses — TypeScript reads `typesVersions` instead, so 10.0.0
+  offered types for `handlers` and `utils` and for nothing else. A consumer
+  importing `EmbeddableMcpServer`, the entry point the release was about, had to
+  add a `paths` override to see its types. Runtime was never affected.
+
+  `typesVersions` is now generated from `exports` and matches it entry for
+  entry, in both packages.
+
+- **A test holds the two maps together.** Nothing here would have caught the
+  drift, because everything in this repository imports by relative path.
+  `src/__tests__/unit/packageEntryPoints.test.ts` asserts that every exported
+  subpath is named in `typesVersions`, that both point at the same file, and
+  that every declared entry point exists after a build. Confirmed to fail
+  against the 10.0.0 manifest before being committed alongside the fix.
+
+
 ## [10.0.0] - 2026-09-11
 
 ### Licence

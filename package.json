@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/lib",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "10.0.0",
+  "version": "10.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -54,8 +54,20 @@
       "utils": [
         "dist/lib/utils.d.ts"
       ],
-      "server": [
-        "dist/server/index.d.ts"
+      "embeddable": [
+        "dist/embeddable/index.d.ts"
+      ],
+      "config": [
+        "dist/lib/config/index.d.ts"
+      ],
+      "auth": [
+        "dist/lib/auth/index.d.ts"
+      ],
+      "logger": [
+        "dist/lib/handlerLogger.d.ts"
+      ],
+      "request-context": [
+        "dist/lib/requestContext.d.ts"
       ]
     }
   },

@@ -443,6 +443,14 @@ Thank you to all contributors! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the co
 | `@mcp-abap-adt/lib` | Apache-2.0 | [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) |
 | `@mcp-abap-adt/core` | AGPL-3.0-only | [`server/LICENSE`](server/LICENSE) |
 
+Both are published from this repository with one command, in the order the
+dependency requires:
+
+```bash
+npm run release:dry    # builds and packs both, publishes nothing
+npm run release        # @mcp-abap-adt/lib, then @mcp-abap-adt/core
+```
+
 Copyright © 2025–2026 Oleksii Kyslytsia
 
 Both are distributed in the hope that they will be useful, but WITHOUT ANY

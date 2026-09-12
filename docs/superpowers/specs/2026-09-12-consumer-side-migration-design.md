@@ -218,14 +218,32 @@ be given one, whatever this document would prefer. Measured on 19, and by member
 rather than by grep, because an earlier draft of this section got the scale
 wrong in both directions:
 
-| | takes an `analyse` | does not |
-|---|---|---|
-| the object classes | `read`, `readMetadata`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate` | `lock`, `unlock`, `getVersions`, `getVersionSource` |
-| `AdtUtils`, 20 members | `search` | the other 19 |
+**Twelve members take one**, across every object class and `AdtUtils` together:
+`read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`,
+`delete`, `checkDeletion`, `activate`, `check`, `validate`, `search`.
 
-```bash
-# regenerate rather than trusting the table
-node -e "…" # see the plan, Task 14 — it parses the .d.ts declarations
+Everything else takes none — `lock`, `unlock`, `getVersions`, `getVersionSource`,
+the test-class lifecycle, the service-binding operations, the group
+activate/delete/check trio, and 19 of the 20 `AdtUtils` members including
+`fetchNodeStructure`.
+
+The tell is the type parameter, not the options type's name: `IAdtOperationOptions`,
+`IReadOptions & IAdtOperationOptions` and `IAdtCreateOptions` are all spellings of
+the same thing, and `answering()` says why in its own comment — *"`E` is only ever
+given a value by the `analyse` argument"*. So regenerate the list from that:
+
+```js
+// node this against the installed package rather than trusting the paragraph
+const fs = require('node:fs');
+const takes = new Set(), none = new Set();
+for (const file of fs.globSync('node_modules/@mcp-abap-adt/adt-clients/dist/core/**/Adt*.d.ts')) {
+  const src = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  for (const m of src.matchAll(/^ {4}([a-zA-Z]\w*)(<[^>]*>)?\s*\(/gm)) {
+    (/E extends IAdtError/.test(m[2] ?? '') ? takes : none).add(m[1]);
+  }
+}
+for (const name of takes) none.delete(name);
+console.log([...takes].sort().join(', '));
 ```
 
 **What that actually costs is narrower than the list looks.** With no `analyse`,

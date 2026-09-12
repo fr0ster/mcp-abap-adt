@@ -20,7 +20,7 @@
 - **After every successful acquire, release is attempted exactly once, on every path out, and a release that failed reaches the caller.** Attempted, not achieved: whether SAP lets go is SAP's answer. A lock chain is `withLock()`, never `sequence()` — a sequence stops at the first failure and would skip the unlock entirely. This holds on the throw path too: a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call whose member declares an options parameter.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Which members accept one is a fact about their signature, not a list kept by hand: `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members declare none in 19, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
+- **`analyse` on every call whose member declares an options parameter.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Which members accept one is a fact about their signature, not a list kept by hand: twelve members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls in this plan.** Every test here runs offline against `tests/fixtures/adt/` (48 cases, 61 exchanges, 27 endpoints). Integration runs are the user's call, after the compiler is clean.
@@ -1917,13 +1917,13 @@ it('every client call passes an analyse', () => {
   const offenders: string[] = [];
   for (const file of handlers) {
     const source = readFileSync(file, 'utf8');
-    // An ALLOWLIST of members that declare an options parameter in 19, not an
-    // exclusion list. `lock`, `unlock`, `getVersions`, `getVersionSource` and
-    // every member of `AdtUtils` declare none, so none of them can be given an
-    // `analyse` — an exclusion list would have to name all of those and would
-    // silently rot the day one of them gains a parameter. Regenerate with the
-    // grep in the spec.
-    const calls = source.match(/\.(read|readMetadata|create|update|updateMetadata|delete|checkDeletion|activate|check|validate)\(/g) ?? [];
+    // An ALLOWLIST of the twelve members that accept an `analyse` in 19, not an
+    // exclusion list. `lock`, `unlock`, `getVersions`, `getVersionSource`, the
+    // group operations and 19 of the 20 `AdtUtils` members accept none, so a
+    // handler calling one of those is not in violation — an exclusion list would
+    // have to name fifty members and would rot the day any of them gains a
+    // parameter. Regenerate the twelve with the script in the spec.
+    const calls = source.match(/\.(read|readMetadata|readTransport|create|update|updateMetadata|delete|checkDeletion|activate|check|validate|search)\(/g) ?? [];
     const analyses = source.match(/analyse:/g) ?? [];
     if (calls.length > analyses.length) offenders.push(`${file}: ${calls.length} calls, ${analyses.length} analyse`);
   }

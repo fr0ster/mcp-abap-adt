@@ -48,6 +48,36 @@ cannot tell a write with nothing to add from a read that found nothing, and
 reading the second as success is the masking defect this repository has removed
 three times.
 
+## An XML-bodied update is a read-modify-write, and the handler does it
+
+adt-clients 19 removed the merge that used to happen inside the member.
+`updateDomain(connection, args, document, lockHandle)` now takes the whole
+document, and the package says why in its own words:
+
+> **The whole content, every time.** This is a replace, never a merge. Read what
+> the object holds, change what you mean to change, and pass the result:
+> anything left out is gone, because nothing is read here to keep it.
+
+Five families take a whole document on 19: `domain`, `dataElement`,
+`functionGroup`, `package`, `tabletype`. For each, an update is three steps the
+handler performs — read, edit, write — and `args` carries only what the request
+needs, the name and the transport.
+
+**This is the sharpest reason the read must be `verbatim`.** It was already the
+right reading because the tools hand metadata back as a string; now it is the
+right reading because the bytes it returns are the bytes that go back to SAP. A
+reading that parsed and re-serialised would write back whatever its parse
+happened to keep — and a parse is faithful enough to read from without being the
+document. `readModifyWrite.test.ts` shows both halves: every metadata fixture
+survives `verbatim` byte for byte, and rebuilding one from its parse does not
+reproduce it.
+
+**Our update handlers do not do this yet.** `handleUpdateDomain` passes
+`{ domainName, packageName, description }` and no document. Under a replace
+that is data loss, not a compile error: the datatype, the length, the fixed
+values and everything else SAP holds would be gone. Five handlers are affected —
+domain and data element at both levels, and package at the low level.
+
 ## The error axis: six encoding principles
 
 Each is how a refusal is written into an answer, measured from the corpus.

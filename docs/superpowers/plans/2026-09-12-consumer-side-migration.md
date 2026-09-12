@@ -20,7 +20,7 @@
 - **After every successful acquire, release is attempted exactly once, on every path out, and a release that failed reaches the caller.** Attempted, not achieved: whether SAP lets go is SAP's answer. A lock chain is `withLock()`, never `sequence()` — a sequence stops at the first failure and would skip the unlock entirely. This holds on the throw path too: a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call that accepts one.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. The exception, measured: `lock(config)` and `unlock(config, lockHandle)` declare no options parameter in 19, so their verdict is the library's and cannot be injected. Task 14's invariant test excludes those two by name, with that sentence beside it.
+- **`analyse` on every call whose member declares an options parameter.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Which members accept one is a fact about their signature, not a list kept by hand: `lock`, `unlock`, `getVersions`, `getVersionSource` and the whole `AdtUtils` surface declare none in 19, so their verdict is the library's and cannot be injected. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls in this plan.** Every test here runs offline against `tests/fixtures/adt/` (48 cases, 61 exchanges, 27 endpoints). Integration runs are the user's call, after the compiler is clean.
@@ -1467,7 +1467,7 @@ return answer(
 
 The search and listing handlers answer JSON built from a parse, so they project `reading.value` through `project(detail, terse)` rather than reading `raw`. Their `terse` is whatever field set that tool already returns — copy it out of the handler as it stands, do not redesign it here.
 
-The utils-backed ones (`handleGetObjectStructure`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetSqlQuery`, `handleGetTableContents`) take `client.getUtils(ourUtils)`.
+The utils-backed ones (`handleGetObjectStructure`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetSqlQuery`, `handleGetTableContents`) take `client.getUtils(ourUtils)` — and pass **no** `analyse`, because no member of `AdtUtils` declares an options parameter in 19. Their result strategy is ours; their verdict is not. Do not add an argument the signature does not have to satisfy a rule; the rule is written by signature for exactly this reason.
 
 - [ ] **Step 4: Run the tests**
 
@@ -1829,7 +1829,7 @@ it('stops at the first refused step and answers that step\'s failure', async () 
 
 - [ ] **Step 3: Run it to verify it fails** — `npx jest src/__tests__/unit/runtimeProfiling.test.ts`. Expected: FAIL, the handler does not compile against 19.
 
-- [ ] **Step 4: Implement** each as `answer(ctx, () => sequence(...), project)`, every step carrying its own `analyse`. `sequence` returns the failing step's answer untouched; the handler adds nothing about which step it was, because the failure's `request` already carries the URL.
+- [ ] **Step 4: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`. The where-used and node-structure steps run on `AdtUtils` and accept none — their verdict stays the library's, and that is recorded in the spec rather than worked around here. `sequence` returns the failing step's answer untouched; the handler adds nothing about which step it was, because the failure's `request` already carries the URL.
 
 - [ ] **Step 5: Run the tests and commit**
 
@@ -1917,8 +1917,12 @@ it('every client call passes an analyse', () => {
   const offenders: string[] = [];
   for (const file of handlers) {
     const source = readFileSync(file, 'utf8');
-    // `lock` and `unlock` are absent on purpose: neither declares an options
-    // parameter in 19, so neither can be given an `analyse`. See the spec.
+    // An ALLOWLIST of members that declare an options parameter in 19, not an
+    // exclusion list. `lock`, `unlock`, `getVersions`, `getVersionSource` and
+    // every member of `AdtUtils` declare none, so none of them can be given an
+    // `analyse` — an exclusion list would have to name all of those and would
+    // silently rot the day one of them gains a parameter. Regenerate with the
+    // grep in the spec.
     const calls = source.match(/\.(read|readMetadata|create|update|updateMetadata|delete|checkDeletion|activate|check|validate)\(/g) ?? [];
     const analyses = source.match(/analyse:/g) ?? [];
     if (calls.length > analyses.length) offenders.push(`${file}: ${calls.length} calls, ${analyses.length} analyse`);

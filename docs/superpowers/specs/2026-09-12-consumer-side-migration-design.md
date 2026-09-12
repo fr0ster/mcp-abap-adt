@@ -54,7 +54,8 @@ seven implementations come from the package: `analyseException`,
 
 One case gets no `analyse` deliberately: the package walkers. A missing package
 and an empty one answer the same sha256, so any reading there would be inventing
-a signal.
+a signal. `fetchNodeStructure` also accepts none, so the point is moot there —
+but it is the one place where we would have declined anyway.
 
 ## What the consumer needs differs by direction
 
@@ -211,14 +212,38 @@ just warning the log, which is all the current handlers do.
 reading — success with a warning — is defensible if a caller is expected to act
 on warnings. The evidence here says they do not.
 
-**`lock` and `unlock` take no `analyse`.** Measured on 19: `lock(config)` and
-`unlock(config, lockHandle)` declare no options parameter at all, so the verdict
-on both is adt-clients' own and cannot be injected. Everywhere else in this
-design the verdict is ours; here it is not, and saying so is better than a rule
-with a silent hole in it. It means `withLock`'s acquire and release failures are
-whatever the library judged them to be — which is enough to know a lock was not
-taken or not released, and not enough to know why in the vocabulary the rest of
-the failures use. Raised against the library as part of issue #200.
+**Which members accept an `analyse` is a fact about their signature.** A member
+that declares an `IAdtOperationOptions` parameter takes one; a member that
+declares no options parameter cannot be given one, whatever this document would
+prefer. An earlier draft of this section said `lock` and `unlock` were "the one
+place" that happens. Measured on 19, they are not close to it:
+
+| member | what it serves |
+|---|---|
+| `lock`, `unlock` | `withLock`'s acquire and release, on 29 object classes |
+| `getVersions`, `getVersionSource` | the version-history tools |
+| the whole `AdtUtils` surface | `fetchNodeStructure`, `getObjectStructure`, `getWhereUsed`, `getWhereUsedScope`, `getVirtualFoldersContents`, `getAllTypes`, `getInactiveObjects`, `getTableContents`, `getTableColumns`, `getSqlQuery`, `discovery`, `activateObjectsGroup`, `deleteObjectsGroup`, `checkDeletionGroup`, `getActivationResults`, `getStatus`, `getResult` |
+
+Regenerate the list rather than trusting this table:
+
+```bash
+grep -rhoE "^\s{4}[a-zA-Z]+(<[^>]*>)?\([^)]*\): Promise<IAdtResponse" \
+  node_modules/@mcp-abap-adt/adt-clients/dist/core/*/Adt*.d.ts \
+  node_modules/@mcp-abap-adt/adt-clients/dist/core/shared/AdtUtils.d.ts \
+  | grep -v IAdtOperationOptions | sed -E 's/^\s*([a-zA-Z]+).*/\1/' | sort -u
+```
+
+So the verdict on every search, every walk, every listing and every group
+operation stays adt-clients' own. That is enough to know a call did not succeed
+and not enough to know why in the vocabulary the rest of the failures use, and
+it is the largest gap this design has. Raised against the library as part of
+issue #200.
+
+**For the package walkers this is not a gap at all**, and the reason is worth
+keeping separate from the signature: a missing package and an empty one answer
+the same sha256, so an `analyse` there would be inventing a signal rather than
+reading one. They would decline the parameter if it were offered. Everywhere
+else on that surface, we would take it.
 
 ## The read-modify-write
 
@@ -275,9 +300,11 @@ its strategies are injected, so its notes describe what it ships.
   is then absent rather than invented.
 - `npx tsc` is clean.
 - No handler reads an envelope property off `IAdtSuccess`.
-- No handler decides a refusal for itself, and every call that accepts an
-  `analyse` is given one. `lock` and `unlock` accept none — the one place the
-  verdict stays adt-clients'.
+- No handler decides a refusal for itself, and **every call whose member
+  declares an options parameter is given an `analyse`**. Members that declare
+  none cannot be given one: `lock`, `unlock`, `getVersions`, `getVersionSource`
+  and the whole `AdtUtils` surface. The check is the signature, not a list of
+  names kept by hand.
 - Every XML-bodied update reads before it writes.
 - After every successful `acquire`, `release` is attempted exactly once, on
   every path out — a refusal, a throw, a success. Whether SAP then lets go of

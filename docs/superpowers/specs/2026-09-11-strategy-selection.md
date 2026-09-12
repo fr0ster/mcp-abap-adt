@@ -1,3 +1,8 @@
+> **Superseded in part by** `2026-09-12-consumer-side-migration-design.md`,
+> which carries the decisions. This stays for the measurements behind them:
+> the call counts per operation, the per-family validation table, and which
+> rows the corpus does not back.
+
 # What the strategies are actually keyed on
 
 **Status:** rewritten 2026-09-11 after a correction that changed the axis.

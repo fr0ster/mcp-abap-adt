@@ -4,7 +4,9 @@
 
 **Goal:** Move all 326 handlers off the adt-clients 18 envelope onto the 19 contract — injected result strategies, a per-call `analyse`, and handler-owned sequences — with the MCP tool surface unchanged except for a `detail` parameter on JSON-answering tools.
 
-**Architecture:** Every handler answers through one adapter, `answer()`. The value it projects comes from a result strategy this repository injects into the client (`verbatim`, `structured`, `statusOnly`); the verdict on a failure comes from an `analyse` this repository passes per call, taken from `@mcp-abap-adt/adt-strategies`. Handlers that need several endpoint calls own the order themselves, through `sequence()` or `pair()`, and never compose an error of their own.
+**Architecture:** Every handler answers through one adapter, `answer()`. The value it projects comes from a result strategy this repository injects into the client (`verbatim`, `structured`, `statusOnly`); the verdict on a failure comes from an `analyse` this repository passes per call, taken from `@mcp-abap-adt/adt-strategies`. Handlers that need several endpoint calls own the order themselves — `sequence()` where the last answer is the result, `pair()` where both are — and never compose an error of their own.
+
+**How much of the tree that is:** 131 handlers make exactly one client call site and 113 make more, of which 4 are dispatches over object families where one branch runs and 18 call both `read` and `readMetadata`. Call sites, not calls per run. Tasks 5 to 13 are where each one is actually settled.
 
 **Tech Stack:** TypeScript 5, `@mcp-abap-adt/adt-clients` 19.0.0, `@mcp-abap-adt/adt-strategies` 0.1.0, `@mcp-abap-adt/interfaces` 44.0.0, `fast-xml-parser`, Jest.
 
@@ -854,7 +856,13 @@ git commit -m "refactor(class): ReadClass answers through the adapter, and stops
 
 ## Task 6: The remaining `readonly` read handlers
 
-Twelve files, the same shape as Task 5, each with its own object type and its own config key. All twelve carry the same masking defect and all twelve lose it here.
+Sixteen files, the same shape as Task 5, each with its own object type and its own config key. All sixteen call both `read` and `readMetadata`, all sixteen carry the same masking defect, and all sixteen lose it here.
+
+Measured, not assumed — this is the `pair` list minus `handleReadClass`, which Task 5 did, and minus `handleGetFunctionModule`, which is a `high` tool and belongs to Task 10:
+
+```bash
+grep -lE '\.read\(' $(find src/handlers -name 'handle*.ts') | xargs grep -lE '\.readMetadata\(' | sort
+```
 
 **Files (modify, in this order — the compiler's own order, most errors first):**
 - `src/handlers/table/readonly/handleReadTable.ts` (`getTable`, `tableDocuments`, `{ tableName }`)
@@ -869,11 +877,15 @@ Twelve files, the same shape as Task 5, each with its own object type and its ow
 - `src/handlers/ddl/readonly/handleReadDdl.ts` (`getDdl`, `ddlDocuments`, `{ ddlName }`)
 - `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts` (`getBehaviorImplementation`, `classDocuments`)
 - `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts` (`getBehaviorDefinition`, `behaviorDefinitionDocuments`)
+- `src/handlers/domain/readonly/handleReadDomain.ts` (`getDomain`, `domainDocuments`, `{ domainName }`)
+- `src/handlers/data_element/readonly/handleReadDataElement.ts` (`getDataElement`, `dataElementDocuments`, `{ dataElementName }`)
+- `src/handlers/package/readonly/handleReadPackage.ts` (`getPackage`, `packageDocuments`, `{ packageName }`)
+- `src/handlers/function_group/readonly/handleReadFunctionGroup.ts` (`getFunctionGroup`, `functionGroupDocuments`, `{ functionGroupName }`)
 - Test: `src/__tests__/unit/readHandlersSurfaceErrors.test.ts` (exists — extend it)
 
 **Interfaces:**
 - Consumes: everything Task 5 produced.
-- Produces: nothing new. The families that read a document without metadata (`handleReadDomain`, `handleReadDataElement`, `handleReadPackage`, `handleReadFunctionGroup`, `handleReadMessageClass`) use `readMetadata` alone and need `answer()` without `pair()` — they are in Task 7.
+- Produces: nothing new. Four of these sixteen were listed in Task 7 as single-call handlers in an earlier draft of this plan. They are not: they call `read` and `readMetadata` both, and the grep above is why they moved here.
 
 - [ ] **Step 1: Extend the existing test so every one of the twelve is covered**
 
@@ -900,7 +912,7 @@ npx jest src/__tests__/unit/readHandlersSurfaceErrors.test.ts
 
 Expected: FAIL on every new row — each handler currently answers `isError: false`.
 
-- [ ] **Step 3: Migrate the twelve, one file per edit**
+- [ ] **Step 3: Migrate the sixteen, one file per edit**
 
 Apply the Task 5 shape verbatim, changing four things per file: the factory (`getTable`), the shipped set (`tableDocuments`), the config key (`{ tableName }`), and the answer's own field names, which stay exactly as that tool already returns them. Check the surface test after each file rather than at the end — a renamed field is caught in the file that renamed it.
 
@@ -911,22 +923,22 @@ npx jest src/__tests__/unit/readHandlersSurfaceErrors.test.ts src/__tests__/unit
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 
-Expected: PASS; error count down by roughly 90 (from 581 to about 490).
+Expected: PASS; error count down by roughly 110 (from 581 to about 470).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/handlers/*/readonly/handleRead*.ts src/__tests__/unit/readHandlersSurfaceErrors.test.ts
-git commit -m "refactor(readonly): the twelve read handlers answer through the adapter"
+git commit -m "refactor(readonly): the sixteen read handlers answer through the adapter"
 ```
 
 ---
 
 ## Task 7: The metadata-only reads, and the search and listing handlers
 
-The remaining `readonly` files that are a single call: `handleReadDomain`, `handleReadDataElement`, `handleReadPackage`, `handleReadFunctionGroup`, `handleReadMessageClass`, `handleReadMessageClassMessage`, `handleGetObjectsByType`, `handleGetObjectsList`, `handleSearchObject`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleGetSqlQuery`, `handleGetTableContents`, `handleListTransports`, `handleGetEnhancements`, `handleGetObjectVersionDiff`, `resolveVersionedObject`.
+The remaining `readonly` files that are a single call: `handleReadMessageClass`, `handleReadMessageClassMessage`, `handleGetObjectsByType`, `handleGetObjectsList`, `handleSearchObject`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleGetSqlQuery`, `handleGetTableContents`, `handleListTransports`, `handleGetEnhancements`, `handleGetObjectVersionDiff`, `resolveVersionedObject`.
 
-**Files:** the nineteen above, under `src/handlers/*/readonly/` and `src/handlers/common/readonly/`.
+**Files:** the fifteen above, under `src/handlers/*/readonly/` and `src/handlers/common/readonly/`. Confirm the list before starting — a file that turns out to call `readMetadata` as well belongs to Task 6's shape, not this one.
 
 **Interfaces:**
 - Consumes: `answer`, `resultsFor`, `ourUtils`, `analyseException`, `project`.
@@ -937,8 +949,8 @@ The remaining `readonly` files that are a single call: `handleReadDomain`, `hand
 ```typescript
 // src/__tests__/unit/readonlySingleCall.test.ts
 it.each([
-  ['ReadDomain', handleReadDomain, { domain_name: 'ZD' }],
-  ['ReadPackage', handleReadPackage, { package_name: 'ZP' }],
+  ['ReadMessageClass', handleReadMessageClass, { message_class_name: 'ZMC' }],
+  ['GetObjectStructure', handleGetObjectStructure, { object_name: 'ZCL_X', object_type: 'CLAS' }],
   ['ListTransports', handleListTransports, {}],
   // one row per file above
 ])('%s answers through the adapter and surfaces a refusal', async (_n, handler, args) => {
@@ -959,16 +971,16 @@ Expected: FAIL on every row.
 - [ ] **Step 3: Implement — the one-call shape**
 
 ```typescript
-// the shape, filled in for handleReadDomain
+// the shape, filled in for handleReadMessageClass
 return answer(
-  { tool: 'ReadDomain', detail: 'terse' },
+  { tool: 'ReadMessageClass', detail: 'terse' },
   () =>
     createAdtClient(connection, logger)
-      .getDomain(resultsFor(domainDocuments))
-      .readMetadata({ domainName }, { analyse: analyseException }),
+      .getMessageClass(resultsFor(messageClassDocuments))
+      .readMetadata({ messageClassName }, { analyse: analyseException }),
   (metadata: AdtReading<string>) => ({
     success: true,
-    domain_name: domainName,
+    message_class_name: messageClassName,
     metadata: metadata.raw,
   }),
 );
@@ -985,7 +997,7 @@ npx jest src/__tests__/unit/readonlySingleCall.test.ts src/__tests__/unit/toolSu
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 
-Expected: PASS; error count down by roughly 60 (to about 430).
+Expected: PASS; error count down by roughly 40 (to about 430).
 
 - [ ] **Step 5: Commit**
 

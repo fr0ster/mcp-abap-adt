@@ -83,20 +83,43 @@ that carries everything behind a parameter that shapes *successes* hid it on the
 path where it is the whole point. `detail` is a parameter of the result
 projection. The failure payload is not a projection.
 
-## Two handler shapes, named
+## Three handler shapes, named
 
 **One call** — `answer(ctx, () => client.getX().member(cfg, { analyse }), project)`.
 The exception boundary is inside; `client_threw` and `adapter_threw` are named
 apart and neither borrows an `AdtFailureOrigin`.
 
-**Several calls** — the same `answer()`, wrapping `sequence()`. Each step
-carries its own `analyse`, and `sequence` hands back the failing step's answer
-untouched. It never composes an error of its own: a sentence like "step 2 of 3
-failed" would put a second account beside the strategy's, and which step it was
-is already in the failure's `request`.
+**Several calls, the last one is the answer** — the same `answer()`, wrapping
+`sequence()`. A read-modify-write, a lock-update-unlock chain, a profiling run.
 
-Thirteen handlers need the second shape today: eight that called removed members
-and five whose update is a read-modify-write.
+**Several calls, all of them are the answer** — the same `answer()`, wrapping
+`pair()`. A tool that reports a document *and* its metadata needs both values,
+not the last one. Capturing the first in a variable outside the run would hand
+the ordering back to the handler one assignment at a time, which is the thing
+these two combinators exist to prevent.
+
+Both combinators share one rule: each step carries its own `analyse`, and the
+failing step's answer is handed back **untouched**. Neither composes an error of
+its own. A sentence like "step 2 of 3 failed" would put a second account beside
+the strategy's, and which step it was is already in the failure's `request`.
+
+**How many handlers need a combinator is not a number this document fixes.**
+An earlier draft said thirteen — eight that called removed members and five
+whose update is a read-modify-write — and that was the count of handlers whose
+sequence adt-clients 19 *took away*, mistaken for the count of handlers that
+have one. Measured on the tree instead:
+
+| | handlers |
+|---|---|
+| exactly one client call site | 131 |
+| more than one | 113 |
+| of those, a dispatch over object families where one branch runs | 4 |
+| of those, calling both `read` and `readMetadata` — the `pair` shape | 18 |
+
+These are call *sites*, counted by the compiler's own file list, not calls per
+run: a branch that only some arguments reach is counted here and may never
+execute. The real audit is the migration itself, family by family, and the
+invariant tests are what hold the result.
 
 ## The read-modify-write
 

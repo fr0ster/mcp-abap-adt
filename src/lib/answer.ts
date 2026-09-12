@@ -48,7 +48,7 @@ function local(kind: string, ctx: AnswerContext, message: string): McpResult {
  *
  * `messages` is the one shape every refusal in the corpus reduces to: a
  * severity and a sentence, plus whatever identity the carrier happened to keep.
- * See `src/lib/adtRefusal.ts` and `tests/fixtures/adt/README.md`.
+ * See `@mcp-abap-adt/adt-strategies` and `tests/fixtures/adt/README.md`.
  */
 interface MessageCarrier {
   messages?: ReadonlyArray<{

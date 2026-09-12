@@ -1,6 +1,3 @@
-import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
-import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   analyseActivation,
   analyseCheck,
@@ -8,7 +5,10 @@ import {
   analyseException,
   analyseUnitTest,
   analyseValidation,
-} from '../../lib/strategies/analyse';
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 
 /**
  * The error axis, injected, against real documents.

@@ -4,17 +4,14 @@ import * as path from 'node:path';
 /**
  * Where the raw ADT corpus lives, resolved in one place.
  *
- * The readings in `adtRefusal.ts` and this corpus are meant to leave together,
- * into a package of their own in the adt-clients repository. Everything else
- * about that move is a `git mv`: the readings import nothing but
- * `fast-xml-parser`, and the corpus is plain files.
+ * The readings left, into `@mcp-abap-adt/adt-strategies`, and the corpus went
+ * with them — that repository tests them against it. This copy stays because
+ * the things that did NOT leave still need it: the projections, the promised
+ * form, the package walk, and the join between a real document and the MCP
+ * adapter. Those are this server's side of the boundary, and they are the ones
+ * that have to be checked against what SAP actually sent.
  *
- * The one thing that would not survive is a fixture path spelled
- * `../../../tests/fixtures/adt` in every test, because it encodes this
- * repository's layout. It is spelled once, here, so the move is one edit.
- *
- * See `tests/fixtures/adt/README.md` for what the corpus is and what still
- * carries this system's own object names.
+ * See `tests/fixtures/adt/README.md` for what the corpus is.
  */
 export const ADT_CORPUS_DIR = path.join(
   __dirname,

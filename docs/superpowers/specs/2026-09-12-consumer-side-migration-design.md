@@ -106,10 +106,16 @@ object locked in SAP. Thirteen update handlers already use `try/finally` for
 exactly this reason. adt-clients' own `LockRegistry` calls itself "a safety net,
 NOT the primary defense" and says preventing that is the caller's job.
 
-These three combinators share one rule: each step carries its own `analyse`, and
-the failing step's answer is handed back **untouched**. None composes an error of
-its own. A sentence like "step 2 of 3 failed" would put a second account beside
-the strategy's, and which step it was is already in the failure's `request`.
+These three combinators share one rule: **every step that accepts an `analyse`
+is given one**, and the failing step's answer is handed back **untouched**. None
+composes an error of its own. A sentence like "step 2 of 3 failed" would put a
+second account beside the strategy's, and which step it was is already in the
+failure's `request`.
+
+`withLock` is where the qualifier earns its place: its `acquire` and `release`
+call `lock` and `unlock`, and neither declares an options parameter in 19, so
+neither can be given an `analyse` at all. Their verdict stays adt-clients'. The
+body in between takes one like any other call. See below.
 
 **How many handlers need a combinator is not a number this document fixes.**
 An earlier draft said thirteen — eight that called removed members and five

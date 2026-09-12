@@ -17,7 +17,7 @@
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` added to JSON-answering tools. 362 tools across 6 groups; the frozen snapshot in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict is the `analyse` strategy's.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a string body it reaches the caller at every level and on every tool; where there is no string — a connection failure, an empty answer, a body the transport already parsed — the field is absent, never invented. `detail` shapes the result projection, and the failure payload is not a projection. Task 4 removes the gate that made this false.
-- **Every acquired lock is released on every path out, and a failed release reaches the caller.** A lock chain is `withLock()`, never `sequence()`: a sequence stops at the first failure and would skip the unlock. This holds on the throw path too — a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
+- **After every successful acquire, release is attempted exactly once, on every path out, and a release that failed reaches the caller.** Attempted, not achieved: whether SAP lets go is SAP's answer. A lock chain is `withLock()`, never `sequence()` — a sequence stops at the first failure and would skip the unlock entirely. This holds on the throw path too: a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call that accepts one.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. The exception, measured: `lock(config)` and `unlock(config, lockHandle)` declare no options parameter in 19, so their verdict is the library's and cannot be injected. Task 14's invariant test excludes those two by name, with that sentence beside it.
@@ -338,6 +338,7 @@ describe('withLock', () => {
       release,
     );
     expect(release).toHaveBeenCalledWith('handle-1');
+    expect(release).toHaveBeenCalledTimes(1);
     expect(result.ok).toBe(false);
     expect(result.getError().message).toBe('Update refused');
     expect((result.getError() as any).cleanup).toBeUndefined();
@@ -353,6 +354,10 @@ describe('withLock', () => {
       ),
     ).rejects.toThrow('parser blew up');
     expect(release).toHaveBeenCalledWith('handle-1');
+    // Exactly once, on the throw path as much as the others. This is the half
+    // of the criterion the code can actually promise; whether SAP then lets go
+    // of the lock is SAP's answer.
+    expect(release).toHaveBeenCalledTimes(1);
   });
 
   it('carries the dangling lock out with a THROWN body when the release is REFUSED', async () => {

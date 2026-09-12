@@ -273,8 +273,11 @@ its strategies are injected, so its notes describe what it ships.
   `analyse` is given one. `lock` and `unlock` accept none — the one place the
   verdict stays adt-clients'.
 - Every XML-bodied update reads before it writes.
-- Every acquired lock is released, on every path out of the handler, and a
-  release that failed reaches the caller rather than only the log.
+- After every successful `acquire`, `release` is attempted exactly once, on
+  every path out — a refusal, a throw, a success. Whether SAP then lets go of
+  the lock is SAP's answer, not something this code can promise; what it
+  promises is that the attempt happens and that a refused or thrown release
+  reaches the caller rather than only the log.
 
 ## Out of scope
 

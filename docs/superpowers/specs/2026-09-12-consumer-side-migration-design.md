@@ -177,6 +177,17 @@ So `cleanup` has two shapes, and which one it is, is itself the information:
 way. A caller told `origin: 'connection'` over an argument-validation defect
 would go looking at the network.
 
+**`cleanup` is rebuilt field by field, and its `request` is the same two fields
+by name.** It is not an object that travels through. The top-level `request`
+already carries this rule — the contract types it as `{ method?, url? }`, but a
+type is not a filter, and TypeScript accepts a wider object structurally, so a
+strategy that put its transport config there would send headers, an
+Authorization bearer and cookies straight to the model. `cleanup` arrives from
+the same place and through an error that may have crossed a `throw`, so it gets
+the same treatment and the same code: `method` and `url`, copied by name, and
+nothing else. A cleanup built from a throw carries no `origin` even if one is
+present on the object, because that shape's whole point is that it has none.
+
 **Why the body wins.** It is what the caller asked about, and losing the cause
 to a secondary fact is the worse trade. The secondary fact is not dropped:
 `cleanup` is a new field on the failure payload, and on the `client_threw`

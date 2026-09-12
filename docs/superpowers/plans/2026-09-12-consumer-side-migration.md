@@ -18,6 +18,7 @@
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict is the `analyse` strategy's.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a string body it reaches the caller at every level and on every tool; where there is no string — a connection failure, an empty answer, a body the transport already parsed — the field is absent, never invented. `detail` shapes the result projection, and the failure payload is not a projection. Task 4 removes the gate that made this false.
 - **Every acquired lock is released on every path out, and a failed release reaches the caller.** A lock chain is `withLock()`, never `sequence()`: a sequence stops at the first failure and would skip the unlock. This holds on the throw path too — a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
+- **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call that accepts one.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. The exception, measured: `lock(config)` and `unlock(config, lockHandle)` declare no options parameter in 19, so their verdict is the library's and cannot be injected. Task 14's invariant test excludes those two by name, with that sentence beside it.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
@@ -590,6 +591,10 @@ async function runRelease<H>(
   return {
     kind: 'refused',
     error,
+    // `request` is NOT copied here. The one place that decides what reaches a
+    // caller is `answer()`'s allowlist, and it narrows this to `method` and
+    // `url` by name — see Step 10. Carrying the whole object this far would
+    // mean two places had to get it right.
     carrier: { message: error.message, origin: error.origin, request: error.request },
   };
 }
@@ -628,19 +633,88 @@ Expected: PASS, all nine.
 `answer.ts`'s allowlist drops unknown fields, so without this the facts never reach a caller. Two places, not one:
 
 - `failurePayload()` — add `cleanup` and `operation` beside `raw_body`, for the refusal path.
-- `local()` — the `client_threw` payload, for the throw path, rendering **both** `cleanup` and `operation`. Read them off the thrown value structurally rather than with `instanceof`, so a `LockNotReleased` built against another copy of the module still renders:
+- `local()` — the `client_threw` payload, for the throw path, rendering **both** `cleanup` and `operation`. Read them off the thrown value structurally rather than with `instanceof`, so a `LockNotReleased` built against another copy of the module still renders.
+
+**`cleanup` is rebuilt field by field, exactly like the top-level `request`.** It arrives from the same place, sometimes through a `throw`, and an object that travels through would carry whatever was attached to it — headers, an Authorization bearer, cookies. The narrowing the top-level `request` already does becomes one function that both callers use:
 
 ```typescript
-// src/lib/answer.ts, in the client_threw branch
-function cleanupOf(thrown: unknown): Record<string, unknown> | undefined {
-  const carrier = (thrown as { cleanup?: unknown } | undefined)?.cleanup;
-  return carrier !== null && typeof carrier === 'object'
-    ? (carrier as Record<string, unknown>)
-    : undefined;
+// src/lib/answer.ts
+
+/** Two fields, copied by name. The contract types `request` as
+ *  `{ method?, url? }`, but a type is not a filter: TypeScript accepts a wider
+ *  object structurally, and what is actually on it is transport config. */
+function safeRequest(value: unknown): Record<string, string> | undefined {
+  const method = (value as { method?: unknown } | undefined)?.method;
+  const url = (value as { url?: unknown } | undefined)?.url;
+  if (typeof method !== 'string' && typeof url !== 'string') return undefined;
+  const out: Record<string, string> = {};
+  if (typeof method === 'string') out.method = method;
+  if (typeof url === 'string') out.url = url;
+  return out;
+}
+
+/** The cleanup, field by field. Its two shapes are mutually exclusive: a
+ *  cleanup built from a throw carries no origin even if the object has one,
+ *  because having none is that shape's whole point. */
+function safeCleanup(value: unknown): Record<string, unknown> | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const carrier = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof carrier.message === 'string') out.message = carrier.message;
+  if (carrier.error === 'client_threw') out.error = 'client_threw';
+  else if (typeof carrier.origin === 'string') out.origin = carrier.origin;
+  const request = safeRequest(carrier.request);
+  if (request !== undefined) out.request = request;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
 ```
 
-Extend `answerFailure.test.ts` with three cases: a refusal carrying `cleanup` survives the allowlist; a `client_threw` carrying `cleanup` does too; and a `client_threw` carrying `operation: 'succeeded'` does, which is the only report a caller gets when the write landed and the unlock threw. The last two are what the criterion "a release that failed reaches the caller" actually rests on.
+Then `failurePayload()` uses `safeRequest` for its own `request` too, so there is one implementation rather than two that can drift.
+
+Extend `answerFailure.test.ts` with four cases: a refusal carrying `cleanup` survives the allowlist; a `client_threw` carrying `cleanup` does too; a `client_threw` carrying `operation: 'succeeded'` does, which is the only report a caller gets when the write landed and the unlock threw; and the leak test:
+
+```typescript
+it('never lets a secret out through cleanup.request', () => {
+  const SECRET = 'Bearer eyJhbGciOiJIUzI1NiJ9.tolkien';
+  const failure = {
+    ok: false as const,
+    getResult: () => { throw new Error('not a success'); },
+    getError: () => ({
+      message: 'Update refused',
+      origin: 'refusal',
+      cleanup: {
+        message: 'Unlock refused',
+        origin: 'refusal',
+        request: {
+          method: 'POST',
+          url: '/sap/bc/adt/domains/ZD',
+          headers: { authorization: SECRET, cookie: 'SAP_SESSIONID=abc' },
+          httpsAgent: { options: { cert: 'PEM' } },
+        },
+      },
+    }),
+  };
+
+  const result: any = return_answer(failure as any, () => ({}), { tool: 'UpdateDomain', detail: 'raw' });
+
+  // The whole serialised answer, not just the field we expect it in.
+  expect(result.content[0].text).not.toContain(SECRET);
+  expect(result.content[0].text).not.toContain('SAP_SESSIONID');
+  expect(result.content[0].text).not.toContain('httpsAgent');
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.cleanup.request).toEqual({
+    method: 'POST',
+    url: '/sap/bc/adt/domains/ZD',
+  });
+});
+
+it('drops the origin from a cleanup that came from a throw', () => {
+  const payload = renderCleanup({ error: 'client_threw', message: 'no handle', origin: 'refusal' });
+  expect(payload).toEqual({ error: 'client_threw', message: 'no handle' });
+});
+```
+
+The first two of those are what the criterion "a release that failed reaches the caller" rests on; the leak test is what keeps it from reaching them with a bearer token attached.
 
 - [ ] **Step 11: Commit `withLock`**
 

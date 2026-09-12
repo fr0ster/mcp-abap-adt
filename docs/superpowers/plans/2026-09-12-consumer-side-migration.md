@@ -14,7 +14,7 @@
 
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` added to JSON-answering tools. 362 tools across 6 groups; the frozen snapshot in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict is the `analyse` strategy's.
-- **A failure carries `raw_body` at every `detail`, on every tool.** `detail` shapes the result projection; the failure payload is not a projection. Task 4 removes the gate that made this false.
+- **`raw_body` never depends on `detail`.** Whenever the failure carries a string body it reaches the caller at every level and on every tool; where there is no string — a connection failure, an empty answer, a body the transport already parsed — the field is absent, never invented. `detail` shapes the result projection, and the failure payload is not a projection. Task 4 removes the gate that made this false.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
@@ -514,7 +514,7 @@ git commit -m "feat(strategies): one reading per slot, stamped over the shipped 
 
 `detail` goes on JSON-answering tools only. Where the promised form is text or XML the three levels coincide, and a parameter that cannot change anything is noise on a surface callers read.
 
-That claim is only true once `raw_body` stops depending on it. `answer.ts` today writes `raw_body` into the failure payload only when `ctx.detail === 'raw'`, so a text-answering tool that hardcodes `'terse'` could never hand back the document SAP refused with. It also contradicts the design's own asymmetry: on a failure the consumer wants everything, and `detail` shapes *successes*. Both are fixed here, before any handler is written against the old behaviour.
+That claim is only true once `raw_body` stops depending on it — for the failures that have a body to hand over. `answer.ts` today writes `raw_body` into the failure payload only when `ctx.detail === 'raw'`, so a text-answering tool that hardcodes `'terse'` could never hand back the document SAP refused with. It also contradicts the design's own asymmetry: on a failure the consumer wants everything, and `detail` shapes *successes*. Both are fixed here, before any handler is written against the old behaviour.
 
 **Files:**
 - Create: `src/lib/strategies/detail.ts`
@@ -623,8 +623,31 @@ describe('raw_body does not depend on detail', () => {
     const result: any = return_answer(failure as any, () => ({}), { tool: 'ReadClass', detail });
     expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
   });
+
+  // The other half of the criterion. A connection failure never reached a
+  // server, an empty answer has nothing to hand over, and a body the transport
+  // already parsed is an object rather than the bytes. In all three the field
+  // is absent — inventing a value there would be this adapter claiming SAP
+  // said something it did not.
+  it.each([
+    ['a connection failure', { message: 'ECONNREFUSED', origin: 'connection' }],
+    ['an empty answer', { message: 'Empty', origin: 'refusal', response: { data: '' } }],
+    ['a parsed body', { message: 'Parsed', origin: 'refusal', response: { data: { a: 1 } } }],
+  ])('leaves raw_body absent for %s', (_name, error) => {
+    const none = {
+      ok: false as const,
+      getResult: () => { throw new Error('not a success'); },
+      getError: () => error,
+    };
+    const result: any = return_answer(none as any, () => ({}), { tool: 'ReadClass', detail: 'raw' });
+    expect('raw_body' in JSON.parse(result.content[0].text)).toBe(false);
+  });
 });
 ```
+
+The empty-string case is deliberate and worth keeping green: `''` is a string, so a
+naive `typeof body === 'string'` would emit `raw_body: ""`, which reads as "SAP sent
+an empty document" when what happened is that there was nothing to send.
 
 - [ ] **Step 5: Run it to verify it fails**
 
@@ -632,7 +655,7 @@ describe('raw_body does not depend on detail', () => {
 npx jest src/__tests__/unit/answerFailure.test.ts
 ```
 
-Expected: FAIL on `terse` and `full` — `raw_body` is `undefined` there today.
+Expected: FAIL on `terse` and `full` for the first three cases; the empty-answer case fails too, because `''` passes a bare string check.
 
 - [ ] **Step 6: Ungate it**
 
@@ -645,7 +668,7 @@ Expected: FAIL on `terse` and `full` — `raw_body` is `undefined` there today.
   // tool declares no `detail` at all, so gating this made the document SAP
   // refused with unreachable for it.
   const body = (error.response as { data?: unknown } | undefined)?.data;
-  if (typeof body === 'string') {
+  if (typeof body === 'string' && body !== '') {
     payload.raw_body = body;
   }
 ```

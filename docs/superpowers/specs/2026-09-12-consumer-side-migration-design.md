@@ -144,7 +144,10 @@ its strategies are injected, so its notes describe what it ships.
 - The tool surface is unchanged except for `detail` on JSON-answering tools.
   362 enumerated tools, checked with `scripts/list-tools.ts` against the frozen
   snapshot in `tests/fixtures/tools/surface.json`.
-- A failure carries `raw_body` at every `detail`, on every tool.
+- Whenever a failure carries a string body, `raw_body` reaches the caller — at
+  every `detail`, on every tool. A connection failure, an empty answer and a
+  body the transport already parsed have no string to hand over, and the field
+  is then absent rather than invented.
 - `npx tsc` is clean.
 - No handler reads an envelope property off `IAdtSuccess`.
 - No handler decides a refusal for itself.

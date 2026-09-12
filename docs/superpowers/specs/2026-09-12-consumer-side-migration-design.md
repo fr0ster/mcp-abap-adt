@@ -67,12 +67,21 @@ So a write pairs the thinnest result projection with the fullest error strategy.
 `terseWrite` answers the string `'SUCCESS'` and never `undefined`, because the
 adapter cannot tell a write with nothing to add from a read that found nothing.
 
-## `detail` is added selectively
+## `detail` shapes the success answer, and only that
 
 `detail: 'terse' | 'full' | 'raw'` goes only on tools whose answer is JSON.
 Where the promised form is text or XML the three levels coincide — the document
 is the answer — and a parameter that cannot change anything is noise on the tool
 surface. **This is the only change to the tool surface in this work.**
+
+**A failure carries `raw_body` whatever `detail` says.** An earlier draft gated
+it on `detail: 'raw'`, and that was wrong twice over. It made the claim above
+false, because a text-answering tool with no `detail` could then never produce
+the document SAP refused with. And it contradicted the asymmetry this design is
+built on: on a failure the consumer wants everything, so putting the one field
+that carries everything behind a parameter that shapes *successes* hid it on the
+path where it is the whole point. `detail` is a parameter of the result
+projection. The failure payload is not a projection.
 
 ## Two handler shapes, named
 
@@ -111,7 +120,8 @@ turns a slow read into a malformed write that the server blames on the caller.
    is a failure, reading the document.
 2. `sequence`, if there is one, returns the first failure as it came.
 3. `answer()` renders it through an allowlist: `message`, `origin`, `code`,
-   `adt_type`, `namespace`, `request`, `messages`, `raw_body`. `response` is
+   `adt_type`, `namespace`, `request`, `messages`, `raw_body`. Every one of them
+   whenever the failure carries it, at every `detail` — see above. `response` is
    never serialised; `request` is rebuilt from `method` and `url` by name.
 4. `messages` carries the normalised `{ type, text }` every form reduces to,
    plus `t100` where the carrier kept it — the message class, its number and the
@@ -132,8 +142,9 @@ its strategies are injected, so its notes describe what it ships.
 ## Success criteria
 
 - The tool surface is unchanged except for `detail` on JSON-answering tools.
-  362 enumerated tools, checked with `scripts/list-tools.ts` against the
-  inventory.
+  362 enumerated tools, checked with `scripts/list-tools.ts` against the frozen
+  snapshot in `tests/fixtures/tools/surface.json`.
+- A failure carries `raw_body` at every `detail`, on every tool.
 - `npx tsc` is clean.
 - No handler reads an envelope property off `IAdtSuccess`.
 - No handler decides a refusal for itself.

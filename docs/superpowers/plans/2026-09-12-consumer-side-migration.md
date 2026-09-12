@@ -14,6 +14,7 @@
 
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` added to JSON-answering tools. 362 tools across 6 groups; the frozen snapshot in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict is the `analyse` strategy's.
+- **A failure carries `raw_body` at every `detail`, on every tool.** `detail` shapes the result projection; the failure payload is not a projection. Task 4 removes the gate that made this false.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
@@ -509,14 +510,16 @@ git commit -m "feat(strategies): one reading per slot, stamped over the shipped 
 
 ---
 
-## Task 4: The `detail` parameter, in one place
+## Task 4: The `detail` parameter, in one place — and off the failure path
 
 `detail` goes on JSON-answering tools only. Where the promised form is text or XML the three levels coincide, and a parameter that cannot change anything is noise on a surface callers read.
 
+That claim is only true once `raw_body` stops depending on it. `answer.ts` today writes `raw_body` into the failure payload only when `ctx.detail === 'raw'`, so a text-answering tool that hardcodes `'terse'` could never hand back the document SAP refused with. It also contradicts the design's own asymmetry: on a failure the consumer wants everything, and `detail` shapes *successes*. Both are fixed here, before any handler is written against the old behaviour.
+
 **Files:**
 - Create: `src/lib/strategies/detail.ts`
-- Modify: `src/lib/answer.ts` (drop the duplicate `AnswerDetail`)
-- Test: `src/__tests__/unit/detail.test.ts`
+- Modify: `src/lib/answer.ts` (drop the duplicate `AnswerDetail`; ungate `raw_body`)
+- Test: `src/__tests__/unit/detail.test.ts`, `src/__tests__/unit/answerFailure.test.ts` (exists — extend)
 
 **Interfaces:**
 - Produces:
@@ -598,7 +601,56 @@ export function detailOf(args: unknown): AnswerDetail {
 }
 ```
 
-- [ ] **Step 4: Remove the second definition of `AnswerDetail`**
+- [ ] **Step 4: Write the failing test for the failure path**
+
+```typescript
+// append to src/__tests__/unit/answerFailure.test.ts
+import { corpusBody } from '../../lib/adtCorpus';
+
+describe('raw_body does not depend on detail', () => {
+  const document = corpusBody('refusal-object-not-found--01-read-source');
+  const failure = {
+    ok: false as const,
+    getResult: () => { throw new Error('not a success'); },
+    getError: () => ({
+      message: 'Resource not found',
+      origin: 'refusal',
+      response: { data: document },
+    }),
+  };
+
+  it.each(['terse', 'full', 'raw'] as const)('carries the document at detail=%s', (detail) => {
+    const result: any = return_answer(failure as any, () => ({}), { tool: 'ReadClass', detail });
+    expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
+  });
+});
+```
+
+- [ ] **Step 5: Run it to verify it fails**
+
+```bash
+npx jest src/__tests__/unit/answerFailure.test.ts
+```
+
+Expected: FAIL on `terse` and `full` — `raw_body` is `undefined` there today.
+
+- [ ] **Step 6: Ungate it**
+
+```typescript
+// src/lib/answer.ts, in failurePayload — replace the detail check
+  // Whatever `detail` says. It is a parameter of the RESULT projection, and a
+  // failure is not a projection: on this path the consumer wants everything,
+  // and hiding the one field that carries everything behind a parameter that
+  // shapes successes hid it exactly where it was the point. A text-answering
+  // tool declares no `detail` at all, so gating this made the document SAP
+  // refused with unreachable for it.
+  const body = (error.response as { data?: unknown } | undefined)?.data;
+  if (typeof body === 'string') {
+    payload.raw_body = body;
+  }
+```
+
+- [ ] **Step 7: Remove the second definition of `AnswerDetail`**
 
 In `src/lib/answer.ts`, replace the local declaration with an import, so `answer()` and `project()` cannot drift apart:
 
@@ -608,7 +660,7 @@ import type { AnswerDetail } from './strategies/projections';
 export type { AnswerDetail };
 ```
 
-- [ ] **Step 5: Run the tests and the compiler**
+- [ ] **Step 8: Run the tests and the compiler**
 
 ```bash
 npx jest src/__tests__/unit/detail.test.ts src/__tests__/unit/answerSuccess.test.ts src/__tests__/unit/answerFailure.test.ts
@@ -617,11 +669,11 @@ npx tsc --noEmit 2>&1 | grep -c 'error TS'
 
 Expected: tests PASS; the error count is 589 or lower, never higher.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add src/lib/strategies/detail.ts src/lib/answer.ts src/__tests__/unit/detail.test.ts
-git commit -m "feat(strategies): detail, declared once and read in one place"
+git add src/lib/strategies/detail.ts src/lib/answer.ts src/__tests__/unit/detail.test.ts src/__tests__/unit/answerFailure.test.ts
+git commit -m "fix(answer): a failure carries raw_body at every detail"
 ```
 
 ---
@@ -1402,6 +1454,8 @@ it('declares detail on every JSON-answering tool and on no other', () => {
   expect(withDetail.sort()).toEqual(JSON_ANSWERING.sort());
 });
 
+// `detail` is a claim about SUCCESSES only — a failure carries `raw_body` at
+// every level, and `answerFailure.test.ts` is where that is held.
 it('answers raw as the document and terse as the summary, for one of them', async () => {
   const terse: any = await handleCheckClass(context as any, { class_name: 'ZCL_X' });
   const raw: any = await handleCheckClass(context as any, { class_name: 'ZCL_X', detail: 'raw' });

@@ -180,13 +180,14 @@ git commit -m "test(surface): freeze the 362 tools, and retire the prose invento
 
 **Files:**
 - Modify: `src/lib/strategies/sequence.ts` (add `pair`)
-- Create: `src/lib/strategies/withLock.ts`
-- Test: `src/__tests__/unit/sequence.test.ts`, `src/__tests__/unit/withLock.test.ts`
+- Create: `src/lib/strategies/withLock.ts`, `src/lib/strategies/safeFields.ts`
+- Test: `src/__tests__/unit/sequence.test.ts`, `src/__tests__/unit/withLock.test.ts`, `src/__tests__/unit/safeFields.test.ts`
 
 **Interfaces:**
 - Produces:
   - `pair<A, B>(first: () => Promise<IAdtResponse<A, IAdtError>>, second: (a: A) => Promise<IAdtResponse<B, IAdtError>>): Promise<IAdtResponse<[A, B], IAdtError>>`
   - `withLock<H, T>(acquire: () => Promise<IAdtResponse<H, IAdtError>>, body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>, release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>): Promise<IAdtResponse<T, IAdtError>>`
+  - `safeRequest(value): { method?, url? } | undefined` and `safeCleanup(value): object | undefined` in `src/lib/strategies/safeFields.ts` — the two narrowing functions `answer.ts` and `withLock.ts` share
   - `Cleanup` — the `cleanup` field `answer()` renders, in **two** shapes: `{ message, origin, request? }` when SAP refused the unlock, `{ error: 'client_threw', message }` when something in this process threw. Never a synthesized origin.
   - `LockNotReleased` — the error `withLock` rethrows, carrying the relevant cause as `cause` and either `cleanup` or `operation: 'succeeded'`
 
@@ -437,6 +438,30 @@ describe('withLock', () => {
     expect((result.getError() as any).operation).toBe('succeeded');
   });
 
+  it('never puts a transport config in the carrier, even before the boundary', async () => {
+    const SECRET = 'Bearer eyJhbGciOiJIUzI1NiJ9.tolkien';
+    const result = await withLock(
+      async () => ok('handle-1') as any,
+      async () => failed('Update refused') as any,
+      async () => ({
+        ok: false as const,
+        getResult: () => { throw new Error('not a success'); },
+        getError: () => ({
+          message: 'Unlock refused',
+          origin: 'refusal',
+          request: {
+            method: 'POST',
+            url: '/sap/bc/adt/domains/ZD',
+            headers: { authorization: SECRET },
+          },
+        }),
+      }) as any,
+    );
+    const cleanup = (result.getError() as any).cleanup;
+    expect(cleanup.request).toEqual({ method: 'POST', url: '/sap/bc/adt/domains/ZD' });
+    expect(JSON.stringify(result.getError())).not.toContain(SECRET);
+  });
+
   it('answers the body value when everything worked', async () => {
     const result = await withLock(
       async () => ok('handle-1') as any,
@@ -459,9 +484,46 @@ Expected: FAIL — cannot find module `withLock`.
 
 - [ ] **Step 8: Implement**
 
+Two modules. First the narrowing, which is what the top-level `request` in `answer.ts` already does, moved somewhere both callers can reach it: `answer.ts` renders the payload, and `withLock` builds a carrier that rides inside a thrown error on its way there. Neither should hold its own copy of the rule.
+
+```typescript
+// src/lib/strategies/safeFields.ts
+
+/** Two fields, copied by name. The contract types `request` as
+ *  `{ method?, url? }`, but a type is not a filter: TypeScript accepts a wider
+ *  object structurally, and what is actually on it is transport config. */
+export function safeRequest(value: unknown): Record<string, string> | undefined {
+  const method = (value as { method?: unknown } | undefined)?.method;
+  const url = (value as { url?: unknown } | undefined)?.url;
+  if (typeof method !== 'string' && typeof url !== 'string') return undefined;
+  const out: Record<string, string> = {};
+  if (typeof method === 'string') out.method = method;
+  if (typeof url === 'string') out.url = url;
+  return out;
+}
+
+/** The cleanup, field by field. Its two shapes are mutually exclusive: a
+ *  cleanup built from a throw carries no origin even if the object has one,
+ *  because having none is that shape's whole point. */
+export function safeCleanup(value: unknown): Record<string, unknown> | undefined {
+  if (value === null || typeof value !== 'object') return undefined;
+  const carrier = value as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  if (typeof carrier.message === 'string') out.message = carrier.message;
+  if (carrier.error === 'client_threw') out.error = 'client_threw';
+  else if (typeof carrier.origin === 'string') out.origin = carrier.origin;
+  const request = safeRequest(carrier.request);
+  if (request !== undefined) out.request = request;
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+```
+
+Then the combinator itself.
+
 ```typescript
 // src/lib/strategies/withLock.ts
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { safeRequest } from './safeFields';
 
 /**
  * What a failed release adds to a payload — in two shapes, and which one it is
@@ -591,11 +653,16 @@ async function runRelease<H>(
   return {
     kind: 'refused',
     error,
-    // `request` is NOT copied here. The one place that decides what reaches a
-    // caller is `answer()`'s allowlist, and it narrows this to `method` and
-    // `url` by name — see Step 10. Carrying the whole object this far would
-    // mean two places had to get it right.
-    carrier: { message: error.message, origin: error.origin, request: error.request },
+    // Narrowed HERE as well as at the boundary. `answer()` narrows everything
+    // it renders, but this carrier rides inside a thrown error on its way
+    // there, and a transport config with an Authorization bearer on it should
+    // not exist in a value that can be logged, inspected or rethrown. One
+    // shared `safeRequest`, so there is no second implementation to drift.
+    carrier: {
+      message: error.message,
+      origin: error.origin,
+      request: safeRequest(error.request),
+    },
   };
 }
 
@@ -626,7 +693,7 @@ export class LockNotReleased extends Error {
 npx jest src/__tests__/unit/withLock.test.ts
 ```
 
-Expected: PASS, all nine.
+Expected: PASS, all ten.
 
 - [ ] **Step 10: Render `cleanup` and `operation` on BOTH payloads**
 
@@ -635,41 +702,11 @@ Expected: PASS, all nine.
 - `failurePayload()` — add `cleanup` and `operation` beside `raw_body`, for the refusal path.
 - `local()` — the `client_threw` payload, for the throw path, rendering **both** `cleanup` and `operation`. Read them off the thrown value structurally rather than with `instanceof`, so a `LockNotReleased` built against another copy of the module still renders.
 
-**`cleanup` is rebuilt field by field, exactly like the top-level `request`.** It arrives from the same place, sometimes through a `throw`, and an object that travels through would carry whatever was attached to it — headers, an Authorization bearer, cookies. The narrowing the top-level `request` already does becomes one function that both callers use:
+**`cleanup` is rebuilt field by field, exactly like the top-level `request`.** It arrives from the same place, sometimes through a `throw`, and an object that travels through would carry whatever was attached to it — headers, an Authorization bearer, cookies. The narrowing the top-level `request` already does moves into one module that `answer.ts` and `withLock.ts` both import, so there is no second implementation to drift:
 
-```typescript
-// src/lib/answer.ts
+The two narrowing functions were written in Task 2, Step 8, where `safeFields.ts` is created. Nothing new here — `failurePayload()` replaces its inline method/url copying with `safeRequest`, and `local()` gains `safeCleanup`.
 
-/** Two fields, copied by name. The contract types `request` as
- *  `{ method?, url? }`, but a type is not a filter: TypeScript accepts a wider
- *  object structurally, and what is actually on it is transport config. */
-function safeRequest(value: unknown): Record<string, string> | undefined {
-  const method = (value as { method?: unknown } | undefined)?.method;
-  const url = (value as { url?: unknown } | undefined)?.url;
-  if (typeof method !== 'string' && typeof url !== 'string') return undefined;
-  const out: Record<string, string> = {};
-  if (typeof method === 'string') out.method = method;
-  if (typeof url === 'string') out.url = url;
-  return out;
-}
-
-/** The cleanup, field by field. Its two shapes are mutually exclusive: a
- *  cleanup built from a throw carries no origin even if the object has one,
- *  because having none is that shape's whole point. */
-function safeCleanup(value: unknown): Record<string, unknown> | undefined {
-  if (value === null || typeof value !== 'object') return undefined;
-  const carrier = value as Record<string, unknown>;
-  const out: Record<string, unknown> = {};
-  if (typeof carrier.message === 'string') out.message = carrier.message;
-  if (carrier.error === 'client_threw') out.error = 'client_threw';
-  else if (typeof carrier.origin === 'string') out.origin = carrier.origin;
-  const request = safeRequest(carrier.request);
-  if (request !== undefined) out.request = request;
-  return Object.keys(out).length > 0 ? out : undefined;
-}
-```
-
-Then `failurePayload()` uses `safeRequest` for its own `request` too, so there is one implementation rather than two that can drift.
+Three callers, one rule: `failurePayload()`, `local()`, and `withLock`'s `runRelease`.
 
 Extend `answerFailure.test.ts` with four cases: a refusal carrying `cleanup` survives the allowlist; a `client_threw` carrying `cleanup` does too; a `client_threw` carrying `operation: 'succeeded'` does, which is the only report a caller gets when the write landed and the unlock threw; and the leak test:
 
@@ -957,7 +994,7 @@ That claim is only true once `raw_body` stops depending on it — for the failur
 
 **Files:**
 - Create: `src/lib/strategies/detail.ts`
-- Modify: `src/lib/answer.ts` (drop the duplicate `AnswerDetail`; ungate `raw_body`)
+- Modify: `src/lib/answer.ts` (drop the duplicate `AnswerDetail`; ungate `raw_body`; narrow `request` and `cleanup` through `safeFields.ts`)
 - Test: `src/__tests__/unit/detail.test.ts`, `src/__tests__/unit/answerFailure.test.ts` (exists — extend)
 
 **Interfaces:**

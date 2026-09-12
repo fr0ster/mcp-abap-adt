@@ -90,18 +90,66 @@ The exception boundary is inside; `client_threw` and `adapter_threw` are named
 apart and neither borrows an `AdtFailureOrigin`.
 
 **Several calls, the last one is the answer** — the same `answer()`, wrapping
-`sequence()`. A read-modify-write, a lock-update-unlock chain, a profiling run.
+`sequence()`. A read-modify-write, a profiling run. Every step must be one the
+run can simply stop at.
 
 **Several calls, all of them are the answer** — the same `answer()`, wrapping
 `pair()`. A tool that reports a document *and* its metadata needs both values,
 not the last one. Capturing the first in a variable outside the run would hand
 the ordering back to the handler one assignment at a time, which is the thing
-these two combinators exist to prevent.
+these combinators exist to prevent.
 
-Both combinators share one rule: each step carries its own `analyse`, and the
-failing step's answer is handed back **untouched**. Neither composes an error of
+**Calls around a held resource** — `withLock()`. A lock-update-unlock chain is
+**not** a `sequence()`, and putting it in one would be a bug: `sequence` stops
+at the first failure, so a refused update would skip the unlock and leave the
+object locked in SAP. Thirteen update handlers already use `try/finally` for
+exactly this reason. adt-clients' own `LockRegistry` calls itself "a safety net,
+NOT the primary defense" and says preventing that is the caller's job.
+
+These three combinators share one rule: each step carries its own `analyse`, and
+the failing step's answer is handed back **untouched**. None composes an error of
 its own. A sentence like "step 2 of 3 failed" would put a second account beside
 the strategy's, and which step it was is already in the failure's `request`.
+
+## What `withLock` does when the cleanup also fails
+
+`withLock(acquire, body, release)` runs `release` after every successful
+`acquire` — after a refusal from `body`, and after a throw from it. Four
+outcomes, and the third is the one worth arguing about:
+
+| acquire | body | release | the answer |
+|---|---|---|---|
+| fails | not run | not run | the acquire failure, untouched |
+| ok | fails | ok | the body failure, untouched |
+| ok | fails | fails | the body failure, untouched, plus `cleanup` |
+| ok | ok | fails | **a failure**, carrying the release failure, plus `operation: 'succeeded'` |
+
+**The primary cause wins.** When both halves fail, the answer is the body's
+failure: it is what the caller asked about, and losing it to a secondary fact
+would be the worse trade. The secondary fact is not dropped — `cleanup` is a
+new field on the failure payload, carrying the release failure's own `message`,
+`origin` and `request`, so a caller learns the object is still locked.
+
+**A write that succeeded under a lock that did not release is reported as a
+failure.** The write happened and the answer says so, but a held lock is the
+caller's next problem and an answer marked success is one an agent does not read
+twice. This repository has removed three masking defects of exactly that shape.
+`LockRegistry.unlockAll()` may still release it at session end, which makes this
+recoverable, not silent — and the reason the answer names the lock rather than
+just warning the log, which is all the current handlers do.
+
+*This is the decision in this document most likely to be argued.* The other
+reading — success with a warning — is defensible if a caller is expected to act
+on warnings. The evidence here says they do not.
+
+**`lock` and `unlock` take no `analyse`.** Measured on 19: `lock(config)` and
+`unlock(config, lockHandle)` declare no options parameter at all, so the verdict
+on both is adt-clients' own and cannot be injected. Everywhere else in this
+design the verdict is ours; here it is not, and saying so is better than a rule
+with a silent hole in it. It means `withLock`'s acquire and release failures are
+whatever the library judged them to be — which is enough to know a lock was not
+taken or not released, and not enough to know why in the vocabulary the rest of
+the failures use. Raised against the library as part of issue #200.
 
 **How many handlers need a combinator is not a number this document fixes.**
 An earlier draft said thirteen — eight that called removed members and five
@@ -143,7 +191,8 @@ turns a slow read into a malformed write that the server blames on the caller.
    is a failure, reading the document.
 2. `sequence`, if there is one, returns the first failure as it came.
 3. `answer()` renders it through an allowlist: `message`, `origin`, `code`,
-   `adt_type`, `namespace`, `request`, `messages`, `raw_body`. Every one of them
+   `adt_type`, `namespace`, `request`, `messages`, `raw_body`, and `cleanup`
+   where a `withLock` release failed. Every one of them
    whenever the failure carries it, at every `detail` — see above. `response` is
    never serialised; `request` is rebuilt from `method` and `url` by name.
 4. `messages` carries the normalised `{ type, text }` every form reduces to,
@@ -173,8 +222,12 @@ its strategies are injected, so its notes describe what it ships.
   is then absent rather than invented.
 - `npx tsc` is clean.
 - No handler reads an envelope property off `IAdtSuccess`.
-- No handler decides a refusal for itself.
+- No handler decides a refusal for itself, and every call that accepts an
+  `analyse` is given one. `lock` and `unlock` accept none — the one place the
+  verdict stays adt-clients'.
 - Every XML-bodied update reads before it writes.
+- Every acquired lock is released, on every path out of the handler, and a
+  release that failed reaches the caller rather than only the log.
 
 ## Out of scope
 

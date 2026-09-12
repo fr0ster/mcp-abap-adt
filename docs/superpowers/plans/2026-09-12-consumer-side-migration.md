@@ -17,8 +17,9 @@
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` added to JSON-answering tools. 362 tools across 6 groups; the frozen snapshot in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict is the `analyse` strategy's.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a string body it reaches the caller at every level and on every tool; where there is no string — a connection failure, an empty answer, a body the transport already parsed — the field is absent, never invented. `detail` shapes the result projection, and the failure payload is not a projection. Task 4 removes the gate that made this false.
+- **Every acquired lock is released on every path out, and a failed release reaches the caller.** A lock chain is `withLock()`, never `sequence()`: a sequence stops at the first failure and would skip the unlock. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times.
+- **`analyse` on every call that accepts one.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. The exception, measured: `lock(config)` and `unlock(config, lockHandle)` declare no options parameter in 19, so their verdict is the library's and cannot be injected. Task 14's invariant test excludes those two by name, with that sentence beside it.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls in this plan.** Every test here runs offline against `tests/fixtures/adt/` (48 cases, 61 exchanges, 27 endpoints). Integration runs are the user's call, after the compiler is clean.
@@ -168,16 +169,24 @@ git commit -m "test(surface): freeze the 362 tools, and retire the prose invento
 
 ---
 
-## Task 2: `pair()` — for a handler that needs both answers
+## Task 2: `pair()` and `withLock()` — what `sequence()` does not cover
 
-`sequence()` returns the last step's value, which serves read-modify-write. It does not serve `handleReadClass`, which calls `read` and `readMetadata` and answers both. Without a combinator the handler would capture the first value in a mutable variable outside the sequence, which puts the ordering back in the handler's hands one assignment at a time.
+`sequence()` returns the last step's value and stops at the first failure. Two shapes it does not cover, and the second is a correctness bug if anyone tries:
+
+**Both answers.** `handleReadClass` calls `read` and `readMetadata` and answers both. Without a combinator the handler captures the first value in a variable outside the sequence, which puts the ordering back in the handler's hands one assignment at a time.
+
+**A held resource.** A lock-update-unlock chain in a `sequence()` would skip the unlock whenever the update is refused, and leave the object locked in SAP. Thirteen update handlers already use `try/finally` for this, and adt-clients' `LockRegistry` says in its own doc comment that it is "a safety net, NOT the primary defense" and that preventing this is the caller's job. Its `unlockAll()` runs at session end, so a dangling lock is recoverable, not permanent — but recovery is not a reason to leak one.
 
 **Files:**
-- Modify: `src/lib/strategies/sequence.ts`
-- Test: `src/__tests__/unit/sequence.test.ts`
+- Modify: `src/lib/strategies/sequence.ts` (add `pair`)
+- Create: `src/lib/strategies/withLock.ts`
+- Test: `src/__tests__/unit/sequence.test.ts`, `src/__tests__/unit/withLock.test.ts`
 
 **Interfaces:**
-- Produces: `pair<A, B>(first: () => Promise<IAdtResponse<A, IAdtError>>, second: (a: A) => Promise<IAdtResponse<B, IAdtError>>): Promise<IAdtResponse<[A, B], IAdtError>>`
+- Produces:
+  - `pair<A, B>(first: () => Promise<IAdtResponse<A, IAdtError>>, second: (a: A) => Promise<IAdtResponse<B, IAdtError>>): Promise<IAdtResponse<[A, B], IAdtError>>`
+  - `withLock<H, T>(acquire: () => Promise<IAdtResponse<H, IAdtError>>, body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>, release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>): Promise<IAdtResponse<T, IAdtError>>`
+  - `CleanupCarrier` — the `cleanup` field `answer()` renders, `{ message, origin, request? }`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -279,11 +288,211 @@ npx jest src/__tests__/unit/sequence.test.ts
 
 Expected: PASS, all three.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 5: Commit `pair`**
 
 ```bash
 git add src/lib/strategies/sequence.ts src/__tests__/unit/sequence.test.ts
 git commit -m "feat(strategies): pair — both answers, the same failure rule"
+```
+
+- [ ] **Step 6: Write the failing test for `withLock`**
+
+```typescript
+// src/__tests__/unit/withLock.test.ts
+import { withLock } from '../../lib/strategies/withLock';
+
+const ok = <T>(value: T) => ({
+  ok: true as const,
+  getResult: () => ({ value }),
+  getError: () => { throw new Error('not a failure'); },
+});
+const failed = (message: string) => ({
+  ok: false as const,
+  getResult: () => { throw new Error('not a success'); },
+  getError: () => ({ message, origin: 'refusal' as const }),
+});
+
+describe('withLock', () => {
+  it('never acquires nothing: a refused lock runs neither body nor release', async () => {
+    const body = jest.fn();
+    const release = jest.fn();
+    const result = await withLock(
+      async () => failed('Object is locked by another user') as any,
+      body as any,
+      release as any,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.getError().message).toBe('Object is locked by another user');
+    expect(body).not.toHaveBeenCalled();
+    expect(release).not.toHaveBeenCalled();
+  });
+
+  it('releases after a refused body, and answers the body failure untouched', async () => {
+    const release = jest.fn(async () => ok(undefined) as any);
+    const result = await withLock(
+      async () => ok('handle-1') as any,
+      async () => failed('Update refused') as any,
+      release,
+    );
+    expect(release).toHaveBeenCalledWith('handle-1');
+    expect(result.ok).toBe(false);
+    expect(result.getError().message).toBe('Update refused');
+    expect((result.getError() as any).cleanup).toBeUndefined();
+  });
+
+  it('releases after a THROWN body, and lets the throw out', async () => {
+    const release = jest.fn(async () => ok(undefined) as any);
+    await expect(
+      withLock(
+        async () => ok('handle-1') as any,
+        async () => { throw new Error('parser blew up'); },
+        release,
+      ),
+    ).rejects.toThrow('parser blew up');
+    expect(release).toHaveBeenCalledWith('handle-1');
+  });
+
+  it('keeps the body failure when the release fails too, and names the dangling lock', async () => {
+    const result = await withLock(
+      async () => ok('handle-1') as any,
+      async () => failed('Update refused') as any,
+      async () => failed('Unlock refused') as any,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.getError().message).toBe('Update refused');
+    expect((result.getError() as any).cleanup.message).toBe('Unlock refused');
+  });
+
+  it('reports a succeeded write under an unreleased lock as a failure', async () => {
+    const result = await withLock(
+      async () => ok('handle-1') as any,
+      async () => ok('written') as any,
+      async () => failed('Unlock refused') as any,
+    );
+    expect(result.ok).toBe(false);
+    expect(result.getError().message).toBe('Unlock refused');
+    expect((result.getError() as any).operation).toBe('succeeded');
+  });
+
+  it('answers the body value when everything worked', async () => {
+    const result = await withLock(
+      async () => ok('handle-1') as any,
+      async () => ok('written') as any,
+      async () => ok(undefined) as any,
+    );
+    expect(result.ok).toBe(true);
+    expect(result.getResult().value).toBe('written');
+  });
+});
+```
+
+- [ ] **Step 7: Run it to verify it fails**
+
+```bash
+npx jest src/__tests__/unit/withLock.test.ts
+```
+
+Expected: FAIL — cannot find module `withLock`.
+
+- [ ] **Step 8: Implement**
+
+```typescript
+// src/lib/strategies/withLock.ts
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+
+/** What a failed release adds to a failure payload. */
+export interface CleanupCarrier {
+  cleanup?: { message: string; origin?: string; request?: unknown };
+  operation?: 'succeeded';
+}
+
+const failure = <T>(error: IAdtError & CleanupCarrier): IAdtResponse<T, IAdtError> =>
+  ({
+    ok: false,
+    getResult: () => { throw new Error('withLock: asked for the result of a failure'); },
+    getError: () => error,
+  }) as unknown as IAdtResponse<T, IAdtError>;
+
+/**
+ * Calls around a held resource.
+ *
+ * NOT a `sequence`. A sequence stops at the first failure, so a refused update
+ * in a lock-update-unlock chain would skip the unlock and leave the object
+ * locked in SAP. `release` runs after every successful `acquire` — after a
+ * refusal from `body` and after a throw from it — which is what the thirteen
+ * handlers that already wrap this in `try/finally` are doing by hand.
+ *
+ * When both halves fail the BODY's failure is the answer: it is what the caller
+ * asked about, and losing the cause to a secondary fact is the worse trade. The
+ * secondary fact is not dropped — `cleanup` carries it, so a caller learns the
+ * object is still held.
+ *
+ * When the body SUCCEEDED and the release did not, the answer is a failure. The
+ * write happened and `operation: 'succeeded'` says so, but a held lock is the
+ * caller's next problem, and an answer marked success is one an agent does not
+ * read twice. `LockRegistry.unlockAll()` may still release it at session end,
+ * which makes this recoverable rather than silent.
+ */
+export async function withLock<H, T>(
+  acquire: () => Promise<IAdtResponse<H, IAdtError>>,
+  body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
+  release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+): Promise<IAdtResponse<T, IAdtError>> {
+  const acquired = await acquire();
+  if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
+  const handle = acquired.getResult().value;
+
+  let answered: IAdtResponse<T, IAdtError> | undefined;
+  let released: IAdtResponse<unknown, IAdtError> | undefined;
+  try {
+    answered = await body(handle);
+  } finally {
+    // Runs on the throw path too, which is the whole point. A release that
+    // throws is swallowed into a failure rather than replacing the body's
+    // exception: the body's cause is the one worth propagating.
+    released = await release(handle).catch(
+      (thrown: unknown) =>
+        failure<unknown>({
+          message: thrown instanceof Error ? thrown.message : String(thrown),
+          origin: 'connection',
+        } as IAdtError),
+    );
+  }
+
+  if (released.ok) return answered as IAdtResponse<T, IAdtError>;
+
+  const cleanup = released.getError();
+  const carrier = {
+    message: cleanup.message,
+    origin: cleanup.origin,
+    request: cleanup.request,
+  };
+
+  if (!(answered as IAdtResponse<T, IAdtError>).ok) {
+    const primary = (answered as IAdtResponse<T, IAdtError>).getError();
+    return failure<T>({ ...primary, cleanup: carrier });
+  }
+  return failure<T>({ ...cleanup, operation: 'succeeded' } as IAdtError & CleanupCarrier);
+}
+```
+
+- [ ] **Step 9: Run the tests**
+
+```bash
+npx jest src/__tests__/unit/withLock.test.ts
+```
+
+Expected: PASS, all six.
+
+- [ ] **Step 10: Render `cleanup` and `operation` in the failure payload**
+
+`answer.ts`'s allowlist drops unknown fields, so without this the two facts never reach a caller. Add them beside `raw_body`, and extend `answerFailure.test.ts` with a case asserting both survive.
+
+- [ ] **Step 11: Commit `withLock`**
+
+```bash
+git add src/lib/strategies/withLock.ts src/lib/answer.ts src/__tests__/unit/withLock.test.ts src/__tests__/unit/answerFailure.test.ts
+git commit -m "feat(strategies): withLock — the release runs on every path out"
 ```
 
 ---
@@ -1268,6 +1477,10 @@ Expected: FAIL — cannot find module `packagePatch`.
 
 - [ ] **Step 3: Implement the patch, then wire the handler**
 
+Where the handler holds a lock — every `high` update — the read-patch-write goes
+inside `withLock`, not beside it. `sequence` is right only for the part that can
+stop at the first failure; the unlock cannot.
+
 ```typescript
 // the handler shape, already proven in handleUpdateDomain
 const written = await sequence(
@@ -1434,6 +1647,8 @@ it('every client call passes an analyse', () => {
   const offenders: string[] = [];
   for (const file of handlers) {
     const source = readFileSync(file, 'utf8');
+    // `lock` and `unlock` are absent on purpose: neither declares an options
+    // parameter in 19, so neither can be given an `analyse`. See the spec.
     const calls = source.match(/\.(read|readMetadata|create|update|updateMetadata|delete|checkDeletion|activate|check|validate)\(/g) ?? [];
     const analyses = source.match(/analyse:/g) ?? [];
     if (calls.length > analyses.length) offenders.push(`${file}: ${calls.length} calls, ${analyses.length} analyse`);

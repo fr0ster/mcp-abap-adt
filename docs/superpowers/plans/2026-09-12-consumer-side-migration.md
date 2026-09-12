@@ -186,8 +186,8 @@ git commit -m "test(surface): freeze the 362 tools, and retire the prose invento
 - Produces:
   - `pair<A, B>(first: () => Promise<IAdtResponse<A, IAdtError>>, second: (a: A) => Promise<IAdtResponse<B, IAdtError>>): Promise<IAdtResponse<[A, B], IAdtError>>`
   - `withLock<H, T>(acquire: () => Promise<IAdtResponse<H, IAdtError>>, body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>, release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>): Promise<IAdtResponse<T, IAdtError>>`
-  - `CleanupCarrier` — the `cleanup` field `answer()` renders, `{ message, origin, request? }`
-  - `LockNotReleased` — the error `withLock` rethrows when the body threw and the release failed too, carrying the original as `cause` and the lock as `cleanup`
+  - `Cleanup` — the `cleanup` field `answer()` renders, in **two** shapes: `{ message, origin, request? }` when SAP refused the unlock, `{ error: 'client_threw', message }` when something in this process threw. Never a synthesized origin.
+  - `LockNotReleased` — the error `withLock` rethrows, carrying the relevant cause as `cause` and either `cleanup` or `operation: 'succeeded'`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -353,7 +353,7 @@ describe('withLock', () => {
     expect(release).toHaveBeenCalledWith('handle-1');
   });
 
-  it('carries the dangling lock out with a THROWN body when the release fails too', async () => {
+  it('carries the dangling lock out with a THROWN body when the release is REFUSED', async () => {
     expect.assertions(4);
     try {
       await withLock(
@@ -366,38 +366,65 @@ describe('withLock', () => {
       // defect in this process, and `answer()` will name it client_threw.
       expect(thrown.message).toBe('parser blew up');
       expect(thrown.cause?.message).toBe('parser blew up');
-      // The lock is a fact about SAP, not about the throw, and survives it.
+      // SAP refused the unlock, so the cleanup has an origin to report.
       expect(thrown.cleanup.message).toBe('Unlock refused');
       expect(thrown.cleanup.origin).toBe('refusal');
     }
   });
 
-  it('carries it out when the release THROWS as well', async () => {
-    expect.assertions(2);
+  it('marks a THROWN release as client_threw and gives it no origin', async () => {
+    expect.assertions(3);
     try {
       await withLock(
         async () => ok('handle-1') as any,
         async () => { throw new Error('parser blew up'); },
-        async () => { throw new Error('socket closed'); },
+        async () => { throw new Error('unlock called with no handle'); },
       );
     } catch (thrown: any) {
       expect(thrown.message).toBe('parser blew up');
-      expect(thrown.cleanup.message).toBe('socket closed');
+      expect(thrown.cleanup).toEqual({
+        error: 'client_threw',
+        message: 'unlock called with no handle',
+      });
+      // The point of the whole case: an argument-validation defect must not be
+      // reported as a transport problem. A caller told `connection` goes and
+      // looks at the network.
+      expect(thrown.cleanup.origin).toBeUndefined();
     }
   });
 
-  it('keeps the body failure when the release fails too, and names the dangling lock', async () => {
+  it('marks a THROWN release as client_threw after a REFUSED body too', async () => {
     const result = await withLock(
       async () => ok('handle-1') as any,
       async () => failed('Update refused') as any,
-      async () => failed('Unlock refused') as any,
+      async () => { throw new Error('unlock called with no handle'); },
     );
     expect(result.ok).toBe(false);
     expect(result.getError().message).toBe('Update refused');
-    expect((result.getError() as any).cleanup.message).toBe('Unlock refused');
+    expect((result.getError() as any).cleanup).toEqual({
+      error: 'client_threw',
+      message: 'unlock called with no handle',
+    });
   });
 
-  it('reports a succeeded write under an unreleased lock as a failure', async () => {
+  it('rethrows a THROWN release after a SUCCESSFUL body, rather than inventing an origin', async () => {
+    expect.assertions(3);
+    try {
+      await withLock(
+        async () => ok('handle-1') as any,
+        async () => ok('written') as any,
+        async () => { throw new Error('unlock called with no handle'); },
+      );
+    } catch (thrown: any) {
+      // A throw stays a throw. Turning it into an IAdtResponse failure here
+      // would mean giving it an AdtFailureOrigin it does not have.
+      expect(thrown.message).toBe('unlock called with no handle');
+      expect(thrown.operation).toBe('succeeded');
+      expect(thrown.cleanup).toBeUndefined();
+    }
+  });
+
+  it('reports a succeeded write under a REFUSED unlock as a failure', async () => {
     const result = await withLock(
       async () => ok('handle-1') as any,
       async () => ok('written') as any,
@@ -405,6 +432,7 @@ describe('withLock', () => {
     );
     expect(result.ok).toBe(false);
     expect(result.getError().message).toBe('Unlock refused');
+    expect(result.getError().origin).toBe('refusal');
     expect((result.getError() as any).operation).toBe('succeeded');
   });
 
@@ -434,9 +462,21 @@ Expected: FAIL — cannot find module `withLock`.
 // src/lib/strategies/withLock.ts
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 
-/** What a failed release adds to a failure payload. */
+/**
+ * What a failed release adds to a payload — in two shapes, and which one it is
+ * carries information of its own.
+ *
+ * SAP refused the unlock: an origin, from the strategy that judged it.
+ * Something in this process threw: `client_threw`, and deliberately no origin.
+ * `connection` and `refusal` are both claims about the server and neither is
+ * true of an argument-validation defect.
+ */
+export type Cleanup =
+  | { message: string; origin?: string; request?: unknown }
+  | { error: 'client_threw'; message: string };
+
 export interface CleanupCarrier {
-  cleanup?: { message: string; origin?: string; request?: unknown };
+  cleanup?: Cleanup;
   operation?: 'succeeded';
 }
 
@@ -490,51 +530,87 @@ export async function withLock<H, T>(
     threw = true;
   }
 
-  const released = await release(handle).catch((error: unknown) =>
-    failure<unknown>({
-      message: error instanceof Error ? error.message : String(error),
-      origin: 'connection',
-    } as IAdtError),
-  );
+  const released = await runRelease(release, handle);
 
-  if (released.ok) {
-    if (threw) throw thrown;
-    return answered as IAdtResponse<T, IAdtError>;
+  if (threw) {
+    if (released.kind === 'ok') throw thrown;
+    throw new LockNotReleased(thrown, { cleanup: released.carrier });
   }
-
-  const cleanup = released.getError();
-  const carrier = {
-    message: cleanup.message,
-    origin: cleanup.origin,
-    request: cleanup.request,
-  };
-
-  // The throw stays the primary cause and keeps its own message; the lock rides
-  // along. `answer()` names the throw `client_threw` and renders `cleanup`
-  // beside it, the same field it renders on a refusal.
-  if (threw) throw new LockNotReleased(thrown, carrier);
 
   if (!(answered as IAdtResponse<T, IAdtError>).ok) {
+    if (released.kind === 'ok') return answered as IAdtResponse<T, IAdtError>;
     const primary = (answered as IAdtResponse<T, IAdtError>).getError();
-    return failure<T>({ ...primary, cleanup: carrier });
+    return failure<T>({ ...primary, cleanup: released.carrier });
   }
-  return failure<T>({ ...cleanup, operation: 'succeeded' } as IAdtError & CleanupCarrier);
+
+  // The body succeeded, so the release's own outcome becomes the answer — in
+  // its own channel. A refusal is a failure; a throw stays a throw, because
+  // turning it into one would mean giving it an origin it does not have.
+  if (released.kind === 'ok') return answered as IAdtResponse<T, IAdtError>;
+  if (released.kind === 'refused') {
+    return failure<T>({ ...released.error, operation: 'succeeded' } as IAdtError & CleanupCarrier);
+  }
+  throw new LockNotReleased(released.thrown, { operation: 'succeeded' });
 }
 
 /**
- * A throw from the body that left a lock behind.
+ * The release, in its three states.
  *
- * Keeps the original as `cause` and borrows its message, so nothing about the
- * primary defect is reworded — `answer()` still reports exactly what threw.
+ * Refused and threw are NOT the same event and are not collapsed here. A
+ * refusal was judged by a strategy and carries an `AdtFailureOrigin`; a throw
+ * came from argument validation, an unsupported-operation check or an invariant
+ * inside this process, and has no origin to carry. Synthesizing one — the first
+ * draft used `origin: 'connection'` — reports a local defect as a transport
+ * problem and sends the caller to look at the network.
+ */
+type Released<H> =
+  | { kind: 'ok' }
+  | { kind: 'refused'; error: IAdtError; carrier: Cleanup }
+  | { kind: 'threw'; thrown: unknown; carrier: Cleanup };
+
+async function runRelease<H>(
+  release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
+  handle: H,
+): Promise<Released<H>> {
+  let answer: IAdtResponse<unknown, IAdtError>;
+  try {
+    answer = await release(handle);
+  } catch (error) {
+    return {
+      kind: 'threw',
+      thrown: error,
+      carrier: {
+        error: 'client_threw',
+        message: error instanceof Error ? error.message : String(error),
+      },
+    };
+  }
+  if (answer.ok) return { kind: 'ok' };
+  const error = answer.getError();
+  return {
+    kind: 'refused',
+    error,
+    carrier: { message: error.message, origin: error.origin, request: error.request },
+  };
+}
+
+/**
+ * A throw that left a lock behind, or a release that threw after the work was
+ * already done.
+ *
+ * Keeps the relevant cause as `cause` and borrows its message, so nothing about
+ * the primary defect is reworded — `answer()` still reports exactly what threw.
  * Wrapping rather than attaching a property to the thrown value, because a
  * thrown value need not be an object and need not be extensible.
  */
 export class LockNotReleased extends Error {
-  readonly cleanup: { message: string; origin?: string; request?: unknown };
-  constructor(cause: unknown, cleanup: { message: string; origin?: string; request?: unknown }) {
+  readonly cleanup?: Cleanup;
+  readonly operation?: 'succeeded';
+  constructor(cause: unknown, extra: { cleanup?: Cleanup; operation?: 'succeeded' }) {
     super(cause instanceof Error ? cause.message : String(cause), { cause });
     this.name = 'LockNotReleased';
-    this.cleanup = cleanup;
+    this.cleanup = extra.cleanup;
+    this.operation = extra.operation;
   }
 }
 ```
@@ -545,14 +621,14 @@ export class LockNotReleased extends Error {
 npx jest src/__tests__/unit/withLock.test.ts
 ```
 
-Expected: PASS, all eight.
+Expected: PASS, all nine.
 
 - [ ] **Step 10: Render `cleanup` and `operation` on BOTH payloads**
 
 `answer.ts`'s allowlist drops unknown fields, so without this the facts never reach a caller. Two places, not one:
 
 - `failurePayload()` — add `cleanup` and `operation` beside `raw_body`, for the refusal path.
-- `local()` — the `client_threw` payload, for the throw path. Read `cleanup` off the thrown value structurally rather than with `instanceof`, so a `LockNotReleased` built against another copy of the module still renders:
+- `local()` — the `client_threw` payload, for the throw path, rendering **both** `cleanup` and `operation`. Read them off the thrown value structurally rather than with `instanceof`, so a `LockNotReleased` built against another copy of the module still renders:
 
 ```typescript
 // src/lib/answer.ts, in the client_threw branch
@@ -564,7 +640,7 @@ function cleanupOf(thrown: unknown): Record<string, unknown> | undefined {
 }
 ```
 
-Extend `answerFailure.test.ts` with two cases: a refusal carrying `cleanup` survives the allowlist, and a `client_threw` carrying `cleanup` does too. The second is the one the criterion "a release that failed reaches the caller" actually rests on.
+Extend `answerFailure.test.ts` with three cases: a refusal carrying `cleanup` survives the allowlist; a `client_threw` carrying `cleanup` does too; and a `client_threw` carrying `operation: 'succeeded'` does, which is the only report a caller gets when the write landed and the unlock threw. The last two are what the criterion "a release that failed reaches the caller" actually rests on.
 
 - [ ] **Step 11: Commit `withLock`**
 

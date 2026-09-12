@@ -111,38 +111,79 @@ the failing step's answer is handed back **untouched**. None composes an error o
 its own. A sentence like "step 2 of 3 failed" would put a second account beside
 the strategy's, and which step it was is already in the failure's `request`.
 
+**How many handlers need a combinator is not a number this document fixes.**
+An earlier draft said thirteen — eight that called removed members and five
+whose update is a read-modify-write — and that was the count of handlers whose
+sequence adt-clients 19 *took away*, mistaken for the count of handlers that
+have one. Measured on the tree instead:
+
+| | handlers |
+|---|---|
+| exactly one client call site | 131 |
+| more than one | 113 |
+| of those, a dispatch over object families where one branch runs | 4 |
+| of those, calling both `read` and `readMetadata` — the `pair` shape | 18 |
+
+These are call *sites*, counted by the compiler's own file list, not calls per
+run: a branch that only some arguments reach is counted here and may never
+execute. The real audit is the migration itself, family by family, and the
+invariant tests are what hold the result.
+
 ## What `withLock` does when the cleanup also fails
 
 `withLock(acquire, body, release)` runs `release` after every successful
-`acquire` — after a refusal from `body`, and after a throw from it. Six
-outcomes, and the fourth is the one worth arguing about:
+`acquire` — after a refusal from `body`, and after a throw from it. Both halves
+have **three** outcomes, not two, and collapsing the last two is where the first
+two drafts of this section went wrong:
 
-| acquire | body | release | the answer |
-|---|---|---|---|
-| fails | not run | not run | the acquire failure, untouched |
-| ok | ok | ok | the body's value |
-| ok | fails | ok | the body failure, untouched |
-| ok | ok | fails | **a failure**, carrying the release failure, plus `operation: 'succeeded'` |
-| ok | fails | fails | the body failure, untouched, plus `cleanup` |
-| ok | **throws** | fails | the body's throw, **rethrown carrying `cleanup`** |
+- **ok**
+- **refused** — an `IAdtResponse` failure. A strategy judged it, and it carries
+  an `AdtFailureOrigin`.
+- **threw** — an exception. adt-clients throws from argument validation,
+  unsupported-operation checks and its own invariants, and our code can throw
+  too. `answer()` names this `client_threw`, and **it gets no origin**:
+  `connection` and `refusal` are both claims about the server, and neither is
+  true when the defect is in this process.
 
-A throw is not an `IAdtResponse` and cannot become one: `answer()` names it
-`client_threw` and that is the honest report of a defect in this process. But the
-lock is a fact about SAP, not about the throw, and it must survive. So the throw
-is rethrown with the release failure attached, and `answer()` renders `cleanup`
-on the `client_threw` payload exactly as it does on a refusal. A `finally` that
-simply let the original exception out would lose it — which is what the first
-draft of the implementation did, and why the outcome is written here rather than
-left to the code.
+Three rules settle every combination.
 
-**The primary cause wins.** When both halves fail, the answer is the body's
-failure: it is what the caller asked about, and losing it to a secondary fact
-would be the worse trade. The secondary fact is not dropped — `cleanup` is a
-new field on the failure payload, carrying the release failure's own `message`,
-`origin` and `request`, so a caller learns the object is still locked.
+1. **A throw stays a throw.** It is never turned into an `IAdtResponse` failure,
+   because that would require inventing the origin it does not have. `answer()`
+   is the one place that names throws.
+2. **The body's outcome is the answer**, and the release's outcome rides along
+   as `cleanup` when the body did not succeed.
+3. **When the body succeeded and the release did not**, the release's outcome
+   becomes the answer, marked `operation: 'succeeded'` — as a failure if it was
+   refused, as a throw if it threw.
+
+| body | release | the answer |
+|---|---|---|
+| ok | ok | the body's value |
+| ok | refused | a failure carrying the release error, plus `operation: 'succeeded'` |
+| ok | threw | **the release's throw**, rethrown, plus `operation: 'succeeded'` |
+| refused | ok | the body failure, untouched |
+| refused | refused | the body failure, untouched, plus `cleanup` with an origin |
+| refused | threw | the body failure, untouched, plus `cleanup` marked `client_threw`, no origin |
+| threw | ok | the body's throw, rethrown unchanged |
+| threw | refused | the body's throw, rethrown, plus `cleanup` with an origin |
+| threw | threw | the body's throw, rethrown, plus `cleanup` marked `client_threw`, no origin |
+
+A failed `acquire` is answered untouched and neither `body` nor `release` runs;
+an `acquire` that throws propagates for the same reason.
+
+So `cleanup` has two shapes, and which one it is, is itself the information:
+`{ message, origin, request }` when SAP refused the unlock, and
+`{ error: 'client_threw', message }` when something in this process threw on the
+way. A caller told `origin: 'connection'` over an argument-validation defect
+would go looking at the network.
+
+**Why the body wins.** It is what the caller asked about, and losing the cause
+to a secondary fact is the worse trade. The secondary fact is not dropped:
+`cleanup` is a new field on the failure payload, and on the `client_threw`
+payload too, so a caller learns the object is still locked either way.
 
 **A write that succeeded under a lock that did not release is reported as a
-failure.** The write happened and the answer says so, but a held lock is the
+failure or a throw, by which of the two happened.** The write happened and the answer says so, but a held lock is the
 caller's next problem and an answer marked success is one an agent does not read
 twice. This repository has removed three masking defects of exactly that shape.
 `LockRegistry.unlockAll()` may still release it at session end, which makes this
@@ -161,24 +202,6 @@ with a silent hole in it. It means `withLock`'s acquire and release failures are
 whatever the library judged them to be — which is enough to know a lock was not
 taken or not released, and not enough to know why in the vocabulary the rest of
 the failures use. Raised against the library as part of issue #200.
-
-**How many handlers need a combinator is not a number this document fixes.**
-An earlier draft said thirteen — eight that called removed members and five
-whose update is a read-modify-write — and that was the count of handlers whose
-sequence adt-clients 19 *took away*, mistaken for the count of handlers that
-have one. Measured on the tree instead:
-
-| | handlers |
-|---|---|
-| exactly one client call site | 131 |
-| more than one | 113 |
-| of those, a dispatch over object families where one branch runs | 4 |
-| of those, calling both `read` and `readMetadata` — the `pair` shape | 18 |
-
-These are call *sites*, counted by the compiler's own file list, not calls per
-run: a branch that only some arguments reach is counted here and may never
-execute. The real audit is the migration itself, family by family, and the
-invariant tests are what hold the result.
 
 ## The read-modify-write
 

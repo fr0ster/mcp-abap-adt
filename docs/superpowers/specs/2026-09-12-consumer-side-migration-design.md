@@ -114,15 +114,26 @@ the strategy's, and which step it was is already in the failure's `request`.
 ## What `withLock` does when the cleanup also fails
 
 `withLock(acquire, body, release)` runs `release` after every successful
-`acquire` — after a refusal from `body`, and after a throw from it. Four
-outcomes, and the third is the one worth arguing about:
+`acquire` — after a refusal from `body`, and after a throw from it. Six
+outcomes, and the fourth is the one worth arguing about:
 
 | acquire | body | release | the answer |
 |---|---|---|---|
 | fails | not run | not run | the acquire failure, untouched |
+| ok | ok | ok | the body's value |
 | ok | fails | ok | the body failure, untouched |
-| ok | fails | fails | the body failure, untouched, plus `cleanup` |
 | ok | ok | fails | **a failure**, carrying the release failure, plus `operation: 'succeeded'` |
+| ok | fails | fails | the body failure, untouched, plus `cleanup` |
+| ok | **throws** | fails | the body's throw, **rethrown carrying `cleanup`** |
+
+A throw is not an `IAdtResponse` and cannot become one: `answer()` names it
+`client_threw` and that is the honest report of a defect in this process. But the
+lock is a fact about SAP, not about the throw, and it must survive. So the throw
+is rethrown with the release failure attached, and `answer()` renders `cleanup`
+on the `client_threw` payload exactly as it does on a refusal. A `finally` that
+simply let the original exception out would lose it — which is what the first
+draft of the implementation did, and why the outcome is written here rather than
+left to the code.
 
 **The primary cause wins.** When both halves fail, the answer is the body's
 failure: it is what the caller asked about, and losing it to a secondary fact
@@ -192,7 +203,9 @@ turns a slow read into a malformed write that the server blames on the caller.
 2. `sequence`, if there is one, returns the first failure as it came.
 3. `answer()` renders it through an allowlist: `message`, `origin`, `code`,
    `adt_type`, `namespace`, `request`, `messages`, `raw_body`, and `cleanup`
-   where a `withLock` release failed. Every one of them
+   where a `withLock` release failed. `cleanup` is rendered on the
+   `client_threw` payload too, which is the only way it reaches a caller when
+   the body threw. Every one of them
    whenever the failure carries it, at every `detail` — see above. `response` is
    never serialised; `request` is rebuilt from `method` and `url` by name.
 4. `messages` carries the normalised `{ type, text }` every form reduces to,

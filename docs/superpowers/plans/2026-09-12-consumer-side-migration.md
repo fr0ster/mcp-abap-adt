@@ -17,7 +17,7 @@
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` added to JSON-answering tools. 362 tools across 6 groups; the frozen snapshot in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict is the `analyse` strategy's.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a string body it reaches the caller at every level and on every tool; where there is no string — a connection failure, an empty answer, a body the transport already parsed — the field is absent, never invented. `detail` shapes the result projection, and the failure payload is not a projection. Task 4 removes the gate that made this false.
-- **Every acquired lock is released on every path out, and a failed release reaches the caller.** A lock chain is `withLock()`, never `sequence()`: a sequence stops at the first failure and would skip the unlock. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
+- **Every acquired lock is released on every path out, and a failed release reaches the caller.** A lock chain is `withLock()`, never `sequence()`: a sequence stops at the first failure and would skip the unlock. This holds on the throw path too — a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call that accepts one.** A call without one gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. The exception, measured: `lock(config)` and `unlock(config, lockHandle)` declare no options parameter in 19, so their verdict is the library's and cannot be injected. Task 14's invariant test excludes those two by name, with that sentence beside it.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
@@ -187,6 +187,7 @@ git commit -m "test(surface): freeze the 362 tools, and retire the prose invento
   - `pair<A, B>(first: () => Promise<IAdtResponse<A, IAdtError>>, second: (a: A) => Promise<IAdtResponse<B, IAdtError>>): Promise<IAdtResponse<[A, B], IAdtError>>`
   - `withLock<H, T>(acquire: () => Promise<IAdtResponse<H, IAdtError>>, body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>, release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>): Promise<IAdtResponse<T, IAdtError>>`
   - `CleanupCarrier` — the `cleanup` field `answer()` renders, `{ message, origin, request? }`
+  - `LockNotReleased` — the error `withLock` rethrows when the body threw and the release failed too, carrying the original as `cause` and the lock as `cleanup`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -340,7 +341,7 @@ describe('withLock', () => {
     expect((result.getError() as any).cleanup).toBeUndefined();
   });
 
-  it('releases after a THROWN body, and lets the throw out', async () => {
+  it('releases after a THROWN body, and lets the throw out unchanged', async () => {
     const release = jest.fn(async () => ok(undefined) as any);
     await expect(
       withLock(
@@ -350,6 +351,39 @@ describe('withLock', () => {
       ),
     ).rejects.toThrow('parser blew up');
     expect(release).toHaveBeenCalledWith('handle-1');
+  });
+
+  it('carries the dangling lock out with a THROWN body when the release fails too', async () => {
+    expect.assertions(4);
+    try {
+      await withLock(
+        async () => ok('handle-1') as any,
+        async () => { throw new Error('parser blew up'); },
+        async () => failed('Unlock refused') as any,
+      );
+    } catch (thrown: any) {
+      // The throw is the primary cause and keeps its own message: it is a
+      // defect in this process, and `answer()` will name it client_threw.
+      expect(thrown.message).toBe('parser blew up');
+      expect(thrown.cause?.message).toBe('parser blew up');
+      // The lock is a fact about SAP, not about the throw, and survives it.
+      expect(thrown.cleanup.message).toBe('Unlock refused');
+      expect(thrown.cleanup.origin).toBe('refusal');
+    }
+  });
+
+  it('carries it out when the release THROWS as well', async () => {
+    expect.assertions(2);
+    try {
+      await withLock(
+        async () => ok('handle-1') as any,
+        async () => { throw new Error('parser blew up'); },
+        async () => { throw new Error('socket closed'); },
+      );
+    } catch (thrown: any) {
+      expect(thrown.message).toBe('parser blew up');
+      expect(thrown.cleanup.message).toBe('socket closed');
+    }
   });
 
   it('keeps the body failure when the release fails too, and names the dangling lock', async () => {
@@ -442,24 +476,31 @@ export async function withLock<H, T>(
   if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
   const handle = acquired.getResult().value;
 
+  // Deliberately a catch rather than a `finally`. A `finally` lets the original
+  // exception out as soon as the block ends, so a release that ALSO failed has
+  // nowhere to go and is lost — the caller would hear about a parser defect and
+  // never about the lock still held in SAP.
   let answered: IAdtResponse<T, IAdtError> | undefined;
-  let released: IAdtResponse<unknown, IAdtError> | undefined;
+  let thrown: unknown;
+  let threw = false;
   try {
     answered = await body(handle);
-  } finally {
-    // Runs on the throw path too, which is the whole point. A release that
-    // throws is swallowed into a failure rather than replacing the body's
-    // exception: the body's cause is the one worth propagating.
-    released = await release(handle).catch(
-      (thrown: unknown) =>
-        failure<unknown>({
-          message: thrown instanceof Error ? thrown.message : String(thrown),
-          origin: 'connection',
-        } as IAdtError),
-    );
+  } catch (error) {
+    thrown = error;
+    threw = true;
   }
 
-  if (released.ok) return answered as IAdtResponse<T, IAdtError>;
+  const released = await release(handle).catch((error: unknown) =>
+    failure<unknown>({
+      message: error instanceof Error ? error.message : String(error),
+      origin: 'connection',
+    } as IAdtError),
+  );
+
+  if (released.ok) {
+    if (threw) throw thrown;
+    return answered as IAdtResponse<T, IAdtError>;
+  }
 
   const cleanup = released.getError();
   const carrier = {
@@ -468,11 +509,33 @@ export async function withLock<H, T>(
     request: cleanup.request,
   };
 
+  // The throw stays the primary cause and keeps its own message; the lock rides
+  // along. `answer()` names the throw `client_threw` and renders `cleanup`
+  // beside it, the same field it renders on a refusal.
+  if (threw) throw new LockNotReleased(thrown, carrier);
+
   if (!(answered as IAdtResponse<T, IAdtError>).ok) {
     const primary = (answered as IAdtResponse<T, IAdtError>).getError();
     return failure<T>({ ...primary, cleanup: carrier });
   }
   return failure<T>({ ...cleanup, operation: 'succeeded' } as IAdtError & CleanupCarrier);
+}
+
+/**
+ * A throw from the body that left a lock behind.
+ *
+ * Keeps the original as `cause` and borrows its message, so nothing about the
+ * primary defect is reworded — `answer()` still reports exactly what threw.
+ * Wrapping rather than attaching a property to the thrown value, because a
+ * thrown value need not be an object and need not be extensible.
+ */
+export class LockNotReleased extends Error {
+  readonly cleanup: { message: string; origin?: string; request?: unknown };
+  constructor(cause: unknown, cleanup: { message: string; origin?: string; request?: unknown }) {
+    super(cause instanceof Error ? cause.message : String(cause), { cause });
+    this.name = 'LockNotReleased';
+    this.cleanup = cleanup;
+  }
 }
 ```
 
@@ -482,11 +545,26 @@ export async function withLock<H, T>(
 npx jest src/__tests__/unit/withLock.test.ts
 ```
 
-Expected: PASS, all six.
+Expected: PASS, all eight.
 
-- [ ] **Step 10: Render `cleanup` and `operation` in the failure payload**
+- [ ] **Step 10: Render `cleanup` and `operation` on BOTH payloads**
 
-`answer.ts`'s allowlist drops unknown fields, so without this the two facts never reach a caller. Add them beside `raw_body`, and extend `answerFailure.test.ts` with a case asserting both survive.
+`answer.ts`'s allowlist drops unknown fields, so without this the facts never reach a caller. Two places, not one:
+
+- `failurePayload()` — add `cleanup` and `operation` beside `raw_body`, for the refusal path.
+- `local()` — the `client_threw` payload, for the throw path. Read `cleanup` off the thrown value structurally rather than with `instanceof`, so a `LockNotReleased` built against another copy of the module still renders:
+
+```typescript
+// src/lib/answer.ts, in the client_threw branch
+function cleanupOf(thrown: unknown): Record<string, unknown> | undefined {
+  const carrier = (thrown as { cleanup?: unknown } | undefined)?.cleanup;
+  return carrier !== null && typeof carrier === 'object'
+    ? (carrier as Record<string, unknown>)
+    : undefined;
+}
+```
+
+Extend `answerFailure.test.ts` with two cases: a refusal carrying `cleanup` survives the allowlist, and a `client_threw` carrying `cleanup` does too. The second is the one the criterion "a release that failed reaches the caller" actually rests on.
 
 - [ ] **Step 11: Commit `withLock`**
 

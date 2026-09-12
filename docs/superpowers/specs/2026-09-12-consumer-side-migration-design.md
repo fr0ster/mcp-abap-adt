@@ -213,31 +213,40 @@ reading — success with a warning — is defensible if a caller is expected to 
 on warnings. The evidence here says they do not.
 
 **Which members accept an `analyse` is a fact about their signature.** A member
-that declares an `IAdtOperationOptions` parameter takes one; a member that
-declares no options parameter cannot be given one, whatever this document would
-prefer. An earlier draft of this section said `lock` and `unlock` were "the one
-place" that happens. Measured on 19, they are not close to it:
+that declares an options parameter takes one; a member that declares none cannot
+be given one, whatever this document would prefer. Measured on 19, and by member
+rather than by grep, because an earlier draft of this section got the scale
+wrong in both directions:
 
-| member | what it serves |
-|---|---|
-| `lock`, `unlock` | `withLock`'s acquire and release, on 29 object classes |
-| `getVersions`, `getVersionSource` | the version-history tools |
-| the whole `AdtUtils` surface | `fetchNodeStructure`, `getObjectStructure`, `getWhereUsed`, `getWhereUsedScope`, `getVirtualFoldersContents`, `getAllTypes`, `getInactiveObjects`, `getTableContents`, `getTableColumns`, `getSqlQuery`, `discovery`, `activateObjectsGroup`, `deleteObjectsGroup`, `checkDeletionGroup`, `getActivationResults`, `getStatus`, `getResult` |
-
-Regenerate the list rather than trusting this table:
+| | takes an `analyse` | does not |
+|---|---|---|
+| the object classes | `read`, `readMetadata`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate` | `lock`, `unlock`, `getVersions`, `getVersionSource` |
+| `AdtUtils`, 20 members | `search` | the other 19 |
 
 ```bash
-grep -rhoE "^\s{4}[a-zA-Z]+(<[^>]*>)?\([^)]*\): Promise<IAdtResponse" \
-  node_modules/@mcp-abap-adt/adt-clients/dist/core/*/Adt*.d.ts \
-  node_modules/@mcp-abap-adt/adt-clients/dist/core/shared/AdtUtils.d.ts \
-  | grep -v IAdtOperationOptions | sed -E 's/^\s*([a-zA-Z]+).*/\1/' | sort -u
+# regenerate rather than trusting the table
+node -e "…" # see the plan, Task 14 — it parses the .d.ts declarations
 ```
 
-So the verdict on every search, every walk, every listing and every group
-operation stays adt-clients' own. That is enough to know a call did not succeed
-and not enough to know why in the vocabulary the rest of the failures use, and
-it is the largest gap this design has. Raised against the library as part of
-issue #200.
+**What that actually costs is narrower than the list looks.** With no `analyse`,
+`answering()` falls back to `recogniseFailure`, which reports a failure when the
+request threw — a transport error, a non-2xx. So for a read, a search, a listing
+or a walk the library's default is adequate: a 404 is a 404 and arrives as one.
+The default is only wrong where **ADT answers 200 with a refusal inside the
+body**, which is the whole reason `analyse` exists.
+
+Cross those two facts and the gap is one member. Of the 19 that take no
+`analyse`, this repository calls ten, and only `activateObjectsGroup` — used by
+`handleActivateObject` — is in the class that hides a refusal under a 200. Group
+activation is one of the two masking families this project has already fixed
+once. The remaining nine are reads and listings that the transport-level default
+serves.
+
+So: `handleActivateObject` is the one place where the design's rule and the
+library's surface genuinely collide, and it is called out as such rather than
+generalised into a claim about every walk and listing. The options are to call
+the per-object `activate`, which does take an `analyse`, or to get the group
+member an options parameter. Raised as part of issue #200.
 
 **For the package walkers this is not a gap at all**, and the reason is worth
 keeping separate from the signature: a missing package and an empty one answer
@@ -303,8 +312,11 @@ its strategies are injected, so its notes describe what it ships.
 - No handler decides a refusal for itself, and **every call whose member
   declares an options parameter is given an `analyse`**. Members that declare
   none cannot be given one: `lock`, `unlock`, `getVersions`, `getVersionSource`
-  and the whole `AdtUtils` surface. The check is the signature, not a list of
-  names kept by hand.
+  and 19 of the 20 `AdtUtils` members. The check is the signature, not a list of
+  names kept by hand. Where the library's default verdict is not enough —
+  `activateObjectsGroup` alone, among the members this repository calls —
+  `handleActivateObject` says so in a comment rather than reading the document
+  itself.
 - Every XML-bodied update reads before it writes.
 - After every successful `acquire`, `release` is attempted exactly once, on
   every path out — a refusal, a throw, a success. Whether SAP then lets go of

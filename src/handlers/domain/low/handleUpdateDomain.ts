@@ -1,12 +1,19 @@
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
  *
- * Uses AdtClient.updateDomain from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Read, patch, write. adt-clients 19 removed the merge that used to happen
+ * inside `updateDomain`: the member takes the whole document now and replaces
+ * with it, so anything not sent is gone. The sequence is the handler's, and
+ * every step of it carries its own `analyse` — the verdict on each answer stays
+ * the strategy's.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { sequence } from '../../../lib/strategies/sequence';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
   restoreSessionInConnection,
@@ -102,24 +109,34 @@ export async function handleUpdateDomain(
     }
 
     try {
-      // Update domain with properties
-      const updateState = await client.getDomain().update(
-        {
-          domainName,
-          packageName: properties.package_name || properties.packageName,
-          description: properties.description || '',
-        },
-        { lockHandle: lock_handle },
+      // The three steps, in the handler because 19 put them there. `analyse` on
+      // each one: a refusal from the read and a refusal from the write are
+      // different failures, and whichever comes back is the one the caller
+      // sees, built by the strategy rather than summarised here.
+      const written = await sequence(
+        () =>
+          client
+            .getDomain()
+            .readMetadata({ domainName }, { analyse: analyseException }),
+        (current) =>
+          client.getDomain().updateMetadata(
+            { domainName },
+            {
+              lockHandle: lock_handle,
+              xmlContent: patchDomainXml(
+                extractXmlString(current, `domain ${domainName}`),
+                properties,
+              ),
+              analyse: analyseException,
+            },
+          ),
       );
-      const updateResult = updateState.updateResult;
 
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for domain ${domainName}`,
-        );
+      if (!written.ok) {
+        const failure = written.getError();
+        logger?.error(`UpdateDomain refused: ${failure.message}`);
+        return return_error(new Error(failure.message));
       }
-
-      // Get updated session state after update
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 

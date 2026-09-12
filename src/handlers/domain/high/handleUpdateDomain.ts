@@ -8,8 +8,12 @@
  * Note: No validation step - lock will fail if domain doesn't exist
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { sequence } from '../../../lib/strategies/sequence';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
   return_error,
@@ -155,29 +159,51 @@ export async function handleUpdateDomain(
       let updateState: any;
 
       try {
-        lockHandle = await client.getDomain().lock({
+        // `lock` answers an IAdtResponse on 18+, not a bare handle.
+        const locked = await client.getDomain().lock({
           domainName,
           packageName: typedArgs.package_name,
         } as any);
+        if (!locked.ok) {
+          return return_error(new Error(locked.getError().message));
+        }
+        lockHandle = locked.getResult().value;
 
-        // Update with properties (packageName and description are required)
-        const properties = {
-          domainName: domainName,
-          packageName: typedArgs.package_name,
-          description: typedArgs.description || domainName,
-          datatype: typedArgs.datatype,
-          length: typedArgs.length,
-          decimals: typedArgs.decimals,
-          conversionExit: typedArgs.conversion_exit,
-          lowercase: typedArgs.lowercase,
-          signExists: typedArgs.sign_exists,
-          valueTable: typedArgs.value_table,
-          fixedValues: typedArgs.fixed_values,
-          transportRequest: typedArgs.transport_request,
-        };
-        updateState = await client
-          .getDomain()
-          .update(properties, { lockHandle: lockHandle });
+        // Read, patch, write — the merge adt-clients 19 stopped doing. Only
+        // the fields the caller named are touched; everything else in the
+        // document travels through unread.
+        const written = await sequence(
+          () =>
+            client
+              .getDomain()
+              .readMetadata({ domainName }, { analyse: analyseException }),
+          (current) =>
+            client.getDomain().updateMetadata(
+              { domainName },
+              {
+                lockHandle,
+                xmlContent: patchDomainXml(
+                  extractXmlString(current, `domain ${domainName}`),
+                  {
+                    description: typedArgs.description,
+                    datatype: typedArgs.datatype,
+                    length: typedArgs.length,
+                    decimals: typedArgs.decimals,
+                    conversion_exit: typedArgs.conversion_exit,
+                    lowercase: typedArgs.lowercase,
+                    sign_exists: typedArgs.sign_exists,
+                    value_table: typedArgs.value_table,
+                    fixed_values: typedArgs.fixed_values,
+                  },
+                ),
+                analyse: analyseException,
+              },
+            ),
+        );
+        if (!written.ok) {
+          return return_error(new Error(written.getError().message));
+        }
+        updateState = written;
 
         // Check
         try {
@@ -212,7 +238,7 @@ export async function handleUpdateDomain(
       try {
         await client
           .getDomain()
-          .read({ domainName }, 'inactive', { withLongPolling: true });
+          .readMetadata({ domainName }, { withLongPolling: true } as never);
       } catch {
         // Continue anyway — activation will fail explicitly if object isn't ready
       }

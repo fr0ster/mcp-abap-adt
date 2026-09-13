@@ -1836,6 +1836,7 @@ Three of the spec's success criteria are claims about 326 files. A reviewer cann
 ```typescript
 // src/__tests__/unit/handlerInvariants.test.ts
 import { globSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import ts from 'typescript';
 
 const handlers = globSync('src/handlers/**/handle*.ts');
@@ -1866,33 +1867,108 @@ it('no handler decides a refusal for itself', () => {
  * only the omission needs checking here.
  */
 it('every client call that accepts an analyse is given one', () => {
-  const program = ts.createProgram(handlers, readConfig('tsconfig.json'));
+  const program = ts.createProgram(handlers, compilerOptions());
   const checker = program.getTypeChecker();
   const offenders: string[] = [];
+  let inspected = 0;
   for (const file of handlers) {
     const source = program.getSourceFile(file);
     if (source === undefined) continue;
-    for (const call of callExpressionsIn(source)) {
+    for (const call of memberCallsIn(source)) {
       const signature = checker.getResolvedSignature(call);
+      // A call the checker cannot resolve tells us nothing. This test is
+      // meaningful only on a clean build, which is why it comes after Task 21.
       const options = signature?.parameters.at(-1);
       if (options === undefined) continue;
       const type = checker.getTypeOfSymbolAtLocation(options, call);
       if (!type.getProperties().some((p) => p.name === 'analyse')) continue;
+      inspected += 1;
       const passed = call.arguments.at(-1);
       const given =
         passed !== undefined &&
         ts.isObjectLiteralExpression(passed) &&
         passed.properties.some((p) => p.name?.getText() === 'analyse');
-      if (!given) offenders.push(`${file}:${lineOf(call)} — ${call.expression.getText()}`);
+      if (!given) offenders.push(`${file}:${lineOf(source, call)} — ${call.expression.getText()}`);
     }
   }
+  // The guard against a test that measures nothing. A program built with wrong
+  // options resolves no signature, finds no member that accepts an `analyse`,
+  // and passes with an empty offenders list. Roughly 275 call sites across 174
+  // handler files carry one, so a run that inspects a handful did not resolve.
+  expect(inspected).toBeGreaterThan(200);
   expect(offenders).toEqual([]);
 });
+
+/**
+ * The project's own compiler options.
+ *
+ * Not a JSON parse of tsconfig: the compiler API needs `extends` resolved,
+ * paths made absolute against the config's directory, and the defaults filled
+ * in. `parseJsonConfigFileContent` is what does all three, and a program built
+ * with hand-rolled options resolves `@mcp-abap-adt/*` to nothing and reports
+ * every signature as unresolved — which this test would then read as "no call
+ * accepts an analyse" and pass while checking nothing.
+ */
+function compilerOptions(): ts.CompilerOptions {
+  const root = join(__dirname, '../../..');
+  const configPath = ts.findConfigFile(root, ts.sys.fileExists, 'tsconfig.json');
+  if (configPath === undefined) throw new Error('tsconfig.json not found');
+  const { config, error } = ts.readConfigFile(configPath, ts.sys.readFile);
+  if (error !== undefined) {
+    throw new Error(ts.flattenDiagnosticMessageText(error.messageText, '\n'));
+  }
+  const parsed = ts.parseJsonConfigFileContent(config, ts.sys, dirname(configPath));
+  if (parsed.errors.length > 0) {
+    throw new Error(parsed.errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('\n'));
+  }
+  // `noEmit`, because this program is only ever asked questions.
+  return { ...parsed.options, noEmit: true };
+}
+
+/** Every `x.y(...)` in a file — the shape a client member call takes. */
+function memberCallsIn(source: ts.SourceFile): ts.CallExpression[] {
+  const calls: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+      calls.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return calls;
+}
+
+/** 1-indexed, so the message matches what an editor shows. */
+function lineOf(source: ts.SourceFile, node: ts.Node): number {
+  return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+}
 ```
 
 Every failure names a file. Fix the file, never the regex. A genuine exception goes in the test with a sentence saying why, so a reviewer sees it.
 
-- [ ] **Step 2: Pin what the legacy contract drops**
+- [ ] **Step 2: Prove the third test can fail, and that it fails for the right reason**
+
+Written after Task 21, this test is green the moment it runs, so it is a ratchet and needs the same proof Task 1's did — with one extra check, because a compiler-API test has a way of passing while measuring nothing.
+
+```bash
+# 1. a control call that should be caught: drop the analyse from one handler
+sed -i 's/, { analyse: analyseException })/)/' src/handlers/class/readonly/handleReadClass.ts
+npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect FAIL naming that file and line
+git checkout src/handlers/class/readonly/handleReadClass.ts
+npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect PASS again
+```
+
+The `inspected` bound in the test is the second half of the proof, and it needs seeing fail too. Break the program on purpose and confirm the bound catches it rather than the test passing quietly:
+
+```bash
+# temporarily replace compilerOptions() with `{}` and run
+npx jest src/__tests__/unit/handlerInvariants.test.ts
+# expect FAIL on `inspected` — a program with no paths resolves no signature,
+# so nothing is inspected and the offenders list is empty for the wrong reason.
+# Then restore compilerOptions().
+```
+
+- [ ] **Step 3: Pin what the legacy contract drops**
 
 `SAP_SYSTEM_TYPE=legacy` is a supported deployment running a subset of the tools through **these same handler files**. `available_in` hides the tools that cannot run on legacy at all, not the 144 that can.
 
@@ -1935,13 +2011,13 @@ it('pins the legacy members that take no strategy', () => {
 });
 ```
 
-- [ ] **Step 3: Run both**
+- [ ] **Step 4: Run both**
 
 ```bash
 npx jest src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyContract.test.ts
 ```
 
-- [ ] **Step 4: Commit** — `test(handlers): the invariants, and what the legacy contract decides alone`
+- [ ] **Step 5: Commit** — `test(handlers): the invariants, and what the legacy contract decides alone`
 
 ---
 

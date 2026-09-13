@@ -17,7 +17,7 @@ Every task's requirements implicitly include this section.
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` on JSON-answering tools. 362 tools across 6 groups; the snapshot frozen in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict belongs to the `analyse` strategy.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
+- **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Pass it **in the call, or in a `const` initialized with an object literal in the same file** — that is what makes the check decidable, and a strategy assembled at runtime is reported so it can be inlined. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a non-empty string body it reaches the caller at every level and on every tool; where there is none the field is absent, never invented.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`. The contract's types are not filters, and what sits on a transport config is headers, an Authorization bearer and cookies.
 - **A lock chain is `withLock()`, never `sequence()`**, and only where the handler owns the lock's whole lifetime. The fifteen `low`-tier `LockX` tools hand the handle back on purpose and are never wrapped.
@@ -2683,16 +2683,30 @@ export function analyseOmissions(handlers: string[]): { offenders: string[]; ins
       const type = checker.getTypeOfSymbolAtLocation(options, call);
       if (!type.getProperties().some((p) => p.name === 'analyse')) continue;
       inspected += 1;
-      // The TYPE of what was passed, not its syntax. An options object built
-      // in a variable, spread from a helper or returned by a function is a
-      // legitimate way to pass a strategy, and a check that only recognised an
-      // inline literal would report every one of them as an omission.
+      // Neither the syntax alone nor the type alone answers this.
+      //
+      // Syntax alone reports a legitimate options variable as an omission.
+      // The declared type alone is worse: `IAdtOperationOptions` declares
+      // `analyse` OPTIONAL, so `const o: IAdtOperationOptions = {}` satisfies
+      // `getProperty('analyse')` while passing no strategy at all. A type says
+      // what may be there; only a value says what is.
+      //
+      // So follow the value to the nearest object literal — the argument
+      // itself, or the initializer of the const it names — and look for the
+      // property there. Anything further than that is not decidable from the
+      // source, and this repository's convention is therefore: pass `analyse`
+      // in the call, or in a `const` initialized with an object literal in the
+      // same file. A strategy assembled at runtime is reported, with a message
+      // saying to inline it rather than a message saying it is missing.
       const passed = call.arguments.at(-1);
-      const argumentType = passed === undefined ? undefined : checker.getTypeAtLocation(passed);
-      const carries =
-        argumentType !== undefined &&
-        argumentType.getProperty('analyse') !== undefined;
-      if (!carries) offenders.push(`${file}:${lineOf(source, call)} — ${call.expression.getText()}`);
+      const verdict = carriesAnalyse(passed, checker);
+      if (verdict !== 'yes') {
+        offenders.push(
+          `${file}:${lineOf(source, call)} — ${call.expression.getText()} — ${
+            verdict === 'no' ? 'no analyse passed' : 'analyse not provable from the source; inline it'
+          }`,
+        );
+      }
     }
   }
   // The caller guards against a run that measured nothing: a program built with
@@ -2729,6 +2743,47 @@ function compilerOptions(): ts.CompilerOptions {
   return { ...parsed.options, noEmit: true };
 }
 
+/**
+ * Does this argument actually carry a strategy?
+ *
+ *  'yes'       — an object literal with an `analyse` property, reached directly
+ *                or through a const initialized with one.
+ *  'no'        — an object literal without it, or no argument at all.
+ *  'unknown'   — anything else: a parameter, a function result, a spread whose
+ *                source is not visible. Not provable here, and reported as
+ *                such rather than silently allowed.
+ */
+function carriesAnalyse(
+  argument: ts.Expression | undefined,
+  checker: ts.TypeChecker,
+): 'yes' | 'no' | 'unknown' {
+  if (argument === undefined) return 'no';
+
+  if (ts.isObjectLiteralExpression(argument)) {
+    for (const property of argument.properties) {
+      if (property.name?.getText() === 'analyse') return 'yes';
+      // A spread can only be followed when it names a const we can see.
+      if (ts.isSpreadAssignment(property)) {
+        const spread = carriesAnalyse(property.expression, checker);
+        if (spread === 'yes') return 'yes';
+        if (spread === 'unknown') return 'unknown';
+      }
+    }
+    return 'no';
+  }
+
+  if (ts.isIdentifier(argument)) {
+    const symbol = checker.getSymbolAtLocation(argument);
+    const declaration = symbol?.declarations?.[0];
+    if (declaration !== undefined && ts.isVariableDeclaration(declaration) && declaration.initializer) {
+      return carriesAnalyse(declaration.initializer, checker);
+    }
+    return 'unknown';
+  }
+
+  return 'unknown';
+}
+
 /** Every `x.y(...)` in a file — the shape a client member call takes. */
 function memberCallsIn(source: ts.SourceFile): ts.CallExpression[] {
   const calls: ts.CallExpression[] = [];
@@ -2762,15 +2817,28 @@ git checkout src/handlers/class/readonly/handleReadClass.ts
 npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect PASS again
 ```
 
-Then the opposite control, because the fix above introduced a second way to be
-wrong: pass the strategy through a variable and confirm the test still counts it
-as given.
+Then both controls for the variable case, because each fix to this check has
+introduced the opposite error.
 
 ```typescript
-// temporarily, in any migrated handler
+// POSITIVE — a strategy passed through a const. Must NOT be reported.
 const options = { analyse: analyseException };
-await obj.read({ className }, version, options);   // must NOT be reported
+await obj.read({ className }, version, options);
+
+// NEGATIVE — a const whose TYPE declares `analyse` as optional and whose VALUE
+// never sets it. Must BE reported. This is the case a type-only check accepts:
+// `IAdtOperationOptions` says a strategy may be there, and no strategy is.
+const empty: IAdtOperationOptions = {};
+await obj.read({ className }, version, empty);
+
+// NEGATIVE — assembled somewhere this file cannot see. Must BE reported, with
+// the "inline it" message rather than the "missing" one.
+await obj.read({ className }, version, optionsFrom(args));
 ```
+
+Run the check after each and confirm the message, not only the exit code. A
+check that reports the right count for the wrong reason is the failure mode this
+step exists for.
 
 The `inspected` bound in the test is the second half of the proof, and it needs seeing fail too. Break the program on purpose and confirm the bound catches it rather than the test passing quietly:
 

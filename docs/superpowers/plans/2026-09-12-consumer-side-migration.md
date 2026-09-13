@@ -21,7 +21,7 @@
 - **In a handler that owns a lock, after every successful acquire, release is attempted exactly once, on every path out, and a release that failed reaches the caller.** Attempted, not achieved: whether SAP lets go is SAP's answer. A lock chain is `withLock()`, never `sequence()` — a sequence stops at the first failure and would skip the unlock entirely. This holds on the throw path too: a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call whose resolved signature accepts one** — resolved per (class, member) by the compiler. There is no reliable shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all, and `readMetadata` accepts one on 30 classes but not on `AdtPackageLegacy`. `createAdtClient` returns `AdtClientLegacy` when `SAP_SYSTEM_TYPE=legacy`, which is a deployment-wide choice of a smaller contract and out of scope for this migration. A call without an `analyse` gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Roughly a dozen members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
+- **`analyse` on every call whose resolved signature accepts one** — resolved per (class, member) by the compiler. There is no reliable shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all, and `readMetadata` accepts one on 30 classes but not on `AdtPackageLegacy`. `createAdtClient` returns `AdtClientLegacy` when `SAP_SYSTEM_TYPE=legacy` — a supported deployment running the same handler files, so four `Legacy` classes that drop the strategy on seventeen members are pinned by a test in Task 14. A call without an `analyse` gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Roughly a dozen members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls in this plan.** Every test here runs offline against `tests/fixtures/adt/` (48 cases, 61 exchanges, 27 endpoints). Integration runs are the user's call, after the compiler is clean.
@@ -1886,7 +1886,7 @@ git commit -am "refactor(lib): the last of the envelope reads"
 Three of the spec's success criteria are claims about 326 files. A reviewer cannot check those by reading, and neither can the next person to add a handler.
 
 **Files:**
-- Create: `src/__tests__/unit/handlerInvariants.test.ts`
+- Create: `src/__tests__/unit/handlerInvariants.test.ts`, `src/__tests__/unit/legacyContract.test.ts`
 
 - [ ] **Step 1: Write the test**
 
@@ -1934,8 +1934,9 @@ it('every client call that accepts an analyse is given one', () => {
     //
     // Passing an `analyse` where it is not accepted is already a compile error,
     // so only the omission needs checking here. This runs against the modern
-    // contract — a legacy deployment (`SAP_SYSTEM_TYPE=legacy`) is a smaller
-    // contract chosen by the operator, and out of scope; see the spec.
+    // contract; the `Legacy` one is pinned by the test below, because
+    // `createAdtClient` is declared to return `AdtClient` and the checker never
+    // sees the `Legacy` declarations from a call site.
     const checker = program.getTypeChecker();
     for (const call of callExpressionsIn(source)) {
       const signature = checker.getResolvedSignature(call);
@@ -1959,19 +1960,74 @@ it('every client call that accepts an analyse is given one', () => {
 });
 ```
 
-- [ ] **Step 2: Run it**
+- [ ] **Step 2: Pin what the legacy contract drops**
+
+`SAP_SYSTEM_TYPE=legacy` is a supported deployment running a subset of the tools, and those tools run **the same handler files** this work rewrites. `available_in` does not help: it hides the tools that cannot run on legacy at all, not the ones that can. Four of the ten overridden `Legacy` classes take no strategy on some members; twenty-three legacy-declaring tools reach them.
+
+```typescript
+// src/__tests__/unit/legacyContract.test.ts
+import { globSync, readFileSync } from 'node:fs';
+
+/**
+ * Where the legacy contract decides for itself.
+ *
+ * Passing a strategy these members have no parameter for is harmless —
+ * JavaScript drops it — but the verdict is then adt-clients', and a refusal
+ * encoded inside a 200 stays masked on a legacy system. Pinned so the set
+ * cannot grow without someone saying so, and so the release notes can name it.
+ * The real fix is one contract across a class and its Legacy twin: issue #200.
+ */
+const PINNED = {
+  AdtPackageLegacy: ['create', 'read', 'readMetadata', 'updateMetadata', 'delete', 'validate'],
+  AdtUnitTestLegacy: ['run', 'getStatus', 'getResult'],
+  AdtRequestLegacy: ['delete', 'updateMetadata', 'list'],
+  AdtUtilsLegacy: ['activateObjectsGroup', 'getTableContents', 'getTableColumns', 'getSqlQuery'],
+};
+
+it('pins the legacy members that take no strategy', () => {
+  const found: Record<string, string[]> = {};
+  for (const file of globSync('node_modules/@mcp-abap-adt/adt-clients/dist/core/**/*Legacy.d.ts')) {
+    const cls = file.split('/').pop()!.replace('.d.ts', '');
+    const src = readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const members = new Set<string>();
+    for (const m of src.matchAll(/^ {4}([a-zA-Z]\w*)(<[^>]*>)?\s*\(([\s\S]*?)\)\s*:\s*Promise</gm)) {
+      const decl = (m[2] ?? '') + m[3];
+      if (!/IAdtOperationOptions|IAdtCreateOptions|analyse/.test(decl) && m[1] !== 'constructor') {
+        members.add(m[1]);
+      }
+    }
+    if (members.size > 0) found[cls] = [...members].sort();
+  }
+  // A new entry means a legacy tool quietly lost its verdict. Decide, then pin.
+  expect(found).toEqual(
+    Object.fromEntries(Object.entries(PINNED).map(([k, v]) => [k, [...v].sort()])),
+  );
+});
+```
+
+- [ ] **Step 3: For those twenty-three handlers, prefer a member that accepts a strategy**
 
 ```bash
-npx jest src/__tests__/unit/handlerInvariants.test.ts
+for f in $(grep -rl "available_in" src/handlers --include='handle*.ts' | xargs grep -l "'legacy'"); do
+  grep -qE "get(Package|Request|Utils|UnitTest)\(" "$f" && echo "${f#src/handlers/}"
+done
+```
+
+Go through that list once. Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. What is left is the measured cost of two contracts, and it belongs in the PR description rather than in a comment nobody reads.
+
+- [ ] **Step 4: Run them**
+
+```bash
+npx jest src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyContract.test.ts
 ```
 
 Expected: PASS if Tasks 5–13 are complete. Every failure names a file — fix the file, never the regex. If a file genuinely must be excepted, the exception goes in the test with a sentence saying why, so a reviewer sees it.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/__tests__/unit/handlerInvariants.test.ts
-git commit -m "test(handlers): the three invariants, checked rather than intended"
+git add src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyContract.test.ts
+git commit -m "test(handlers): the invariants, and what the legacy contract decides alone"
 ```
 
 ---

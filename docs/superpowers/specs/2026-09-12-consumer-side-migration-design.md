@@ -268,20 +268,41 @@ AdtClient`, overrides ten factories with `Legacy` classes and declares fourteen
 more as `never`, and some of those Legacy members take no strategy —
 `AdtPackageLegacy.readMetadata<E>()` has no parameter at all.
 
-**That is a different deployment, not a hidden branch.** `isLegacy` is
-`SAP_SYSTEM_TYPE=legacy`, set by whoever runs the server. A deployment is legacy
-or it is not, for its whole life; the two shapes never mix inside one process,
-and `available_in` already keeps the tools that cannot work there off a legacy
-system. So this is a consumer's explicit choice of a smaller contract, and the
-smaller contract decides fewer verdicts for itself. Worth stating once, not
-worth auditing here: a ledger of every place the legacy twin ignores a strategy
-would be measuring a contract this migration does not target, and would need
-regenerating whenever either side moves.
+**Legacy is a supported subset of the tools, and this migration covers it.** An
+earlier draft put it out of scope on the grounds that `SAP_SYSTEM_TYPE=legacy`
+is the operator's own choice. That is true and it is not sufficient:
+`available_in` hides only the tools that cannot run on legacy at all, and does
+nothing for the ones that do — they run **the same handler file**, which this
+work rewrites. Declaring a supported deployment out of scope is not a way to
+keep its behaviour.
 
-What this design owes the subject is one sentence and an issue. The sentence:
-**on a legacy system the verdict is adt-clients' wherever the `Legacy` member
-takes no strategy, and that is accepted.** The issue: one contract across a
-class and its `Legacy` twin, which is adt-clients' to give — part of #200.
+Passing a strategy a `Legacy` member has no parameter for is harmless in itself;
+JavaScript drops the argument. What is lost is the verdict, and only where ADT
+encodes a refusal inside a 200 — everywhere else `recogniseFailure` still
+reports a thrown request. Measured, the exposure is small and bounded:
+
+| `Legacy` class | members that take no strategy |
+|---|---|
+| `AdtPackageLegacy` | `create`, `read`, `readMetadata`, `updateMetadata`, `delete`, `validate` |
+| `AdtUnitTestLegacy` | `run`, `getStatus`, `getResult` |
+| `AdtRequestLegacy` | `delete`, `updateMetadata`, `list` |
+| `AdtUtilsLegacy` | `activateObjectsGroup`, `getTableContents`, `getTableColumns`, `getSqlQuery` |
+
+Twenty-three tools that declare `legacy` reach those four factories — the
+package tools, the unit-test tools, three listing tools and
+`handleActivateObject`. The other six overridden `Legacy` classes — program,
+class, interface, function group, function module, ddl — keep the strategy on
+every member, so their handlers need nothing special.
+
+So the rule for those twenty-three: **call a member that accepts a strategy
+where one exists, and where none does, pin the pair.** A short committed list of
+`(Legacy class, member)` pairs, checked by a test, so the set cannot grow
+unnoticed and the release can say which legacy tools still take adt-clients'
+verdict. Not a per-handler ledger — the list is seventeen members long and is
+generated from the declarations.
+
+This is a gap the two contracts create, and closing it properly is adt-clients'
+to do: one contract across a class and its `Legacy` twin. Part of issue #200.
 
 Within one shape, passing an `analyse` where it is not accepted is a compile
 error, so that half enforces itself. The half that needs a test is the omission:
@@ -372,10 +393,10 @@ its strategies are injected, so its notes describe what it ships.
 - No handler reads an envelope property off `IAdtSuccess`.
 - No handler decides a refusal for itself, and **every call whose resolved
   signature accepts an `analyse` is given one** — resolved per (class, member)
-  by the compiler, on the modern contract this migration targets. Neither the
-  presence of an `options` parameter nor a `<E extends IAdtError>` type
-  parameter is a reliable proxy. A legacy deployment runs a smaller contract by
-  the operator's own choice and is out of scope here. Where the
+  by the compiler on the modern contract, and by a pinned list of seventeen
+  members on the `Legacy` one, which `createAdtClient`'s declared return type
+  hides from the compiler. Neither the presence of an `options` parameter nor a
+  `<E extends IAdtError>` type parameter is a reliable proxy. Where the
   library's default verdict is not enough — `activateObjectsGroup` alone, among
   the members this repository calls — `handleActivateObject` says so in a
   comment rather than reading the document itself.

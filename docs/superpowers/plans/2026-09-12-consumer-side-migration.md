@@ -1781,9 +1781,31 @@ import { globSync } from 'node:fs';
 import { analyseOmissions } from '../src/lib/audit/analyseOmissions';
 
 const pattern = process.argv[2] ?? 'src/handlers/**/handle*.ts';
-const { offenders, inspected } = analyseOmissions(globSync(pattern));
+const files = globSync(pattern);
+const { offenders, inspected } = analyseOmissions(files);
+
 for (const line of offenders) console.error(line);
-console.log(`${inspected} calls accept an analyse, ${offenders.length} were given none`);
+console.log(
+  `${files.length} files, ${inspected} calls accept an analyse, ${offenders.length} were given none`,
+);
+
+// Zero inspected is a FAILURE, not a pass.
+//
+// This runs from Task 10 onward, while the tree still has hundreds of compiler
+// errors, so "the checker resolved nothing" is a live possibility and not a
+// theoretical one. A mistyped glob does the same. Both produce zero offenders,
+// and a script that exits 0 on them reports a clean family it never looked at —
+// which is the shape of every masking defect this migration exists to remove.
+if (files.length === 0) {
+  console.error(`no files matched ${pattern}`);
+  process.exit(2);
+}
+if (inspected === 0) {
+  console.error(
+    `${files.length} files matched but no call accepted an analyse — either the family genuinely has none, or the program resolved nothing. Check one signature by hand before believing this.`,
+  );
+  process.exit(2);
+}
 process.exit(offenders.length === 0 ? 0 : 1);
 ```
 
@@ -1791,11 +1813,19 @@ Task 26's third invariant calls the same `analyseOmissions`, over the whole
 tree instead of one family, and its twelve fixtures are what hold each verdict
 this module can reach.
 
+**Why the guard is "not zero" rather than a per-family minimum.** A number per
+family would have to be maintained by whoever adds a handler, and a maintained
+number drifts until someone lowers it to make a run pass. Zero is the only
+threshold that needs no upkeep and still catches the failure that matters: a run
+that inspected nothing. The printed count is there for the human — a family of
+eight handlers reporting two inspected calls is worth stopping over, and no
+assertion will tell you that.
+
 - [ ] **Step 5: Run the tests, the check and the compiler**
 
 ```bash
 npx jest src/__tests__/unit/domainLow.test.ts src/__tests__/unit/toolSurface.test.ts
-npx tsx scripts/check-analyse.ts 'src/handlers/domain/low/**'   # expect 0 offenders
+npx tsx scripts/check-analyse.ts 'src/handlers/domain/low/**'   # 0 offenders AND a non-zero count
 npx tsc --noEmit 2>&1 | grep "handlers/domain/low" | wc -l      # expect 0
 ```
 
@@ -2028,7 +2058,7 @@ The third test is the one that decides Step 1: it passes under option 1 and fail
 
 ```bash
 npx jest src/__tests__/unit/commonLowOperations.test.ts
-npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # expect 0 offenders
+npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # 0 offenders AND a non-zero count
 ```
 
 - [ ] **Step 6: Commit** — `refactor(common): the generic operations, with the strategy deciding`
@@ -2086,7 +2116,7 @@ it.each([
 - [ ] **Step 5: Run the omission check on the family just touched**
 
 ```bash
-npx tsx scripts/check-analyse.ts 'src/handlers/<family>/low/**'   # expect 0 offenders
+npx tsx scripts/check-analyse.ts 'src/handlers/<family>/low/**'   # 0 offenders AND a non-zero count
 npx jest src/__tests__/unit/toolSurface.test.ts
 ```
 - [ ] **Step 6: Commit the family** — `refactor(<family>): the low tier, on strategies`
@@ -2967,6 +2997,7 @@ Twelve of them, and the name is the assertion:
 
 ```typescript
 // src/__tests__/unit/analyseOmissions.test.ts
+import { spawnSync } from 'node:child_process';
 import { globSync } from 'node:fs';
 import { basename } from 'node:path';
 import { analyseOmissions } from '../../lib/audit/analyseOmissions';
@@ -2976,6 +3007,24 @@ const fixtures = globSync('src/__tests__/fixtures/analyse/*.ts');
 it('has a fixture for every verdict, and finds them all', () => {
   // A glob that matched nothing would make every assertion below vacuous.
   expect(fixtures).toHaveLength(12);
+});
+
+it('inspects nothing when given nothing, and the script turns that into a failure', () => {
+  // The module reports the fact; the script decides it is a failure. Both
+  // halves are asserted, because the module answering `inspected: 0` is
+  // correct and the script exiting 0 on it would not be.
+  expect(analyseOmissions([])).toEqual({ offenders: [], inspected: 0 });
+
+  const run = (pattern: string) =>
+    spawnSync('npx', ['tsx', 'scripts/check-analyse.ts', pattern], { encoding: 'utf8' });
+
+  const noMatch = run('src/handlers/**/handleNoSuchThing*.ts');
+  expect(noMatch.status).toBe(2);
+  expect(noMatch.stderr).toContain('no files matched');
+
+  const noCalls = run('src/__tests__/fixtures/analyse/../../helpers/*.ts');
+  expect(noCalls.status).toBe(2);
+  expect(noCalls.stderr).toContain('no call accepted an analyse');
 });
 
 it.each(fixtures)('%s produces the verdict its name claims', (file) => {
@@ -2999,7 +3048,7 @@ it.each(fixtures)('%s produces the verdict its name claims', (file) => {
 - [ ] **Step 3: Run them, and make one fail on purpose**
 
 ```bash
-npx jest src/__tests__/unit/analyseOmissions.test.ts   # 13 assertions, all green
+npx jest src/__tests__/unit/analyseOmissions.test.ts   # 14 assertions, all green
 ```
 
 Then break `carriesAnalyse` in the one way each round of review already found —

@@ -3195,9 +3195,12 @@ const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
  */
 export function legacyEnabledHandlers(pattern = 'src/handlers/**/handle*.ts'): string[] {
   const AVAILABLE_IN = /available_in\s*:\s*\[([^\]]*)\]/;
+  // Either quote style. The repository writes single quotes today, and a
+  // formatter switching them would otherwise empty this list without a word.
+  const LEGACY = /['"`]legacy['"`]/;
   return globSync(pattern).filter((file) => {
     const declared = AVAILABLE_IN.exec(readFileSync(file, 'utf8'));
-    return declared === null || declared[1].includes("'legacy'");
+    return declared === null || LEGACY.test(declared[1]);
   });
 }
 
@@ -3277,9 +3280,14 @@ npx tsx -e "
 " > tests/fixtures/legacy-exposure.json
 ```
 
-The count on stderr is the check that the filter ran: an unfiltered glob answers
-326 and the filtered one answers 144. A ledger generated from 326 files is not a
-longer ledger, it is a wrong one.
+The count on stderr tells you which happened right now: an unfiltered glob
+answers 326 and the filtered one answers 144. A ledger generated from 326 files
+is not a longer ledger, it is a wrong one.
+
+**That count is for the person running this step, and guards nothing
+afterwards.** The committed test carries the standing guard — see Step 4, where
+it asserts the filter still finds most of the tree before the ledger is believed
+at all.
 
 - [ ] **Step 2: Prove the walk sees every call form before trusting the list**
 
@@ -3362,7 +3370,7 @@ array is what success looks like here and so is the wrong way to be wrong.
 
 ```typescript
 // src/__tests__/unit/legacyExposure.test.ts
-import { readFileSync } from 'node:fs';
+import { globSync, readFileSync } from 'node:fs';
 import { legacyEnabledHandlers, legacyExposure } from '../../lib/audit/analyseOmissions';
 
 /**
@@ -3377,6 +3385,21 @@ import { legacyEnabledHandlers, legacyExposure } from '../../lib/audit/analyseOm
  * It may only shrink. A new entry means a handler moved ONTO a member that
  * decides alone, which is the wrong direction and needs saying out loud.
  */
+it('still finds the handlers legacy is offered', () => {
+  // The ledger below is fail-open without this. If the filter stops matching —
+  // a formatter switching quote style, `available_in` moving into a shared
+  // constant — it answers [], the exposure list is empty, nothing was "added",
+  // and the ledger test passes while having examined no handler at all.
+  //
+  // Measured: 144 of 326 handlers declare legacy. The floor is a third rather
+  // than 144 so that adding handlers never needs this number edited; what it
+  // catches is the filter collapsing, which is a fall to zero, not a drift.
+  const all = globSync('src/handlers/**/handle*.ts');
+  const kept = legacyEnabledHandlers();
+  expect(all.length).toBeGreaterThan(300);
+  expect(kept.length).toBeGreaterThan(all.length / 3);
+});
+
 it('lands on no legacy member that decides alone, beyond the ones recorded', () => {
   const recorded: string[] = JSON.parse(readFileSync('tests/fixtures/legacy-exposure.json', 'utf8'));
   // Filtered, for the same reason the snapshot is: a tool not offered on

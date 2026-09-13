@@ -1771,7 +1771,7 @@ Do not batch two families into one commit.
 
 29 files: `handleGetClass`, `handleGetDomain`, `handleGetTable`, `handleGetStructure`, `handleGetProgram`, `handleGetInterface`, `handleGetDdl`, `handleGetDataElement`, `handleGetPackage`, `handleGetMessageClass`, `handleGetMessageClassMessage`, `handleGetFunctionGroup`, `handleGetFunctionModule`, `handleGetServiceBinding`, `handleGetServiceDefinition`, `handleGetMetadataExtension`, `handleGetBehaviorDefinition`, `handleGetBehaviorImplementation`, `handleGetLocalTestClass`, `handleGetLocalTypes`, `handleGetLocalDefinitions`, `handleGetLocalMacros`, `handleGetUnitTest`, `handleGetUnitTestStatus`, `handleGetUnitTestResult`, `handleGetCdsUnitTest`, `handleGetCdsUnitTestStatus`, `handleGetCdsUnitTestResult`, `handleListServiceBindingTypes`.
 
-Each follows Task 9 (two calls, `pair`) or Task 12 (one call). The six unit-test readers take `analyseUnitTest` and `structured`; note that `AdtUnitTestLegacy` accepts no strategy on `run`, `getStatus` and `getResult`, which Task 24 pins.
+Each follows Task 9 (two calls, `pair`) or Task 12 (one call). The six unit-test readers take `analyseUnitTest` and `structured`; note that `AdtUnitTestLegacy` accepts no strategy on `run`, `getStatus` and `getResult`, which Task 26 pins.
 
 - [ ] **Step 1: Extend `readonlySingleCall.test.ts` with one row per `Get*` handler**, asserting a refusal surfaces as `isError: true`
 - [ ] **Step 2: Run it to verify it fails**
@@ -1781,16 +1781,38 @@ Each follows Task 9 (two calls, `pair`) or Task 12 (one call). The six unit-test
 
 ---
 
-## Task 19: The `high` tier writes, under `withLock`
+## Task 19: The eighteen high-tier writes that hold a lock
 
-Every `high` update holds a lock for the whole call, which is exactly `withLock`'s shape and exactly what the thirteen `try/finally` handlers are doing by hand today. Those thirteen also flatten the strategy's failure into `return_error(new Error(message))` and log a failed unlock as a warning the caller never sees.
+Measured, because the shape follows from whether the handler takes a lock and
+not from the verb:
 
-**Files:** the `high`-tier `Create*`, `Update*` and `Delete*` handlers — `class`, `interface`, `program`, `ddl`, `ddlx`, `structure`, `table`, `behavior_definition`, `behavior_implementation`, `service_definition`, `service_binding`, `message_class`, `function*`, `package`, `data_element`, `domain`, `transport`, `unit_test`.
+```bash
+for f in $(find src/handlers -path '*/high/*' -name 'handle[CUD]*.ts'); do
+  grep -qE "\.lock\(" "$f" && echo "LOCK ${f#src/handlers/}"
+done | sort
+```
+
+**Thirteen updates and five creates** hold a lock for the whole call. That is
+`withLock`'s shape, and it is what the thirteen `try/finally` handlers are doing
+by hand today — those also flatten the strategy's failure into
+`return_error(new Error(message))` and log a failed unlock as a warning the
+caller never sees.
+
+The five creates are a lifecycle rather than one call: `handleCreateDomain`
+validates, creates, locks, updates the body, unlocks, checks and activates. The
+create itself takes no lock — the spec's corpus evidence is that a create is a
+bare POST — so the lock wraps only the update in the middle, and the whole thing
+is a `sequence` with a `withLock` inside it. This is also why a `CreateX` taking
+`source_code` must call `update()` after `create()`: `create` writes the shell.
+
+**Files:** the eighteen the command above lists.
 
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/highTierLocking.test.ts
+import { fakeClientOf, okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+
 it('releases the lock when the update is refused, and answers the update failure', async () => {
   const unlock = jest.fn(async () => okResponse(undefined));
   fakeClient = fakeClientOf({
@@ -1798,9 +1820,7 @@ it('releases the lock when the update is refused, and answers the update failure
     update: async () => refusedResponse('Update refused'),
     unlock,
   });
-  const result: any = await handleUpdateClass(context as any, {
-    class_name: 'ZCL_X', source_code: 'x',
-  });
+  const result: any = await handleUpdateClass(context as any, { class_name: 'ZCL_X', source_code: 'x' });
   expect(unlock).toHaveBeenCalledTimes(1);
   expect(result.isError).toBe(true);
   expect(JSON.parse(result.content[0].text).message).toBe('Update refused');
@@ -1812,21 +1832,36 @@ it('reports a succeeded write under a refused unlock as a failure naming both', 
     update: async () => okResponse(reading(undefined, '', 200)),
     unlock: async () => refusedResponse('Unlock refused'),
   });
-  const result: any = await handleUpdateClass(context as any, {
-    class_name: 'ZCL_X', source_code: 'x',
-  });
+  const result: any = await handleUpdateClass(context as any, { class_name: 'ZCL_X', source_code: 'x' });
   const payload = JSON.parse(result.content[0].text);
   expect(result.isError).toBe(true);
   expect(payload.message).toBe('Unlock refused');
   expect(payload.operation).toBe('succeeded');
 });
+
+it('a lifecycle create locks only the body write, not the create', async () => {
+  const order: string[] = [];
+  fakeClient = fakeClientOf({
+    validate: async () => { order.push('validate'); return okResponse(reading({})); },
+    create: async () => { order.push('create'); return okResponse(reading(undefined, '', 200)); },
+    lock: async () => { order.push('lock'); return okResponse('handle-1'); },
+    update: async () => { order.push('update'); return okResponse(reading(undefined, '', 200)); },
+    unlock: async () => { order.push('unlock'); return okResponse(undefined); },
+    activate: async () => { order.push('activate'); return okResponse(reading({})); },
+  });
+  await handleCreateDomain(context as any, {
+    domain_name: 'ZD', package_name: 'ZP', description: 'x', data_type: 'CHAR', length: 10,
+  });
+  expect(order).toEqual(['validate', 'create', 'lock', 'update', 'unlock', 'activate']);
+});
 ```
 
-- [ ] **Step 2: Run it to verify it fails** — today the unlock failure is a `logger.warn` and the handler answers success.
+- [ ] **Step 2: Run them to verify they fail** — today the unlock failure is a `logger.warn` and the handler answers success.
+
 - [ ] **Step 3: Implement**
 
 ```typescript
-// the shape
+// an update: the lock is the whole call
 return answer(
   { tool: 'UpdateClass', detail: detailOf(args) },
   () =>
@@ -1837,14 +1872,148 @@ return answer(
     ),
   project(detailOf(args), terseWrite),
 );
+
+// a lifecycle create: the lock wraps only the body write
+return answer(
+  { tool: 'CreateDomain', detail: detailOf(args) },
+  () =>
+    sequence(
+      () => obj.validate(config, { analyse: analyseValidation }),
+      () => obj.create(config, { analyse: analyseException }),
+      () =>
+        withLock(
+          () => obj.lock({ domainName }),
+          (lockHandle) => obj.updateMetadata({ domainName }, { lockHandle, xmlContent, analyse: analyseException }),
+          (lockHandle) => obj.unlock({ domainName }, lockHandle),
+        ),
+    ),
+  project(detailOf(args), terseWrite),
+);
 ```
 
+Activation after the create is a further step; keep whatever the handler does today and give it `analyseActivation`.
+
 - [ ] **Step 4: Run the tests and measure**
-- [ ] **Step 5: Commit** — `refactor(high): the writes hold their lock through withLock`
+- [ ] **Step 5: Commit** — `refactor(high): the writes that hold a lock hold it through withLock`
 
 ---
 
-## Task 20: The four remaining read-modify-write families
+## Task 20: The high-tier creates and updates that hold no lock
+
+**Seventeen creates and eleven updates.** A create is a bare POST — the corpus
+has `create-class--01-oo-classes` and `create-domain--01-ddic-domains`, one
+exchange each, no lock — and these eleven updates take the handle as an
+argument rather than acquiring one. Both are the single-call shape of Task 9,
+with Task 10's pairing: `analyseException`, `statusOnly`, `terseWrite`.
+
+**Do not give these a lock lifecycle.** A `withLock` here would acquire a lock
+the tool was never asked for and release it under an object the caller may hold
+open elsewhere.
+
+```bash
+for f in $(find src/handlers -path '*/high/*' -name 'handle[CU]*.ts' | grep -v handleCheck); do
+  grep -qE "\.lock\(" "$f" || echo "${f#src/handlers/}"
+done | sort
+```
+
+- [ ] **Step 1: Write the failing test**
+
+```typescript
+// src/__tests__/unit/highTierWrites.test.ts
+it.each([
+  ['CreateClass', handleCreateClass, { class_name: 'ZCL_X', package_name: 'ZP', description: 'x' }],
+  ['CreateInterface', handleCreateInterface, { interface_name: 'ZIF_X', package_name: 'ZP', description: 'x' }],
+  // one row per file the command above lists
+])('%s reports a refused create as an error', async (_n, handler, args) => {
+  fakeClient = fakeClientOf({ create: async () => refusedResponse('Name already taken') });
+  const result: any = await (handler as any)(context as any, args);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Name already taken');
+});
+
+it('answers SUCCESS and nothing else when a create works', async () => {
+  // A class create answers 200 with zero bytes; the status is the whole verdict.
+  fakeClient = fakeClientOf({ create: async () => okResponse(reading(undefined, '', 200)) });
+  const result: any = await handleCreateClass(context as any, {
+    class_name: 'ZCL_X', package_name: 'ZP', description: 'x',
+  });
+  expect(result.isError).toBe(false);
+  expect(result.content[0].text).toContain('SUCCESS');
+});
+
+it('never acquires a lock', async () => {
+  const lock = jest.fn();
+  fakeClient = fakeClientOf({ create: async () => okResponse(reading(undefined, '', 200)), lock });
+  await handleCreateClass(context as any, { class_name: 'ZCL_X', package_name: 'ZP', description: 'x' });
+  expect(lock).not.toHaveBeenCalled();
+});
+```
+
+**A refused create is unrecorded in the corpus for every family** — the spec
+says so. These tests therefore assert the handler's behaviour given a refusal,
+not the shape of the document ADT sends; say that in the file's header.
+
+- [ ] **Step 2: Run them to verify they fail**
+- [ ] **Step 3: Implement**, one family per commit, as single-call `answer()`.
+- [ ] **Step 4: Run the tests and measure**
+- [ ] **Step 5: Commit per family** — `refactor(<family>): the high-tier create, single call`
+
+---
+
+## Task 21: The high-tier deletes and checks
+
+**Twenty-four deletes and thirteen checks**, none of which locks. A deletion is
+a POST to `/sap/bc/adt/deletion/delete` with the object in the body — the corpus
+has it as `delete-success--01-deletion-delete`, one exchange — and **a held lock
+is what makes a deletion refuse**, which is how `refusal-delete-refused` was
+captured. So a delete handler must not take a lock; doing so would make the
+operation fail.
+
+| operation | `analyse` | reading | projection |
+|---|---|---|---|
+| Delete | `analyseDeletion` | `structured` | `terseDeletion` |
+| Deletion check | `analyseDeletion` | `structured` | `terseDeletion` |
+| Check | `analyseCheck` | `structured` | `terseCheck` |
+
+- [ ] **Step 1: Write the failing test, from the corpus**
+
+```typescript
+// src/__tests__/unit/highTierDeletes.test.ts
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { corpusBody } from '../../lib/adtCorpus';
+import { fakeClientOf, refusedResponse } from '../helpers/fakeClient';
+
+it('reports a refused deletion as an error, though ADT answered 200', async () => {
+  // The masking family this project has already fixed twice: isDeleted=false
+  // and a del:message, under a 200. The handler must not read the status.
+  const document = corpusBody('refusal-delete-refused--01-deletion-delete');
+  fakeClient = fakeClientOf({
+    delete: async (_c: unknown, o: any) => {
+      expect(o.analyse).toBe(analyseDeletion);
+      return refusedResponse((o.analyse('adt:no-failure', { data: document, status: 200 }) as any).message);
+    },
+  });
+  const result: any = await handleDeleteClass(context as any, { class_name: 'ZCL_X' });
+  expect(result.isError).toBe(true);
+  expect(result.content[0].text).not.toContain('"success": true');
+});
+
+it('never acquires a lock, because a held lock is what makes a deletion refuse', async () => {
+  const lock = jest.fn();
+  fakeClient = fakeClientOf({ delete: async () => okResponse(reading({})), lock });
+  await handleDeleteClass(context as any, { class_name: 'ZCL_X' });
+  expect(lock).not.toHaveBeenCalled();
+});
+```
+
+- [ ] **Step 2: Run them to verify they fail**
+- [ ] **Step 3: Implement**, one family per commit.
+- [ ] **Step 4: Run the tests and measure**
+- [ ] **Step 5: Commit per family** — `refactor(<family>): the high-tier delete, on the deletion strategy`
+
+---
+
+## Task 22: The four remaining read-modify-write families
 
 `domain` is done and is the worked example. Four families take a whole document on 19 and `update` replaces rather than merges: `dataElement`, `package`, `functionGroup`, `tabletype`. Their update handlers pass a handful of named fields and no document, which under a replace is silent data loss.
 
@@ -1927,11 +2096,11 @@ A `low`-tier update takes the handle as an argument and must not acquire or rele
 
 ---
 
-## Task 21: The six static sequences 19 removed
+## Task 23: The six static sequences 19 removed
 
 These have no type error to fix — they have no member to call. Each is a fixed
 chain: run the steps in order, stop at the first failure. The two class
-profiling handlers are **not** here; they poll, and Task 22 is theirs.
+profiling handlers are **not** here; they poll, and Task 24 is theirs.
 
 | file | removed member |
 |---|---|
@@ -1976,7 +2145,7 @@ it("stops at the first refused step and answers that step's failure", async () =
 
 ---
 
-## Task 22: `poll()` — the two profiling handlers that are not a sequence
+## Task 24: `poll()` — the two profiling handlers that are not a sequence
 
 `sequence()` runs a fixed chain and stops at the first failure. That is not what
 `RuntimeRunClass` and `RuntimeRunClassWithProfiling` do: a trace does not exist
@@ -1996,7 +2165,7 @@ one.** Only a test that counts attempts will.
 
 The other two profiling handlers, `handleRuntimeRunProgram` and
 `handleRuntimeRunProgramWithProfiling`, declare none of these parameters and are
-static sequences — they are in Task 21.
+static sequences — they are in Task 23.
 
 **Files:**
 - Create: `src/lib/strategies/poll.ts`, `src/__tests__/unit/poll.test.ts`, `src/__tests__/unit/runtimeProfiling.test.ts`
@@ -2248,7 +2417,7 @@ tsc: <before> → <after>"
 
 ---
 
-## Task 23: The library files, and the last of the compiler's list
+## Task 25: The library files, and the last of the compiler's list
 
 **Files:** `src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver}.ts`, `src/embeddable/BaseMcpServer.ts`, and whatever the compiler still names.
 
@@ -2273,7 +2442,7 @@ Expected: `CLEAN`, and the whole unit suite green. From here the pre-commit hook
 
 ---
 
-## Task 24: The invariants, and what the legacy contract decides alone
+## Task 26: The invariants, and what the legacy contract decides alone
 
 Three of the spec's success criteria are claims about 326 files. A reviewer cannot check those by reading, and neither can the next person to add a handler.
 
@@ -2325,7 +2494,7 @@ it('every client call that accepts an analyse is given one', () => {
     for (const call of memberCallsIn(source)) {
       const signature = checker.getResolvedSignature(call);
       // A call the checker cannot resolve tells us nothing. This test is
-      // meaningful only on a clean build, which is why it comes after Task 23.
+      // meaningful only on a clean build, which is why it comes after Task 25.
       const options = signature?.parameters.at(-1);
       if (options === undefined) continue;
       const type = checker.getTypeOfSymbolAtLocation(options, call);
@@ -2396,7 +2565,7 @@ Every failure names a file. Fix the file, never the regex. A genuine exception g
 
 - [ ] **Step 2: Prove the third test can fail, and that it fails for the right reason**
 
-Written after Task 23, this test is green the moment it runs, so it is a ratchet and needs the same proof Task 1's did — with one extra check, because a compiler-API test has a way of passing while measuring nothing.
+Written after Task 25, this test is green the moment it runs, so it is a ratchet and needs the same proof Task 1's did — with one extra check, because a compiler-API test has a way of passing while measuring nothing.
 
 ```bash
 # 1. a control call that should be caught: drop the analyse from one handler
@@ -2469,7 +2638,7 @@ npx jest src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyC
 
 ---
 
-## Task 25: The twenty-three tools that reach a legacy contract
+## Task 27: The twenty-three tools that reach a legacy contract
 
 ```bash
 for f in $(grep -rl "available_in" src/handlers --include='handle*.ts' | xargs grep -l "'legacy'"); do
@@ -2486,7 +2655,7 @@ The package tools, the unit-test tools, three listing tools and `handleActivateO
 
 ---
 
-## Task 26: `detail` on the JSON-answering tools
+## Task 28: `detail` on the JSON-answering tools
 
 Last, deliberately: adding a parameter before the handlers honour it puts a lie on the tool surface.
 
@@ -2547,7 +2716,7 @@ Expected: no output. Anything printed is a surface change this work was not allo
 
 ---
 
-## Task 27: Documentation, and the close
+## Task 29: Documentation, and the close
 
 Releasing means updating everything the change touches, not only the changelog.
 
@@ -2558,7 +2727,7 @@ grep -rln "readResult\|metadataResult\|adt-clients 18\|activationRefusal\|deleti
 npm run docs:tools
 ```
 
-- [ ] **Step 2: Update it**, with a migration note: `detail` is new and optional; a read that used to answer `success: true` with a null body now answers an error; a write that succeeded under a failed unlock now answers an error carrying `operation: 'succeeded'`; and on a legacy system the tools listed in Task 25 take adt-clients' verdict.
+- [ ] **Step 2: Update it**, with a migration note: `detail` is new and optional; a read that used to answer `success: true` with a null body now answers an error; a write that succeeded under a failed unlock now answers an error carrying `operation: 'succeeded'`; and on a legacy system the tools listed in Task 27 take adt-clients' verdict.
 - [ ] **Step 3: Run everything**
 
 ```bash
@@ -2571,7 +2740,7 @@ npx tsc --noEmit && npm run lint:check && npx jest
 npm run test:integration 2>&1 | tee /tmp/integration-test.log
 ```
 
-- [ ] **Step 5: Open the PR**, listing the two behaviour changes above, the Task 13 decision and the Task 25 leftovers.
+- [ ] **Step 5: Open the PR**, listing the two behaviour changes above, the Task 13 decision and the Task 27 leftovers.
 - [ ] **Step 6: After merge, delete the spec and this plan**, per the project's lifecycle rule. History lives in git.
 
 ---
@@ -2585,7 +2754,7 @@ npm run test:integration 2>&1 | tee /tmp/integration-test.log
 - **A schema outlives its implementation.** `max_trace_attempts` and its
   siblings stayed in the tool surface after 19 removed the member that honoured
   them, and Task 1's ratchet cannot tell the difference — it compares schemas,
-  not behaviour. Task 22 is the answer for the two handlers where this was
+  not behaviour. Task 24 is the answer for the two handlers where this was
   found. If another parameter turns out to be promised and unread, it will be
   found the same way: by someone reading the schema against the code.
-- **The invariant regexes in Task 24 are blunt** and will catch a comment mentioning `exc:exception`. That is the right direction to be wrong in; move the comment, do not loosen the pattern.
+- **The invariant regexes in Task 26 are blunt** and will catch a comment mentioning `exc:exception`. That is the right direction to be wrong in; move the comment, do not loosen the pattern.

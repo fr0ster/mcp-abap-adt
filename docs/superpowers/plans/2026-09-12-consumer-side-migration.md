@@ -1826,7 +1826,7 @@ npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # expect 0 offen
 
 **Files:** every `handle*.ts` under `src/handlers/<family>/low/` for the families in this cluster's row, plus `src/__tests__/unit/lowTierStrategies.test.ts`, created in the first cluster and extended by each of the others.
 
-For each family, in order:For each family, in order:
+For each family, in order:
 
 - [ ] **Step 1: Measure** — `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l`
 - [ ] **Step 2: Write the family's test row** in `src/__tests__/unit/lowTierStrategies.test.ts`, asserting the pairing rather than the prose: what goes wrong at this scale is a handler taking the wrong `analyse`, and that is visible from the call.

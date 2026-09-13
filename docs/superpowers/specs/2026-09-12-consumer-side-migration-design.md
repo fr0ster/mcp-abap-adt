@@ -134,7 +134,7 @@ second account beside the strategy's, and which step it was is already in the
 failure's `request`.
 
 `withLock` is where the qualifier earns its place: its `acquire` and `release`
-call `lock` and `unlock`, and neither declares an options parameter in 19, so
+call `lock` and `unlock`, and neither declares `<E extends IAdtError>` in 19, so
 neither can be given an `analyse` at all. Their verdict stays adt-clients'. The
 body in between takes one like any other call. See below.
 
@@ -232,10 +232,13 @@ just warning the log, which is all the current handlers do.
 reading — success with a warning — is defensible if a caller is expected to act
 on warnings. The evidence here says they do not.
 
-**Which members accept an `analyse` is a fact about their signature.** A member
-that declares an options parameter takes one; a member that declares none cannot
-be given one, whatever this document would prefer. Measured on 19, and by member
-rather than by grep, because an earlier draft of this section got the scale
+**Which members accept an `analyse` is a fact about their signature — and the
+fact is the type parameter, not the options.** A member that declares
+`<E extends IAdtError>` takes a strategy; a member without it cannot be given
+one, whatever this document would prefer, and having an `options` argument
+proves nothing either way: `fetchNodeStructure` declares one for `nodeId` and
+`withShortDescriptions` and accepts no strategy at all. Measured on 19, by
+member rather than by grep, because earlier drafts of this section got the scale
 wrong in both directions:
 
 **Twelve members take one**, across every object class and `AdtUtils` together:
@@ -284,7 +287,8 @@ So: `handleActivateObject` is the one place where the design's rule and the
 library's surface genuinely collide, and it is called out as such rather than
 generalised into a claim about every walk and listing. The options are to call
 the per-object `activate`, which does take an `analyse`, or to get the group
-member an options parameter. Raised as part of issue #200.
+member the `<E extends IAdtError>` shape the other twelve have. Raised as part
+of issue #200.
 
 **For the package walkers this is not a gap at all**, and the reason is worth
 keeping separate from the signature: a missing package and an empty one answer

@@ -3145,7 +3145,7 @@ done
 **Files:**
 - Modify: the twenty-three the command above lists, under `src/handlers/`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `legacyExposure()` beside it
-- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-exposure.json`, and two fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts` and `aliased.ts`
+- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-exposure.json`, and three fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts`, `aliased.ts`, `asserted.ts`
 
 **Task 26's pin does not hold this.** `legacyContract.test.ts` reads the
 `*Legacy.d.ts` declarations and knows nothing about which member any handler
@@ -3227,9 +3227,19 @@ function factoryOf(receiver: ts.Expression, checker: ts.TypeChecker): string | u
       return factoryOf(declaration.initializer, checker);
     }
   }
-  // `await client.getPackage()` and parenthesised forms unwrap to the same
-  // question rather than to a different answer.
-  if (ts.isAwaitExpression(receiver) || ts.isParenthesizedExpression(receiver)) {
+  // Everything that wraps an expression without changing which factory made
+  // it. `as any` is the one that matters: seven handlers write
+  // `const unitTest = client.getUnitTest() as any`, three of them among the
+  // twenty-three this ledger is for, and an assertion is invisible to a walk
+  // that only knows about calls and identifiers.
+  if (
+    ts.isAwaitExpression(receiver) ||
+    ts.isParenthesizedExpression(receiver) ||
+    ts.isAsExpression(receiver) ||
+    ts.isTypeAssertionExpression(receiver) ||
+    ts.isNonNullExpression(receiver) ||
+    ts.isSatisfiesExpression(receiver)
+  ) {
     return factoryOf(receiver.expression, checker);
   }
   return undefined;
@@ -3244,11 +3254,11 @@ npx tsx -e "
 " > tests/fixtures/legacy-exposure.json
 ```
 
-- [ ] **Step 2: Prove the walk sees both call forms before trusting the list**
+- [ ] **Step 2: Prove the walk sees every call form before trusting the list**
 
-Two more fixtures beside the twelve from Task 26, under
-`src/__tests__/fixtures/analyse/` — they exercise `legacyExposure`, not
-`analyseOmissions`, so name them apart:
+Three fixtures, under `src/__tests__/fixtures/legacy/` — they exercise
+`legacyExposure` rather than `analyseOmissions`, so they live apart from Task
+26's twelve. Each is a shape counted on the real tree, not an invented one:
 
 ```typescript
 // src/__tests__/fixtures/legacy/chain.ts — the direct form
@@ -3268,19 +3278,37 @@ export const call = () => {
 ```
 
 ```typescript
+// src/__tests__/fixtures/legacy/asserted.ts — the form seven handlers use
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+declare const client: AdtClient;
+export const call = () => {
+  // Verbatim from handleGetClassUnitTestStatus, one of the twenty-three.
+  const unitTest = client.getUnitTest() as any;
+  return unitTest.getStatus({ className: 'ZCL_X' });
+};
+```
+
+```typescript
 // in src/__tests__/unit/legacyExposure.test.ts
-it('sees a legacy member through both the chain and a local', () => {
-  expect(legacyExposure(['src/__tests__/fixtures/legacy/chain.ts'])).toEqual([
-    '../__tests__/fixtures/legacy/chain.ts → getPackage().readMetadata',
-  ]);
-  // The one that matters: 109 call sites take this shape, and a walk that
-  // handled only the chain would return [] here and read as good news.
-  expect(legacyExposure(['src/__tests__/fixtures/legacy/aliased.ts'])).toHaveLength(1);
+it.each([
+  ['chain.ts', 'getPackage().readMetadata'],
+  // 109 call sites take this shape.
+  ['aliased.ts', 'getPackage().readMetadata'],
+  // 7 take this one, 3 of them among the twenty-three. An assertion hides the
+  // factory from a walk that knows only calls and identifiers.
+  ['asserted.ts', 'getUnitTest().getStatus'],
+])('sees the factory through %s', (fixture, pair) => {
+  const found = legacyExposure([`src/__tests__/fixtures/legacy/${fixture}`]);
+  // Every one of these must find exactly one, because [] is what a clean
+  // result looks like and is therefore the wrong way to be wrong.
+  expect(found).toHaveLength(1);
+  expect(found[0]).toContain(pair);
 });
 ```
 
-Adjust the expected strings to whatever the path prefix actually produces; the
-assertion that matters is that neither answers an empty array.
+Adjust the path prefix in the expected pair to whatever `legacyExposure`
+actually produces; the assertion that matters is the length, because an empty
+array is what success looks like here and so is the wrong way to be wrong.
 
 - [ ] **Step 3: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate the file after each change; the list must get shorter.
 

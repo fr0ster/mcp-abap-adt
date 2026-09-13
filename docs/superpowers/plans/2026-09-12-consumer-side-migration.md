@@ -2356,6 +2356,40 @@ it.each([
   expect(JSON.parse(result.content[0].text).message).toBe('Name already taken');
 });
 
+// The eleven updates are a different call and a different assertion. A row
+// for one of them in the table above would mock `create`, which the handler
+// never calls, and then assert a refused create that never happened.
+it.each([
+  ['UpdateClass', handleUpdateClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateInterface', handleUpdateInterface, { interface_name: 'ZIF_X', source_code: 'x', lock_handle: 'h' }],
+  // one row per update the command above lists
+])('%s reports a refused update as an error', async (_n, handler, args) => {
+  fakeClient = fakeClientOf({ update: async () => refusedResponse('Object is locked by another user') });
+  const result: any = await (handler as any)(context as any, args);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Object is locked by another user');
+});
+
+it.each([
+  ['UpdateClass', handleUpdateClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateInterface', handleUpdateInterface, { interface_name: 'ZIF_X', source_code: 'x', lock_handle: 'h' }],
+])('%s takes the lock handle as an argument and acquires none', async (_n, handler, args) => {
+  // These eleven are `high`-tier by name and `low`-tier by shape: the caller
+  // already holds the lock. Acquiring one here would take a second lock on an
+  // object the caller has open, and releasing it would drop theirs.
+  const lock = jest.fn();
+  const unlock = jest.fn();
+  const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
+  fakeClient = fakeClientOf({ update, lock, unlock });
+  await (handler as any)(context as any, args);
+  expect(lock).not.toHaveBeenCalled();
+  expect(unlock).not.toHaveBeenCalled();
+  expect(update).toHaveBeenCalledWith(
+    expect.anything(),
+    expect.objectContaining({ lockHandle: 'h', analyse: analyseException }),
+  );
+});
+
 it('answers SUCCESS and nothing else when a create works', async () => {
   // A class create answers 200 with zero bytes; the status is the whole verdict.
   fakeClient = fakeClientOf({ create: async () => okResponse(reading(undefined, '', 200)) });
@@ -2425,6 +2459,47 @@ it('reports a refused deletion as an error, though ADT answered 200', async () =
   const result: any = await handleDeleteClass(context as any, { class_name: 'ZCL_X' });
   expect(result.isError).toBe(true);
   expect(result.content[0].text).not.toContain('"success": true');
+});
+
+// The thirteen checks are the other half of this task and take a different
+// strategy, a different reading and a different projection. The omission audit
+// proves only that SOME analyse was passed; only this proves it was the right
+// one, and picking analyseDeletion for a check run would pass that audit.
+it.each([
+  ['CheckClass', handleCheckClass, { class_name: 'ZCL_X' }],
+  ['CheckDdl', handleCheckDdl, { ddl_name: 'ZDDL' }],
+  // one row per check handler in this task
+])('%s takes analyseCheck and projects the check report', async (_n, handler, args) => {
+  const document = corpusBody('check-success-verdict--01-checkrun');
+  const seen: unknown[] = [];
+  fakeClient = fakeClientOf({
+    check: async (_c: unknown, _status: unknown, o: any) => {
+      seen.push(o.analyse);
+      return okResponse(reading(parseStructure(document), document, 200));
+    },
+  });
+  const result: any = await (handler as any)(context as any, args);
+  expect(seen).toEqual([analyseCheck]);
+  // terseCheck's own fields, so a projection swapped for terseDeletion fails
+  // here rather than passing as "some JSON came back".
+  expect(JSON.parse(result.content[0].text)).toMatchObject({ ran: true });
+});
+
+it('a deletion check takes analyseDeletion, not analyseCheck', async () => {
+  // Two members one letter apart in meaning: `check` runs the syntax check,
+  // `checkDeletion` asks whether the object may be deleted. They encode their
+  // refusals differently and the corpus has both.
+  const document = corpusBody('deletion-check-allows--01-deletion-check');
+  const seen: unknown[] = [];
+  fakeClient = fakeClientOf({
+    checkDeletion: async (_c: unknown, o: any) => {
+      seen.push(o.analyse);
+      return okResponse(reading(parseStructure(document), document, 200));
+    },
+  });
+  const result: any = await handleDeleteClass(context as any, { class_name: 'ZCL_X', check_only: true });
+  expect(seen).toEqual([analyseDeletion]);
+  expect(JSON.parse(result.content[0].text)).toHaveProperty('deletable');
 });
 
 it('never acquires a lock, because a held lock is what makes a deletion refuse', async () => {
@@ -2625,7 +2700,7 @@ static sequences — they are in Task 23.
 
 **Files:**
 - Create: `src/lib/strategies/poll.ts`, `src/__tests__/unit/poll.test.ts`, `src/__tests__/unit/runtimeProfiling.test.ts`
-- Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`, `src/lib/answer.ts`
+- Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`, `src/lib/answer.ts`, `src/__tests__/unit/answerFailure.test.ts`
 
 **Interfaces:**
 - Produces:
@@ -2865,7 +2940,11 @@ npx tsc --noEmit 2>&1 | grep -c 'error TS'
 - [ ] **Step 9: Commit**
 
 ```bash
-git add src/lib/strategies/poll.ts src/lib/answer.ts src/handlers/system/readonly/handleRuntimeRunClass*.ts src/__tests__/unit/poll.test.ts src/__tests__/unit/runtimeProfiling.test.ts
+git add src/lib/strategies/poll.ts src/lib/answer.ts \
+        src/handlers/system/readonly/handleRuntimeRunClass*.ts \
+        src/__tests__/unit/poll.test.ts \
+        src/__tests__/unit/runtimeProfiling.test.ts \
+        src/__tests__/unit/answerFailure.test.ts
 git commit --no-verify -m "feat(system): the profiling handlers poll, because the schema says they do
 
 tsc: <before> → <after>"
@@ -3459,6 +3538,7 @@ Last, deliberately: adding a parameter before the handlers honour it puts a lie 
 - Modify: the `TOOL_DEFINITION` of every JSON-answering tool, and those handlers' `detail` argument
 - Modify: `tests/fixtures/tools/surface.json` — regenerated, with `detail` as the only difference
 - Create: `src/__tests__/unit/detailSurface.test.ts`
+- Modify: `src/lib/audit/analyseOmissions.ts` — add `detailWiring()`
 
 - [ ] **Step 1: Enumerate the JSON-answering tools**
 
@@ -3472,6 +3552,61 @@ for (const [g, tools] of Object.entries(groups)) for (const t of tools) console.
 A tool answers JSON unless it hands a document through as the whole answer. `source_code` or `metadata` as the only field is a pass-through; the same field inside a JSON object with others is JSON.
 
 - [ ] **Step 2: Write the failing test**
+
+A schema and a behaviour are two claims, and the second needs its own check.
+The rule is symmetrical, which makes it self-checking with no list to maintain:
+a handler whose tool **declares** `detail` must pass `detailOf(args)`; one whose
+tool **does not** must pass a literal.
+
+```typescript
+// src/lib/audit/analyseOmissions.ts — append
+
+/**
+ * Handlers whose `detail` argument disagrees with their own tool schema.
+ *
+ * Both directions are defects. A tool that offers `detail` and hardcodes
+ * `'terse'` advertises a parameter it ignores. A tool that offers none and
+ * calls `detailOf(args)` reads a parameter no caller can set — harmless today,
+ * and a lie in the schema the day someone reads the handler to learn the
+ * contract.
+ */
+export function detailWiring(handlers: string[]): string[] {
+  const program = ts.createProgram(handlers, compilerOptions());
+  const offenders: string[] = [];
+  for (const file of handlers) {
+    const source = program.getSourceFile(file);
+    if (source === undefined) continue;
+    // `DETAIL_PROPERTY` spread into the schema, or the property written out.
+    const declares = /DETAIL_PROPERTY|\bdetail\s*:\s*\{/.test(source.getFullText());
+
+    for (const call of answerCallsIn(source)) {
+      const ctx = call.arguments[0];
+      if (ctx === undefined || !ts.isObjectLiteralExpression(ctx)) continue;
+      const detail = ctx.properties.find((p) => p.name?.getText() === 'detail');
+      if (detail === undefined || !ts.isPropertyAssignment(detail)) continue;
+      const value = detail.initializer;
+      const dynamic = ts.isCallExpression(value) && value.expression.getText() === 'detailOf';
+      if (declares !== dynamic) {
+        offenders.push(
+          `${file}:${lineOf(source, value)} — tool ${declares ? 'declares' : 'does not declare'} detail, handler passes ${value.getText()}`,
+        );
+      }
+    }
+  }
+  return offenders;
+}
+
+/** Calls to `answer(...)` — the only place a detail reaches a caller. */
+function answerCallsIn(source: ts.SourceFile): ts.CallExpression[] {
+  const calls: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && node.expression.getText() === 'answer') calls.push(node);
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return calls;
+}
+```
 
 ```typescript
 // src/__tests__/unit/detailSurface.test.ts
@@ -3490,6 +3625,18 @@ it('declares detail on every JSON-answering tool and on no other', () => {
   expect(toolsDeclaring('detail').sort()).toEqual([...JSON_ANSWERING].sort());
 });
 
+it('wires detail the way each tool schema claims', () => {
+  // The test above says the parameter is offered. This one says it is read.
+  // A handler can declare `detail` and keep `detail: 'terse'` hardcoded in its
+  // `answer()` call — satisfying the schema test while ignoring the parameter
+  // — and a behavioural test on one handler would never notice for the other
+  // hundred.
+  expect(detailWiring(globSync('src/handlers/**/handle*.ts'))).toEqual([]);
+});
+
+// One worked example beside the invariant, since `detailWiring` proves the
+// argument is wired and not that the projection honours it.
+//
 // `detail` is a claim about SUCCESSES only — a failure carries raw_body at
 // every level, and answerFailure.test.ts is where that is held.
 it('answers raw as the document and terse as the summary', async () => {

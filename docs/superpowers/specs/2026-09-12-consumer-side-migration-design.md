@@ -100,8 +100,28 @@ not the last one. Capturing the first in a variable outside the run would hand
 the ordering back to the handler one assignment at a time, which is the thing
 these combinators exist to prevent.
 
-**Calls around a held resource** — `withLock()`. A lock-update-unlock chain is
-**not** a `sequence()`, and putting it in one would be a bug: `sequence` stops
+**Calls around a held resource** — `withLock()`, and only where the handler owns
+the whole lifetime of the lock. Two boundaries on that, both measured:
+
+*What actually locks.* In the corpus, an update is `lock`, `PUT`, `unlock`
+(`update-source-success`, three exchanges). A create is a bare `POST`
+(`create-class`, `create-domain`), an activation is a bare `POST`
+(`activation-success-verdict`), and a deletion is a `POST` to
+`/sap/bc/adt/deletion/delete` with the object in the body and no lock at all
+(`delete-success`) — a held lock is what makes a deletion *refuse*, which is how
+`refusal-delete-refused` was captured. So `withLock` belongs to the write that
+goes through a `PUT`, and nowhere else.
+
+*Where a lock deliberately outlives the handler.* Fifteen `low`-tier tools —
+`LockClassLow`, `LockDomainLow`, `LockObject` and the rest — acquire a lock and
+hand the handle back, because the caller's next MCP call is the update and the
+one after that is the unlock. Releasing it before returning would destroy the
+tool. **These are not `withLock` and must not be wrapped in it.** They are the
+one shape where an unreleased lock is the correct outcome, and `withLock`'s
+criterion does not apply to them.
+
+A lock-update-unlock chain is **not** a `sequence()`, and putting it in one would
+be a bug: `sequence` stops
 at the first failure, so a refused update would skip the unlock and leave the
 object locked in SAP. Thirteen update handlers already use `try/finally` for
 exactly this reason. adt-clients' own `LockRegistry` calls itself "a safety net,
@@ -327,20 +347,22 @@ its strategies are injected, so its notes describe what it ships.
   is then absent rather than invented.
 - `npx tsc` is clean.
 - No handler reads an envelope property off `IAdtSuccess`.
-- No handler decides a refusal for itself, and **every call whose member
-  declares an options parameter is given an `analyse`**. Members that declare
-  none cannot be given one: `lock`, `unlock`, `getVersions`, `getVersionSource`
-  and 19 of the 20 `AdtUtils` members. The check is the signature, not a list of
-  names kept by hand. Where the library's default verdict is not enough —
-  `activateObjectsGroup` alone, among the members this repository calls —
-  `handleActivateObject` says so in a comment rather than reading the document
-  itself.
+- No handler decides a refusal for itself, and **every call to one of the twelve
+  members that declare `<E extends IAdtError>` is given an `analyse`**. Having
+  an options parameter is not the test — `fetchNodeStructure` takes one, for
+  `nodeId` and `withShortDescriptions`, and accepts no strategy. The type
+  parameter is the test, because `E` is only ever given a value by `analyse`.
+  Where the library's default verdict is not enough — `activateObjectsGroup`
+  alone, among the members this repository calls — `handleActivateObject` says
+  so in a comment rather than reading the document itself.
 - Every XML-bodied update reads before it writes.
-- After every successful `acquire`, `release` is attempted exactly once, on
-  every path out — a refusal, a throw, a success. Whether SAP then lets go of
+- In a handler that owns a lock's whole lifetime, after every successful
+  `acquire`, `release` is attempted exactly once, on every path out — a refusal, a throw, a success. Whether SAP then lets go of
   the lock is SAP's answer, not something this code can promise; what it
   promises is that the attempt happens and that a refused or thrown release
-  reaches the caller rather than only the log.
+  reaches the caller rather than only the log. The fifteen `low`-tier lock tools
+  are outside this: handing the handle back with the lock still held is what
+  they are for.
 
 ## Out of scope
 

@@ -232,6 +232,8 @@ just warning the log, which is all the current handlers do.
 reading — success with a warning — is defensible if a caller is expected to act
 on warnings. The evidence here says they do not.
 
+## Who decides a refusal, when the member will not take a strategy
+
 **Whether a call accepts an `analyse` is a property of the (class, member) pair,
 and no reading of member names can answer it.** Three drafts of this section tried to
 answer it by reading declarations, and each was wrong in a different way:
@@ -250,7 +252,8 @@ answer it by reading declarations, and each was wrong in a different way:
 **The legacy twins are not hypothetical.** `createAdtClient` returns
 `AdtClientLegacy` whenever the system context says so, so the same handler runs
 against both shapes. A rule that holds for `AdtPackage` and not for
-`AdtPackageLegacy` is a rule that breaks on a legacy system only.
+`AdtPackageLegacy` is a rule that breaks on a legacy system only — see *Legacy
+is in scope, and here is why*.
 
 So this document states the rule and refuses to enumerate the members:
 
@@ -263,46 +266,9 @@ version.
 
 **But `tsc` sees only one of the two contracts, and saying it saw both was
 wrong.** `createAdtClient` is declared to return `AdtClient` and returns
-`AdtClientLegacy` when the context says legacy. `AdtClientLegacy extends
-AdtClient`, overrides ten factories with `Legacy` classes and declares fourteen
-more as `never`, and some of those Legacy members take no strategy —
-`AdtPackageLegacy.readMetadata<E>()` has no parameter at all.
-
-**Legacy is a supported subset of the tools, and this migration covers it.** An
-earlier draft put it out of scope on the grounds that `SAP_SYSTEM_TYPE=legacy`
-is the operator's own choice. That is true and it is not sufficient:
-`available_in` hides only the tools that cannot run on legacy at all, and does
-nothing for the ones that do — they run **the same handler file**, which this
-work rewrites. Declaring a supported deployment out of scope is not a way to
-keep its behaviour.
-
-Passing a strategy a `Legacy` member has no parameter for is harmless in itself;
-JavaScript drops the argument. What is lost is the verdict, and only where ADT
-encodes a refusal inside a 200 — everywhere else `recogniseFailure` still
-reports a thrown request. Measured, the exposure is small and bounded:
-
-| `Legacy` class | members that take no strategy |
-|---|---|
-| `AdtPackageLegacy` | `create`, `read`, `readMetadata`, `updateMetadata`, `delete`, `validate` |
-| `AdtUnitTestLegacy` | `run`, `getStatus`, `getResult` |
-| `AdtRequestLegacy` | `delete`, `updateMetadata`, `list` |
-| `AdtUtilsLegacy` | `activateObjectsGroup`, `getTableContents`, `getTableColumns`, `getSqlQuery` |
-
-Twenty-three tools that declare `legacy` reach those four factories — the
-package tools, the unit-test tools, three listing tools and
-`handleActivateObject`. The other six overridden `Legacy` classes — program,
-class, interface, function group, function module, ddl — keep the strategy on
-every member, so their handlers need nothing special.
-
-So the rule for those twenty-three: **call a member that accepts a strategy
-where one exists, and where none does, pin the pair.** A short committed list of
-`(Legacy class, member)` pairs, checked by a test, so the set cannot grow
-unnoticed and the release can say which legacy tools still take adt-clients'
-verdict. Not a per-handler ledger — the list is seventeen members long and is
-generated from the declarations.
-
-This is a gap the two contracts create, and closing it properly is adt-clients'
-to do: one contract across a class and its `Legacy` twin. Part of issue #200.
+`AdtClientLegacy` when the context says legacy, so a call site is always checked
+against the modern shape. That is a section of its own — *Legacy is in scope,
+and here is why* — because the answer is not a footnote about the compiler.
 
 Within one shape, passing an `analyse` where it is not accepted is a compile
 error, so that half enforces itself. The half that needs a test is the omission:
@@ -335,6 +301,68 @@ keeping separate from the signature: a missing package and an empty one answer
 the same sha256, so an `analyse` there would be inventing a signal rather than
 reading one. They would decline the parameter if it were offered. Everywhere
 else on that surface, we would take it.
+
+## Legacy is in scope, and here is why
+
+**What it is.** `SAP_SYSTEM_TYPE=legacy` tells this server the system is BASIS
+below 7.50, and `createAdtClient` then builds `AdtClientLegacy` instead of
+`AdtClient`. It is set by whoever runs the server and holds for the life of that
+deployment; the two clients never coexist in one process.
+
+**Why it is not a separate product.** Legacy is a **subset of the same tools**,
+not a fork. 144 of the 326 tools declare `legacy` in `available_in`, and they are
+served by **the same handler files** — there is no legacy handler directory and
+no legacy code path inside a handler. So this migration rewrites the legacy
+tools whether or not it says it does. An earlier draft of this document put
+legacy out of scope on the grounds that the operator chose it. That was a
+sentence, not a mechanism: declaring a deployment out of scope does not stop the
+code under it from changing, and the choice being explicit does not make an
+unannounced behaviour change acceptable. **A migration cannot decline to migrate
+the code it is rewriting.**
+
+**Why `available_in` does not cover it.** `available_in` decides which tools a
+system is offered. It hides the tools that cannot run on legacy at all — the
+fourteen factories `AdtClientLegacy` declares as `never`, so `GetDomain`,
+`ReadTable`, the service-binding tools and the rest. It says nothing about the
+144 tools that **do** run there, which is exactly the set at risk.
+
+**What actually differs.** `AdtClientLegacy` overrides ten factories with
+`Legacy` classes. Six of them — program, class, interface, function group,
+function module, ddl — parameterise every member, so their handlers need nothing
+special. Four do not:
+
+| `Legacy` class | members that take no strategy |
+|---|---|
+| `AdtPackageLegacy` | `create`, `read`, `readMetadata`, `updateMetadata`, `delete`, `validate` |
+| `AdtUnitTestLegacy` | `run`, `getStatus`, `getResult` |
+| `AdtRequestLegacy` | `delete`, `updateMetadata`, `list` |
+| `AdtUtilsLegacy` | `activateObjectsGroup`, `getTableContents`, `getTableColumns`, `getSqlQuery` |
+
+Twenty-three legacy-declaring tools reach those four factories: the package
+tools, the unit-test tools, three listing tools and `handleActivateObject`.
+
+**What it costs, precisely.** Passing a strategy to a member with no parameter
+for it is harmless — JavaScript drops the argument. What is lost is the verdict:
+`recogniseFailure` still reports a thrown request, so a 404 or a transport error
+surfaces as it should, and only a refusal **encoded inside a 200** stays
+unread. On those twenty-three tools, on a legacy system, that class of refusal
+is adt-clients' to judge.
+
+**What is done about it.** For those twenty-three: call a member that accepts a
+strategy where one exists; where none does, pin the `(Legacy class, member)`
+pair in a committed list a test checks, so the set cannot grow unnoticed and the
+release notes can name it. Seventeen members, generated from the declarations —
+this is a pin, not a per-handler ledger.
+
+**Two things deliberately not done.** Narrowing `createAdtClient` to
+`AdtClient | AdtClientLegacy` would make the compiler honest and would also
+force every handler to confront the fourteen `never` factories; that is a
+different project, and `available_in` already keeps those tools away. And
+dropping legacy support is not on the table: it is a supported subset, and
+ending it would be a product decision, not a migration detail.
+
+**The real fix is not ours.** One contract across a class and its `Legacy` twin,
+so a consumer writes the call once. Raised as part of issue #200.
 
 ## The read-modify-write
 

@@ -63,7 +63,8 @@ sed -E 's/\(.*//' /tmp/errs.txt | sort | uniq -c | sort -rn | head -30
 | `scripts/check-analyse.ts` | runs it on one family, from Task 10 onward |
 | `src/__tests__/unit/handlerInvariants.test.ts` | no envelope read, no handler verdict, no missing `analyse` |
 | `src/__tests__/unit/analyseOmissions.test.ts` + twelve fixtures | every verdict the check can reach, held by a committed case |
-| `src/__tests__/unit/legacyExposure.test.ts` + `tests/fixtures/legacy-exposure.json` | which handlers still land on a legacy member that decides alone |
+| `src/__tests__/unit/legacyExposure.test.ts` + `tests/fixtures/legacy-handlers.json` | exactly which handlers legacy is offered, pinned |
+| `tests/fixtures/legacy-exposure.json` | which of those still land on a member that decides alone |
 | `src/__tests__/unit/legacyContract.test.ts` | the seventeen legacy members that decide alone |
 
 **Modified:** `src/lib/answer.ts`, `src/lib/strategies/sequence.ts`, 253 handler files, and six non-handler files carrying the same envelope reads (`src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver,packageEnumerator}.ts`, `src/embeddable/BaseMcpServer.ts`).
@@ -3145,7 +3146,7 @@ done
 **Files:**
 - Modify: the twenty-three the command above lists, under `src/handlers/`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `legacyExposure()` beside it
-- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-exposure.json`, and four fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts`, `aliased.ts`, `asserted.ts`, `not-on-legacy.ts`
+- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-handlers.json`, `tests/fixtures/legacy-exposure.json`, and four fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts`, `aliased.ts`, `asserted.ts`, `not-on-legacy.ts`
 
 **Task 26's pin does not hold this.** `legacyContract.test.ts` reads the
 `*Legacy.d.ts` declarations and knows nothing about which member any handler
@@ -3272,22 +3273,28 @@ function factoryOf(receiver: ts.Expression, checker: ts.TypeChecker): string | u
 ```
 
 ```bash
+# the set of handlers legacy is offered, pinned
+npx tsx -e "
+  const { legacyEnabledHandlers } = require('./src/lib/audit/analyseOmissions');
+  console.log(JSON.stringify(legacyEnabledHandlers().sort(), null, 2));
+" > tests/fixtures/legacy-handlers.json
+wc -l tests/fixtures/legacy-handlers.json   # 144 handlers, so ~146 lines
+
+# and which of them land on a member that decides alone
 npx tsx -e "
   const { legacyExposure, legacyEnabledHandlers } = require('./src/lib/audit/analyseOmissions');
-  const files = legacyEnabledHandlers();
-  console.error(files.length + ' handlers are offered on legacy');
-  console.log(JSON.stringify(legacyExposure(files), null, 2));
+  console.log(JSON.stringify(legacyExposure(legacyEnabledHandlers()), null, 2));
 " > tests/fixtures/legacy-exposure.json
 ```
 
-The count on stderr tells you which happened right now: an unfiltered glob
-answers 326 and the filtered one answers 144. A ledger generated from 326 files
-is not a longer ledger, it is a wrong one.
+**Read the first file before committing it.** 326 handlers exist and 144 are
+offered on legacy; a file holding 326 means the filter did not run, and one
+holding a handful means it collapsed. Both look like a normal file from the
+outside, and this is the only moment anyone looks.
 
-**That count is for the person running this step, and guards nothing
-afterwards.** The committed test carries the standing guard — see Step 4, where
-it asserts the filter still finds most of the tree before the ledger is believed
-at all.
+After that the pinned set carries it: Step 4's first test compares
+`legacyEnabledHandlers()` against this file exactly, so a filter that later
+stops matching even one handler fails rather than shrinking the ledger.
 
 - [ ] **Step 2: Prove the walk sees every call form before trusting the list**
 
@@ -3370,7 +3377,7 @@ array is what success looks like here and so is the wrong way to be wrong.
 
 ```typescript
 // src/__tests__/unit/legacyExposure.test.ts
-import { globSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { legacyEnabledHandlers, legacyExposure } from '../../lib/audit/analyseOmissions';
 
 /**
@@ -3385,19 +3392,21 @@ import { legacyEnabledHandlers, legacyExposure } from '../../lib/audit/analyseOm
  * It may only shrink. A new entry means a handler moved ONTO a member that
  * decides alone, which is the wrong direction and needs saying out loud.
  */
-it('still finds the handlers legacy is offered', () => {
-  // The ledger below is fail-open without this. If the filter stops matching —
-  // a formatter switching quote style, `available_in` moving into a shared
-  // constant — it answers [], the exposure list is empty, nothing was "added",
-  // and the ledger test passes while having examined no handler at all.
+it('finds exactly the handlers legacy is offered', () => {
+  // The ledger below is fail-open without this, and a threshold is not enough.
+  // A floor of "most of the tree" still allows the filter to quietly stop
+  // matching thirty handlers: their exposures drop out of `actual`, the ledger
+  // logs them as "fixed", and losing coverage reads as progress — which is the
+  // most dangerous shape a defect can take in this repository.
   //
-  // Measured: 144 of 326 handlers declare legacy. The floor is a third rather
-  // than 144 so that adding handlers never needs this number edited; what it
-  // catches is the filter collapsing, which is a fall to zero, not a drift.
-  const all = globSync('src/handlers/**/handle*.ts');
-  const kept = legacyEnabledHandlers();
-  expect(all.length).toBeGreaterThan(300);
-  expect(kept.length).toBeGreaterThan(all.length / 3);
+  // So the set is pinned, not counted. Adding a handler or changing its
+  // `available_in` is a deliberate change to what legacy is offered, and
+  // recording it here is the same discipline Task 1 applies to the tool
+  // surface: the snapshot moves when someone means it to.
+  const recorded: string[] = JSON.parse(
+    readFileSync('tests/fixtures/legacy-handlers.json', 'utf8'),
+  );
+  expect(legacyEnabledHandlers().sort()).toEqual(recorded.sort());
 });
 
 it('lands on no legacy member that decides alone, beyond the ones recorded', () => {

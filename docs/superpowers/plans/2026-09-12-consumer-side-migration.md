@@ -456,16 +456,20 @@ git commit --no-verify -m "fix(answer): a failure carries everything it has, at 
 
 ---
 
-## Task 4: `pair()` — both answers, the same failure rule
+## Task 4: `pair()`, and a `sequence()` long enough for a lifecycle
 
-`sequence()` returns the last step's value, which serves a read-modify-write. It does not serve `handleReadClass`, which calls `read` and `readMetadata` and answers both. Without a combinator the handler captures the first value in a variable outside the run, which hands the ordering back to the handler one assignment at a time.
+Two changes to the same file.
+
+**`pair()`** — `sequence()` returns the last step's value, which serves a read-modify-write. It does not serve `handleReadClass`, which calls `read` and `readMetadata` and answers both. Without a combinator the handler captures the first value in a variable outside the run, which hands the ordering back to the handler one assignment at a time.
+
+**More steps.** `sequence()` is declared for two steps and for three. A lifecycle create is five — validate, create, the locked body write, check, activate — and `handleCreateDomain` is exactly that today. Three overloads are not a design decision, they are where someone stopped; add four and five so Task 19 does not have to nest one `sequence` inside another to express an order the tool already performs.
 
 **Files:**
 - Modify: `src/lib/strategies/sequence.ts`
 - Test: `src/__tests__/unit/sequence.test.ts` (exists — extend)
 
 **Interfaces:**
-- Produces: `pair<A, B>(first, second): Promise<IAdtResponse<[A, B], IAdtError>>`
+- Produces: `pair<A, B>(first, second): Promise<IAdtResponse<[A, B], IAdtError>>`, and `sequence` overloads for four and five steps
 
 - [ ] **Step 1: Write the failing test**
 
@@ -505,6 +509,30 @@ describe('pair', () => {
     expect(result.getError().message).toBe('meta refused');
   });
 });
+
+describe('sequence, at five steps', () => {
+  it('runs all five in order and answers the last', async () => {
+    const order: string[] = [];
+    const step = (name: string) => async () => { order.push(name); return ok(name) as any; };
+    const result = await sequence(
+      step('validate'), step('create'), step('write'), step('check'), step('activate'),
+    );
+    expect(order).toEqual(['validate', 'create', 'write', 'check', 'activate']);
+    expect(result.getResult().value).toBe('activate');
+  });
+
+  it('stops at the fourth and never reaches the fifth', async () => {
+    const fifth = jest.fn();
+    const step = (name: string) => async () => ok(name) as any;
+    const result = await sequence(
+      step('validate'), step('create'), step('write'),
+      async () => failed('Check refused') as any,
+      fifth as any,
+    );
+    expect(result.getError().message).toBe('Check refused');
+    expect(fifth).not.toHaveBeenCalled();
+  });
+});
 ```
 
 - [ ] **Step 2: Run it to verify it fails**
@@ -518,7 +546,30 @@ Expected: FAIL — `pair is not a function`.
 - [ ] **Step 3: Implement**
 
 ```typescript
-// src/lib/strategies/sequence.ts — append
+// src/lib/strategies/sequence.ts
+
+/** Run four. A create that validates, creates, writes its body and activates. */
+export async function sequence<A, B, C, D>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: Step<A, B>,
+  third: Step<B, C>,
+  fourth: Step<C, D>,
+): Promise<IAdtResponse<D, IAdtError>>;
+/** Run five. The full lifecycle create, with its check between write and activate. */
+export async function sequence<A, B, C, D, E>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: Step<A, B>,
+  third: Step<B, C>,
+  fourth: Step<C, D>,
+  fifth: Step<D, E>,
+): Promise<IAdtResponse<E, IAdtError>>;
+```
+
+The implementation already loops over `...rest`, so it needs no change — only
+the overloads, which is what stopped a five-phase handler from compiling.
+
+```typescript
+// and, appended
 
 /**
  * Two calls whose BOTH answers are the result.
@@ -1839,20 +1890,62 @@ it('reports a succeeded write under a refused unlock as a failure naming both', 
   expect(payload.operation).toBe('succeeded');
 });
 
-it('a lifecycle create locks only the body write, not the create', async () => {
-  const order: string[] = [];
-  fakeClient = fakeClientOf({
+const lifecycleArgs = {
+  domain_name: 'ZD', package_name: 'ZP', description: 'x', data_type: 'CHAR', length: 10,
+};
+
+/** Every phase answering, recording the order it was asked in. */
+const recordingLifecycle = (order: string[], overrides: Record<string, unknown> = {}) =>
+  fakeClientOf({
     validate: async () => { order.push('validate'); return okResponse(reading({})); },
     create: async () => { order.push('create'); return okResponse(reading(undefined, '', 200)); },
     lock: async () => { order.push('lock'); return okResponse('handle-1'); },
-    update: async () => { order.push('update'); return okResponse(reading(undefined, '', 200)); },
+    updateMetadata: async () => { order.push('update'); return okResponse(reading(undefined, '', 200)); },
     unlock: async () => { order.push('unlock'); return okResponse(undefined); },
+    check: async () => { order.push('check'); return okResponse(reading({})); },
     activate: async () => { order.push('activate'); return okResponse(reading({})); },
+    ...overrides,
   });
-  await handleCreateDomain(context as any, {
-    domain_name: 'ZD', package_name: 'ZP', description: 'x', data_type: 'CHAR', length: 10,
+
+it('a lifecycle create runs all five phases, and locks only the body write', async () => {
+  const order: string[] = [];
+  fakeClient = recordingLifecycle(order);
+  const result: any = await handleCreateDomain(context as any, lifecycleArgs);
+  expect(result.isError).toBe(false);
+  // The order the handler performs today. `check` and `activate` are phases,
+  // not a postscript: a create that stops after the body write leaves an
+  // inactive object and reports success.
+  expect(order).toEqual(['validate', 'create', 'lock', 'update', 'unlock', 'check', 'activate']);
+});
+
+it('a refused check stops the lifecycle before activation', async () => {
+  const order: string[] = [];
+  fakeClient = recordingLifecycle(order, {
+    check: async () => { order.push('check'); return refusedResponse('Syntax check failed'); },
   });
-  expect(order).toEqual(['validate', 'create', 'lock', 'update', 'unlock', 'activate']);
+  const result: any = await handleCreateDomain(context as any, lifecycleArgs);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Syntax check failed');
+  expect(order).not.toContain('activate');
+  // The lock was released before the check ran, so a refused check leaves none.
+  expect(order.filter((p) => p === 'unlock')).toHaveLength(1);
+});
+
+it('a refused activation is answered as the strategy built it', async () => {
+  const order: string[] = [];
+  fakeClient = recordingLifecycle(order, {
+    activate: async (_c: unknown, o: any) => {
+      expect(o.analyse).toBe(analyseActivation);
+      return refusedResponse('Activation failed');
+    },
+  });
+  const result: any = await handleCreateDomain(context as any, lifecycleArgs);
+  expect(result.isError).toBe(true);
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.message).toBe('Activation failed');
+  expect(payload.origin).toBe('refusal');
+  // No sentence of the handler's own about which phase it was.
+  expect(result.content[0].text).not.toContain('phase');
 });
 ```
 
@@ -1873,7 +1966,7 @@ return answer(
   project(detailOf(args), terseWrite),
 );
 
-// a lifecycle create: the lock wraps only the body write
+// a lifecycle create: five phases, the lock wrapping only the body write
 return answer(
   { tool: 'CreateDomain', detail: detailOf(args) },
   () =>
@@ -1883,15 +1976,30 @@ return answer(
       () =>
         withLock(
           () => obj.lock({ domainName }),
-          (lockHandle) => obj.updateMetadata({ domainName }, { lockHandle, xmlContent, analyse: analyseException }),
+          (lockHandle) =>
+            obj.updateMetadata({ domainName }, { lockHandle, xmlContent, analyse: analyseException }),
           (lockHandle) => obj.unlock({ domainName }, lockHandle),
         ),
+      () => obj.check(config, 'inactive', { analyse: analyseCheck }),
+      () => obj.activate(config, { analyse: analyseActivation }),
     ),
   project(detailOf(args), terseWrite),
 );
 ```
 
-Activation after the create is a further step; keep whatever the handler does today and give it `analyseActivation`.
+**All five phases, in one `sequence`.** Task 4 widened the overloads to five for
+this: nesting a second `sequence` inside the first would express the same order
+while hiding two of the phases from anyone reading the call.
+
+Each phase carries the strategy its encoding needs — `analyseValidation` for the
+name check, `analyseException` for the create and the write, `analyseCheck` for
+the syntax check, `analyseActivation` for the activation — and `sequence` hands
+back the first failure untouched, so the caller learns which phase refused from
+that failure's own `request`.
+
+Confirm the order against the handler before editing; `handleCreateDomain` today
+runs validate, create, lock, update, unlock, check, activate, and a second
+unlock on its error path that `withLock` replaces.
 
 - [ ] **Step 4: Run the tests and measure**
 - [ ] **Step 5: Commit** — `refactor(high): the writes that hold a lock hold it through withLock`

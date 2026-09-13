@@ -2366,9 +2366,16 @@ it.each([
 // for one of them in the table above would mock `create`, which the handler
 // never calls, and then assert a refused create that never happened.
 it.each([
-  ['UpdateClass', handleUpdateClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
-  ['UpdateInterface', handleUpdateInterface, { interface_name: 'ZIF_X', source_code: 'x', lock_handle: 'h' }],
-  // one row per update the command above lists
+  ['UpdateLocalTestClass', handleUpdateLocalTestClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalTypes', handleUpdateLocalTypes, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalDefinitions', handleUpdateLocalDefinitions, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalMacros', handleUpdateLocalMacros, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateBehaviorImplementation', handleUpdateBehaviorImplementation, { behavior_implementation_name: 'ZBI', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateFunctionInclude', handleUpdateFunctionInclude, { include_name: 'ZINC', function_group_name: 'ZFG', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateMessageClass', handleUpdateMessageClass, { message_class_name: 'ZMC', lock_handle: 'h' }],
+  ['UpdateMessageClassMessage', handleUpdateMessageClassMessage, { message_class_name: 'ZMC', message_number: '001', lock_handle: 'h' }],
+  ['UpdateUnitTest', handleUpdateUnitTest, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateCdsUnitTest', handleUpdateCdsUnitTest, { ddl_name: 'ZDDL', source_code: 'x', lock_handle: 'h' }],
 ])('%s reports a refused update as an error', async (_n, handler, args) => {
   fakeClient = fakeClientOf({ update: async () => refusedResponse('Object is locked by another user') });
   const result: any = await (handler as any)(context as any, args);
@@ -2376,9 +2383,20 @@ it.each([
   expect(JSON.parse(result.content[0].text).message).toBe('Object is locked by another user');
 });
 
+// Every update in this task, not a sample. Two rows would leave eight
+// handlers free to acquire a lock nobody asked them for, and this is the
+// assertion that stops that.
 it.each([
-  ['UpdateClass', handleUpdateClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
-  ['UpdateInterface', handleUpdateInterface, { interface_name: 'ZIF_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalTestClass', handleUpdateLocalTestClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalTypes', handleUpdateLocalTypes, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalDefinitions', handleUpdateLocalDefinitions, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateLocalMacros', handleUpdateLocalMacros, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateBehaviorImplementation', handleUpdateBehaviorImplementation, { behavior_implementation_name: 'ZBI', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateFunctionInclude', handleUpdateFunctionInclude, { include_name: 'ZINC', function_group_name: 'ZFG', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateMessageClass', handleUpdateMessageClass, { message_class_name: 'ZMC', lock_handle: 'h' }],
+  ['UpdateMessageClassMessage', handleUpdateMessageClassMessage, { message_class_name: 'ZMC', message_number: '001', lock_handle: 'h' }],
+  ['UpdateUnitTest', handleUpdateUnitTest, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
+  ['UpdateCdsUnitTest', handleUpdateCdsUnitTest, { ddl_name: 'ZDDL', source_code: 'x', lock_handle: 'h' }],
 ])('%s takes the lock handle as an argument and acquires none', async (_n, handler, args) => {
   // These eleven are `high`-tier by name and `low`-tier by shape: the caller
   // already holds the lock. Acquiring one here would take a second lock on an
@@ -2654,27 +2672,107 @@ program profiling handlers are the ones that become sequences.
 - [ ] **Step 1: Establish what each removed member did, from the changelog and the corpus**
 
 ```bash
-grep -rn "runWithProfiling\|getWhereUsedList\|listFunctionModules\|listFunctionGroupIncludes" \
-  node_modules/@mcp-abap-adt/adt-clients/CHANGELOG.md | head -20
+# every member the table names, not the four an earlier draft happened to list
+for m in runWithProfiling getWhereUsedList listFunctionModules listFunctionGroupIncludes \
+         searchObjects updateServiceBinding validateServiceBinding getPackageContentsList; do
+  echo "--- $m"
+  grep -rn "$m" node_modules/@mcp-abap-adt/adt-clients/CHANGELOG.md 2>/dev/null | head -3
+done
 git show 57f0645 --stat   # the walk already moved, as the worked example
 ```
+
+`updateServiceBinding` is the one with no obvious successor in the table.
+`AdtServiceBinding` offers `update`, `classifyServiceBinding`,
+`generateServiceBinding` and `getServiceGroup`, and which of those the old
+composite issued is exactly what this step settles. Do not start that handler
+until it is written down.
 
 Write down the endpoint sequence each one issued **before** writing code. A sequence guessed from the old arguments is a guess.
 
 - [ ] **Step 2: Write the failing test**
 
+Eleven consumers in four shapes, and each shape needs a test. A rename is not
+free of risk: `searchObjects` became `search`, which **takes an `analyse` where
+the old member took none**, so migrating it as a pure rename hands the verdict
+back to the library and nothing says so.
+
 ```typescript
 // src/__tests__/unit/staticSequences.test.ts
-it("stops at the first refused step and answers that step's failure", async () => {
-  fakeClient = fakeClientOf({ getWhereUsed: async () => refusedResponse('Where-used lookup refused') });
-  const result: any = await handleGetWhereUsed(context as any, {
-    object_type: 'CLAS', object_name: 'ZCL_X',
-  });
+
+// SHAPE 1 — a rename, still one call.
+it.each([
+  ['GetWhereUsed', handleGetWhereUsed, { object_type: 'CLAS', object_name: 'ZCL_X' }, 'getWhereUsed'],
+  ['GetStructuresList', handleGetStructuresList, { structure_name: 'ZS' }, 'getWhereUsed'],
+  ['SearchObject', handleSearchObject, { query: 'ZCL*' }, 'search'],
+  ['ValidateServiceBinding', handleValidateServiceBinding,
+    { service_binding_name: 'ZSB', package_name: 'ZP' }, 'validate'],
+  ['ListFunctionModules', handleListFunctionModules, { function_group_name: 'ZFG' }, 'fetchNodeStructure'],
+  ['ListFunctionGroupIncludes', handleListFunctionGroupIncludes, { function_group_name: 'ZFG' }, 'fetchNodeStructure'],
+])('%s calls the member that replaced it and surfaces its refusal', async (_n, handler, args, member) => {
+  fakeClient = fakeClientOf({ [member as string]: async () => refusedResponse('Refused') });
+  const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
-  expect(JSON.parse(result.content[0].text).message).toBe('Where-used lookup refused');
+  expect(JSON.parse(result.content[0].text).message).toBe('Refused');
   // The failing step's answer, untouched. No "step 2 of 3" sentence beside it.
   expect(result.content[0].text).not.toContain('step');
 });
+
+it('SearchObject passes an analyse, which the member it replaced never took', async () => {
+  const seen: unknown[] = [];
+  fakeClient = fakeClientOf({
+    search: async (_c: unknown, o: any) => { seen.push(o?.analyse); return okResponse(reading([])); },
+  });
+  await handleSearchObject(context as any, { query: 'ZCL*' });
+  expect(seen).toEqual([analyseException]);
+});
+
+// SHAPE 2 — the two lib files, which are not handlers and answer no MCP result.
+it('packageEnumerator walks rather than calling the removed member', async () => {
+  const walked: string[] = [];
+  const enumerated = await enumeratePackage(
+    fakeClientOf({
+      fetchNodeStructure: async (_t: unknown, name: unknown) => {
+        walked.push(String(name));
+        return okResponse(reading({ nodes: [] }));
+      },
+    }) as any,
+    'ZMCP_SHR_PKG',
+  );
+  expect(walked).toContain('ZMCP_SHR_PKG');
+  expect(enumerated).toEqual([]);
+});
+
+it('packageResolver searches through the renamed member, with a strategy', async () => {
+  const seen: unknown[] = [];
+  fakeClient = fakeClientOf({
+    search: async (_c: unknown, o: any) => { seen.push(o?.analyse); return okResponse(reading([])); },
+  });
+  await resolvePackage(fakeClient as any, 'ZMCP*');
+  expect(seen).toEqual([analyseException]);
+});
+
+// SHAPE 3 — the two program profiling handlers: two calls where there was one.
+it('a program profiling run schedules the trace before it runs', async () => {
+  const order: string[] = [];
+  fakeClient = fakeClientOf({
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
+    runWithProfiler: async () => { order.push('run'); return okResponse(reading({ done: true })); },
+  });
+  await handleRuntimeRunProgramWithProfiling(context as any, { program_name: 'ZP' });
+  expect(order).toEqual(['schedule', 'run']);
+});
+
+it('stops at the first refused step of a profiling run', async () => {
+  fakeClient = fakeClientOf({ scheduleTrace: async () => refusedResponse('Trace scheduling refused') });
+  const result: any = await handleRuntimeRunProgramWithProfiling(context as any, { program_name: 'ZP' });
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Trace scheduling refused');
+});
+
+// SHAPE 4 — the service-binding update, whose replacement Step 1 establishes.
+// Written once that step has answered: it is the one member in the table with
+// no obvious successor, and a test written first would test the guess.
+it.todo('UpdateServiceBinding, once Step 1 has named the members it maps onto');
 
 // The seventh consumer is not a handler and needs its own test: it feeds the
 // source search, so a walk that answers nothing there is a search that finds
@@ -3578,7 +3676,7 @@ Last, deliberately: adding a parameter before the handlers honour it puts a lie 
 - Modify: the `TOOL_DEFINITION` of every JSON-answering tool, and those handlers' `detail` argument
 - Modify: `tests/fixtures/tools/surface.json` — regenerated, with `detail` as the only difference
 - Create: `src/__tests__/unit/detailSurface.test.ts`
-- Create: three fixtures under `src/__tests__/fixtures/detail/` — `declares-passes-none.ts`, `declares-indirect-context.ts`, `declares-shorthand.ts`
+- Create: four fixtures under `src/__tests__/fixtures/detail/` — `declares-passes-none.ts`, `declares-indirect-context.ts`, `declares-shorthand.ts`, `declares-no-answer-call.ts`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `detailWiring()`
 
 - [ ] **Step 1: Enumerate the JSON-answering tools**
@@ -3620,7 +3718,15 @@ export function detailWiring(handlers: string[]): string[] {
     // `DETAIL_PROPERTY` spread into the schema, or the property written out.
     const declares = /DETAIL_PROPERTY|\bdetail\s*:\s*\{/.test(source.getFullText());
 
-    for (const call of answerCallsIn(source)) {
+    const calls = answerCallsIn(source);
+    // No `answer()` at all is the emptiest way to pass: the loop below never
+    // runs, so it can report nothing. A tool that declares `detail` and never
+    // reaches the adapter has not wired the parameter — it has nowhere to.
+    if (declares && calls.length === 0) {
+      offenders.push(`${file} — tool declares detail and the handler never calls answer()`);
+    }
+
+    for (const call of calls) {
       const ctx = call.arguments[0];
 
       // A context this walk cannot read is not a pass. The failure being
@@ -3703,7 +3809,15 @@ it('declares detail on every JSON-answering tool and on no other', () => {
 // `declares-shorthand.ts` (`{ detail }`). Each must produce exactly one
 // offender; a walk that skips them produces none, which is what a correct
 // repository also produces.
-it.each(['declares-passes-none', 'declares-indirect-context', 'declares-shorthand'])(
+it.each([
+  'declares-passes-none',
+  'declares-indirect-context',
+  'declares-shorthand',
+  // The emptiest case, and the last one a loop-based check can miss: no
+  // `answer()` in the file, so there is nothing to iterate and nothing to
+  // report — indistinguishable from correct.
+  'declares-no-answer-call',
+])(
   'reports %s rather than skipping it',
   (fixture) => {
     expect(detailWiring([`src/__tests__/fixtures/detail/${fixture}.ts`])).toHaveLength(1);

@@ -1129,7 +1129,137 @@ git commit --no-verify -m "feat(strategies): detail, declared once and read in o
 
 ---
 
-## Task 8: The reference read — `handleReadClass`
+## Task 8: The test helpers, written once
+
+Every handler test from here needs the same four things: a success, a refusal, a
+fake client that answers them, and a way to see which `analyse` a handler passed.
+Written once so no task invents its own and no task refers to a helper that
+exists only in prose.
+
+**Files:**
+- Create: `src/__tests__/helpers/fakeClient.ts`
+
+**Interfaces:**
+- Produces: `okResponse`, `refusedResponse`, `fakeClientOf`, `refusingClient`, `recordAnalyse`
+
+- [ ] **Step 1: Write it**
+
+```typescript
+// src/__tests__/helpers/fakeClient.ts
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+
+/** A success carrying whatever a result strategy would have produced. */
+export function okResponse<T>(value: T): IAdtResponse<T, IAdtError> {
+  return {
+    ok: true,
+    getResult: () => ({ value }),
+    getError: () => { throw new Error('asked for the error of a success'); },
+  } as unknown as IAdtResponse<T, IAdtError>;
+}
+
+/** A refusal shaped the way a strategy from the package builds one. */
+export function refusedResponse(
+  message: string,
+  extra: Partial<IAdtError> = {},
+): IAdtResponse<never, IAdtError> {
+  return {
+    ok: false,
+    getResult: () => { throw new Error('asked for the result of a failure'); },
+    getError: () => ({ message, origin: 'refusal', ...extra }),
+  } as unknown as IAdtResponse<never, IAdtError>;
+}
+
+/** A reading, as `resultsFor` would have built it. */
+export const reading = <T>(value: T, raw = String(value ?? ''), status = 200) => ({ value, raw, status });
+
+type Members = Record<string, (...args: unknown[]) => unknown>;
+
+/**
+ * A client whose every factory answers the same member table.
+ *
+ * Handlers reach members through `client.getX(results)`, and a test does not
+ * care which X. Anything not named answers a success with `undefined`, so a
+ * test says only what it is about.
+ */
+export function fakeClientOf(members: Members) {
+  const object = new Proxy(members, {
+    get: (target, name: string) =>
+      target[name] ?? (async () => okResponse(undefined)),
+  });
+  return new Proxy({} as Record<string, unknown>, {
+    get: () => () => object,
+  });
+}
+
+/** A client that refuses whatever it is asked. */
+export function refusingClient(message: string, extra: Partial<IAdtError> = {}) {
+  return new Proxy({} as Record<string, unknown>, {
+    get: () => () => new Proxy({} as Members, {
+      get: () => async () => refusedResponse(message, extra),
+    }),
+  });
+}
+
+/**
+ * Which `analyse` the handler passed, and how often a member was called.
+ *
+ * What goes wrong at the scale of a hundred handlers is a handler taking the
+ * wrong strategy, and that is visible from the call rather than from the answer.
+ */
+export function recordAnalyse() {
+  const calls: Array<{ member: string; analyse: unknown; args: unknown[] }> = [];
+  const client = new Proxy({} as Record<string, unknown>, {
+    get: () => () => new Proxy({} as Members, {
+      get: (_t, member: string) => async (...args: unknown[]) => {
+        const options = args.at(-1) as { analyse?: unknown } | undefined;
+        calls.push({ member, analyse: options?.analyse, args });
+        return okResponse(reading(undefined, '', 200));
+      },
+    }),
+  });
+  return {
+    client,
+    calls,
+    get last() { return calls.at(-1)?.analyse; },
+    countOf: (member: string) => calls.filter((c) => c.member === member).length,
+  };
+}
+```
+
+- [ ] **Step 2: Prove the recorder records**
+
+```typescript
+// src/__tests__/unit/fakeClient.test.ts
+it('reports the analyse the caller passed, and counts the calls', async () => {
+  const seen = recordAnalyse();
+  const marker = () => null;
+  await (seen.client as any).getDomain().delete({ domainName: 'ZD' }, { analyse: marker });
+  expect(seen.last).toBe(marker);
+  expect(seen.countOf('delete')).toBe(1);
+});
+
+it('reports undefined when the caller passed none', async () => {
+  const seen = recordAnalyse();
+  await (seen.client as any).getDomain().lock({ domainName: 'ZD' });
+  expect(seen.last).toBeUndefined();
+});
+```
+
+- [ ] **Step 3: Run it** — `npx jest src/__tests__/unit/fakeClient.test.ts`. Expected: PASS.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add src/__tests__/helpers/fakeClient.ts src/__tests__/unit/fakeClient.test.ts
+git commit --no-verify -m "test(helpers): one fake client, so no task invents its own"
+```
+
+Every later task imports from here. A test needing something this module does
+not have adds it here rather than locally, and says in a comment what it is for.
+
+---
+
+## Task 9: The reference read — `handleReadClass`
 
 The template for every read that calls `read` and `readMetadata`. It is also a bug fix: today the handler answers `success: true` with `source_code: null` when the read fails, which is the read-path masking defect.
 
@@ -1139,7 +1269,7 @@ The template for every read that calls `read` and `readMetadata`. It is also a b
 
 **Interfaces:**
 - Consumes: `answer`, `pair`, `resultsFor`, `analyseException`, `AdtReading`.
-- Produces: the shape Task 10 applies sixteen times.
+- Produces: the shape Task 11 applies sixteen times.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1278,7 +1408,7 @@ tsc: <before> → <after>"
 
 ---
 
-## Task 9: The reference write family — `domain/low`
+## Task 10: The reference write family — `domain/low`
 
 The template for every `low`-tier family. One family, all seven operations, so the per-operation pairing is established in code before it is applied a hundred times.
 
@@ -1313,7 +1443,10 @@ import { corpusBody } from '../../lib/adtCorpus';
 
 it('ValidateDomain reports an inadmissible name as an error', async () => {
   const document = corpusBody('refusal-validation-name-taken-domain--01-domains-validation');
-  fakeClient = validating({ data: document, status: 200 });
+  fakeClient = fakeClientOf({
+    validate: async (_c: unknown, o: any) =>
+      refusedResponse((o.analyse('adt:no-failure', { data: document, status: 200 }) as any).message),
+  });
   const result: any = await handleValidateDomain(context as any, {
     domain_name: 'ZD_TAKEN', package_name: 'ZP', description: 'x',
   });
@@ -1370,9 +1503,9 @@ tsc: <before> → <after>"
 
 ---
 
-## Task 10: The sixteen `readonly` reads that call both members
+## Task 11: The sixteen `readonly` reads that call both members
 
-Same shape as Task 8. Measured, not assumed — this is the list of handlers calling `read` and `readMetadata` both, minus `handleReadClass` (Task 8) and `handleGetFunctionModule` (Task 17, a `high` tool):
+Same shape as Task 9. Measured, not assumed — this is the list of handlers calling `read` and `readMetadata` both, minus `handleReadClass` (Task 9) and `handleGetFunctionModule` (Task 18, a `high` tool):
 
 ```bash
 grep -lE '\.read\(' $(find src/handlers -name 'handle*.ts') | xargs grep -lE '\.readMetadata\(' | sort
@@ -1433,7 +1566,7 @@ it.each([
 
 - [ ] **Step 2: Run it to verify it fails** — every row fails; each handler answers `isError: false` today.
 
-- [ ] **Step 3: Migrate, one file per edit**, applying Task 8's shape and changing four things: the factory, the shipped set, the config key, and the answer's field names, which stay exactly as that tool already returns them. Run the surface test after each file, not at the end.
+- [ ] **Step 3: Migrate, one file per edit**, applying Task 9's shape and changing four things: the factory, the shipped set, the config key, and the answer's field names, which stay exactly as that tool already returns them. Run the surface test after each file, not at the end.
 
 - [ ] **Step 4: Run the tests and measure**
 
@@ -1453,11 +1586,11 @@ tsc: <before> → <after>"
 
 ---
 
-## Task 11: The single-call reads, searches and listings
+## Task 12: The single-call reads, searches and listings
 
 Fifteen `readonly` files that make one call: `handleReadMessageClass`, `handleReadMessageClassMessage`, `handleGetObjectsByType`, `handleGetObjectsList`, `handleSearchObject`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleGetSqlQuery`, `handleGetTableContents`, `handleListTransports`, `handleGetEnhancements`, `handleGetObjectVersionDiff`, `resolveVersionedObject`.
 
-Confirm the list before starting: a file that turns out to call `readMetadata` as well belongs to Task 10's shape.
+Confirm the list before starting: a file that turns out to call `readMetadata` as well belongs to Task 11's shape.
 
 **Interfaces:**
 - Consumes: `answer`, `resultsFor`, `ourUtils`, `project`, `detailOf`.
@@ -1506,7 +1639,7 @@ The searches and listings answer JSON built from a parse, so they project `readi
 
 ---
 
-## Task 12: `common/low` — the six generic operations, and the one real collision
+## Task 13: `common/low` — the six generic operations, and the one real collision
 
 `handleValidateObject`, `handleLockObject`, `handleUnlockObject`, `handleDeleteObject`, `handleCheckObject`, `handleActivateObject`. These dispatch over object families, so only one branch runs per call; keep each dispatch exactly as it is and change only how the call is made and answered.
 
@@ -1525,9 +1658,27 @@ Prefer 1 where the tool takes one object, which is the common case. Do not silen
 
 ```typescript
 // src/__tests__/unit/commonLowOperations.test.ts
+import { analyseActivation, analyseDeletion, analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { corpusBody } from '../../lib/adtCorpus';
+import { fakeClientOf, refusedResponse } from '../helpers/fakeClient';
+
+/**
+ * The document ADT actually sent, judged by the strategy the handler passes.
+ * These three cases all answer HTTP 200 with the refusal inside, which is why
+ * the handler must not read the status.
+ */
+const refusalFrom = (member: string, caseName: string, analyse: (v: unknown, a: unknown) => unknown) =>
+  fakeClientOf({
+    [member]: async (_config: unknown, options: any) => {
+      const wire = { data: corpusBody(caseName), status: 200 };
+      expect(options.analyse).toBe(analyse);
+      const verdict = options.analyse('adt:no-failure', wire);
+      return refusedResponse((verdict as { message: string }).message);
+    },
+  });
+
 it('reports a refused deletion as an error, though ADT answered 200', async () => {
-  const document = corpusBody('refusal-delete-refused--01-deletion-delete');
-  fakeClient = deleting({ data: document, status: 200 });
+  fakeClient = refusalFrom('delete', 'refusal-delete-refused--01-deletion-delete', analyseDeletion);
   const result: any = await handleDeleteObject(context as any, {
     object_type: 'CLAS', object_name: 'ZCL_X', lock_handle: 'h',
   });
@@ -1536,8 +1687,9 @@ it('reports a refused deletion as an error, though ADT answered 200', async () =
 });
 
 it('reports an inadmissible name as an error', async () => {
-  const document = corpusBody('refusal-validation-name-taken-class--01-validation-objectname');
-  fakeClient = validating({ data: document, status: 200 });
+  fakeClient = refusalFrom(
+    'validate', 'refusal-validation-name-taken-class--01-validation-objectname', analyseValidation,
+  );
   const result: any = await handleValidateObject(context as any, {
     object_type: 'CLAS', object_name: 'ZCL_TAKEN', package_name: 'ZP',
   });
@@ -1545,8 +1697,7 @@ it('reports an inadmissible name as an error', async () => {
 });
 
 it('reports a refused activation as an error', async () => {
-  const document = corpusBody('refusal-activation-fails--01-activation');
-  fakeClient = activating({ data: document, status: 200 });
+  fakeClient = refusalFrom('activate', 'refusal-activation-fails--01-activation', analyseActivation);
   const result: any = await handleActivateObject(context as any, {
     object_type: 'CLAS', object_name: 'ZCL_X',
   });
@@ -1557,22 +1708,22 @@ it('reports a refused activation as an error', async () => {
 The third test is the one that decides Step 1: it passes under option 1 and fails under option 2. If option 2 is chosen, change the test to assert what is actually true and say in its name that the verdict is adt-clients'.
 
 - [ ] **Step 3: Run them to verify they fail** — all three; these handlers mask today.
-- [ ] **Step 4: Implement**, per Task 9's table.
+- [ ] **Step 4: Implement**, per Task 10's table.
 - [ ] **Step 5: Run the tests and measure**
 - [ ] **Step 6: Commit** — `refactor(common): the generic operations, with the strategy deciding`
 
 ---
 
-## Tasks 13–16: The `low` tier, in four clusters
+## Tasks 14–17: The `low` tier, in four clusters
 
-112 files, the most mechanical part of the migration. Task 9's per-operation table applies unchanged; what differs per family is the factory, the shipped set and the config key. **Commit per family**, so a reviewer can reject one family while approving its neighbour.
+112 files, the most mechanical part of the migration. Task 10's per-operation table applies unchanged; what differs per family is the factory, the shipped set and the config key. **Commit per family**, so a reviewer can reject one family while approving its neighbour.
 
 | task | families | files |
 |---|---|---|
-| **13** | `class` (11), `interface` (8), `behavior_definition` (8), `behavior_implementation` (3) | 30 |
-| **14** | `ddl` (8), `ddlx` (8), `structure` (8), `table` (8) | 32 |
-| **15** | `program` (8), `function` (14), `function_group`, `function_include` | 22+ |
-| **16** | `data_element` (7), `package` (6), `service_binding` (1), `service_definition` (1), `system` (1), `transport` (1) | 17 |
+| **14** | `class` (11), `interface` (8), `behavior_definition` (8), `behavior_implementation` (3) | 30 |
+| **15** | `ddl` (8), `ddlx` (8), `structure` (8), `table` (8) | 32 |
+| **16** | `program` (8), `function` (14), `function_group`, `function_include` | 22+ |
+| **17** | `data_element` (7), `package` (6), `service_binding` (1), `service_definition` (1), `system` (1), `transport` (1) | 17 |
 
 For each family, in order:
 
@@ -1580,18 +1731,31 @@ For each family, in order:
 - [ ] **Step 2: Write the family's test row** in `src/__tests__/unit/lowTierStrategies.test.ts`, asserting the pairing rather than the prose: what goes wrong at this scale is a handler taking the wrong `analyse`, and that is visible from the call.
 
 ```typescript
-it.each(['class', 'interface', 'ddl', 'structure', 'table', 'program', 'data_element'])(
-  '%s: activate takes analyseActivation, delete takes analyseDeletion, validate takes analyseValidation',
-  async (family) => {
-    const seen = recordAnalyse();
-    await activateOf(family)(context as any, argsOf(family));
-    expect(seen.last).toBe(analyseActivation);
-    await deleteOf(family)(context as any, argsOf(family));
-    expect(seen.last).toBe(analyseDeletion);
-    await validateOf(family)(context as any, argsOf(family));
-    expect(seen.last).toBe(analyseValidation);
-  },
-);
+// src/__tests__/unit/lowTierStrategies.test.ts
+import { analyseActivation, analyseDeletion, analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { recordAnalyse } from '../helpers/fakeClient';
+import { handleActivateClass, handleDeleteClass, handleValidateClass } from '...';
+
+// Explicit rows rather than a family lookup: an executor reads one task and
+// must not have to reconstruct which handler a family name maps to. Add the
+// row for each family as that family is migrated.
+const seen = recordAnalyse();
+jest.mock('../../lib/clients', () => ({ createAdtClient: () => seen.client }));
+
+it.each([
+  ['class', handleActivateClass, handleDeleteClass, handleValidateClass,
+    { class_name: 'ZCL_X', package_name: 'ZP', lock_handle: 'h' }],
+  ['interface', handleActivateInterface, handleDeleteInterface, handleValidateInterface,
+    { interface_name: 'ZIF_X', package_name: 'ZP', lock_handle: 'h' }],
+  // one row per family in this cluster
+])('%s pairs each operation with its own strategy', async (_family, activate, remove, validate, args) => {
+  await (activate as any)(context as any, args);
+  expect(seen.last).toBe(analyseActivation);
+  await (remove as any)(context as any, args);
+  expect(seen.last).toBe(analyseDeletion);
+  await (validate as any)(context as any, args);
+  expect(seen.last).toBe(analyseValidation);
+});
 ```
 
 - [ ] **Step 3: Run it to verify it fails**
@@ -1603,11 +1767,11 @@ Do not batch two families into one commit.
 
 ---
 
-## Task 17: The `high` tier `Get*` handlers
+## Task 18: The `high` tier `Get*` handlers
 
 29 files: `handleGetClass`, `handleGetDomain`, `handleGetTable`, `handleGetStructure`, `handleGetProgram`, `handleGetInterface`, `handleGetDdl`, `handleGetDataElement`, `handleGetPackage`, `handleGetMessageClass`, `handleGetMessageClassMessage`, `handleGetFunctionGroup`, `handleGetFunctionModule`, `handleGetServiceBinding`, `handleGetServiceDefinition`, `handleGetMetadataExtension`, `handleGetBehaviorDefinition`, `handleGetBehaviorImplementation`, `handleGetLocalTestClass`, `handleGetLocalTypes`, `handleGetLocalDefinitions`, `handleGetLocalMacros`, `handleGetUnitTest`, `handleGetUnitTestStatus`, `handleGetUnitTestResult`, `handleGetCdsUnitTest`, `handleGetCdsUnitTestStatus`, `handleGetCdsUnitTestResult`, `handleListServiceBindingTypes`.
 
-Each follows Task 8 (two calls, `pair`) or Task 11 (one call). The six unit-test readers take `analyseUnitTest` and `structured`; note that `AdtUnitTestLegacy` accepts no strategy on `run`, `getStatus` and `getResult`, which Task 22 pins.
+Each follows Task 9 (two calls, `pair`) or Task 12 (one call). The six unit-test readers take `analyseUnitTest` and `structured`; note that `AdtUnitTestLegacy` accepts no strategy on `run`, `getStatus` and `getResult`, which Task 24 pins.
 
 - [ ] **Step 1: Extend `readonlySingleCall.test.ts` with one row per `Get*` handler**, asserting a refusal surfaces as `isError: true`
 - [ ] **Step 2: Run it to verify it fails**
@@ -1617,7 +1781,7 @@ Each follows Task 8 (two calls, `pair`) or Task 11 (one call). The six unit-test
 
 ---
 
-## Task 18: The `high` tier writes, under `withLock`
+## Task 19: The `high` tier writes, under `withLock`
 
 Every `high` update holds a lock for the whole call, which is exactly `withLock`'s shape and exactly what the thirteen `try/finally` handlers are doing by hand today. Those thirteen also flatten the strategy's failure into `return_error(new Error(message))` and log a failed unlock as a warning the caller never sees.
 
@@ -1629,7 +1793,11 @@ Every `high` update holds a lock for the whole call, which is exactly `withLock`
 // src/__tests__/unit/highTierLocking.test.ts
 it('releases the lock when the update is refused, and answers the update failure', async () => {
   const unlock = jest.fn(async () => okResponse(undefined));
-  fakeClient = clientWhere({ update: refused('Update refused'), unlock });
+  fakeClient = fakeClientOf({
+    lock: async () => okResponse('handle-1'),
+    update: async () => refusedResponse('Update refused'),
+    unlock,
+  });
   const result: any = await handleUpdateClass(context as any, {
     class_name: 'ZCL_X', source_code: 'x',
   });
@@ -1639,7 +1807,11 @@ it('releases the lock when the update is refused, and answers the update failure
 });
 
 it('reports a succeeded write under a refused unlock as a failure naming both', async () => {
-  fakeClient = clientWhere({ update: okResponse(''), unlock: refused('Unlock refused') });
+  fakeClient = fakeClientOf({
+    lock: async () => okResponse('handle-1'),
+    update: async () => okResponse(reading(undefined, '', 200)),
+    unlock: async () => refusedResponse('Unlock refused'),
+  });
   const result: any = await handleUpdateClass(context as any, {
     class_name: 'ZCL_X', source_code: 'x',
   });
@@ -1672,7 +1844,7 @@ return answer(
 
 ---
 
-## Task 19: The four remaining read-modify-write families
+## Task 20: The four remaining read-modify-write families
 
 `domain` is done and is the worked example. Four families take a whole document on 19 and `update` replaces rather than merges: `dataElement`, `package`, `functionGroup`, `tabletype`. Their update handlers pass a handful of named fields and no document, which under a replace is silent data loss.
 
@@ -1755,15 +1927,15 @@ A `low`-tier update takes the handle as an argument and must not acquire or rele
 
 ---
 
-## Task 20: The eight handlers that called members 19 removed
+## Task 21: The six static sequences 19 removed
 
-These have no type error to fix — they have no member to call.
+These have no type error to fix — they have no member to call. Each is a fixed
+chain: run the steps in order, stop at the first failure. The two class
+profiling handlers are **not** here; they poll, and Task 22 is theirs.
 
 | file | removed member |
 |---|---|
-| `system/readonly/handleRuntimeRunClass.ts` | `runWithProfiling` |
 | `system/readonly/handleRuntimeRunProgram.ts` | `runWithProfiling` |
-| `system/readonly/handleRuntimeRunClassWithProfiling.ts` | `runWithProfiling` |
 | `system/readonly/handleRuntimeRunProgramWithProfiling.ts` | `runWithProfiling` |
 | `system/readonly/handleGetWhereUsed.ts` | `getWhereUsedList` |
 | `structure/readonly/handleGetStructuresList.ts` | `getWhereUsedList` |
@@ -1784,23 +1956,299 @@ Write down the endpoint sequence each one issued **before** writing code. A sequ
 - [ ] **Step 2: Write the failing test**
 
 ```typescript
-// src/__tests__/unit/runtimeProfiling.test.ts
+// src/__tests__/unit/staticSequences.test.ts
 it("stops at the first refused step and answers that step's failure", async () => {
-  fakeClient = clientRefusingAt(1, 'Trace creation refused');
-  const result: any = await handleRuntimeRunClassWithProfiling(context as any, { class_name: 'ZCL_X' });
+  fakeClient = fakeClientOf({ getWhereUsed: async () => refusedResponse('Where-used lookup refused') });
+  const result: any = await handleGetWhereUsed(context as any, {
+    object_type: 'CLAS', object_name: 'ZCL_X',
+  });
   expect(result.isError).toBe(true);
-  expect(JSON.parse(result.content[0].text).message).toBe('Trace creation refused');
+  expect(JSON.parse(result.content[0].text).message).toBe('Where-used lookup refused');
+  // The failing step's answer, untouched. No "step 2 of 3" sentence beside it.
+  expect(result.content[0].text).not.toContain('step');
 });
 ```
 
 - [ ] **Step 3: Run it to verify it fails**
 - [ ] **Step 4: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`. The where-used and node-structure steps run on `AdtUtils` and accept none. `packageEnumerator` uses `walkPackage` from `packageWalk.ts`, which already replaced `getPackageContentsList` in `handleGetPackageTree`.
 - [ ] **Step 5: Run the tests and measure**
-- [ ] **Step 6: Commit** — `refactor(system): the handlers own the sequences 19 removed`
+- [ ] **Step 6: Commit** — `refactor(system): the six static sequences 19 removed`
 
 ---
 
-## Task 21: The library files, and the last of the compiler's list
+## Task 22: `poll()` — the two profiling handlers that are not a sequence
+
+`sequence()` runs a fixed chain and stops at the first failure. That is not what
+`RuntimeRunClass` and `RuntimeRunClassWithProfiling` do: a trace does not exist
+the instant the run ends, so `runWithProfiling` polled for it, and the tool
+surface already promises the parameters of that poll —
+
+```
+max_trace_attempts    default 5, "max polling attempts to resolve traceId"
+trace_retry_delay_ms  default 2000, "delay in ms between trace polling attempts"
+trace_lookup_uris     the feeds to look in
+```
+
+— and answers the resolved `trace_id`. 19 removed the member that did the
+polling; the parameters stayed in the schema. **A schema keeps its promise
+whether or not the implementation does, so Task 1's ratchet will not catch this
+one.** Only a test that counts attempts will.
+
+The other two profiling handlers, `handleRuntimeRunProgram` and
+`handleRuntimeRunProgramWithProfiling`, declare none of these parameters and are
+static sequences — they are in Task 21.
+
+**Files:**
+- Create: `src/lib/strategies/poll.ts`, `src/__tests__/unit/poll.test.ts`, `src/__tests__/unit/runtimeProfiling.test.ts`
+- Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`, `src/lib/answer.ts`
+
+**Interfaces:**
+- Produces:
+  - `poll<T>(step, { attempts, delayMs, done }): Promise<IAdtResponse<T, IAdtError>>`
+  - `PollExhausted` — thrown when the attempts run out, carrying `attempts` and `delayMs`
+  - `answer()` names a thrown `localKind` instead of always saying `client_threw`
+
+- [ ] **Step 1: Write down the endpoint workflow before writing code**
+
+```bash
+git log --all --oneline -S"runWithProfiling" -- src/handlers/system | head
+grep -rn "runWithProfiling" -A 30 $(git rev-parse --show-toplevel)/src/handlers/system/readonly/handleRuntimeRunClass.ts
+ls tests/fixtures/adt/ | grep -i "profil\|trace" || echo "no trace fixtures in the corpus"
+```
+
+Write the sequence down — run, then look for the trace in each of
+`trace_lookup_uris` until one answers — and **replace the member names in the
+tests below with the ones you found**: `run` and `getRuntimeTraces` there are
+placeholders for whatever 19 actually exposes, and Step 1 is where that is
+settled. Say plainly in the handler's comment which parts the corpus backs. It does not hold a profiling exchange, so these
+tests are built from fakes and the claim about ADT's timing is unverified.
+
+- [ ] **Step 2: Write the failing tests for `poll`**
+
+```typescript
+// src/__tests__/unit/poll.test.ts
+import { poll, PollExhausted } from '../../lib/strategies/poll';
+
+const ok = <T>(value: T) => ({
+  ok: true as const, getResult: () => ({ value }),
+  getError: () => { throw new Error('not a failure'); },
+});
+const failed = (message: string) => ({
+  ok: false as const,
+  getResult: () => { throw new Error('not a success'); },
+  getError: () => ({ message, origin: 'refusal' as const }),
+});
+
+describe('poll', () => {
+  it('answers as soon as done() is satisfied, without waiting again', async () => {
+    const step = jest.fn(async () => ok('trace-1') as any);
+    const slept: number[] = [];
+    const result = await poll(step, {
+      attempts: 5, delayMs: 2000, done: (v) => v === 'trace-1', sleep: async (ms) => { slept.push(ms); },
+    });
+    expect(result.ok).toBe(true);
+    expect(step).toHaveBeenCalledTimes(1);
+    expect(slept).toEqual([]);
+  });
+
+  it('keeps trying until done(), and waits between attempts', async () => {
+    let n = 0;
+    const slept: number[] = [];
+    const result = await poll(async () => ok(++n === 3 ? 'trace-1' : undefined) as any, {
+      attempts: 5, delayMs: 2000, done: (v) => v !== undefined, sleep: async (ms) => { slept.push(ms); },
+    });
+    expect(result.getResult().value).toBe('trace-1');
+    expect(n).toBe(3);
+    expect(slept).toEqual([2000, 2000]);
+  });
+
+  it('throws PollExhausted when the attempts run out, naming them', async () => {
+    expect.assertions(4);
+    try {
+      await poll(async () => ok(undefined) as any, {
+        attempts: 3, delayMs: 10, done: () => false, sleep: async () => {},
+      });
+    } catch (thrown: any) {
+      expect(thrown).toBeInstanceOf(PollExhausted);
+      expect(thrown.attempts).toBe(3);
+      expect(thrown.delayMs).toBe(10);
+      // Our own give-up, not the server's refusal: no AdtFailureOrigin.
+      expect(thrown.origin).toBeUndefined();
+    }
+  });
+
+  it('hands back a refusal untouched and stops, however many attempts are left', async () => {
+    const step = jest.fn(async () => failed('Run refused') as any);
+    const result = await poll(step, {
+      attempts: 5, delayMs: 10, done: () => true, sleep: async () => {},
+    });
+    expect(result.ok).toBe(false);
+    expect(result.getError().message).toBe('Run refused');
+    expect(step).toHaveBeenCalledTimes(1);
+  });
+});
+```
+
+- [ ] **Step 3: Run them to verify they fail** — `npx jest src/__tests__/unit/poll.test.ts`
+
+- [ ] **Step 4: Implement**
+
+```typescript
+// src/lib/strategies/poll.ts
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+
+export interface PollOptions<T> {
+  /** How many times to ask. The tool's `max_trace_attempts`. */
+  readonly attempts: number;
+  /** How long to wait between asks. The tool's `trace_retry_delay_ms`. */
+  readonly delayMs: number;
+  /** Whether this answer is the one worth keeping. */
+  readonly done: (value: T) => boolean;
+  /** Injected so a test does not spend the delay. Defaults to a real wait. */
+  readonly sleep?: (ms: number) => Promise<void>;
+}
+
+/**
+ * A step asked again until it answers something, or until the attempts run out.
+ *
+ * NOT a `sequence`. A sequence is a fixed chain of different calls; this is one
+ * call repeated, and the tool surface already promises how many times and how
+ * far apart. ADT does not have the trace the instant the run ends, which is why
+ * `runWithProfiling` polled — 19 removed the member and left the promise.
+ *
+ * A refusal stops it immediately and is handed back untouched, like every other
+ * combinator here: the server has answered, and asking four more times would
+ * only repeat a question already refused.
+ */
+export async function poll<T>(
+  step: () => Promise<IAdtResponse<T, IAdtError>>,
+  options: PollOptions<T>,
+): Promise<IAdtResponse<T, IAdtError>> {
+  const wait = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  for (let attempt = 1; attempt <= options.attempts; attempt += 1) {
+    const answered = await step();
+    if (!answered.ok) return answered;
+    if (options.done(answered.getResult().value)) return answered;
+    if (attempt < options.attempts) await wait(options.delayMs);
+  }
+  throw new PollExhausted(options.attempts, options.delayMs);
+}
+
+/**
+ * The attempts ran out.
+ *
+ * Deliberately a throw rather than an `IAdtResponse` failure, and deliberately
+ * without an origin. Nothing was refused — the server answered every time, and
+ * the answer simply was not the one being waited for. `connection` and
+ * `refusal` are both claims about the server and neither is true of our own
+ * decision to stop asking.
+ */
+export class PollExhausted extends Error {
+  readonly localKind = 'poll_exhausted';
+  constructor(readonly attempts: number, readonly delayMs: number) {
+    super(`no answer after ${attempts} attempts ${delayMs}ms apart`);
+    this.name = 'PollExhausted';
+  }
+}
+```
+
+- [ ] **Step 5: Let `answer()` name it**
+
+`local()` currently calls every throw `client_threw`, which would report our own give-up as a defect in this process. One line, read structurally like `cleanup`:
+
+```typescript
+// src/lib/answer.ts, in the catch around the call
+const kind = (thrown as { localKind?: unknown } | undefined)?.localKind;
+return local(typeof kind === 'string' ? kind : 'client_threw', ctx, messageOf(thrown), thrown);
+```
+
+Add a case to `answerFailure.test.ts`: a thrown `PollExhausted` renders as `error: 'poll_exhausted'` with no `origin`.
+
+- [ ] **Step 6: Write the failing tests for the two handlers**
+
+```typescript
+// src/__tests__/unit/runtimeProfiling.test.ts
+it('resolves the trace after several attempts and answers its id', async () => {
+  let look = 0;
+  fakeClient = fakeClientOf({
+    run: async () => okResponse(reading({ done: true })),
+    // The trace is not there the instant the run ends. That is the whole
+    // reason these two handlers poll.
+    getRuntimeTraces: async () =>
+      okResponse(reading(++look >= 3 ? { traces: [{ id: 'trace-1' }] } : { traces: [] })),
+  });
+  const result: any = await handleRuntimeRunClass(context as any, {
+    class_name: 'ZCL_X', profile: true, max_trace_attempts: 5, trace_retry_delay_ms: 0,
+  });
+  expect(result.isError).toBe(false);
+  expect(JSON.parse(result.content[0].text).trace_id).toBe('trace-1');
+});
+
+it('honours max_trace_attempts rather than looking forever', async () => {
+  const lookups = jest.fn(async () => okResponse(reading({ traces: [] })));
+  fakeClient = fakeClientOf({ run: async () => okResponse(reading({ done: true })), getRuntimeTraces: lookups });
+  const result: any = await handleRuntimeRunClass(context as any, {
+    class_name: 'ZCL_X', profile: true, max_trace_attempts: 2, trace_retry_delay_ms: 0,
+  });
+  // The parameter is in the schema; this is what makes it true.
+  expect(lookups).toHaveBeenCalledTimes(2);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).error).toBe('poll_exhausted');
+});
+
+it('looks in every uri trace_lookup_uris names', async () => {
+  const seen: string[] = [];
+  fakeClient = fakeClientOf({
+    run: async () => okResponse(reading({ done: true })),
+    getRuntimeTraces: async (uri: unknown) => {
+      seen.push(String(uri));
+      return okResponse(reading({ traces: [] }));
+    },
+  });
+  await handleRuntimeRunClass(context as any, {
+    class_name: 'ZCL_X', profile: true, trace_retry_delay_ms: 0,
+    trace_lookup_uris: ['/sap/bc/adt/runtime/traces/abaptraces', '/sap/bc/adt/runtime/traces/other'],
+  });
+  expect(seen).toEqual([
+    '/sap/bc/adt/runtime/traces/abaptraces', '/sap/bc/adt/runtime/traces/other',
+  ]);
+});
+
+it('keeps an intermediate refusal as the strategy built it', async () => {
+  fakeClient = fakeClientOf({ run: async () => refusedResponse('Trace creation refused') });
+  const result: any = await handleRuntimeRunClass(context as any, {
+    class_name: 'ZCL_X', profile: true,
+  });
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.message).toBe('Trace creation refused');
+  expect(payload.origin).toBe('refusal');
+  expect(payload.error).toBeUndefined();   // not reworded into a local failure
+});
+```
+
+The corpus holds no profiling exchange, so these run on fakes. Say so in the file's header comment rather than implying the timing is measured.
+
+- [ ] **Step 7: Run them to verify they fail**, then implement both handlers as `answer(ctx, () => sequence(run, () => poll(lookup, {...})), project)`.
+
+- [ ] **Step 8: Run everything and measure**
+
+```bash
+npx jest src/__tests__/unit/poll.test.ts src/__tests__/unit/runtimeProfiling.test.ts src/__tests__/unit/answerFailure.test.ts
+npx tsc --noEmit 2>&1 | grep -c 'error TS'
+```
+
+- [ ] **Step 9: Commit**
+
+```bash
+git add src/lib/strategies/poll.ts src/lib/answer.ts src/handlers/system/readonly/handleRuntimeRunClass*.ts src/__tests__/unit/poll.test.ts src/__tests__/unit/runtimeProfiling.test.ts
+git commit --no-verify -m "feat(system): the profiling handlers poll, because the schema says they do
+
+tsc: <before> → <after>"
+```
+
+---
+
+## Task 23: The library files, and the last of the compiler's list
 
 **Files:** `src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver}.ts`, `src/embeddable/BaseMcpServer.ts`, and whatever the compiler still names.
 
@@ -1825,7 +2273,7 @@ Expected: `CLEAN`, and the whole unit suite green. From here the pre-commit hook
 
 ---
 
-## Task 22: The invariants, and what the legacy contract decides alone
+## Task 24: The invariants, and what the legacy contract decides alone
 
 Three of the spec's success criteria are claims about 326 files. A reviewer cannot check those by reading, and neither can the next person to add a handler.
 
@@ -1877,7 +2325,7 @@ it('every client call that accepts an analyse is given one', () => {
     for (const call of memberCallsIn(source)) {
       const signature = checker.getResolvedSignature(call);
       // A call the checker cannot resolve tells us nothing. This test is
-      // meaningful only on a clean build, which is why it comes after Task 21.
+      // meaningful only on a clean build, which is why it comes after Task 23.
       const options = signature?.parameters.at(-1);
       if (options === undefined) continue;
       const type = checker.getTypeOfSymbolAtLocation(options, call);
@@ -1948,7 +2396,7 @@ Every failure names a file. Fix the file, never the regex. A genuine exception g
 
 - [ ] **Step 2: Prove the third test can fail, and that it fails for the right reason**
 
-Written after Task 21, this test is green the moment it runs, so it is a ratchet and needs the same proof Task 1's did — with one extra check, because a compiler-API test has a way of passing while measuring nothing.
+Written after Task 23, this test is green the moment it runs, so it is a ratchet and needs the same proof Task 1's did — with one extra check, because a compiler-API test has a way of passing while measuring nothing.
 
 ```bash
 # 1. a control call that should be caught: drop the analyse from one handler
@@ -2021,7 +2469,7 @@ npx jest src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyC
 
 ---
 
-## Task 23: The twenty-three tools that reach a legacy contract
+## Task 25: The twenty-three tools that reach a legacy contract
 
 ```bash
 for f in $(grep -rl "available_in" src/handlers --include='handle*.ts' | xargs grep -l "'legacy'"); do
@@ -2038,7 +2486,7 @@ The package tools, the unit-test tools, three listing tools and `handleActivateO
 
 ---
 
-## Task 24: `detail` on the JSON-answering tools
+## Task 26: `detail` on the JSON-answering tools
 
 Last, deliberately: adding a parameter before the handlers honour it puts a lie on the tool surface.
 
@@ -2057,8 +2505,19 @@ A tool answers JSON unless it hands a document through as the whole answer. `sou
 
 ```typescript
 // src/__tests__/unit/detailSurface.test.ts
+const surface = JSON.parse(
+  execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }),
+);
+
+/** Every tool whose input schema declares the parameter, across all six groups. */
+const toolsDeclaring = (param: string): string[] =>
+  Object.values<any>(surface)
+    .flat()
+    .filter((t: any) => t.params.some((p: any) => p.name === param))
+    .map((t: any) => t.name);
+
 it('declares detail on every JSON-answering tool and on no other', () => {
-  expect(toolsDeclaring('detail').sort()).toEqual(JSON_ANSWERING.sort());
+  expect(toolsDeclaring('detail').sort()).toEqual([...JSON_ANSWERING].sort());
 });
 
 // `detail` is a claim about SUCCESSES only — a failure carries raw_body at
@@ -2088,7 +2547,7 @@ Expected: no output. Anything printed is a surface change this work was not allo
 
 ---
 
-## Task 25: Documentation, and the close
+## Task 27: Documentation, and the close
 
 Releasing means updating everything the change touches, not only the changelog.
 
@@ -2099,7 +2558,7 @@ grep -rln "readResult\|metadataResult\|adt-clients 18\|activationRefusal\|deleti
 npm run docs:tools
 ```
 
-- [ ] **Step 2: Update it**, with a migration note: `detail` is new and optional; a read that used to answer `success: true` with a null body now answers an error; a write that succeeded under a failed unlock now answers an error carrying `operation: 'succeeded'`; and on a legacy system the tools listed in Task 23 take adt-clients' verdict.
+- [ ] **Step 2: Update it**, with a migration note: `detail` is new and optional; a read that used to answer `success: true` with a null body now answers an error; a write that succeeded under a failed unlock now answers an error carrying `operation: 'succeeded'`; and on a legacy system the tools listed in Task 25 take adt-clients' verdict.
 - [ ] **Step 3: Run everything**
 
 ```bash
@@ -2112,7 +2571,7 @@ npx tsc --noEmit && npm run lint:check && npx jest
 npm run test:integration 2>&1 | tee /tmp/integration-test.log
 ```
 
-- [ ] **Step 5: Open the PR**, listing the two behaviour changes above, the Task 12 decision and the Task 23 leftovers.
+- [ ] **Step 5: Open the PR**, listing the two behaviour changes above, the Task 13 decision and the Task 25 leftovers.
 - [ ] **Step 6: After merge, delete the spec and this plan**, per the project's lifecycle rule. History lives in git.
 
 ---
@@ -2120,7 +2579,13 @@ npm run test:integration 2>&1 | tee /tmp/integration-test.log
 ## Risks, named
 
 - **The slot table is a judgement**, and Task 6 is where it is reviewable. If a slot wants `verbatim` rather than `structured` in some family, the corpus says so and Task 6's test is where it is recorded.
-- **`statusOnly` on `created` changes what a create answers**, from whatever the body held to `'SUCCESS'`. The tool's schema does not change, so Task 1's ratchet stays green, but the answer's content does. It is a deliberate decision from the spec; a reviewer who disagrees should say so before Task 13, which applies it thirty times.
+- **`statusOnly` on `created` changes what a create answers**, from whatever the body held to `'SUCCESS'`. The tool's schema does not change, so Task 1's ratchet stays green, but the answer's content does. It is a deliberate decision from the spec; a reviewer who disagrees should say so before Task 14, which applies it thirty times.
 - **A write that succeeded under a failed unlock is now an error.** This is the spec's most arguable decision. It will surface in integration runs as new failures that are not regressions.
 - **The corpus does not back every row.** A refused `create` is unrecorded for every family; `where-used` has only ever answered one hit; `transport list` has only ever answered empty; no captured check message carries `chkrun:t100Key`; there is no `dataElement` or `tabletype` metadata. Tests for those say plainly that they are unverified. Issue #200 tracks the gap.
-- **The invariant regexes in Task 22 are blunt** and will catch a comment mentioning `exc:exception`. That is the right direction to be wrong in; move the comment, do not loosen the pattern.
+- **A schema outlives its implementation.** `max_trace_attempts` and its
+  siblings stayed in the tool surface after 19 removed the member that honoured
+  them, and Task 1's ratchet cannot tell the difference — it compares schemas,
+  not behaviour. Task 22 is the answer for the two handlers where this was
+  found. If another parameter turns out to be promised and unread, it will be
+  found the same way: by someone reading the schema against the code.
+- **The invariant regexes in Task 24 are blunt** and will catch a comment mentioning `exc:exception`. That is the right direction to be wrong in; move the comment, do not loosen the pattern.

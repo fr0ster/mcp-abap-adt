@@ -2746,12 +2746,19 @@ function compilerOptions(): ts.CompilerOptions {
 /**
  * Does this argument actually carry a strategy?
  *
- *  'yes'       — an object literal with an `analyse` property, reached directly
- *                or through a const initialized with one.
- *  'no'        — an object literal without it, or no argument at all.
- *  'unknown'   — anything else: a parameter, a function result, a spread whose
- *                source is not visible. Not provable here, and reported as
- *                such rather than silently allowed.
+ *  'yes'       — something in it definitely sets `analyse` to a value.
+ *  'no'        — nothing does.
+ *  'unknown'   — a spread or expression this file cannot see into, which might
+ *                set it and might set it to `undefined`. Not provable here, and
+ *                reported as such rather than silently allowed.
+ *
+ * **Read right to left.** An object literal applies its properties in order and
+ * the last writer wins, so `{ analyse: x, ...opts }` does not carry a strategy
+ * if `opts` sets `analyse: undefined`, and `{ ...opts, analyse: x }` does carry
+ * one whatever `opts` holds. A left-to-right scan answers both backwards.
+ *
+ * A spread that definitely has no `analyse` overrides nothing, so it does not
+ * end the scan — spreading an object without the key leaves the key alone.
  */
 function carriesAnalyse(
   argument: ts.Expression | undefined,
@@ -2760,13 +2767,21 @@ function carriesAnalyse(
   if (argument === undefined) return 'no';
 
   if (ts.isObjectLiteralExpression(argument)) {
-    for (const property of argument.properties) {
-      if (property.name?.getText() === 'analyse') return 'yes';
-      // A spread can only be followed when it names a const we can see.
+    for (let i = argument.properties.length - 1; i >= 0; i -= 1) {
+      const property = argument.properties[i];
+
+      if (property.name?.getText() === 'analyse') {
+        // `analyse: undefined` is not a strategy; it is the absence of one
+        // written out, and the library would read it as none passed.
+        const value = ts.isPropertyAssignment(property) ? property.initializer : undefined;
+        const isUndefined =
+          value !== undefined && ts.isIdentifier(value) && value.text === 'undefined';
+        return isUndefined ? 'no' : 'yes';
+      }
+
       if (ts.isSpreadAssignment(property)) {
         const spread = carriesAnalyse(property.expression, checker);
-        if (spread === 'yes') return 'yes';
-        if (spread === 'unknown') return 'unknown';
+        if (spread !== 'no') return spread;   // 'yes' wins here; 'unknown' may override
       }
     }
     return 'no';
@@ -2834,7 +2849,23 @@ await obj.read({ className }, version, empty);
 // NEGATIVE — assembled somewhere this file cannot see. Must BE reported, with
 // the "inline it" message rather than the "missing" one.
 await obj.read({ className }, version, optionsFrom(args));
+
+// POSITIVE — an explicit analyse AFTER an opaque spread. The spread cannot
+// override what follows it, so this carries a strategy. Must NOT be reported.
+await obj.read({ className }, version, { ...optionsFrom(args), analyse: analyseException });
+
+// NEGATIVE — the same two in the other order. A later spread wins, and it may
+// carry `analyse: undefined`, so this is not provable. Must BE reported.
+await obj.read({ className }, version, { analyse: analyseException, ...optionsFrom(args) });
+
+// NEGATIVE — the absence written out. Must BE reported as missing, not as
+// unprovable: nothing here is hidden, it just passes no strategy.
+await obj.read({ className }, version, { analyse: undefined });
 ```
+
+Those last three are the ordering controls. Both orders must be run: a check
+that scans an object literal left to right answers each of them backwards, and
+the two mistakes cancel in the count while every individual verdict is wrong.
 
 Run the check after each and confirm the message, not only the exit code. A
 check that reports the right count for the wrong reason is the failure mode this

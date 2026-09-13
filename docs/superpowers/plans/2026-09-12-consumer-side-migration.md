@@ -3145,7 +3145,7 @@ done
 **Files:**
 - Modify: the twenty-three the command above lists, under `src/handlers/`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `legacyExposure()` beside it
-- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-exposure.json`, and three fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts`, `aliased.ts`, `asserted.ts`
+- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-exposure.json`, and four fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts`, `aliased.ts`, `asserted.ts`, `not-on-legacy.ts`
 
 **Task 26's pin does not hold this.** `legacyContract.test.ts` reads the
 `*Legacy.d.ts` declarations and knows nothing about which member any handler
@@ -3162,6 +3162,7 @@ this needs the same receiver resolution:
 
 ```typescript
 // src/lib/audit/analyseOmissions.ts — append
+import { globSync, readFileSync } from 'node:fs';
 
 /**
  * Which `(handler, Legacy class, member)` pairs land on a member the legacy
@@ -3178,6 +3179,27 @@ const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
   getRequest: ['delete', 'updateMetadata', 'list'],
   getUtils: ['activateObjectsGroup', 'getTableContents', 'getTableColumns', 'getSqlQuery'],
 };
+
+/**
+ * The handlers a legacy system can actually reach.
+ *
+ * **The ledger is meaningless without this filter.** 48 handlers call the four
+ * factories whose `Legacy` class drops the strategy, and 25 of them are not
+ * offered on legacy at all — the package creates, the searches, the transport
+ * tools. Recorded unfiltered, the ledger would carry more false entries than
+ * real ones and read as a much worse problem than exists.
+ *
+ * A file with no `available_in` is available everywhere, legacy included. No
+ * handler is in that state today; the branch is here because the field is
+ * optional by contract, not because something needs it.
+ */
+export function legacyEnabledHandlers(pattern = 'src/handlers/**/handle*.ts'): string[] {
+  const AVAILABLE_IN = /available_in\s*:\s*\[([^\]]*)\]/;
+  return globSync(pattern).filter((file) => {
+    const declared = AVAILABLE_IN.exec(readFileSync(file, 'utf8'));
+    return declared === null || declared[1].includes("'legacy'");
+  });
+}
 
 export function legacyExposure(handlers: string[]): string[] {
   const program = ts.createProgram(handlers, compilerOptions());
@@ -3248,15 +3270,20 @@ function factoryOf(receiver: ts.Expression, checker: ts.TypeChecker): string | u
 
 ```bash
 npx tsx -e "
-  const { legacyExposure } = require('./src/lib/audit/analyseOmissions');
-  const { globSync } = require('node:fs');
-  console.log(JSON.stringify(legacyExposure(globSync('src/handlers/**/handle*.ts')), null, 2));
+  const { legacyExposure, legacyEnabledHandlers } = require('./src/lib/audit/analyseOmissions');
+  const files = legacyEnabledHandlers();
+  console.error(files.length + ' handlers are offered on legacy');
+  console.log(JSON.stringify(legacyExposure(files), null, 2));
 " > tests/fixtures/legacy-exposure.json
 ```
 
+The count on stderr is the check that the filter ran: an unfiltered glob answers
+326 and the filtered one answers 144. A ledger generated from 326 files is not a
+longer ledger, it is a wrong one.
+
 - [ ] **Step 2: Prove the walk sees every call form before trusting the list**
 
-Three fixtures, under `src/__tests__/fixtures/legacy/` — they exercise
+Four fixtures, under `src/__tests__/fixtures/legacy/` — they exercise
 `legacyExposure` rather than `analyseOmissions`, so they live apart from Task
 26's twelve. Each is a shape counted on the real tree, not an invented one:
 
@@ -3289,7 +3316,26 @@ export const call = () => {
 ```
 
 ```typescript
+// src/__tests__/fixtures/legacy/not-on-legacy.ts — a tool legacy never sees
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+declare const client: AdtClient;
+export const TOOL_DEFINITION = {
+  name: 'CreatePackage',
+  available_in: ['onprem', 'cloud'] as const,
+} as const;
+export const call = () => client.getPackage().create({ packageName: 'ZP' });
+```
+
+```typescript
 // in src/__tests__/unit/legacyExposure.test.ts
+it('excludes a handler legacy is never offered', () => {
+  const kept = legacyEnabledHandlers('src/__tests__/fixtures/legacy/*.ts');
+  expect(kept).not.toContain('src/__tests__/fixtures/legacy/not-on-legacy.ts');
+  // 25 of the 48 handlers that call these factories are in this position, so
+  // an unfiltered ledger would carry more invented entries than real ones.
+  expect(kept.length).toBe(3);
+});
+
 it.each([
   ['chain.ts', 'getPackage().readMetadata'],
   // 109 call sites take this shape.
@@ -3316,8 +3362,8 @@ array is what success looks like here and so is the wrong way to be wrong.
 
 ```typescript
 // src/__tests__/unit/legacyExposure.test.ts
-import { globSync, readFileSync } from 'node:fs';
-import { legacyExposure } from '../../lib/audit/analyseOmissions';
+import { readFileSync } from 'node:fs';
+import { legacyEnabledHandlers, legacyExposure } from '../../lib/audit/analyseOmissions';
 
 /**
  * The pairs where a handler still lands on a legacy member that decides for
@@ -3333,7 +3379,10 @@ import { legacyExposure } from '../../lib/audit/analyseOmissions';
  */
 it('lands on no legacy member that decides alone, beyond the ones recorded', () => {
   const recorded: string[] = JSON.parse(readFileSync('tests/fixtures/legacy-exposure.json', 'utf8'));
-  const actual = legacyExposure(globSync('src/handlers/**/handle*.ts'));
+  // Filtered, for the same reason the snapshot is: a tool not offered on
+  // legacy never reaches a Legacy class, and recording it as exposure invents
+  // a masking defect that cannot happen.
+  const actual = legacyExposure(legacyEnabledHandlers());
 
   const added = actual.filter((pair) => !recorded.includes(pair));
   expect(added).toEqual([]);

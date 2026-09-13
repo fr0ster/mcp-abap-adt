@@ -1414,7 +1414,7 @@ git commit -m "refactor(readonly): the sixteen read handlers answer through the 
 
 ---
 
-## Task 7: The metadata-only reads, and the search and listing handlers
+## Task 7: The single-call reads, searches and listings
 
 The remaining `readonly` files that are a single call: `handleReadMessageClass`, `handleReadMessageClassMessage`, `handleGetObjectsByType`, `handleGetObjectsList`, `handleSearchObject`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleGetSqlQuery`, `handleGetTableContents`, `handleListTransports`, `handleGetEnhancements`, `handleGetObjectVersionDiff`, `resolveVersionedObject`.
 

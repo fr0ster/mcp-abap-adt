@@ -233,7 +233,7 @@ reading — success with a warning — is defensible if a caller is expected to 
 on warnings. The evidence here says they do not.
 
 **Whether a call accepts an `analyse` is a property of the (class, member) pair,
-and only the compiler can answer it.** Three drafts of this section tried to
+and no reading of member names can answer it.** Three drafts of this section tried to
 answer it by reading declarations, and each was wrong in a different way:
 
 - *"the member has an `options` parameter"* — `fetchNodeStructure(parentType,
@@ -259,13 +259,42 @@ So this document states the rule and refuses to enumerate the members:
 "Resolved" is the operative word — the check belongs to `tsc`, which knows the
 type of the options parameter at each call site, and not to a grep, a list of
 names, or a table in a design document that ages the moment adt-clients ships a
-version. The invariant test resolves call sites through the TypeScript compiler
-API for the same reason.
+version.
 
-Passing one where it is not accepted is a compile error, so that half enforces
-itself. The half that needs the test is the omission: a call that *could* take a
-strategy and does not, which compiles cleanly and silently takes the library's
-verdict.
+**But `tsc` cannot see the legacy half, and saying it could was wrong.**
+`createAdtClient` declares its return as `AdtClient` while returning
+`AdtClientLegacy` when the system context says legacy. `AdtClientLegacy extends
+AdtClient` and overrides ten factories with `Legacy` classes — `getProgram`,
+`getClass`, `getInterface`, `getFunctionGroup`, `getFunctionModule`,
+`getPackage`, `getDdl`, `getUnitTest`, `getRequest`, `getUtils` — and declares
+fourteen more as `never`. At a call site the compiler sees only the modern
+contract, so it will accept an `analyse` for `readMetadata` that
+`AdtPackageLegacy.readMetadata<E>()` has no parameter for. JavaScript drops the
+extra argument without a word. The migration can be `tsc`-clean and still fall
+back to the library's verdict **on a legacy system only** — the hardest kind of
+defect to see from here, because the polygon this corpus came from is not one.
+
+**144 of the 326 tools declare `legacy` in `available_in`, and 108 of those
+touch one of the ten overridden classes.** That is the audit's scope, measured
+rather than estimated.
+
+Two things follow, and the first is a decision not to do the obvious thing.
+Narrowing `createAdtClient` to `AdtClient | AdtClientLegacy` would make the
+compiler honest, and would also make every handler confront fourteen factories
+that answer `never` on legacy — `getDomain`, `getTable`, `getServiceBinding` and
+the rest. That is a different project, and `available_in` is what keeps those
+tools off legacy systems today. So the widened type stays, and the gap is
+covered by a **second audit against the `Legacy` declarations themselves**,
+keyed on `available_in` and kept as a committed ledger, so a handler that starts
+relying on a strategy the legacy shape ignores cannot appear unnoticed.
+
+The second: a uniform contract across a class and its `Legacy` twin is the real
+fix, and it belongs to adt-clients. Raised as part of issue #200.
+
+Within one shape, passing an `analyse` where it is not accepted is a compile
+error, so that half enforces itself. The half that needs a test is the omission:
+a call that *could* take a strategy and does not, which compiles cleanly and
+silently takes the library's verdict.
 
 **What that actually costs is narrower than the list looks.** With no `analyse`,
 `answering()` falls back to `recogniseFailure`, which reports a failure when the
@@ -351,9 +380,10 @@ its strategies are injected, so its notes describe what it ships.
 - No handler reads an envelope property off `IAdtSuccess`.
 - No handler decides a refusal for itself, and **every call whose resolved
   signature accepts an `analyse` is given one** — resolved per (class, member)
-  by the compiler, because the same member name accepts one on a class and not
-  on its `Legacy` twin, and neither the presence of an `options` parameter nor a
-  `<E extends IAdtError>` type parameter is a reliable proxy. Where the
+  by the compiler on the modern contract, and by a ledger audit on the `Legacy`
+  one, which `createAdtClient`'s declared return type hides from the compiler.
+  Neither the presence of an `options` parameter nor a `<E extends IAdtError>`
+  type parameter is a reliable proxy. Where the
   library's default verdict is not enough — `activateObjectsGroup` alone, among
   the members this repository calls — `handleActivateObject` says so in a
   comment rather than reading the document itself.

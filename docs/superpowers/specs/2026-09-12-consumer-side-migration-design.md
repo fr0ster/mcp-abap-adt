@@ -134,8 +134,8 @@ second account beside the strategy's, and which step it was is already in the
 failure's `request`.
 
 `withLock` is where the qualifier earns its place: its `acquire` and `release`
-call `lock` and `unlock`, and neither declares `<E extends IAdtError>` in 19, so
-neither can be given an `analyse` at all. Their verdict stays adt-clients'. The
+call `lock` and `unlock`, and neither accepts an `analyse` on any class in 19, so
+the verdict on both stays the library's. Their verdict stays adt-clients'. The
 body in between takes one like any other call. See below.
 
 **How many handlers need a combinator is not a number this document fixes.**
@@ -232,42 +232,40 @@ just warning the log, which is all the current handlers do.
 reading — success with a warning — is defensible if a caller is expected to act
 on warnings. The evidence here says they do not.
 
-**Which members accept an `analyse` is a fact about their signature — and the
-fact is the type parameter, not the options.** A member that declares
-`<E extends IAdtError>` takes a strategy; a member without it cannot be given
-one, whatever this document would prefer, and having an `options` argument
-proves nothing either way: `fetchNodeStructure` declares one for `nodeId` and
-`withShortDescriptions` and accepts no strategy at all. Measured on 19, by
-member rather than by grep, because earlier drafts of this section got the scale
-wrong in both directions:
+**Whether a call accepts an `analyse` is a property of the (class, member) pair,
+and only the compiler can answer it.** Three drafts of this section tried to
+answer it by reading declarations, and each was wrong in a different way:
 
-**Twelve members take one**, across every object class and `AdtUtils` together:
-`read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`,
-`delete`, `checkDeletion`, `activate`, `check`, `validate`, `search`.
+- *"the member has an `options` parameter"* — `fetchNodeStructure(parentType,
+  parentName, options?: IGetNodeContentsOptions)` has one, for `nodeId` and
+  `withShortDescriptions`, and accepts no strategy.
+- *"the member declares `<E extends IAdtError>`"* — `AdtPackageLegacy` declares
+  `readMetadata<E extends IAdtError = IAdtError>()`, with no parameters at all,
+  so there is nowhere to put one.
+- *"the member's name"* — `readMetadata` accepts a strategy on 30 classes and
+  not on `AdtPackageLegacy`; `update`, `create`, `delete`, `validate` and
+  `updateMetadata` differ the same way between a class and its `Legacy` twin.
+  A name-keyed measurement collapses exactly the difference that matters.
 
-Everything else takes none — `lock`, `unlock`, `getVersions`, `getVersionSource`,
-the test-class lifecycle, the service-binding operations, the group
-activate/delete/check trio, and 19 of the 20 `AdtUtils` members including
-`fetchNodeStructure`.
+**The legacy twins are not hypothetical.** `createAdtClient` returns
+`AdtClientLegacy` whenever the system context says so, so the same handler runs
+against both shapes. A rule that holds for `AdtPackage` and not for
+`AdtPackageLegacy` is a rule that breaks on a legacy system only.
 
-The tell is the type parameter, not the options type's name: `IAdtOperationOptions`,
-`IReadOptions & IAdtOperationOptions` and `IAdtCreateOptions` are all spellings of
-the same thing, and `answering()` says why in its own comment — *"`E` is only ever
-given a value by the `analyse` argument"*. So regenerate the list from that:
+So this document states the rule and refuses to enumerate the members:
 
-```js
-// node this against the installed package rather than trusting the paragraph
-const fs = require('node:fs');
-const takes = new Set(), none = new Set();
-for (const file of fs.globSync('node_modules/@mcp-abap-adt/adt-clients/dist/core/**/Adt*.d.ts')) {
-  const src = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
-  for (const m of src.matchAll(/^ {4}([a-zA-Z]\w*)(<[^>]*>)?\s*\(/gm)) {
-    (/E extends IAdtError/.test(m[2] ?? '') ? takes : none).add(m[1]);
-  }
-}
-for (const name of takes) none.delete(name);
-console.log([...takes].sort().join(', '));
-```
+> Every call whose resolved signature accepts an `analyse` is given one.
+
+"Resolved" is the operative word — the check belongs to `tsc`, which knows the
+type of the options parameter at each call site, and not to a grep, a list of
+names, or a table in a design document that ages the moment adt-clients ships a
+version. The invariant test resolves call sites through the TypeScript compiler
+API for the same reason.
+
+Passing one where it is not accepted is a compile error, so that half enforces
+itself. The half that needs the test is the omission: a call that *could* take a
+strategy and does not, which compiles cleanly and silently takes the library's
+verdict.
 
 **What that actually costs is narrower than the list looks.** With no `analyse`,
 `answering()` falls back to `recogniseFailure`, which reports a failure when the
@@ -351,14 +349,14 @@ its strategies are injected, so its notes describe what it ships.
   is then absent rather than invented.
 - `npx tsc` is clean.
 - No handler reads an envelope property off `IAdtSuccess`.
-- No handler decides a refusal for itself, and **every call to one of the twelve
-  members that declare `<E extends IAdtError>` is given an `analyse`**. Having
-  an options parameter is not the test — `fetchNodeStructure` takes one, for
-  `nodeId` and `withShortDescriptions`, and accepts no strategy. The type
-  parameter is the test, because `E` is only ever given a value by `analyse`.
-  Where the library's default verdict is not enough — `activateObjectsGroup`
-  alone, among the members this repository calls — `handleActivateObject` says
-  so in a comment rather than reading the document itself.
+- No handler decides a refusal for itself, and **every call whose resolved
+  signature accepts an `analyse` is given one** — resolved per (class, member)
+  by the compiler, because the same member name accepts one on a class and not
+  on its `Legacy` twin, and neither the presence of an `options` parameter nor a
+  `<E extends IAdtError>` type parameter is a reliable proxy. Where the
+  library's default verdict is not enough — `activateObjectsGroup` alone, among
+  the members this repository calls — `handleActivateObject` says so in a
+  comment rather than reading the document itself.
 - Every XML-bodied update reads before it writes.
 - In a handler that owns a lock's whole lifetime, after every successful
   `acquire`, `release` is attempted exactly once, on every path out — a refusal, a throw, a success. Whether SAP then lets go of

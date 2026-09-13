@@ -21,7 +21,7 @@
 - **In a handler that owns a lock, after every successful acquire, release is attempted exactly once, on every path out, and a release that failed reaches the caller.** Attempted, not achieved: whether SAP lets go is SAP's answer. A lock chain is `withLock()`, never `sequence()` — a sequence stops at the first failure and would skip the unlock entirely. This holds on the throw path too: a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call to a member that declares `<E extends IAdtError>`.** That type parameter is the tell, not the presence of an `options` argument — `fetchNodeStructure` has options for `nodeId` and `withShortDescriptions` and accepts no strategy. A call without an `analyse` gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Twelve members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
+- **`analyse` on every call whose resolved signature accepts one** — resolved per (class, member) by the compiler. There is no reliable shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all, and `readMetadata` accepts one on 30 classes but not on `AdtPackageLegacy`. `createAdtClient` returns `AdtClientLegacy` on a legacy system, so both shapes are live. A call without an `analyse` gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Roughly a dozen members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls in this plan.** Every test here runs offline against `tests/fixtures/adt/` (48 cases, 61 exchanges, 27 endpoints). Integration runs are the user's call, after the compiler is clean.
@@ -1915,19 +1915,43 @@ it('no handler decides a refusal for itself', () => {
 
 /** Every call carries one. Without it the default verdict is a status-code
  *  reading, and ADT puts refusals inside a 200. */
-it('every client call passes an analyse', () => {
+it('every client call that accepts an analyse is given one', () => {
+  // One program over the handler sources, so the checker can resolve the
+  // adt-clients declarations the calls actually bind to.
+  const program = ts.createProgram(handlers, readConfig('tsconfig.json'));
   const offenders: string[] = [];
   for (const file of handlers) {
-    const source = readFileSync(file, 'utf8');
-    // An ALLOWLIST of the twelve members that accept an `analyse` in 19, not an
-    // exclusion list. `lock`, `unlock`, `getVersions`, `getVersionSource`, the
-    // group operations and 19 of the 20 `AdtUtils` members accept none, so a
-    // handler calling one of those is not in violation — an exclusion list would
-    // have to name fifty members and would rot the day any of them gains a
-    // parameter. Regenerate the twelve with the script in the spec.
-    const calls = source.match(/\.(read|readMetadata|readTransport|create|update|updateMetadata|delete|checkDeletion|activate|check|validate|search)\(/g) ?? [];
-    const analyses = source.match(/analyse:/g) ?? [];
-    if (calls.length > analyses.length) offenders.push(`${file}: ${calls.length} calls, ${analyses.length} analyse`);
+    const source = program.getSourceFile(file);
+    if (source === undefined) continue;
+    // Resolved by the compiler, not matched by a regex over the text.
+    //
+    // Three earlier drafts of this test used a member-name allowlist, and each
+    // was wrong: `fetchNodeStructure` has an options parameter and accepts no
+    // strategy; `AdtPackageLegacy.readMetadata<E>()` is generic and takes no
+    // parameters at all; and `readMetadata` accepts one on thirty classes and
+    // not on `AdtPackageLegacy`, which `createAdtClient` returns on a legacy
+    // system. A name cannot answer the question, so ask the type.
+    //
+    // Passing an `analyse` where it is not accepted is already a compile error,
+    // so only the omission needs checking here.
+    const checker = program.getTypeChecker();
+    for (const call of callExpressionsIn(source)) {
+      const signature = checker.getResolvedSignature(call);
+      if (signature === undefined) continue;
+      const options = signature.parameters.at(-1);
+      if (options === undefined) continue;
+      const type = checker.getTypeOfSymbolAtLocation(options, call);
+      const accepts = type.getProperties().some((p) => p.name === 'analyse');
+      if (!accepts) continue;
+      const passed = call.arguments.at(-1);
+      const given =
+        passed !== undefined &&
+        ts.isObjectLiteralExpression(passed) &&
+        passed.properties.some((p) => p.name?.getText() === 'analyse');
+      if (!given) {
+        offenders.push(`${file}:${lineOf(call)} — ${call.expression.getText()} accepts an analyse and was given none`);
+      }
+    }
   }
   expect(offenders).toEqual([]);
 });

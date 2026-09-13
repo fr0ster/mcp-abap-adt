@@ -2320,14 +2320,14 @@ unlock on its error path that `withLock` replaces.
 
 ## Task 20: The high-tier creates and updates that hold no lock
 
-**Seventeen creates and eleven updates.** A create is a bare POST — the corpus
+**Seventeen creates and ten updates.** A create is a bare POST — the corpus
 has `create-class--01-oo-classes` and `create-domain--01-ddic-domains`, one
-exchange each, no lock — and these eleven updates take the handle as an
+exchange each, no lock — and these ten updates take the handle as an
 argument rather than acquiring one. Both are the single-call shape of Task 9,
 with Task 10's pairing: `analyseException`, `statusOnly`, `terseWrite`.
 
 **Files:**
-- Modify: the seventeen creates and eleven updates the command below lists, under `src/handlers/*/high/`
+- Modify: the seventeen creates and ten updates the command below lists, under `src/handlers/*/high/` — the command prints eleven updates, and `handleUpdateServiceBinding` is the one Task 23 takes
 - Create: `src/__tests__/unit/highTierWrites.test.ts`
 
 **Do not give these a lock lifecycle.** A `withLock` here would acquire a lock
@@ -2362,7 +2362,7 @@ it.each([
   expect(JSON.parse(result.content[0].text).message).toBe('Name already taken');
 });
 
-// The eleven updates are a different call and a different assertion. A row
+// The ten updates are a different call and a different assertion. A row
 // for one of them in the table above would mock `create`, which the handler
 // never calls, and then assert a refused create that never happened.
 it.each([
@@ -2383,9 +2383,9 @@ it.each([
   expect(JSON.parse(result.content[0].text).message).toBe('Object is locked by another user');
 });
 
-// Every update in this task, not a sample. Two rows would leave eight
-// handlers free to acquire a lock nobody asked them for, and this is the
-// assertion that stops that.
+// All ten in this task, not a sample. Two rows would leave eight handlers
+// free to acquire a lock nobody asked them for, and this is the assertion
+// that stops that.
 it.each([
   ['UpdateLocalTestClass', handleUpdateLocalTestClass, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
   ['UpdateLocalTypes', handleUpdateLocalTypes, { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' }],
@@ -2726,7 +2726,9 @@ it('SearchObject passes an analyse, which the member it replaced never took', as
   expect(seen).toEqual([analyseException]);
 });
 
-// SHAPE 2 — the two lib files, which are not handlers and answer no MCP result.
+// SHAPE 2 — the two lib files. They are not handlers and answer no MCP result,
+// and they feed the source search: a walk that answers nothing there is a
+// search that finds nothing, with no error to show for it.
 it('packageEnumerator walks rather than calling the removed member', async () => {
   const walked: string[] = [];
   const enumerated = await enumeratePackage(
@@ -2752,55 +2754,98 @@ it('packageResolver searches through the renamed member, with a strategy', async
 });
 
 // SHAPE 3 — the two program profiling handlers: two calls where there was one.
-it('a program profiling run schedules the trace before it runs', async () => {
+// Both of them. The compiler catches a handler that still names the removed
+// member; it says nothing about one that calls the two replacements in the
+// wrong order, or calls only one of them.
+const profiling = [
+  ['RuntimeRunProgram', handleRuntimeRunProgram, { program_name: 'ZP', profile: true }],
+  ['RuntimeRunProgramWithProfiling', handleRuntimeRunProgramWithProfiling, { program_name: 'ZP' }],
+] as const;
+
+it.each(profiling)('%s schedules the trace before it runs', async (_n, handler, args) => {
   const order: string[] = [];
   fakeClient = fakeClientOf({
     scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
     runWithProfiler: async () => { order.push('run'); return okResponse(reading({ done: true })); },
   });
-  await handleRuntimeRunProgramWithProfiling(context as any, { program_name: 'ZP' });
+  await (handler as any)(context as any, args);
   expect(order).toEqual(['schedule', 'run']);
 });
 
-it('stops at the first refused step of a profiling run', async () => {
-  fakeClient = fakeClientOf({ scheduleTrace: async () => refusedResponse('Trace scheduling refused') });
-  const result: any = await handleRuntimeRunProgramWithProfiling(context as any, { program_name: 'ZP' });
+it.each(profiling)('%s stops at the first refused step', async (_n, handler, args) => {
+  const run = jest.fn();
+  fakeClient = fakeClientOf({
+    scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
+    runWithProfiler: run,
+  });
+  const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
   expect(JSON.parse(result.content[0].text).message).toBe('Trace scheduling refused');
+  expect(run).not.toHaveBeenCalled();
 });
 
-// SHAPE 4 — the service-binding update, whose replacement Step 1 establishes.
-// Written once that step has answered: it is the one member in the table with
-// no obvious successor, and a test written first would test the guess.
+// SHAPE 4 — the service-binding update. Step 3 replaces this with a real
+// test; `it.todo` is a placeholder for one step, not a way to finish.
 it.todo('UpdateServiceBinding, once Step 1 has named the members it maps onto');
 
-// The seventh consumer is not a handler and needs its own test: it feeds the
-// source search, so a walk that answers nothing there is a search that finds
-// nothing, with no error to show for it.
-it('enumerates a package through walkPackage rather than the removed member', async () => {
-  const walked: string[] = [];
-  const enumerated = await enumeratePackage(
-    fakeClientOf({
-      fetchNodeStructure: async (_t: unknown, name: unknown) => {
-        walked.push(String(name));
-        return okResponse(reading({ nodes: [] }));
-      },
-    }) as any,
-    'ZMCP_SHR_PKG',
-  );
-  expect(walked).toContain('ZMCP_SHR_PKG');
-  expect(enumerated).toEqual([]);
+```
+
+- [ ] **Step 3: Replace the `it.todo` with a failing test**
+
+Step 1 has now named which members `updateServiceBinding` maps onto. Write the
+test before the handler, like every other shape in this task, and assert three
+things rather than one: the order of the calls, the arguments each receives, and
+that a refusal in the first stops the rest.
+
+```typescript
+it('UpdateServiceBinding calls the members that replaced the composite, in order', async () => {
+  const order: string[] = [];
+  const seen: Record<string, unknown> = {};
+  fakeClient = fakeClientOf({
+    // the member names Step 1 established, not these guesses
+    update: async (config: any, o: any) => {
+      order.push('update'); seen.update = { config, analyse: o?.analyse };
+      return okResponse(reading(undefined, '', 200));
+    },
+    classifyServiceBinding: async (config: any) => {
+      order.push('classify'); seen.classify = config;
+      return okResponse(reading({}));
+    },
+  });
+  await handleUpdateServiceBinding(context as any, {
+    service_binding_name: 'ZSB', desired_publication_state: 'published',
+  });
+  expect(order).toEqual(['update', 'classify']);
+  expect((seen.update as any).analyse).toBe(analyseException);
+});
+
+it('UpdateServiceBinding stops at the first refused step', async () => {
+  const second = jest.fn();
+  fakeClient = fakeClientOf({
+    update: async () => refusedResponse('Binding is locked'),
+    classifyServiceBinding: second,
+  });
+  const result: any = await handleUpdateServiceBinding(context as any, {
+    service_binding_name: 'ZSB', desired_publication_state: 'published',
+  });
+  expect(result.isError).toBe(true);
+  expect(second).not.toHaveBeenCalled();
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
-- [ ] **Step 4: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`.
+**This task is not done while an `it.todo` remains in it.** Jest passes a todo,
+so the suite is green either way — which makes this the one consumer that could
+ship with no behavioural test at all, and it is also the least determined one in
+the table.
+
+- [ ] **Step 4: Run the tests to verify they fail**
+- [ ] **Step 5: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`.
 
 **Two axes, and only one of them is missing here.** The where-used and node-structure members accept **no per-call `analyse`** — their verdict stays adt-clients'. They do still take **our injected result set**: `client.getUtils(ourUtils)`, never `client.getUtils()`. Omitting it selects the shipped `node` strategy, which drops the descriptions `nodeLevel` keeps, and a tree without descriptions is one a caller has to walk again. Absent strategy and absent injection are different absences; do not read the first as licence for the second.
 
 `packageEnumerator` uses `walkPackage` from `packageWalk.ts`, which already replaced `getPackageContentsList` in `handleGetPackageTree`.
-- [ ] **Step 5: Run the tests and measure**
-- [ ] **Step 6: Commit** — `refactor(system): the eleven consumers of members 19 removed`
+- [ ] **Step 6: Run the tests and measure**
+- [ ] **Step 7: Commit** — `refactor(system): the eleven consumers of members 19 removed`
 
 ---
 

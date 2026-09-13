@@ -1,7 +1,18 @@
 # Migrating onto adt-clients 19 — design
 
-**Status:** drafted 2026-09-12. Replaces `2026-09-08-result-error-strategies-design.md`,
-which was written against adt-clients 18 and is wrong about who does what.
+**Status:** reviewed and approved 2026-09-13. Replaces
+`2026-09-08-result-error-strategies-design.md`, which was written against
+adt-clients 18 and is wrong about who does what.
+
+Ten rounds of external review changed it in ten places: `raw_body` no longer
+depends on `detail`; `pair()` joined the handler shapes and the "thirteen
+handlers" count was replaced by a measurement; a lock chain became `withLock()`
+rather than `sequence()`, with all six outcomes written down and a refused
+release separated from a thrown one; `cleanup` is rebuilt field by field like
+`request`; the release criterion promises an attempt rather than a result; the
+`analyse` rule is stated by resolved signature rather than by member name; and
+legacy is in scope with its own section. The implementation plan is
+`docs/superpowers/plans/2026-09-12-consumer-side-migration.md`.
 
 ## What changed under us
 

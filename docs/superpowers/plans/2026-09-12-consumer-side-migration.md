@@ -17,7 +17,7 @@ Every task's requirements implicitly include this section.
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` on JSON-answering tools. 362 tools across 6 groups; the snapshot frozen in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict belongs to the `analyse` strategy.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Pass it **in the call, or in a `const` initialized with an object literal in the same file** — that is what makes the check decidable, and a strategy assembled at runtime is reported so it can be inlined. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
+- **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Pass it **in the call, or in a `const` initialized with an object literal in the same file and not mutated afterwards** — that is what makes the check decidable. A `let`, a value assembled at runtime, or one that may be `undefined` is reported so it can be inlined. `const` fixes the binding and not the object, so mutating the literal afterwards defeats the check; the invariant is a guard, not a proof. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a non-empty string body it reaches the caller at every level and on every tool; where there is none the field is absent, never invented.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`. The contract's types are not filters, and what sits on a transport config is headers, an Authorization bearer and cookies.
 - **A lock chain is `withLock()`, never `sequence()`**, and only where the handler owns the lock's whole lifetime. The fifteen `low`-tier `LockX` tools hand the handle back on purpose and are never wrapped.
@@ -2797,13 +2797,41 @@ function carriesAnalyse(
   if (ts.isIdentifier(argument)) {
     const symbol = checker.getSymbolAtLocation(argument);
     const declaration = symbol?.declarations?.[0];
-    if (declaration !== undefined && ts.isVariableDeclaration(declaration) && declaration.initializer) {
+    // A `const` binding is the only one whose initializer still describes the
+    // value at the call. `let options = { analyse: x }; options = {}` has the
+    // same initializer and passes nothing, so following a `let` would prove
+    // the opposite of what it looks like.
+    if (
+      declaration !== undefined &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer !== undefined &&
+      isConstBinding(declaration)
+    ) {
       return carriesAnalyse(declaration.initializer, checker);
     }
     return 'unknown';
   }
 
   return 'unknown';
+}
+
+/**
+ * Was this declared `const`?
+ *
+ * The flag lives on the declaration LIST, not on the declaration, so
+ * `declaration.flags` answers nothing useful and `declaration.parent` is where
+ * to ask.
+ *
+ * **What this still does not prove.** `const` fixes the binding, not the
+ * object: `const o = { analyse: x }; o.analyse = undefined;` would pass. Nothing
+ * short of tracking mutation catches that, and this check does not try. It is
+ * why the convention is written as it is — pass the strategy in the call, or in
+ * a `const` literal left alone — and why the invariant is a guard rather than a
+ * proof.
+ */
+function isConstBinding(declaration: ts.VariableDeclaration): boolean {
+  const list = declaration.parent;
+  return ts.isVariableDeclarationList(list) && (list.flags & ts.NodeFlags.Const) !== 0;
 }
 
 /**
@@ -2902,10 +2930,17 @@ await obj.read({ className }, version, { analyse: maybe });
 
 // NEGATIVE — the same, written as a conditional.
 await obj.read({ className }, version, { analyse: strict ? analyseException : undefined });
+
+// NEGATIVE — a `let` whose initializer looks right and whose value is not.
+// Must BE reported as unprovable: the binding can change after the line that
+// declares it, and this check reads only the declaration.
+let mutable = { analyse: analyseException };
+mutable = {};
+await obj.read({ className }, version, mutable);
 ```
 
-The three after the opaque spread are the ordering controls, and the four after
-them are the value controls — a key set to nothing, or to something that may be
+The three after the opaque spread are the ordering controls, and the five after
+them are the value and binding controls — a key set to nothing, or to something that may be
 nothing, is not a strategy passed, however it is spelled.
 
 The ordering pair specifically: Both orders must be run: a check

@@ -2691,6 +2691,12 @@ Write down the endpoint sequence each one issued **before** writing code. A sequ
 
 - [ ] **Step 2: Write the failing test**
 
+**Take every test's arguments from the tool's own `required` list.** A handler
+validates its input before it builds a client, so a row missing a required field
+never reaches the member under test. The negative tests are the trap: a missing
+field also answers `isError: true`, so such a row passes while proving nothing.
+Assert the message, not just the flag.
+
 Eleven consumers in four shapes, and each shape needs a test. A rename is not
 free of risk: `searchObjects` became `search`, which **takes an `analyse` where
 the old member took none**, so migrating it as a pure rename hands the verdict
@@ -2703,9 +2709,13 @@ back to the library and nothing says so.
 it.each([
   ['GetWhereUsed', handleGetWhereUsed, { object_type: 'CLAS', object_name: 'ZCL_X' }, 'getWhereUsed'],
   ['GetStructuresList', handleGetStructuresList, { structure_name: 'ZS' }, 'getWhereUsed'],
-  ['SearchObject', handleSearchObject, { query: 'ZCL*' }, 'search'],
+  // Arguments copied from each tool's own `required` list, not invented. A
+  // handler validates its input before it builds a client, so a row missing a
+  // required field never reaches the member it is meant to be testing — and
+  // fails, or passes, for a reason that has nothing to do with the migration.
+  ['SearchObject', handleSearchObject, { object_name: 'ZCL*' }, 'search'],
   ['ValidateServiceBinding', handleValidateServiceBinding,
-    { service_binding_name: 'ZSB', package_name: 'ZP' }, 'validate'],
+    { service_binding_name: 'ZSB', service_definition_name: 'ZSD' }, 'validate'],
   ['ListFunctionModules', handleListFunctionModules, { function_group_name: 'ZFG' }, 'fetchNodeStructure'],
   ['ListFunctionGroupIncludes', handleListFunctionGroupIncludes, { function_group_name: 'ZFG' }, 'fetchNodeStructure'],
 ])('%s calls the member that replaced it and surfaces its refusal', async (_n, handler, args, member) => {
@@ -2722,7 +2732,7 @@ it('SearchObject passes an analyse, which the member it replaced never took', as
   fakeClient = fakeClientOf({
     search: async (_c: unknown, o: any) => { seen.push(o?.analyse); return okResponse(reading([])); },
   });
-  await handleSearchObject(context as any, { query: 'ZCL*' });
+  await handleSearchObject(context as any, { object_name: 'ZCL*' });
   expect(seen).toEqual([analyseException]);
 });
 
@@ -2812,8 +2822,15 @@ it('UpdateServiceBinding calls the members that replaced the composite, in order
       return okResponse(reading({}));
     },
   });
+  // All four of this tool's required fields: service_binding_name,
+  // desired_publication_state, binding_variant and service_name. The handler
+  // throws on each of the last three before it reaches a client, so a shorter
+  // object leaves `order` empty and the test fails on the wrong thing.
   await handleUpdateServiceBinding(context as any, {
-    service_binding_name: 'ZSB', desired_publication_state: 'published',
+    service_binding_name: 'ZSB',
+    desired_publication_state: 'published',
+    binding_variant: 'ODATA_V4',
+    service_name: 'ZSRV',
   });
   expect(order).toEqual(['update', 'classify']);
   expect((seen.update as any).analyse).toBe(analyseException);
@@ -2826,9 +2843,16 @@ it('UpdateServiceBinding stops at the first refused step', async () => {
     classifyServiceBinding: second,
   });
   const result: any = await handleUpdateServiceBinding(context as any, {
-    service_binding_name: 'ZSB', desired_publication_state: 'published',
+    service_binding_name: 'ZSB',
+    desired_publication_state: 'published',
+    binding_variant: 'ODATA_V4',
+    service_name: 'ZSRV',
   });
   expect(result.isError).toBe(true);
+  // And for the right reason. Missing a required field also produces
+  // `isError: true`, so a row short of one would pass this line while never
+  // calling the member the test is about.
+  expect(JSON.parse(result.content[0].text).message).toBe('Binding is locked');
   expect(second).not.toHaveBeenCalled();
 });
 ```

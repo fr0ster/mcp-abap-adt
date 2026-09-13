@@ -2877,91 +2877,100 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
 
 Every failure names a file. Fix the file, never the regex. A genuine exception goes in the test with a sentence saying why, so a reviewer sees it.
 
-- [ ] **Step 2: Prove the third test can fail, and that it fails for the right reason**
+- [ ] **Step 2: Commit the controls as fixtures, not as a ritual**
 
-Written after Task 25, this test is green the moment it runs, so it is a ratchet and needs the same proof Task 1's did — with one extra check, because a compiler-API test has a way of passing while measuring nothing.
+Every verdict `carriesAnalyse` reaches has been wrong at least once: it read only
+inline literals, then only types, then left to right, then ignored `undefined`,
+then followed a `let`. Each fix was checked by hand with a `sed` and a revert,
+and **not one of them is protected**. A permanent test over the real tree only
+exercises the call shapes that happen to be in it today, so the next change to
+this function breaks a shape nobody writes yet and the suite stays green.
 
-```bash
-# 1. a control call that should be caught: drop the analyse from one handler
-sed -i 's/, { analyse: analyseException })/)/' src/handlers/class/readonly/handleReadClass.ts
-npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect FAIL naming that file and line
-git checkout src/handlers/class/readonly/handleReadClass.ts
-npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect PASS again
-```
-
-Then both controls for the variable case, because each fix to this check has
-introduced the opposite error.
+So the controls become files. One tiny module per case, named for the verdict it
+must produce, under `src/__tests__/fixtures/analyse/`. They import the real
+client type so the checker resolves real signatures, and `declare const` keeps
+them from needing a connection.
 
 ```typescript
-// POSITIVE — a strategy passed through a const. Must NOT be reported.
-const options = { analyse: analyseException };
-await obj.read({ className }, version, options);
-
-// NEGATIVE — a const whose TYPE declares `analyse` as optional and whose VALUE
-// never sets it. Must BE reported. This is the case a type-only check accepts:
-// `IAdtOperationOptions` says a strategy may be there, and no strategy is.
-const empty: IAdtOperationOptions = {};
-await obj.read({ className }, version, empty);
-
-// NEGATIVE — assembled somewhere this file cannot see. Must BE reported, with
-// the "inline it" message rather than the "missing" one.
-await obj.read({ className }, version, optionsFrom(args));
-
-// POSITIVE — an explicit analyse AFTER an opaque spread. The spread cannot
-// override what follows it, so this carries a strategy. Must NOT be reported.
-await obj.read({ className }, version, { ...optionsFrom(args), analyse: analyseException });
-
-// NEGATIVE — the same two in the other order. A later spread wins, and it may
-// carry `analyse: undefined`, so this is not provable. Must BE reported.
-await obj.read({ className }, version, { analyse: analyseException, ...optionsFrom(args) });
-
-// NEGATIVE — the absence written out. Must BE reported as missing, not as
-// unprovable: nothing here is hidden, it just passes no strategy.
-await obj.read({ className }, version, { analyse: undefined });
-
-// NEGATIVE — the same absence behind a name. Must BE reported.
-const analyse = undefined;
-await obj.read({ className }, version, { analyse });
-
-// NEGATIVE — a value that may be nothing. Must BE reported as unprovable:
-// the type says it can be undefined, and this file cannot see that it is not.
-const maybe: typeof analyseException | undefined = pick(args);
-await obj.read({ className }, version, { analyse: maybe });
-
-// NEGATIVE — the same, written as a conditional.
-await obj.read({ className }, version, { analyse: strict ? analyseException : undefined });
-
-// NEGATIVE — a `let` whose initializer looks right and whose value is not.
-// Must BE reported as unprovable: the binding can change after the line that
-// declares it, and this check reads only the declaration.
-let mutable = { analyse: analyseException };
-mutable = {};
-await obj.read({ className }, version, mutable);
+// src/__tests__/fixtures/analyse/yes-inline.ts
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+declare const client: AdtClient;
+export const call = () =>
+  client.getClass().read({ className: 'X' }, 'active', { analyse: analyseException });
 ```
 
-The three after the opaque spread are the ordering controls, and the five after
-them are the value and binding controls — a key set to nothing, or to something that may be
-nothing, is not a strategy passed, however it is spelled.
+Twelve of them, and the name is the assertion:
 
-The ordering pair specifically: Both orders must be run: a check
-that scans an object literal left to right answers each of them backwards, and
-the two mistakes cancel in the count while every individual verdict is wrong.
+| fixture | the call it makes | verdict |
+|---|---|---|
+| `yes-inline.ts` | `{ analyse: analyseException }` | yes |
+| `yes-const.ts` | `const o = { analyse: analyseException }` | yes |
+| `yes-spread-then-analyse.ts` | `{ ...opaque(), analyse: analyseException }` | yes |
+| `no-absent.ts` | no options argument at all | no |
+| `no-empty-literal.ts` | `{}` | no |
+| `no-typed-empty-const.ts` | `const o: IAdtOperationOptions = {}` | no |
+| `no-explicit-undefined.ts` | `{ analyse: undefined }` | no |
+| `no-shorthand-undefined.ts` | `const analyse = undefined; { analyse }` | no |
+| `unknown-analyse-then-spread.ts` | `{ analyse: analyseException, ...opaque() }` | unknown |
+| `unknown-maybe-undefined.ts` | `{ analyse: maybe }` typed `T \| undefined` | unknown |
+| `unknown-conditional.ts` | `{ analyse: strict ? analyseException : undefined }` | unknown |
+| `unknown-reassigned-let.ts` | `let o = { analyse: x }; o = {}` | unknown |
 
-Run the check after each and confirm the message, not only the exit code. A
-check that reports the right count for the wrong reason is the failure mode this
-step exists for.
+```typescript
+// src/__tests__/unit/analyseOmissions.test.ts
+import { globSync } from 'node:fs';
+import { basename } from 'node:path';
+import { analyseOmissions } from '../../lib/audit/analyseOmissions';
 
-The `inspected` bound in the test is the second half of the proof, and it needs seeing fail too. Break the program on purpose and confirm the bound catches it rather than the test passing quietly:
+const fixtures = globSync('src/__tests__/fixtures/analyse/*.ts');
+
+it('has a fixture for every verdict, and finds them all', () => {
+  // A glob that matched nothing would make every assertion below vacuous.
+  expect(fixtures).toHaveLength(12);
+});
+
+it.each(fixtures)('%s produces the verdict its name claims', (file) => {
+  const expected = basename(file).split('-')[0];           // yes | no | unknown
+  const { offenders, inspected } = analyseOmissions([file]);
+  expect(inspected).toBe(1);
+  if (expected === 'yes') {
+    expect(offenders).toEqual([]);
+    return;
+  }
+  expect(offenders).toHaveLength(1);
+  // The two failures are reported differently on purpose: one says a strategy
+  // is missing, the other says it cannot be proved from the source. A change
+  // that collapses them loses the instruction to the author.
+  expect(offenders[0]).toContain(
+    expected === 'no' ? 'no analyse passed' : 'not provable from the source',
+  );
+});
+```
+
+- [ ] **Step 3: Run them, and make one fail on purpose**
 
 ```bash
-# temporarily replace compilerOptions() with `{}` and run
-npx jest src/__tests__/unit/handlerInvariants.test.ts
-# expect FAIL on `inspected` — a program with no paths resolves no signature,
-# so nothing is inspected and the offenders list is empty for the wrong reason.
-# Then restore compilerOptions().
+npx jest src/__tests__/unit/analyseOmissions.test.ts   # 13 assertions, all green
 ```
 
-- [ ] **Step 3: Pin what the legacy contract drops**
+Then break `carriesAnalyse` in the one way each round of review already found —
+scan the object literal left to right instead of right to left — and confirm
+that `yes-spread-then-analyse` and `unknown-analyse-then-spread` both fail. They
+are the pair that catches it, and a suite where only one of them exists would
+have let that bug through with the offender count unchanged.
+
+- [ ] **Step 4: Check the whole tree, once**
+
+```bash
+npx jest src/__tests__/unit/handlerInvariants.test.ts
+```
+
+The repo-wide run keeps the `inspected` bound, which guards against a program
+that resolved nothing. The fixtures guard the logic; the bound guards the setup.
+Neither substitutes for the other.
+
+- [ ] **Step 5: Pin what the legacy contract drops**
 
 `SAP_SYSTEM_TYPE=legacy` is a supported deployment running a subset of the tools through **these same handler files**. `available_in` hides the tools that cannot run on legacy at all, not the 144 that can.
 
@@ -3004,13 +3013,15 @@ it('pins the legacy members that take no strategy', () => {
 });
 ```
 
-- [ ] **Step 4: Run both**
+- [ ] **Step 6: Run everything this task added**
 
 ```bash
-npx jest src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyContract.test.ts
+npx jest src/__tests__/unit/analyseOmissions.test.ts \
+         src/__tests__/unit/handlerInvariants.test.ts \
+         src/__tests__/unit/legacyContract.test.ts
 ```
 
-- [ ] **Step 5: Commit** — `test(handlers): the invariants, and what the legacy contract decides alone`
+- [ ] **Step 7: Commit** — `test(handlers): the invariants, their controls, and what legacy decides alone`
 
 ---
 

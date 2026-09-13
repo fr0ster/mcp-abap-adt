@@ -3145,7 +3145,7 @@ done
 **Files:**
 - Modify: the twenty-three the command above lists, under `src/handlers/`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `legacyExposure()` beside it
-- Create: `src/__tests__/unit/legacyExposure.test.ts` and `tests/fixtures/legacy-exposure.json`
+- Create: `src/__tests__/unit/legacyExposure.test.ts`, `tests/fixtures/legacy-exposure.json`, and two fixtures under `src/__tests__/fixtures/legacy/` — `chain.ts` and `aliased.ts`
 
 **Task 26's pin does not hold this.** `legacyContract.test.ts` reads the
 `*Legacy.d.ts` declarations and knows nothing about which member any handler
@@ -3181,21 +3181,58 @@ const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
 
 export function legacyExposure(handlers: string[]): string[] {
   const program = ts.createProgram(handlers, compilerOptions());
+  const checker = program.getTypeChecker();
   const found = new Set<string>();
   for (const file of handlers) {
     const source = program.getSourceFile(file);
     if (source === undefined) continue;
     for (const call of memberCallsIn(source)) {
-      const member = (call.expression as ts.PropertyAccessExpression).name.getText();
-      const receiver = (call.expression as ts.PropertyAccessExpression).expression;
-      if (!ts.isCallExpression(receiver) || !ts.isPropertyAccessExpression(receiver.expression)) continue;
-      const factory = receiver.expression.name.getText();
-      if (LEGACY_NO_STRATEGY[factory]?.includes(member)) {
+      const access = call.expression as ts.PropertyAccessExpression;
+      const member = access.name.getText();
+      const factory = factoryOf(access.expression, checker);
+      if (factory !== undefined && LEGACY_NO_STRATEGY[factory]?.includes(member)) {
         found.add(`${file.replace('src/handlers/', '')} → ${factory}().${member}`);
       }
     }
   }
   return [...found].sort();
+}
+
+/**
+ * Which factory produced this receiver?
+ *
+ * **Both forms, because handlers use both.** 188 call sites are the direct
+ * chain `client.getPackage().read(...)`; 109 hold the object in a local first —
+ * `const utils = client.getUtils(); utils.getSqlQuery(...)` — and
+ * `handleGetPackageContents` is one of them, which is to say one of the
+ * twenty-three this ledger exists for. A walk that recognised only the chain
+ * would miss the majority of what it is meant to record, and would do it
+ * quietly: a shorter ledger reads like progress.
+ *
+ * Only a `const` is followed, for the reason `carriesAnalyse` follows only a
+ * `const`: a rebound `let` no longer describes what the initializer says.
+ */
+function factoryOf(receiver: ts.Expression, checker: ts.TypeChecker): string | undefined {
+  if (ts.isCallExpression(receiver) && ts.isPropertyAccessExpression(receiver.expression)) {
+    return receiver.expression.name.getText();
+  }
+  if (ts.isIdentifier(receiver)) {
+    const declaration = checker.getSymbolAtLocation(receiver)?.declarations?.[0];
+    if (
+      declaration !== undefined &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer !== undefined &&
+      isConstBinding(declaration)
+    ) {
+      return factoryOf(declaration.initializer, checker);
+    }
+  }
+  // `await client.getPackage()` and parenthesised forms unwrap to the same
+  // question rather than to a different answer.
+  if (ts.isAwaitExpression(receiver) || ts.isParenthesizedExpression(receiver)) {
+    return factoryOf(receiver.expression, checker);
+  }
+  return undefined;
 }
 ```
 
@@ -3207,9 +3244,47 @@ npx tsx -e "
 " > tests/fixtures/legacy-exposure.json
 ```
 
-- [ ] **Step 2: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate the file after each change; the list must get shorter.
+- [ ] **Step 2: Prove the walk sees both call forms before trusting the list**
 
-- [ ] **Step 3: Commit what remains as a ledger, and hold it**
+Two more fixtures beside the twelve from Task 26, under
+`src/__tests__/fixtures/analyse/` — they exercise `legacyExposure`, not
+`analyseOmissions`, so name them apart:
+
+```typescript
+// src/__tests__/fixtures/legacy/chain.ts — the direct form
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+declare const client: AdtClient;
+export const call = () => client.getPackage().readMetadata({ packageName: 'ZP' });
+```
+
+```typescript
+// src/__tests__/fixtures/legacy/aliased.ts — the form 109 call sites use
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+declare const client: AdtClient;
+export const call = () => {
+  const pkg = client.getPackage();
+  return pkg.readMetadata({ packageName: 'ZP' });
+};
+```
+
+```typescript
+// in src/__tests__/unit/legacyExposure.test.ts
+it('sees a legacy member through both the chain and a local', () => {
+  expect(legacyExposure(['src/__tests__/fixtures/legacy/chain.ts'])).toEqual([
+    '../__tests__/fixtures/legacy/chain.ts → getPackage().readMetadata',
+  ]);
+  // The one that matters: 109 call sites take this shape, and a walk that
+  // handled only the chain would return [] here and read as good news.
+  expect(legacyExposure(['src/__tests__/fixtures/legacy/aliased.ts'])).toHaveLength(1);
+});
+```
+
+Adjust the expected strings to whatever the path prefix actually produces; the
+assertion that matters is that neither answers an empty array.
+
+- [ ] **Step 3: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate the file after each change; the list must get shorter.
+
+- [ ] **Step 4: Commit what remains as a ledger, and hold it**
 
 ```typescript
 // src/__tests__/unit/legacyExposure.test.ts
@@ -3245,7 +3320,7 @@ it('lands on no legacy member that decides alone, beyond the ones recorded', () 
 });
 ```
 
-- [ ] **Step 4: Run it, and prove it fails on a new entry**
+- [ ] **Step 5: Run it, and prove it fails on a new entry**
 
 ```bash
 npx jest src/__tests__/unit/legacyExposure.test.ts
@@ -3255,9 +3330,9 @@ Then point one migrated handler back at `getPackage().readMetadata(...)`, run it
 again, and confirm the pair is named. A ledger that has never refused an
 addition is a file, not a check.
 
-- [ ] **Step 5: Put the remainder where people read it** — the PR description and the release notes, with the issue number. A limitation recorded only in a JSON fixture is a limitation nobody outside this repository learns about.
+- [ ] **Step 6: Put the remainder where people read it** — the PR description and the release notes, with the issue number. A limitation recorded only in a JSON fixture is a limitation nobody outside this repository learns about.
 
-- [ ] **Step 6: Commit** — `refactor(legacy): prefer the members that take our strategy, and record what is left`
+- [ ] **Step 7: Commit** — `refactor(legacy): prefer the members that take our strategy, and record what is left`
 
 ---
 

@@ -3371,7 +3371,7 @@ Adjust the path prefix in the expected pair to whatever `legacyExposure`
 actually produces; the assertion that matters is the length, because an empty
 array is what success looks like here and so is the wrong way to be wrong.
 
-- [ ] **Step 3: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate the file after each change; the list must get shorter.
+- [ ] **Step 3: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate `tests/fixtures/legacy-exposure.json` **in the same commit as the change**, and read the diff: the pairs that left should be the ones you fixed, by name. A regeneration that drops pairs you never touched is the walk breaking, not the work landing.
 
 - [ ] **Step 4: Commit what remains as a ledger, and hold it**
 
@@ -3380,18 +3380,7 @@ array is what success looks like here and so is the wrong way to be wrong.
 import { readFileSync } from 'node:fs';
 import { legacyEnabledHandlers, legacyExposure } from '../../lib/audit/analyseOmissions';
 
-/**
- * The pairs where a handler still lands on a legacy member that decides for
- * itself. On a legacy system those calls take adt-clients' verdict, so a
- * refusal encoded inside a 200 stays masked there.
- *
- * This is the ledger Task 26's pin cannot be: that one reads the library's
- * declarations, and all twenty-three handlers could sit on the old members
- * with it still green. This one reads the calls.
- *
- * It may only shrink. A new entry means a handler moved ONTO a member that
- * decides alone, which is the wrong direction and needs saying out loud.
- */
+/** Which handlers a legacy system is offered at all — the input to the ledger. */
 it('finds exactly the handlers legacy is offered', () => {
   // The ledger below is fail-open without this, and a threshold is not enough.
   // A floor of "most of the tree" still allows the filter to quietly stop
@@ -3409,23 +3398,39 @@ it('finds exactly the handlers legacy is offered', () => {
   expect(legacyEnabledHandlers().sort()).toEqual(recorded.sort());
 });
 
-it('lands on no legacy member that decides alone, beyond the ones recorded', () => {
+/**
+ * The pairs where a handler still lands on a legacy member that decides for
+ * itself. On a legacy system those calls take adt-clients' verdict, so a
+ * refusal encoded inside a 200 stays masked there.
+ *
+ * This is the ledger Task 26's pin cannot be: that one reads the library's
+ * declarations, and all twenty-three handlers could sit on the old members
+ * with it still green. This one reads the calls.
+ *
+ * **Exact equality, both directions.** An earlier draft failed only on a new
+ * pair and logged a disappeared one, reasoning that failing when a handler is
+ * fixed would punish the improvement. That was wrong twice. It made the whole
+ * ledger fail-open — a regression in the AST walk stops seeing real calls,
+ * every entry reads as "fixed", and losing the analysis looks exactly like
+ * finishing the work — and it let this file, and the release notes built from
+ * it, drift with nothing ever forcing the update.
+ *
+ * Regenerating the snapshot is part of making the fix, not a penalty for it.
+ * That is the bargain every snapshot test makes, and the one Task 1 already
+ * makes for the tool surface.
+ */
+it('lands on exactly the legacy members recorded, and no others', () => {
   const recorded: string[] = JSON.parse(readFileSync('tests/fixtures/legacy-exposure.json', 'utf8'));
   // Filtered, for the same reason the snapshot is: a tool not offered on
   // legacy never reaches a Legacy class, and recording it as exposure invents
   // a masking defect that cannot happen.
   const actual = legacyExposure(legacyEnabledHandlers());
 
-  const added = actual.filter((pair) => !recorded.includes(pair));
-  expect(added).toEqual([]);
-
-  // Not an equality check: a pair that disappears is a handler that was fixed,
-  // and a test that failed on that would punish the improvement. Regenerate
-  // the file when it happens, so the ledger keeps shrinking on the record.
-  const removed = recorded.filter((pair) => !actual.includes(pair));
-  if (removed.length > 0) {
-    console.log(`ledger is stale, ${removed.length} pairs fixed — regenerate it:\n${removed.join('\n')}`);
-  }
+  // An addition is a handler that moved onto a member which decides alone. A
+  // disappearance is either a fix worth recording or a walk that stopped
+  // working, and those two are indistinguishable from here — which is exactly
+  // why neither may pass in silence.
+  expect(actual.sort()).toEqual(recorded.sort());
 });
 ```
 
@@ -3436,8 +3441,9 @@ npx jest src/__tests__/unit/legacyExposure.test.ts
 ```
 
 Then point one migrated handler back at `getPackage().readMetadata(...)`, run it
-again, and confirm the pair is named. A ledger that has never refused an
-addition is a file, not a check.
+again, and confirm the pair is named. Then the other direction: delete a pair
+from the fixture without touching any handler, and confirm that fails too. A
+ledger that has never refused in both directions is a file, not a check.
 
 - [ ] **Step 6: Put the remainder where people read it** — the PR description and the release notes, with the issue number. A limitation recorded only in a JSON fixture is a limitation nobody outside this repository learns about.
 

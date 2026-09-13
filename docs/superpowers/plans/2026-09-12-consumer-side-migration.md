@@ -1490,7 +1490,6 @@ The template for every `low`-tier family. Seven handlers, covering create, check
 | Activate | `activate` | `analyseActivation` | `structured` | `terseActivation` |
 | Validate | `validate` | `analyseValidation` | `structured` | `terseValidation` |
 | Delete | `delete` | `analyseDeletion` | `structured` | `terseDeletion` |
-| Deletion check | `checkDeletion` | `analyseDeletion` | `structured` | `terseDeletion` |
 
 `lock` and `unlock` accept no strategy on any class in 19. Do not add an argument the signature does not have.
 
@@ -2341,6 +2340,13 @@ for f in $(find src/handlers -path '*/high/*' -name 'handle[CU]*.ts' | grep -v h
 done | sort
 ```
 
+**`handleUpdateServiceBinding` is not in this task**, though that command lists
+it. It calls `updateServiceBinding(...)`, which does not exist anywhere in
+adt-clients 19 — `tsc` says so at line 101 and suggests `generateServiceBinding`
+— so it has no `update(config, { lockHandle, analyse })` to mock and no lock
+handle to assert. It belongs to Task 23 with the other removed members. The same
+goes for `handleValidateServiceBinding` and `validateServiceBinding`.
+
 - [ ] **Step 1: Write the failing test**
 
 ```typescript
@@ -2435,8 +2441,19 @@ operation fail.
 | operation | `analyse` | reading | projection |
 |---|---|---|---|
 | Delete | `analyseDeletion` | `structured` | `terseDeletion` |
-| Deletion check | `analyseDeletion` | `structured` | `terseDeletion` |
 | Check | `analyseCheck` | `structured` | `terseCheck` |
+
+**No handler calls `checkDeletion`, and none ever did.** `grep -rl checkDeletion
+src/handlers` answers nothing, and `DeleteClassArgs` is `class_name` plus
+`transport_request` — there is no check-only mode to reach it with. The member
+exists on every object class and no tool exposes it.
+
+That is worth knowing rather than glossing: adt-clients 19 removed
+`parseDeletionCheck` and `assertDeletable`, which is where the pre-check used to
+happen inside `delete()`. So **nothing performs a deletion check now**, and
+this migration does not add one — adding a tool or a mode is a change to the
+tool surface, which this work is not allowed to make. Recorded here so the
+next person meets the fact rather than the gap.
 
 - [ ] **Step 1: Write the failing test, from the corpus**
 
@@ -2483,23 +2500,6 @@ it.each([
   // terseCheck's own fields, so a projection swapped for terseDeletion fails
   // here rather than passing as "some JSON came back".
   expect(JSON.parse(result.content[0].text)).toMatchObject({ ran: true });
-});
-
-it('a deletion check takes analyseDeletion, not analyseCheck', async () => {
-  // Two members one letter apart in meaning: `check` runs the syntax check,
-  // `checkDeletion` asks whether the object may be deleted. They encode their
-  // refusals differently and the corpus has both.
-  const document = corpusBody('deletion-check-allows--01-deletion-check');
-  const seen: unknown[] = [];
-  fakeClient = fakeClientOf({
-    checkDeletion: async (_c: unknown, o: any) => {
-      seen.push(o.analyse);
-      return okResponse(reading(parseStructure(document), document, 200));
-    },
-  });
-  const result: any = await handleDeleteClass(context as any, { class_name: 'ZCL_X', check_only: true });
-  expect(seen).toEqual([analyseDeletion]);
-  expect(JSON.parse(result.content[0].text)).toHaveProperty('deletable');
 });
 
 it('never acquires a lock, because a held lock is what makes a deletion refuse', async () => {
@@ -2601,25 +2601,55 @@ A `low`-tier update takes the handle as an argument and must not acquire or rele
 
 ---
 
-## Task 23: The seven static sequences 19 removed
+## Task 23: The eleven consumers of members 19 removed or renamed
 
 These have no type error to fix — they have no member to call. Each is a fixed
 chain: run the steps in order, stop at the first failure. The two class
 profiling handlers are **not** here; they poll, and Task 24 is theirs.
 
-| file | removed member |
-|---|---|
-| `system/readonly/handleRuntimeRunProgram.ts` | `runWithProfiling` |
-| `system/readonly/handleRuntimeRunProgramWithProfiling.ts` | `runWithProfiling` |
-| `system/readonly/handleGetWhereUsed.ts` | `getWhereUsedList` |
-| `structure/readonly/handleGetStructuresList.ts` | `getWhereUsedList` |
-| `function_include/readonly/handleListFunctionModules.ts` | `listFunctionModules` |
-| `function_include/readonly/handleListFunctionGroupIncludes.ts` | `listFunctionGroupIncludes` |
-| `src/lib/search-source/packageEnumerator.ts` | `getPackageContentsList` |
+**Ask the compiler for this list rather than trusting the table.** An earlier
+draft was written by hand and missed three consumers; the compiler names every
+one:
+
+```bash
+npx tsc --noEmit 2>&1 \
+  | grep -E "Property '[a-zA-Z]+' does not exist on type '(Adt|IAdt|ClassExecutor|ProgramExecutor)" \
+  | sed -E "s|^([^(]+).*Property '([a-zA-Z]+)'.*|\2  \1|" | sort -u
+```
+
+Ignore the envelope properties — `readResult`, `metadataResult`, `deleteResult`
+and the rest are Tasks 9 to 22's work. What is left is this:
+
+| consumer | the member it calls | what 19 offers instead |
+|---|---|---|
+| `system/readonly/handleGetWhereUsed.ts` | `getWhereUsedList` | `getWhereUsed` |
+| `structure/readonly/handleGetStructuresList.ts` | `getWhereUsedList` | `getWhereUsed` |
+| `function_include/readonly/handleListFunctionModules.ts` | `listFunctionModules` | establish in Step 1 |
+| `function_include/readonly/handleListFunctionGroupIncludes.ts` | `listFunctionGroupIncludes` | establish in Step 1 |
+| `search/readonly/handleSearchObject.ts` | `searchObjects` | `search` |
+| `src/lib/search-source/packageResolver.ts` | `searchObjects` | `search` |
+| `src/lib/search-source/packageEnumerator.ts` | `getPackageContentsList` | `walkPackage`, already written |
+| `service_binding/high/handleUpdateServiceBinding.ts` | `updateServiceBinding` | establish in Step 1 |
+| `service_binding/high/handleValidateServiceBinding.ts` | `validateServiceBinding` | `validate` |
+| `system/readonly/handleRuntimeRunProgram.ts` | `runWithProfiling` | `scheduleTrace` + `runWithProfiler` |
+| `system/readonly/handleRuntimeRunProgramWithProfiling.ts` | `runWithProfiling` | `scheduleTrace` + `runWithProfiler` |
+
+Eleven consumers, not seven. The three the hand-written table missed —
+`searchObjects` twice and the two service-binding members — would otherwise have
+waited for the final compiler sweep in Task 25, in a task that has no test for
+them.
+
+**`runWithProfiling` was split, not deleted.** `ProgramExecutor` says so in its
+own comment: *"who wants the old member writes `scheduleTrace`, then
+`runWithProfiler` with the id it answered."* Two calls where there was one,
+which is this task's shape exactly.
 
 **Files:**
-- Modify: the seven consumers in the table above
+- Modify: the eleven consumers the compiler lists
 - Create: `src/__tests__/unit/staticSequences.test.ts`
+
+Most are a rename and stay one call. `handleUpdateServiceBinding` and the two
+program profiling handlers are the ones that become sequences.
 
 - [ ] **Step 1: Establish what each removed member did, from the changelog and the corpus**
 
@@ -2672,7 +2702,7 @@ it('enumerates a package through walkPackage rather than the removed member', as
 
 `packageEnumerator` uses `walkPackage` from `packageWalk.ts`, which already replaced `getPackageContentsList` in `handleGetPackageTree`.
 - [ ] **Step 5: Run the tests and measure**
-- [ ] **Step 6: Commit** — `refactor(system): the seven static sequences 19 removed`
+- [ ] **Step 6: Commit** — `refactor(system): the eleven consumers of members 19 removed`
 
 ---
 
@@ -2689,8 +2719,18 @@ trace_retry_delay_ms  default 2000, "delay in ms between trace polling attempts"
 trace_lookup_uris     the feeds to look in
 ```
 
-— and answers the resolved `trace_id`. 19 removed the member that did the
-polling; the parameters stayed in the schema. **A schema keeps its promise
+— and answers the resolved `trace_id`.
+
+**19 split that member rather than deleting it.** `ProgramExecutor` says so in
+its own comment: *"who wants the old member writes `scheduleTrace`, then
+`runWithProfiler` with the id it answered. The composite stays in the contract
+for an implementation that joins them."* So the two calls are certain; **whether
+a poll sits between them is not, and Step 1 is where that is settled.** If
+`scheduleTrace` answers a usable id straight away, `poll()` is unnecessary here
+and the three parameters are a promise the tool should stop making — which is a
+surface change, and therefore the user's call rather than this task's.
+
+Either way the parameters stayed in the schema when the member moved. **A schema keeps its promise
 whether or not the implementation does, so Task 1's ratchet will not catch this
 one.** Only a test that counts attempts will.
 
@@ -3538,6 +3578,7 @@ Last, deliberately: adding a parameter before the handlers honour it puts a lie 
 - Modify: the `TOOL_DEFINITION` of every JSON-answering tool, and those handlers' `detail` argument
 - Modify: `tests/fixtures/tools/surface.json` — regenerated, with `detail` as the only difference
 - Create: `src/__tests__/unit/detailSurface.test.ts`
+- Create: three fixtures under `src/__tests__/fixtures/detail/` — `declares-passes-none.ts`, `declares-indirect-context.ts`, `declares-shorthand.ts`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `detailWiring()`
 
 - [ ] **Step 1: Enumerate the JSON-answering tools**
@@ -3581,9 +3622,40 @@ export function detailWiring(handlers: string[]): string[] {
 
     for (const call of answerCallsIn(source)) {
       const ctx = call.arguments[0];
-      if (ctx === undefined || !ts.isObjectLiteralExpression(ctx)) continue;
+
+      // A context this walk cannot read is not a pass. The failure being
+      // guarded against is a tool that declares `detail` and never passes it,
+      // and `continue` on an unreadable context is exactly how that escapes:
+      // no property, no offender, invariant green.
+      if (ctx === undefined || !ts.isObjectLiteralExpression(ctx)) {
+        if (declares) {
+          offenders.push(
+            `${file}:${lineOf(source, call)} — tool declares detail, answer() context is not a literal this check can read`,
+          );
+        }
+        continue;
+      }
+
       const detail = ctx.properties.find((p) => p.name?.getText() === 'detail');
-      if (detail === undefined || !ts.isPropertyAssignment(detail)) continue;
+      if (detail === undefined) {
+        if (declares) {
+          offenders.push(
+            `${file}:${lineOf(source, call)} — tool declares detail, answer() passes none`,
+          );
+        }
+        continue;
+      }
+
+      // Shorthand `{ detail }` and a spread carry a value this walk cannot
+      // follow to its source. Reported rather than skipped, for the same
+      // reason: silence here reads as compliance.
+      if (!ts.isPropertyAssignment(detail)) {
+        offenders.push(
+          `${file}:${lineOf(source, detail)} — detail passed in a form this check cannot read; write detailOf(args) or a literal`,
+        );
+        continue;
+      }
+
       const value = detail.initializer;
       const dynamic = ts.isCallExpression(value) && value.expression.getText() === 'detailOf';
       if (declares !== dynamic) {
@@ -3624,6 +3696,19 @@ const toolsDeclaring = (param: string): string[] =>
 it('declares detail on every JSON-answering tool and on no other', () => {
   expect(toolsDeclaring('detail').sort()).toEqual([...JSON_ANSWERING].sort());
 });
+
+// Three fixtures under `src/__tests__/fixtures/detail/`, one per way the
+// absence hides: `declares-passes-none.ts` (no detail property at all),
+// `declares-indirect-context.ts` (the context built in a variable) and
+// `declares-shorthand.ts` (`{ detail }`). Each must produce exactly one
+// offender; a walk that skips them produces none, which is what a correct
+// repository also produces.
+it.each(['declares-passes-none', 'declares-indirect-context', 'declares-shorthand'])(
+  'reports %s rather than skipping it',
+  (fixture) => {
+    expect(detailWiring([`src/__tests__/fixtures/detail/${fixture}.ts`])).toHaveLength(1);
+  },
+);
 
 it('wires detail the way each tool schema claims', () => {
   // The test above says the parameter is offered. This one says it is read.

@@ -2746,11 +2746,12 @@ function compilerOptions(): ts.CompilerOptions {
 /**
  * Does this argument actually carry a strategy?
  *
- *  'yes'       — something in it definitely sets `analyse` to a value.
- *  'no'        — nothing does.
- *  'unknown'   — a spread or expression this file cannot see into, which might
- *                set it and might set it to `undefined`. Not provable here, and
- *                reported as such rather than silently allowed.
+ *  'yes'       — something in it sets `analyse` to a value that cannot be
+ *                `undefined`. The type decides that, not the spelling.
+ *  'no'        — nothing sets it, or what sets it IS `undefined`.
+ *  'unknown'   — it may be set and may be nothing: a spread this file cannot
+ *                see into, a value typed `T | undefined`, an `any`. Not
+ *                provable here, and reported as such rather than allowed.
  *
  * **Read right to left.** An object literal applies its properties in order and
  * the last writer wins, so `{ analyse: x, ...opts }` does not carry a strategy
@@ -2771,12 +2772,18 @@ function carriesAnalyse(
       const property = argument.properties[i];
 
       if (property.name?.getText() === 'analyse') {
-        // `analyse: undefined` is not a strategy; it is the absence of one
-        // written out, and the library would read it as none passed.
-        const value = ts.isPropertyAssignment(property) ? property.initializer : undefined;
-        const isUndefined =
-          value !== undefined && ts.isIdentifier(value) && value.text === 'undefined';
-        return isUndefined ? 'no' : 'yes';
+        // The TYPE of the value, not its spelling. `analyse: undefined` is the
+        // obvious case, but `const analyse = undefined; { analyse }`,
+        // `analyse: maybeStrategy` typed `Strategy | undefined` and
+        // `analyse: enabled ? strategy : undefined` all pass a key whose value
+        // may be nothing, and the library reads that as no strategy passed.
+        const value = ts.isPropertyAssignment(property)
+          ? property.initializer
+          : ts.isShorthandPropertyAssignment(property)
+            ? property.name
+            : undefined;
+        if (value === undefined) return 'unknown';
+        return admitsUndefined(checker.getTypeAtLocation(value));
       }
 
       if (ts.isSpreadAssignment(property)) {
@@ -2797,6 +2804,28 @@ function carriesAnalyse(
   }
 
   return 'unknown';
+}
+
+/**
+ * Can this value be nothing?
+ *
+ *  'no'       — it IS `undefined`. A key set to nothing is no strategy.
+ *  'unknown'  — it MAY be: a union with `undefined`, or `any`/`unknown`, where
+ *               the author may have a runtime guarantee this file cannot see.
+ *               Reported as unprovable, with the message to make it provable.
+ *  'yes'      — it cannot be.
+ */
+function admitsUndefined(type: ts.Type): 'yes' | 'no' | 'unknown' {
+  const OPAQUE = ts.TypeFlags.Any | ts.TypeFlags.Unknown;
+  const NOTHING = ts.TypeFlags.Undefined | ts.TypeFlags.Void;
+
+  if ((type.flags & OPAQUE) !== 0) return 'unknown';
+  if (!type.isUnion()) return (type.flags & NOTHING) !== 0 ? 'no' : 'yes';
+
+  const parts = type.types;
+  if (parts.every((t) => (t.flags & NOTHING) !== 0)) return 'no';
+  if (parts.some((t) => (t.flags & (NOTHING | OPAQUE)) !== 0)) return 'unknown';
+  return 'yes';
 }
 
 /** Every `x.y(...)` in a file — the shape a client member call takes. */
@@ -2861,9 +2890,25 @@ await obj.read({ className }, version, { analyse: analyseException, ...optionsFr
 // NEGATIVE — the absence written out. Must BE reported as missing, not as
 // unprovable: nothing here is hidden, it just passes no strategy.
 await obj.read({ className }, version, { analyse: undefined });
+
+// NEGATIVE — the same absence behind a name. Must BE reported.
+const analyse = undefined;
+await obj.read({ className }, version, { analyse });
+
+// NEGATIVE — a value that may be nothing. Must BE reported as unprovable:
+// the type says it can be undefined, and this file cannot see that it is not.
+const maybe: typeof analyseException | undefined = pick(args);
+await obj.read({ className }, version, { analyse: maybe });
+
+// NEGATIVE — the same, written as a conditional.
+await obj.read({ className }, version, { analyse: strict ? analyseException : undefined });
 ```
 
-Those last three are the ordering controls. Both orders must be run: a check
+The three after the opaque spread are the ordering controls, and the four after
+them are the value controls — a key set to nothing, or to something that may be
+nothing, is not a strategy passed, however it is spelled.
+
+The ordering pair specifically: Both orders must be run: a check
 that scans an object literal left to right answers each of them backwards, and
 the two mistakes cancel in the count while every individual verdict is wrong.
 

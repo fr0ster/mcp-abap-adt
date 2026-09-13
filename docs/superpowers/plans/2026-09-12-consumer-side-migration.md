@@ -63,6 +63,7 @@ sed -E 's/\(.*//' /tmp/errs.txt | sort | uniq -c | sort -rn | head -30
 | `scripts/check-analyse.ts` | runs it on one family, from Task 10 onward |
 | `src/__tests__/unit/handlerInvariants.test.ts` | no envelope read, no handler verdict, no missing `analyse` |
 | `src/__tests__/unit/analyseOmissions.test.ts` + twelve fixtures | every verdict the check can reach, held by a committed case |
+| `src/__tests__/unit/legacyExposure.test.ts` + `tests/fixtures/legacy-exposure.json` | which handlers still land on a legacy member that decides alone |
 | `src/__tests__/unit/legacyContract.test.ts` | the seventeen legacy members that decide alone |
 
 **Modified:** `src/lib/answer.ts`, `src/lib/strategies/sequence.ts`, 253 handler files, and six non-handler files carrying the same envelope reads (`src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver,packageEnumerator}.ts`, `src/embeddable/BaseMcpServer.ts`).
@@ -3141,14 +3142,122 @@ for f in $(grep -rl "available_in" src/handlers --include='handle*.ts' | xargs g
 done
 ```
 
-**Files:** the twenty-three the command above lists, under `src/handlers/`. No new test file — this task changes which member a handler calls, and Task 26's pin is what holds the result.
+**Files:**
+- Modify: the twenty-three the command above lists, under `src/handlers/`
+- Modify: `src/lib/audit/analyseOmissions.ts` — add `legacyExposure()` beside it
+- Create: `src/__tests__/unit/legacyExposure.test.ts` and `tests/fixtures/legacy-exposure.json`
+
+**Task 26's pin does not hold this.** `legacyContract.test.ts` reads the
+`*Legacy.d.ts` declarations and knows nothing about which member any handler
+calls — all twenty-three could stay exactly as they are and it would still be
+green. What holds this is a ledger of the pairs that remain, and it belongs
+here, with the task that creates them.
 
 The package tools, the unit-test tools, three listing tools and `handleActivateObject`.
 
-- [ ] **Step 1: Walk the list once.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it.
-- [ ] **Step 2: Write down what is left** — the (tool, member) pairs where the legacy verdict stays adt-clients'. This goes in the PR description and the release notes, not in a comment nobody reads.
-- [ ] **Step 3: Run the suite**
-- [ ] **Step 4: Commit** — `refactor(legacy): prefer the members that take our strategy`
+- [ ] **Step 1: Measure what the twenty-three call today**
+
+Add a second function to the audit module — the AST walk is already there, and
+this needs the same receiver resolution:
+
+```typescript
+// src/lib/audit/analyseOmissions.ts — append
+
+/**
+ * Which `(handler, Legacy class, member)` pairs land on a member the legacy
+ * contract does not parameterise.
+ *
+ * A handler reaches a member through `client.getPackage().readMetadata(...)`,
+ * so the factory name is the property access one level in. That factory decides
+ * which class serves the call on a legacy system, and only four of the ten
+ * overridden classes drop the strategy.
+ */
+const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
+  getPackage: ['create', 'read', 'readMetadata', 'updateMetadata', 'delete', 'validate'],
+  getUnitTest: ['run', 'getStatus', 'getResult'],
+  getRequest: ['delete', 'updateMetadata', 'list'],
+  getUtils: ['activateObjectsGroup', 'getTableContents', 'getTableColumns', 'getSqlQuery'],
+};
+
+export function legacyExposure(handlers: string[]): string[] {
+  const program = ts.createProgram(handlers, compilerOptions());
+  const found = new Set<string>();
+  for (const file of handlers) {
+    const source = program.getSourceFile(file);
+    if (source === undefined) continue;
+    for (const call of memberCallsIn(source)) {
+      const member = (call.expression as ts.PropertyAccessExpression).name.getText();
+      const receiver = (call.expression as ts.PropertyAccessExpression).expression;
+      if (!ts.isCallExpression(receiver) || !ts.isPropertyAccessExpression(receiver.expression)) continue;
+      const factory = receiver.expression.name.getText();
+      if (LEGACY_NO_STRATEGY[factory]?.includes(member)) {
+        found.add(`${file.replace('src/handlers/', '')} → ${factory}().${member}`);
+      }
+    }
+  }
+  return [...found].sort();
+}
+```
+
+```bash
+npx tsx -e "
+  const { legacyExposure } = require('./src/lib/audit/analyseOmissions');
+  const { globSync } = require('node:fs');
+  console.log(JSON.stringify(legacyExposure(globSync('src/handlers/**/handle*.ts')), null, 2));
+" > tests/fixtures/legacy-exposure.json
+```
+
+- [ ] **Step 2: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate the file after each change; the list must get shorter.
+
+- [ ] **Step 3: Commit what remains as a ledger, and hold it**
+
+```typescript
+// src/__tests__/unit/legacyExposure.test.ts
+import { globSync, readFileSync } from 'node:fs';
+import { legacyExposure } from '../../lib/audit/analyseOmissions';
+
+/**
+ * The pairs where a handler still lands on a legacy member that decides for
+ * itself. On a legacy system those calls take adt-clients' verdict, so a
+ * refusal encoded inside a 200 stays masked there.
+ *
+ * This is the ledger Task 26's pin cannot be: that one reads the library's
+ * declarations, and all twenty-three handlers could sit on the old members
+ * with it still green. This one reads the calls.
+ *
+ * It may only shrink. A new entry means a handler moved ONTO a member that
+ * decides alone, which is the wrong direction and needs saying out loud.
+ */
+it('lands on no legacy member that decides alone, beyond the ones recorded', () => {
+  const recorded: string[] = JSON.parse(readFileSync('tests/fixtures/legacy-exposure.json', 'utf8'));
+  const actual = legacyExposure(globSync('src/handlers/**/handle*.ts'));
+
+  const added = actual.filter((pair) => !recorded.includes(pair));
+  expect(added).toEqual([]);
+
+  // Not an equality check: a pair that disappears is a handler that was fixed,
+  // and a test that failed on that would punish the improvement. Regenerate
+  // the file when it happens, so the ledger keeps shrinking on the record.
+  const removed = recorded.filter((pair) => !actual.includes(pair));
+  if (removed.length > 0) {
+    console.log(`ledger is stale, ${removed.length} pairs fixed — regenerate it:\n${removed.join('\n')}`);
+  }
+});
+```
+
+- [ ] **Step 4: Run it, and prove it fails on a new entry**
+
+```bash
+npx jest src/__tests__/unit/legacyExposure.test.ts
+```
+
+Then point one migrated handler back at `getPackage().readMetadata(...)`, run it
+again, and confirm the pair is named. A ledger that has never refused an
+addition is a file, not a check.
+
+- [ ] **Step 5: Put the remainder where people read it** — the PR description and the release notes, with the issue number. A limitation recorded only in a JSON fixture is a limitation nobody outside this repository learns about.
+
+- [ ] **Step 6: Commit** — `refactor(legacy): prefer the members that take our strategy, and record what is left`
 
 ---
 

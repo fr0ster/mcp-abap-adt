@@ -59,7 +59,10 @@ sed -E 's/\(.*//' /tmp/errs.txt | sort | uniq -c | sort -rn | head -30
 | `src/__tests__/unit/withLock.test.ts` | the six outcomes, and release exactly once |
 | `src/__tests__/unit/resultSets.test.ts` | every slot maps to a reading |
 | `src/__tests__/unit/detail.test.ts` | the three levels, and the default |
+| `src/lib/audit/analyseOmissions.ts` | the omission check, shared by the script and the test |
+| `scripts/check-analyse.ts` | runs it on one family, from Task 10 onward |
 | `src/__tests__/unit/handlerInvariants.test.ts` | no envelope read, no handler verdict, no missing `analyse` |
+| `src/__tests__/unit/analyseOmissions.test.ts` + twelve fixtures | every verdict the check can reach, held by a committed case |
 | `src/__tests__/unit/legacyContract.test.ts` | the seventeen legacy members that decide alone |
 
 **Modified:** `src/lib/answer.ts`, `src/lib/strategies/sequence.ts`, 253 handler files, and six non-handler files carrying the same envelope reads (`src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver,packageEnumerator}.ts`, `src/embeddable/BaseMcpServer.ts`).
@@ -1672,6 +1675,10 @@ tsc: <before> → <after>"
 
 Fifteen `readonly` files that make one call: `handleReadMessageClass`, `handleReadMessageClassMessage`, `handleGetObjectsByType`, `handleGetObjectsList`, `handleSearchObject`, `handleGetAllTypes`, `handleGetInactiveObjects`, `handleGetObjectInfo`, `handleGetObjectStructure`, `handleGetSqlQuery`, `handleGetTableContents`, `handleListTransports`, `handleGetEnhancements`, `handleGetObjectVersionDiff`, `resolveVersionedObject`.
 
+**Files:**
+- Modify: the fifteen named above, under `src/handlers/*/readonly/` and `src/handlers/common/readonly/`
+- Create: `src/__tests__/unit/readonlySingleCall.test.ts`
+
 Confirm the list before starting: a file that turns out to call `readMetadata` as well belongs to Task 11's shape.
 
 **Interfaces:**
@@ -1724,6 +1731,10 @@ The searches and listings answer JSON built from a parse, so they project `readi
 ## Task 13: `common/low` — the six generic operations, and the one real collision
 
 `handleValidateObject`, `handleLockObject`, `handleUnlockObject`, `handleDeleteObject`, `handleCheckObject`, `handleActivateObject`. These dispatch over object families, so only one branch runs per call; keep each dispatch exactly as it is and change only how the call is made and answered.
+
+**Files:**
+- Modify: `src/handlers/common/low/handleValidateObject.ts`, `handleLockObject.ts`, `handleUnlockObject.ts`, `handleDeleteObject.ts`, `handleCheckObject.ts`, `handleActivateObject.ts`
+- Create: `src/__tests__/unit/commonLowOperations.test.ts`
 
 **`handleActivateObject` is the one place where the design's rule and the library's surface collide.** It calls `activateObjectsGroup`, which accepts no strategy, and group activation is one of the two masking families this project has already fixed once — ADT answers 200 with the refusal inside.
 
@@ -1813,7 +1824,9 @@ npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # expect 0 offen
 | **16** | `program` (8), `function` (14), `function_group`, `function_include` | 22+ |
 | **17** | `data_element` (7), `package` (6), `service_binding` (1), `service_definition` (1), `system` (1), `transport` (1) | 17 |
 
-For each family, in order:
+**Files:** every `handle*.ts` under `src/handlers/<family>/low/` for the families in this cluster's row, plus `src/__tests__/unit/lowTierStrategies.test.ts`, created in the first cluster and extended by each of the others.
+
+For each family, in order:For each family, in order:
 
 - [ ] **Step 1: Measure** — `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l`
 - [ ] **Step 2: Write the family's test row** in `src/__tests__/unit/lowTierStrategies.test.ts`, asserting the pairing rather than the prose: what goes wrong at this scale is a handler taking the wrong `analyse`, and that is visible from the call.
@@ -1863,6 +1876,10 @@ Do not batch two families into one commit.
 ## Task 18: The `high` tier `Get*` handlers
 
 29 files: `handleGetClass`, `handleGetDomain`, `handleGetTable`, `handleGetStructure`, `handleGetProgram`, `handleGetInterface`, `handleGetDdl`, `handleGetDataElement`, `handleGetPackage`, `handleGetMessageClass`, `handleGetMessageClassMessage`, `handleGetFunctionGroup`, `handleGetFunctionModule`, `handleGetServiceBinding`, `handleGetServiceDefinition`, `handleGetMetadataExtension`, `handleGetBehaviorDefinition`, `handleGetBehaviorImplementation`, `handleGetLocalTestClass`, `handleGetLocalTypes`, `handleGetLocalDefinitions`, `handleGetLocalMacros`, `handleGetUnitTest`, `handleGetUnitTestStatus`, `handleGetUnitTestResult`, `handleGetCdsUnitTest`, `handleGetCdsUnitTestStatus`, `handleGetCdsUnitTestResult`, `handleListServiceBindingTypes`.
+
+**Files:**
+- Modify: the twenty-nine `handleGet*.ts` and `handleListServiceBindingTypes.ts` named above, under `src/handlers/*/high/`
+- Modify: `src/__tests__/unit/readonlySingleCall.test.ts` — one row per handler
 
 Each follows Task 9 (two calls, `pair`) or Task 12 (one call). The six unit-test readers take `analyseUnitTest` and `structured`; note that `AdtUnitTestLegacy` accepts no strategy on `run`, `getStatus` and `getResult`, which Task 26 pins.
 
@@ -2056,6 +2073,10 @@ exchange each, no lock — and these eleven updates take the handle as an
 argument rather than acquiring one. Both are the single-call shape of Task 9,
 with Task 10's pairing: `analyseException`, `statusOnly`, `terseWrite`.
 
+**Files:**
+- Modify: the seventeen creates and eleven updates the command below lists, under `src/handlers/*/high/`
+- Create: `src/__tests__/unit/highTierWrites.test.ts`
+
 **Do not give these a lock lifecycle.** A `withLock` here would acquire a lock
 the tool was never asked for and release it under an object the caller may hold
 open elsewhere.
@@ -2118,6 +2139,10 @@ has it as `delete-success--01-deletion-delete`, one exchange — and **a held lo
 is what makes a deletion refuse**, which is how `refusal-delete-refused` was
 captured. So a delete handler must not take a lock; doing so would make the
 operation fail.
+
+**Files:**
+- Modify: the twenty-four `handleDelete*.ts` and thirteen `handleCheck*.ts` under `src/handlers/*/high/`
+- Create: `src/__tests__/unit/highTierDeletes.test.ts`
 
 | operation | `analyse` | reading | projection |
 |---|---|---|---|
@@ -2262,6 +2287,10 @@ profiling handlers are **not** here; they poll, and Task 24 is theirs.
 | `function_include/readonly/handleListFunctionModules.ts` | `listFunctionModules` |
 | `function_include/readonly/handleListFunctionGroupIncludes.ts` | `listFunctionGroupIncludes` |
 | `src/lib/search-source/packageEnumerator.ts` | `getPackageContentsList` |
+
+**Files:**
+- Modify: the seven consumers in the table above
+- Create: `src/__tests__/unit/staticSequences.test.ts`
 
 - [ ] **Step 1: Establish what each removed member did, from the changelog and the corpus**
 
@@ -2619,7 +2648,14 @@ Expected: `CLEAN`, and the whole unit suite green. From here the pre-commit hook
 
 Three of the spec's success criteria are claims about 326 files. A reviewer cannot check those by reading, and neither can the next person to add a handler.
 
-**Files:** create `src/__tests__/unit/handlerInvariants.test.ts`, `src/__tests__/unit/legacyContract.test.ts`
+**Files:**
+- Create: `src/__tests__/unit/handlerInvariants.test.ts` — the three invariants
+- Create: `src/__tests__/unit/analyseOmissions.test.ts` — the controls, run against the fixtures
+- Create: `src/__tests__/fixtures/analyse/` — twelve modules, named for the verdict each must produce: `yes-inline.ts`, `yes-const.ts`, `yes-spread-then-analyse.ts`, `no-absent.ts`, `no-empty-literal.ts`, `no-typed-empty-const.ts`, `no-explicit-undefined.ts`, `no-shorthand-undefined.ts`, `unknown-analyse-then-spread.ts`, `unknown-maybe-undefined.ts`, `unknown-conditional.ts`, `unknown-reassigned-let.ts`
+- Create: `src/__tests__/unit/legacyContract.test.ts` — the seventeen legacy members that decide alone
+- Modify: `src/lib/audit/analyseOmissions.ts` — written in Task 10; this task is where its `inspected` bound and its two failure messages are fixed
+
+`tsconfig.json` already excludes `src/__tests__` from the build, so the fixtures typecheck under `tsconfig.test.json` and never reach `dist`. Run `npm run test:check` once they exist: a fixture that does not compile is one whose signature the checker cannot resolve, and the whole test would then pass while inspecting nothing.
 
 - [ ] **Step 1: Write the invariants**
 
@@ -3021,7 +3057,18 @@ npx jest src/__tests__/unit/analyseOmissions.test.ts \
          src/__tests__/unit/legacyContract.test.ts
 ```
 
-- [ ] **Step 7: Commit** — `test(handlers): the invariants, their controls, and what legacy decides alone`
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/__tests__/unit/handlerInvariants.test.ts \
+        src/__tests__/unit/analyseOmissions.test.ts \
+        src/__tests__/unit/legacyContract.test.ts \
+        src/__tests__/fixtures/analyse/ \
+        src/lib/audit/analyseOmissions.ts
+git commit -m "test(handlers): the invariants, their controls, and what legacy decides alone"
+```
+
+`git status --short` before committing: twelve fixtures are easy to half-stage, and a control that is not committed is a control that does not exist.
 
 ---
 
@@ -3032,6 +3079,8 @@ for f in $(grep -rl "available_in" src/handlers --include='handle*.ts' | xargs g
   grep -qE "get(Package|Request|Utils|UnitTest)\(" "$f" && echo "${f#src/handlers/}"
 done
 ```
+
+**Files:** the twenty-three the command above lists, under `src/handlers/`. No new test file — this task changes which member a handler calls, and Task 26's pin is what holds the result.
 
 The package tools, the unit-test tools, three listing tools and `handleActivateObject`.
 
@@ -3045,6 +3094,11 @@ The package tools, the unit-test tools, three listing tools and `handleActivateO
 ## Task 28: `detail` on the JSON-answering tools
 
 Last, deliberately: adding a parameter before the handlers honour it puts a lie on the tool surface.
+
+**Files:**
+- Modify: the `TOOL_DEFINITION` of every JSON-answering tool, and those handlers' `detail` argument
+- Modify: `tests/fixtures/tools/surface.json` — regenerated, with `detail` as the only difference
+- Create: `src/__tests__/unit/detailSurface.test.ts`
 
 - [ ] **Step 1: Enumerate the JSON-answering tools**
 
@@ -3106,6 +3160,10 @@ Expected: no output. Anything printed is a surface change this work was not allo
 ## Task 29: Documentation, and the close
 
 Releasing means updating everything the change touches, not only the changelog.
+
+**Files:**
+- Modify: `README.md`, `CHANGELOG.md`, and whatever under `docs/` the grep below names
+- Delete, after merge: `docs/superpowers/specs/2026-09-12-consumer-side-migration-design.md` and this plan
 
 - [ ] **Step 1: Find the stale prose**
 

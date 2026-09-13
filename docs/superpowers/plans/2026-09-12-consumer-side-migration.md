@@ -17,7 +17,7 @@ Every task's requirements implicitly include this section.
 - **The tool surface does not change**, except `detail: 'terse' | 'full' | 'raw'` on JSON-answering tools. 362 tools across 6 groups; the snapshot frozen in Task 1 is the check.
 - **No handler decides a refusal.** A handler must not read a status code, an `isDeleted`, a `chkrun:status` or an `exc:exception` to decide success. That verdict belongs to the `analyse` strategy.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Passing one where it is not accepted is already a compile error; the omission is what Task 18 tests.
+- **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a non-empty string body it reaches the caller at every level and on every tool; where there is none the field is absent, never invented.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`. The contract's types are not filters, and what sits on a transport config is headers, an Authorization bearer and cookies.
 - **A lock chain is `withLock()`, never `sequence()`**, and only where the handler owns the lock's whole lifetime. The fifteen `low`-tier `LockX` tools hand the handle back on purpose and are never wrapped.
@@ -68,7 +68,9 @@ sed -E 's/\(.*//' /tmp/errs.txt | sort | uniq -c | sort -rn | head -30
 
 ## Task 1: Freeze the tool surface
 
-The spec's first success criterion is that 362 tools stay as they are. A test can check that; nothing else in this plan can.
+The spec's first success criterion is that 362 tools stay as they are. This ratchet checks that no tool, group or parameter moves, and that the only parameter added anywhere is `detail`.
+
+**It does not check that `detail` went only to the JSON-answering tools.** It would accept `detail` on all 362. That half of the criterion is Task 28's exact-list test, and the two together are what the spec asks for.
 
 **Files:**
 - Create: `tests/fixtures/tools/surface.json`, `src/__tests__/unit/toolSurface.test.ts`
@@ -1461,7 +1463,9 @@ tsc: <before> → <after>"
 
 ## Task 10: The reference write family — `domain/low`
 
-The template for every `low`-tier family. One family, all seven operations, so the per-operation pairing is established in code before it is applied a hundred times.
+The template for every `low`-tier family. Seven handlers, covering create, check, activate, validate, delete, lock and unlock, so the per-operation pairing is established in code before it is applied a hundred times.
+
+**Two rows of the table below are not in this family, and that is not an oversight.** `handleUpdateDomain` was migrated already (commit `abd7b19`) as the worked example of a read-modify-write, and Task 22 revisits it to put its lock under `withLock`. And `domain/low` has no standalone deletion-check tool — `checkDeletion` is a member, not a tool, and the families that do expose one pick it up in Tasks 14–17.
 
 **Files:**
 - Modify: `src/handlers/domain/low/handleCreateDomain.ts`, `handleCheckDomain.ts`, `handleActivateDomain.ts`, `handleValidateDomain.ts`, `handleDeleteDomain.ts`, `handleLockDomain.ts`, `handleUnlockDomain.ts`
@@ -1492,6 +1496,12 @@ The template for every `low`-tier family. One family, all seven operations, so t
 import { analyseActivation, analyseDeletion, analyseValidation } from '@mcp-abap-adt/adt-strategies';
 import { corpusBody } from '../../lib/adtCorpus';
 
+// The recorder IS the client, or it records nothing. Every test in this file
+// that reads `seen.last` needs this wiring.
+const seen = recordAnalyse();
+let fakeClient: unknown = seen.client;
+jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+
 it('ValidateDomain reports an inadmissible name as an error', async () => {
   const document = corpusBody('refusal-validation-name-taken-domain--01-domains-validation');
   fakeClient = fakeClientOf({
@@ -1505,7 +1515,7 @@ it('ValidateDomain reports an inadmissible name as an error', async () => {
 });
 
 it('ActivateDomain takes analyseActivation, and DeleteDomain analyseDeletion', async () => {
-  const seen = recordAnalyse();
+  fakeClient = seen.client;
   await handleActivateDomain(context as any, { domain_name: 'ZD' });
   expect(seen.last).toBe(analyseActivation);
   await handleDeleteDomain(context as any, { domain_name: 'ZD', lock_handle: 'h' });
@@ -1513,7 +1523,7 @@ it('ActivateDomain takes analyseActivation, and DeleteDomain analyseDeletion', a
 });
 
 it('LockDomain passes no analyse, because lock() accepts none', async () => {
-  const seen = recordAnalyse();
+  fakeClient = seen.client;
   await handleLockDomain(context as any, { domain_name: 'ZD' });
   expect(seen.last).toBeUndefined();
 });
@@ -1536,17 +1546,38 @@ return answer(
 );
 ```
 
-- [ ] **Step 4: Run the tests and measure**
+- [ ] **Step 4: Write the omission check as a script, not only as a final test**
+
+The spec makes "every call whose resolved signature accepts an `analyse` is given one" a repository-wide criterion. A test that lands after every handler has been migrated finds the first omission a hundred commits too late, so the logic goes into a script now and the test in Task 26 calls the same function over the whole tree.
+
+```typescript
+// scripts/check-analyse.ts — `npx tsx scripts/check-analyse.ts 'src/handlers/domain/low/**'`
+import { globSync } from 'node:fs';
+import { analyseOmissions } from '../src/lib/audit/analyseOmissions';
+
+const pattern = process.argv[2] ?? 'src/handlers/**/handle*.ts';
+const { offenders, inspected } = analyseOmissions(globSync(pattern));
+for (const line of offenders) console.error(line);
+console.log(`${inspected} calls accept an analyse, ${offenders.length} were given none`);
+process.exit(offenders.length === 0 ? 0 : 1);
+```
+
+`analyseOmissions` is the body of Task 26's third invariant, lifted into
+`src/lib/audit/analyseOmissions.ts` so the script and the test share it rather
+than drifting. Write it there now; Task 26 imports it.
+
+- [ ] **Step 5: Run the tests, the check and the compiler**
 
 ```bash
 npx jest src/__tests__/unit/domainLow.test.ts src/__tests__/unit/toolSurface.test.ts
-npx tsc --noEmit 2>&1 | grep "handlers/domain/low" | wc -l   # expect 0
+npx tsx scripts/check-analyse.ts 'src/handlers/domain/low/**'   # expect 0 offenders
+npx tsc --noEmit 2>&1 | grep "handlers/domain/low" | wc -l      # expect 0
 ```
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add src/handlers/domain/low src/__tests__/unit/domainLow.test.ts
+git add src/handlers/domain/low src/__tests__/unit/domainLow.test.ts scripts/check-analyse.ts src/lib/audit/analyseOmissions.ts
 git commit --no-verify -m "refactor(domain): the low tier, on strategies — the reference family
 
 tsc: <before> → <after>"
@@ -1698,12 +1729,12 @@ The searches and listings answer JSON built from a parse, so they project `readi
 
 - [ ] **Step 1: Decide `handleActivateObject`, and write the decision down**
 
-Two options, and the choice belongs in the PR description either way:
+The spec names two options and neither of them is "keep the masking quietly":
 
-1. **Call the per-object `activate`**, which does accept an `analyse`, looping over the objects. More requests; the verdict is ours.
-2. **Keep `activateObjectsGroup`** and accept adt-clients' verdict, with a comment naming issue #200 and saying what is masked.
+1. **Call the per-object `activate`**, which does accept an `analyse`, looping over the objects. More requests; the verdict is ours. **This is the default**, and it is what the tool's one-object case — the common one — should do.
+2. **Get `activateObjectsGroup` the `<E extends IAdtError>` shape the other twelve members have.** That is a change to adt-clients, raised under issue #200, not something this migration can decide.
 
-Prefer 1 where the tool takes one object, which is the common case. Do not silently pick 2.
+If option 1 turns out not to serve a multi-object call, the group member stays **and the limitation is surfaced**: named in the PR description, in the release notes and in the handler's own comment, with the issue number. Accepting a masked refusal without saying so is the defect this repository has removed twice.
 
 - [ ] **Step 2: Write the failing test, from the corpus**
 
@@ -1760,7 +1791,13 @@ The third test is the one that decides Step 1: it passes under option 1 and fail
 
 - [ ] **Step 3: Run them to verify they fail** — all three; these handlers mask today.
 - [ ] **Step 4: Implement**, per Task 10's table.
-- [ ] **Step 5: Run the tests and measure**
+- [ ] **Step 5: Run the tests, the check and the compiler**
+
+```bash
+npx jest src/__tests__/unit/commonLowOperations.test.ts
+npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # expect 0 offenders
+```
+
 - [ ] **Step 6: Commit** — `refactor(common): the generic operations, with the strategy deciding`
 
 ---
@@ -1811,7 +1848,12 @@ it.each([
 
 - [ ] **Step 3: Run it to verify it fails**
 - [ ] **Step 4: Migrate the family**, then `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l` — expect 0
-- [ ] **Step 5: Run `npx jest src/__tests__/unit/toolSurface.test.ts`**
+- [ ] **Step 5: Run the omission check on the family just touched**
+
+```bash
+npx tsx scripts/check-analyse.ts 'src/handlers/<family>/low/**'   # expect 0 offenders
+npx jest src/__tests__/unit/toolSurface.test.ts
+```
 - [ ] **Step 6: Commit the family** — `refactor(<family>): the low tier, on strategies`
 
 Do not batch two families into one commit.
@@ -2187,9 +2229,10 @@ withLock(
       (current) =>
         obj.updateMetadata({ dataElementName }, {
           lockHandle,
-          xmlContent: patchDataElementXml(
-            extractXmlString(current, `data element ${dataElementName}`), properties,
-          ),
+          // `current` is an `AdtReading`, and `raw` is the document as it
+          // arrived. Those are the bytes that go back to SAP, which is why the
+          // read is `verbatim` and why nothing re-serialises them on the way.
+          xmlContent: patchDataElementXml(current.raw, properties),
           analyse: analyseException,
         }),
     ),
@@ -2204,7 +2247,7 @@ A `low`-tier update takes the handle as an argument and must not acquire or rele
 
 ---
 
-## Task 23: The six static sequences 19 removed
+## Task 23: The seven static sequences 19 removed
 
 These have no type error to fix — they have no member to call. Each is a fixed
 chain: run the steps in order, stop at the first failure. The two class
@@ -2244,12 +2287,34 @@ it("stops at the first refused step and answers that step's failure", async () =
   // The failing step's answer, untouched. No "step 2 of 3" sentence beside it.
   expect(result.content[0].text).not.toContain('step');
 });
+
+// The seventh consumer is not a handler and needs its own test: it feeds the
+// source search, so a walk that answers nothing there is a search that finds
+// nothing, with no error to show for it.
+it('enumerates a package through walkPackage rather than the removed member', async () => {
+  const walked: string[] = [];
+  const enumerated = await enumeratePackage(
+    fakeClientOf({
+      fetchNodeStructure: async (_t: unknown, name: unknown) => {
+        walked.push(String(name));
+        return okResponse(reading({ nodes: [] }));
+      },
+    }) as any,
+    'ZMCP_SHR_PKG',
+  );
+  expect(walked).toContain('ZMCP_SHR_PKG');
+  expect(enumerated).toEqual([]);
+});
 ```
 
 - [ ] **Step 3: Run it to verify it fails**
-- [ ] **Step 4: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`. The where-used and node-structure steps run on `AdtUtils` and accept none. `packageEnumerator` uses `walkPackage` from `packageWalk.ts`, which already replaced `getPackageContentsList` in `handleGetPackageTree`.
+- [ ] **Step 4: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`.
+
+**Two axes, and only one of them is missing here.** The where-used and node-structure members accept **no per-call `analyse`** — their verdict stays adt-clients'. They do still take **our injected result set**: `client.getUtils(ourUtils)`, never `client.getUtils()`. Omitting it selects the shipped `node` strategy, which drops the descriptions `nodeLevel` keeps, and a tree without descriptions is one a caller has to walk again. Absent strategy and absent injection are different absences; do not read the first as licence for the second.
+
+`packageEnumerator` uses `walkPackage` from `packageWalk.ts`, which already replaced `getPackageContentsList` in `handleGetPackageTree`.
 - [ ] **Step 5: Run the tests and measure**
-- [ ] **Step 6: Commit** — `refactor(system): the six static sequences 19 removed`
+- [ ] **Step 6: Commit** — `refactor(system): the seven static sequences 19 removed`
 
 ---
 
@@ -2592,6 +2657,16 @@ it('no handler decides a refusal for itself', () => {
  * only the omission needs checking here.
  */
 it('every client call that accepts an analyse is given one', () => {
+  // The same function `scripts/check-analyse.ts` has been running per family
+  // since Task 10. Here it runs over the whole tree, which is what the spec
+  // makes a success criterion.
+  const { offenders, inspected } = analyseOmissions(handlers);
+  expect(inspected).toBeGreaterThan(200);
+  expect(offenders).toEqual([]);
+});
+
+/** In `src/lib/audit/analyseOmissions.ts`, so the script and this test share it. */
+export function analyseOmissions(handlers: string[]): { offenders: string[]; inspected: number } {
   const program = ts.createProgram(handlers, compilerOptions());
   const checker = program.getTypeChecker();
   const offenders: string[] = [];
@@ -2608,21 +2683,25 @@ it('every client call that accepts an analyse is given one', () => {
       const type = checker.getTypeOfSymbolAtLocation(options, call);
       if (!type.getProperties().some((p) => p.name === 'analyse')) continue;
       inspected += 1;
+      // The TYPE of what was passed, not its syntax. An options object built
+      // in a variable, spread from a helper or returned by a function is a
+      // legitimate way to pass a strategy, and a check that only recognised an
+      // inline literal would report every one of them as an omission.
       const passed = call.arguments.at(-1);
-      const given =
-        passed !== undefined &&
-        ts.isObjectLiteralExpression(passed) &&
-        passed.properties.some((p) => p.name?.getText() === 'analyse');
-      if (!given) offenders.push(`${file}:${lineOf(source, call)} — ${call.expression.getText()}`);
+      const argumentType = passed === undefined ? undefined : checker.getTypeAtLocation(passed);
+      const carries =
+        argumentType !== undefined &&
+        argumentType.getProperty('analyse') !== undefined;
+      if (!carries) offenders.push(`${file}:${lineOf(source, call)} — ${call.expression.getText()}`);
     }
   }
-  // The guard against a test that measures nothing. A program built with wrong
-  // options resolves no signature, finds no member that accepts an `analyse`,
-  // and passes with an empty offenders list. Roughly 275 call sites across 174
-  // handler files carry one, so a run that inspects a handful did not resolve.
-  expect(inspected).toBeGreaterThan(200);
-  expect(offenders).toEqual([]);
-});
+  // The caller guards against a run that measured nothing: a program built with
+  // wrong options resolves no signature, finds no member that accepts an
+  // `analyse`, and answers an empty offenders list. Roughly 275 call sites
+  // across 174 handler files carry one, so a run that inspects a handful did
+  // not resolve.
+  return { offenders, inspected };
+}
 
 /**
  * The project's own compiler options.
@@ -2681,6 +2760,16 @@ sed -i 's/, { analyse: analyseException })/)/' src/handlers/class/readonly/handl
 npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect FAIL naming that file and line
 git checkout src/handlers/class/readonly/handleReadClass.ts
 npx jest src/__tests__/unit/handlerInvariants.test.ts   # expect PASS again
+```
+
+Then the opposite control, because the fix above introduced a second way to be
+wrong: pass the strategy through a variable and confirm the test still counts it
+as given.
+
+```typescript
+// temporarily, in any migrated handler
+const options = { analyse: analyseException };
+await obj.read({ className }, version, options);   // must NOT be reported
 ```
 
 The `inspected` bound in the test is the second half of the proof, and it needs seeing fail too. Break the program on purpose and confirm the bound catches it rather than the test passing quietly:

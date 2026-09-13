@@ -21,7 +21,7 @@
 - **In a handler that owns a lock, after every successful acquire, release is attempted exactly once, on every path out, and a release that failed reaches the caller.** Attempted, not achieved: whether SAP lets go is SAP's answer. A lock chain is `withLock()`, never `sequence()` — a sequence stops at the first failure and would skip the unlock entirely. This holds on the throw path too: a body that throws and a release that then fails must produce both facts, not just the throw. Logging a failed unlock as a warning, which is what the thirteen current update handlers do, is not reaching the caller.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`, never passed through: the contract's types are not filters, and what is actually on a transport config is headers, an Authorization bearer and cookies. One narrowing function, used by both.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
-- **`analyse` on every call whose resolved signature accepts one** — resolved per (class, member) by the compiler. There is no reliable shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all, and `readMetadata` accepts one on 30 classes but not on `AdtPackageLegacy`. `createAdtClient` returns `AdtClientLegacy` on a legacy system while being declared to return `AdtClient`, so the compiler never sees the legacy shape from a call site — Task 14 audits it separately. A call without an `analyse` gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Roughly a dozen members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
+- **`analyse` on every call whose resolved signature accepts one** — resolved per (class, member) by the compiler. There is no reliable shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all, and `readMetadata` accepts one on 30 classes but not on `AdtPackageLegacy`. `createAdtClient` returns `AdtClientLegacy` when `SAP_SYSTEM_TYPE=legacy`, which is a deployment-wide choice of a smaller contract and out of scope for this migration. A call without an `analyse` gets adt-clients' default verdict, which is a status-code reading, and that is the masking defect this repository has removed three times. Roughly a dozen members accept one — `read`, `readMetadata`, `readTransport`, `create`, `update`, `updateMetadata`, `delete`, `checkDeletion`, `activate`, `check`, `validate`, `search` — and everything else, including `lock`, `unlock`, `getVersions`, `getVersionSource` and 19 of the 20 `AdtUtils` members, accepts none, so their verdict is the library's and cannot be injected. Without an `analyse` the library reports a failure when the request threw, which is adequate for a read or a listing and wrong only where ADT hides a refusal under a 200 — `activateObjectsGroup`, and nothing else this repository calls. Task 14's invariant test is written as an allowlist of members that DO accept one, for that reason.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls in this plan.** Every test here runs offline against `tests/fixtures/adt/` (48 cases, 61 exchanges, 27 endpoints). Integration runs are the user's call, after the compiler is clean.
@@ -1886,7 +1886,7 @@ git commit -am "refactor(lib): the last of the envelope reads"
 Three of the spec's success criteria are claims about 326 files. A reviewer cannot check those by reading, and neither can the next person to add a handler.
 
 **Files:**
-- Create: `src/__tests__/unit/handlerInvariants.test.ts`, `src/__tests__/unit/legacyAnalyseLedger.test.ts`, `scripts/audit-legacy-analyse.ts`, `tests/fixtures/legacy-analyse-ledger.json`
+- Create: `src/__tests__/unit/handlerInvariants.test.ts`
 
 - [ ] **Step 1: Write the test**
 
@@ -1932,11 +1932,10 @@ it('every client call that accepts an analyse is given one', () => {
     // not on `AdtPackageLegacy`, which `createAdtClient` returns on a legacy
     // system. A name cannot answer the question, so ask the type.
     //
-    // Passing an `analyse` where it is not accepted is already a compile error
-    // WITHIN ONE SHAPE, so only the omission needs checking here. The legacy
-    // shape is a separate test below: `createAdtClient` declares `AdtClient`
-    // while returning `AdtClientLegacy` on a legacy system, so the checker
-    // never sees the Legacy declarations from a call site.
+    // Passing an `analyse` where it is not accepted is already a compile error,
+    // so only the omission needs checking here. This runs against the modern
+    // contract — a legacy deployment (`SAP_SYSTEM_TYPE=legacy`) is a smaller
+    // contract chosen by the operator, and out of scope; see the spec.
     const checker = program.getTypeChecker();
     for (const call of callExpressionsIn(source)) {
       const signature = checker.getResolvedSignature(call);
@@ -1960,60 +1959,19 @@ it('every client call that accepts an analyse is given one', () => {
 });
 ```
 
-- [ ] **Step 2: Write the legacy ledger test**
-
-The compiler cannot reach this one. `createAdtClient` is declared to return `AdtClient`; on a legacy system it returns `AdtClientLegacy`, which overrides ten factories with `Legacy` classes and declares fourteen more as `never`. So a call site type-checks against the modern contract, and an `analyse` that `AdtPackageLegacy.readMetadata<E>()` has no parameter for is dropped by JavaScript in silence. 144 of the 326 tools declare `legacy` in `available_in`; 108 of those touch one of the ten overridden classes.
-
-```typescript
-// src/__tests__/unit/legacyAnalyseLedger.test.ts
-import { readFileSync } from 'node:fs';
-import ts from 'typescript';
-
-const OVERRIDDEN = {
-  getProgram: 'AdtProgramLegacy', getClass: 'AdtClassLegacy',
-  getInterface: 'AdtInterfaceLegacy', getFunctionGroup: 'AdtFunctionGroupLegacy',
-  getFunctionModule: 'AdtFunctionModuleLegacy', getPackage: 'AdtPackageLegacy',
-  getDdl: 'AdtDdlLegacy', getUnitTest: 'AdtUnitTestLegacy',
-  getRequest: 'AdtRequestLegacy', getUtils: 'AdtUtilsLegacy',
-} as const;
-
-/**
- * Every (handler, member) where the tool runs on legacy and the Legacy class
- * takes no `analyse`. On such a system the verdict is adt-clients', whatever the
- * handler passes. The list is committed so a NEW one cannot appear unnoticed —
- * it is a ledger, not a prohibition: some of these have no alternative until
- * adt-clients gives the twins one contract (issue #200).
- */
-it('records every place the legacy shape ignores our strategy', () => {
-  const found = auditLegacy(OVERRIDDEN);           // (handler, class, member)
-  const ledger = JSON.parse(readFileSync('tests/fixtures/legacy-analyse-ledger.json', 'utf8'));
-  expect(found).toEqual(ledger);
-});
-```
-
-- [ ] **Step 3: Generate the ledger and read it before committing it**
+- [ ] **Step 2: Run it**
 
 ```bash
-npx tsx scripts/audit-legacy-analyse.ts > tests/fixtures/legacy-analyse-ledger.json
-wc -l tests/fixtures/legacy-analyse-ledger.json
-```
-
-A ledger nobody read is a snapshot of a bug. Go through it once: for each entry decide whether the handler can call a member that does accept a strategy instead, and fix the ones that can. What remains is the measured cost of the two contracts, and it goes in the PR description.
-
-- [ ] **Step 4: Run it**
-
-```bash
-npx jest src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyAnalyseLedger.test.ts
+npx jest src/__tests__/unit/handlerInvariants.test.ts
 ```
 
 Expected: PASS if Tasks 5–13 are complete. Every failure names a file — fix the file, never the regex. If a file genuinely must be excepted, the exception goes in the test with a sentence saying why, so a reviewer sees it.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 3: Commit**
 
 ```bash
-git add src/__tests__/unit/handlerInvariants.test.ts src/__tests__/unit/legacyAnalyseLedger.test.ts \
-       tests/fixtures/legacy-analyse-ledger.json scripts/audit-legacy-analyse.ts
-git commit -m "test(handlers): the invariants, and the ledger for what legacy ignores"
+git add src/__tests__/unit/handlerInvariants.test.ts
+git commit -m "test(handlers): the three invariants, checked rather than intended"
 ```
 
 ---

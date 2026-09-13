@@ -19,6 +19,7 @@ Every task's requirements implicitly include this section.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Pass it **in the call, or in a `const` initialized with an object literal in the same file and not mutated afterwards** — that is what makes the check decidable. A `let`, a value assembled at runtime, or one that may be `undefined` is reported so it can be inlined. `const` fixes the binding and not the object, so mutating the literal afterwards defeats the check; the invariant is a guard, not a proof. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a non-empty string body it reaches the caller at every level and on every tool; where there is none the field is absent, never invented.
+- **Every test's arguments come from its tool's own `required` list, and every negative test asserts what failed.** A handler validates its input before it builds a client, so a call short of a required field never reaches the member under test — and still answers `isError: true`. Asserting only that flag passes such a test while proving nothing. Assert the message, or `origin: 'refusal'`, which a local validation error cannot produce.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`. The contract's types are not filters, and what sits on a transport config is headers, an Authorization bearer and cookies.
 - **A lock chain is `withLock()`, never `sequence()`**, and only where the handler owns the lock's whole lifetime. The fifteen `low`-tier `LockX` tools hand the handle back on purpose and are never wrapped.
 - **Legacy is in scope.** `SAP_SYSTEM_TYPE=legacy` selects `AdtClientLegacy`, which serves 144 of the 326 tools through these same handler files. Four `Legacy` classes drop the strategy on seventeen members; Task 18 pins them and Task 19 walks the twenty-three tools that reach them.
@@ -1516,6 +1517,7 @@ it('ValidateDomain reports an inadmissible name as an error', async () => {
     domain_name: 'ZD_TAKEN', package_name: 'ZP', description: 'x',
   });
   expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
 });
 
 it('ActivateDomain takes analyseActivation, and DeleteDomain analyseDeletion', async () => {
@@ -1942,17 +1944,22 @@ Confirm the list before starting: a file that turns out to call `readMetadata` a
 
 ```typescript
 // src/__tests__/unit/readonlySingleCall.test.ts
+// Arguments from each tool's own `required` list. A handler validates before
+// it builds a client, so a row short of a required field never reaches the
+// adapter — and still answers `isError: true`, which is what this test asserts.
+// That combination passes while proving nothing, so the message is asserted too.
 it.each([
   ['ReadMessageClass', handleReadMessageClass, { message_class_name: 'ZMC' }],
   ['GetObjectStructure', handleGetObjectStructure, { object_name: 'ZCL_X', object_type: 'CLAS' }],
-  ['SearchObject', handleSearchObject, { query: 'ZCL*' }],
+  ['SearchObject', handleSearchObject, { object_name: 'ZCL*' }],
   ['ListTransports', handleListTransports, {}],
-  ['GetSqlQuery', handleGetSqlQuery, { query: 'SELECT 1' }],
+  ['GetSqlQuery', handleGetSqlQuery, { sql_query: 'SELECT 1' }],
   // one row per file above
 ])('%s answers through the adapter and surfaces a refusal', async (_n, handler, args) => {
   fakeClient = refusingClient('Not found');
   const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Not found');
 });
 ```
 
@@ -2040,14 +2047,21 @@ it('reports an inadmissible name as an error', async () => {
     object_type: 'CLAS', object_name: 'ZCL_TAKEN', package_name: 'ZP',
   });
   expect(result.isError).toBe(true);
+  // `origin` proves the failure came from the strategy rather than from the
+  // handler's own input validation, which answers isError too.
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
 });
 
 it('reports a refused activation as an error', async () => {
   fakeClient = refusalFrom('activate', 'refusal-activation-fails--01-activation', analyseActivation);
+  // `objects`, an array of `{ name, type }` — this tool activates a set, which
+  // is why it reaches `activateObjectsGroup` and why Step 1 above is a decision
+  // rather than a mapping.
   const result: any = await handleActivateObject(context as any, {
-    object_type: 'CLAS', object_name: 'ZCL_X',
+    objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }],
   });
   expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
 });
 ```
 

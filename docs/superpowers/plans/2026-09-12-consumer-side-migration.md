@@ -29,7 +29,8 @@ own tests pass and it is committed — not when it is described.
 | 8. Test helpers | done | `47609aa` |
 | 9. The reference read | done | `39c19b9` |
 | 10. The reference write family | done | `d4978a2` |
-| 11 – 29 | not started | |
+| 11. Sixteen two-call reads | done | `9281c35` |
+| 12 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -1997,7 +1998,7 @@ grep -lE '\.read\(' $(find src/handlers -name 'handle*.ts') | xargs grep -lE '\.
 
 Confirm each config key against the family's `I*Config` before editing; the table above is a starting point, not an authority.
 
-- [ ] **Step 1: Extend the existing surface-error test with one row per file**
+- [x] **Step 1: Extend the existing surface-error test with one row per file**
 
 `src/__tests__/unit/readHandlersSurfaceErrors.test.ts` already asserts that a read handler surfaces an error. Add sixteen rows, each with that handler's own argument name:
 
@@ -2027,18 +2028,18 @@ it.each([
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails** — every row fails; each handler answers `isError: false` today.
+- [x] **Step 2: Run it to verify it fails** — every row fails; each handler answers `isError: false` today.
 
-- [ ] **Step 3: Migrate, one file per edit**, applying Task 9's shape and changing four things: the factory, the shipped set, the config key, and the answer's field names, which stay exactly as that tool already returns them. Run the surface test after each file, not at the end.
+- [x] **Step 3: Migrate, one file per edit**, applying Task 9's shape and changing four things: the factory, the shipped set, the config key, and the answer's field names, which stay exactly as that tool already returns them. Run the surface test after each file, not at the end.
 
-- [ ] **Step 4: Run the tests and measure**
+- [x] **Step 4: Run the tests and measure**
 
 ```bash
 npx jest src/__tests__/unit/readHandlersSurfaceErrors.test.ts src/__tests__/unit/toolSurface.test.ts
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/handlers/*/readonly/handleRead*.ts src/__tests__/unit/readHandlersSurfaceErrors.test.ts

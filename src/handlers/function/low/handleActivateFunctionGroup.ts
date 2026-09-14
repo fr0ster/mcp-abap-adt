@@ -1,19 +1,18 @@
 /**
- * ActivateFunctionGroup Handler - Activate ABAP Function Group
+ * ActivateFunctionGroupLow Handler - Activate ABAP Function Group
  *
- * Uses AdtClient.activateFunctionGroup from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getFunctionGroup().activate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseActivationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseActivation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateFunctionGroupLow',
@@ -42,6 +41,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['function_group_name'],
   },
@@ -55,125 +55,33 @@ interface ActivateFunctionGroupArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ActivateFunctionGroup MCP tool
- *
- * Uses AdtClient.activateFunctionGroup - low-level single method call
- */
 export async function handleActivateFunctionGroup(
   context: HandlerContext,
   args: ActivateFunctionGroupArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { function_group_name, session_id, session_state } =
-      args as ActivateFunctionGroupArgs;
+  const { function_group_name, session_id, session_state } = args;
 
-    // Validation
-    if (!function_group_name) {
-      return return_error(new Error('function_group_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const functionGroupName = function_group_name.toUpperCase();
-
-    logger?.info(`Starting function group activation: ${functionGroupName}`);
-
-    try {
-      // Activate function group
-      const activateState = await client.getFunctionGroup().activate({
-        functionGroupName: functionGroupName,
-      });
-      const response = activateState.activateResult;
-
-      if (!response) {
-        throw new Error(
-          `Activation did not return a response for function group ${functionGroupName}`,
-        );
-      }
-
-      // Parse activation response
-      const activationResult = parseActivationResponse(response.data);
-      const success = activationResult.activated && activationResult.checked;
-
-      // Get updated session state after activation
-
-      logger?.info(`✅ ActivateFunctionGroup completed: ${functionGroupName}`);
-      logger?.debug(
-        `Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success,
-            function_group_name: functionGroupName,
-            activation: {
-              activated: activationResult.activated,
-              checked: activationResult.checked,
-              generated: activationResult.generated,
-            },
-            messages: activationResult.messages,
-            warnings: activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
-            ),
-            errors: activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            ),
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: success
-              ? `Function group ${functionGroupName} activated successfully`
-              : `Function group ${functionGroupName} activation completed with ${activationResult.messages.length} message(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error activating function group ${functionGroupName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to activate function group: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Function group ${functionGroupName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!function_group_name) {
+    return return_error(new Error('function_group_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const functionGroupName = function_group_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ActivateFunctionGroupLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionGroup(resultsFor(functionGroupDocuments))
+        .activate({ functionGroupName }, { analyse: analyseActivation }),
+    project(detail, terseActivation),
+  );
 }

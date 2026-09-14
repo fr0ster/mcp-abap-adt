@@ -1,18 +1,20 @@
 /**
- * UnlockFunctionGroup Handler - Unlock ABAP FunctionGroup
+ * UnlockFunctionGroupLow Handler - Unlock ABAP Function Group
  *
- * Uses AdtClient.unlockFunctionGroup from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getFunctionGroup().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockFunctionGroupLow',
@@ -61,110 +63,33 @@ interface UnlockFunctionGroupArgs {
   };
 }
 
-/**
- * Main handler for UnlockFunctionGroup MCP tool
- *
- * Uses AdtClient.unlockFunctionGroup - low-level single method call
- */
 export async function handleUnlockFunctionGroup(
   context: HandlerContext,
   args: UnlockFunctionGroupArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { function_group_name, lock_handle, session_id, session_state } =
-      args as UnlockFunctionGroupArgs;
+  const { function_group_name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!function_group_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error(
-          'function_group_name, lock_handle, and session_id are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const functionGroupName = function_group_name.toUpperCase();
-
-    logger?.info(
-      `Starting function group unlock: ${functionGroupName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!function_group_name || !lock_handle || !session_id) {
+    return return_error(
+      new Error(
+        'function_group_name, lock_handle, and session_id are required',
+      ),
     );
-
-    try {
-      // Unlock function group
-      const unlockState = await client
-        .getFunctionGroup()
-        .unlock({ functionGroupName: functionGroupName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for function group ${functionGroupName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockFunctionGroup completed: ${functionGroupName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            function_group_name: functionGroupName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `FunctionGroup ${functionGroupName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking function group ${functionGroupName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock function group: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `FunctionGroup ${functionGroupName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockFunctionGroup.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const functionGroupName = function_group_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockFunctionGroupLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionGroup()
+        .unlock({ functionGroupName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

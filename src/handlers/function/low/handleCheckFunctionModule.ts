@@ -1,19 +1,27 @@
 /**
- * CheckFunctionModule Handler - Syntax check for ABAP function module via ADT API
+ * CheckFunctionModuleLow Handler - Syntax check for ABAP Function Module
  *
- * Uses checkFunctionModule from @mcp-abap-adt/adt-clients/core/functionModule for function module-specific checking.
- * Requires function group name.
+ * Uses AdtClient.getFunctionModule().check from @mcp-abap-adt/adt-clients 19.
+ *
+ * `version` defaults to `'active'` when omitted — the pre-migration default,
+ * kept rather than switched to the shipped member's own inactive default (see
+ * `CheckClassLow`, which keeps the same 'active' default for the same
+ * reason). The shipped `checkFunctionModule(connection, group, module,
+ * version, undefined, contentTypes)` hardcodes its source argument to
+ * `undefined`, so no source is ever forwarded, matching the pre-migration
+ * tool schema (which has no `source_code` parameter). Verified against
+ * `AdtFunctionModule.js`.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckFunctionModuleLow',
@@ -52,6 +60,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['function_group_name', 'function_module_name'],
   },
@@ -67,126 +76,49 @@ interface CheckFunctionModuleArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckFunctionModule MCP tool
- */
 export async function handleCheckFunctionModule(
   context: HandlerContext,
   args: CheckFunctionModuleArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      function_group_name,
-      function_module_name,
-      version = 'active',
-      session_id,
-      session_state,
-    } = args as CheckFunctionModuleArgs;
+  const {
+    function_group_name,
+    function_module_name,
+    version,
+    session_id,
+    session_state,
+  } = args;
 
-    if (!function_group_name || !function_module_name) {
-      return return_error(
-        new Error('function_group_name and function_module_name are required'),
-      );
-    }
-
-    const checkVersion =
-      version && ['active', 'inactive'].includes(version.toLowerCase())
-        ? (version.toLowerCase() as 'active' | 'inactive')
-        : 'active';
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const functionGroupName = function_group_name.toUpperCase();
-    const functionModuleName = function_module_name.toUpperCase();
-
-    logger?.info(
-      `Starting function module check: ${functionModuleName} in group ${functionGroupName} (version: ${checkVersion})`,
+  if (!function_group_name || !function_module_name) {
+    return return_error(
+      new Error('function_group_name and function_module_name are required'),
     );
-
-    try {
-      const client = createAdtClient(connection, logger);
-      const checkState = await client.getFunctionModule().check(
-        {
-          functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName,
-        },
-        checkVersion,
-      );
-      const response = checkState.checkResult;
-      if (!response) {
-        throw new Error('Function module check did not return a response');
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckFunctionModule completed: ${functionModuleName}`);
-      logger?.debug(
-        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            function_group_name: functionGroupName,
-            function_module_name: functionModuleName,
-            version: checkVersion,
-            check_result: checkResult,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Function module ${functionModuleName} has no syntax errors`
-              : `Function module ${functionModuleName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking function module ${functionModuleName}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to check function module: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Function module ${functionModuleName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  const checkVersion =
+    version && ['active', 'inactive'].includes(version.toLowerCase())
+      ? (version.toLowerCase() as 'active' | 'inactive')
+      : 'active';
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const functionGroupName = function_group_name.toUpperCase();
+  const functionModuleName = function_module_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckFunctionModuleLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionModule(resultsFor(functionModuleDocuments))
+        .check({ functionModuleName, functionGroupName }, checkVersion, {
+          analyse: analyseCheck,
+        }),
+    project(detail, terseCheck),
+  );
 }

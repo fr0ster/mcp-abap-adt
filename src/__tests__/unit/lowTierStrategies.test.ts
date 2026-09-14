@@ -102,6 +102,33 @@ import {
 } from '../../handlers/ddlx/low/handleUnlockMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../handlers/ddlx/low/handleUpdateMetadataExtension';
 import { handleValidateMetadataExtension } from '../../handlers/ddlx/low/handleValidateMetadataExtension';
+import { handleActivateFunctionGroup } from '../../handlers/function/low/handleActivateFunctionGroup';
+import { handleActivateFunctionModule } from '../../handlers/function/low/handleActivateFunctionModule';
+import { handleCheckFunctionGroup } from '../../handlers/function/low/handleCheckFunctionGroup';
+import { handleCheckFunctionModule } from '../../handlers/function/low/handleCheckFunctionModule';
+import { handleCreateFunctionGroup } from '../../handlers/function/low/handleCreateFunctionGroup';
+import { handleCreateFunctionModule } from '../../handlers/function/low/handleCreateFunctionModule';
+import { handleDeleteFunctionGroup } from '../../handlers/function/low/handleDeleteFunctionGroup';
+import { handleDeleteFunctionModule } from '../../handlers/function/low/handleDeleteFunctionModule';
+import {
+  handleLockFunctionGroup,
+  TOOL_DEFINITION as LockFunctionGroupToolDefinition,
+} from '../../handlers/function/low/handleLockFunctionGroup';
+import {
+  handleLockFunctionModule,
+  TOOL_DEFINITION as LockFunctionModuleToolDefinition,
+} from '../../handlers/function/low/handleLockFunctionModule';
+import {
+  handleUnlockFunctionGroup,
+  TOOL_DEFINITION as UnlockFunctionGroupToolDefinition,
+} from '../../handlers/function/low/handleUnlockFunctionGroup';
+import {
+  handleUnlockFunctionModule,
+  TOOL_DEFINITION as UnlockFunctionModuleToolDefinition,
+} from '../../handlers/function/low/handleUnlockFunctionModule';
+import { handleUpdateFunctionModule } from '../../handlers/function/low/handleUpdateFunctionModule';
+import { handleValidateFunctionGroup } from '../../handlers/function/low/handleValidateFunctionGroup';
+import { handleValidateFunctionModule } from '../../handlers/function/low/handleValidateFunctionModule';
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
 import { handleDeleteInterface } from '../../handlers/interface/low/handleDeleteInterface';
@@ -290,6 +317,33 @@ it.each([
     'getProgram',
     {
       program_name: 'Z_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'function (function group)',
+    handleActivateFunctionGroup,
+    handleDeleteFunctionGroup,
+    handleValidateFunctionGroup,
+    'getFunctionGroup',
+    {
+      function_group_name: 'ZFG_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'function (function module)',
+    handleActivateFunctionModule,
+    handleDeleteFunctionModule,
+    handleValidateFunctionModule,
+    'getFunctionModule',
+    {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',
@@ -1577,6 +1631,346 @@ describe('program', () => {
 
     const result: any = await handleActivateProgram(context as any, {
       program_name: 'Z_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+});
+
+describe('function (function group)', () => {
+  it("CheckFunctionGroupLow leaves the check member's status undefined — no version parameter exists on this tool", async () => {
+    await handleCheckFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+    });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getFunctionGroup');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[0]).toEqual({ functionGroupName: 'ZFG_X' });
+    expect(call?.args[1]).toBeUndefined();
+  });
+
+  it('CreateFunctionGroupLow reaches getFunctionGroup with analyseException, forwarding description — the shipped create reads it', async () => {
+    await handleCreateFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getFunctionGroup');
+    expect(call?.args[0]).toEqual({
+      functionGroupName: 'ZFG_X',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockFunctionGroupLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+    });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getFunctionGroup');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in LockFunctionGroupToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it("LockFunctionGroupLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'FGRP_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.function_group_name).toBe('ZFG_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockFunctionGroupLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'FGRP_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockFunctionGroup(
+      connectionSessionContext as any,
+      { function_group_name: 'ZFG_X', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockFunctionGroupLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getFunctionGroup');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in UnlockFunctionGroupToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it('ValidateFunctionGroupLow defaults description to the function group name when omitted, and forwards packageName', async () => {
+    await handleValidateFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+      package_name: 'zp',
+    });
+    const call = callTo('validate');
+    expect(call?.factory).toBe('getFunctionGroup');
+    expect(call?.args[0]).toEqual({
+      functionGroupName: 'ZFG_X',
+      packageName: 'ZP',
+      description: 'ZFG_X',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseValidation);
+  });
+
+  it('ValidateFunctionGroupLow reads a real corpus document (function-group-specific refusal fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody(
+        'refusal-validation-name-taken-functiongroup--01-functions-validation',
+      ),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateFunctionGroup(context as any, {
+      function_group_name: 'ZMCP_SHR_FGRP',
+      package_name: 'ZMCP_SHR_PKG',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      admissible: false,
+      message: {
+        type: 'ERROR',
+        text: 'Function group ZMCP_SHR_FGRP already exists',
+      },
+    });
+  });
+
+  it('ActivateFunctionGroupLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+});
+
+describe('function (function module)', () => {
+  it("CheckFunctionModuleLow defaults the check member's status to 'active' when version is omitted — the pre-migration default, kept", async () => {
+    await handleCheckFunctionModule(context as any, {
+      function_group_name: 'ZFG_X',
+      function_module_name: 'ZFM_X',
+    });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[0]).toEqual({
+      functionModuleName: 'ZFM_X',
+      functionGroupName: 'ZFG_X',
+    });
+    expect(call?.args[1]).toBe('active');
+  });
+
+  it('CheckFunctionModuleLow passes "inactive" through to the check member\'s second parameter when asked', async () => {
+    await handleCheckFunctionModule(context as any, {
+      function_group_name: 'ZFG_X',
+      function_module_name: 'ZFM_X',
+      version: 'inactive',
+    });
+    const call = callTo('check');
+    expect(call?.args[1]).toBe('inactive');
+  });
+
+  it('UpdateFunctionModuleLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
+    await handleUpdateFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+      source_code: 'FUNCTION zfm_x.\nENDFUNCTION.',
+      lock_handle: 'h',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.args[0]).toEqual({
+      functionModuleName: 'ZFM_X',
+      functionGroupName: 'ZFG_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'FUNCTION zfm_x.\nENDFUNCTION.',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateFunctionModuleLow reaches getFunctionModule with analyseException, forwarding no packageName — the shipped create reads no package of its own', async () => {
+    await handleCreateFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.args[0]).toEqual({
+      functionModuleName: 'ZFM_X',
+      functionGroupName: 'ZFG_X',
+      description: 'x',
+      transportRequest: 'E19K900001',
+    });
+    // The negative half: packageName never lands in config at all, so a
+    // regression that starts forwarding it (a field the member never reads)
+    // cannot pass silently either.
+    expect((call?.args[0] as any)?.packageName).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockFunctionModuleLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+    });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in LockFunctionModuleToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it("LockFunctionModuleLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'FM_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.function_module_name).toBe('ZFM_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockFunctionModuleLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'FM_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockFunctionModule(
+      connectionSessionContext as any,
+      {
+        function_module_name: 'ZFM_X',
+        function_group_name: 'ZFG_X',
+        session_id: 'caller-session',
+      },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockFunctionModuleLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in UnlockFunctionModuleToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it('ValidateFunctionModuleLow forwards no packageName — validateFunctionModuleName takes none', async () => {
+    await handleValidateFunctionModule(context as any, {
+      function_group_name: 'ZFG_X',
+      function_module_name: 'ZFM_X',
+      description: 'x',
+    });
+    const call = callTo('validate');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.args[0]).toEqual({
+      functionModuleName: 'ZFM_X',
+      functionGroupName: 'ZFG_X',
+      description: 'x',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseValidation);
+  });
+
+  it('ValidateFunctionModuleLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateFunctionModule(context as any, {
+      function_group_name: 'ZFG_X',
+      function_module_name: 'ZFM_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('ActivateFunctionModuleLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
     });
 
     expect(result.isError).toBe(false);

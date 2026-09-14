@@ -3043,6 +3043,23 @@ difference against the snapshot, never by position. And:
 `src/__tests__/helpers/traceHelpers.ts` in adt-clients is the worked example the
 reference points at. Read it before writing the loop.
 
+**These two tools take no `detail`, and their projection is applied directly.**
+`project(detail, terse)` reads an `AdtReading` — `reading.raw` at raw,
+`reading.value ?? reading.raw` at full, `terse(reading.value, reading.status)`
+at terse. What these handlers answer is not a reading: it is a composite this
+repository assembles from two or three calls, and the executors give it neither
+a document to be `raw` nor a status, since `IAdtResult<T>` is `{ value }` alone.
+Passing the composite through `project()` would read `reading.value` as
+`undefined`, hand that to the projection, and answer `adapter_threw`.
+
+So the projection goes to `answer()` as itself — `terseClassRun`, not
+`project(detail, terseClassRun)` — and the context carries `detail: 'terse'`.
+
+That also settles whether these belong in Task 28's `detail` set: they do not.
+The rule is that `detail` goes where the three levels differ, and here there is
+no document for them to differ over. `detailWiring` expects a literal from a
+tool that declares none, which is what this passes.
+
 **Two output fields cannot survive any option, and that is a third decision.**
 `run_status` and `trace_requests_status` come from the transport envelope, and
 19 does not expose it to a caller: `ClassExecutor` takes no result strategy in
@@ -3449,7 +3466,7 @@ both gone by the time the projection runs. The tools answer `class_name` and
 
 ```typescript
 return answer(
-  { tool: 'RuntimeRunClass', detail: detailOf(args) },
+  { tool: 'RuntimeRunClass', detail: 'terse' },
   async () => {
     // `sequence` hands the next step the VALUE — it calls
     // `step(answer.getResult().value)` — so `id` is already the string.
@@ -3469,7 +3486,9 @@ return answer(
     // No trace id under these options: nothing searched for one.
     return succeededWith({ className, output: ran.getResult().value, profilerId });
   },
-  project(detailOf(args), terseClassRun),
+  // The projection itself, not `project(...)`: see above — there is no reading
+  // here, so `detail` has nothing to select between.
+  terseClassRun,
 );
 ```
 
@@ -3537,7 +3556,7 @@ and the handler:
 const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
 
 return answer(
-  { tool: 'RuntimeRunClass', detail: detailOf(args) },
+  { tool: 'RuntimeRunClass', detail: 'terse' },
   async () => {
     // 1. the snapshot. A refused feed read is a refusal, not an empty feed.
     const snapshot = await profiler.list();
@@ -3575,7 +3594,9 @@ return answer(
       traceId: found.getResult().value,
     });
   },
-  project(detailOf(args), terseClassRun),
+  // The projection itself, not `project(...)`: see above — there is no reading
+  // here, so `detail` has nothing to select between.
+  terseClassRun,
 );
 ```
 
@@ -3598,6 +3619,9 @@ import type { Terse } from './projections';
  * `run_status` is gone and cannot come back — see the decision above. Do not add
  * it reading `undefined`.
  */
+// `Terse<T>` is `(value, status) => unknown`. There is no status on this path —
+// `IAdtResult` carries only a value — so the second parameter is left off
+// rather than passed something invented.
 export const terseClassRun: Terse<any> = (value) => ({
   success: true,
   class_name: value.className,

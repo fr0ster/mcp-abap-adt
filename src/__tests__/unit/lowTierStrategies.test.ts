@@ -26,6 +26,9 @@ import { handleDeleteClass } from '../../handlers/class/low/handleDeleteClass';
 import { handleLockClassTestClasses } from '../../handlers/class/low/handleLockClassTestClasses';
 import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
+import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
+import { handleDeleteInterface } from '../../handlers/interface/low/handleDeleteInterface';
+import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
 import { recordAnalyse } from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
@@ -50,6 +53,18 @@ it.each([
     handleValidateClass,
     {
       class_name: 'ZCL_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'interface',
+    handleActivateInterface,
+    handleDeleteInterface,
+    handleValidateInterface,
+    {
+      interface_name: 'ZIF_X',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',

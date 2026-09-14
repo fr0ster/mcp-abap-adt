@@ -10,6 +10,28 @@
 
 **Tech Stack:** TypeScript 5, `@mcp-abap-adt/adt-clients` 19.0.0, `@mcp-abap-adt/adt-strategies` 0.1.0, `@mcp-abap-adt/interfaces` 44.0.0, `fast-xml-parser`, Jest.
 
+## Progress
+
+**This table is the record; the checkboxes below are the detail.** Every row
+names the commit that closed the task, so `git show <hash> --stat` answers what
+it touched and `git log --oneline` answers the order. A task is done when its
+own tests pass and it is committed — not when it is described.
+
+| task | state | commit |
+|---|---|---|
+| 1. Freeze the tool surface | done | `dc48ffa` |
+| 2. `safeFields` | done | `3cc6192` |
+| 3. `answer.ts` — the failure payload | done | `c340a77` |
+| 4 – 29 | not started | |
+
+Verify without reading anything above:
+
+```bash
+git log --oneline --grep='^Task\|^test(surface)\|^feat(strategies)\|^fix(answer)' -20
+npx jest src/__tests__/unit/toolSurface.test.ts src/__tests__/unit/safeFields.test.ts src/__tests__/unit/answer
+npx tsc --noEmit 2>&1 | grep -cE '^src/.*error TS'   # 589 at the baseline, and until Task 9
+```
+
 ## Global Constraints
 
 Every task's requirements implicitly include this section.
@@ -105,7 +127,7 @@ The spec's first success criterion is that 362 tools stay as they are. This ratc
 - Consumes: `scripts/list-tools.ts`, which enumerates all six groups and already handles both input-schema shapes — plain JSON Schema, and the five handlers that declare a bare zod raw shape.
 - Produces: the baseline every later task is measured against.
 
-- [ ] **Step 1: Generate the snapshot**
+- [x] **Step 1: Generate the snapshot**
 
 ```bash
 mkdir -p tests/fixtures/tools
@@ -118,7 +140,7 @@ console.log(rows.length, 'tools:', JSON.stringify(byGroup));
 "   # expect 362 across six groups
 ```
 
-- [ ] **Step 2: Write the ratchet**
+- [x] **Step 2: Write the ratchet**
 
 ```typescript
 // src/__tests__/unit/toolSurface.test.ts
@@ -176,7 +198,7 @@ describe('the MCP tool surface', () => {
 });
 ```
 
-- [ ] **Step 3: Run it, expect PASS**
+- [x] **Step 3: Run it, expect PASS**
 
 ```bash
 npx jest src/__tests__/unit/toolSurface.test.ts
@@ -184,11 +206,11 @@ npx jest src/__tests__/unit/toolSurface.test.ts
 
 This one is written green — it is a ratchet, not a red-green cycle.
 
-- [ ] **Step 4: Prove it can fail**
+- [x] **Step 4: Prove it can fail**
 
 Rename `ReadClass` to `ReadClassX` in `src/handlers/class/readonly/handleReadClass.ts`, run the test, confirm FAIL, revert. A ratchet nobody has seen fail is not known to work.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add tests/fixtures/tools/surface.json src/__tests__/unit/toolSurface.test.ts
@@ -210,7 +232,7 @@ The contract types `request` as `{ method?, url? }`, but a type is not a filter:
   - `safeRequest(value: unknown): Record<string, string> | undefined`
   - `safeCleanup(value: unknown): Record<string, unknown> | undefined`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/safeFields.test.ts
@@ -268,7 +290,7 @@ describe('safeCleanup', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 npx jest src/__tests__/unit/safeFields.test.ts
@@ -276,7 +298,7 @@ npx jest src/__tests__/unit/safeFields.test.ts
 
 Expected: FAIL — cannot find module `safeFields`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/lib/strategies/safeFields.ts
@@ -324,7 +346,7 @@ export function safeCleanup(value: unknown): Record<string, unknown> | undefined
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx jest src/__tests__/unit/safeFields.test.ts
@@ -332,7 +354,7 @@ npx jest src/__tests__/unit/safeFields.test.ts
 
 Expected: PASS, all six.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/strategies/safeFields.ts src/__tests__/unit/safeFields.test.ts
@@ -353,7 +375,7 @@ Three changes, and the first is a bug fix the spec argues at length: `raw_body` 
 - Consumes: `safeRequest`, `safeCleanup` from Task 2.
 - Produces: `AnswerDetail` re-exported from `projections.ts` so there is one definition; a failure payload carrying `cleanup` and `operation` on both the refusal and the `client_threw` path.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 ```typescript
 // append to src/__tests__/unit/answerFailure.test.ts
@@ -428,7 +450,7 @@ describe('the failure payload', () => {
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
+- [x] **Step 2: Run them to verify they fail**
 
 ```bash
 npx jest src/__tests__/unit/answerFailure.test.ts
@@ -436,7 +458,7 @@ npx jest src/__tests__/unit/answerFailure.test.ts
 
 Expected: FAIL — `raw_body` absent at `terse` and `full`; `cleanup` and `operation` dropped by the allowlist on both paths. The empty-answer case fails too, because `''` passes a bare string check.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/lib/answer.ts — the three edits
@@ -479,7 +501,7 @@ function local(kind: string, ctx: AnswerContext, message: string, thrown?: unkno
 
 Both `catch` blocks in `answer()` pass the thrown value to `local()`.
 
-- [ ] **Step 4: Run the tests and the compiler**
+- [x] **Step 4: Run the tests and the compiler**
 
 ```bash
 npx jest src/__tests__/unit/answer*.test.ts
@@ -488,7 +510,7 @@ npx tsc --noEmit 2>&1 | grep -c 'error TS'
 
 Expected: tests PASS; the error count is not higher than it was.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/answer.ts src/__tests__/unit/answerFailure.test.ts

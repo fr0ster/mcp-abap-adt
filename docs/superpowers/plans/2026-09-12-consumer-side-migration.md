@@ -3087,7 +3087,7 @@ edits the tool definitions and whether the feed search is written at all.
 ```typescript
 // src/__tests__/unit/runtimeProfiling.test.ts
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 // The answer Step 1 recorded. Written once, here, so the assertions below
 // follow the decision instead of being edited into agreement with whatever
@@ -3356,7 +3356,7 @@ are its own.
 ```typescript
 // src/__tests__/unit/newTrace.test.ts
 import { newTraceAfter } from '../../lib/strategies/newTrace';
-import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const entry = (id: string, recordedAt: string) => ({ id, recordedAt });
 const feed = (...entries: ReturnType<typeof entry>[]) => okResponse(entries);

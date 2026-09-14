@@ -52,7 +52,7 @@ export const TOOL_DEFINITION = {
       structure_type: {
         type: 'string',
         description:
-          "Structure type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).",
+          'Accepted for compatibility; not forwarded to the create request. (These values name ABAP program subtypes — a DDIC structure has no structure-type concept of its own.)',
       },
       application: {
         type: 'string',

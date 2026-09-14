@@ -36,7 +36,7 @@ export const TOOL_DEFINITION = {
       package_name: {
         type: 'string',
         description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.',
       },
       description: {
         type: 'string',

@@ -112,6 +112,7 @@ import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdate
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
 import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
 import { handleCheckStructure } from '../../handlers/structure/low/handleCheckStructure';
+import { handleCreateStructure } from '../../handlers/structure/low/handleCreateStructure';
 import { handleDeleteStructure } from '../../handlers/structure/low/handleDeleteStructure';
 import {
   handleLockStructure,
@@ -1138,6 +1139,25 @@ describe('structure', () => {
     expect(call?.args[1]).toMatchObject({
       sourceCode: 'define structure zst_x { client : abap.clnt; }',
       lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateStructureLow reaches getStructure with analyseException, forwarding no source (createStructure never reads one)', async () => {
+    await handleCreateStructure(context as any, {
+      structure_name: 'ZST_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getStructure');
+    expect(call?.args[0]).toEqual({
+      structureName: 'ZST_X',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);

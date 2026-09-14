@@ -1,0 +1,1812 @@
+[
+  {
+    "group": "readonly",
+    "name": "GetTableContents",
+    "inputs": "table_name*, max_rows"
+  },
+  {
+    "group": "readonly",
+    "name": "GetPackageContents",
+    "inputs": "package_name*, include_subpackages, max_depth, include_descriptions"
+  },
+  {
+    "group": "readonly",
+    "name": "GetInclude",
+    "inputs": "include_name*"
+  },
+  {
+    "group": "readonly",
+    "name": "GetIncludesList",
+    "inputs": "object_name*, object_type*, detailed, timeout"
+  },
+  {
+    "group": "readonly",
+    "name": "GetEnhancements",
+    "inputs": "object_name*, object_type*"
+  },
+  {
+    "group": "readonly",
+    "name": "GetEnhancementSpot",
+    "inputs": "enhancement_spot*"
+  },
+  {
+    "group": "readonly",
+    "name": "GetEnhancementImpl",
+    "inputs": "enhancement_spot*, enhancement_name*"
+  },
+  {
+    "group": "readonly",
+    "name": "GetTransport",
+    "inputs": "transport_number*, include_objects, include_tasks"
+  },
+  {
+    "group": "readonly",
+    "name": "ListTransports",
+    "inputs": "user, modifiable_only"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadClass",
+    "inputs": "class_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadInterface",
+    "inputs": "interface_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadProgram",
+    "inputs": "program_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadTable",
+    "inputs": "table_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadStructure",
+    "inputs": "structure_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "GetStructuresList",
+    "inputs": "structure_name*, version, include_extensions, timeout"
+  },
+  {
+    "group": "readonly",
+    "name": "GetObjectVersions",
+    "inputs": "object_type*, object_name*, function_group_name"
+  },
+  {
+    "group": "readonly",
+    "name": "GetObjectVersionSource",
+    "inputs": "object_type*, content_uri*"
+  },
+  {
+    "group": "readonly",
+    "name": "GetObjectVersionDiff",
+    "inputs": "object_type*, content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadDdl",
+    "inputs": "ddl_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadDomain",
+    "inputs": "domain_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadMessageClass",
+    "inputs": "message_class_name*"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadMessageClassMessage",
+    "inputs": "message_class_name*, msgno*"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadDataElement",
+    "inputs": "data_element_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadFunctionModule",
+    "inputs": "function_module_name*, function_group_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadFunctionInclude",
+    "inputs": "function_group_name*, include_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ListFunctionGroupIncludes",
+    "inputs": "function_group_name*"
+  },
+  {
+    "group": "readonly",
+    "name": "ListFunctionModules",
+    "inputs": "function_group_name*"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadFunctionGroup",
+    "inputs": "function_group_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadPackage",
+    "inputs": "package_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadServiceDefinition",
+    "inputs": "service_definition_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadMetadataExtension",
+    "inputs": "metadata_extension_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadBehaviorDefinition",
+    "inputs": "behavior_definition_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadBehaviorImplementation",
+    "inputs": "behavior_implementation_name*, version"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadServiceBinding",
+    "inputs": "service_binding_name*"
+  },
+  {
+    "group": "high",
+    "name": "ActivateObjects",
+    "inputs": "objects*, preaudit"
+  },
+  {
+    "group": "high",
+    "name": "ActivateDomain",
+    "inputs": "domain_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateDataElement",
+    "inputs": "data_element_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateTable",
+    "inputs": "table_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateStructure",
+    "inputs": "structure_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateDdl",
+    "inputs": "ddl_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateClass",
+    "inputs": "class_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateInterface",
+    "inputs": "interface_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateProgram",
+    "inputs": "program_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateFunctionModule",
+    "inputs": "function_module_name*, function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateFunctionGroup",
+    "inputs": "function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateBehaviorDefinition",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateMetadataExtension",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateServiceDefinition",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "ActivateServiceBinding",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "high",
+    "name": "CreatePackage",
+    "inputs": "package_name*, description, super_package*, package_type, software_component, transport_layer, transport_request, record_changes, application_component, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetPackage",
+    "inputs": "package_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "CreateDomain",
+    "inputs": "domain_name*, description, package_name, transport_request, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, activate, fixed_values, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetDomain",
+    "inputs": "domain_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateDomain",
+    "inputs": "domain_name*, description, package_name*, transport_request, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, activate, fixed_values"
+  },
+  {
+    "group": "high",
+    "name": "DeleteDomain",
+    "inputs": "domain_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "GetMessageClass",
+    "inputs": "message_class_name*"
+  },
+  {
+    "group": "high",
+    "name": "CreateMessageClass",
+    "inputs": "message_class_name*, description, package_name*, transport_request, master_language"
+  },
+  {
+    "group": "high",
+    "name": "UpdateMessageClass",
+    "inputs": "message_class_name*, description*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "DeleteMessageClass",
+    "inputs": "message_class_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "GetMessageClassMessage",
+    "inputs": "message_class_name*, msgno*"
+  },
+  {
+    "group": "high",
+    "name": "CreateMessageClassMessage",
+    "inputs": "message_class_name*, msgno*, msgtext*, self_explanatory, description, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "UpdateMessageClassMessage",
+    "inputs": "message_class_name*, msgno*, msgtext*, self_explanatory, description, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "DeleteMessageClassMessage",
+    "inputs": "message_class_name*, msgno*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateDataElement",
+    "inputs": "data_element_name*, description, package_name*, transport_request, data_type, length, decimals, short_label, medium_label, long_label, heading_label, type_kind, type_name, search_help, search_help_parameter, set_get_parameter, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetDataElement",
+    "inputs": "data_element_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateDataElement",
+    "inputs": "data_element_name*, description, package_name*, transport_request, type_kind, type_name, data_type, length, decimals, field_label_short, field_label_medium, field_label_long, field_label_heading, search_help, search_help_parameter, set_get_parameter, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteDataElement",
+    "inputs": "data_element_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateTransport",
+    "inputs": "transport_type, description*, target_system, owner"
+  },
+  {
+    "group": "high",
+    "name": "CreateTable",
+    "inputs": "table_name*, description, package_name*, transport_request, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetTable",
+    "inputs": "table_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateTable",
+    "inputs": "table_name*, ddl_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteTable",
+    "inputs": "table_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateStructure",
+    "inputs": "structure_name*, description, package_name*, transport_request, fields*, includes, activate, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetStructure",
+    "inputs": "structure_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateStructure",
+    "inputs": "structure_name*, ddl_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteStructure",
+    "inputs": "structure_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateDdl",
+    "inputs": "ddl_name*, package_name*, transport_request, description, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetDdl",
+    "inputs": "ddl_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateDdl",
+    "inputs": "ddl_name*, ddl_source*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteDdl",
+    "inputs": "ddl_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateServiceDefinition",
+    "inputs": "service_definition_name*, description, package_name*, transport_request, source_code, activate, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetServiceDefinition",
+    "inputs": "service_definition_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateServiceDefinition",
+    "inputs": "service_definition_name*, source_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteServiceDefinition",
+    "inputs": "service_definition_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateServiceBinding",
+    "inputs": "service_binding_name*, service_definition_name*, package_name*, description, binding_variant, service_name, service_version, transport_request, activate, response_format, master_language"
+  },
+  {
+    "group": "high",
+    "name": "ListServiceBindingTypes",
+    "inputs": "response_format"
+  },
+  {
+    "group": "high",
+    "name": "GetServiceBinding",
+    "inputs": "service_binding_name*, response_format"
+  },
+  {
+    "group": "high",
+    "name": "UpdateServiceBinding",
+    "inputs": "service_binding_name*, desired_publication_state*, binding_variant*, service_name*, service_version, response_format"
+  },
+  {
+    "group": "high",
+    "name": "ValidateServiceBinding",
+    "inputs": "service_binding_name*, description, service_definition_name*, package_name, service_binding_version"
+  },
+  {
+    "group": "high",
+    "name": "DeleteServiceBinding",
+    "inputs": "service_binding_name*, transport_request, response_format"
+  },
+  {
+    "group": "high",
+    "name": "GetClass",
+    "inputs": "class_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "CreateClass",
+    "inputs": "class_name*, description, package_name*, transport_request, superclass, final, abstract, create_protected, master_language"
+  },
+  {
+    "group": "high",
+    "name": "UpdateClass",
+    "inputs": "class_name*, source_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteClass",
+    "inputs": "class_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateUnitTest",
+    "inputs": "tests*, title, context, scope, risk_level, duration"
+  },
+  {
+    "group": "high",
+    "name": "RunUnitTest",
+    "inputs": "tests*, title, context, scope, risk_level, duration"
+  },
+  {
+    "group": "high",
+    "name": "GetUnitTest",
+    "inputs": "run_id*"
+  },
+  {
+    "group": "high",
+    "name": "GetUnitTestStatus",
+    "inputs": "run_id*, with_long_polling"
+  },
+  {
+    "group": "high",
+    "name": "GetUnitTestResult",
+    "inputs": "run_id*, with_navigation_uris, format"
+  },
+  {
+    "group": "high",
+    "name": "UpdateUnitTest",
+    "inputs": "run_id*"
+  },
+  {
+    "group": "high",
+    "name": "DeleteUnitTest",
+    "inputs": "run_id*"
+  },
+  {
+    "group": "high",
+    "name": "CreateCdsUnitTest",
+    "inputs": "class_name*, package_name*, cds_view_name*, description, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "GetCdsUnitTest",
+    "inputs": "run_id*"
+  },
+  {
+    "group": "high",
+    "name": "GetCdsUnitTestStatus",
+    "inputs": "run_id*, with_long_polling"
+  },
+  {
+    "group": "high",
+    "name": "GetCdsUnitTestResult",
+    "inputs": "run_id*, with_navigation_uris, format"
+  },
+  {
+    "group": "high",
+    "name": "UpdateCdsUnitTest",
+    "inputs": "class_name*, test_class_source*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "DeleteCdsUnitTest",
+    "inputs": "class_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "GetLocalTestClass",
+    "inputs": "class_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateLocalTestClass",
+    "inputs": "class_name*, test_class_code*, transport_request, activate_on_update"
+  },
+  {
+    "group": "high",
+    "name": "DeleteLocalTestClass",
+    "inputs": "class_name*, transport_request, activate_on_delete"
+  },
+  {
+    "group": "high",
+    "name": "GetLocalTypes",
+    "inputs": "class_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateLocalTypes",
+    "inputs": "class_name*, local_types_code*, transport_request, activate_on_update"
+  },
+  {
+    "group": "high",
+    "name": "DeleteLocalTypes",
+    "inputs": "class_name*, transport_request, activate_on_delete"
+  },
+  {
+    "group": "high",
+    "name": "GetLocalDefinitions",
+    "inputs": "class_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateLocalDefinitions",
+    "inputs": "class_name*, definitions_code*, transport_request, activate_on_update"
+  },
+  {
+    "group": "high",
+    "name": "DeleteLocalDefinitions",
+    "inputs": "class_name*, transport_request, activate_on_delete"
+  },
+  {
+    "group": "high",
+    "name": "GetLocalMacros",
+    "inputs": "class_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateLocalMacros",
+    "inputs": "class_name*, macros_code*, transport_request, activate_on_update"
+  },
+  {
+    "group": "high",
+    "name": "DeleteLocalMacros",
+    "inputs": "class_name*, transport_request, activate_on_delete"
+  },
+  {
+    "group": "high",
+    "name": "CreateProgram",
+    "inputs": "program_name*, description, package_name*, transport_request, program_type, application, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetProgram",
+    "inputs": "program_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateProgram",
+    "inputs": "program_name*, source_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteProgram",
+    "inputs": "program_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateInterface",
+    "inputs": "interface_name*, description, package_name*, transport_request, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetInterface",
+    "inputs": "interface_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateInterface",
+    "inputs": "interface_name*, source_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteInterface",
+    "inputs": "interface_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateFunctionGroup",
+    "inputs": "function_group_name*, description, package_name*, transport_request, activate, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetFunctionGroup",
+    "inputs": "function_group_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateFunctionGroup",
+    "inputs": "function_group_name*, description*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "DeleteFunctionGroup",
+    "inputs": "function_group_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateFunctionModule",
+    "inputs": "function_group_name*, function_module_name*, description, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "GetFunctionModule",
+    "inputs": "function_module_name*, function_group_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateFunctionModule",
+    "inputs": "function_group_name*, function_module_name*, source_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteFunctionModule",
+    "inputs": "function_module_name*, function_group_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateFunctionInclude",
+    "inputs": "function_group_name*, include_name*, description, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "UpdateFunctionInclude",
+    "inputs": "function_group_name*, include_name*, source_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteFunctionInclude",
+    "inputs": "function_group_name*, include_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateBehaviorDefinition",
+    "inputs": "name*, description, package_name*, transport_request, root_entity*, implementation_type*, activate, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetBehaviorDefinition",
+    "inputs": "behavior_definition_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateBehaviorDefinition",
+    "inputs": "name*, source_code*, transport_request, lock_handle, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteBehaviorDefinition",
+    "inputs": "behavior_definition_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateBehaviorImplementation",
+    "inputs": "class_name*, behavior_definition*, description, package_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "GetBehaviorImplementation",
+    "inputs": "behavior_implementation_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateBehaviorImplementation",
+    "inputs": "class_name*, behavior_definition*, implementation_code*, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteBehaviorImplementation",
+    "inputs": "behavior_implementation_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CreateMetadataExtension",
+    "inputs": "name*, description, package_name*, transport_request, activate, master_language"
+  },
+  {
+    "group": "high",
+    "name": "GetMetadataExtension",
+    "inputs": "metadata_extension_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "UpdateMetadataExtension",
+    "inputs": "name*, source_code*, lock_handle, transport_request, activate"
+  },
+  {
+    "group": "high",
+    "name": "DeleteMetadataExtension",
+    "inputs": "metadata_extension_name*, transport_request"
+  },
+  {
+    "group": "high",
+    "name": "CheckBehaviorDefinition",
+    "inputs": "name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckClass",
+    "inputs": "class_name*, version, source_code"
+  },
+  {
+    "group": "high",
+    "name": "CheckDataElement",
+    "inputs": "data_element_name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckDomain",
+    "inputs": "domain_name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckFunctionGroup",
+    "inputs": "function_group_name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckFunctionModule",
+    "inputs": "function_group_name*, function_module_name*, version"
+  },
+  {
+    "group": "high",
+    "name": "CheckInterface",
+    "inputs": "interface_name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckMetadataExtension",
+    "inputs": "name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckPackage",
+    "inputs": "package_name*, super_package*"
+  },
+  {
+    "group": "high",
+    "name": "CheckProgram",
+    "inputs": "program_name*"
+  },
+  {
+    "group": "high",
+    "name": "CheckStructure",
+    "inputs": "structure_name*, version, ddl_code"
+  },
+  {
+    "group": "high",
+    "name": "CheckTable",
+    "inputs": "table_name*, version, ddl_code"
+  },
+  {
+    "group": "high",
+    "name": "CheckDdl",
+    "inputs": "ddl_name*, version, ddl_source"
+  },
+  {
+    "group": "high",
+    "name": "GetClassVersions",
+    "inputs": "class_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetClassVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetClassVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetProgramVersions",
+    "inputs": "program_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetProgramVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetProgramVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetInterfaceVersions",
+    "inputs": "interface_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetInterfaceVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetInterfaceVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetFunctionModuleVersions",
+    "inputs": "function_module_name*, function_group_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetFunctionModuleVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetFunctionModuleVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetTableVersions",
+    "inputs": "table_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetTableVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetTableVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetStructureVersions",
+    "inputs": "structure_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetStructureVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetStructureVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetDdlVersions",
+    "inputs": "ddl_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetDdlVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetDdlVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetBehaviorDefinitionVersions",
+    "inputs": "behavior_definition_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetBehaviorDefinitionVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetBehaviorDefinitionVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "high",
+    "name": "GetMetadataExtensionVersions",
+    "inputs": "metadata_extension_name*"
+  },
+  {
+    "group": "high",
+    "name": "GetMetadataExtensionVersionSource",
+    "inputs": "content_uri*"
+  },
+  {
+    "group": "high",
+    "name": "GetMetadataExtensionVersionDiff",
+    "inputs": "content_uri_from*, content_uri_to*"
+  },
+  {
+    "group": "low",
+    "name": "ActivateObjectLow",
+    "inputs": "objects*, preaudit"
+  },
+  {
+    "group": "low",
+    "name": "UpdatePackageLow",
+    "inputs": "package_name*, super_package*, updated_description*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockPackageLow",
+    "inputs": "package_name*, super_package*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckPackageLow",
+    "inputs": "package_name*, super_package*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeletePackageLow",
+    "inputs": "package_name*, transport_request, force_new_connection, connection_config"
+  },
+  {
+    "group": "low",
+    "name": "LockPackageLow",
+    "inputs": "package_name*, super_package*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidatePackageLow",
+    "inputs": "package_name*, super_package*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreatePackageLow",
+    "inputs": "package_name*, super_package*, description*, package_type, software_component, transport_layer, transport_request, record_changes, application_component, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateDomainLow",
+    "inputs": "domain_name*, properties*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckDomainLow",
+    "inputs": "domain_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteDomainLow",
+    "inputs": "domain_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockDomainLow",
+    "inputs": "domain_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockDomainLow",
+    "inputs": "domain_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateDomainLow",
+    "inputs": "domain_name*, description*, package_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateDomainLow",
+    "inputs": "domain_name*, description*, package_name*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateDomainLow",
+    "inputs": "domain_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateDataElementLow",
+    "inputs": "data_element_name*, properties*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckDataElementLow",
+    "inputs": "data_element_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteDataElementLow",
+    "inputs": "data_element_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockDataElementLow",
+    "inputs": "data_element_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockDataElementLow",
+    "inputs": "data_element_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateDataElementLow",
+    "inputs": "data_element_name*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateDataElementLow",
+    "inputs": "data_element_name*, description*, package_name*, transport_request, data_type, type_kind, type_name, length, decimals, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateDataElementLow",
+    "inputs": "data_element_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateTransportLow",
+    "inputs": "description*, transport_type"
+  },
+  {
+    "group": "low",
+    "name": "UpdateTableLow",
+    "inputs": "table_name*, ddl_code*, lock_handle*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteTableLow",
+    "inputs": "table_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockTableLow",
+    "inputs": "table_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockTableLow",
+    "inputs": "table_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateTableLow",
+    "inputs": "table_name*, package_name*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckTableLow",
+    "inputs": "table_name*, ddl_code, version, reporter, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateTableLow",
+    "inputs": "table_name*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateTableLow",
+    "inputs": "table_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateStructureLow",
+    "inputs": "structure_name*, ddl_code*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckStructureLow",
+    "inputs": "structure_name*, ddl_code, version, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteStructureLow",
+    "inputs": "structure_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockStructureLow",
+    "inputs": "structure_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockStructureLow",
+    "inputs": "structure_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateStructureLow",
+    "inputs": "structure_name*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateStructureLow",
+    "inputs": "structure_name*, description*, package_name*, transport_request, structure_type, application, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateStructureLow",
+    "inputs": "structure_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateDdlLow",
+    "inputs": "ddl_name*, ddl_source*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckDdlLow",
+    "inputs": "ddl_name*, ddl_source, version, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteDdlLow",
+    "inputs": "ddl_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockDdlLow",
+    "inputs": "ddl_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockDdlLow",
+    "inputs": "ddl_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateDdlLow",
+    "inputs": "ddl_name*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateDdlLow",
+    "inputs": "ddl_name*, description*, package_name*, transport_request, application, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateDdlLow",
+    "inputs": "ddl_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateClassLow",
+    "inputs": "class_name*, source_code*, lock_handle*"
+  },
+  {
+    "group": "low",
+    "name": "DeleteClassLow",
+    "inputs": "class_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockClassLow",
+    "inputs": "class_name*"
+  },
+  {
+    "group": "low",
+    "name": "UnlockClassLow",
+    "inputs": "class_name*, lock_handle*"
+  },
+  {
+    "group": "low",
+    "name": "CreateClassLow",
+    "inputs": "class_name*, description*, package_name*, transport_request, superclass, final, abstract, create_protected, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateClassLow",
+    "inputs": "class_name*, package_name*, description*, superclass, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckClassLow",
+    "inputs": "class_name*, version, source_code, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateClassLow",
+    "inputs": "class_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "LockClassTestClassesLow",
+    "inputs": "class_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockClassTestClassesLow",
+    "inputs": "class_name*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateClassTestClassesLow",
+    "inputs": "class_name*, test_class_source*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateClassTestClassesLow",
+    "inputs": "class_name*, test_class_name, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "RunClassUnitTestsLow",
+    "inputs": "tests*, title, context, scope, risk_level, duration, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "GetClassUnitTestStatusLow",
+    "inputs": "run_id*, with_long_polling, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "GetClassUnitTestResultLow",
+    "inputs": "run_id*, with_navigation_uris, format, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateProgramLow",
+    "inputs": "program_name*, source_code*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckProgramLow",
+    "inputs": "program_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteProgramLow",
+    "inputs": "program_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockProgramLow",
+    "inputs": "program_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockProgramLow",
+    "inputs": "program_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateProgramLow",
+    "inputs": "program_name*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateProgramLow",
+    "inputs": "program_name*, description*, package_name*, transport_request, program_type, application, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateProgramLow",
+    "inputs": "program_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateInterfaceLow",
+    "inputs": "interface_name*, source_code*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckInterfaceLow",
+    "inputs": "interface_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteInterfaceLow",
+    "inputs": "interface_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockInterfaceLow",
+    "inputs": "interface_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockInterfaceLow",
+    "inputs": "interface_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateInterfaceLow",
+    "inputs": "interface_name*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateInterfaceLow",
+    "inputs": "interface_name*, description*, package_name*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateInterfaceLow",
+    "inputs": "interface_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckFunctionGroupLow",
+    "inputs": "function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteFunctionGroupLow",
+    "inputs": "function_group_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "DeleteFunctionModuleLow",
+    "inputs": "function_module_name*, function_group_name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockFunctionGroupLow",
+    "inputs": "function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "LockFunctionModuleLow",
+    "inputs": "function_module_name*, function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockFunctionGroupLow",
+    "inputs": "function_group_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockFunctionModuleLow",
+    "inputs": "function_module_name*, function_group_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateFunctionGroupLow",
+    "inputs": "function_group_name*, package_name, description, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateFunctionGroupLow",
+    "inputs": "function_group_name*, description*, package_name*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateFunctionModuleLow",
+    "inputs": "function_module_name*, function_group_name*, description*, package_name*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateFunctionModuleLow",
+    "inputs": "function_module_name*, function_group_name*, source_code*, transport_request, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateFunctionModuleLow",
+    "inputs": "function_group_name*, function_module_name*, description, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckFunctionModuleLow",
+    "inputs": "function_group_name*, function_module_name*, version, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateFunctionModuleLow",
+    "inputs": "function_module_name*, function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateFunctionGroupLow",
+    "inputs": "function_group_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckBdefLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteBehaviorDefinitionLow",
+    "inputs": "name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockBehaviorDefinitionLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockBehaviorDefinitionLow",
+    "inputs": "name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateBehaviorDefinitionLow",
+    "inputs": "name*, root_entity*, implementation_type*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateBehaviorDefinitionLow",
+    "inputs": "name*, description*, package_name*, transport_request, root_entity*, implementation_type*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateBehaviorDefinitionLow",
+    "inputs": "name*, source_code*, lock_handle*, transport_request, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateBehaviorDefinitionLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateBehaviorImplementationLow",
+    "inputs": "class_name*, behavior_definition*, package_name*, description*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateBehaviorImplementationLow",
+    "inputs": "class_name*, behavior_definition*, description*, package_name*, transport_request, implementation_code, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "LockBehaviorImplementationLow",
+    "inputs": "class_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CheckMetadataExtensionLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "DeleteMetadataExtensionLow",
+    "inputs": "name*, transport_request"
+  },
+  {
+    "group": "low",
+    "name": "LockMetadataExtensionLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UnlockMetadataExtensionLow",
+    "inputs": "name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ValidateMetadataExtensionLow",
+    "inputs": "name*, description*, package_name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "CreateMetadataExtensionLow",
+    "inputs": "name*, description*, package_name*, transport_request, master_language, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "UpdateMetadataExtensionLow",
+    "inputs": "name*, source_code*, lock_handle*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateMetadataExtensionLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateServiceDefinitionLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "low",
+    "name": "ActivateServiceBindingLow",
+    "inputs": "name*, session_id, session_state"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerValidate",
+    "inputs": "object_type*, object_name*, package_name, description, behavior_definition, root_entity, implementation_type, service_definition_name, service_binding_version, session_id, session_state"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerActivate",
+    "inputs": "object_type, object_name, object_adt_type, objects, preaudit"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerLock",
+    "inputs": "object_type*, object_name*, super_package, session_id, session_state"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerUnlock",
+    "inputs": "object_type*, object_name*, lock_handle*, session_id*, session_state"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerCheckRun",
+    "inputs": "object_type*, object_name*, version, session_id, session_state"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerUnitTestRun",
+    "inputs": "tests*, title, context, scope, risk_level, duration"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerUnitTestStatus",
+    "inputs": "run_id*, with_long_polling"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerUnitTestResult",
+    "inputs": "run_id*, with_navigation_uris, format"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerCdsUnitTestStatus",
+    "inputs": "run_id*, with_long_polling"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerCdsUnitTestResult",
+    "inputs": "run_id*, with_navigation_uris, format"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerProfileRun",
+    "inputs": "target_type*, class_name, program_name, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerProfileList",
+    "inputs": "(none)"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerProfileView",
+    "inputs": "trace_id_or_uri*, view*, with_system_events, id, with_details, auto_drill_down_threshold"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDumpList",
+    "inputs": "user, top, from, to"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDumpView",
+    "inputs": "dump_id*, view"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerServiceBindingListTypes",
+    "inputs": "response_format"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerServiceBindingValidate",
+    "inputs": "service_binding_name*, service_definition_name*, service_binding_version, package_name, description"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerTransportCreate",
+    "inputs": "transport_type, description*, target_system, owner"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerCreate",
+    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, activate, program_type, application, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, name, root_entity, implementation_type, behavior_definition, cds_view_name, fields, tests"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerGet",
+    "inputs": "object_type*, package_name, class_name, interface_name, program_name, domain_name, data_element_name, table_name, structure_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, run_id, response_format, version"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerUpdate",
+    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, ddl_source, transport_request, activate, description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, name, behavior_definition, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, run_id, binding_variant, desired_publication_state"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerDelete",
+    "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, run_id"
+  },
+  {
+    "group": "system",
+    "name": "GetTypeInfo",
+    "inputs": "type_name*, include_structure_fallback"
+  },
+  {
+    "group": "system",
+    "name": "GetTransaction",
+    "inputs": "transaction_name*"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeCreateProfilerTraceParameters",
+    "inputs": "description*, all_misc_abap_statements, all_procedural_units, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeListProfilerTraceFiles",
+    "inputs": "(none)"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeGetProfilerTraceData",
+    "inputs": "trace_id_or_uri*, view*, with_system_events, id, with_details, auto_drill_down_threshold"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeGetDumpById",
+    "inputs": "dump_id*, view, response_mode"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeRunClass",
+    "inputs": "class_name*, profile, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing, max_trace_attempts, trace_retry_delay_ms, trace_lookup_uris"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeRunProgram",
+    "inputs": "program_name*, profile, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeRunClassWithProfiling",
+    "inputs": "class_name*, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing, max_trace_attempts, trace_retry_delay_ms, trace_lookup_uris"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeRunProgramWithProfiling",
+    "inputs": "program_name*, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeAnalyzeProfilerTrace",
+    "inputs": "trace_id_or_uri*, view, top, with_system_events"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeListFeeds",
+    "inputs": "feed_type, user, max_results, from, to"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeListSystemMessages",
+    "inputs": "user, max_results, from, to"
+  },
+  {
+    "group": "system",
+    "name": "RuntimeGetGatewayErrorLog",
+    "inputs": "error_url, user, max_results, from, to"
+  },
+  {
+    "group": "system",
+    "name": "GetSqlQuery",
+    "inputs": "sql_query*, row_number"
+  },
+  {
+    "group": "system",
+    "name": "GetWhereUsed",
+    "inputs": "object_name*, object_type*, enable_all_types, enable_only_types, disable_types"
+  },
+  {
+    "group": "system",
+    "name": "GetObjectInfo",
+    "inputs": "parent_type*, parent_name*, maxDepth, enrich"
+  },
+  {
+    "group": "system",
+    "name": "GetAbapAST",
+    "inputs": "code*"
+  },
+  {
+    "group": "system",
+    "name": "GetAbapSemanticAnalysis",
+    "inputs": "code*"
+  },
+  {
+    "group": "system",
+    "name": "GetAbapSystemSymbols",
+    "inputs": "code*"
+  },
+  {
+    "group": "system",
+    "name": "GetSession",
+    "inputs": "force_new"
+  },
+  {
+    "group": "system",
+    "name": "GetInactiveObjects",
+    "inputs": "(none)"
+  },
+  {
+    "group": "system",
+    "name": "GetAdtTypes",
+    "inputs": "validate_type"
+  },
+  {
+    "group": "system",
+    "name": "GetObjectStructure",
+    "inputs": "objecttype*, objectname*"
+  },
+  {
+    "group": "system",
+    "name": "GetObjectNodeFromCache",
+    "inputs": "object_type*, object_name*, tech_name*"
+  },
+  {
+    "group": "system",
+    "name": "DescribeByList",
+    "inputs": "objects*"
+  },
+  {
+    "group": "system",
+    "name": "GetVirtualFoldersLow",
+    "inputs": "object_search_pattern, preselection, facet_order, with_versions, ignore_short_descriptions"
+  },
+  {
+    "group": "system",
+    "name": "GetNodeStructureLow",
+    "inputs": "parent_type*, parent_name*, node_id, with_short_descriptions, session_id, session_state"
+  },
+  {
+    "group": "system",
+    "name": "GetObjectStructureLow",
+    "inputs": "object_type*, object_name*, session_id, session_state"
+  },
+  {
+    "group": "system",
+    "name": "GetPackageTree",
+    "inputs": "package_name*, include_subpackages, max_depth, include_descriptions, debug"
+  },
+  {
+    "group": "search",
+    "name": "SearchObject",
+    "inputs": "object_name*, object_type, maxResults"
+  },
+  {
+    "group": "search",
+    "name": "SearchSource",
+    "inputs": "query*, query2, exclude, packages*, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, emit_no_hits, max_objects, concurrency, version, time_budget_ms"
+  },
+  {
+    "group": "search",
+    "name": "GetObjectsList",
+    "inputs": "parent_name*, parent_tech_name*, parent_type*, with_short_descriptions"
+  },
+  {
+    "group": "search",
+    "name": "GetObjectsByType",
+    "inputs": "parent_name*, parent_tech_name*, parent_type*, node_id*, format, with_short_descriptions"
+  }
+]

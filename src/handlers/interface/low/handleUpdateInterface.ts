@@ -2,6 +2,15 @@
  * UpdateInterface Handler - Update ABAP Interface Source Code
  *
  * Uses AdtClient.getInterface().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes in `options`, not `config`.** `IInterfaceConfig` still
+ * declares a `sourceCode` field, so `update({ interfaceName, sourceCode },
+ * ...)` compiles either way — but the shipped `AdtInterface.update()` reads
+ * `options?.sourceCode` only (its own comment: "This used to fall back to
+ * `config.sourceCode` — two channels for one value, where the contract
+ * documents one"). A `.d.ts` comment is not evidence for where a value
+ * lands; the compiled JavaScript is. Verified against `AdtInterface.js`, not
+ * the declaration file.
  */
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -102,8 +111,12 @@ export async function handleUpdateInterface(
       createAdtClient(connection, logger)
         .getInterface(resultsFor(interfaceDocuments))
         .update(
-          { interfaceName, sourceCode: source_code },
-          { lockHandle: lock_handle, analyse: analyseException },
+          { interfaceName },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
         ),
     project(detail, terseWrite),
   );

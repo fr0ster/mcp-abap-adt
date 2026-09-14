@@ -27,7 +27,8 @@ own tests pass and it is committed — not when it is described.
 | 6. The slot table | done | `8c2a040` |
 | 7. `detail` | done | `dfc31ef` |
 | 8. Test helpers | done | `47609aa` |
-| 9 – 29 | not started | |
+| 9. The reference read | done | `39c19b9` |
+| 10 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -1439,7 +1440,7 @@ The template for every read that calls `read` and `readMetadata`. It is also a b
 - Consumes: `answer`, `pair`, `resultsFor`, `analyseException`, `AdtReading`.
 - Produces: the shape Task 11 applies sixteen times.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/handleReadClass.test.ts
@@ -1501,7 +1502,7 @@ describe('handleReadClass', () => {
 
 Corpus exchange names are `<case>--<NN>-<endpoint>`; `ls tests/fixtures/adt/ | sed 's/\.body\..*//' | sort -u` is the index. Never invent a document: if the case you want is absent, say so in the test name.
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 npx jest src/__tests__/unit/handleReadClass.test.ts
@@ -1509,7 +1510,7 @@ npx jest src/__tests__/unit/handleReadClass.test.ts
 
 Expected: FAIL — the handler reads `readResult.readResult.data`, so `source_code` is `null` and both assertions fail.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/handlers/class/readonly/handleReadClass.ts — the body; TOOL_DEFINITION unchanged
@@ -1558,14 +1559,14 @@ export async function handleReadClass(
 
 Two things that repeat in every later task. There is no `if (result?.readResult?.data)` — the presence of a body is not the handler's verdict. And `source.raw`, not `source.value` — the tool promised the document, so the document is what it answers.
 
-- [ ] **Step 4: Run the tests and measure**
+- [x] **Step 4: Run the tests and measure**
 
 ```bash
 npx jest src/__tests__/unit/handleReadClass.test.ts src/__tests__/unit/toolSurface.test.ts
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 
-- [ ] **Step 5: Commit**, putting the measured count in the message
+- [x] **Step 5: Commit**, putting the measured count in the message
 
 ```bash
 git add src/handlers/class/readonly/handleReadClass.ts src/__tests__/unit/handleReadClass.test.ts

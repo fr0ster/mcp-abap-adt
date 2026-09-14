@@ -79,7 +79,7 @@ export function recordAnalyse() {
   const calls: Array<{
     member: string;
     analyse: unknown;
-    hadOptions: boolean;
+    carriedAnalyse: boolean;
     args: unknown[];
   }> = [];
   const client = new Proxy({} as Record<string, unknown>, {
@@ -88,12 +88,15 @@ export function recordAnalyse() {
         get:
           (_t, member: string) =>
           async (...args: unknown[]) => {
-            const hadOptions = args.length > 1;
-            const options = args.at(-1) as { analyse?: unknown } | undefined;
+            const lastArg = args.at(-1);
+            const carriedAnalyse =
+              typeof lastArg === 'object' &&
+              lastArg !== null &&
+              'analyse' in lastArg;
             calls.push({
               member,
-              analyse: hadOptions ? options?.analyse : undefined,
-              hadOptions,
+              analyse: carriedAnalyse ? (lastArg as any).analyse : undefined,
+              carriedAnalyse,
               args,
             });
             return okResponse(reading(undefined, '', 200));
@@ -106,7 +109,7 @@ export function recordAnalyse() {
     get last() {
       const lastCall = calls.at(-1);
       return lastCall
-        ? { analyse: lastCall.analyse, hadOptions: lastCall.hadOptions }
+        ? { analyse: lastCall.analyse, carriedAnalyse: lastCall.carriedAnalyse }
         : undefined;
     },
     countOf: (member: string) =>

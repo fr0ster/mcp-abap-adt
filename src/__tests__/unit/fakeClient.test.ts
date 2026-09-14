@@ -106,33 +106,37 @@ describe('fakeClient helpers', () => {
     });
   });
 
-  it('recordAnalyse reports the analyse the caller passed', async () => {
-    const seen = recordAnalyse();
-    const marker = () => null;
-    await (seen.client as any)
-      .getDomain()
-      .delete({ domainName: 'ZD' }, { analyse: marker });
-    expect(seen.last?.analyse).toBe(marker);
-    expect(seen.last?.hadOptions).toBe(true);
-    expect(seen.countOf('delete')).toBe(1);
-  });
-
-  it('recordAnalyse reports undefined when the caller passed none', async () => {
+  it('records a call with no options as carriedAnalyse: false', async () => {
     const seen = recordAnalyse();
     await (seen.client as any).getDomain().lock({ domainName: 'ZD' });
     expect(seen.last?.analyse).toBeUndefined();
-    expect(seen.last?.hadOptions).toBe(false);
+    expect(seen.last?.carriedAnalyse).toBe(false);
+  });
+
+  it('records a call with empty options as carriedAnalyse: false', async () => {
+    const seen = recordAnalyse();
+    await (seen.client as any).getDomain().lock({ domainName: 'ZD' }, {});
+    expect(seen.last?.analyse).toBeUndefined();
+    expect(seen.last?.carriedAnalyse).toBe(false);
+  });
+
+  it('records a call with { analyse: undefined } as carriedAnalyse: true', async () => {
+    const seen = recordAnalyse();
+    await (seen.client as any)
+      .getDomain()
+      .lock({ domainName: 'ZD' }, { analyse: undefined });
+    expect(seen.last?.analyse).toBeUndefined();
+    expect(seen.last?.carriedAnalyse).toBe(true);
   });
 
   it('distinguishes no options from options with analyse: undefined', async () => {
     const seen = recordAnalyse();
-    const marker = () => null;
 
     // First call: no options object at all
     await (seen.client as any).getDomain().lock({ domainName: 'ZD' });
     const noOptions = seen.calls[0];
     expect(noOptions.analyse).toBeUndefined();
-    expect(noOptions.hadOptions).toBe(false);
+    expect(noOptions.carriedAnalyse).toBe(false);
 
     // Second call: options object with analyse: undefined
     await (seen.client as any)
@@ -140,10 +144,30 @@ describe('fakeClient helpers', () => {
       .lock({ domainName: 'ZD' }, { analyse: undefined });
     const withUndefined = seen.calls[1];
     expect(withUndefined.analyse).toBeUndefined();
-    expect(withUndefined.hadOptions).toBe(true);
+    expect(withUndefined.carriedAnalyse).toBe(true);
 
-    // Both have undefined analyse but different hadOptions
-    expect(noOptions.hadOptions).not.toBe(withUndefined.hadOptions);
+    // Both have undefined analyse but different carriedAnalyse
+    expect(noOptions.carriedAnalyse).not.toBe(withUndefined.carriedAnalyse);
+  });
+
+  it('records options as only argument with analyse correctly', async () => {
+    const seen = recordAnalyse();
+    const marker = () => null;
+    // This mimics the list member pattern: options as the sole argument
+    await (seen.client as any).getTransport().list({ analyse: marker });
+    expect(seen.last?.analyse).toBe(marker);
+    expect(seen.last?.carriedAnalyse).toBe(true);
+  });
+
+  it('records a call with analyse in a multi-argument context', async () => {
+    const seen = recordAnalyse();
+    const marker = () => null;
+    await (seen.client as any)
+      .getDomain()
+      .delete({ domainName: 'ZD' }, { analyse: marker });
+    expect(seen.last?.analyse).toBe(marker);
+    expect(seen.last?.carriedAnalyse).toBe(true);
+    expect(seen.countOf('delete')).toBe(1);
   });
 
   it('recordAnalyse counts multiple calls to the same member', async () => {

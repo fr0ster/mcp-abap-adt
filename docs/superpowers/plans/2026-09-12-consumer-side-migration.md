@@ -2877,7 +2877,54 @@ it.each(profiling)('%s passes the scheduled id to the profiler run', async (_n, 
   // `runWithProfiler` with no id, the wrong id, or a constant passes an
   // order check and fails in production, so the id that came back from
   // `scheduleTrace` is what must arrive.
-  expect(passed).toBe('trace-1');
+  expect(passed).toBe(PROFILER_REQUEST);
+});
+
+it.each(handlers)('%s finds the trace by difference, not by position', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  // The feed already holds an entry, and it is LAST in document order with the
+  // newest `recordedAt`. An implementation that takes the first entry, or the
+  // last, or sorts the strings, picks the wrong one — only the difference
+  // against the snapshot gives the right answer.
+  const existing = { id: 'completed-trace-1', recordedAt: '2026-09-14T10:00:00+02:00' };
+  const produced = { id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' };
+  let listed = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  profiler = {
+    list: async () => okResponse(reading(++listed === 1 ? [existing] : [existing, produced])),
+  };
+
+  const result: any = await (handler as any)(context as any, {
+    ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
+  });
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.profile?.trace_id ?? payload.trace_id).toBe(COMPLETED_TRACE);
+  // Snapshot, then at least one more read. One call means no snapshot.
+  expect(listed).toBeGreaterThan(1);
+});
+
+it.each(handlers)('%s stops after max_trace_attempts and still reports the run', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  let listed = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  profiler = { list: async () => { listed += 1; return okResponse(reading([])); } };
+
+  const result: any = await (handler as any)(context as any, {
+    ...args, max_trace_attempts: 2, trace_retry_delay_ms: 0,
+  });
+  // The snapshot plus two attempts.
+  expect(listed).toBe(3);
+  // A run that worked with no trace written yet is a SUCCESS with no trace id.
+  // SAP writes it asynchronously and it may arrive a week later.
+  expect(result.isError).toBe(false);
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.profile?.trace_id ?? payload.trace_id).toBeUndefined();
 });
 
 it.each(profiling)('%s stops at the first refused step', async (_n, handler, args) => {
@@ -3002,7 +3049,7 @@ Three options, and the third is the one the package itself describes.
 
 | option | what it means |
 |---|---|
-| **find the trace on this side** | `CLIENT_API_REFERENCE.md`: *"To find the one your run produced, note the ids before running and look for a new one."* List the profiler feed before scheduling, run, then poll `IProfiler.list()` until an id appears that was not there. The three parameters keep their meaning and `trace_id` keeps answering. **Recommended**: it is the only option that keeps the contract. |
+| **find the trace on this side** | `CLIENT_API_REFERENCE.md`: *"To find the one your run produced, note the ids before running and look for a new one."* List the profiler feed before scheduling, run, then poll `IProfiler.list()` until an id appears that was not there. `max_trace_attempts` and `trace_retry_delay_ms` keep their meaning and `trace_id` keeps answering. **Recommended**: it is the only option that keeps most of the contract. |
 | **keep them as accepted no-ops** | the surface does not change, which is this work's rule, but the schema then advertises three parameters that do nothing and a field that is always null, and every description has to say so. |
 | **remove them** | honest, and a change to the tool surface that Task 1's ratchet will refuse. Needs the user's decision and a release note. |
 
@@ -3025,9 +3072,25 @@ difference against the snapshot, never by position. And:
 `src/__tests__/helpers/traceHelpers.ts` in adt-clients is the worked example the
 reference points at. Read it before writing the loop.
 
+**`trace_lookup_uris` does not survive even option one, and that needs its own
+answer.** `IProfilerListOptions` is `{ user?: string }` — the whole interface —
+so there is nowhere to put a URI. Two ways out, and the first is preferred:
+
+1. **Admit the parameter changed.** The feed is one endpoint now; listing it is
+   not addressed by URI. Say so in the tool description and treat the parameter
+   as accepted and ignored, with a release note. It is the only one of the four
+   that loses its meaning under this option, which is a much smaller admission
+   than the whole set.
+2. **Issue a raw request per URI**, below `IProfiler`, rebuilding what the old
+   member did. More code, in this repository, for a parameter whose value has
+   not been measured — no corpus case uses a non-default lookup URI.
+
+Whichever is chosen, it is a second decision and belongs in Step 1 beside the
+first, not discovered while implementing.
+
 **Files:**
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
-- Create: `src/__tests__/unit/runtimeProfiling.test.ts`
+- Create: `src/__tests__/unit/runtimeProfiling.test.ts`, and `src/lib/strategies/newTrace.ts` if Step 1 chose the first option
 
 **These two handlers are mocked differently from every other task.** They
 construct `new AdtExecutor(connection, logger)` rather than calling
@@ -3052,11 +3115,25 @@ edits the tool definitions and whether the feed search is written at all.
 // src/__tests__/unit/runtimeProfiling.test.ts
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
+// The answer Step 1 recorded. Written once, here, so the assertions below
+// follow the decision instead of being edited into agreement with whatever
+// was built.
+const OPTION: 'find-the-trace' | 'accepted-no-ops' | 'removed' = 'find-the-trace';
+
 let classExecutor: Record<string, unknown>;
+let profiler: Record<string, unknown>;
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
+  AdtRuntime: jest.fn(() => ({ getProfiler: () => profiler })),
 }));
+
+// Two different ids, deliberately. `scheduleTrace` answers a PROFILER REQUEST
+// id, which `runWithProfiler` consumes; the completed trace gets a different id
+// and appears in the feed later. A test that names both 'trace-1' passes for an
+// implementation that confuses them, which is the easiest mistake here.
+const PROFILER_REQUEST = 'profiler-request-1';
+const COMPLETED_TRACE = 'completed-trace-7';
 
 const handlers = [
   ['RuntimeRunClass', handleRuntimeRunClass, { class_name: 'ZCL_X', profile: true }],
@@ -3067,13 +3144,14 @@ it.each(handlers)('%s passes the scheduled id to the profiler run', async (_n, h
   const order: string[] = [];
   let passed: unknown;
   classExecutor = {
-    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading(PROFILER_REQUEST)); },
     runWithProfiler: async (_target: unknown, options: any) => {
       order.push('run');
       passed = options?.profilerId;
       return okResponse(reading('done'));
     },
   };
+  profiler = { list: async () => okResponse(reading([])) };
   await (handler as any)(context as any, args);
   expect(order).toEqual(['schedule', 'run']);
   // The order alone proves nothing about the join: a handler calling
@@ -3088,6 +3166,7 @@ it.each(handlers)('%s stops at a refused schedule and never runs', async (_n, ha
     scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
     runWithProfiler: run,
   };
+  profiler = { list: async () => okResponse(reading([])) };
   const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
   expect(JSON.parse(result.content[0].text).message).toBe('Trace scheduling refused');
@@ -3106,25 +3185,89 @@ it.each([
     (p: any) => p.trace_id],
 ])('%s answers its trace id where its own schema puts it', async (_n, handler, args, at) => {
   classExecutor = {
-    scheduleTrace: async () => okResponse(reading('trace-1')),
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
     runWithProfiler: async () => okResponse(reading('done')),
   };
+  profiler = { list: async () => okResponse(reading([{ id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' }])) };
   const result: any = await (handler as any)(context as any, args);
   const found = (at as any)(JSON.parse(result.content[0].text));
 
   // Under option one, the id the feed search produced. Under the other two it
   // is absent, and the assertion flips with the decision Step 1 recorded —
   // which is why that decision is a step and not a remark.
-  expect(found).toBe(OPTION === 'find-the-trace' ? 'trace-1' : undefined);
+  expect(found).toBe(OPTION === 'find-the-trace' ? COMPLETED_TRACE : undefined);
 });
 ```
 
 The corpus holds no profiling exchange, so these run on fakes. Say so in the
 file's header rather than implying the behaviour is measured.
 
-- [ ] **Step 3: Run them to verify they fail**, then implement both handlers as `answer(ctx, () => sequence(schedule, run), project)`, and edit the tool definitions only if Step 1 said to.
+- [ ] **Step 3: Run them to verify they fail**
 
-- [ ] **Step 4: Run everything and measure**
+- [ ] **Step 4: Implement**
+
+Under options two and three the handler is a bare sequence:
+
+```typescript
+answer(ctx, () => sequence(
+  () => executor.scheduleTrace(profilerParameters),
+  (profilerId) => executor.runWithProfiler(target, { profilerId: profilerId.value }),
+), project)
+```
+
+**Under option one there is a third phase, and it is the whole point of that
+option.** Snapshot the feed, run, then look for an id that was not there:
+
+```typescript
+// src/lib/strategies/newTrace.ts
+
+/**
+ * The id this run produced, found by difference.
+ *
+ * Not by position: `CLIENT_API_REFERENCE.md` measured a feed whose first
+ * entries were minutes old and whose last were eight days older, so "the first
+ * id in the document" is a trace chosen at random. Not by `recordedAt` as a
+ * string either — `09:00:00Z` sorts below `10:00:00+02:00` while being later —
+ * which is what `compareRecordedAt` is exported for.
+ */
+export async function newTraceAfter(
+  profiler: { list: (o?: { user?: string }) => Promise<IAdtResponse<ITraceEntry[]>> },
+  before: ReadonlySet<string>,
+  options: { attempts: number; delayMs: number; sleep?: (ms: number) => Promise<void> },
+): Promise<string | undefined> {
+  const wait = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+  for (let attempt = 1; attempt <= options.attempts; attempt += 1) {
+    const listed = await profiler.list();
+    if (listed.ok) {
+      const fresh = listed.getResult().value.filter((entry) => !before.has(entry.id));
+      if (fresh.length > 0) {
+        return [...fresh].sort(compareRecordedAt).at(-1)?.id;
+      }
+    }
+    if (attempt < options.attempts) await wait(options.delayMs);
+  }
+  return undefined;   // the run happened; SAP has not written the trace yet
+}
+```
+
+and the handler:
+
+```typescript
+const before = new Set(
+  (await profiler.list()).getResult().value.map((entry) => entry.id),
+);
+// schedule → run through `sequence`, exactly as the other three handlers,
+// then the search. A run that succeeded with no trace yet is still a
+// successful run: the trace id is absent, not an error.
+const traceId = await newTraceAfter(profiler, before, {
+  attempts: max_trace_attempts ?? 5,
+  delayMs: trace_retry_delay_ms ?? 2000,
+});
+```
+
+Edit the tool definitions only if Step 1 said to.
+
+- [ ] **Step 5: Run everything and measure**
 
 ```bash
 npx jest src/__tests__/unit/runtimeProfiling.test.ts src/__tests__/unit/toolSurface.test.ts
@@ -3135,7 +3278,7 @@ If Step 1 chose to remove the parameters, `toolSurface.test.ts` fails by design:
 regenerate the snapshot in the same commit and say in the message that the
 surface changed on the user's instruction.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \

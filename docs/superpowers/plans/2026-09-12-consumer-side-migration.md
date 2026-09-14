@@ -22,7 +22,7 @@ own tests pass and it is committed — not when it is described.
 | 1. Freeze the tool surface | done | `dc48ffa` |
 | 2. `safeFields` | done | `3cc6192` |
 | 3. `answer.ts` — the failure payload | done | `c340a77` |
-| 4. `pair()`, and `sequence()` at five steps | done | `PENDING` |
+| 4. `pair()`, and `sequence()` at five steps | done | `2b4de6f` |
 | 5 – 29 | not started | |
 
 Verify without reading anything above:

@@ -30,6 +30,26 @@ Every task's requirements implicitly include this section.
 - **Do not modify the 29 shared polygon objects** under `ZMCP_SHR_PKG`.
 - **The pre-commit hook runs the full build**, which stays red until Task 17. Commit with `--no-verify` until then, and say so in the message.
 
+## The mapping is the migration guide, and the worklist is the compiler
+
+`node_modules/@mcp-abap-adt/adt-clients/docs/usage/MIGRATION-19.md` says what
+each removed member became. **Read it before any task that replaces one**, and
+prefer it to this plan where the two disagree — several cells here that once
+read "establish in Step 1" were answered there all along, and one of them, the
+profiling workflow, was guessed wrong in this plan for six drafts.
+
+It also carries three facts that outrank anything derived from the type
+declarations alone:
+
+- `update` is a replace **on every type**, not only the six that stopped hiding
+  it. For a class, a program, a DDL source or an interface the whole content is
+  the full source, and always was.
+- 454 input guards were removed, with one exception kept: `packageName` on a
+  create, because an object created without a package cannot be deleted through
+  ADT at all — the deletion check resolves through the package.
+- `activateObjectsGroup` answers the **run id**, not a body, and the wait that
+  used to be inside it is now the caller's `getActivationRun` loop.
+
 ## The worklist is the compiler
 
 `npx tsc --noEmit` reports **589 errors in 259 files** at the plan's baseline. 499 are TS2339 — a handler reading an envelope property (`readResult`, `metadataResult`, `deleteResult`, `validationResponse`, `activateResult`, `createResult`, `updateResult`, `unlockResult`, `checkResult`) off `IAdtSuccess<string>`, which in 19 carries the strategy's value and nothing else.
@@ -2306,7 +2326,10 @@ return answer(
         withLock(
           () => obj.lock({ domainName }),
           (lockHandle) =>
-            obj.updateMetadata({ domainName }, { lockHandle, xmlContent, analyse: analyseException }),
+            obj.updateMetadata(
+              { domainName, document: patched },
+              { lockHandle, analyse: analyseException },
+            ),
           (lockHandle) => obj.unlock({ domainName }, lockHandle),
         ),
       () => obj.check(config, 'inactive', { analyse: analyseCheck }),
@@ -2555,7 +2578,11 @@ it('never acquires a lock, because a held lock is what makes a deletion refuse',
 
 ## Task 22: The four remaining read-modify-write families
 
-`domain` is done and is the worked example. Four families take a whole document on 19 and `update` replaces rather than merges: `dataElement`, `package`, `functionGroup`, `tabletype`. Their update handlers pass a handful of named fields and no document, which under a replace is silent data loss.
+`domain` is done and is the worked example. **Six types** take a whole document on 19, not five: `domain`, `package`, `dataElement`, `tableType`, `functionGroup` and **`transport`**. The migration guide names all six; an earlier draft of this plan missed the transport. Their update handlers pass a handful of named fields and no document, which under a replace is silent data loss.
+
+`functionGroup` carries one more difference the guide names: it used to lock and
+unlock around its own update. That is the handler's job now, which makes it a
+`withLock` around the read-patch-write rather than a bare `sequence`.
 
 **What the corpus backs.** There is a metadata document for `package` (`read-metadata-package--01-packages-zmcpshrpkg`) and for `functionGroup` (`read-metadata-function-group--01-groups-zmcpshrfgrp`), and **none for `dataElement` or `tabletype`**. Do not write a stand-in. Capture the two that are missing first —
 
@@ -2567,7 +2594,7 @@ npx tsx scripts/capture-adt-corpus.ts --env <session> --only read-metadata-data-
 
 **Files:**
 - Create: `src/lib/strategies/{packagePatch,functionGroupPatch,dataElementPatch,tableTypePatch}.ts`
-- Modify: `data_element/{low,high}/handleUpdateDataElement.ts`, `package/low/handleUpdatePackage.ts`, `function/high/handleUpdateFunctionGroup.ts`, `table/high/handleUpdateTable.ts`
+- Modify: `data_element/{low,high}/handleUpdateDataElement.ts`, `package/low/handleUpdatePackage.ts`, `function/high/handleUpdateFunctionGroup.ts`, `table/high/handleUpdateTable.ts`, and the transport update handlers — `grep -rl "getRequest()" src/handlers` names them
 - Test: `src/__tests__/unit/readModifyWrite.test.ts` (exists — extend), one patch test per family
 
 - [ ] **Step 1: Write the failing test**
@@ -2617,14 +2644,17 @@ withLock(
     sequence(
       () => obj.readMetadata({ dataElementName }, { analyse: analyseException }),
       (current) =>
-        obj.updateMetadata({ dataElementName }, {
-          lockHandle,
-          // `current` is an `AdtReading`, and `raw` is the document as it
-          // arrived. Those are the bytes that go back to SAP, which is why the
-          // read is `verbatim` and why nothing re-serialises them on the way.
-          xmlContent: patchDataElementXml(current.raw, properties),
-          analyse: analyseException,
-        }),
+        // The document goes in the CONFIG as `document`, not in the options.
+        // The guide's own example is
+        // `updateMetadata({ domainName, document: edited }, { lockHandle })`.
+        //
+        // `current` is an `AdtReading` and `raw` is the document as it arrived.
+        // Those are the bytes that go back to SAP, which is why the read is
+        // `verbatim` and why nothing re-serialises them on the way.
+        obj.updateMetadata(
+          { dataElementName, document: patchDataElementXml(current.raw, properties) },
+          { lockHandle, analyse: analyseException },
+        ),
     ),
   (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
 )
@@ -2641,7 +2671,8 @@ A `low`-tier update takes the handle as an argument and must not acquire or rele
 
 These have no type error to fix — they have no member to call. Each is a fixed
 chain: run the steps in order, stop at the first failure. The two class
-profiling handlers are **not** here; they poll, and Task 24 is theirs.
+profiling handlers are **not** here; they take the same shape and Task 24 is
+theirs, together with the tool-surface question their dead parameters raise.
 
 **Ask the compiler for this list rather than trusting the table.** An earlier
 draft was written by hand and missed four consumers — `searchObjects` twice, and
@@ -2658,17 +2689,17 @@ and the rest are Tasks 9 to 22's work. What is left is this:
 
 | consumer | the member it calls | what 19 offers instead |
 |---|---|---|
-| `system/readonly/handleGetWhereUsed.ts` | `getWhereUsedList` | `getWhereUsed` |
-| `structure/readonly/handleGetStructuresList.ts` | `getWhereUsedList` | `getWhereUsed` |
-| `function_include/readonly/handleListFunctionModules.ts` | `listFunctionModules` | establish in Step 1 |
-| `function_include/readonly/handleListFunctionGroupIncludes.ts` | `listFunctionGroupIncludes` | establish in Step 1 |
+| `system/readonly/handleGetWhereUsed.ts` | `getWhereUsedList` | `getWhereUsedScope`, `modifyWhereUsedScope` (no request), `getWhereUsed` — **three calls** |
+| `structure/readonly/handleGetStructuresList.ts` | `getWhereUsedList` | the same three |
+| `function_include/readonly/handleListFunctionModules.ts` | `listFunctionModules` | the object's node structure, then the child type's node |
+| `function_include/readonly/handleListFunctionGroupIncludes.ts` | `listFunctionGroupIncludes` | the same two |
 | `search/readonly/handleSearchObject.ts` | `searchObjects` | `search` |
 | `src/lib/search-source/packageResolver.ts` | `searchObjects` | `search` |
 | `src/lib/search-source/packageEnumerator.ts` | `getPackageContentsList` | `walkPackage`, already written |
-| `service_binding/high/handleUpdateServiceBinding.ts` | `updateServiceBinding` | establish in Step 1 |
+| `service_binding/high/handleUpdateServiceBinding.ts` | `updateServiceBinding` | not in the guide's table — establish in Step 1 |
 | `service_binding/high/handleValidateServiceBinding.ts` | `validateServiceBinding` | `validate` |
-| `system/readonly/handleRuntimeRunProgram.ts` | `runWithProfiling` | `scheduleTrace` + `runWithProfiler` |
-| `system/readonly/handleRuntimeRunProgramWithProfiling.ts` | `runWithProfiling` | `scheduleTrace` + `runWithProfiler` |
+| `system/readonly/handleRuntimeRunProgram.ts` | `runWithProfiling` | `scheduleTrace`, then `runWithProfiler(target, { profilerId })` |
+| `system/readonly/handleRuntimeRunProgramWithProfiling.ts` | `runWithProfiling` | the same two |
 
 Eleven consumers, not seven. The four the hand-written table missed would
 otherwise have waited for the final compiler sweep in Task 25, in a task that
@@ -2698,7 +2729,11 @@ done
 git show 57f0645 --stat   # the walk already moved, as the worked example
 ```
 
-`updateServiceBinding` is the one with no obvious successor in the table.
+**The guide answers most of this table**, and Step 1 is now a lookup rather
+than an investigation for everything except the service binding. Read section 7,
+"Sequences are yours", before the changelog.
+
+`updateServiceBinding` is the one member the guide's table does not name.
 `AdtServiceBinding` offers `update`, `classifyServiceBinding`,
 `generateServiceBinding` and `getServiceGroup`, and which of those the old
 composite issued is exactly what this step settles. Do not start that handler
@@ -2812,17 +2847,24 @@ const profiling = [
   ['RuntimeRunProgramWithProfiling', handleRuntimeRunProgramWithProfiling, { program_name: 'ZP' }],
 ] as const;
 
-it.each(profiling)('%s schedules the trace before it runs', async (_n, handler, args) => {
+it.each(profiling)('%s passes the scheduled id to the profiler run', async (_n, handler, args) => {
   const order: string[] = [];
+  let passed: unknown;
   programExecutor = {
     scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
-    runWithProfiler: async () => { order.push('run'); return okResponse(reading({ done: true })); },
+    runWithProfiler: async (_target: unknown, options: any) => {
+      order.push('run');
+      passed = options?.profilerId;
+      return okResponse(reading({ done: true }));
+    },
   };
   await (handler as any)(context as any, args);
   expect(order).toEqual(['schedule', 'run']);
-  // Not empty. An empty order is what a handler that built a real executor
-  // also produces, right before it fails on a connection nobody opened.
-  expect(order.length).toBeGreaterThan(0);
+  // The order alone proves nothing about the join. A handler calling
+  // `runWithProfiler` with no id, the wrong id, or a constant passes an
+  // order check and fails in production, so the id that came back from
+  // `scheduleTrace` is what must arrive.
+  expect(passed).toBe('trace-1');
 });
 
 it.each(profiling)('%s stops at the first refused step', async (_n, handler, args) => {
@@ -2916,313 +2958,140 @@ the table.
 
 ---
 
-## Task 24: `poll()` — the two profiling handlers that are not a sequence
+## Task 24: The two class profiling handlers, and three parameters that now configure nothing
 
-`sequence()` runs a fixed chain and stops at the first failure. That is not what
-`RuntimeRunClass` and `RuntimeRunClassWithProfiling` do: a trace does not exist
-the instant the run ends, so `runWithProfiling` polled for it, and the tool
-surface already promises the parameters of that poll —
+`RuntimeRunClass` and `RuntimeRunClassWithProfiling` take the same shape as the
+two program ones in Task 23: `scheduleTrace`, then
+`runWithProfiler(target, { profilerId })`.
 
-```
-max_trace_attempts    default 5, "max polling attempts to resolve traceId"
-trace_retry_delay_ms  default 2000, "delay in ms between trace polling attempts"
-trace_lookup_uris     the feeds to look in
-```
+**An earlier draft of this task built a `poll()` combinator for them. It was
+wrong, and the package says so in its own words.** `IAdtExecutors.d.ts`:
 
-— and answers the resolved `trace_id`.
+> The three polling options are gone: a run does not wait for a trace, so
+> "where to look", "how many times" and "how long between tries" were asking the
+> caller to configure a search that no longer happens.
 
-**19 split that member rather than deleting it.** `ProgramExecutor` says so in
-its own comment: *"who wants the old member writes `scheduleTrace`, then
-`runWithProfiler` with the id it answered. The composite stays in the contract
-for an implementation that joins them."* So the two calls are certain; **whether
-a poll sits between them is not, and Step 1 is where that is settled.** If
-`scheduleTrace` answers a usable id straight away, `poll()` is unnecessary here
-and the three parameters are a promise the tool should stop making — which is a
-surface change, and therefore the user's call rather than this task's.
+and, on the result:
 
-Either way the parameters stayed in the schema when the member moved. **A schema keeps its promise
-whether or not the implementation does, so Task 1's ratchet will not catch this
-one.** Only a test that counts attempts will.
+> `traceId` is gone because a run cannot promise a trace that may not exist yet,
+> may never exist, and may be read a week later. Reading a trace is
+> `IProfiler.list()` and `read()`, whenever the caller is ready.
 
-The other two profiling handlers, `handleRuntimeRunProgram` and
-`handleRuntimeRunProgramWithProfiling`, declare none of these parameters and are
-static sequences — they are in Task 23.
+So there is no poll, no attempts, no delay, and no `trace_id` to answer. The
+combinator is not written, and `poll` appears nowhere in this plan.
+
+**What that leaves is a tool-surface question, and it is the user's.** These two
+tools declare `max_trace_attempts`, `trace_retry_delay_ms` and
+`trace_lookup_uris`, and answer a `trace_id`. All four now describe a search
+that does not happen.
+
+| option | what it means |
+|---|---|
+| **keep them as accepted no-ops** | the surface does not change, which is this work's rule. The schema then advertises three parameters that do nothing and a field that is always null, and the description has to say so. |
+| **remove them** | honest, and a change to the tool surface that Task 1's ratchet will refuse. It needs the user's decision and a release note, and it is out of scope for this plan without one. |
+
+Ask before implementing. Do not quietly leave the parameters reading as though
+they work.
 
 **Files:**
-- Create: `src/lib/strategies/poll.ts`, `src/__tests__/unit/poll.test.ts`, `src/__tests__/unit/runtimeProfiling.test.ts`
+- Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
+- Create: `src/__tests__/unit/runtimeProfiling.test.ts`
 
 **These two handlers are mocked differently from every other task.** They
 construct `new AdtExecutor(connection, logger)` rather than calling
 `createAdtClient`, so the test mocks `@mcp-abap-adt/adt-clients` and returns a
 stub from `getClassExecutor()`. Mocking `../../lib/clients` here would compile,
 run, and test a real executor.
-- Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`, `src/lib/answer.ts`, `src/__tests__/unit/answerFailure.test.ts`
 
-**Interfaces:**
-- Produces:
-  - `poll<T>(step, { attempts, delayMs, done }): Promise<IAdtResponse<T, IAdtError>>`
-  - `PollExhausted` — thrown when the attempts run out, carrying `attempts` and `delayMs`
-  - `answer()` names a thrown `localKind` instead of always saying `client_threw`
+- [ ] **Step 1: Put the surface question to the user**
 
-- [ ] **Step 1: Write down the endpoint workflow before writing code**
+Show them the table above. Their answer decides whether Step 3 also edits the
+tool definitions, and nothing else in this task depends on it.
 
-```bash
-git log --all --oneline -S"runWithProfiling" -- src/handlers/system | head
-grep -rn "runWithProfiling" -A 30 $(git rev-parse --show-toplevel)/src/handlers/system/readonly/handleRuntimeRunClass.ts
-ls tests/fixtures/adt/ | grep -i "profil\|trace" || echo "no trace fixtures in the corpus"
-```
-
-Write the sequence down — run, then look for the trace in each of
-`trace_lookup_uris` until one answers — and **replace the member names in the
-tests below with the ones you found**: `run` and `getRuntimeTraces` there are
-placeholders for whatever 19 actually exposes, and Step 1 is where that is
-settled. Say plainly in the handler's comment which parts the corpus backs. It does not hold a profiling exchange, so these
-tests are built from fakes and the claim about ADT's timing is unverified.
-
-- [ ] **Step 2: Write the failing tests for `poll`**
-
-```typescript
-// src/__tests__/unit/poll.test.ts
-import { poll, PollExhausted } from '../../lib/strategies/poll';
-
-const ok = <T>(value: T) => ({
-  ok: true as const, getResult: () => ({ value }),
-  getError: () => { throw new Error('not a failure'); },
-});
-const failed = (message: string) => ({
-  ok: false as const,
-  getResult: () => { throw new Error('not a success'); },
-  getError: () => ({ message, origin: 'refusal' as const }),
-});
-
-describe('poll', () => {
-  it('answers as soon as done() is satisfied, without waiting again', async () => {
-    const step = jest.fn(async () => ok('trace-1') as any);
-    const slept: number[] = [];
-    const result = await poll(step, {
-      attempts: 5, delayMs: 2000, done: (v) => v === 'trace-1', sleep: async (ms) => { slept.push(ms); },
-    });
-    expect(result.ok).toBe(true);
-    expect(step).toHaveBeenCalledTimes(1);
-    expect(slept).toEqual([]);
-  });
-
-  it('keeps trying until done(), and waits between attempts', async () => {
-    let n = 0;
-    const slept: number[] = [];
-    const result = await poll(async () => ok(++n === 3 ? 'trace-1' : undefined) as any, {
-      attempts: 5, delayMs: 2000, done: (v) => v !== undefined, sleep: async (ms) => { slept.push(ms); },
-    });
-    expect(result.getResult().value).toBe('trace-1');
-    expect(n).toBe(3);
-    expect(slept).toEqual([2000, 2000]);
-  });
-
-  it('throws PollExhausted when the attempts run out, naming them', async () => {
-    expect.assertions(4);
-    try {
-      await poll(async () => ok(undefined) as any, {
-        attempts: 3, delayMs: 10, done: () => false, sleep: async () => {},
-      });
-    } catch (thrown: any) {
-      expect(thrown).toBeInstanceOf(PollExhausted);
-      expect(thrown.attempts).toBe(3);
-      expect(thrown.delayMs).toBe(10);
-      // Our own give-up, not the server's refusal: no AdtFailureOrigin.
-      expect(thrown.origin).toBeUndefined();
-    }
-  });
-
-  it('hands back a refusal untouched and stops, however many attempts are left', async () => {
-    const step = jest.fn(async () => failed('Run refused') as any);
-    const result = await poll(step, {
-      attempts: 5, delayMs: 10, done: () => true, sleep: async () => {},
-    });
-    expect(result.ok).toBe(false);
-    expect(result.getError().message).toBe('Run refused');
-    expect(step).toHaveBeenCalledTimes(1);
-  });
-});
-```
-
-- [ ] **Step 3: Run them to verify they fail** — `npx jest src/__tests__/unit/poll.test.ts`
-
-- [ ] **Step 4: Implement**
-
-```typescript
-// src/lib/strategies/poll.ts
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
-
-export interface PollOptions<T> {
-  /** How many times to ask. The tool's `max_trace_attempts`. */
-  readonly attempts: number;
-  /** How long to wait between asks. The tool's `trace_retry_delay_ms`. */
-  readonly delayMs: number;
-  /** Whether this answer is the one worth keeping. */
-  readonly done: (value: T) => boolean;
-  /** Injected so a test does not spend the delay. Defaults to a real wait. */
-  readonly sleep?: (ms: number) => Promise<void>;
-}
-
-/**
- * A step asked again until it answers something, or until the attempts run out.
- *
- * NOT a `sequence`. A sequence is a fixed chain of different calls; this is one
- * call repeated, and the tool surface already promises how many times and how
- * far apart. ADT does not have the trace the instant the run ends, which is why
- * `runWithProfiling` polled — 19 removed the member and left the promise.
- *
- * A refusal stops it immediately and is handed back untouched, like every other
- * combinator here: the server has answered, and asking four more times would
- * only repeat a question already refused.
- */
-export async function poll<T>(
-  step: () => Promise<IAdtResponse<T, IAdtError>>,
-  options: PollOptions<T>,
-): Promise<IAdtResponse<T, IAdtError>> {
-  const wait = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
-  for (let attempt = 1; attempt <= options.attempts; attempt += 1) {
-    const answered = await step();
-    if (!answered.ok) return answered;
-    if (options.done(answered.getResult().value)) return answered;
-    if (attempt < options.attempts) await wait(options.delayMs);
-  }
-  throw new PollExhausted(options.attempts, options.delayMs);
-}
-
-/**
- * The attempts ran out.
- *
- * Deliberately a throw rather than an `IAdtResponse` failure, and deliberately
- * without an origin. Nothing was refused — the server answered every time, and
- * the answer simply was not the one being waited for. `connection` and
- * `refusal` are both claims about the server and neither is true of our own
- * decision to stop asking.
- */
-export class PollExhausted extends Error {
-  readonly localKind = 'poll_exhausted';
-  constructor(readonly attempts: number, readonly delayMs: number) {
-    super(`no answer after ${attempts} attempts ${delayMs}ms apart`);
-    this.name = 'PollExhausted';
-  }
-}
-```
-
-- [ ] **Step 5: Let `answer()` name it**
-
-`local()` currently calls every throw `client_threw`, which would report our own give-up as a defect in this process. One line, read structurally like `cleanup`:
-
-```typescript
-// src/lib/answer.ts, in the catch around the call
-const kind = (thrown as { localKind?: unknown } | undefined)?.localKind;
-return local(typeof kind === 'string' ? kind : 'client_threw', ctx, messageOf(thrown), thrown);
-```
-
-Add a case to `answerFailure.test.ts`: a thrown `PollExhausted` renders as `error: 'poll_exhausted'` with no `origin`.
-
-- [ ] **Step 6: Write the failing tests for the two handlers**
+- [ ] **Step 2: Write the failing tests**
 
 ```typescript
 // src/__tests__/unit/runtimeProfiling.test.ts
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
-// `handleRuntimeRunClass` and `handleRuntimeRunClassWithProfiling` build
-// `new AdtExecutor(connection, logger)` themselves — they never call
-// `createAdtClient` — so the mock every other test in this plan uses would
-// leave them talking to a real executor over a connection nobody opened.
 let classExecutor: Record<string, unknown>;
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
 }));
-// The same door as Task 23: these two build `new AdtExecutor(...)` themselves
-// and reach the members through `getClassExecutor()`, so mocking
-// `../../lib/clients` would leave the handler talking to a real executor. Mock
-// `@mcp-abap-adt/adt-clients` and hand back `classExecutor`.
-// Both class handlers, not one. Step 7 migrates handleRuntimeRunClass and
-// handleRuntimeRunClassWithProfiling; a suite that only ever calls the first
-// stays green while the second keeps the old API or a different order.
-const classHandlers = [
+
+const handlers = [
   ['RuntimeRunClass', handleRuntimeRunClass, { class_name: 'ZCL_X', profile: true }],
   ['RuntimeRunClassWithProfiling', handleRuntimeRunClassWithProfiling, { class_name: 'ZCL_X' }],
 ] as const;
 
-it.each(classHandlers)('%s resolves the trace after several attempts', async (_n, handler, base) => {
-  let look = 0;
-  classExecutor = ({
-    run: async () => okResponse(reading({ done: true })),
-    // The trace is not there the instant the run ends. That is the whole
-    // reason these two handlers poll.
-    getRuntimeTraces: async () =>
-      okResponse(reading(++look >= 3 ? { traces: [{ id: 'trace-1' }] } : { traces: [] })),
-  });
-  const result: any = await (handler as any)(context as any, {
-    ...base, max_trace_attempts: 5, trace_retry_delay_ms: 0,
-  });
-  expect(result.isError).toBe(false);
-  expect(JSON.parse(result.content[0].text).trace_id).toBe('trace-1');
-});
-
-it.each(classHandlers)('%s honours max_trace_attempts rather than looking forever', async (_n, handler, base) => {
-  const lookups = jest.fn(async () => okResponse(reading({ traces: [] })));
-  classExecutor = { run: async () => okResponse(reading({ done: true })), getRuntimeTraces: lookups };
-  const result: any = await (handler as any)(context as any, {
-    ...base, max_trace_attempts: 2, trace_retry_delay_ms: 0,
-  });
-  // The parameter is in the schema; this is what makes it true.
-  expect(lookups).toHaveBeenCalledTimes(2);
-  expect(result.isError).toBe(true);
-  expect(JSON.parse(result.content[0].text).error).toBe('poll_exhausted');
-});
-
-it.each(classHandlers)('%s looks in every uri trace_lookup_uris names', async (_n, handler, base) => {
-  const seen: string[] = [];
+it.each(handlers)('%s passes the scheduled id to the profiler run', async (_n, handler, args) => {
+  const order: string[] = [];
+  let passed: unknown;
   classExecutor = {
-    run: async () => okResponse(reading({ done: true })),
-    getRuntimeTraces: async (uri: unknown) => {
-      seen.push(String(uri));
-      return okResponse(reading({ traces: [] }));
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
+    runWithProfiler: async (_target: unknown, options: any) => {
+      order.push('run');
+      passed = options?.profilerId;
+      return okResponse(reading('done'));
     },
   };
-  await (handler as any)(context as any, {
-    ...base, trace_retry_delay_ms: 0,
-    trace_lookup_uris: ['/sap/bc/adt/runtime/traces/abaptraces', '/sap/bc/adt/runtime/traces/other'],
-  });
-  expect(seen).toEqual([
-    '/sap/bc/adt/runtime/traces/abaptraces', '/sap/bc/adt/runtime/traces/other',
-  ]);
+  await (handler as any)(context as any, args);
+  expect(order).toEqual(['schedule', 'run']);
+  // The order alone proves nothing about the join: a handler calling
+  // `runWithProfiler` with no id, the wrong id or a constant passes an order
+  // check and fails in production.
+  expect(passed).toBe('trace-1');
 });
 
-it.each(classHandlers)('%s keeps an intermediate refusal as the strategy built it', async (_n, handler, base) => {
-  classExecutor = { run: async () => refusedResponse('Trace creation refused') };
-  const result: any = await (handler as any)(context as any, base);
-  const payload = JSON.parse(result.content[0].text);
-  expect(payload.message).toBe('Trace creation refused');
-  expect(payload.origin).toBe('refusal');
-  expect(payload.error).toBeUndefined();   // not reworded into a local failure
+it.each(handlers)('%s stops at a refused schedule and never runs', async (_n, handler, args) => {
+  const run = jest.fn();
+  classExecutor = {
+    scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
+    runWithProfiler: run,
+  };
+  const result: any = await (handler as any)(context as any, args);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Trace scheduling refused');
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
+  expect(run).not.toHaveBeenCalled();
+});
+
+it.each(handlers)('%s answers no trace_id, because a run cannot promise one', async (_n, handler, args) => {
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading('trace-1')),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  const result: any = await (handler as any)(context as any, args);
+  // The package removed `traceId` from the result deliberately: the trace may
+  // not exist yet, may never exist, and may be read a week later. Reading one
+  // is `IProfiler.list()` and `read()` when the caller is ready.
+  expect(JSON.parse(result.content[0].text).trace_id).toBeUndefined();
 });
 ```
 
-The corpus holds no profiling exchange, so these run on fakes. Say so in the file's header comment rather than implying the timing is measured.
+The corpus holds no profiling exchange, so these run on fakes. Say so in the
+file's header rather than implying the behaviour is measured.
 
-- [ ] **Step 7: Run them to verify they fail**, then implement both handlers as `answer(ctx, () => sequence(run, () => poll(lookup, {...})), project)`.
+- [ ] **Step 3: Run them to verify they fail**, then implement both handlers as `answer(ctx, () => sequence(schedule, run), project)`, and edit the tool definitions only if Step 1 said to.
 
-- [ ] **Step 8: Run everything and measure**
+- [ ] **Step 4: Run everything and measure**
 
 ```bash
-npx jest src/__tests__/unit/poll.test.ts src/__tests__/unit/runtimeProfiling.test.ts src/__tests__/unit/answerFailure.test.ts
+npx jest src/__tests__/unit/runtimeProfiling.test.ts src/__tests__/unit/toolSurface.test.ts
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 
-- [ ] **Step 9: Commit**
+If Step 1 chose to remove the parameters, `toolSurface.test.ts` fails by design:
+regenerate the snapshot in the same commit and say in the message that the
+surface changed on the user's instruction.
+
+- [ ] **Step 5: Commit**
 
 ```bash
-git add src/lib/strategies/poll.ts src/lib/answer.ts \
-        src/handlers/system/readonly/handleRuntimeRunClass*.ts \
-        src/__tests__/unit/poll.test.ts \
-        src/__tests__/unit/runtimeProfiling.test.ts \
-        src/__tests__/unit/answerFailure.test.ts
-git commit --no-verify -m "feat(system): the profiling handlers poll, because the schema says they do
+git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
+        src/__tests__/unit/runtimeProfiling.test.ts
+git commit --no-verify -m "refactor(system): the class profiling handlers schedule, then run
 
 tsc: <before> → <after>"
 ```

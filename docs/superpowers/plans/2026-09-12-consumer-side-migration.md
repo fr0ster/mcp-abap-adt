@@ -24,7 +24,8 @@ own tests pass and it is committed — not when it is described.
 | 3. `answer.ts` — the failure payload | done | `c340a77` |
 | 4. `pair()`, and `sequence()` at five steps | done | `2b4de6f` |
 | 5. `withLock()` | done | `f19ffea` |
-| 6 – 29 | not started | |
+| 6. The slot table | done | `8c2a040` |
+| 7 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -1037,7 +1038,7 @@ modern (non-legacy) systems. `ourUnitTest = resultsFor(unitTestDocuments, ['run'
 beside `ourUtils` for exactly this reason: a later task imports it instead of re-deriving the
 exception.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/resultSets.test.ts
@@ -1097,7 +1098,7 @@ describe('the slot table', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 npx jest src/__tests__/unit/resultSets.test.ts
@@ -1105,7 +1106,7 @@ npx jest src/__tests__/unit/resultSets.test.ts
 
 Expected: FAIL — cannot find module `resultSets`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/lib/strategies/resultSets.ts
@@ -1190,7 +1191,7 @@ export const ourUtils = {
 export const ourUnitTest = resultsFor(unitTestDocuments, ['run']);
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx jest src/__tests__/unit/resultSets.test.ts
@@ -1198,7 +1199,7 @@ npx jest src/__tests__/unit/resultSets.test.ts
 
 Expected: PASS. If the first test fails it names the slot — add it with the reading its tool promises. Do not widen the test.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/strategies/resultSets.ts src/__tests__/unit/resultSets.test.ts

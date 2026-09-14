@@ -3428,17 +3428,36 @@ it('hands a refused read straight back and stops asking', async () => {
 
 - [ ] **Step 5: Implement**
 
-Under options two and three the handler is a bare sequence:
+Under options two and three there are two calls rather than three — but **not a
+bare `sequence`**, for the same reason option one is not: a sequence answers the
+last step's value and nothing else, so the class name and the profiler id are
+both gone by the time the projection runs. The tools answer `class_name` and
+`profiler_id` today.
 
 ```typescript
-answer(ctx, () => sequence(
-  () => executor.scheduleTrace(profilerParameters),
-  // `sequence` hands the next step the VALUE — it calls
-  // `step(answer.getResult().value)` — so this is already the id string.
-  // `profilerId.value` would read a property a string does not have and pass
-  // `undefined` to the run.
-  (profilerId) => executor.runWithProfiler(target, { profilerId }),
-), project)
+return answer(
+  { tool: 'RuntimeRunClass', detail: detailOf(args) },
+  async () => {
+    // `sequence` hands the next step the VALUE — it calls
+    // `step(answer.getResult().value)` — so `id` is already the string.
+    // `id.value` would read a property a string does not have and pass
+    // `undefined` to the run. And it forgets the id afterwards, which is why
+    // it is captured here.
+    let profilerId = '';
+    const ran = await sequence(
+      () => executor.scheduleTrace(profilerParameters),
+      (id: string) => {
+        profilerId = id;
+        return executor.runWithProfiler(target, { profilerId: id });
+      },
+    );
+    if (!ran.ok) return ran;
+
+    // No trace id under these options: nothing searched for one.
+    return succeededWith({ className, output: ran.getResult().value, profilerId });
+  },
+  project(detailOf(args), terseClassRun),
+);
 ```
 
 **Under option one there is a third phase, and it is the whole point of that
@@ -3556,6 +3575,8 @@ projection too:
 
 ```typescript
 // src/lib/strategies/runProjections.ts
+import type { Terse } from './projections';
+
 
 /**
  * `RuntimeRunClass`: profiler fields nested under `profile`, and `output` at the

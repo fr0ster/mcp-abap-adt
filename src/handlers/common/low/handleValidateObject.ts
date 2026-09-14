@@ -234,6 +234,12 @@ export async function handleValidateObject(
   const objectName = object_name.toUpperCase();
   const detail = detailOf(args);
   const client = createAdtClient(connection, logger);
+  // An empty string collapses to absent, the same as every field the old
+  // handler guarded with `|| undefined` — an empty `package_name` or
+  // `description` reaching the wire is not the same request as the field
+  // being left out, and the old handler never sent the former.
+  const packageName = package_name || undefined;
+  const normalizedDescription = description || undefined;
 
   return answer(
     { tool: 'ValidateObjectLow', detail },
@@ -243,24 +249,26 @@ export async function handleValidateObject(
           return client.getProgram(resultsFor(programDocuments)).validate(
             {
               programName: objectName,
-              packageName: package_name,
-              description,
+              packageName,
+              description: normalizedDescription,
             },
             { analyse: analyseValidation },
           );
         case 'class':
-          return client
-            .getClass(resultsFor(classDocuments))
-            .validate(
-              { className: objectName, packageName: package_name, description },
-              { analyse: analyseValidation },
-            );
+          return client.getClass(resultsFor(classDocuments)).validate(
+            {
+              className: objectName,
+              packageName,
+              description: normalizedDescription,
+            },
+            { analyse: analyseValidation },
+          );
         case 'interface':
           return client.getInterface(resultsFor(interfaceDocuments)).validate(
             {
               interfaceName: objectName,
-              packageName: package_name,
-              description,
+              packageName,
+              description: normalizedDescription,
             },
             { analyse: analyseValidation },
           );
@@ -268,38 +276,45 @@ export async function handleValidateObject(
           return client
             .getFunctionGroup(resultsFor(functionGroupDocuments))
             .validate(
-              { functionGroupName: objectName, description },
+              {
+                functionGroupName: objectName,
+                description: normalizedDescription,
+              },
               { analyse: analyseValidation },
             );
         case 'table':
-          return client
-            .getTable(resultsFor(tableDocuments))
-            .validate(
-              { tableName: objectName, packageName: package_name, description },
-              { analyse: analyseValidation },
-            );
+          return client.getTable(resultsFor(tableDocuments)).validate(
+            {
+              tableName: objectName,
+              packageName,
+              description: normalizedDescription,
+            },
+            { analyse: analyseValidation },
+          );
         case 'structure':
           return client.getStructure(resultsFor(structureDocuments)).validate(
             {
               structureName: objectName,
-              packageName: package_name,
-              description,
+              packageName,
+              description: normalizedDescription,
             },
             { analyse: analyseValidation },
           );
         case 'ddl':
-          return client
-            .getDdl(resultsFor(ddlDocuments))
-            .validate(
-              { ddlName: objectName, packageName: package_name, description },
-              { analyse: analyseValidation },
-            );
+          return client.getDdl(resultsFor(ddlDocuments)).validate(
+            {
+              ddlName: objectName,
+              packageName,
+              description: normalizedDescription,
+            },
+            { analyse: analyseValidation },
+          );
         case 'domain':
           return client.getDomain(resultsFor(domainDocuments)).validate(
             {
               domainName: objectName,
-              packageName: package_name,
-              description,
+              packageName,
+              description: normalizedDescription,
             },
             { analyse: analyseValidation },
           );
@@ -309,8 +324,8 @@ export async function handleValidateObject(
             .validate(
               {
                 dataElementName: objectName,
-                packageName: package_name,
-                description,
+                packageName,
+                description: normalizedDescription,
               },
               { analyse: analyseValidation },
             );
@@ -318,7 +333,7 @@ export async function handleValidateObject(
           return client
             .getPackage(resultsFor(packageDocuments))
             .validate(
-              { packageName: objectName, description },
+              { packageName: objectName, description: normalizedDescription },
               { analyse: analyseValidation },
             );
         case 'behavior_definition':
@@ -327,8 +342,8 @@ export async function handleValidateObject(
             .validate(
               {
                 name: objectName,
-                packageName: package_name,
-                description,
+                packageName,
+                description: normalizedDescription,
                 rootEntity: root_entity,
                 implementationType: normalizedImplementationType,
               },
@@ -344,9 +359,11 @@ export async function handleValidateObject(
             .validate(
               {
                 className: objectName,
-                packageName: package_name as string,
+                packageName: packageName as string,
                 behaviorDefinition: behavior_definition || '',
-                ...(description ? { description } : {}),
+                ...(normalizedDescription
+                  ? { description: normalizedDescription }
+                  : {}),
               },
               { analyse: analyseValidation },
             );
@@ -355,7 +372,11 @@ export async function handleValidateObject(
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .validate(
-              { name: objectName, description, packageName: package_name },
+              {
+                name: objectName,
+                description: normalizedDescription,
+                packageName,
+              },
               { analyse: analyseValidation },
             );
         default:

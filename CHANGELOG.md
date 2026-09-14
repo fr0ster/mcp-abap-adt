@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **`ActivateObjectLow` (multi-object activation) now answers acceptance, not
+  a verdict.** Activating a single object still reads a real pass/fail
+  straight from ADT. Activating more than one object at once — or one object
+  of a type this tool has no dedicated family for — goes through group
+  activation, and ADT's answer there has always meant "the request was
+  accepted and a run was queued," not "activation finished." The tool now
+  says so explicitly: `accepted` (from whether a run id came back), `run_id`,
+  and `activated: null` (there is no verdict on this path — acceptance is
+  not completion). It does not wait for the run. To learn what actually
+  happened, call `GetInactiveObjects` afterwards — an object still listed
+  there did not activate — keeping in mind that a check made immediately
+  after acceptance can still show an object as inactive that goes on to
+  activate a moment later, since the run has not necessarily finished yet.
+
+  Separately, and left open: group activation cannot judge a refusal the way
+  every other write path in this migration now does — `activateObjectsGroup`
+  accepts no error strategy at all, so a refusal ADT embeds in its answer is
+  not caught on this path. Tracked as issue #200 in
+  `@mcp-abap-adt/adt-clients` (giving the member the `<E extends IAdtError>`
+  shape every sibling member already has); not fixed by this change.
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

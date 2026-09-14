@@ -10,7 +10,7 @@ import { handleDeleteObject } from '../../handlers/common/low/handleDeleteObject
 import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import { structured } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
@@ -41,8 +41,13 @@ beforeEach(() => {
 
 /**
  * The document ADT actually sent, judged by the strategy the handler passes.
- * These three cases all answer HTTP 200 with the refusal inside, which is why
- * the handler must not read the status.
+ *
+ * Two of these three cases answer HTTP 200 with the refusal inside — the
+ * masking family this task exists to fix. The third
+ * (`refusal-validation-name-taken-class`) is a genuine HTTP 400; the status
+ * comes from the fixture's own sidecar rather than a literal here, so this
+ * helper drives the real strategy over the real status ADT actually sent,
+ * not a status the test invented.
  */
 const refusalFrom = (
   member: string,
@@ -55,10 +60,18 @@ const refusalFrom = (
 ) =>
   fakeClientOf({
     [member]: async (_config: unknown, options: any) => {
-      const wire = { data: corpusBody(caseName), status: 200 };
+      const status = Number(corpusSidecar(caseName).response.status);
+      const wire = { data: corpusBody(caseName), status };
       expect(options.analyse).toBe(analyse);
       const verdict = options.analyse('adt:no-failure', wire);
-      return refusedResponse((verdict as { message: string }).message);
+      // The strategy's own verdict is the error, not a re-wrap of its
+      // message — passing only `message` would let this test pass even if
+      // the strategy classified the document as something other than a
+      // refusal, as long as it happened to produce a truthy `message`.
+      return refusedResponse(
+        (verdict as { message: string }).message,
+        verdict as any,
+      );
     },
   });
 
@@ -177,6 +190,51 @@ describe('ValidateObjectLow', () => {
     expect(result.isError).toBe(true);
     expect(seen.calls.length).toBe(0);
   });
+
+  it('an empty package_name or description collapses to absent, not to an empty string on the wire', async () => {
+    fakeClient = seen.client;
+    await handleValidateObject(context as any, {
+      object_type: 'class',
+      object_name: 'zcl_x',
+      package_name: '',
+      description: '',
+    });
+    const call = seen.calls.filter((c) => c.member === 'validate').at(-1);
+    expect(call?.args[0]).toEqual({
+      className: 'ZCL_X',
+      packageName: undefined,
+      description: undefined,
+    });
+  });
+
+  // behavior_definition and metadata_extension address the object with the
+  // same config key (`name`) and, after `resultsFor`, read through
+  // structurally identical readings — no reading and no projection can tell
+  // the two apart, so only the factory name proves which one ran.
+  it("behavior_definition and metadata_extension reach their own factory, not each other's", async () => {
+    fakeClient = seen.client;
+    await handleValidateObject(context as any, {
+      object_type: 'behavior_definition',
+      object_name: 'zbd',
+      package_name: 'zp',
+      description: 'x',
+      root_entity: 'e',
+      implementation_type: 'Managed',
+    });
+    expect(
+      seen.calls.filter((c) => c.member === 'validate').at(-1)?.factory,
+    ).toBe('getBehaviorDefinition');
+
+    await handleValidateObject(context as any, {
+      object_type: 'metadata_extension',
+      object_name: 'zmd',
+      package_name: 'zp',
+      description: 'x',
+    });
+    expect(
+      seen.calls.filter((c) => c.member === 'validate').at(-1)?.factory,
+    ).toBe('getMetadataExtension');
+  });
 });
 
 describe('DeleteObjectLow', () => {
@@ -236,6 +294,25 @@ describe('DeleteObjectLow', () => {
       transportRequest: undefined,
     });
   });
+
+  it('behavior_definition and metadata_extension reach their own factory', async () => {
+    fakeClient = seen.client;
+    await handleDeleteObject(context as any, {
+      object_type: 'behavior_definition',
+      object_name: 'zbd',
+    });
+    expect(
+      seen.calls.filter((c) => c.member === 'delete').at(-1)?.factory,
+    ).toBe('getBehaviorDefinition');
+
+    await handleDeleteObject(context as any, {
+      object_type: 'metadata_extension',
+      object_name: 'zmd',
+    });
+    expect(
+      seen.calls.filter((c) => c.member === 'delete').at(-1)?.factory,
+    ).toBe('getMetadataExtension');
+  });
 });
 
 describe('CheckObjectLow', () => {
@@ -270,6 +347,50 @@ describe('CheckObjectLow', () => {
     expect(call?.analyse).toBe(analyseCheck);
     expect(call?.args[0]).toEqual({ className: 'ZCL_X' });
     expect(call?.args[1]).toBe('inactive');
+  });
+
+  // Pinned, not merely asserted in passing: this is the one place this
+  // migration knowingly changed CheckObject's default behaviour rather than
+  // preserved it. `checkFunctionGroup`/behavior_definition's `check()` in
+  // adt-clients 18 mapped an absent status to `inactive`; this handler never
+  // forwarded a version for these two branches at all (0577d89e), so a
+  // caller who omitted `version` — the ordinary case, right after editing
+  // and saving — was checked against the version they just wrote. This
+  // handler's default is `'active'` (the schema's documented default, and
+  // what the other nine branches already do), so that same omitted-version
+  // call now checks the ACTIVE version, which for a freshly-created,
+  // not-yet-activated object may not exist yet. Kept deliberately (see the
+  // task report), but it must stay pinned here rather than merely declared.
+  it.each([
+    'function_group',
+    'behavior_definition',
+  ] as const)("defaults %s's check to the active version when the caller omits it", async (objectType) => {
+    fakeClient = seen.client;
+    await handleCheckObject(context as any, {
+      object_type: objectType,
+      object_name: 'zx',
+    });
+    const call = seen.calls.filter((c) => c.member === 'check').at(-1);
+    expect(call?.args[1]).toBe('active');
+  });
+
+  it('behavior_definition and metadata_extension reach their own factory', async () => {
+    fakeClient = seen.client;
+    await handleCheckObject(context as any, {
+      object_type: 'behavior_definition',
+      object_name: 'zbd',
+    });
+    expect(seen.calls.filter((c) => c.member === 'check').at(-1)?.factory).toBe(
+      'getBehaviorDefinition',
+    );
+
+    await handleCheckObject(context as any, {
+      object_type: 'metadata_extension',
+      object_name: 'zmd',
+    });
+    expect(seen.calls.filter((c) => c.member === 'check').at(-1)?.factory).toBe(
+      'getMetadataExtension',
+    );
   });
 });
 
@@ -327,6 +448,55 @@ describe('ActivateObjectLow', () => {
     expect(seen.calls).toHaveLength(1);
     expect(seen.calls[0].member).toBe('activateObjectsGroup');
   });
+
+  it('the group fallback reads acceptance from the run id, not a hardcoded true', async () => {
+    fakeClient = fakeClientOf({
+      activateObjectsGroup: async () => okResponse('E19-ACT-RUN-1'),
+    });
+    const result: any = await handleActivateObject(context as any, {
+      objects: [
+        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zcl_x', type: 'CLAS/OC' },
+      ],
+    });
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.accepted).toBe(true);
+    expect(payload.run_id).toBe('E19-ACT-RUN-1');
+    // No verdict — acceptance is not completion. Explicitly null, not
+    // omitted, and not `true`.
+    expect(payload.activated).toBeNull();
+  });
+
+  it('an empty run id reads as not accepted, not as a silent success', async () => {
+    fakeClient = fakeClientOf({
+      activateObjectsGroup: async () => okResponse(''),
+    });
+    const result: any = await handleActivateObject(context as any, {
+      objects: [
+        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zcl_x', type: 'CLAS/OC' },
+      ],
+    });
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.accepted).toBe(false);
+    expect(payload.run_id).toBeNull();
+    expect(payload.activated).toBeNull();
+  });
+
+  it('behavior_definition and metadata_extension reach their own factory', async () => {
+    fakeClient = seen.client;
+    await handleActivateObject(context as any, {
+      objects: [{ name: 'zbd', type: 'behavior_definition' }],
+    });
+    expect(seen.calls.at(-1)?.factory).toBe('getBehaviorDefinition');
+
+    await handleActivateObject(context as any, {
+      objects: [{ name: 'zmd', type: 'metadata_extension' }],
+    });
+    expect(seen.calls.at(-1)?.factory).toBe('getMetadataExtension');
+  });
 });
 
 describe('LockObjectLow', () => {
@@ -377,6 +547,25 @@ describe('LockObjectLow', () => {
       superPackage: 'ZSUPER',
     });
   });
+
+  it('behavior_definition and metadata_extension reach their own factory', async () => {
+    fakeClient = seen.client;
+    await handleLockObject(context as any, {
+      object_type: 'behavior_definition',
+      object_name: 'zbd',
+    });
+    expect(seen.calls.filter((c) => c.member === 'lock').at(-1)?.factory).toBe(
+      'getBehaviorDefinition',
+    );
+
+    await handleLockObject(context as any, {
+      object_type: 'metadata_extension',
+      object_name: 'zmd',
+    });
+    expect(seen.calls.filter((c) => c.member === 'lock').at(-1)?.factory).toBe(
+      'getMetadataExtension',
+    );
+  });
 });
 
 describe('UnlockObjectLow', () => {
@@ -406,5 +595,28 @@ describe('UnlockObjectLow', () => {
     expect(call?.carriedAnalyse).toBe(false);
     expect(call?.analyse).toBeUndefined();
     expect(call?.args).toEqual([{ className: 'ZCL_X' }, 'h']);
+  });
+
+  it('behavior_definition and metadata_extension reach their own factory', async () => {
+    fakeClient = seen.client;
+    await handleUnlockObject(context as any, {
+      object_type: 'behavior_definition',
+      object_name: 'zbd',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    expect(
+      seen.calls.filter((c) => c.member === 'unlock').at(-1)?.factory,
+    ).toBe('getBehaviorDefinition');
+
+    await handleUnlockObject(context as any, {
+      object_type: 'metadata_extension',
+      object_name: 'zmd',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    expect(
+      seen.calls.filter((c) => c.member === 'unlock').at(-1)?.factory,
+    ).toBe('getMetadataExtension');
   });
 });

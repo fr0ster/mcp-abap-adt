@@ -36,16 +36,27 @@
  *      `service_binding`/`service_definition`/other families this generic
  *      tool has never dispatched).
  *
- * On that fallback path the masking is real and **not fixed here** — surfaced
- * here, in the PR description and in the release notes, per issue #200. A
- * second, independent change since 18.x compounds it: `activateObjectsGroup`
- * now only starts an asynchronous run and answers the run id (`/activation/
- * runs`, 19.0.0's three-step flow — see `AdtUtils.activateObjectsGroup`'s own
- * doc comment) rather than the synchronous activation result the 18.x
- * wrapper polled for internally. This handler does not implement that
- * poll-and-fetch loop — `getActivationRun`/`getActivationResults` are not
- * exposed as tools — so the fallback path answers "a run was started",
- * never a verdict, whether or not SAP actually activated anything.
+ * **What that fallback path answers, and why a run id is not a lesser
+ * answer.** ADT is asynchronous here, and always has been: `POST
+ * /activation/runs` answering means the request was accepted — the object
+ * references were valid and a run was queued — not that activation
+ * finished. Waiting inside one call for a `finished`/`error` status was the
+ * 18.x wrapper's own invention (an internal poll loop); ADT never promised
+ * it, so this is not a capability this migration lost. The fallback answers
+ * what the protocol actually said: accepted or not, by whether a run id
+ * came back, and it points a caller at `GetInactiveObjects` — the tool this
+ * server already exposes for exactly this question — rather than inventing
+ * a verdict this call does not have. An object still listed there after the
+ * run is one that did not activate.
+ *
+ * What genuinely IS a gap, and stays one on this path: `activateObjectsGroup`
+ * cannot judge a refusal the way every per-object `activate()` above does.
+ * It takes no `options` parameter at all, so there is nowhere to inject
+ * `analyse`, and a refusal ADT embeds in this path's answer is not read as a
+ * failure — the same masking family this repository has already fixed
+ * twice, left open here. That is issue #200 in `@mcp-abap-adt/adt-clients`,
+ * surfaced here, in the PR description and in the release notes — not fixed
+ * by this migration.
  */
 
 import {
@@ -66,7 +77,7 @@ import type { IObjectReference } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -102,7 +113,13 @@ export const TOOL_DEFINITION = {
         description:
           'Request pre-audit before activation. Default: true. Honored only when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family) — the per-object activate() this tool prefers for a single object has no preaudit parameter at all.',
       },
-      ...DETAIL_PROPERTY,
+      detail: {
+        type: 'string',
+        enum: ['terse', 'full', 'raw'],
+        default: 'terse',
+        description:
+          'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.',
+      },
     },
     required: ['objects'],
   },
@@ -266,28 +283,47 @@ export async function handleActivateObject(
   }
 
   // Fallback: multiple objects, or a single object of a type this dispatcher
-  // does not map to a family client. See the module doc comment — this path
-  // keeps the masking issue #200 describes, and answers a run id rather than
-  // an activation verdict (adt-clients 19's `activateObjectsGroup` only
-  // starts the run).
+  // does not map to a family client. See the module doc comment: ADT's
+  // answer here is acceptance, not completion, and this path is honest about
+  // that rather than inventing a verdict it does not have.
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
     () =>
       client
         .getUtils(ourUtils)
         .activateObjectsGroup(activationObjects, preaudit),
-    (runId: string) => ({
-      started: true,
-      run_id: runId || null,
-      objects_count: activationObjects.length,
-      objects: activationObjects,
-      message:
-        `Activation run started for ${activationObjects.length} object(s). ` +
-        'This path answers a run id, not an activation verdict — adt-clients 19 ' +
-        'made group activation asynchronous, and a refusal embedded in a 200 is ' +
-        'not caught here (activateObjectsGroup takes no analyse strategy; see ' +
-        'issue #200). Prefer calling this tool one object at a time when the ' +
-        "object's type is supported, which reads the real verdict.",
-    }),
+    (runId: string) => {
+      // A run id is the only evidence this path has that anything was
+      // accepted — `activationRunId` answers `''` when no `Location` header
+      // carried one (see its own doc comment in adt-clients). `accepted`
+      // must say so rather than being hardcoded true: a caller scanning
+      // field names, not the prose, would otherwise read this as success in
+      // the one case where the reading found no evidence of acceptance.
+      const accepted = runId !== '';
+      return {
+        accepted,
+        run_id: accepted ? runId : null,
+        // Explicitly null, not omitted: this call never carries a verdict —
+        // acceptance is not completion — and a missing field reads
+        // differently from a field that says so.
+        activated: null,
+        objects_count: activationObjects.length,
+        objects: activationObjects,
+        message: accepted
+          ? `Activation run ${runId} accepted for ${activationObjects.length} object(s). ` +
+            'ADT confirms acceptance here, not completion — call GetInactiveObjects ' +
+            'afterwards; an object still listed there did not activate. Right after ' +
+            'acceptance the run may still be in progress, so an immediate check can ' +
+            'still show an object as inactive that goes on to activate a moment ' +
+            'later. Separately, a refusal embedded in this accept response is not ' +
+            'read as a failure on this path (activateObjectsGroup takes no analyse ' +
+            'strategy; see issue #200).'
+          : `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
+            'object(s) — no run id came back, so this handler has no evidence a run ' +
+            'was queued at all. Prefer calling this tool one object at a time when ' +
+            "the type is supported, which reads a real verdict from the object's " +
+            'own activate().',
+      };
+    },
   );
 }

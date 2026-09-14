@@ -96,16 +96,27 @@ export function throwingClient(message: string) {
  *
  * What goes wrong at the scale of a hundred handlers is a handler taking the
  * wrong strategy, and that is visible from the call rather than from the answer.
+ *
+ * **`factory` is captured too, unlike `fakeClientOf`'s outer proxy.** Two
+ * families can share an identical result-set shape — same slot names, so
+ * `resultsFor` hands both the same reading functions — while addressing the
+ * object with the same config key (`name`). Swapping which family's factory
+ * gets called is then invisible to every reading and every projection; only
+ * the factory name itself proves which one ran. `getX` is captured as asked
+ * for, not resolved against the client's real method names, so a call
+ * through a factory this double was never told about still shows up as
+ * whatever string the handler used.
  */
 export function recordAnalyse() {
   const calls: Array<{
     member: string;
+    factory: string;
     analyse: unknown;
     carriedAnalyse: boolean;
     args: unknown[];
   }> = [];
   const client = new Proxy({} as Record<string, unknown>, {
-    get: () => () =>
+    get: (_target, factory: string) => () =>
       new Proxy({} as Members, {
         get:
           (_t, member: string) =>
@@ -117,6 +128,7 @@ export function recordAnalyse() {
               'analyse' in lastArg;
             calls.push({
               member,
+              factory,
               analyse: carriedAnalyse ? (lastArg as any).analyse : undefined,
               carriedAnalyse,
               args,
@@ -131,7 +143,11 @@ export function recordAnalyse() {
     get last() {
       const lastCall = calls.at(-1);
       return lastCall
-        ? { analyse: lastCall.analyse, carriedAnalyse: lastCall.carriedAnalyse }
+        ? {
+            analyse: lastCall.analyse,
+            carriedAnalyse: lastCall.carriedAnalyse,
+            factory: lastCall.factory,
+          }
         : undefined;
     },
     countOf: (member: string) =>

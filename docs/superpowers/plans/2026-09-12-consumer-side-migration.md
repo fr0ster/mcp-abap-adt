@@ -25,7 +25,8 @@ own tests pass and it is committed — not when it is described.
 | 4. `pair()`, and `sequence()` at five steps | done | `2b4de6f` |
 | 5. `withLock()` | done | `f19ffea` |
 | 6. The slot table | done | `8c2a040` |
-| 7 – 29 | not started | |
+| 7. `detail` | done | `dfc31ef` |
+| 8 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -1216,7 +1217,7 @@ git commit --no-verify -m "feat(strategies): one reading per slot, stamped over 
 **Interfaces:**
 - Produces: `DETAIL_PROPERTY` (the schema fragment), `detailOf(args): AnswerDetail`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/detail.test.ts
@@ -1246,9 +1247,9 @@ describe('detailOf', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails** — `npx jest src/__tests__/unit/detail.test.ts`
+- [x] **Step 2: Run it to verify it fails** — `npx jest src/__tests__/unit/detail.test.ts`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/lib/strategies/detail.ts
@@ -1284,9 +1285,9 @@ export function detailOf(args: unknown): AnswerDetail {
 }
 ```
 
-- [ ] **Step 4: Run the tests** — `npx jest src/__tests__/unit/detail.test.ts`. Expected: PASS.
+- [x] **Step 4: Run the tests** — `npx jest src/__tests__/unit/detail.test.ts`. Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/strategies/detail.ts src/__tests__/unit/detail.test.ts

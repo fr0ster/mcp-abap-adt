@@ -49,7 +49,12 @@ import { handleReadServiceDefinition } from '../../handlers/service_definition/r
 import { handleReadStructure } from '../../handlers/structure/readonly/handleReadStructure';
 import { handleReadTable } from '../../handlers/table/readonly/handleReadTable';
 import { corpusBody } from '../../lib/adtCorpus';
-import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import {
+  fakeClientOf,
+  okResponse,
+  reading,
+  recordAnalyse,
+} from '../helpers/fakeClient';
 
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -62,7 +67,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadTable',
       handler: handleReadTable,
       args: { table_name: 'zt' },
-      identity: { field: 'table_name', expected: 'ZT' },
+      identity: { table_name: 'ZT' },
       source: 'TABLE SOURCE MARKER',
       metadata: corpusBody(
         'read-table-metadata-structure--01-tables-zmcpshrrtabl',
@@ -72,7 +77,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadStructure',
       handler: handleReadStructure,
       args: { structure_name: 'zs' },
-      identity: { field: 'structure_name', expected: 'ZS' },
+      identity: { structure_name: 'ZS' },
       source: 'STRUCTURE SOURCE MARKER',
       metadata: corpusBody(
         'read-metadata-structure--01-structures-zmcpshrstru',
@@ -82,7 +87,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadServiceDefinition',
       handler: handleReadServiceDefinition,
       args: { service_definition_name: 'zsd' },
-      identity: { field: 'service_definition_name', expected: 'ZSD' },
+      identity: { service_definition_name: 'ZSD' },
       source: 'SERVICE DEFINITION SOURCE MARKER',
       metadata: corpusBody(
         'read-metadata-service-definition--01-sources-zmcpshrsrvd01',
@@ -92,7 +97,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadServiceBinding',
       handler: handleReadServiceBinding,
       args: { service_binding_name: 'zsb' },
-      identity: { field: 'service_binding_name', expected: 'ZSB' },
+      identity: { service_binding_name: 'ZSB' },
       source: 'SERVICE BINDING SOURCE MARKER (no fixture)',
       metadata: 'SERVICE BINDING METADATA MARKER (no fixture)',
     },
@@ -100,7 +105,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadProgram',
       handler: handleReadProgram,
       args: { program_name: 'zp' },
-      identity: { field: 'program_name', expected: 'ZP' },
+      identity: { program_name: 'ZP' },
       source: 'PROGRAM SOURCE MARKER (no fixture)',
       // ReadProgram rejects anything that is not PROG/P, so the metadata
       // marker must carry that adtcore:type for the success path to be
@@ -111,7 +116,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadMetadataExtension',
       handler: handleReadMetadataExtension,
       args: { metadata_extension_name: 'zme' },
-      identity: { field: 'metadata_extension_name', expected: 'ZME' },
+      identity: { metadata_extension_name: 'ZME' },
       source: 'METADATA EXTENSION SOURCE MARKER (no fixture)',
       metadata: 'METADATA EXTENSION METADATA MARKER (no fixture)',
     },
@@ -119,7 +124,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadInterface',
       handler: handleReadInterface,
       args: { interface_name: 'zif' },
-      identity: { field: 'interface_name', expected: 'ZIF' },
+      identity: { interface_name: 'ZIF' },
       source: 'INTERFACE SOURCE MARKER (no fixture)',
       metadata: 'INTERFACE METADATA MARKER (no fixture)',
     },
@@ -127,7 +132,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadFunctionInclude',
       handler: handleReadFunctionInclude,
       args: { function_group_name: 'zfg', include_name: 'zinc' },
-      identity: { field: 'include_name', expected: 'ZINC' },
+      identity: { include_name: 'ZINC', function_group_name: 'ZFG' },
       source: 'FUNCTION INCLUDE SOURCE MARKER (no fixture)',
       metadata: 'FUNCTION INCLUDE METADATA MARKER (no fixture)',
     },
@@ -135,7 +140,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadDdl',
       handler: handleReadDdl,
       args: { ddl_name: 'zddl' },
-      identity: { field: 'ddl_name', expected: 'ZDDL' },
+      identity: { ddl_name: 'ZDDL' },
       source: 'DDL SOURCE MARKER',
       metadata: corpusBody('read-metadata-ddl--01-sources-zmcpshriroot'),
     },
@@ -143,7 +148,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadBehaviorImplementation',
       handler: handleReadBehaviorImplementation,
       args: { behavior_implementation_name: 'zbi' },
-      identity: { field: 'behavior_implementation_name', expected: 'ZBI' },
+      identity: { behavior_implementation_name: 'ZBI' },
       source: 'BEHAVIOR IMPLEMENTATION SOURCE MARKER (no fixture)',
       metadata: 'BEHAVIOR IMPLEMENTATION METADATA MARKER (no fixture)',
     },
@@ -151,7 +156,7 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadBehaviorDefinition',
       handler: handleReadBehaviorDefinition,
       args: { behavior_definition_name: 'zbd' },
-      identity: { field: 'behavior_definition_name', expected: 'ZBD' },
+      identity: { behavior_definition_name: 'ZBD' },
       source: 'BEHAVIOR DEFINITION SOURCE MARKER',
       metadata: corpusBody(
         'read-metadata-behavior-definition--01-behaviordefinitions-zmcpshriroot',
@@ -175,7 +180,9 @@ describe('readonly handlers map a success into the right fields, not swapped', (
     const payload = JSON.parse(result.content[0].text);
     expect(payload.source_code).toBe(source);
     expect(payload.metadata).toBe(metadata);
-    expect(payload[identity.field]).toBe(identity.expected);
+    for (const [field, expected] of Object.entries(identity)) {
+      expect(payload[field]).toBe(expected);
+    }
   });
 
   // Domain, DataElement, Package and FunctionGroup have no source resource
@@ -188,28 +195,28 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       name: 'ReadDomain',
       handler: handleReadDomain,
       args: { domain_name: 'zd' },
-      identity: { field: 'domain_name', expected: 'ZD' },
+      identity: { domain_name: 'ZD' },
       metadata: 'DOMAIN METADATA MARKER (no fixture)',
     },
     {
       name: 'ReadDataElement',
       handler: handleReadDataElement,
       args: { data_element_name: 'zde' },
-      identity: { field: 'data_element_name', expected: 'ZDE' },
+      identity: { data_element_name: 'ZDE' },
       metadata: 'DATA ELEMENT METADATA MARKER (no fixture)',
     },
     {
       name: 'ReadPackage',
       handler: handleReadPackage,
       args: { package_name: 'zpkg' },
-      identity: { field: 'package_name', expected: 'ZPKG' },
+      identity: { package_name: 'ZPKG' },
       metadata: corpusBody('read-metadata-package--01-packages-zmcpshrpkg'),
     },
     {
       name: 'ReadFunctionGroup',
       handler: handleReadFunctionGroup,
       args: { function_group_name: 'zfg' },
-      identity: { field: 'function_group_name', expected: 'ZFG' },
+      identity: { function_group_name: 'ZFG' },
       metadata: corpusBody(
         'read-metadata-function-group--01-groups-zmcpshrfgrp',
       ),
@@ -230,7 +237,31 @@ describe('readonly handlers map a success into the right fields, not swapped', (
     const payload = JSON.parse(result.content[0].text);
     expect(payload.source_code).toBe(metadata);
     expect(payload.metadata).toBe(metadata);
-    expect(payload[identity.field]).toBe(identity.expected);
+    for (const [field, expected] of Object.entries(identity)) {
+      expect(payload[field]).toBe(expected);
+    }
+  });
+
+  // ReadPackage is the one handler in the single-readMetadata-call group
+  // where `version` is not inert: AdtPackage forwards it into the query
+  // string the same way `read`'s positional argument used to (Domain,
+  // DataElement and FunctionGroup ignore it at every level, so their
+  // `version` stays an echo only). `recordAnalyse` inspects the actual call
+  // arguments, which is the only way to prove a parameter arrived — the
+  // answer's echoed `version` field proves nothing, since the handler could
+  // echo the caller's argument back without ever forwarding it.
+  it('ReadPackage passes the caller-requested version to readMetadata', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+
+    await handleReadPackage(context as any, {
+      package_name: 'zpkg',
+      version: 'inactive',
+    });
+
+    const call = seen.calls.filter((c) => c.member === 'readMetadata').at(-1);
+    const options = call?.args.at(-1) as { version?: string } | undefined;
+    expect(options?.version).toBe('inactive');
   });
 
   // FunctionModule reads metadata FIRST (to verify the caller's group
@@ -260,5 +291,52 @@ describe('readonly handlers map a success into the right fields, not swapped', (
     expect(payload.metadata).toBe(metadata);
     expect(payload.function_module_name).toBe('Z_MCP_SHR_FM');
     expect(payload.function_group_name).toBe('ZMCP_SHR_FGRP');
+  });
+
+  // The group-match check itself: deleting `assertFunctionGroupMatches` from
+  // the handler does not fail the test above (it supplies the real group),
+  // so it is pinned separately. The metadata's own containerRef names
+  // ZMCP_SHR_FGRP; the caller asks for a different group, and `read` must
+  // never be reached. If the check were removed, `read`'s stub answer below
+  // would come back as a success instead.
+  it('ReadFunctionModule refuses when the caller-supplied group does not match the metadata containerRef', async () => {
+    const metadata = corpusBody(
+      'read-metadata-function-module--01-fmodules-zmcpshrfm',
+    );
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(reading(metadata)),
+      read: async () => okResponse(reading('SHOULD NOT BE READ')),
+    });
+
+    const result: any = await handleReadFunctionModule(context as any, {
+      function_module_name: 'z_mcp_shr_fm',
+      function_group_name: 'zwrong_group',
+    });
+
+    expect(result.isError).toBe(true);
+  });
+
+  // The PROG/P gate itself: neither the refusal rows in
+  // readHandlersSurfaceErrors.test.ts nor the success row above exercises
+  // it (a refusal short-circuits before it runs; the success row's metadata
+  // is already typed PROG/P). Deleting the gate from the handler would
+  // answer this with success:true and the include's source/metadata, so it
+  // is pinned here on its own.
+  it('ReadProgram refuses a non-PROG/P object as invalid_object_type', async () => {
+    fakeClient = fakeClientOf({
+      read: async () => okResponse(reading('INCLUDE SOURCE')),
+      readMetadata: async () =>
+        okResponse(reading('<a adtcore:type="PROG/I"/>')),
+    });
+
+    const result: any = await handleReadProgram(context as any, {
+      program_name: 'zinc',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(false);
+    expect(payload.error).toBe('invalid_object_type');
+    expect(payload.object_type).toBe('PROG/I');
   });
 });

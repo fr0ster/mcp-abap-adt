@@ -7,10 +7,7 @@ import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
-import {
-  assertFunctionGroupMatches,
-  parseContainerGroupName,
-} from '../shared/parseContainerGroup';
+import { assertFunctionGroupMatches } from '../shared/parseContainerGroup';
 
 export const TOOL_DEFINITION = {
   name: 'ReadFunctionModule',
@@ -73,6 +70,12 @@ export async function handleReadFunctionModule(
   // step's own reading for exactly this reason — `assertFunctionGroupMatches`
   // throws when the groups disagree, which `answer()` catches and reports as
   // `client_threw`, the same verdict the pre-19 handler gave for a mismatch.
+  //
+  // `realGroup` is assigned once, inside the pair step that already parsed
+  // `containerRef` to get it, and carried out through this closure so the
+  // projection below can answer it without a second parse of the same
+  // document.
+  let realGroup = functionGroupName;
   return answer(
     { tool: 'ReadFunctionModule', detail: 'terse' },
     () =>
@@ -83,7 +86,7 @@ export async function handleReadFunctionModule(
             { analyse: analyseException },
           ),
         (metadata: AdtReading<string>) => {
-          const realGroup = assertFunctionGroupMatches(
+          realGroup = assertFunctionGroupMatches(
             metadata.raw,
             functionGroupName,
             functionModuleName,
@@ -98,11 +101,7 @@ export async function handleReadFunctionModule(
     ([metadata, source]: [AdtReading<string>, AdtReading<string>]) => ({
       success: true,
       function_module_name: functionModuleName,
-      // Already validated as matching by assertFunctionGroupMatches above —
-      // re-read here rather than re-derived, so there is one parse of the
-      // containerRef, not two.
-      function_group_name:
-        parseContainerGroupName(metadata.raw) ?? functionGroupName,
+      function_group_name: realGroup,
       version,
       source_code: source.raw,
       metadata: metadata.raw,

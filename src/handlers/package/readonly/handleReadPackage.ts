@@ -48,9 +48,17 @@ export async function handleReadPackage(
   // unlike its siblings in this family there is no `.read()` to call at all:
   // `read` and `readMetadata` fetched the identical document even before 19.
   // One call, used for both fields this tool has always answered.
+  //
+  // Unlike Domain, DataElement and FunctionGroup, AdtPackage actually honours
+  // `version`: it forwards `options.version` into the query string the same
+  // way `read`'s positional argument used to. The pre-19 handler sent it
+  // through that positional argument; passing it here is what keeps an
+  // "inactive" request from silently answering the active document while
+  // still claiming to be inactive.
   return answer(
     { tool: 'ReadPackage', detail: 'terse' },
-    () => obj.readMetadata({ packageName }, { analyse: analyseException }),
+    () =>
+      obj.readMetadata({ packageName }, { version, analyse: analyseException }),
     (metadata: AdtReading<string>) => ({
       success: true,
       package_name: packageName,

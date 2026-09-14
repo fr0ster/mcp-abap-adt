@@ -70,6 +70,28 @@ export function refusingClient(
 }
 
 /**
+ * A client that throws (not refuses) whatever it is asked.
+ *
+ * A structured refusal (`refusingClient`) is `IAdtResponse.ok === false` —
+ * `answer()` reads its `getError()` straight into the failure payload, and
+ * that payload never carries `ctx.tool`. A throw is a different path
+ * entirely: `answer()`'s own try/catch names it `client_threw` and builds
+ * the payload from the answer's own context, `tool` included. Use this
+ * client when the assertion is about that path, not about a refusal's
+ * message.
+ */
+export function throwingClient(message: string) {
+  return new Proxy({} as Record<string, unknown>, {
+    get: () => () =>
+      new Proxy({} as Members, {
+        get: () => async () => {
+          throw new Error(message);
+        },
+      }),
+  });
+}
+
+/**
  * Which `analyse` the handler passed, and how often a member was called.
  *
  * What goes wrong at the scale of a hundred handlers is a handler taking the

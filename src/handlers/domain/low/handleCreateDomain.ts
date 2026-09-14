@@ -1,18 +1,24 @@
 /**
  * CreateDomain Handler - Create ABAP Domain
  *
- * Uses AdtClient.createDomain from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDomain().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim` (not `statusOnly` — a DDIC create answers a
+ * document, measured at 1878 bytes for a domain), so `project(detail,
+ * terseWrite)` still reads the status for `terse` while `full`/`raw` now
+ * answer the document ADT actually sent instead of discarding it.
  */
 
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateDomainLow',
@@ -55,6 +61,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['domain_name', 'description', 'package_name'],
   },
@@ -71,117 +78,50 @@ interface CreateDomainArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateDomain MCP tool
- *
- * Uses AdtClient.createDomain - low-level single method call
- */
 export async function handleCreateDomain(
   context: HandlerContext,
   args: CreateDomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      domain_name,
-      description,
-      package_name,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as CreateDomainArgs;
+  const {
+    domain_name,
+    description,
+    package_name,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!domain_name || !description || !package_name) {
-      return return_error(
-        new Error('domain_name, description, and package_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const domainName = domain_name.toUpperCase();
-
-    logger?.info(`Starting domain creation: ${domainName}`);
-
-    try {
-      // Create domain
-      const createState = await client.getDomain().create({
-        domainName,
-        description,
-        packageName: package_name,
-        transportRequest: transport_request,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for domain ${domainName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateDomain completed: ${domainName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            domain_name: domainName,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Domain ${domainName} created successfully. Use LockDomain and UpdateDomain to add source code, then UnlockDomain and ActivateObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to create domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Domain ${domainName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!domain_name || !description || !package_name) {
+    return return_error(
+      new Error('domain_name, description, and package_name are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const domainName = domain_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateDomainLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDomain(resultsFor(domainDocuments))
+        .create(
+          {
+            domainName,
+            description,
+            packageName: package_name,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

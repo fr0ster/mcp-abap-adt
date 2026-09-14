@@ -3,6 +3,18 @@ import { answer } from '../../lib/answer';
 import { writeProjection } from '../../lib/strategies/promised';
 import { pair, sequence } from '../../lib/strategies/sequence';
 
+/**
+ * `writeProjection` is `Terse<unknown>` — `(value, status)`, same as
+ * `terseWrite` — and `answer()`'s `project` takes one parameter. A real call
+ * site bridges the two with `project(detail, terseWrite)`, reading `status`
+ * off the `AdtReading` a result strategy produced (see `resultSets.ts` and
+ * `src/handlers/domain/low`). These tests exercise `sequence` and `answer`
+ * with plain values that never went through a reading, so the status is
+ * supplied here instead — 200, because these are the tests' own successes,
+ * never a number read off the wire.
+ */
+const projectWrite = (value: unknown) => writeProjection(value, 200);
+
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
   return {
     ok: true,
@@ -97,7 +109,7 @@ describe('a sequence keeps the strategies in charge', () => {
                   ],
                 } as never),
             ),
-          writeProjection,
+          projectWrite,
         )
       ).content[0].text,
     );
@@ -117,7 +129,7 @@ describe('a sequence keeps the strategies in charge', () => {
           async () => ok('<doma:domain/>'),
           async () => ok(undefined),
         ),
-      (value) => writeProjection(value, 200),
+      projectWrite,
     );
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('SUCCESS');

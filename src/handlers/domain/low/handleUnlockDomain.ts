@@ -1,18 +1,20 @@
 /**
  * UnlockDomain Handler - Unlock ABAP Domain
  *
- * Uses AdtClient.unlockDomain from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDomain().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockDomainLow',
@@ -61,128 +63,31 @@ interface UnlockDomainArgs {
   };
 }
 
-/**
- * Main handler for UnlockDomain MCP tool
- *
- * Uses AdtClient.unlockDomain - low-level single method call
- */
 export async function handleUnlockDomain(
   context: HandlerContext,
   args: UnlockDomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { domain_name, lock_handle, session_id, session_state } =
-      args as UnlockDomainArgs;
+  const { domain_name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!domain_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('domain_name, lock_handle, and session_id are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    const domainName = domain_name.toUpperCase();
-
-    logger?.info(
-      `Starting unlock for ${domainName}; lock_handle=${lock_handle}; session=${session_id.substring(0, 8)}...; session_state=${session_state ? 'provided' : 'none'}`,
+  if (!domain_name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('domain_name, lock_handle, and session_id are required'),
     );
-
-    // Restore session state if provided
-    if (session_state) {
-      logger?.info(
-        `Restoring session state from lock: cookies=${session_state.cookies?.length || 0}, csrf=${session_state.csrf_token?.length || 0}, store_keys=${session_state.cookie_store ? Object.keys(session_state.cookie_store).length : 0}`,
-      );
-
-      // CRITICAL: Use restoreSessionInConnection to properly restore session
-      // This will set sessionId in connection and enable stateful session mode
-      await restoreSessionInConnection(connection, session_id, session_state);
-
-      // Verify session was restored
-      logger?.info(
-        `Session state restored (conn session ${connection.getSessionId()})`,
-      );
-    } else {
-      logger?.warn('No session state provided (may fail if domain is locked)');
-      // Ensure connection is established
-    }
-
-    logger?.info(
-      `Starting domain unlock: ${domainName} (session: ${session_id.substring(0, 8)}...)`,
-    );
-
-    try {
-      // Unlock domain
-      logger?.debug(
-        `Calling client.getDomain().unlock({ domainName: ${domainName} }, ${lock_handle})`,
-      );
-      const unlockState = await client
-        .getDomain()
-        .unlock({ domainName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for domain ${domainName}`,
-        );
-      }
-
-      // Session state management is now handled by auth-broker
-
-      logger?.info(`✅ UnlockDomain completed: ${domainName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            domain_name: domainName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Domain ${domainName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Domain ${domainName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockDomain.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const domainName = domain_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockDomainLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getDomain()
+        .unlock({ domainName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

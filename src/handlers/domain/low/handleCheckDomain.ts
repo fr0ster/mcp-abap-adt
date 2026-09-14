@@ -1,19 +1,18 @@
 /**
  * CheckDomain Handler - Syntax check for ABAP Domain
  *
- * Uses AdtClient.checkDomain from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDomain().check from @mcp-abap-adt/adt-clients 19.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckDomainLow',
@@ -42,6 +41,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['domain_name'],
   },
@@ -55,111 +55,35 @@ interface CheckDomainArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckDomain MCP tool
- *
- * Uses AdtClient.checkDomain - low-level single method call
- */
 export async function handleCheckDomain(
   context: HandlerContext,
   args: CheckDomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { domain_name, session_id, session_state } = args as CheckDomainArgs;
+  const { domain_name, session_id, session_state } = args;
 
-    // Validation
-    if (!domain_name) {
-      return return_error(new Error('domain_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const domainName = domain_name.toUpperCase();
-
-    logger?.info(`Starting domain check: ${domainName}`);
-
-    try {
-      // Check domain
-      const checkState = await client
-        .getDomain()
-        .check({ domainName: domainName });
-      const response = checkState.checkResult;
-
-      if (!response) {
-        throw new Error(
-          `Check did not return a response for domain ${domainName}`,
-        );
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckDomain completed: ${domainName}`);
-      logger?.debug(
-        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            domain_name: domainName,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Domain ${domainName} has no syntax errors`
-              : `Domain ${domainName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to check domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Domain ${domainName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!domain_name) {
+    return return_error(new Error('domain_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const domainName = domain_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckDomainLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDomain(resultsFor(domainDocuments))
+        // `status` left undefined: the shipped default checks the inactive
+        // version, which is what a caller wants right after a write.
+        .check({ domainName }, undefined, { analyse: analyseCheck }),
+    project(detail, terseCheck),
+  );
 }

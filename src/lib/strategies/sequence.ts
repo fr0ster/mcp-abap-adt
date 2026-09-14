@@ -11,11 +11,25 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
  * with its origin, its messages and its T100 key.
  *
  * ```typescript
+ * const domain = client.getDomain(resultsFor(domainDocuments));
  * return answer(ctx, () => sequence(
- *   () => client.getDomain().read({ domainName }, 'active', { analyse: analyseException }),
- *   (current) => client.getDomain().update({ domainName }, patch(current), { lockHandle, analyse: analyseException }),
- * ), writeProjection);
+ *   () => domain.readMetadata({ domainName }, { analyse: analyseException }),
+ *   (current) => domain.updateMetadata({ domainName }, { lockHandle, xmlContent: patch(current), analyse: analyseException }),
+ * ), project(detail, terseWrite));
  * ```
+ *
+ * This example used to pass `writeProjection` (from `promised.ts`) straight
+ * to `answer()` in place of the last line above. That does not compile:
+ * `writeProjection` is `Terse<unknown>` — `(value, status)`, same as
+ * `terseWrite` — and `answer()`'s `project` takes one argument. A function
+ * that requires a second, required parameter is not assignable where the
+ * caller supplies only the first — TS2345, "Target signature provides too
+ * few arguments." (Dropping a trailing parameter a caller does not use is
+ * fine; gaining one it does not supply is not.) `project(detail, terseWrite)`
+ * is the real bridge: it reads a write's `AdtReading` (`statusOnly`, or
+ * `verbatim` for the DDIC creates that answer a document — see
+ * `resultSets.ts`) and hands `terseWrite` the `status` off of it. Every
+ * migrated write handler in `src/handlers/domain/low` uses it this way.
  *
  * **It never builds an error of its own.** A sequence that composed a sentence
  * like "step 2 of 3 failed" would be inventing a verdict beside the one the

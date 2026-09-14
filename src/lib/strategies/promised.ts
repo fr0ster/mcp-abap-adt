@@ -36,7 +36,23 @@ export function readingFor(form: PromisedForm) {
  */
 export const writeReading = statusOnly;
 
-/** And its projection: worked, or nothing — never `undefined` on a success. */
+/**
+ * And its projection: worked, or nothing — never `undefined` on a success.
+ *
+ * `Terse<T>` — two parameters, `(value, status)` — same as `terseWrite`
+ * itself. **Not what `answer()`'s `project` takes.** `answer<T>(ctx, call,
+ * project: (value: T) => unknown)` is one parameter, and a function requiring
+ * a second, required one is not assignable where the caller supplies only the
+ * first — TS2345, "Target signature provides too few arguments." (A function
+ * MAY drop a trailing parameter its caller does not need; it may never gain
+ * one the caller does not supply.) A handler wires this into a write by
+ * passing it through `project(detail, terseWrite)` instead — see
+ * `resultSets.ts` for the `AdtReading` that supplies the `status`, and
+ * `src/handlers/domain/low` for every real call site. `writeProjection`
+ * itself stays two-parameter, exactly `terseWrite`, because that is what lets
+ * it be exercised directly against a reading in `strategyPromised.test.ts`
+ * without a caller in between.
+ */
 export const writeProjection: Terse<unknown> = terseWrite;
 
 /**

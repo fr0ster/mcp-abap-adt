@@ -2781,6 +2781,27 @@ it('packageResolver searches through the renamed member, with a strategy', async
 });
 
 // SHAPE 3 — the two program profiling handlers: two calls where there was one.
+//
+// **These four runtime handlers do not go through `createAdtClient`.** Each
+// writes `new AdtExecutor(connection, logger)` directly and reaches the members
+// through `executor.getProgramExecutor()` or `getClassExecutor()`, so the
+// `jest.mock('../../lib/clients')` every other test in this plan relies on does
+// nothing here — the handler would build a real executor and the fake would
+// never be asked. Mock the module they actually import:
+//
+// ```typescript
+// jest.mock('@mcp-abap-adt/adt-clients', () => ({
+//   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
+//   AdtExecutor: jest.fn(() => ({
+//     getProgramExecutor: () => programExecutor,
+//     getClassExecutor: () => classExecutor,
+//   })),
+// }));
+// ```
+//
+// `programExecutor` and `classExecutor` are plain objects built per test with
+// `okResponse` and `refusedResponse`, the same way `fakeClientOf` builds one —
+// they are simply reached through a different door.
 // Both of them. The compiler catches a handler that still names the removed
 // member; it says nothing about one that calls the two replacements in the
 // wrong order, or calls only one of them.
@@ -2791,20 +2812,23 @@ const profiling = [
 
 it.each(profiling)('%s schedules the trace before it runs', async (_n, handler, args) => {
   const order: string[] = [];
-  fakeClient = fakeClientOf({
+  programExecutor = {
     scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
     runWithProfiler: async () => { order.push('run'); return okResponse(reading({ done: true })); },
-  });
+  };
   await (handler as any)(context as any, args);
   expect(order).toEqual(['schedule', 'run']);
+  // Not empty. An empty order is what a handler that built a real executor
+  // also produces, right before it fails on a connection nobody opened.
+  expect(order.length).toBeGreaterThan(0);
 });
 
 it.each(profiling)('%s stops at the first refused step', async (_n, handler, args) => {
   const run = jest.fn();
-  fakeClient = fakeClientOf({
+  programExecutor = {
     scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
     runWithProfiler: run,
-  });
+  };
   const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
   expect(JSON.parse(result.content[0].text).message).toBe('Trace scheduling refused');
@@ -2924,6 +2948,12 @@ static sequences — they are in Task 23.
 
 **Files:**
 - Create: `src/lib/strategies/poll.ts`, `src/__tests__/unit/poll.test.ts`, `src/__tests__/unit/runtimeProfiling.test.ts`
+
+**These two handlers are mocked differently from every other task.** They
+construct `new AdtExecutor(connection, logger)` rather than calling
+`createAdtClient`, so the test mocks `@mcp-abap-adt/adt-clients` and returns a
+stub from `getClassExecutor()`. Mocking `../../lib/clients` here would compile,
+run, and test a real executor.
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`, `src/lib/answer.ts`, `src/__tests__/unit/answerFailure.test.ts`
 
 **Interfaces:**
@@ -3092,9 +3122,24 @@ Add a case to `answerFailure.test.ts`: a thrown `PollExhausted` renders as `erro
 
 ```typescript
 // src/__tests__/unit/runtimeProfiling.test.ts
+import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+
+// `handleRuntimeRunClass` and `handleRuntimeRunClassWithProfiling` build
+// `new AdtExecutor(connection, logger)` themselves — they never call
+// `createAdtClient` — so the mock every other test in this plan uses would
+// leave them talking to a real executor over a connection nobody opened.
+let classExecutor: Record<string, unknown>;
+jest.mock('@mcp-abap-adt/adt-clients', () => ({
+  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
+  AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
+}));
+// The same door as Task 23: these two build `new AdtExecutor(...)` themselves
+// and reach the members through `getClassExecutor()`, so mocking
+// `../../lib/clients` would leave the handler talking to a real executor. Mock
+// `@mcp-abap-adt/adt-clients` and hand back `classExecutor`.
 it('resolves the trace after several attempts and answers its id', async () => {
   let look = 0;
-  fakeClient = fakeClientOf({
+  classExecutor = ({
     run: async () => okResponse(reading({ done: true })),
     // The trace is not there the instant the run ends. That is the whole
     // reason these two handlers poll.
@@ -3110,7 +3155,7 @@ it('resolves the trace after several attempts and answers its id', async () => {
 
 it('honours max_trace_attempts rather than looking forever', async () => {
   const lookups = jest.fn(async () => okResponse(reading({ traces: [] })));
-  fakeClient = fakeClientOf({ run: async () => okResponse(reading({ done: true })), getRuntimeTraces: lookups });
+  classExecutor = { run: async () => okResponse(reading({ done: true })), getRuntimeTraces: lookups };
   const result: any = await handleRuntimeRunClass(context as any, {
     class_name: 'ZCL_X', profile: true, max_trace_attempts: 2, trace_retry_delay_ms: 0,
   });
@@ -3122,13 +3167,13 @@ it('honours max_trace_attempts rather than looking forever', async () => {
 
 it('looks in every uri trace_lookup_uris names', async () => {
   const seen: string[] = [];
-  fakeClient = fakeClientOf({
+  classExecutor = {
     run: async () => okResponse(reading({ done: true })),
     getRuntimeTraces: async (uri: unknown) => {
       seen.push(String(uri));
       return okResponse(reading({ traces: [] }));
     },
-  });
+  };
   await handleRuntimeRunClass(context as any, {
     class_name: 'ZCL_X', profile: true, trace_retry_delay_ms: 0,
     trace_lookup_uris: ['/sap/bc/adt/runtime/traces/abaptraces', '/sap/bc/adt/runtime/traces/other'],
@@ -3139,7 +3184,7 @@ it('looks in every uri trace_lookup_uris names', async () => {
 });
 
 it('keeps an intermediate refusal as the strategy built it', async () => {
-  fakeClient = fakeClientOf({ run: async () => refusedResponse('Trace creation refused') });
+  classExecutor = { run: async () => refusedResponse('Trace creation refused') };
   const result: any = await handleRuntimeRunClass(context as any, {
     class_name: 'ZCL_X', profile: true,
   });

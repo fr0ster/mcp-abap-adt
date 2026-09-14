@@ -3149,9 +3149,22 @@ it.each(handlers)('%s finds the trace by difference, not by position', async (_n
   // newest `recordedAt`. An implementation that takes the first entry, or the
   // last, or sorts the strings, picks the wrong one — only the difference
   // against the snapshot gives the right answer.
-  const existing = { id: 'completed-trace-1', recordedAt: '2026-09-14T10:00:00+02:00' };
-  const produced = { id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' };
-  // The FIRST call is the snapshot and must not contain the produced id — an
+  // The feed is built to fail three wrong implementations at once.
+  //
+  //  · no snapshot, take the first entry        → picks `older`, which was there
+  //  · no snapshot, take the last entry         → picks `decoy`, which was there
+  //  · difference, but sort recordedAt as text  → picks `decoy`, see below
+  //
+  // `COMPLETED_TRACE` sits in the MIDDLE of document order, and its timestamp
+  // is 09:00 UTC against the decoy's 10:30+02:00, which is 08:30 UTC. So it is
+  // the newer of the two fresh entries while sorting LOWER as a string — the
+  // exact trap `compareRecordedAt` exists for.
+  const older  = { id: 'completed-trace-1', recordedAt: '2026-09-13T10:00:00+02:00' };
+  const stale  = { id: 'completed-trace-2', recordedAt: '2026-09-13T11:00:00+02:00' };
+  const produced = { id: COMPLETED_TRACE,   recordedAt: '2026-09-14T09:00:00Z' };
+  const decoy  = { id: 'completed-trace-9', recordedAt: '2026-09-14T10:30:00+02:00' };
+
+  // The FIRST call is the snapshot and must not contain either fresh id — an
   // id already in `before` can never be the new one, and a mock that returns
   // it from the start asks the implementation to be wrong.
   let listed = 0;
@@ -3160,7 +3173,8 @@ it.each(handlers)('%s finds the trace by difference, not by position', async (_n
     runWithProfiler: async () => okResponse(reading('done')),
   };
   profiler = {
-    list: async () => okResponse(reading(++listed === 1 ? [existing] : [existing, produced])),
+    list: async () =>
+      okResponse(reading(++listed === 1 ? [older, stale] : [older, produced, stale, decoy])),
   };
 
   const result: any = await (handler as any)(context as any, {
@@ -3265,9 +3279,86 @@ it.each([
 The corpus holds no profiling exchange, so these run on fakes. Say so in the
 file's header rather than implying the behaviour is measured.
 
-- [ ] **Step 3: Run them to verify they fail**
+- [ ] **Step 3: Write the helper's own tests, if Step 1 chose the first option**
 
-- [ ] **Step 4: Implement**
+Everything that can go wrong in the search lives in `newTraceAfter`, and the
+handler tests exercise it only through two handlers and one happy path. These
+are its own.
+
+```typescript
+// src/__tests__/unit/newTrace.test.ts
+import { newTraceAfter } from '../../lib/strategies/newTrace';
+import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
+
+const entry = (id: string, recordedAt: string) => ({ id, recordedAt });
+const feed = (...entries: ReturnType<typeof entry>[]) => okResponse(reading(entries));
+const never = async () => { throw new Error('should not have waited'); };
+
+it('answers on the first read when a new id is already there, without waiting', async () => {
+  const list = jest.fn(async () => feed(entry('new-1', '2026-09-14T09:00:00Z')));
+  const found = await newTraceAfter({ list } as any, new Set(), {
+    attempts: 5, delayMs: 2000, sleep: never,
+  });
+  expect(found.ok).toBe(true);
+  expect(found.getResult().value).toBe('new-1');
+  expect(list).toHaveBeenCalledTimes(1);
+});
+
+it('ignores every id that was already in the snapshot', async () => {
+  const before = new Set(['old-1', 'old-2']);
+  const found = await newTraceAfter(
+    { list: async () => feed(entry('old-1', '2026-09-14T12:00:00Z'), entry('old-2', '2026-09-14T11:00:00Z')) } as any,
+    before,
+    { attempts: 1, delayMs: 0, sleep: never },
+  );
+  // Nothing new, so no id — and a SUCCESS, because nothing refused anything.
+  expect(found.ok).toBe(true);
+  expect(found.getResult().value).toBeUndefined();
+});
+
+it('picks the newest of several new ids, by time and not by text', async () => {
+  // 09:00Z is 09:00 UTC; 10:30+02:00 is 08:30 UTC. The first is later in time
+  // and lower as a string, which is what compareRecordedAt is for.
+  const found = await newTraceAfter(
+    { list: async () => feed(
+      entry('new-late', '2026-09-14T09:00:00Z'),
+      entry('new-early', '2026-09-14T10:30:00+02:00'),
+    ) } as any,
+    new Set(),
+    { attempts: 1, delayMs: 0, sleep: never },
+  );
+  expect(found.getResult().value).toBe('new-late');
+});
+
+it('waits between attempts and stops at the count it was given', async () => {
+  const slept: number[] = [];
+  const list = jest.fn(async () => feed());
+  const found = await newTraceAfter({ list } as any, new Set(), {
+    attempts: 3, delayMs: 250, sleep: async (ms) => { slept.push(ms); },
+  });
+  expect(list).toHaveBeenCalledTimes(3);
+  // Two waits for three attempts: none after the last.
+  expect(slept).toEqual([250, 250]);
+  expect(found.ok).toBe(true);
+  expect(found.getResult().value).toBeUndefined();
+});
+
+it('hands a refused read straight back and stops asking', async () => {
+  const list = jest.fn(async () => refusedResponse('Session expired'));
+  const found = await newTraceAfter({ list } as any, new Set(), {
+    attempts: 5, delayMs: 0, sleep: never,
+  });
+  expect(found.ok).toBe(false);
+  expect(found.getError().message).toBe('Session expired');
+  // Once. Retrying past a refusal is asking a question already answered, and
+  // exhausting the attempts would turn it into "no trace yet".
+  expect(list).toHaveBeenCalledTimes(1);
+});
+```
+
+- [ ] **Step 4: Run them all to verify they fail**
+
+- [ ] **Step 5: Implement**
 
 Under options two and three the handler is a bare sequence:
 
@@ -3376,10 +3467,12 @@ join two values; lift it out of `sequence.ts` rather than writing a third copy.
 
 Edit the tool definitions only if Step 1 said to.
 
-- [ ] **Step 5: Run everything and measure**
+- [ ] **Step 6: Run everything and measure**
 
 ```bash
-npx jest src/__tests__/unit/runtimeProfiling.test.ts src/__tests__/unit/toolSurface.test.ts
+npx jest src/__tests__/unit/runtimeProfiling.test.ts \
+         src/__tests__/unit/newTrace.test.ts \
+         src/__tests__/unit/toolSurface.test.ts
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 
@@ -3387,22 +3480,51 @@ If Step 1 chose to remove the parameters, `toolSurface.test.ts` fails by design:
 regenerate the snapshot in the same commit and say in the message that the
 surface changed on the user's instruction.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
+
+**Run only the block for the option Step 1 chose.** The three are alternatives,
+not a sequence: the first names files the others never create, and the third
+moves a snapshot the others must leave alone.
+
+Option one, find the trace on this side:
+
+```bash
+git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
+        src/__tests__/unit/runtimeProfiling.test.ts \
+        src/lib/strategies/newTrace.ts src/lib/strategies/sequence.ts \
+        src/__tests__/unit/newTrace.test.ts
+git status --short
+git commit --no-verify -m "refactor(system): the class profiling handlers schedule, run, then find the trace
+
+tsc: <before> → <after>"
+```
+
+Option two, accepted no-ops:
 
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
         src/__tests__/unit/runtimeProfiling.test.ts
-
-# option one also creates the search and exports the builder it shares with pair()
-git add src/lib/strategies/newTrace.ts src/lib/strategies/sequence.ts \
-        src/__tests__/unit/newTrace.test.ts
-
-# option three also moves the surface, which Task 1's ratchet will otherwise refuse
-git add tests/fixtures/tools/surface.json \
-        src/handlers/system/readonly/handleRuntimeRunClass*.ts
-
-git status --short   # read it: the stanzas above are per-option, not all three
+git status --short
 git commit --no-verify -m "refactor(system): the class profiling handlers schedule, then run
+
+The polling parameters are accepted and ignored; the descriptions say so.
+
+tsc: <before> → <after>"
+```
+
+Option three, removed — the surface moves, so the snapshot moves with it in the
+same commit:
+
+```bash
+git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
+        src/__tests__/unit/runtimeProfiling.test.ts \
+        tests/fixtures/tools/surface.json
+git status --short
+git commit --no-verify -m "refactor(system)!: the class profiling handlers schedule, then run
+
+BREAKING: max_trace_attempts, trace_retry_delay_ms and trace_lookup_uris are
+removed and no trace_id is answered, on the user's instruction. A run does not
+wait for a trace; read one with the profiler tools when it exists.
 
 tsc: <before> → <after>"
 ```

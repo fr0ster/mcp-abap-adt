@@ -26,7 +26,8 @@ own tests pass and it is committed — not when it is described.
 | 5. `withLock()` | done | `f19ffea` |
 | 6. The slot table | done | `8c2a040` |
 | 7. `detail` | done | `dfc31ef` |
-| 8 – 29 | not started | |
+| 8. Test helpers | done | `47609aa` |
+| 9 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -1309,7 +1310,7 @@ exists only in prose.
 **Interfaces:**
 - Produces: `okResponse`, `refusedResponse`, `fakeClientOf`, `refusingClient`, `recordAnalyse`
 
-- [ ] **Step 1: Write it**
+- [x] **Step 1: Write it**
 
 ```typescript
 // src/__tests__/helpers/fakeClient.ts
@@ -1393,7 +1394,7 @@ export function recordAnalyse() {
 }
 ```
 
-- [ ] **Step 2: Prove the recorder records**
+- [x] **Step 2: Prove the recorder records**
 
 ```typescript
 // src/__tests__/unit/fakeClient.test.ts
@@ -1412,9 +1413,9 @@ it('reports undefined when the caller passed none', async () => {
 });
 ```
 
-- [ ] **Step 3: Run it** — `npx jest src/__tests__/unit/fakeClient.test.ts`. Expected: PASS.
+- [x] **Step 3: Run it** — `npx jest src/__tests__/unit/fakeClient.test.ts`. Expected: PASS.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add src/__tests__/helpers/fakeClient.ts src/__tests__/unit/fakeClient.test.ts

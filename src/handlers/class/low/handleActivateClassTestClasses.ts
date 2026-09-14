@@ -43,7 +43,7 @@ export const TOOL_DEFINITION = {
       test_class_name: {
         type: 'string',
         description:
-          'Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value.',
+          'Ignored. This activates the whole class, test classes included, without naming one — there is no per-test-class activation to target.',
       },
       session_id: {
         type: 'string',

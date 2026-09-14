@@ -44,6 +44,7 @@ import {
   handleUnlockBehaviorDefinition,
   TOOL_DEFINITION as UnlockBehaviorDefinitionToolDefinition,
 } from '../../handlers/behavior_definition/low/handleUnlockBehaviorDefinition';
+import { handleUpdateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleUpdateBehaviorDefinition';
 import { handleValidateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
 import {
@@ -65,6 +66,7 @@ import {
   TOOL_DEFINITION as UnlockClassToolDefinition,
 } from '../../handlers/class/low/handleUnlockClass';
 import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
+import { handleUpdateClass } from '../../handlers/class/low/handleUpdateClass';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
@@ -77,6 +79,7 @@ import {
   handleUnlockInterface,
   TOOL_DEFINITION as UnlockInterfaceToolDefinition,
 } from '../../handlers/interface/low/handleUnlockInterface';
+import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdateInterface';
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured } from '../../lib/strategies/reading';
@@ -177,6 +180,23 @@ describe('class', () => {
     expect(call?.args[1]).toBe('active');
   });
 
+  it('UpdateClassLow passes sourceCode via options, not config — the shipped AdtClass.update() only reads it there', async () => {
+    await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'CLASS zcl_x IMPLEMENTATION.\nENDCLASS.',
+      lock_handle: 'h',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getClass');
+    expect(call?.args[0]).toEqual({ className: 'ZCL_X' });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'CLASS zcl_x IMPLEMENTATION.\nENDCLASS.',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
   it('LockClassLow passes no analyse and carries no detail parameter', async () => {
     await handleLockClass(context as any, { class_name: 'ZCL_X' });
     const call = callTo('lock');
@@ -259,6 +279,23 @@ describe('interface', () => {
     expect(call?.args[1]).toBeUndefined();
   });
 
+  it('UpdateInterfaceLow passes sourceCode via options, not config — the shipped AdtInterface.update() only reads it there', async () => {
+    await handleUpdateInterface(context as any, {
+      interface_name: 'ZIF_X',
+      source_code: 'INTERFACE zif_x.\nENDINTERFACE.',
+      lock_handle: 'h',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getInterface');
+    expect(call?.args[0]).toEqual({ interfaceName: 'ZIF_X' });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'INTERFACE zif_x.\nENDINTERFACE.',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
   it('LockInterfaceLow passes no analyse and carries no detail parameter', async () => {
     await handleLockInterface(context as any, { interface_name: 'ZIF_X' });
     const call = callTo('lock');
@@ -268,6 +305,24 @@ describe('interface', () => {
     expect('detail' in LockInterfaceToolDefinition.inputSchema.properties).toBe(
       false,
     );
+  });
+
+  it("LockInterfaceLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'IF_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockInterface(context as any, {
+      interface_name: 'ZIF_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.interface_name).toBe('ZIF_X');
+    expect(payload.lock_handle).toBe(handle);
+    // context.connection.getSessionId() answers null here, so the caller's
+    // own session_id is what should surface.
+    expect(payload.session_id).toBe('caller-session');
   });
 
   it('UnlockInterfaceLow passes no analyse and carries no detail parameter', async () => {
@@ -318,6 +373,27 @@ describe('behavior_definition', () => {
     expect(call?.args[1]).toBeUndefined();
   });
 
+  it('UpdateBehaviorDefinitionLow passes sourceCode via options and transportRequest via config — the shipped AdtBehaviorDefinition.update() only reads sourceCode there', async () => {
+    await handleUpdateBehaviorDefinition(context as any, {
+      name: 'ZBDEF_X',
+      source_code: 'behavior definitions',
+      lock_handle: 'h',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getBehaviorDefinition');
+    expect(call?.args[0]).toEqual({
+      name: 'ZBDEF_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'behavior definitions',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
   it('LockBehaviorDefinitionLow passes no analyse and carries no detail parameter', async () => {
     await handleLockBehaviorDefinition(context as any, { name: 'ZBDEF_X' });
     const call = callTo('lock');
@@ -327,6 +403,22 @@ describe('behavior_definition', () => {
     expect(
       'detail' in LockBehaviorDefinitionToolDefinition.inputSchema.properties,
     ).toBe(false);
+  });
+
+  it("LockBehaviorDefinitionLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'BDEF_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockBehaviorDefinition(context as any, {
+      name: 'ZBDEF_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.name).toBe('ZBDEF_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
   });
 
   it('UnlockBehaviorDefinitionLow passes no analyse and carries no detail parameter', async () => {
@@ -412,6 +504,70 @@ describe('behavior_implementation — declared over the class document set', () 
     expect(validateCall?.factory).toBe('getBehaviorImplementation');
     expect(validateCall?.carriedAnalyse).toBe(true);
     expect(validateCall?.analyse).toBe(analyseValidation);
+  });
+
+  it('CreateBehaviorImplementationLow, with implementation_code, sequences create then a locked update — field by field', async () => {
+    await handleCreateBehaviorImplementation(context as any, {
+      class_name: 'ZBP_X',
+      behavior_definition: 'ZI_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+      implementation_code: 'CLASS lhc_x DEFINITION.\nENDCLASS.',
+    });
+
+    const createCall = callTo('create');
+    expect(createCall?.factory).toBe('getBehaviorImplementation');
+    expect(createCall?.args[0]).toEqual({
+      className: 'ZBP_X',
+      behaviorDefinition: 'ZI_X',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
+    });
+    expect(createCall?.args[1]).toMatchObject({ analyse: analyseException });
+
+    const lockCall = callTo('lock');
+    expect(lockCall?.factory).toBe('getBehaviorImplementation');
+    expect(lockCall?.args[0]).toEqual({ className: 'ZBP_X' });
+
+    // The one field this round exists for: sourceCode belongs in options
+    // (AdtBehaviorImplementation.update() reads `options?.sourceCode` only —
+    // with it in config the request carries no body at all), and
+    // transportRequest belongs in config (the member reads
+    // `config.transportRequest` directly).
+    const updateCall = callTo('update');
+    expect(updateCall?.factory).toBe('getBehaviorImplementation');
+    expect(updateCall?.args[0]).toEqual({
+      className: 'ZBP_X',
+      behaviorDefinition: 'ZI_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(updateCall?.args[1]).toMatchObject({
+      sourceCode: 'CLASS lhc_x DEFINITION.\nENDCLASS.',
+      analyse: analyseException,
+    });
+    expect((updateCall?.args[1] as any)?.lockHandle).toBeDefined();
+
+    const unlockCall = callTo('unlock');
+    expect(unlockCall?.factory).toBe('getBehaviorImplementation');
+    expect(unlockCall?.args[0]).toEqual({ className: 'ZBP_X' });
+  });
+
+  it("LockBehaviorImplementationLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'BIMPL_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockBehaviorImplementation(context as any, {
+      class_name: 'ZBP_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.class_name).toBe('ZBP_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
   });
 
   it('ValidateBehaviorImplementationLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {

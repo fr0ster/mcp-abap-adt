@@ -2,6 +2,15 @@
  * UpdateClass Handler - Update ABAP Class Source Code
  *
  * Uses AdtClient.getClass().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes in `options`, not `config`.** `IClassConfig` still
+ * declares a `sourceCode` field, so `update({ className, sourceCode }, ...)`
+ * compiles either way — but the shipped `AdtClass.update()` reads
+ * `options?.sourceCode` only (its own comment: "This used to fall back to
+ * `config.sourceCode` — two channels for one value, where the contract
+ * documents one. `config.sourceCode` is `check`'s alone now"). A `.d.ts`
+ * comment is not evidence for where a value lands; the compiled JavaScript
+ * is. Verified against `AdtClass.js`, not the declaration file.
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
@@ -72,8 +81,12 @@ export async function handleUpdateClass(
       createAdtClient(connection, logger)
         .getClass(resultsFor(classDocuments))
         .update(
-          { className, sourceCode: source_code },
-          { lockHandle: lock_handle, analyse: analyseException },
+          { className },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
         ),
     project(detail, terseWrite),
   );

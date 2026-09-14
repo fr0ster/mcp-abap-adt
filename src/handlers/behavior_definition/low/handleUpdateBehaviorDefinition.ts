@@ -2,6 +2,17 @@
  * UpdateBehaviorDefinition Handler - Update ABAP Behavior Definition Source Code
  *
  * Uses AdtClient.getBehaviorDefinition().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes in `options`, not `config`.**
+ * `IBehaviorDefinitionConfig` still declares a `sourceCode` field, so
+ * `update({ name, sourceCode }, ...)` compiles either way — but the shipped
+ * `AdtBehaviorDefinition.update()` reads `options?.sourceCode` only (its own
+ * comment: "This used to fall back to `config.sourceCode` — two channels
+ * for one value, where the contract documents one"). `transportRequest`
+ * stays in `config` — the same member reads `config.transportRequest`
+ * directly. A `.d.ts` comment is not evidence for where a value lands; the
+ * compiled JavaScript is. Verified against `AdtBehaviorDefinition.js`, not
+ * the declaration file.
  */
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
@@ -111,10 +122,13 @@ export async function handleUpdateBehaviorDefinition(
         .update(
           {
             name: bdefName,
-            sourceCode: source_code,
             transportRequest: transport_request,
           },
-          { lockHandle: lock_handle, analyse: analyseException },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
         ),
     project(detail, terseWrite),
   );

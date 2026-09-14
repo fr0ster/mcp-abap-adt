@@ -1,8 +1,23 @@
 /**
  * LockClassTestClasses Handler - Lock ABAP Unit test include for a class
  *
- * Uses AdtClient.lockTestClasses from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getClass().lockTestClasses from @mcp-abap-adt/adt-clients 19.
+ *
+ * `lockTestClasses()` is not part of the `IAdtLockable` shape every other
+ * family's `lock()` implements — it takes only a config and answers a bare
+ * `string`, not an `IAdtResponse`. There is therefore no `analyse` to inject
+ * (the member has no `options` parameter at all) and no reading to route
+ * through `answer()`: this stays a direct call, the same shape the pre-19
+ * code already used.
+ *
+ * The `as any` stays, for a structural reason rather than a typing gap the
+ * package left open: `AdtClient.getClass()` is typed to return
+ * `IClassContract<R>`, which is `IAdtCreatable & IAdtReadable & … &
+ * IAdtLockable & …` — the CRUD surface every family shares. `lockTestClasses`
+ * exists on the concrete `AdtClass` class but was never added to that shared
+ * contract, so there is no public type through which `getClass()` can reach
+ * it. Casting past `IClassContract` is the only way this repository has to
+ * call it through the client facade at all.
  */
 
 import { createAdtClient } from '../../../lib/clients';
@@ -62,25 +77,21 @@ export async function handleLockClassTestClasses(
 ) {
   const { connection, logger } = context;
   try {
-    const { class_name, session_id, session_state } =
-      args as LockClassTestClassesArgs;
+    const { class_name, session_id, session_state } = args;
 
     if (!class_name) {
       return return_error(new Error('class_name is required'));
     }
 
-    const client = createAdtClient(connection, logger);
-
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
     }
 
     const className = class_name.toUpperCase();
     logger?.info(`Starting test classes lock for: ${className}`);
 
     try {
-      const classClient = client.getClass() as any;
+      const classClient = createAdtClient(connection, logger).getClass() as any;
       const lockHandle = await classClient.lockTestClasses({ className });
 
       if (!lockHandle) {

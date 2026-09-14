@@ -1,19 +1,20 @@
 /**
- * CheckClass Handler - Syntax check for ABAP class via ADT API
+ * CheckClass Handler - Syntax check for ABAP Class
  *
- * Uses checkClass from @mcp-abap-adt/adt-clients/core/class for class-specific checking.
- * Supports checking existing classes or hypothetical source code.
+ * Uses AdtClient.getClass().check from @mcp-abap-adt/adt-clients 19. Can check
+ * an existing class (active/inactive) or hypothetical source code passed in
+ * `source_code`, without creating the object.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckClassLow',
@@ -53,6 +54,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name'],
   },
@@ -68,119 +70,46 @@ interface CheckClassArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckClass MCP tool
- */
 export async function handleCheckClass(
   context: HandlerContext,
   args: CheckClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      version = 'active',
-      source_code,
-      session_id,
-      session_state,
-    } = args as CheckClassArgs;
+  const {
+    class_name,
+    version = 'active',
+    source_code,
+    session_id,
+    session_state,
+  } = args;
 
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-
-    const checkVersion =
-      version && ['active', 'inactive'].includes(version.toLowerCase())
-        ? (version.toLowerCase() as 'active' | 'inactive')
-        : 'active';
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const className = class_name.toUpperCase();
-
-    logger?.info(
-      `Starting class check: ${className} (version: ${checkVersion}, has source: ${!!source_code})`,
-    );
-
-    try {
-      const client = createAdtClient(connection, logger);
-      const checkState = await client
-        .getClass()
-        .check({ className, sourceCode: source_code }, checkVersion);
-      const response = checkState.checkResult;
-      if (!response) {
-        throw new Error('Class check did not return a response');
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckClass completed: ${className}`);
-      logger?.info(`   Status: ${checkResult.status}`);
-      logger?.info(
-        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            class_name: className,
-            version: checkVersion,
-            check_result: checkResult,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Class ${className} has no syntax errors`
-              : `Class ${className} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking class ${className}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to check class: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Class ${className} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!class_name) {
+    return return_error(new Error('class_name is required'));
   }
+
+  const checkVersion =
+    version && ['active', 'inactive'].includes(version.toLowerCase())
+      ? (version.toLowerCase() as 'active' | 'inactive')
+      : 'active';
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const className = class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckClassLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getClass(resultsFor(classDocuments))
+        .check({ className, sourceCode: source_code }, checkVersion, {
+          analyse: analyseCheck,
+        }),
+    project(detail, terseCheck),
+  );
 }

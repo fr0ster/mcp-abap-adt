@@ -1,8 +1,23 @@
 /**
  * UnlockClassTestClasses Handler - Unlock ABAP Unit test include for a class
  *
- * Uses AdtClient.unlockTestClasses from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getClass().unlockTestClasses from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlockTestClasses()` is not part of the `IAdtLockable` shape every other
+ * family's `unlock()` implements — it takes a config and a lock handle and
+ * answers a bare `IAdtWireResponse`, not an `IAdtResponse`. There is therefore
+ * no `analyse` to inject (the member has no `options` parameter at all) and
+ * no reading to route through `answer()`: this stays a direct call, the same
+ * shape the pre-19 code already used.
+ *
+ * The `as any` stays, for a structural reason rather than a typing gap the
+ * package left open: `AdtClient.getClass()` is typed to return
+ * `IClassContract<R>`, which is `IAdtCreatable & IAdtReadable & … &
+ * IAdtLockable & …` — the CRUD surface every family shares.
+ * `unlockTestClasses` exists on the concrete `AdtClass` class but was never
+ * added to that shared contract, so there is no public type through which
+ * `getClass()` can reach it. Casting past `IClassContract` is the only way
+ * this repository has to call it through the client facade at all.
  */
 
 import { createAdtClient } from '../../../lib/clients';
@@ -67,25 +82,21 @@ export async function handleUnlockClassTestClasses(
 ) {
   const { connection, logger } = context;
   try {
-    const { class_name, lock_handle, session_id, session_state } =
-      args as UnlockClassTestClassesArgs;
+    const { class_name, lock_handle, session_id, session_state } = args;
 
     if (!class_name || !lock_handle) {
       return return_error(new Error('class_name and lock_handle are required'));
     }
 
-    const client = createAdtClient(connection, logger);
-
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
     }
 
     const className = class_name.toUpperCase();
     logger?.info(`Starting test classes unlock for: ${className}`);
 
     try {
-      const classClient = client.getClass() as any;
+      const classClient = createAdtClient(connection, logger).getClass() as any;
       await classClient.unlockTestClasses({ className }, lock_handle);
 
       logger?.info(`✅ UnlockClassTestClasses completed: ${className}`);

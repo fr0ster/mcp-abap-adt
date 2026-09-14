@@ -1,17 +1,18 @@
 /**
  * UpdateClass Handler - Update ABAP Class Source Code
  *
- * Uses AdtClient.updateClass from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getClass().update from @mcp-abap-adt/adt-clients 19.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateClassLow',
@@ -36,6 +37,7 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockClass operation. Required for update operation.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'source_code', 'lock_handle'],
   },
@@ -45,100 +47,34 @@ interface UpdateClassArgs {
   class_name: string;
   source_code: string;
   lock_handle: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateClass MCP tool
- *
- * Uses AdtClient.updateClass - low-level single method call
- */
 export async function handleUpdateClass(
   context: HandlerContext,
   args: UpdateClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { class_name, source_code, lock_handle } = args as UpdateClassArgs;
+  const { class_name, source_code, lock_handle } = args;
 
-    // Validation
-    if (!class_name || !source_code || !lock_handle) {
-      return return_error(
-        new Error('class_name, source_code, and lock_handle are required'),
-      );
-    }
+  if (!class_name || !source_code || !lock_handle) {
+    return return_error(
+      new Error('class_name, source_code, and lock_handle are required'),
+    );
+  }
 
-    const client = createAdtClient(connection, logger);
+  const className = class_name.toUpperCase();
+  const detail = detailOf(args);
 
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Starting class update: ${className}`);
-
-    try {
-      // Update class with source code
-      const updateState = await client
-        .getClass()
+  return answer(
+    { tool: 'UpdateClassLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getClass(resultsFor(classDocuments))
         .update(
           { className, sourceCode: source_code },
-          { lockHandle: lock_handle },
-        );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for class ${className}`,
-        );
-      }
-
-      logger?.info(`✅ UpdateClass completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            message: `Class ${className} updated successfully. Remember to unlock using UnlockClassLow.`,
-          },
-          null,
-          2,
+          { lockHandle: lock_handle, analyse: analyseException },
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating class ${className}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update class: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Class ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    project(detail, terseWrite),
+  );
 }

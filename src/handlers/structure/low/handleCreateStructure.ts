@@ -1,18 +1,27 @@
 /**
- * CreateStructure Handler - Create ABAP Structure
+ * CreateStructureLow Handler - Create ABAP Structure
  *
- * Uses AdtClient.createStructure from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getStructure().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
+ *
+ * **No source here.** The shipped create posts a metadata document only; the
+ * DDL source comes through `UpdateStructureLow`, after `LockStructureLow`.
+ * Verified against `AdtStructure.js`.
  */
 
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateStructureLow',
@@ -64,6 +73,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['structure_name', 'description', 'package_name'],
   },
@@ -80,118 +90,50 @@ interface CreateStructureArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateStructure MCP tool
- *
- * Uses AdtClient.createStructure - low-level single method call
- */
 export async function handleCreateStructure(
   context: HandlerContext,
   args: CreateStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      structure_name,
-      description,
-      package_name,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as CreateStructureArgs;
+  const {
+    structure_name,
+    description,
+    package_name,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!structure_name || !description || !package_name) {
-      return return_error(
-        new Error('structure_name, description, and package_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(`Starting structure creation: ${structureName}`);
-
-    try {
-      // Create structure
-      const createState = await client.getStructure().create({
-        structureName,
-        description,
-        packageName: package_name,
-        ddlCode: '',
-        transportRequest: transport_request,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for structure ${structureName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateStructure completed: ${structureName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            structure_name: structureName,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Structure ${structureName} created successfully. Use LockStructure and UpdateStructure to add source code, then UnlockStructure and ActivateObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error creating structure ${structureName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to create structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Structure ${structureName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!structure_name || !description || !package_name) {
+    return return_error(
+      new Error('structure_name, description, and package_name are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const structureName = structure_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateStructureLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getStructure(resultsFor(structureDocuments))
+        .create(
+          {
+            structureName,
+            description,
+            packageName: package_name,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

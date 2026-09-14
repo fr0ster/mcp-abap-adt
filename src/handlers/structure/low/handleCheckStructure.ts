@@ -1,19 +1,24 @@
 /**
- * CheckStructure Handler - Syntax check for ABAP Structure
+ * CheckStructureLow Handler - Syntax check for ABAP Structure
  *
- * Uses AdtClient.checkStructure from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getStructure().check from @mcp-abap-adt/adt-clients 19.
+ *
+ * `ddl_code` is not a dead parameter: the shipped `AdtStructure.check()`
+ * passes `config.ddlCode` straight into
+ * `checkStructure(connection, name, version, config.ddlCode, logger)`, so a
+ * caller validating unsaved code still reaches the server with it. Verified
+ * against `AdtStructure.js`, not the declaration file.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckStructureLow',
@@ -53,6 +58,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['structure_name'],
   },
@@ -68,128 +74,37 @@ interface CheckStructureArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckStructure MCP tool
- *
- * Uses AdtClient.checkStructure - low-level single method call
- */
 export async function handleCheckStructure(
   context: HandlerContext,
   args: CheckStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      structure_name,
-      ddl_code,
-      version = 'inactive',
-      session_id,
-      session_state,
-    } = args as CheckStructureArgs;
+  const { structure_name, ddl_code, version, session_id, session_state } = args;
 
-    // Validation
-    if (!structure_name) {
-      return return_error(new Error('structure_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    const validVersions = ['active', 'inactive'];
-    const checkVersion =
-      version && validVersions.includes(version.toLowerCase())
-        ? (version.toLowerCase() as 'active' | 'inactive')
-        : 'inactive';
-
-    logger?.info(
-      `Starting structure check: ${structureName} (version: ${checkVersion}) ${ddl_code ? '(with new code)' : '(saved version)'}`,
-    );
-
-    try {
-      // Check structure with optional source code (for validating new/unsaved code)
-      // If ddl_code is provided, it will be base64 encoded in the request body
-      const checkState = await client
-        .getStructure()
-        .check({ structureName, ddlCode: ddl_code }, checkVersion);
-      const response = checkState.checkResult;
-
-      if (!response) {
-        throw new Error(
-          `Check did not return a response for structure ${structureName}`,
-        );
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckStructure completed: ${structureName}`);
-      logger?.info(`   Status: ${checkResult.status}`);
-      logger?.info(
-        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            structure_name: structureName,
-            version: checkVersion,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Structure ${structureName} has no syntax errors`
-              : `Structure ${structureName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error checking structure ${structureName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to check structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Structure ${structureName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!structure_name) {
+    return return_error(new Error('structure_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const structureName = structure_name.toUpperCase();
+  const checkVersion =
+    version && version.toLowerCase() === 'active' ? 'active' : 'inactive';
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckStructureLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getStructure(resultsFor(structureDocuments))
+        .check({ structureName, ddlCode: ddl_code }, checkVersion, {
+          analyse: analyseCheck,
+        }),
+    project(detail, terseCheck),
+  );
 }

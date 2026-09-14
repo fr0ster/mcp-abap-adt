@@ -108,6 +108,19 @@ import {
 } from '../../handlers/interface/low/handleUnlockInterface';
 import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdateInterface';
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
+import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
+import { handleCheckStructure } from '../../handlers/structure/low/handleCheckStructure';
+import { handleDeleteStructure } from '../../handlers/structure/low/handleDeleteStructure';
+import {
+  handleLockStructure,
+  TOOL_DEFINITION as LockStructureToolDefinition,
+} from '../../handlers/structure/low/handleLockStructure';
+import {
+  handleUnlockStructure,
+  TOOL_DEFINITION as UnlockStructureToolDefinition,
+} from '../../handlers/structure/low/handleUnlockStructure';
+import { handleUpdateStructure } from '../../handlers/structure/low/handleUpdateStructure';
+import { handleValidateStructure } from '../../handlers/structure/low/handleValidateStructure';
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured } from '../../lib/strategies/reading';
 import { fakeClientOf, okResponse, recordAnalyse } from '../helpers/fakeClient';
@@ -202,6 +215,19 @@ it.each([
     'getMetadataExtension',
     {
       name: 'ZI_X_DDLX',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'structure',
+    handleActivateStructure,
+    handleDeleteStructure,
+    handleValidateStructure,
+    'getStructure',
+    {
+      structure_name: 'ZST_X',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',
@@ -966,6 +992,144 @@ describe('ddlx (metadataExtension)', () => {
 
     const result: any = await handleActivateMetadataExtension(context as any, {
       name: 'ZI_X_DDLX',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+});
+
+describe('structure', () => {
+  it("CheckStructureLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_code via config.ddlCode — checkStructure reads it", async () => {
+    await handleCheckStructure(context as any, {
+      structure_name: 'ZST_X',
+      ddl_code: 'define structure zst_x { client : abap.clnt; }',
+    });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getStructure');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[0]).toEqual({
+      structureName: 'ZST_X',
+      ddlCode: 'define structure zst_x { client : abap.clnt; }',
+    });
+    expect(call?.args[1]).toBe('inactive');
+  });
+
+  it('CheckStructureLow passes "active" through to the check member\'s second parameter when asked', async () => {
+    await handleCheckStructure(context as any, {
+      structure_name: 'ZST_X',
+      version: 'active',
+    });
+    const call = callTo('check');
+    expect(call?.args[1]).toBe('active');
+  });
+
+  it('UpdateStructureLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
+    await handleUpdateStructure(context as any, {
+      structure_name: 'ZST_X',
+      ddl_code: 'define structure zst_x { client : abap.clnt; }',
+      lock_handle: 'h',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getStructure');
+    expect(call?.args[0]).toEqual({ structureName: 'ZST_X' });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'define structure zst_x { client : abap.clnt; }',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockStructureLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockStructure(context as any, { structure_name: 'ZST_X' });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getStructure');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in LockStructureToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it("LockStructureLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'STRUCTURE_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockStructure(context as any, {
+      structure_name: 'ZST_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.structure_name).toBe('ZST_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockStructureLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'STRUCTURE_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockStructure(
+      connectionSessionContext as any,
+      { structure_name: 'ZST_X', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockStructureLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockStructure(context as any, {
+      structure_name: 'ZST_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getStructure');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in UnlockStructureToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it('ValidateStructureLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
+    // No structure-specific validation fixture exists in the corpus; the
+    // `asx:abap`/`DATA`/`SEVERITY` shape is shared across every DDIC/OO
+    // validation endpoint — ValidateDdlLow's own test proves the same shape
+    // against the same projection, captured here for a table instead.
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateStructure(context as any, {
+      structure_name: 'ZST_X',
+      package_name: 'ZP',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('ActivateStructureLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateStructure(context as any, {
+      structure_name: 'ZST_X',
     });
 
     expect(result.isError).toBe(false);

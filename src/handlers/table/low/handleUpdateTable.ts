@@ -1,18 +1,25 @@
 /**
- * UpdateTable Handler - Update ABAP Table DDL Source
+ * UpdateTableLow Handler - Update ABAP Table DDL Source
  *
- * Uses AdtClient.updateTable from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getTable().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes through `options.sourceCode`.** `AdtTable.update()`'s
+ * shipped body does keep a fallback — `const source = options?.sourceCode ||
+ * config.ddlCode` — but this handler writes through `options` only, the one
+ * channel every sibling family in this cluster shares, and never puts a
+ * source string on `config`. Verified against `AdtTable.js`, not the
+ * declaration file.
  */
 
+import { tableDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateTableLow',
@@ -56,6 +63,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['table_name', 'ddl_code', 'lock_handle'],
   },
@@ -72,116 +80,49 @@ interface UpdateTableArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateTable MCP tool
- *
- * Uses AdtClient.updateTable - low-level single method call
- */
 export async function handleUpdateTable(
   context: HandlerContext,
   args: UpdateTableArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      table_name,
-      ddl_code,
-      lock_handle,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as UpdateTableArgs;
+  const {
+    table_name,
+    ddl_code,
+    lock_handle,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!table_name || !ddl_code || !lock_handle) {
-      return return_error(
-        new Error('table_name, ddl_code, and lock_handle are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const tableName = table_name.toUpperCase();
-
-    logger?.info(`Starting table update: ${tableName}`);
-
-    try {
-      // Update table with DDL code
-      const updateState = await client.getTable().update(
-        {
-          tableName: tableName,
-          ddlCode: ddl_code,
-          transportRequest: transport_request,
-        },
-        { lockHandle: lock_handle },
-      );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for table ${tableName}`,
-        );
-      }
-
-      // Get updated session state after update
-
-      logger?.info(`✅ UpdateTable completed: ${tableName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            table_name: tableName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Table ${tableName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error updating table ${tableName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to update table: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Table ${tableName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Table ${tableName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!table_name || !ddl_code || !lock_handle) {
+    return return_error(
+      new Error('table_name, ddl_code, and lock_handle are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const tableName = table_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateTableLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getTable(resultsFor(tableDocuments))
+        .update(
+          { tableName, transportRequest: transport_request },
+          {
+            sourceCode: ddl_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

@@ -1,26 +1,34 @@
 /**
- * CheckTable Handler - Syntax check for ABAP table via ADT API
+ * CheckTableLow Handler - Syntax check for ABAP Table
  *
- * Uses runTableCheckRun from @mcp-abap-adt/adt-clients/core/table for table-specific checking.
- * Requires session_id for stateful operations.
+ * Uses AdtClient.getTable().check from @mcp-abap-adt/adt-clients 19.
+ *
+ * **`ddl_code` and `reporter` no longer reach the wire.** The shipped
+ * `AdtTable.check()` calls `runTableCheckRun(connection, 'abapCheckRun',
+ * name, undefined, version)` — the reporter is hardcoded to `'abapCheckRun'`
+ * and the fourth argument (where a source would go) is hardcoded
+ * `undefined`, never `config.ddlCode`. Unlike `structure`'s sibling member,
+ * there is no unsaved-code check here. Both parameters stay on the tool
+ * schema (removing an existing parameter is not this migration's job) but
+ * neither is forwarded, since forwarding them would say they do something
+ * they do not. Verified against `AdtTable.js`, not the declaration file.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { tableDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { generateSessionId } from '../../../lib/sessionUtils';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckTableLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).',
+    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -60,6 +68,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['table_name'],
   },
@@ -76,129 +85,38 @@ interface CheckTableArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckTable MCP tool
- */
 export async function handleCheckTable(
   context: HandlerContext,
   args: CheckTableArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      table_name,
-      ddl_code,
-      version = 'new',
-      reporter = 'abapCheckRun',
-      session_id,
-      session_state,
-    } = args as CheckTableArgs;
+  const { table_name, version, session_id, session_state } = args;
 
-    if (!table_name) {
-      return return_error(new Error('table_name is required'));
-    }
-
-    const validReporters = ['tableStatusCheck', 'abapCheckRun'];
-    const checkReporter =
-      reporter && validReporters.includes(reporter)
-        ? (reporter as 'tableStatusCheck' | 'abapCheckRun')
-        : 'abapCheckRun';
-
-    const validVersions = ['active', 'inactive', 'new'];
-    const checkVersion =
-      version && validVersions.includes(version.toLowerCase())
-        ? (version.toLowerCase() as 'active' | 'inactive' | 'new')
-        : 'new';
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    // Use provided session_id or generate new one (required for table check)
-    const sessionId = session_id || generateSessionId();
-    const tableName = table_name.toUpperCase();
-
-    logger?.info(
-      `Starting table check: ${tableName} (reporter: ${checkReporter}, version: ${checkVersion}, session: ${sessionId.substring(0, 8)}..., ${ddl_code ? 'with new code' : 'saved version'})`,
-    );
-
-    try {
-      const builder = createAdtClient(connection, logger);
-
-      // Check table with optional source code (for validating new/unsaved code)
-      // If ddl_code is provided, it will be base64 encoded in the request body
-      const checkState = await builder
-        .getTable()
-        .check({ tableName, ddlCode: ddl_code }, checkVersion);
-      const response = checkState.checkResult;
-      if (!response) {
-        throw new Error('Table check did not return a response');
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckTable completed: ${tableName}`);
-      logger?.info(`   Status: ${checkResult.status}`);
-      logger?.info(
-        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            table_name: tableName,
-            version: checkVersion,
-            reporter: checkReporter,
-            check_result: checkResult,
-            session_id: sessionId,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Table ${tableName} has no syntax errors`
-              : `Table ${tableName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error checking table ${tableName}:`, error);
-
-      let errorMessage = `Failed to check table: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Table ${tableName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!table_name) {
+    return return_error(new Error('table_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const tableName = table_name.toUpperCase();
+  const validVersions = ['active', 'inactive', 'new'];
+  const checkVersion =
+    version && validVersions.includes(version.toLowerCase())
+      ? version.toLowerCase()
+      : 'new';
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckTableLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getTable(resultsFor(tableDocuments))
+        .check({ tableName }, checkVersion, { analyse: analyseCheck }),
+    project(detail, terseCheck),
+  );
 }

@@ -1,19 +1,30 @@
 /**
- * CreateTable Handler - Create ABAP Table
+ * CreateTableLow Handler - Create ABAP Table
  *
- * Uses AdtClient.createTable from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getTable().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
+ *
+ * **No source, no description.** The shipped `createTable` reads five
+ * fields — table name, package, transport, master and responsible — and
+ * neither `description` nor `ddl_code` is among them; passing them read as
+ * if a create wrote either, and it never did. The DDL source is
+ * `UpdateTableLow`'s job, after `LockTableLow`. Verified against
+ * `AdtTable.js`.
  */
 
-import type { ITableConfig } from '@mcp-abap-adt/interfaces';
+import { tableDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateTableLow',
@@ -52,138 +63,62 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['table_name', 'package_name'],
   },
 } as const;
 
-interface CreateTableArgs
-  extends Pick<
-    ITableConfig,
-    'tableName' | 'packageName' | 'transportRequest' | 'description'
-  > {
+interface CreateTableArgs {
   table_name: string;
-  description: string;
   package_name: string;
   transport_request?: string;
-  table_type?: string;
-  application?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateTable MCP tool
- *
- * Uses AdtClient.createTable - low-level single method call
- */
 export async function handleCreateTable(
   context: HandlerContext,
   args: CreateTableArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      table_name,
-      package_name,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as CreateTableArgs;
+  const {
+    table_name,
+    package_name,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!table_name || !package_name) {
-      return return_error(
-        new Error('table_name and package_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const tableName = table_name.toUpperCase();
-
-    logger?.info(`Starting table creation: ${tableName}`);
-
-    try {
-      // Create table
-      const createState = await client.getTable().create({
-        tableName,
-        packageName: package_name,
-        description: '',
-        ddlCode: '',
-        transportRequest: transport_request,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for table ${tableName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateTable completed: ${tableName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            table_name: tableName,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Table ${tableName} created successfully. Use LockTable and UpdateTable to add source code, then UnlockTable and ActivateObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error creating table ${tableName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to create table: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Table ${tableName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!table_name || !package_name) {
+    return return_error(new Error('table_name and package_name are required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const tableName = table_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateTableLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getTable(resultsFor(tableDocuments))
+        .create(
+          {
+            tableName,
+            packageName: package_name,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

@@ -1,44 +1,46 @@
 /**
- * UnlockTable Handler - Unlock ABAP Table
+ * UnlockTableLow Handler - Unlock ABAP Table
  *
- * Uses AdtClient.unlockTable from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getTable().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockTableLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.',
+    '[low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTableLow operation.',
   inputSchema: {
     type: 'object',
     properties: {
       table_name: {
         type: 'string',
-        description: 'Table name (e.g., Z_MY_PROGRAM).',
+        description: 'Table name (e.g., Z_MY_TABLE).',
       },
       lock_handle: {
         type: 'string',
-        description: 'Lock handle from LockTable operation.',
+        description: 'Lock handle from LockTableLow operation.',
       },
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockTable operation. Must be the same as used in LockTable.',
+          'Session ID from LockTableLow operation. Must be the same as used in LockTableLow.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockTable (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          'Session state from LockTableLow (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },
@@ -61,100 +63,31 @@ interface UnlockTableArgs {
   };
 }
 
-/**
- * Main handler for UnlockTable MCP tool
- *
- * Uses AdtClient.unlockTable - low-level single method call
- */
 export async function handleUnlockTable(
   context: HandlerContext,
   args: UnlockTableArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { table_name, lock_handle, session_id, session_state } =
-      args as UnlockTableArgs;
+  const { table_name, lock_handle, session_id, session_state } = args;
 
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const tableName = table_name.toUpperCase();
-
-    logger?.info(
-      `Starting table unlock: ${tableName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!table_name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('table_name, lock_handle, and session_id are required'),
     );
-
-    try {
-      // Unlock table
-      const unlockState = await client
-        .getTable()
-        .unlock({ tableName: tableName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for table ${tableName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockTable completed: ${tableName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            table_name: tableName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Table ${tableName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error unlocking table ${tableName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to unlock table: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Table ${tableName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockTable.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const tableName = table_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockTableLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getTable()
+        .unlock({ tableName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

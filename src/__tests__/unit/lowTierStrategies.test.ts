@@ -121,6 +121,19 @@ import {
 } from '../../handlers/structure/low/handleUnlockStructure';
 import { handleUpdateStructure } from '../../handlers/structure/low/handleUpdateStructure';
 import { handleValidateStructure } from '../../handlers/structure/low/handleValidateStructure';
+import { handleActivateTable } from '../../handlers/table/low/handleActivateTable';
+import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
+import { handleDeleteTable } from '../../handlers/table/low/handleDeleteTable';
+import {
+  handleLockTable,
+  TOOL_DEFINITION as LockTableToolDefinition,
+} from '../../handlers/table/low/handleLockTable';
+import {
+  handleUnlockTable,
+  TOOL_DEFINITION as UnlockTableToolDefinition,
+} from '../../handlers/table/low/handleUnlockTable';
+import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
+import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured } from '../../lib/strategies/reading';
 import { fakeClientOf, okResponse, recordAnalyse } from '../helpers/fakeClient';
@@ -228,6 +241,19 @@ it.each([
     'getStructure',
     {
       structure_name: 'ZST_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'table',
+    handleActivateTable,
+    handleDeleteTable,
+    handleValidateTable,
+    'getTable',
+    {
+      table_name: 'ZT_X',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',
@@ -1130,6 +1156,143 @@ describe('structure', () => {
 
     const result: any = await handleActivateStructure(context as any, {
       structure_name: 'ZST_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+});
+
+describe('table', () => {
+  it("CheckTableLow defaults the check member's status to 'new' when version is omitted, and forwards no source — runTableCheckRun's source argument is hardcoded undefined", async () => {
+    await handleCheckTable(context as any, {
+      table_name: 'ZT_X',
+      ddl_code: 'define table zt_x { client : abap.clnt; }',
+    });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getTable');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    // ddl_code is accepted by the tool but never reaches config — unlike
+    // structure's sibling handler, table's check has nothing to forward it to.
+    expect(call?.args[0]).toEqual({ tableName: 'ZT_X' });
+    expect(call?.args[1]).toBe('new');
+  });
+
+  it('CheckTableLow passes "active" through to the check member\'s second parameter when asked', async () => {
+    await handleCheckTable(context as any, {
+      table_name: 'ZT_X',
+      version: 'active',
+    });
+    const call = callTo('check');
+    expect(call?.args[1]).toBe('active');
+  });
+
+  it('UpdateTableLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
+    await handleUpdateTable(context as any, {
+      table_name: 'ZT_X',
+      ddl_code: 'define table zt_x { client : abap.clnt; }',
+      lock_handle: 'h',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getTable');
+    expect(call?.args[0]).toEqual({
+      tableName: 'ZT_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'define table zt_x { client : abap.clnt; }',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockTableLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockTable(context as any, { table_name: 'ZT_X' });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getTable');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in LockTableToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it("LockTableLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'TABLE_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockTable(context as any, {
+      table_name: 'ZT_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.table_name).toBe('ZT_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockTableLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'TABLE_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockTable(connectionSessionContext as any, {
+      table_name: 'ZT_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockTableLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockTable(context as any, {
+      table_name: 'ZT_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getTable');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in UnlockTableToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it('ValidateTableLow reads a real corpus document (table-specific fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateTable(context as any, {
+      table_name: 'ZMCP_BLD_FREE_T1',
+      package_name: 'ZADT_BLD_PKG03',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('ActivateTableLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateTable(context as any, {
+      table_name: 'ZT_X',
     });
 
     expect(result.isError).toBe(false);

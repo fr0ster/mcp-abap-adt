@@ -1,6 +1,6 @@
 // `npx tsx scripts/check-analyse.ts 'src/handlers/domain/low/**'`
 import { globSync } from 'node:fs';
-import { analyseOmissions } from '../src/lib/audit/analyseOmissions';
+import { analyseOmissions } from './lib/analyseOmissions';
 
 const pattern = process.argv[2] ?? 'src/handlers/**/handle*.ts';
 const files = globSync(pattern);

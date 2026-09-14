@@ -18,7 +18,15 @@ export function analyseOmissions(handlers: string[]): {
       // meaningful only on a clean build, which is why it comes after Task 25.
       const options = signature?.parameters.at(-1);
       if (options === undefined) continue;
-      const type = checker.getTypeOfSymbolAtLocation(options, call);
+      // Non-nullable, or an optional parameter's declared type is always
+      // `T | undefined` — a union whose `getProperties()` answers only what
+      // every member shares, which with `undefined` is nothing. Skipping on
+      // that empty result would skip every optional-options call whether or
+      // not it actually accepts `analyse`, which is not "this member takes no
+      // strategy" — it is the check unable to see past its own parameter type.
+      const type = checker.getNonNullableType(
+        checker.getTypeOfSymbolAtLocation(options, call),
+      );
       if (!type.getProperties().some((p) => p.name === 'analyse')) continue;
       inspected += 1;
       // Neither the syntax alone nor the type alone answers this.
@@ -41,7 +49,9 @@ export function analyseOmissions(handlers: string[]): {
       if (verdict !== 'yes') {
         offenders.push(
           `${file}:${lineOf(source, call)} — ${call.expression.getText()} — ${
-            verdict === 'no' ? 'no analyse passed' : 'analyse not provable from the source; inline it'
+            verdict === 'no'
+              ? 'no analyse passed'
+              : 'analyse not provable from the source; inline it'
           }`,
         );
       }
@@ -66,16 +76,32 @@ export function analyseOmissions(handlers: string[]): {
  * accepts an analyse" and pass while checking nothing.
  */
 function compilerOptions(): ts.CompilerOptions {
-  const root = join(__dirname, '../../..');
-  const configPath = ts.findConfigFile(root, ts.sys.fileExists, 'tsconfig.json');
+  // scripts/lib -> scripts -> repo root: two levels, not three. This module
+  // used to live at src/lib/audit, one directory deeper, where '../../..' was
+  // correct; moving it without updating this made every program resolve the
+  // wrong tsconfig.json from the parent of the repo, if one even exists there.
+  const root = join(__dirname, '../..');
+  const configPath = ts.findConfigFile(
+    root,
+    ts.sys.fileExists,
+    'tsconfig.json',
+  );
   if (configPath === undefined) throw new Error('tsconfig.json not found');
   const { config, error } = ts.readConfigFile(configPath, ts.sys.readFile);
   if (error !== undefined) {
     throw new Error(ts.flattenDiagnosticMessageText(error.messageText, '\n'));
   }
-  const parsed = ts.parseJsonConfigFileContent(config, ts.sys, dirname(configPath));
+  const parsed = ts.parseJsonConfigFileContent(
+    config,
+    ts.sys,
+    dirname(configPath),
+  );
   if (parsed.errors.length > 0) {
-    throw new Error(parsed.errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n')).join('\n'));
+    throw new Error(
+      parsed.errors
+        .map((d) => ts.flattenDiagnosticMessageText(d.messageText, '\n'))
+        .join('\n'),
+    );
   }
   // `noEmit`, because this program is only ever asked questions.
   return { ...parsed.options, noEmit: true };
@@ -169,7 +195,10 @@ function carriesAnalyse(
  */
 function isConstBinding(declaration: ts.VariableDeclaration): boolean {
   const list = declaration.parent;
-  return ts.isVariableDeclarationList(list) && (list.flags & ts.NodeFlags.Const) !== 0;
+  return (
+    ts.isVariableDeclarationList(list) &&
+    (list.flags & ts.NodeFlags.Const) !== 0
+  );
 }
 
 /**
@@ -198,7 +227,10 @@ function admitsUndefined(type: ts.Type): 'yes' | 'no' | 'unknown' {
 function memberCallsIn(source: ts.SourceFile): ts.CallExpression[] {
   const calls: ts.CallExpression[] = [];
   const visit = (node: ts.Node): void => {
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression)
+    ) {
       calls.push(node);
     }
     ts.forEachChild(node, visit);

@@ -1,3 +1,4 @@
+import type { IAdtError } from '@mcp-abap-adt/interfaces';
 import {
   fakeClientOf,
   okResponse,
@@ -11,11 +12,20 @@ describe('fakeClient helpers', () => {
   it('okResponse carries its value', () => {
     const response = okResponse({ some: 'value' });
     expect(response.ok).toBe(true);
+    if (!response.ok) throw new Error('expected the success');
     expect(response.getResult()).toEqual({ value: { some: 'value' } });
   });
 
   it('okResponse throws when asked for the error', () => {
     const response = okResponse('success');
+    // `getError` is not on `IAdtSuccess`'s contract at all — narrowing on
+    // `.ok` can only ever land in the success branch here, which has no
+    // `getError` to call. The double still carries one (a defensive throw),
+    // so narrow on ITS presence instead: `in` narrows to the union member
+    // that declares the property, which for `getError` is `IAdtFailure`.
+    if (!('getError' in response)) {
+      throw new Error('expected the double to carry getError');
+    }
     expect(() => response.getError()).toThrow(
       'asked for the error of a success',
     );
@@ -24,6 +34,7 @@ describe('fakeClient helpers', () => {
   it('refusedResponse carries its message and origin', () => {
     const response = refusedResponse('Something went wrong');
     expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected the refusal');
     expect(response.getError()).toEqual({
       message: 'Something went wrong',
       origin: 'refusal',
@@ -32,6 +43,12 @@ describe('fakeClient helpers', () => {
 
   it('refusedResponse throws when asked for the result', () => {
     const response = refusedResponse('failure');
+    // Same shape as the `getError`-on-success case above, mirrored: `getResult`
+    // is not on `IAdtFailure`'s contract, so narrow on the double actually
+    // carrying it rather than on `.ok`.
+    if (!('getResult' in response)) {
+      throw new Error('expected the double to carry getResult');
+    }
     expect(() => response.getResult()).toThrow(
       'asked for the result of a failure',
     );
@@ -39,13 +56,18 @@ describe('fakeClient helpers', () => {
 
   it('refusedResponse accepts extra fields', () => {
     const response = refusedResponse('Error', {
-      request: 'data',
+      request: { method: 'GET', url: '/data' },
+      // Wider than `Partial<IAdtError>` on purpose: the point of the test is
+      // that `extra` spreads through untouched, and an object literal cannot
+      // carry an unknown field into that parameter without saying so.
       extra: 'field',
-    });
+    } as Partial<IAdtError>);
+    expect(response.ok).toBe(false);
+    if (response.ok) throw new Error('expected the refusal');
     expect(response.getError()).toEqual({
       message: 'Error',
       origin: 'refusal',
-      request: 'data',
+      request: { method: 'GET', url: '/data' },
       extra: 'field',
     });
   });
@@ -94,7 +116,9 @@ describe('fakeClient helpers', () => {
   });
 
   it('refusingClient refuses whatever it is asked', async () => {
-    const client = refusingClient('Network error', { request: 'GET /adt' });
+    const client = refusingClient('Network error', {
+      request: { method: 'GET', url: '/adt' },
+    });
     const factory = (client as any).getAnything;
     const member = factory();
     const result = await member.deleteClass();
@@ -102,7 +126,7 @@ describe('fakeClient helpers', () => {
     expect(result.getError()).toEqual({
       message: 'Network error',
       origin: 'refusal',
-      request: 'GET /adt',
+      request: { method: 'GET', url: '/adt' },
     });
   });
 

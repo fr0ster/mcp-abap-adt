@@ -27,6 +27,16 @@ const seen = recordAnalyse();
 let fakeClient: unknown = seen.client;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
+// Nothing in this file asserts that a handler injects `resultsFor(domainDocuments)`
+// into `getDomain(...)` — both `fakeClientOf` and `recordAnalyse` ignore the
+// factory argument entirely (`fakeClientOf`'s own doc comment names this), so
+// a handler calling `getDomain()` bare would satisfy every test here. That
+// injection is guarded by `tsc` instead: `resultsFor`'s mapped return type is
+// what makes `getX(resultsFor(xDocuments)).op(...)` answer the reading-shaped
+// type a handler's `project(detail, terseX)` actually needs, and dropping the
+// call is a type error at the `project` call site, not a runtime failure a
+// test here would catch.
+
 const context = {
   connection: { getSessionId: () => null } as any,
   logger: undefined,
@@ -92,7 +102,7 @@ describe('CreateDomainLow', () => {
       description: 'x',
       package_name: 'ZP',
     });
-    const call = seen.calls.find((c) => c.member === 'create');
+    const call = seen.calls.filter((c) => c.member === 'create').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
   });
@@ -120,7 +130,7 @@ describe('CheckDomainLow', () => {
   it('hands check its own analyseCheck, and status undefined (the inactive default)', async () => {
     fakeClient = seen.client;
     await handleCheckDomain(context as any, { domain_name: 'ZD' });
-    const call = seen.calls.find((c) => c.member === 'check');
+    const call = seen.calls.filter((c) => c.member === 'check').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseCheck);
     expect(call?.args[1]).toBeUndefined();
@@ -227,7 +237,7 @@ describe('ValidateDomainLow', () => {
       package_name: 'ZP',
       description: 'x',
     });
-    const call = seen.calls.find((c) => c.member === 'validate');
+    const call = seen.calls.filter((c) => c.member === 'validate').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseValidation);
   });
@@ -285,7 +295,7 @@ describe('LockDomainLow', () => {
   it('LockDomain passes no analyse, because lock() accepts none', async () => {
     fakeClient = seen.client;
     await handleLockDomain(context as any, { domain_name: 'ZD' });
-    const call = seen.calls.find((c) => c.member === 'lock');
+    const call = seen.calls.filter((c) => c.member === 'lock').at(-1);
     expect(call?.carriedAnalyse).toBe(false);
     expect(call?.analyse).toBeUndefined();
   });
@@ -312,7 +322,7 @@ describe('UnlockDomainLow', () => {
       lock_handle: 'h',
       session_id: 's',
     });
-    const call = seen.calls.find((c) => c.member === 'unlock');
+    const call = seen.calls.filter((c) => c.member === 'unlock').at(-1);
     expect(call?.carriedAnalyse).toBe(false);
     expect(call?.analyse).toBeUndefined();
   });

@@ -19,7 +19,7 @@ Every task's requirements implicitly include this section.
 - **No handler builds a failure sentence.** `answer()` renders the strategy's failure through its allowlist. `return_error(new Error(failure.message))` is a defect, not a migration step.
 - **`analyse` on every call whose resolved signature accepts one** — resolved by the compiler, per (class, member). There is no shortcut: `fetchNodeStructure` has an `options` argument and accepts no strategy, and `AdtPackageLegacy.readMetadata<E>()` is generic with no parameters at all. Pass it **in the call, or in a `const` initialized with an object literal in the same file and not mutated afterwards** — that is what makes the check decidable. A `let`, a value assembled at runtime, or one that may be `undefined` is reported so it can be inlined. `const` fixes the binding and not the object, so mutating the literal afterwards defeats the check; the invariant is a guard, not a proof. Passing one where it is not accepted is already a compile error. The omission is caught by `scripts/check-analyse.ts`, written in Task 10 and run by every task that migrates handlers **on the family it just touched**, so a missing strategy is found in the commit that introduced it. Task 26 runs the same check repo-wide as a test.
 - **`raw_body` never depends on `detail`.** Whenever the failure carries a non-empty string body it reaches the caller at every level and on every tool; where there is none the field is absent, never invented.
-- **Every test's arguments come from its tool's own `required` list, and every negative test asserts what failed.** A handler validates its input before it builds a client, so a call short of a required field never reaches the member under test — and still answers `isError: true`. Asserting only that flag passes such a test while proving nothing. Assert the message, or `origin: 'refusal'`, which a local validation error cannot produce.
+- **Every test's arguments come from its tool's own schema — names, and values from any `enum` or documented set — and every negative test asserts what failed.** Values matter as much as names: `binding_variant` accepts four spellings and `ODATA_V4` is none of them; `object_type` is lowercased and matched against `class` or the ADT code `clas/oc`, so `CLAS` falls through to the default. A handler validates its input before it builds a client, so a call short of a required field never reaches the member under test — and still answers `isError: true`. Asserting only that flag passes such a test while proving nothing. Assert the message, or `origin: 'refusal'`, which a local validation error cannot produce.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`. The contract's types are not filters, and what sits on a transport config is headers, an Authorization bearer and cookies.
 - **A lock chain is `withLock()`, never `sequence()`**, and only where the handler owns the lock's whole lifetime. The fifteen `low`-tier `LockX` tools hand the handle back on purpose and are never wrapped.
 - **Legacy is in scope.** `SAP_SYSTEM_TYPE=legacy` selects `AdtClientLegacy`, which serves 144 of the 326 tools through these same handler files. Four `Legacy` classes drop the strategy on seventeen members; Task 18 pins them and Task 19 walks the twenty-three tools that reach them.
@@ -1950,7 +1950,7 @@ Confirm the list before starting: a file that turns out to call `readMetadata` a
 // That combination passes while proving nothing, so the message is asserted too.
 it.each([
   ['ReadMessageClass', handleReadMessageClass, { message_class_name: 'ZMC' }],
-  ['GetObjectStructure', handleGetObjectStructure, { object_name: 'ZCL_X', object_type: 'CLAS' }],
+  ['GetObjectStructure', handleGetObjectStructure, { object_name: 'ZCL_X', object_type: 'class' }],
   ['SearchObject', handleSearchObject, { object_name: 'ZCL*' }],
   ['ListTransports', handleListTransports, {}],
   ['GetSqlQuery', handleGetSqlQuery, { sql_query: 'SELECT 1' }],
@@ -2033,9 +2033,12 @@ const refusalFrom = (member: string, caseName: string, analyse: (v: unknown, a: 
 it('reports a refused deletion as an error, though ADT answered 200', async () => {
   fakeClient = refusalFrom('delete', 'refusal-delete-refused--01-deletion-delete', analyseDeletion);
   const result: any = await handleDeleteObject(context as any, {
-    object_type: 'CLAS', object_name: 'ZCL_X', lock_handle: 'h',
+    object_type: 'class', object_name: 'ZCL_X', lock_handle: 'h',
   });
   expect(result.isError).toBe(true);
+  // What failed, not just that something did. A local validation error
+  // answers isError too, and would pass the line below unchanged.
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
   expect(result.content[0].text).not.toContain('"success": true');
 });
 
@@ -2044,7 +2047,7 @@ it('reports an inadmissible name as an error', async () => {
     'validate', 'refusal-validation-name-taken-class--01-validation-objectname', analyseValidation,
   );
   const result: any = await handleValidateObject(context as any, {
-    object_type: 'CLAS', object_name: 'ZCL_TAKEN', package_name: 'ZP',
+    object_type: 'class', object_name: 'ZCL_TAKEN', package_name: 'ZP',
   });
   expect(result.isError).toBe(true);
   // `origin` proves the failure came from the strategy rather than from the
@@ -2507,6 +2510,7 @@ it('reports a refused deletion as an error, though ADT answered 200', async () =
   });
   const result: any = await handleDeleteClass(context as any, { class_name: 'ZCL_X' });
   expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
   expect(result.content[0].text).not.toContain('"success": true');
 });
 
@@ -2640,8 +2644,8 @@ chain: run the steps in order, stop at the first failure. The two class
 profiling handlers are **not** here; they poll, and Task 24 is theirs.
 
 **Ask the compiler for this list rather than trusting the table.** An earlier
-draft was written by hand and missed three consumers; the compiler names every
-one:
+draft was written by hand and missed four consumers — `searchObjects` twice, and
+both service-binding members. The compiler names every one:
 
 ```bash
 npx tsc --noEmit 2>&1 \
@@ -2666,10 +2670,9 @@ and the rest are Tasks 9 to 22's work. What is left is this:
 | `system/readonly/handleRuntimeRunProgram.ts` | `runWithProfiling` | `scheduleTrace` + `runWithProfiler` |
 | `system/readonly/handleRuntimeRunProgramWithProfiling.ts` | `runWithProfiling` | `scheduleTrace` + `runWithProfiler` |
 
-Eleven consumers, not seven. The three the hand-written table missed —
-`searchObjects` twice and the two service-binding members — would otherwise have
-waited for the final compiler sweep in Task 25, in a task that has no test for
-them.
+Eleven consumers, not seven. The four the hand-written table missed would
+otherwise have waited for the final compiler sweep in Task 25, in a task that
+has no test for them.
 
 **`runWithProfiling` was split, not deleted.** `ProgramExecutor` says so in its
 own comment: *"who wants the old member writes `scheduleTrace`, then
@@ -2721,7 +2724,7 @@ back to the library and nothing says so.
 
 // SHAPE 1 — a rename, still one call.
 it.each([
-  ['GetWhereUsed', handleGetWhereUsed, { object_type: 'CLAS', object_name: 'ZCL_X' }, 'getWhereUsed'],
+  ['GetWhereUsed', handleGetWhereUsed, { object_type: 'class', object_name: 'ZCL_X' }, 'getWhereUsed'],
   ['GetStructuresList', handleGetStructuresList, { structure_name: 'ZS' }, 'getWhereUsed'],
   // Arguments copied from each tool's own `required` list, not invented. A
   // handler validates its input before it builds a client, so a row missing a
@@ -2843,7 +2846,7 @@ it('UpdateServiceBinding calls the members that replaced the composite, in order
   await handleUpdateServiceBinding(context as any, {
     service_binding_name: 'ZSB',
     desired_publication_state: 'published',
-    binding_variant: 'ODATA_V4',
+    binding_variant: 'ODATA_V4_UI',
     service_name: 'ZSRV',
   });
   expect(order).toEqual(['update', 'classify']);
@@ -2859,7 +2862,7 @@ it('UpdateServiceBinding stops at the first refused step', async () => {
   const result: any = await handleUpdateServiceBinding(context as any, {
     service_binding_name: 'ZSB',
     desired_publication_state: 'published',
-    binding_variant: 'ODATA_V4',
+    binding_variant: 'ODATA_V4_UI',
     service_name: 'ZSRV',
   });
   expect(result.isError).toBe(true);

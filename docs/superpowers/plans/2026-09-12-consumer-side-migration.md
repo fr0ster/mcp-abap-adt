@@ -23,7 +23,8 @@ own tests pass and it is committed — not when it is described.
 | 2. `safeFields` | done | `3cc6192` |
 | 3. `answer.ts` — the failure payload | done | `c340a77` |
 | 4. `pair()`, and `sequence()` at five steps | done | `2b4de6f` |
-| 5 – 29 | not started | |
+| 5. `withLock()` | done | `f19ffea` |
+| 6 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -709,7 +710,7 @@ The nine combinations, from the spec:
 | threw | refused | the body's throw, plus `cleanup` with an origin |
 | threw | threw | the body's throw, plus `cleanup` marked `client_threw` |
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/withLock.test.ts
@@ -849,7 +850,7 @@ describe('withLock', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 npx jest src/__tests__/unit/withLock.test.ts
@@ -857,7 +858,7 @@ npx jest src/__tests__/unit/withLock.test.ts
 
 Expected: FAIL — cannot find module `withLock`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/lib/strategies/withLock.ts
@@ -988,7 +989,7 @@ export class LockNotReleased extends Error {
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx jest src/__tests__/unit/withLock.test.ts src/__tests__/unit/answerFailure.test.ts
@@ -996,7 +997,7 @@ npx jest src/__tests__/unit/withLock.test.ts src/__tests__/unit/answerFailure.te
 
 Expected: PASS, all ten plus Task 3's.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/strategies/withLock.ts src/__tests__/unit/withLock.test.ts

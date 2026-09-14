@@ -2869,11 +2869,11 @@ it.each(profiling)('%s passes the scheduled id to the profiler run', async (_n, 
   const order: string[] = [];
   let passed: unknown;
   programExecutor = {
-    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading(PROGRAM_REQUEST)); },
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(PROGRAM_REQUEST); },
     runWithProfiler: async (_target: unknown, options: any) => {
       order.push('run');
       passed = options?.profilerId;
-      return okResponse(reading({ done: true }));
+      return okResponse({ done: true });
     },
   };
   await (handler as any)(context as any, args);
@@ -2918,11 +2918,11 @@ it('UpdateServiceBinding calls the members that replaced the composite, in order
     // the member names Step 1 established, not these guesses
     update: async (config: any, o: any) => {
       order.push('update'); seen.update = { config, analyse: o?.analyse };
-      return okResponse(reading(undefined, '', 200));
+      return okResponse(undefined, '', 200);
     },
     classifyServiceBinding: async (config: any) => {
       order.push('classify'); seen.classify = config;
-      return okResponse(reading({}));
+      return okResponse({});
     },
   });
   // All four of this tool's required fields: service_binding_name,
@@ -3122,7 +3122,7 @@ const handlers = [
 // this, a migration that routes every run through the profiler workflow passes
 // every other test in this file — they all pass `profile: true`.
 it('RuntimeRunClass without profile runs the class and touches no profiler', async () => {
-  const run = jest.fn(async () => okResponse(reading('output')));
+  const run = jest.fn(async () => okResponse('output'));
   const schedule = jest.fn();
   const withProfiler = jest.fn();
   const list = jest.fn();
@@ -3153,14 +3153,14 @@ it.each(handlers)('%s passes the scheduled id to the profiler run', async (_n, h
   const order: string[] = [];
   let passed: unknown;
   classExecutor = {
-    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading(PROFILER_REQUEST)); },
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(PROFILER_REQUEST); },
     runWithProfiler: async (_target: unknown, options: any) => {
       order.push('run');
       passed = options?.profilerId;
-      return okResponse(reading('done'));
+      return okResponse('done');
     },
   };
-  profiler = { list: async () => okResponse(reading([])) };
+  profiler = { list: async () => okResponse([]) };
   // One attempt and no delay. Under the recommended option this handler polls,
   // and the defaults are five attempts two seconds apart — eight seconds per
   // parametrised case, against Jest's five-second timeout. This test is about
@@ -3179,7 +3179,7 @@ it.each(handlers)('%s stops at a refused schedule and never runs', async (_n, ha
     scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
     runWithProfiler: run,
   };
-  profiler = { list: async () => okResponse(reading([])) };
+  profiler = { list: async () => okResponse([]) };
   const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
   expect(JSON.parse(result.content[0].text).message).toBe('Trace scheduling refused');
@@ -3213,12 +3213,12 @@ it.each(handlers)('%s finds the trace by difference, not by position', async (_n
   // it from the start asks the implementation to be wrong.
   let listed = 0;
   classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
+    scheduleTrace: async () => okResponse(PROFILER_REQUEST),
+    runWithProfiler: async () => okResponse('done'),
   };
   profiler = {
     list: async () =>
-      okResponse(reading(++listed === 1 ? [older, stale] : [older, produced, stale, decoy])),
+      okResponse(++listed === 1 ? [older, stale] : [older, produced, stale, decoy]),
   };
 
   const result: any = await (handler as any)(context as any, {
@@ -3236,8 +3236,8 @@ it.each(handlers)('%s reports a refused feed read rather than an empty feed', as
   // call count can say so. A handler that schedules and runs before the
   // snapshot, or carries on after its refusal, returns the same error and
   // would pass a test that only reads the message.
-  const schedule = jest.fn(async () => okResponse(reading(PROFILER_REQUEST)));
-  const run = jest.fn(async () => okResponse(reading('done')));
+  const schedule = jest.fn(async () => okResponse(PROFILER_REQUEST));
+  const run = jest.fn(async () => okResponse('done'));
   classExecutor = { scheduleTrace: schedule, runWithProfiler: run };
   profiler = { list: async () => refusedResponse('Profiler feed not authorised') };
 
@@ -3253,14 +3253,14 @@ it.each(handlers)('%s reports a refusal during the search, not a missing trace',
   if (OPTION !== 'find-the-trace') return;
   let call = 0;
   classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
+    scheduleTrace: async () => okResponse(PROFILER_REQUEST),
+    runWithProfiler: async () => okResponse('done'),
   };
   // The snapshot succeeds; the poll is refused. Reporting "no trace yet" here
   // would be the masking defect: SAP answered, and it said no.
   profiler = {
     list: async () =>
-      ++call === 1 ? okResponse(reading([])) : refusedResponse('Session expired'),
+      ++call === 1 ? okResponse([]) : refusedResponse('Session expired'),
   };
   const result: any = await (handler as any)(context as any, {
     ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
@@ -3273,10 +3273,10 @@ it.each(handlers)('%s stops after max_trace_attempts and still reports the run',
   if (OPTION !== 'find-the-trace') return;
   let listed = 0;
   classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
+    scheduleTrace: async () => okResponse(PROFILER_REQUEST),
+    runWithProfiler: async () => okResponse('done'),
   };
-  profiler = { list: async () => { listed += 1; return okResponse(reading([])); } };
+  profiler = { list: async () => { listed += 1; return okResponse([]); } };
 
   const result: any = await (handler as any)(context as any, {
     ...args, max_trace_attempts: 2, trace_retry_delay_ms: 0,
@@ -3290,6 +3290,13 @@ it.each(handlers)('%s stops after max_trace_attempts and still reports the run',
   expect(payload.profile?.trace_id ?? payload.trace_id).toBeUndefined();
 });
 
+// No `reading(...)` anywhere in this file, unlike every other handler test in
+// the plan. The executors and the profiler take no injected result strategy, so
+// their `IAdtResponse` carries the plain value — a string, an array of entries —
+// and wrapping it in an `AdtReading` would hand `sequence` an object where the
+// implementation expects an id, and `newTraceAfter` an object where it expects
+// an array.
+
 // The two answer the id in DIFFERENT PLACES, so this cannot be parametrised
 // on the field: `RuntimeRunClass` nests it under `profile`, and the deprecated
 // `RuntimeRunClassWithProfiling` puts it at the top level. A shared assertion
@@ -3301,14 +3308,14 @@ it.each([
     (p: any) => p.trace_id],
 ])('%s answers its trace id where its own schema puts it', async (_n, handler, args, at) => {
   classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
+    scheduleTrace: async () => okResponse(PROFILER_REQUEST),
+    runWithProfiler: async () => okResponse('done'),
   };
   // Empty snapshot, then the produced trace — the same order as a real run.
   let seen = 0;
   profiler = {
     list: async () =>
-      okResponse(reading(++seen === 1 ? [] : [{ id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' }])),
+      okResponse(++seen === 1 ? [] : [{ id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' }]),
   };
   const result: any = await (handler as any)(context as any, args);
   const payload = JSON.parse(result.content[0].text);
@@ -3319,9 +3326,16 @@ it.each([
   expect(payload.class_name).toBe('ZCL_X');
   expect('output' in payload).toBe(_n === 'RuntimeRunClass');
   // `run_status` and `trace_requests_status` are gone on both — the status is
-  // not in the 19 contract. Absent, not null.
+  // not in the 19 contract. Absent, not null, and looked for WHERE EACH TOOL
+  // PUTS IT: `RuntimeRunClass` nests `trace_requests_status` inside `profile`,
+  // so checking the top level would have been false before the migration too
+  // and proved nothing.
   expect('run_status' in payload).toBe(false);
-  expect('trace_requests_status' in payload).toBe(false);
+  if (_n === 'RuntimeRunClass') {
+    expect('trace_requests_status' in (payload.profile ?? {})).toBe(false);
+  } else {
+    expect('trace_requests_status' in payload).toBe(false);
+  }
 
   // Under option one, the id the feed search produced. Under the other two it
   // is absent, and the assertion flips with the decision Step 1 recorded —
@@ -3345,7 +3359,7 @@ import { newTraceAfter } from '../../lib/strategies/newTrace';
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
 const entry = (id: string, recordedAt: string) => ({ id, recordedAt });
-const feed = (...entries: ReturnType<typeof entry>[]) => okResponse(reading(entries));
+const feed = (...entries: ReturnType<typeof entry>[]) => okResponse(entries);
 const never = async () => { throw new Error('should not have waited'); };
 
 it('answers on the first read when a new id is already there, without waiting', async () => {
@@ -3582,9 +3596,11 @@ Edit the tool definitions only if Step 1 said to.
 - [ ] **Step 6: Run everything and measure**
 
 ```bash
-npx jest src/__tests__/unit/runtimeProfiling.test.ts \
-         src/__tests__/unit/newTrace.test.ts \
-         src/__tests__/unit/toolSurface.test.ts
+# every option
+npx jest src/__tests__/unit/runtimeProfiling.test.ts src/__tests__/unit/toolSurface.test.ts
+
+# option one only — the other two never create this file
+npx jest src/__tests__/unit/newTrace.test.ts
 npx tsc --noEmit 2>&1 | grep -c 'error TS'
 ```
 

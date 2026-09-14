@@ -4315,7 +4315,24 @@ for (const r of rows) console.log(r.group, r.name, '|', r.inputs);
 " > /tmp/all-tools.txt
 ```
 
-A tool answers JSON unless it hands a document through as the whole answer. `source_code` or `metadata` as the only field is a pass-through; the same field inside a JSON object with others is JSON.
+**The test is whether an `AdtReading` is behind the answer**, not whether the
+answer looks like JSON. `detail` exists to choose between the layers of a
+reading — `raw` is the document as it arrived, `value` its parse, `terse` a
+selection from that parse. Where no reading produced the answer there are no
+layers, and the parameter cannot mean anything.
+
+Three cases, and the rule sorts all three without an exception list:
+
+| the answer | reading behind it | `detail` |
+|---|---|---|
+| a document handed through whole — `source_code` or `metadata` as the only field | one, but `raw` and the projection are the same bytes | no |
+| a JSON object built from a parsed document | yes, with a parse and a document behind it | **yes** |
+| a composite this repository assembles from several calls, with no document — the two runtime profiling tools | none: the executors take no result strategy, and `IAdtResult<T>` is `{ value }` | no |
+
+The third row is why Task 24 hands its projection to `answer()` directly and
+carries `detail: 'terse'`. That is not an exception granted to those two tools;
+it is this rule reaching the same answer as for a pass-through, by the same
+argument. A tool later given a reading gains `detail` with it.
 
 - [ ] **Step 2: Write the failing test**
 
@@ -4506,7 +4523,18 @@ grep -rln "readResult\|metadataResult\|adt-clients 18\|activationRefusal\|deleti
 npm run docs:tools
 ```
 
-- [ ] **Step 2: Update it**, with a migration note: `detail` is new and optional; a read that used to answer `success: true` with a null body now answers an error; a write that succeeded under a failed unlock now answers an error carrying `operation: 'succeeded'`; and on a legacy system the tools listed in Task 27 take adt-clients' verdict.
+- [ ] **Step 2: Update it**, with a migration note covering every behaviour this work changed:
+
+  - `detail` is new and optional, on the tools Task 28 lists.
+  - A read that used to answer `success: true` with a null body now answers an error.
+  - A write that succeeded under a failed unlock now answers an error carrying `operation: 'succeeded'`.
+  - On a legacy system the pairs in `tests/fixtures/legacy-exposure.json` take adt-clients' verdict. Name them.
+  - **`RuntimeRunClass` and `RuntimeRunClassWithProfiling` stop answering `run_status` and `trace_requests_status`.** The status is not in the 19 contract — `IAdtResult<T>` is `{ value }` — so this lands on every Task 24 option, not just one.
+  - **Whichever Task 24 decision was taken, in its own words**: `trace_lookup_uris` accepted and ignored under the recommended option; all three polling parameters and `trace_id` removed under the third, which is breaking and must be labelled as such.
+
+  A decision recorded only in a commit message is one no caller ever reads.
+  Task 24 asked the user three questions; this is where the answers reach the
+  people affected by them.
 - [ ] **Step 3: Run everything**
 
 ```bash
@@ -4519,7 +4547,12 @@ npx tsc --noEmit && npm run lint:check && npx jest
 npm run test:integration 2>&1 | tee /tmp/integration-test.log
 ```
 
-- [ ] **Step 5: Open the PR**, listing the two behaviour changes above, the Task 13 decision and the Task 27 leftovers.
+- [ ] **Step 5: Open the PR**, listing every decision this work took rather than only its diffstat:
+
+  - the two behaviour changes above — the masked read and the masked unlock;
+  - Task 13's `handleActivateObject` decision, per-object `activate` or the library change under #200;
+  - Task 24's three answers: the polling option, `trace_lookup_uris`, and the two status fields that leave on every path;
+  - Task 27's leftovers, the `(tool, member)` pairs where a legacy system still takes adt-clients' verdict.
 - [ ] **Step 6: After merge, delete the spec and this plan**, per the project's lifecycle rule. History lives in git.
 
 ---

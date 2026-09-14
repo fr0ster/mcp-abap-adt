@@ -97,6 +97,12 @@ const context = {
   logger: undefined,
 };
 
+/** For the branch of `connection.getSessionId() || session_id || null` that the caller's session_id never reaches. */
+const connectionSessionContext = {
+  connection: { getSessionId: () => 'CONN_SESSION' } as any,
+  logger: undefined,
+};
+
 beforeEach(() => {
   seen.calls.length = 0;
   fakeClient = seen.client;
@@ -206,6 +212,24 @@ describe('class', () => {
     expect('detail' in LockClassToolDefinition.inputSchema.properties).toBe(
       false,
     );
+  });
+
+  it('LockClassLow answers its own envelope — the lock handle, the class name and the message, not merely a truthy result', async () => {
+    const handle = 'CLASS_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockClass(context as any, {
+      class_name: 'zcl_x',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload).toEqual({
+      success: true,
+      class_name: 'ZCL_X',
+      lock_handle: handle,
+      message:
+        'Class ZCL_X locked successfully. Use this lock_handle for subsequent update/unlock operations.',
+    });
   });
 
   it('UnlockClassLow passes no analyse and carries no detail parameter', async () => {
@@ -325,6 +349,22 @@ describe('interface', () => {
     expect(payload.session_id).toBe('caller-session');
   });
 
+  it("LockInterfaceLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'IF_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockInterface(
+      connectionSessionContext as any,
+      {
+        interface_name: 'ZIF_X',
+        session_id: 'caller-session',
+      },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
   it('UnlockInterfaceLow passes no analyse and carries no detail parameter', async () => {
     await handleUnlockInterface(context as any, {
       interface_name: 'ZIF_X',
@@ -419,6 +459,19 @@ describe('behavior_definition', () => {
     expect(payload.name).toBe('ZBDEF_X');
     expect(payload.lock_handle).toBe(handle);
     expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockBehaviorDefinitionLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'BDEF_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockBehaviorDefinition(
+      connectionSessionContext as any,
+      { name: 'ZBDEF_X', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
   });
 
   it('UnlockBehaviorDefinitionLow passes no analyse and carries no detail parameter', async () => {
@@ -568,6 +621,19 @@ describe('behavior_implementation — declared over the class document set', () 
     expect(payload.class_name).toBe('ZBP_X');
     expect(payload.lock_handle).toBe(handle);
     expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockBehaviorImplementationLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'BIMPL_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockBehaviorImplementation(
+      connectionSessionContext as any,
+      { class_name: 'ZBP_X', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
   });
 
   it('ValidateBehaviorImplementationLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {

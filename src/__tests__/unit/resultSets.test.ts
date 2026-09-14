@@ -3,9 +3,10 @@ import {
   domainDocuments,
   packageDocuments,
   tableDocuments,
+  unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { corpusBody } from '../../lib/adtCorpus';
+import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   ourUtils,
   READING_BY_SLOT,
@@ -53,17 +54,56 @@ describe('the slot table', () => {
   });
 
   it('reads a write as its status, and still carries the document', () => {
-    const reading: any = resultsFor(classDocuments).created({
-      data: '',
+    // `updated`, unlike `created`, has no fixture answering a body — every
+    // write in the corpus is a zero-byte 200. `statusOnly` is right for it.
+    const document = corpusBody('update-source-success--02-update-source');
+    const reading: any = resultsFor(classDocuments).updated({
+      data: document,
       status: 200,
     } as any);
     expect(reading.value).toBeUndefined();
     expect(reading.status).toBe(200);
-    expect(reading.raw).toBe('');
+    expect(reading.raw).toBe(document);
+  });
+
+  it('answers the document for a DDIC create, and still answers a status for the zero-byte class create', () => {
+    const domainDocument = corpusBody('create-domain--01-ddic-domains');
+    const domainReading: any = resultsFor(domainDocuments).created({
+      data: domainDocument,
+      status: 201,
+    } as any);
+    expect(domainReading.value).toBe(domainDocument);
+    expect(domainReading.raw).toBe(domainDocument);
+
+    const classReading: any = resultsFor(classDocuments).created({
+      data: '',
+      status: 200,
+    } as any);
+    expect(classReading.status).toBe(200);
+    expect(classReading.raw).toBe('');
   });
 
   it('gives the walk our own node reading, not the shipped one', () => {
     expect(ourUtils.node).not.toBe(utilDocuments.node);
+  });
+
+  it('keeps a kept slot as the shipped function, not the table default', () => {
+    expect(resultsFor(utilDocuments, ['activation']).activation).toBe(
+      utilDocuments.activation,
+    );
+    expect(ourUtils.activation).toBe(utilDocuments.activation);
+  });
+
+  it('reads the unit-test run id out of the Location header, not the empty body', () => {
+    const sidecar = corpusSidecar('unittest-run-passing--01-abapunit-runs');
+    const body = corpusBody('unittest-run-passing--01-abapunit-runs');
+    const wire = {
+      data: body,
+      status: sidecar.response.status,
+      headers: sidecar.response.headers,
+    };
+    const reading = resultsFor(unitTestDocuments, ['run']).run(wire as any);
+    expect(reading).toBe('FA53C505DD7B1FD1ABB8599833A05D44');
   });
 
   it('refuses a set with a slot it does not know', () => {

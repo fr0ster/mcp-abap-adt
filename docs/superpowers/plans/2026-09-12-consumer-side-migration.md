@@ -1015,7 +1015,19 @@ adt-clients 19 exports 31 shipped result sets holding 308 slots, and those 308 c
 
 **Interfaces:**
 - Consumes: `verbatim`, `structured`, `statusOnly` from `reading.ts`; `nodeLevel` from `packageWalk.ts`.
-- Produces: `READING_BY_SLOT`, `resultsFor<R>(shipped: R): R`, `ourUtils`
+- Produces: `READING_BY_SLOT`, `resultsFor<R>(shipped: R, keep?: ReadonlyArray<keyof R>): R`, `ourUtils`
+
+**The slot-name premise has two named exceptions, found in review (round 1 of 5).** Which
+reading a slot wants is a property of the slot's name for roughly 300 of the 308 slots, and
+fails in two ways: where one object type answers a body another does not (`created` — a DDIC
+create answers a document, a class create answers zero bytes), and where a shipped reading looks
+at something none of `verbatim`, `structured` or `statusOnly` can see (`utilDocuments.activation`
+and `unitTestDocuments.run` both read the `Location` header, not the body). The first is fixed by
+moving `created` to `verbatim`. The second is fixed by giving `resultsFor` a keep-list: slots
+named there are left exactly as the shipped set had them, at the call site, rather than folded
+into the table. Do not reintroduce `created: statusOnly`, and do not fold `activation` or `run`
+back into the table for the sets where they read headers — see the exceptions documented on
+`READING_BY_SLOT` in `resultSets.ts` for the full evidence.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1106,9 +1118,9 @@ import { statusOnly, structured, verbatim } from './reading';
  */
 export const READING_BY_SLOT: Record<string, IResultStrategy<unknown>> = {
   source: verbatim, sourceDocument: verbatim, metadata: verbatim,
-  transport: verbatim, include: verbatim, read: verbatim,
+  transport: verbatim, include: verbatim, read: verbatim, created: verbatim,
 
-  created: statusOnly, updated: statusOnly, metadataUpdated: statusOnly, written: statusOnly,
+  updated: statusOnly, metadataUpdated: statusOnly, written: statusOnly,
 
   check: structured, cdsCheck: structured, activation: structured, validation: structured,
   deletion: structured, deleted: structured, deletionCheck: structured,
@@ -1120,10 +1132,22 @@ export const READING_BY_SLOT: Record<string, IResultStrategy<unknown>> = {
   columns: structured, contents: structured, discovery: structured,
 };
 
-/** Stamp the table over a shipped result set, keeping that set's own keys. */
-export function resultsFor<R extends Record<string, unknown>>(shipped: R): R {
+/**
+ * Stamp the table over a shipped result set, keeping that set's own keys.
+ * `keep` names slots to leave exactly as the shipped set has them — for the
+ * rare slot whose shipped reading needs a header, not the body.
+ */
+export function resultsFor<R extends Record<string, unknown>>(
+  shipped: R,
+  keep: ReadonlyArray<keyof R> = [],
+): R {
+  const kept = new Set<keyof R>(keep);
   const out: Record<string, unknown> = {};
   for (const slot of Object.keys(shipped)) {
+    if (kept.has(slot as keyof R)) {
+      out[slot] = shipped[slot];
+      continue;
+    }
     const reading = READING_BY_SLOT[slot];
     if (reading === undefined) {
       throw new Error(`resultsFor: no reading declared for the slot "${slot}"`);
@@ -1136,9 +1160,13 @@ export function resultsFor<R extends Record<string, unknown>>(shipped: R): R {
 /**
  * The util set, with our own node reading — `nodeLevel` keeps the descriptions
  * the shipped `nodeContents` drops, and a tree without them is a tree a caller
- * has to walk again.
+ * has to walk again. `activation` is kept as shipped: it reads the `Location`
+ * header a started activation run answers with, which `structured` cannot see.
  */
-export const ourUtils = { ...resultsFor(utilDocuments), node: nodeLevel };
+export const ourUtils = {
+  ...resultsFor(utilDocuments, ['activation']),
+  node: nodeLevel,
+};
 ```
 
 - [ ] **Step 4: Run the tests**

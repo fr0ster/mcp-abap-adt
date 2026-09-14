@@ -20,6 +20,9 @@ import {
   analyseDeletion,
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
+import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
+import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
+import { handleValidateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { handleActivateClass } from '../../handlers/class/low/handleActivateClass';
 import { handleActivateClassTestClasses } from '../../handlers/class/low/handleActivateClassTestClasses';
 import { handleDeleteClass } from '../../handlers/class/low/handleDeleteClass';
@@ -67,6 +70,20 @@ it.each([
       interface_name: 'ZIF_X',
       package_name: 'ZP',
       description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'behavior_definition',
+    handleActivateBehaviorDefinition,
+    handleDeleteBehaviorDefinition,
+    handleValidateBehaviorDefinition,
+    {
+      name: 'ZBDEF_X',
+      package_name: 'ZP',
+      description: 'x',
+      root_entity: 'ZI_X',
+      implementation_type: 'Managed',
       lock_handle: 'h',
     },
   ],

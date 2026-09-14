@@ -31,7 +31,8 @@ own tests pass and it is committed — not when it is described.
 | 10. The reference write family | done | `d4978a2` |
 | 11. Sixteen two-call reads | done | `9281c35` |
 | 12. Single-call reads and listings | done | `141ac27` |
-| 13 – 29 | not started | |
+| 13. `common/low`, six generic ops | done | `ef6074c` |
+| 14 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2123,7 +2124,7 @@ The searches and listings answer JSON built from a parse, so they project `readi
 
 **`handleActivateObject` is the one place where the design's rule and the library's surface collide.** It calls `activateObjectsGroup`, which accepts no strategy, and group activation is one of the two masking families this project has already fixed once — ADT answers 200 with the refusal inside.
 
-- [ ] **Step 1: Decide `handleActivateObject`, and write the decision down**
+- [x] **Step 1: Decide `handleActivateObject`, and write the decision down**
 
 The spec names two options and neither of them is "keep the masking quietly":
 
@@ -2132,7 +2133,7 @@ The spec names two options and neither of them is "keep the masking quietly":
 
 If option 1 turns out not to serve a multi-object call, the group member stays **and the limitation is surfaced**: named in the PR description, in the release notes and in the handler's own comment, with the issue number. Accepting a masked refusal without saying so is the defect this repository has removed twice.
 
-- [ ] **Step 2: Write the failing test, from the corpus**
+- [x] **Step 2: Write the failing test, from the corpus**
 
 ```typescript
 // src/__tests__/unit/commonLowOperations.test.ts
@@ -2195,16 +2196,16 @@ it('reports a refused activation as an error', async () => {
 
 The third test is the one that decides Step 1: it passes under option 1 and fails under option 2. If option 2 is chosen, change the test to assert what is actually true and say in its name that the verdict is adt-clients'.
 
-- [ ] **Step 3: Run them to verify they fail** — all three; these handlers mask today.
-- [ ] **Step 4: Implement**, per Task 10's table.
-- [ ] **Step 5: Run the tests, the check and the compiler**
+- [x] **Step 3: Run them to verify they fail** — all three; these handlers mask today.
+- [x] **Step 4: Implement**, per Task 10's table.
+- [x] **Step 5: Run the tests, the check and the compiler**
 
 ```bash
 npx jest src/__tests__/unit/commonLowOperations.test.ts
 npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # 0 offenders AND a non-zero count
 ```
 
-- [ ] **Step 6: Commit** — `refactor(common): the generic operations, with the strategy deciding`
+- [x] **Step 6: Commit** — `refactor(common): the generic operations, with the strategy deciding`
 
 ---
 

@@ -2802,6 +2802,12 @@ it('packageResolver searches through the renamed member, with a strategy', async
 // `programExecutor` and `classExecutor` are plain objects built per test with
 // `okResponse` and `refusedResponse`, the same way `fakeClientOf` builds one —
 // they are simply reached through a different door.
+//
+// CHECK WHICH DOOR BEFORE WRITING ANY HANDLER TEST.
+// `grep -rl "new AdtExecutor" src/handlers` names the four that take this one;
+// everything else in the plan goes through `createAdtClient`. A test that mocks
+// the wrong dependency compiles, runs, and exercises the real one.
+
 // Both of them. The compiler catches a handler that still names the removed
 // member; it says nothing about one that calls the two replacements in the
 // wrong order, or calls only one of them.

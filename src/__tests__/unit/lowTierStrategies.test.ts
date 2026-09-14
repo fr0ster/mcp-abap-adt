@@ -126,6 +126,7 @@ import { handleUpdateStructure } from '../../handlers/structure/low/handleUpdate
 import { handleValidateStructure } from '../../handlers/structure/low/handleValidateStructure';
 import { handleActivateTable } from '../../handlers/table/low/handleActivateTable';
 import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
+import { handleCreateTable } from '../../handlers/table/low/handleCreateTable';
 import { handleDeleteTable } from '../../handlers/table/low/handleDeleteTable';
 import {
   handleLockTable,
@@ -1299,6 +1300,23 @@ describe('table', () => {
     expect(call?.args[1]).toMatchObject({
       sourceCode: 'define table zt_x { client : abap.clnt; }',
       lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateTableLow reaches getTable with analyseException, forwarding no description or source (createTable reads neither)', async () => {
+    await handleCreateTable(context as any, {
+      table_name: 'ZT_X',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getTable');
+    expect(call?.args[0]).toEqual({
+      tableName: 'ZT_X',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);

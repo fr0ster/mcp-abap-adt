@@ -28,7 +28,7 @@ export const TOOL_DEFINITION = {
   name: 'CheckTableLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).',
+    '[low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -39,18 +39,18 @@ export const TOOL_DEFINITION = {
       ddl_code: {
         type: 'string',
         description:
-          'Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.',
+          'Accepted for compatibility; not sent to the server. The shipped check endpoint takes no source of its own — it checks whatever is already saved.',
       },
       version: {
         type: 'string',
         description:
-          "Version to check: 'active' (last activated), 'inactive' (current unsaved), or 'new' (for new code validation). Default: new",
+          "Version to check: 'active' selects the last activated version. 'inactive' and 'new' are accepted for compatibility but indistinguishable — the shipped check endpoint treats anything other than 'active' as 'inactive'. Default: new.",
         enum: ['active', 'inactive', 'new'],
       },
       reporter: {
         type: 'string',
         description:
-          "Check reporter: 'tableStatusCheck' or 'abapCheckRun'. Default: abapCheckRun",
+          "Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.",
         enum: ['tableStatusCheck', 'abapCheckRun'],
       },
       session_id: {

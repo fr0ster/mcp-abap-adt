@@ -6,7 +6,9 @@ import {
   unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
+import type { AdtReading } from '../../lib/strategies/reading';
 import {
   ourUnitTest,
   ourUtils,
@@ -115,5 +117,34 @@ describe('the slot table', () => {
     expect(() =>
       resultsFor({ ...packageDocuments, invented: (() => {}) as any }),
     ).toThrow(/invented/);
+  });
+
+  it('types a stamped slot as the reading it was given, not the shipped set — pinned at compile time', () => {
+    // This test fails by NOT COMPILING, not by an assertion at runtime. If
+    // `resultsFor` regresses to returning its input type `R` — the bug fixed
+    // alongside Task 9 — `classResults.source` goes back to typing as
+    // `IResultStrategy<string>` (a function returning a bare `string`) and
+    // the line below stops type-checking, because `verbatim` actually
+    // answers `AdtReading<string>`, not `string`. `tsc` catches that; jest's
+    // assertion runtime cannot, so the `expect` here only proves the two
+    // functions are the same referenced value — the type pin is the
+    // assignment itself.
+    const classResults = resultsFor(classDocuments);
+    const sourceReading: IResultStrategy<AdtReading<string>> =
+      classResults.source;
+    expect(sourceReading).toBe(READING_BY_SLOT.source);
+
+    // The exception slots must type as the SHIPPED strategy, not the
+    // table's default for that slot name — `ourUtils.activation` reads a
+    // `Location` header and answers a string id, never the
+    // `AdtReading<unknown>` that `structured` (the table's default for the
+    // name `activation`) would produce. Also a compile-time pin: assigning
+    // `ourUtils.activation` to a variable typed as the table's default shape
+    // would fail to compile if `resultsFor` widened a kept slot back to it.
+    const keptActivation: IResultStrategy<string> = ourUtils.activation;
+    expect(keptActivation).toBe(utilDocuments.activation);
+
+    const keptRun: IResultStrategy<string> = ourUnitTest.run;
+    expect(keptRun).toBe(unitTestDocuments.run);
   });
 });

@@ -43,7 +43,15 @@ import { statusOnly, structured, verbatim } from './reading';
  * the same treatment — `search`, `types`, `node`, `inactive`, `status` and
  * `result` in those two sets all read only `answer.data` and are unaffected.
  */
-export const READING_BY_SLOT: Record<string, IResultStrategy<unknown>> = {
+// `satisfies`, never a `: Record<string, IResultStrategy<unknown>>`
+// annotation — the annotation is what erased every slot's type to `unknown`
+// and made `resultsFor` return its input type untouched. `satisfies` checks
+// the same shape (every value is an `IResultStrategy<unknown>`) without
+// widening a single one of them: `READING_BY_SLOT.source` stays the literal
+// type of `verbatim`, `(answer) => AdtReading<string>`, which is what makes
+// the mapped type below able to answer it back per slot. The package's own
+// `core/class/types.d.ts` documents the identical rule above `classDocuments`.
+export const READING_BY_SLOT = {
   source: verbatim,
   sourceDocument: verbatim,
   metadata: verbatim,
@@ -85,7 +93,19 @@ export const READING_BY_SLOT: Record<string, IResultStrategy<unknown>> = {
   columns: structured,
   contents: structured,
   discovery: structured,
-};
+} satisfies Record<string, IResultStrategy<unknown>>;
+
+/**
+ * What `resultsFor` answers for one slot that is NOT in the keep-list: the
+ * table's own reading if it declares the slot's name, `never` otherwise —
+ * matching the throw `resultsFor` raises at runtime for exactly that slot.
+ * `never` rather than `IResultStrategy<unknown>` because the whole point of
+ * the exercise is that a caller of a slot the table does not know should not
+ * type-check quietly; it should fail to compile, the same way it fails to run.
+ */
+type SlotReading<P extends PropertyKey> = P extends keyof typeof READING_BY_SLOT
+  ? (typeof READING_BY_SLOT)[P]
+  : never;
 
 /**
  * Stamp the table over a shipped result set, keeping that set's own keys.
@@ -95,25 +115,39 @@ export const READING_BY_SLOT: Record<string, IResultStrategy<unknown>> = {
  * `structured` or `statusOnly` can: a header, not the body. `activation` on
  * `utilDocuments` and `run` on `unitTestDocuments` are the two known cases;
  * see the exceptions documented on `READING_BY_SLOT` above.
+ *
+ * **The return type is a per-slot map, not `R`.** `K` is a `const` type
+ * parameter so a call site's `keep` array is known at the type level as the
+ * literal slots it names, not widened to `(keyof R)[]` — that is what lets a
+ * kept slot answer `R[P]` (the shipped strategy's own type) while every other
+ * slot answers `SlotReading<P>` (the table's). Returning `R` here — the bug
+ * this function shipped with — typed every slot as the shipped strategy's
+ * type even where the runtime had swapped it for `verbatim`/`structured`/
+ * `statusOnly`, so `getClass(resultsFor(classDocuments)).read(...)` type
+ * checked as answering `string` when it actually answers `AdtReading<string>`.
  */
-export function resultsFor<R extends Record<string, unknown>>(
+export function resultsFor<
+  R extends Record<string, unknown>,
+  const K extends readonly (keyof R)[] = [],
+>(
   shipped: R,
-  keep: ReadonlyArray<keyof R> = [],
-): R {
+  keep: K = [] as unknown as K,
+): { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> } {
   const kept = new Set<keyof R>(keep);
   const out: Record<string, unknown> = {};
+  const table = READING_BY_SLOT as Record<string, IResultStrategy<unknown>>;
   for (const slot of Object.keys(shipped)) {
     if (kept.has(slot as keyof R)) {
       out[slot] = shipped[slot];
       continue;
     }
-    const reading = READING_BY_SLOT[slot];
+    const reading = table[slot];
     if (reading === undefined) {
       throw new Error(`resultsFor: no reading declared for the slot "${slot}"`);
     }
     out[slot] = reading;
   }
-  return out as R;
+  return out as { [P in keyof R]: P extends K[number] ? R[P] : SlotReading<P> };
 }
 
 /**

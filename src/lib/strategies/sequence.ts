@@ -40,6 +40,21 @@ export async function sequence<A, B, C>(
   second: Step<A, B>,
   third: Step<B, C>,
 ): Promise<IAdtResponse<C, IAdtError>>;
+/** Run four. A create that validates, creates, writes its body and activates. */
+export async function sequence<A, B, C, D>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: Step<A, B>,
+  third: Step<B, C>,
+  fourth: Step<C, D>,
+): Promise<IAdtResponse<D, IAdtError>>;
+/** Run five. The full lifecycle create, with its check between write and activate. */
+export async function sequence<A, B, C, D, E>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: Step<A, B>,
+  third: Step<B, C>,
+  fourth: Step<C, D>,
+  fifth: Step<D, E>,
+): Promise<IAdtResponse<E, IAdtError>>;
 export async function sequence(
   first: () => Promise<IAdtResponse<unknown, IAdtError>>,
   ...rest: Array<Step<unknown, unknown>>
@@ -52,4 +67,36 @@ export async function sequence(
     answer = await step(answer.getResult().value);
   }
   return answer;
+}
+
+/**
+ * Two calls whose BOTH answers are the result.
+ *
+ * `sequence` answers the last step, which is what a read-modify-write wants. A
+ * read that reports a document and its metadata wants both, and capturing the
+ * first outside the run would put the ordering back in the handler one
+ * assignment at a time.
+ *
+ * The failure rule is `sequence`'s exactly: the failing step's own answer,
+ * untouched, and the second step is never reached when the first refuses.
+ */
+export async function pair<A, B>(
+  first: () => Promise<IAdtResponse<A, IAdtError>>,
+  second: (a: A) => Promise<IAdtResponse<B, IAdtError>>,
+): Promise<IAdtResponse<[A, B], IAdtError>> {
+  const a = await first();
+  if (!a.ok) return a as unknown as IAdtResponse<[A, B], IAdtError>;
+
+  const valueA = a.getResult().value;
+  const b = await second(valueA);
+  if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
+
+  const both: [A, B] = [valueA, b.getResult().value];
+  return {
+    ok: true,
+    getResult: () => ({ value: both }),
+    getError: () => {
+      throw new Error('pair: asked for the error of a success');
+    },
+  } as unknown as IAdtResponse<[A, B], IAdtError>;
 }

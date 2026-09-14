@@ -22,7 +22,8 @@ own tests pass and it is committed — not when it is described.
 | 1. Freeze the tool surface | done | `dc48ffa` |
 | 2. `safeFields` | done | `3cc6192` |
 | 3. `answer.ts` — the failure payload | done | `c340a77` |
-| 4 – 29 | not started | |
+| 4. `pair()`, and `sequence()` at five steps | done | `PENDING` |
+| 5 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -534,7 +535,7 @@ Two changes to the same file.
 **Interfaces:**
 - Produces: `pair<A, B>(first, second): Promise<IAdtResponse<[A, B], IAdtError>>`, and `sequence` overloads for four and five steps
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // append to src/__tests__/unit/sequence.test.ts
@@ -598,7 +599,7 @@ describe('sequence, at five steps', () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails**
+- [x] **Step 2: Run it to verify it fails**
 
 ```bash
 npx jest src/__tests__/unit/sequence.test.ts
@@ -606,7 +607,7 @@ npx jest src/__tests__/unit/sequence.test.ts
 
 Expected: FAIL — `pair is not a function`.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // src/lib/strategies/sequence.ts
@@ -662,7 +663,7 @@ export async function pair<A, B>(
 }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [x] **Step 4: Run the tests**
 
 ```bash
 npx jest src/__tests__/unit/sequence.test.ts
@@ -670,7 +671,7 @@ npx jest src/__tests__/unit/sequence.test.ts
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/strategies/sequence.ts src/__tests__/unit/sequence.test.ts
@@ -1523,6 +1524,18 @@ tsc: <before> → <after>"
 ---
 
 ## Task 10: The reference write family — `domain/low`
+
+**A live type error waits here.** `promised.ts` exports
+`writeProjection: Terse<unknown>`, and `sequence.ts`'s own doc comment shows it
+being passed to `answer()`. It cannot be: `Terse<T>` is
+`(value, status) => unknown` and `answer()` takes `(value) => unknown`, and
+TypeScript lets a function drop a parameter, never gain a required one.
+`npx tsc -p tsconfig.test.json` reports it today at
+`src/__tests__/unit/sequence.test.ts`. Fix it here, where the first write is
+migrated: either type `writeProjection` as the one-parameter shape, or drop it
+and use `project(detail, terseWrite)`, which is what this task's table already
+prescribes. Update the comment in `sequence.ts` with it.
+
 
 The template for every `low`-tier family. Seven handlers, covering create, check, activate, validate, delete, lock and unlock, so the per-operation pairing is established in code before it is applied a hundred times.
 

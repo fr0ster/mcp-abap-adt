@@ -1,7 +1,7 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../lib/answer';
 import { writeProjection } from '../../lib/strategies/promised';
-import { sequence } from '../../lib/strategies/sequence';
+import { pair, sequence } from '../../lib/strategies/sequence';
 
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
   return {
@@ -132,5 +132,71 @@ describe('a sequence keeps the strategies in charge', () => {
     expect(
       (result as { getResult: () => { value: number } }).getResult().value,
     ).toBe(3);
+  });
+});
+
+describe('pair', () => {
+  it('answers both values when both steps succeed', async () => {
+    const result = await pair(
+      async () => ok('source') as never,
+      async () => ok('meta') as never,
+    );
+    if (!result.ok) throw new Error('expected both values');
+    expect(result.getResult().value).toEqual(['source', 'meta']);
+  });
+
+  it('hands back the first failure untouched, and never calls the second step', async () => {
+    const second = jest.fn();
+    const result = await pair(
+      async () => refused('read refused') as never,
+      second as never,
+    );
+    if (result.ok) throw new Error('expected the read refusal');
+    expect(result.getError().message).toBe('read refused');
+    expect(second).not.toHaveBeenCalled();
+  });
+
+  it('hands back the second failure untouched', async () => {
+    const result = await pair(
+      async () => ok('source') as never,
+      async () => refused('meta refused') as never,
+    );
+    if (result.ok) throw new Error('expected the metadata refusal');
+    expect(result.getError().message).toBe('meta refused');
+  });
+});
+
+describe('sequence, at four and five steps', () => {
+  it('runs all five in order and answers the last', async () => {
+    const order: string[] = [];
+    const step = (name: string) => async () => {
+      order.push(name);
+      return ok(name) as never;
+    };
+    const result = await sequence(
+      step('validate'),
+      step('create'),
+      step('write'),
+      step('check'),
+      step('activate'),
+    );
+    expect(order).toEqual(['validate', 'create', 'write', 'check', 'activate']);
+    if (!result.ok) throw new Error('expected all five to run');
+    expect(result.getResult().value).toBe('activate');
+  });
+
+  it('stops at the fourth and never reaches the fifth', async () => {
+    const fifth = jest.fn();
+    const step = (name: string) => async () => ok(name) as never;
+    const result = await sequence(
+      step('validate'),
+      step('create'),
+      step('write'),
+      async () => refused('Check refused') as never,
+      fifth as never,
+    );
+    if (result.ok) throw new Error('expected the check refusal');
+    expect(result.getError().message).toBe('Check refused');
+    expect(fifth).not.toHaveBeenCalled();
   });
 });

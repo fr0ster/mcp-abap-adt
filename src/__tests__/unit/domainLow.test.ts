@@ -11,6 +11,7 @@ import { handleCreateDomain } from '../../handlers/domain/low/handleCreateDomain
 import { handleDeleteDomain } from '../../handlers/domain/low/handleDeleteDomain';
 import { handleLockDomain } from '../../handlers/domain/low/handleLockDomain';
 import { handleUnlockDomain } from '../../handlers/domain/low/handleUnlockDomain';
+import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
 import { handleValidateDomain } from '../../handlers/domain/low/handleValidateDomain';
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured, verbatim } from '../../lib/strategies/reading';
@@ -325,5 +326,51 @@ describe('UnlockDomainLow', () => {
     const call = seen.calls.filter((c) => c.member === 'unlock').at(-1);
     expect(call?.carriedAnalyse).toBe(false);
     expect(call?.analyse).toBeUndefined();
+  });
+});
+
+describe('UpdateDomainLow', () => {
+  // Fix round 3, task 14 (domain is not this cluster's family, but the
+  // defect found here is the exact mirror of the one this task fixed
+  // across class/interface/behavior_definition/behavior_implementation:
+  // `AdtDomain.updateMetadata()`'s shipped body reads `config.document`
+  // only ("config.document is what gets written") and never
+  // `options.xmlContent` — that field exists on `IAdtOperationOptions` but
+  // nothing in `updateDomain()`'s call chain reads it. Verified against
+  // `AdtDomain.js` and `core/domain/update.js`.
+  it('passes the patched document via config.document, and no stray xmlContent survives in options', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
+    let updateCall: { config: any; options: any } | undefined;
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (config: unknown, options: unknown) => {
+        updateCall = { config, options };
+        return okResponse(undefined);
+      },
+    });
+
+    const result: any = await handleUpdateDomain(context as any, {
+      domain_name: 'zd',
+      properties: { description: 'after' },
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+
+    // The request the member actually builds from this: config carries the
+    // whole patched document, nothing beside it; options carries the lock
+    // handle and the strategy, and nothing that looks like a body.
+    expect(updateCall?.config).toEqual({
+      domainName: 'ZD',
+      document: expect.stringContaining('adtcore:description="after"'),
+    });
+    expect(updateCall?.options).toEqual({
+      lockHandle: 'h',
+      analyse: analyseException,
+    });
+    expect(
+      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+    ).toBeUndefined();
   });
 });

@@ -6,6 +6,20 @@
  * with it, so anything not sent is gone. The sequence is the handler's, and
  * every step of it carries its own `analyse` — the verdict on each answer stays
  * the strategy's.
+ *
+ * **The patched document goes in `config.document`, not `options.xmlContent`.**
+ * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only
+ * ("`config.document` is what gets written. The fields beside it describe a
+ * create; on an update nothing here merges them into a document, because
+ * nothing is read to merge them into.") and passes it straight to
+ * `updateDomain(connection, {...}, config.document, options?.lockHandle)` as
+ * the PUT body. `options` declares an `xmlContent` field
+ * (`IAdtOperationOptions.xmlContent`) that this member never reads — nothing
+ * in the low-level `updateDomain()` call reaches into `options` for a body.
+ * With the patched document in `options.xmlContent`, this issued a PUT with
+ * `data: undefined` against a replace-semantics endpoint and answered
+ * whatever status came back as success. Verified against the compiled
+ * `AdtDomain.js` and `core/domain/update.js`, not the declaration file.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -120,13 +134,15 @@ export async function handleUpdateDomain(
             .readMetadata({ domainName }, { analyse: analyseException }),
         (current) =>
           client.getDomain().updateMetadata(
-            { domainName },
             {
-              lockHandle: lock_handle,
-              xmlContent: patchDomainXml(
+              domainName,
+              document: patchDomainXml(
                 extractXmlString(current, `domain ${domainName}`),
                 properties,
               ),
+            },
+            {
+              lockHandle: lock_handle,
               analyse: analyseException,
             },
           ),

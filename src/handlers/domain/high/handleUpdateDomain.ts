@@ -6,6 +6,15 @@
  *
  * Workflow: lock -> update -> check -> unlock -> (activate)
  * Note: No validation step - lock will fail if domain doesn't exist
+ *
+ * **The patched document goes in `config.document`, not `options.xmlContent`.**
+ * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only and
+ * passes it straight to the PUT body; `options.xmlContent` is declared on the
+ * options type but never read by this member. With the patched document in
+ * `options.xmlContent`, this issued a PUT with an empty body against a
+ * replace-semantics endpoint and answered success. Verified against the
+ * compiled `AdtDomain.js` and `core/domain/update.js`, not the declaration
+ * file. See `handleUpdateDomain.ts` (low) for the same fix.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -179,10 +188,9 @@ export async function handleUpdateDomain(
               .readMetadata({ domainName }, { analyse: analyseException }),
           (current) =>
             client.getDomain().updateMetadata(
-              { domainName },
               {
-                lockHandle,
-                xmlContent: patchDomainXml(
+                domainName,
+                document: patchDomainXml(
                   extractXmlString(current, `domain ${domainName}`),
                   {
                     description: typedArgs.description,
@@ -196,6 +204,9 @@ export async function handleUpdateDomain(
                     fixed_values: typedArgs.fixed_values,
                   },
                 ),
+              },
+              {
+                lockHandle,
                 analyse: analyseException,
               },
             ),

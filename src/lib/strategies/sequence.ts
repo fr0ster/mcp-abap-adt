@@ -14,9 +14,18 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
  * const domain = client.getDomain(resultsFor(domainDocuments));
  * return answer(ctx, () => sequence(
  *   () => domain.readMetadata({ domainName }, { analyse: analyseException }),
- *   (current) => domain.updateMetadata({ domainName }, { lockHandle, xmlContent: patch(current), analyse: analyseException }),
+ *   (current) => domain.updateMetadata({ domainName, document: patch(current) }, { lockHandle, analyse: analyseException }),
  * ), project(detail, terseWrite));
  * ```
+ *
+ * **The patched document goes in the config's `document` field, not
+ * `options.xmlContent`.** The shipped `updateMetadata()` reads
+ * `config.document` for the PUT body and nothing from `options` but the lock
+ * handle, the timeout and the strategy — verified against the compiled
+ * `AdtDomain.js`, not this package's own declaration file, which is why the
+ * example above names the field it does. `options.xmlContent` exists on the
+ * type and is read by nothing; `handleUpdateDomain.ts` (low and high) both
+ * carried this exact mistake until fix round 3 of task 14 found it.
  *
  * This example used to pass `writeProjection` (from `promised.ts`) straight
  * to `answer()` in place of the last line above. That does not compile:

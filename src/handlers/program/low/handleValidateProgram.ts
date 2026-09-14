@@ -1,20 +1,22 @@
 /**
- * ValidateProgram Handler - Validate ABAP Program Name
+ * ValidateProgramLow Handler - Validate ABAP Program Name
  *
- * Uses AdtClient.validateProgram from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getProgram().validate from @mcp-abap-adt/adt-clients 19.
+ *
+ * `packageName` reaches the wire here: the shipped `validateProgramName(
+ * connection, config.programName, config.packageName, config.description)`
+ * reads all three. Verified against `AdtProgram.js`.
  */
 
+import { programDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  isCloudConnection,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateProgramLow',
@@ -52,6 +54,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['program_name', 'package_name', 'description'],
   },
@@ -67,126 +70,43 @@ interface ValidateProgramArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateProgram MCP tool
- *
- * Uses AdtClient.validateProgram - low-level single method call
- */
 export async function handleValidateProgram(
   context: HandlerContext,
   args: ValidateProgramArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      program_name,
-      package_name,
-      description,
-      session_id,
-      session_state,
-    } = args as ValidateProgramArgs;
+  const { program_name, package_name, description, session_id, session_state } =
+    args;
 
-    // Validation
-    if (!program_name || !package_name || !description) {
-      return return_error(
-        new Error('program_name, package_name, and description are required'),
-      );
-    }
-
-    // Check if cloud - programs are not available on cloud systems
-    if (isCloudConnection()) {
-      return return_error(
-        new Error(
-          'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const programName = program_name.toUpperCase();
-
-    logger?.info(`Starting program validation: ${programName}`);
-
-    try {
-      // Validate program
-      const validationState = await client.getProgram().validate({
-        programName: programName,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(
-        `✅ ValidateProgram completed: ${programName} (valid=${result.valid})`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            program_name: programName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `Program name ${programName} is valid and available`
-              : `Program name ${programName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating program ${programName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to validate program: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Program ${programName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!program_name || !package_name || !description) {
+    return return_error(
+      new Error('program_name, package_name, and description are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const programName = program_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateProgramLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getProgram(resultsFor(programDocuments))
+        .validate(
+          {
+            programName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

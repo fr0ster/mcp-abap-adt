@@ -1,6 +1,11 @@
 /**
  * Cluster 14: `class`, `interface`, `behavior_definition`, `behavior_implementation`.
  * Cluster 15: `ddl`, `ddlx` (metadataExtension), `structure`, `table`.
+ * Cluster 16: `program`, `function` (function group and function module — the
+ * families named `function_group` and `function_include` in the brief have
+ * no `low/` directory of their own; every function-group low-tier operation
+ * lives in `src/handlers/function/low/*FunctionGroup*`, and function includes
+ * have no low tier at all).
  *
  * Task 10's per-operation table (Create/Update -> analyseException, statusOnly,
  * terseWrite; Check -> analyseCheck, structured, terseCheck; Activate ->
@@ -110,6 +115,20 @@ import {
 } from '../../handlers/interface/low/handleUnlockInterface';
 import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdateInterface';
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
+import { handleActivateProgram } from '../../handlers/program/low/handleActivateProgram';
+import { handleCheckProgram } from '../../handlers/program/low/handleCheckProgram';
+import { handleCreateProgram } from '../../handlers/program/low/handleCreateProgram';
+import { handleDeleteProgram } from '../../handlers/program/low/handleDeleteProgram';
+import {
+  handleLockProgram,
+  TOOL_DEFINITION as LockProgramToolDefinition,
+} from '../../handlers/program/low/handleLockProgram';
+import {
+  handleUnlockProgram,
+  TOOL_DEFINITION as UnlockProgramToolDefinition,
+} from '../../handlers/program/low/handleUnlockProgram';
+import { handleUpdateProgram } from '../../handlers/program/low/handleUpdateProgram';
+import { handleValidateProgram } from '../../handlers/program/low/handleValidateProgram';
 import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
 import { handleCheckStructure } from '../../handlers/structure/low/handleCheckStructure';
 import { handleCreateStructure } from '../../handlers/structure/low/handleCreateStructure';
@@ -258,6 +277,19 @@ it.each([
     'getTable',
     {
       table_name: 'ZT_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'program',
+    handleActivateProgram,
+    handleDeleteProgram,
+    handleValidateProgram,
+    'getProgram',
+    {
+      program_name: 'Z_X',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',
@@ -1403,6 +1435,148 @@ describe('table', () => {
 
     const result: any = await handleActivateTable(context as any, {
       table_name: 'ZT_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+});
+
+describe('program', () => {
+  it("CheckProgramLow leaves the check member's status undefined — no version parameter exists on this tool", async () => {
+    await handleCheckProgram(context as any, { program_name: 'Z_X' });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[0]).toEqual({ programName: 'Z_X' });
+    expect(call?.args[1]).toBeUndefined();
+  });
+
+  it('UpdateProgramLow passes sourceCode via options, not config — the shipped AdtProgram.update() only reads it there', async () => {
+    await handleUpdateProgram(context as any, {
+      program_name: 'Z_X',
+      source_code: 'REPORT z_x.',
+      lock_handle: 'h',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.args[0]).toEqual({ programName: 'Z_X' });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'REPORT z_x.',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateProgramLow reaches getProgram with analyseException, forwarding description, programType and application — all three reach the shipped create', async () => {
+    await handleCreateProgram(context as any, {
+      program_name: 'Z_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+      program_type: 'executable',
+      application: '*',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.args[0]).toEqual({
+      programName: 'Z_X',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
+      programType: 'executable',
+      application: '*',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockProgramLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockProgram(context as any, { program_name: 'Z_X' });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in LockProgramToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it("LockProgramLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'PROGRAM_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockProgram(context as any, {
+      program_name: 'Z_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.program_name).toBe('Z_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockProgramLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'PROGRAM_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockProgram(
+      connectionSessionContext as any,
+      { program_name: 'Z_X', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockProgramLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockProgram(context as any, {
+      program_name: 'Z_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in UnlockProgramToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it('ValidateProgramLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateProgram(context as any, {
+      program_name: 'Z_X',
+      package_name: 'ZP',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('ActivateProgramLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateProgram(context as any, {
+      program_name: 'Z_X',
     });
 
     expect(result.isError).toBe(false);

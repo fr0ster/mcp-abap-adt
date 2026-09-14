@@ -3048,7 +3048,10 @@ first, not discovered while implementing.
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
-- Create: `src/__tests__/unit/runtimeProfiling.test.ts`, and `src/lib/strategies/newTrace.ts` if Step 1 chose the first option
+- Create: `src/__tests__/unit/runtimeProfiling.test.ts`
+- Create, if Step 1 chose the first option: `src/lib/strategies/newTrace.ts` and `src/__tests__/unit/newTrace.test.ts`
+- Modify, if Step 1 chose the first option: `src/lib/strategies/sequence.ts` — export the one-line `IAdtResponse` builder `pair()` already has, rather than writing a third copy of it
+- Modify, if Step 1 chose the third option: the two tool definitions and `tests/fixtures/tools/surface.json`
 
 **These two handlers are mocked differently from every other task.** They
 construct `new AdtExecutor(connection, logger)` rather than calling
@@ -3114,7 +3117,11 @@ it.each(handlers)('%s passes the scheduled id to the profiler run', async (_n, h
     },
   };
   profiler = { list: async () => okResponse(reading([])) };
-  await (handler as any)(context as any, args);
+  // One attempt and no delay. Under the recommended option this handler polls,
+  // and the defaults are five attempts two seconds apart — eight seconds per
+  // parametrised case, against Jest's five-second timeout. This test is about
+  // the id travelling, not about the search.
+  await (handler as any)(context as any, { ...args, max_trace_attempts: 1, trace_retry_delay_ms: 0 });
   expect(order).toEqual(['schedule', 'run']);
   // The order alone proves nothing about the join: a handler calling
   // `runWithProfiler` with no id, the wrong id or a constant passes an order
@@ -3167,16 +3174,21 @@ it.each(handlers)('%s finds the trace by difference, not by position', async (_n
 
 it.each(handlers)('%s reports a refused feed read rather than an empty feed', async (_n, handler, args) => {
   if (OPTION !== 'find-the-trace') return;
-  classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
-  };
-  // Refused on the SNAPSHOT, before the run. Nothing should be run at all.
+  // Spies, not plain functions: the claim is that nothing runs, and only a
+  // call count can say so. A handler that schedules and runs before the
+  // snapshot, or carries on after its refusal, returns the same error and
+  // would pass a test that only reads the message.
+  const schedule = jest.fn(async () => okResponse(reading(PROFILER_REQUEST)));
+  const run = jest.fn(async () => okResponse(reading('done')));
+  classExecutor = { scheduleTrace: schedule, runWithProfiler: run };
   profiler = { list: async () => refusedResponse('Profiler feed not authorised') };
+
   const result: any = await (handler as any)(context as any, args);
   expect(result.isError).toBe(true);
   expect(JSON.parse(result.content[0].text).message).toBe('Profiler feed not authorised');
   expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
+  expect(schedule).not.toHaveBeenCalled();
+  expect(run).not.toHaveBeenCalled();
 });
 
 it.each(handlers)('%s reports a refusal during the search, not a missing trace', async (_n, handler, args) => {
@@ -3262,7 +3274,11 @@ Under options two and three the handler is a bare sequence:
 ```typescript
 answer(ctx, () => sequence(
   () => executor.scheduleTrace(profilerParameters),
-  (profilerId) => executor.runWithProfiler(target, { profilerId: profilerId.value }),
+  // `sequence` hands the next step the VALUE — it calls
+  // `step(answer.getResult().value)` — so this is already the id string.
+  // `profilerId.value` would read a property a string does not have and pass
+  // `undefined` to the run.
+  (profilerId) => executor.runWithProfiler(target, { profilerId }),
 ), project)
 ```
 
@@ -3376,6 +3392,16 @@ surface changed on the user's instruction.
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
         src/__tests__/unit/runtimeProfiling.test.ts
+
+# option one also creates the search and exports the builder it shares with pair()
+git add src/lib/strategies/newTrace.ts src/lib/strategies/sequence.ts \
+        src/__tests__/unit/newTrace.test.ts
+
+# option three also moves the surface, which Task 1's ratchet will otherwise refuse
+git add tests/fixtures/tools/surface.json \
+        src/handlers/system/readonly/handleRuntimeRunClass*.ts
+
+git status --short   # read it: the stanzas above are per-option, not all three
 git commit --no-verify -m "refactor(system): the class profiling handlers schedule, then run
 
 tsc: <before> → <after>"

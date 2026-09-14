@@ -2578,7 +2578,20 @@ it('never acquires a lock, because a held lock is what makes a deletion refuse',
 
 ## Task 22: The four remaining read-modify-write families
 
-`domain` is done and is the worked example. **Six types** take a whole document on 19, not five: `domain`, `package`, `dataElement`, `tableType`, `functionGroup` and **`transport`**. The migration guide names all six; an earlier draft of this plan missed the transport. Their update handlers pass a handful of named fields and no document, which under a replace is silent data loss.
+`domain` is done and is the worked example. The migration guide names **six**
+types whose `update` now takes the whole document: `domain`, `package`,
+`dataElement`, `tableType`, `functionGroup` and `transport`.
+
+**Five of them are this task; the transport is not, because no tool updates
+one.** `grep -rln "getRequest()" src/handlers` finds four handlers — two
+creates and two reads — and `src/handlers/transport/` contains no update at all.
+The type changed; this repository has nothing on it to change. Recorded so the
+next reader meets the reason rather than the gap, and so nobody migrates
+`handleCreateTransport` by mistake looking for it.
+
+So four families here, beside the domain already done: `dataElement`, `package`,
+`functionGroup`, `tableType`. Their update handlers pass a handful of named
+fields and no document, which under a replace is silent data loss.
 
 `functionGroup` carries one more difference the guide names: it used to lock and
 unlock around its own update. That is the handler's job now, which makes it a
@@ -2594,7 +2607,7 @@ npx tsx scripts/capture-adt-corpus.ts --env <session> --only read-metadata-data-
 
 **Files:**
 - Create: `src/lib/strategies/{packagePatch,functionGroupPatch,dataElementPatch,tableTypePatch}.ts`
-- Modify: `data_element/{low,high}/handleUpdateDataElement.ts`, `package/low/handleUpdatePackage.ts`, `function/high/handleUpdateFunctionGroup.ts`, `table/high/handleUpdateTable.ts`, and the transport update handlers — `grep -rl "getRequest()" src/handlers` names them
+- Modify: `data_element/{low,high}/handleUpdateDataElement.ts`, `package/low/handleUpdatePackage.ts`, `function/high/handleUpdateFunctionGroup.ts`, `table/high/handleUpdateTable.ts`
 - Test: `src/__tests__/unit/readModifyWrite.test.ts` (exists — extend), one patch test per family
 
 - [ ] **Step 1: Write the failing test**
@@ -2985,13 +2998,32 @@ tools declare `max_trace_attempts`, `trace_retry_delay_ms` and
 `trace_lookup_uris`, and answer a `trace_id`. All four now describe a search
 that does not happen.
 
+Three options, and the third is the one the package itself describes.
+
 | option | what it means |
 |---|---|
-| **keep them as accepted no-ops** | the surface does not change, which is this work's rule. The schema then advertises three parameters that do nothing and a field that is always null, and the description has to say so. |
-| **remove them** | honest, and a change to the tool surface that Task 1's ratchet will refuse. It needs the user's decision and a release note, and it is out of scope for this plan without one. |
+| **find the trace on this side** | `CLIENT_API_REFERENCE.md`: *"To find the one your run produced, note the ids before running and look for a new one."* List the profiler feed before scheduling, run, then poll `IProfiler.list()` until an id appears that was not there. The three parameters keep their meaning and `trace_id` keeps answering. **Recommended**: it is the only option that keeps the contract. |
+| **keep them as accepted no-ops** | the surface does not change, which is this work's rule, but the schema then advertises three parameters that do nothing and a field that is always null, and every description has to say so. |
+| **remove them** | honest, and a change to the tool surface that Task 1's ratchet will refuse. Needs the user's decision and a release note. |
 
 Ask before implementing. Do not quietly leave the parameters reading as though
 they work.
+
+**If the first option is chosen**, two warnings from the same reference decide
+the implementation, and both are counter-intuitive enough to get wrong:
+
+> Position in the feed is not age. A feed's first entries have been measured
+> minutes old while its last were eight days older.
+
+So "the newest trace" is not the first entry, and the id is found by set
+difference against the snapshot, never by position. And:
+
+> Comparing `recordedAt` as a string is wrong: `09:00:00Z` is later than
+> `10:00:00+02:00` and sorts lower as text. Use the exported
+> `compareRecordedAt`.
+
+`src/__tests__/helpers/traceHelpers.ts` in adt-clients is the worked example the
+reference points at. Read it before writing the loop.
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
@@ -3005,8 +3037,14 @@ run, and test a real executor.
 
 - [ ] **Step 1: Put the surface question to the user**
 
-Show them the table above. Their answer decides whether Step 3 also edits the
-tool definitions, and nothing else in this task depends on it.
+Show them the table above, and recommend the first option: it is the only one
+that keeps the contract the tools already advertise, and the package documents
+how to do it.
+
+Write the answer into the test file as a constant — `const OPTION = '...'` — so
+the assertions below flip with it rather than being edited by hand into
+agreement with whatever was built. Their answer decides whether Step 3 also
+edits the tool definitions and whether the feed search is written at all.
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -3057,16 +3095,27 @@ it.each(handlers)('%s stops at a refused schedule and never runs', async (_n, ha
   expect(run).not.toHaveBeenCalled();
 });
 
-it.each(handlers)('%s answers no trace_id, because a run cannot promise one', async (_n, handler, args) => {
+// The two answer the id in DIFFERENT PLACES, so this cannot be parametrised
+// on the field: `RuntimeRunClass` nests it under `profile`, and the deprecated
+// `RuntimeRunClassWithProfiling` puts it at the top level. A shared assertion
+// on the top-level field passes for the first handler without touching it.
+it.each([
+  ['RuntimeRunClass', handleRuntimeRunClass, { class_name: 'ZCL_X', profile: true },
+    (p: any) => p.profile?.trace_id],
+  ['RuntimeRunClassWithProfiling', handleRuntimeRunClassWithProfiling, { class_name: 'ZCL_X' },
+    (p: any) => p.trace_id],
+])('%s answers its trace id where its own schema puts it', async (_n, handler, args, at) => {
   classExecutor = {
     scheduleTrace: async () => okResponse(reading('trace-1')),
     runWithProfiler: async () => okResponse(reading('done')),
   };
   const result: any = await (handler as any)(context as any, args);
-  // The package removed `traceId` from the result deliberately: the trace may
-  // not exist yet, may never exist, and may be read a week later. Reading one
-  // is `IProfiler.list()` and `read()` when the caller is ready.
-  expect(JSON.parse(result.content[0].text).trace_id).toBeUndefined();
+  const found = (at as any)(JSON.parse(result.content[0].text));
+
+  // Under option one, the id the feed search produced. Under the other two it
+  // is absent, and the assertion flips with the decision Step 1 recorded —
+  // which is why that decision is a step and not a remark.
+  expect(found).toBe(OPTION === 'find-the-trace' ? 'trace-1' : undefined);
 });
 ```
 

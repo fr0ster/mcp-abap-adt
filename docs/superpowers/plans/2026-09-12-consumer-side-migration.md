@@ -962,7 +962,7 @@ export async function withLock<H, T>(
   // its own channel. A refusal is a failure; a throw stays a throw.
   if (released.kind === 'ok') return value;
   if (released.kind === 'refused') {
-    return failure<T>({ ...released.error, operation: 'succeeded' } as IAdtError & CleanupCarrier);
+    return failure<T>({ ...released.carrier, operation: 'succeeded' } as IAdtError & CleanupCarrier);
   }
   throw new LockNotReleased(released.thrown, { operation: 'succeeded' });
 }

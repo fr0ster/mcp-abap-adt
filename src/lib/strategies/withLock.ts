@@ -110,8 +110,12 @@ export async function withLock<H, T>(
   // its own channel. A refusal is a failure; a throw stays a throw.
   if (released.kind === 'ok') return value;
   if (released.kind === 'refused') {
+    // From `released.carrier`, not `released.error` — the error is the raw
+    // answer from `release`, and `error.request` has not been through
+    // `safeRequest`. The carrier is narrowed once, in `runRelease`, and every
+    // branch that reports a release outcome reads it from there.
     return failure<T>({
-      ...released.error,
+      ...released.carrier,
       operation: 'succeeded',
     } as IAdtError & CleanupCarrier);
   }

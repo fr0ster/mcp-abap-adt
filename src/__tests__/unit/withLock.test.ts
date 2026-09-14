@@ -140,6 +140,26 @@ describe('withLock', () => {
     );
   });
 
+  it('never puts a transport config in a succeeded write under a REFUSED unlock', async () => {
+    const SECRET = 'Bearer eyJhbGciOiJIUzI1NiJ9.tolkien';
+
+    const result = await withLock(
+      async () => ok('handle-1'),
+      async () => ok('written'),
+      async () =>
+        refused('Unlock refused', {
+          method: 'POST',
+          url: '/u',
+          headers: { authorization: SECRET },
+        }),
+    );
+
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error('expected the release refusal');
+    expect(result.getError().request).toEqual({ method: 'POST', url: '/u' });
+    expect(JSON.stringify(result.getError())).not.toContain(SECRET);
+  });
+
   it('rethrows a THROWN release after a successful body rather than inventing an origin', async () => {
     expect.assertions(3);
     try {

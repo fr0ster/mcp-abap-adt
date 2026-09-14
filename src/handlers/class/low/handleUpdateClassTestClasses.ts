@@ -1,19 +1,24 @@
 /**
  * UpdateClassTestClasses Handler - Update ABAP Unit test include for a class
  *
- * Uses AdtClient.updateClassTestIncludes from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getLocalTestClass().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * The testclasses include has no result set of its own: `AdtLocalTestClass`
+ * is declared over `IClassResults`/`classDocuments`, the same set `class`
+ * uses, because ADT addresses the include as part of the class. So this
+ * injects `resultsFor(classDocuments)` — the shipped set applied through the
+ * table, same as every other family here — rather than a set of its own.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  extractAdtErrorMessage,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateClassTestClassesLow',
@@ -50,6 +55,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'test_class_source', 'lock_handle'],
   },
@@ -65,6 +71,7 @@ interface UpdateClassTestClassesArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateClassTestClasses(
@@ -72,76 +79,36 @@ export async function handleUpdateClassTestClasses(
   args: UpdateClassTestClassesArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      test_class_source,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UpdateClassTestClassesArgs;
+  const {
+    class_name,
+    test_class_source,
+    lock_handle,
+    session_id,
+    session_state,
+  } = args;
 
-    if (!class_name || !test_class_source || !lock_handle) {
-      return return_error(
-        new Error(
-          'class_name, test_class_source, and lock_handle are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-    }
-
-    const className = class_name.toUpperCase();
-    logger?.info(`Starting test classes update for: ${className}`);
-
-    try {
-      const updateState = await client.getLocalTestClass().update(
-        {
-          className,
-          testClassCode: test_class_source,
-        },
-        { lockHandle: lock_handle },
-      );
-      const updateResult = updateState.updateResult;
-
-      logger?.info(`✅ UpdateClassTestClasses completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            session_id: session_id || null,
-            status: updateResult?.status,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Test classes for ${className} updated successfully. Remember to unlock using UnlockClassTestClassesLow.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      const detailedError = extractAdtErrorMessage(
-        error,
-        `Failed to update test classes for ${className}`,
-      );
-      logger?.error(
-        `Error updating test classes for ${className}: ${detailedError}`,
-      );
-      const reason =
-        error?.response?.status === 404
-          ? `Class ${className} not found.`
-          : error?.response?.status === 423
-            ? `Test classes for ${className} are locked by another user or lock handle is invalid.`
-            : detailedError;
-      return return_error(new Error(reason));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!class_name || !test_class_source || !lock_handle) {
+    return return_error(
+      new Error('class_name, test_class_source, and lock_handle are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const className = class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateClassTestClassesLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getLocalTestClass(resultsFor(classDocuments))
+        .update(
+          { className, testClassCode: test_class_source },
+          { lockHandle: lock_handle, analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

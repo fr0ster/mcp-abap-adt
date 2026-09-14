@@ -3,6 +3,15 @@
  *
  * Uses AdtClient.getUnitTest().getResult from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
+ *
+ * **Deliberately excluded from Task 14's `class/low` migration and its
+ * `tsc`/`check-analyse` gates.** This reaches `getUnitTest()`, not
+ * `getClass()` — a different family with its own result set (`ourUnitTest`,
+ * already exported from `resultSets.ts`) and its own `analyseUnitTest`
+ * strategy — and it stays on `client.getUnitTest() as any` until the task
+ * that wires the unit-test members and that shared result set migrates it.
+ * The `IAdtResponse` compiler error below is pre-existing and known, not an
+ * omission this task's gate missed.
  */
 
 import type { IAdtResponse } from '@mcp-abap-adt/interfaces';

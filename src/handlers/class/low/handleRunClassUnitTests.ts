@@ -3,6 +3,15 @@
  *
  * Uses AdtClient.runClassUnitTests from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
+ *
+ * **Deliberately excluded from Task 14's `class/low` migration.** This
+ * reaches `getUnitTest()`, not `getClass()` — a different family with its
+ * own result set (`ourUnitTest`, already exported from `resultSets.ts`) and
+ * its own `analyseUnitTest` strategy — and stays on `client.getUnitTest() as
+ * any` until the task that wires the unit-test members migrates it. It has
+ * no `tsc` error today only because nothing here resolves a signature that
+ * names `IAdtResponse`'s type parameters explicitly, not because it is
+ * migrated.
  */
 
 import { createAdtClient } from '../../../lib/clients';

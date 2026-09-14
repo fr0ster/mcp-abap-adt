@@ -17,7 +17,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateClassLow',
@@ -114,12 +114,18 @@ export async function handleCreateClass(
     final,
     abstract,
     create_protected,
+    session_id,
+    session_state,
   } = args;
 
   if (!class_name || !description || !package_name) {
     return return_error(
       new Error('class_name, description, and package_name are required'),
     );
+  }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
   }
 
   const className = class_name.toUpperCase();

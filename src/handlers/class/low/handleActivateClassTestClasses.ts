@@ -10,6 +10,12 @@
  * exists but takes no `options`/`analyse` and is not what this tool has ever
  * called (the doc comment claiming otherwise was stale even before this
  * migration — the old code already called `.activate({ className })`).
+ *
+ * `test_class_name` stays on this tool's surface (removing it would be a
+ * surface change beyond the one this migration is allowed) but was never
+ * read by the old handler either — `activate({ className })` activates
+ * everything the class owns, test classes included, without naming one.
+ * Ignored, not newly ignored.
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';

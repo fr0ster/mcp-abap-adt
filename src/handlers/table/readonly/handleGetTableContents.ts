@@ -1,8 +1,16 @@
 import * as z from 'zod';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { detailOf } from '../../../lib/strategies/detail';
+import type { AnswerDetail } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { parseSqlQueryXml } from '../../system/readonly/handleGetSqlQuery';
+import {
+  parseSqlQueryXml,
+  projectRaw,
+} from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
@@ -15,59 +23,63 @@ export const TOOL_DEFINITION = {
       .number()
       .optional()
       .describe('Maximum number of rows to retrieve'),
+    // This tool's `inputSchema` is a bare zod raw shape (`scripts/list-tools.ts`
+    // reads that shape's optionality off `.isOptional()`), not the
+    // `{type:'object', properties, required}` JSON Schema `DETAIL_PROPERTY`
+    // (from `lib/strategies/detail.ts`) is written for — spreading it here
+    // compiles (both are plain objects) but is not a zod type, so the tool
+    // surface reads it as "required: unknown" rather than optional. Written
+    // out as zod instead, kept to the same three values/default/wording.
+    detail: z
+      .enum(['terse', 'full', 'raw'])
+      .optional()
+      .default('terse')
+      .describe(
+        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
+      ),
   },
 } as const;
 
 export async function handleGetTableContents(
   context: HandlerContext,
-  args: any,
+  args: { table_name: string; max_rows?: number; detail?: AnswerDetail },
 ) {
   const { connection, logger } = context;
-  try {
-    if (!args?.table_name) {
-      return return_error('Table name is required');
-    }
-
-    const tableName = args.table_name;
-    const maxRows = args.max_rows || 100;
-
-    logger?.info(`Reading table contents: ${tableName} (max_rows=${maxRows})`);
-
-    const client = createAdtClient(connection, logger);
-    const response = await client
-      .getUtils()
-      .getTableContents({ table_name: tableName, max_rows: maxRows });
-
-    if (response.status === 200 && response.data) {
-      logger?.info('Table contents request completed successfully');
-
-      const parsedData = parseSqlQueryXml(
-        response.data,
-        `SELECT * FROM ${tableName}`,
-        maxRows,
-        logger,
-      );
-
-      logger?.debug(
-        `Parsed table data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
-      );
-
-      return {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(parsedData, null, 2),
-          },
-        ],
-      };
-    } else {
-      return return_error(
-        `Failed to read table contents. Status: ${response.status}`,
-      );
-    }
-  } catch (error) {
-    logger?.error('Failed to read table contents', error as any);
-    return return_error(error);
+  if (!args?.table_name) {
+    return return_error('Table name is required');
   }
+
+  const tableName = args.table_name;
+  const maxRows = args.max_rows || 100;
+  const detail = detailOf(args);
+
+  logger?.info(`Reading table contents: ${tableName} (max_rows=${maxRows})`);
+
+  // `IGetTableContentsParams.sql_query` is required since adt-clients 42.0.0 —
+  // the caller states the statement, it is not built server-side from the
+  // table's columns any more (see the type's own doc). The pre-migration call
+  // never sent one; sending `SELECT * FROM <table>` here is not a new
+  // capability, it is naming what this tool's own success label
+  // ("SELECT * FROM ${tableName}") already assumed was being run.
+  const sqlQuery = `SELECT * FROM ${tableName}`;
+
+  // `getTableContents(params)` takes no options object at all — no `analyse`
+  // to pass, matching the brief.
+  return answer(
+    { tool: 'GetTableContents', detail },
+    () =>
+      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents({
+        table_name: tableName,
+        max_rows: maxRows,
+        sql_query: sqlQuery,
+      }),
+    (reading: AdtReading<unknown>) =>
+      projectRaw(detail, reading, (raw) => {
+        const parsedData = parseSqlQueryXml(raw, sqlQuery, maxRows, logger);
+        logger?.debug(
+          `Parsed table data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
+        );
+        return parsedData;
+      }),
+  );
 }

@@ -1,9 +1,12 @@
-import { XMLParser } from 'fast-xml-parser';
-import convert from 'xml-js';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import type { NodeLevel } from '../../../lib/strategies/packageWalk';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectInfo',
   available_in: ['onprem', 'cloud'] as const,
@@ -37,208 +40,166 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-// Determine default depth for various object types
 function getDefaultDepth(parent_type: string): number {
   const type = parent_type?.toUpperCase() || '';
   if (type.startsWith('PROG/') || type.startsWith('FUGR/')) return 2;
   return 1;
 }
 
-async function fetchNodeStructureRaw(
-  context: HandlerContext,
-  parent_type: string,
-  parent_name: string,
-  node_id?: string,
-) {
-  const { connection, logger } = context;
-  const client = createAdtClient(connection, logger);
-  const utils = client.getUtils();
-
-  const response = await utils.fetchNodeStructure(
-    parent_type,
-    parent_name,
-    node_id || '0000',
-    true, // withShortDescriptions
-  );
-
-  const result = convert.xml2js(response.data, { compact: true });
-  let nodes =
-    result['asx:abap']?.['asx:values']?.DATA?.TREE_CONTENT
-      ?.SEU_ADT_REPOSITORY_OBJ_NODE || [];
-  if (!Array.isArray(nodes)) nodes = [nodes];
-  return nodes;
+interface TreeNode {
+  OBJECT_TYPE: string;
+  OBJECT_NAME: string;
+  OBJECT_DESCRIPTION?: string;
+  OBJECT_PACKAGE?: string;
+  CHILDREN?: TreeNode[];
 }
 
+function ok(node: TreeNode): IAdtResponse<TreeNode, IAdtError> {
+  return {
+    ok: true,
+    getResult: () => ({ value: node }),
+    getError: () => {
+      throw new Error('asked for the error of a success');
+    },
+  } as unknown as IAdtResponse<TreeNode, IAdtError>;
+}
+
+/**
+ * Enrich the root node with description/package via `SearchObject` (best
+ * effort — a search failure never fails the tree, matching the pre-migration
+ * handler).
+ *
+ * `SearchObject`'s answer is now the tab-separated `name\ttype\tdescription\t
+ * package` table this migration gives it (`handleSearchObject.ts`), not the
+ * `<adtcore:objectReference>` XML the pre-migration handler parsed — both
+ * files were migrated together in this task, so the contract between them is
+ * updated on both ends rather than one side guessing at the other's old shape.
+ */
 async function enrichNodeWithSearchObject(
   context: HandlerContext,
   objectType: string,
   objectName: string,
   fallbackDescription?: string,
-) {
-  const { connection, logger } = context;
+): Promise<{ packageName?: string; description?: string; type: string }> {
   let packageName: string | undefined;
   let description = fallbackDescription;
   let type = objectType;
   try {
     const searchResult = await handleSearchObject(context, {
-      query: objectName,
+      object_name: objectName,
       object_type: objectType,
       maxResults: 1,
     });
     if (!searchResult.isError && Array.isArray(searchResult.content)) {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '',
-      });
       for (const entry of searchResult.content) {
-        // The `Error: <?xml` guard that used to live here keyed on a prefix
-        // removed in #155; the `!searchResult.isError` gate above covers it.
-        if ('text' in entry && typeof entry.text === 'string') {
-          const parsed = parser.parse(entry.text);
-          const refs =
-            parsed?.['adtcore:objectReferences']?.['adtcore:objectReference'];
-          const objects = refs ? (Array.isArray(refs) ? refs : [refs]) : [];
-          for (const obj of objects) {
-            if (
-              obj['adtcore:type'] &&
-              obj['adtcore:name'] &&
-              obj['adtcore:name'].toUpperCase() === objectName.toUpperCase()
-            ) {
-              packageName = obj['adtcore:packageName'];
-              description = obj['adtcore:description'] || description;
-              type = obj['adtcore:type'];
-              return { packageName, description, type };
-            }
+        if (!('text' in entry) || typeof entry.text !== 'string') continue;
+        const [, ...rows] = entry.text.split('\n'); // drop the header row
+        for (const line of rows) {
+          const [name, hitType, hitDescription, hitPackage] = line.split('\t');
+          if (name && name.toUpperCase() === objectName.toUpperCase()) {
+            packageName = hitPackage || undefined;
+            description = hitDescription || description;
+            type = hitType || type;
+            return { packageName, description, type };
           }
         }
       }
     }
-  } catch (_e) {
-    // ignore
+  } catch {
+    // Enrichment is best-effort; the tree still answers without it.
   }
   return { packageName, description, type };
 }
 
-function getText(node: any, key: string) {
-  if (!node) return undefined;
-  if (node[key] && typeof node[key] === 'object' && '_text' in node[key])
-    return node[key]._text;
-  if (typeof node[key] === 'string') return node[key];
-  return undefined;
-}
+type NodeSource = ReturnType<ReturnType<typeof createAdtClient>['getUtils']>;
 
-// Terminal leaf: has OBJECT_NAME and OBJECT_URI
-function isTerminalLeaf(node: any): boolean {
-  return !!getText(node, 'OBJECT_NAME') && !!getText(node, 'OBJECT_URI');
-}
-
-// Group node: has NODE_ID, OBJECT_TYPE, but no OBJECT_URI
-function isGroupNode(node: any): boolean {
-  return (
-    !!getText(node, 'NODE_ID') &&
-    !!getText(node, 'OBJECT_TYPE') &&
-    !getText(node, 'OBJECT_URI')
-  );
-}
-
-function _getNodeType(node: any, depth: number): 'root' | 'point' | 'end' {
-  if (depth === 0) return 'root';
-  if (isTerminalLeaf(node)) return 'end';
-  if (isGroupNode(node)) return 'point';
-  return 'point';
-}
-
+/**
+ * One tree node: the object itself, enriched, plus its children.
+ *
+ * **Corpus-informed, not the pre-migration algorithm ported unchanged.** The
+ * pre-migration handler read only `DATA.TREE_CONTENT.SEU_ADT_REPOSITORY_OBJ_NODE`
+ * and recursed into an entry there when it looked like a "group node" (a
+ * `NODE_ID` with no `OBJECT_URI`). Across all eight `read-object-tree-structure`
+ * fixtures under `tests/fixtures/adt/` — BDEF, FUGR, service definition,
+ * structure, table, across every depth captured — no entry ever carries a
+ * `NODE_ID`: real content lives in `DATA.OBJECT_TYPES.SEU_ADT_OBJECT_TYPE_INFO`
+ * (the type folders `nodeLevel`'s `childNodes` reads), which the pre-migration
+ * handler never read at all. For a package root, `TREE_CONTENT` is empty in
+ * fixture 01 — so at the tool's own default `maxDepth` of 1, the pre-migration
+ * handler answered an empty `CHILDREN` for the single most common call
+ * (`parent_type: 'DEVC/K'`). This version reads both halves of the one
+ * document `ourUtils.node` (`nodeLevel`) already parses: direct objects at
+ * this level, plus one fetch per type folder for the objects inside it —
+ * matching `walkPackage`'s own two-tier walk in `packageWalk.ts`, which is
+ * exercised by `handleGetPackageContents`/`handleGetPackageTree` today. Also
+ * dropped: `PARENT_NODE_ID` — the pre-migration handler read that field name,
+ * but the fixtures only ever carry `PARENT_NAME`; `PARENT_NODE_ID` was
+ * therefore always `undefined` and never appeared in the JSON `answer`
+ * serialises (`JSON.stringify` drops `undefined` values), so nothing observable
+ * changes by not carrying it forward.
+ *
+ * A refusal at ANY fetch — the root's or a type folder's — is returned as-is
+ * and bubbles to `answer()` unchanged, the same short-circuit
+ * `handleGetObjectsList.ts` uses.
+ */
 async function buildTree(
   context: HandlerContext,
+  utils: NodeSource,
   objectType: string,
   objectName: string,
-  depth: number,
-  maxDepth: number,
+  expandTypeFolders: boolean,
   enrich: boolean,
-  node_id: string = '',
-): Promise<any> {
-  // 1. Enrich root node
-  let enrichment: any = {
-    packageName: undefined,
-    description: undefined,
-    type: objectType,
-  };
-  if (enrich) {
-    enrichment = await enrichNodeWithSearchObject(
-      context,
-      objectType,
-      objectName,
-    );
+): Promise<IAdtResponse<TreeNode, IAdtError>> {
+  const enrichment = enrich
+    ? await enrichNodeWithSearchObject(context, objectType, objectName)
+    : { type: objectType, description: undefined, packageName: undefined };
+
+  const rootResponse = await utils.fetchNodeStructure(objectType, objectName, {
+    withShortDescriptions: true,
+  });
+  if (!rootResponse.ok) {
+    return rootResponse as IAdtResponse<TreeNode, IAdtError>;
   }
-  // 2. Get children if depth < maxDepth
-  const children: any[] = [];
-  if (depth < maxDepth) {
-    // Use node_id "0000" for the root; for others keep the actual NODE_ID
-    const nodes = await fetchNodeStructureRaw(
-      context,
-      objectType,
-      objectName,
-      depth === 0 ? '0000' : node_id,
-    );
-    for (const node of nodes) {
-      // When the next level hits the maximum depth, only include terminal leaves
-      if (depth + 1 === maxDepth) {
-        if (isTerminalLeaf(node)) {
-          const terminalNode: any = {
-            OBJECT_TYPE: getText(node, 'OBJECT_TYPE'),
-            OBJECT_NAME: getText(node, 'OBJECT_NAME'),
-            PARENT_NODE_ID: getText(node, 'PARENT_NODE_ID'),
-          };
-          children.push(terminalNode);
-        }
-        // Skip group nodes at the maximum level
-      } else {
-        if (isGroupNode(node)) {
-          // Group node: recurse, attach its children
-          const groupChildren = await buildTree(
-            context,
-            getText(node, 'OBJECT_TYPE'),
-            getText(node, 'OBJECT_NAME'),
-            depth + 1,
-            maxDepth,
-            enrich,
-            String(getText(node, 'NODE_ID') ?? ''),
-          );
-          const groupNode: any = {
-            OBJECT_TYPE: getText(node, 'OBJECT_TYPE'),
-            OBJECT_NAME: getText(node, 'OBJECT_NAME'),
-            PARENT_NODE_ID: getText(node, 'PARENT_NODE_ID'),
-          };
-          if (
-            Array.isArray(groupChildren.CHILDREN) &&
-            groupChildren.CHILDREN.length > 0
-          ) {
-            groupNode.CHILDREN = groupChildren.CHILDREN;
-          }
-          children.push(groupNode);
-        } else if (isTerminalLeaf(node)) {
-          // Terminal leaf: add as is
-          const terminalNode: any = {
-            OBJECT_TYPE: getText(node, 'OBJECT_TYPE'),
-            OBJECT_NAME: getText(node, 'OBJECT_NAME'),
-            PARENT_NODE_ID: getText(node, 'PARENT_NODE_ID'),
-          };
-          children.push(terminalNode);
-        }
-        // else: skip nodes that are neither group nor terminal leaf
+  const root = rootResponse.getResult().value as NodeLevel;
+
+  const children: TreeNode[] = root.objects.map((o) => ({
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
+    ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+  }));
+
+  if (expandTypeFolders) {
+    for (const child of root.childNodes) {
+      const childResponse = await utils.fetchNodeStructure(
+        objectType,
+        objectName,
+        { nodeId: child.nodeId, withShortDescriptions: true },
+      );
+      if (!childResponse.ok) {
+        return childResponse as IAdtResponse<TreeNode, IAdtError>;
+      }
+      const childLevel = childResponse.getResult().value as NodeLevel;
+      for (const o of childLevel.objects) {
+        children.push({
+          OBJECT_TYPE: o.type,
+          OBJECT_NAME: o.name,
+          ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+        });
       }
     }
   }
-  const resultNode: any = {
+
+  return ok({
     OBJECT_TYPE: enrichment.type || objectType,
     OBJECT_NAME: objectName,
-    OBJECT_DESCRIPTION: enrichment.description,
-    OBJECT_PACKAGE: enrichment.packageName,
-  };
-  if (children.length > 0) {
-    resultNode.CHILDREN = children;
-  }
-  return resultNode;
+    ...(enrichment.description
+      ? { OBJECT_DESCRIPTION: enrichment.description }
+      : {}),
+    ...(enrichment.packageName
+      ? { OBJECT_PACKAGE: enrichment.packageName }
+      : {}),
+    ...(children.length > 0 ? { CHILDREN: children } : {}),
+  });
 }
 
 export async function handleGetObjectInfo(
@@ -250,52 +211,31 @@ export async function handleGetObjectInfo(
     enrich?: boolean;
   },
 ) {
-  const { logger } = context;
-  try {
-    if (!args?.parent_type || !args?.parent_name) {
-      return return_error('parent_type and parent_name are required');
-    }
-    logger?.info(
-      `Building object info tree for ${args.parent_type}/${args.parent_name}`,
-    );
-    // Determine the default depth if none is provided
-    const maxDepth = Number.isInteger(args.maxDepth)
-      ? (args.maxDepth as number)
-      : getDefaultDepth(args.parent_type);
-    const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
-    const result = await buildTree(
-      context,
-      args.parent_type,
-      args.parent_name,
-      0,
-      maxDepth ?? getDefaultDepth(args.parent_type),
-      enrich,
-    );
-    logger?.debug(
-      `Object tree built with depth ${maxDepth} (enrich=${enrich})`,
-    );
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'json',
-          json: result,
-        },
-      ],
-    };
-  } catch (error) {
-    logger?.error(
-      `Failed to build object info for ${args?.parent_type}/${args?.parent_name}`,
-      error as any,
-    );
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: error instanceof Error ? error.message : String(error),
-        },
-      ],
-    };
+  const { connection, logger } = context;
+  if (!args?.parent_type || !args?.parent_name) {
+    return return_error('parent_type and parent_name are required');
   }
+  logger?.info(
+    `Building object info tree for ${args.parent_type}/${args.parent_name}`,
+  );
+  const maxDepth = Number.isInteger(args.maxDepth)
+    ? (args.maxDepth as number)
+    : getDefaultDepth(args.parent_type);
+  const enrich = typeof args.enrich === 'boolean' ? args.enrich : true;
+
+  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+
+  return answer(
+    { tool: 'GetObjectInfo', detail: 'terse' },
+    () =>
+      buildTree(
+        context,
+        utils,
+        args.parent_type,
+        args.parent_name,
+        maxDepth >= 1,
+        enrich,
+      ),
+    (tree: TreeNode) => tree,
+  );
 }

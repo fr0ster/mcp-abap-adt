@@ -1,11 +1,15 @@
 /**
- * Handler for retrieving ADT object structure and returning compact JSON tree.
+ * Handler for retrieving ADT object structure and returning a compact tree.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructure',
   available_in: ['onprem', 'cloud'] as const,
@@ -22,12 +26,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'ADT object name (e.g. /CBY/ACQ_DDL)',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['objecttype', 'objectname'],
   },
 } as const;
 
-// Build nested tree from flat node list (nodeid/parentid)
 interface FlatObjectStructureNode {
   nodeid: string;
   parentid?: string;
@@ -41,7 +45,33 @@ interface ObjectStructureTreeNode {
   children: ObjectStructureTreeNode[];
 }
 
-function buildNestedTree(flatNodes: FlatObjectStructureNode[]) {
+/**
+ * `projectexplorer:objectstructure/projectexplorer:node`, attributes
+ * `nodeid`/`parentid`/`objecttype`/`objectname` — the same field set this
+ * tool has always read, off the generic `structured` parse that now supplies
+ * `objectStructure` (`resultSets.ts`'s `READING_BY_SLOT` overrides the
+ * shipped `rawDocument` default). `node`'s local name is one of `structured`'s
+ * forced-array elements, so this holds for a single node too.
+ */
+function flatNodesOf(value: unknown): FlatObjectStructureNode[] {
+  const nodesRaw = (value as any)?.['projectexplorer:objectstructure']?.[
+    'projectexplorer:node'
+  ];
+  const nodes = Array.isArray(nodesRaw) ? nodesRaw : nodesRaw ? [nodesRaw] : [];
+  return nodes.map((n: any) => {
+    const a = n?.['@'] ?? {};
+    return {
+      nodeid: a.nodeid,
+      parentid: a.parentid,
+      objecttype: a.objecttype,
+      objectname: a.objectname,
+    };
+  });
+}
+
+function buildNestedTree(
+  flatNodes: FlatObjectStructureNode[],
+): ObjectStructureTreeNode[] {
   const nodeMap: Record<string, ObjectStructureTreeNode> = {};
   flatNodes.forEach((node) => {
     nodeMap[node.nodeid] = {
@@ -61,7 +91,6 @@ function buildNestedTree(flatNodes: FlatObjectStructureNode[]) {
   return roots;
 }
 
-// Serialize tree to MCP-compatible text format ("tree:")
 function serializeTree(
   tree: ObjectStructureTreeNode[],
   indent: string = '',
@@ -76,6 +105,12 @@ function serializeTree(
   return result;
 }
 
+function treeText(value: unknown): string {
+  const nodes = flatNodesOf(value);
+  if (nodes.length === 0) return 'No nodes found in object structure response.';
+  return `tree:\n${serializeTree(buildNestedTree(nodes))}`;
+}
+
 export async function handleGetObjectStructure(
   context: HandlerContext,
   args: {
@@ -83,69 +118,31 @@ export async function handleGetObjectStructure(
     objectname?: string;
     object_type?: string;
     object_name?: string;
+    detail?: 'terse' | 'full' | 'raw';
   },
 ) {
   const { connection, logger } = context;
-  try {
-    const objectType = args.objecttype ?? args.object_type;
-    const objectName = args.objectname ?? args.object_name;
-    if (!objectType || !objectName) {
-      throw new Error(
+  const objectType = args.objecttype ?? args.object_type;
+  const objectName = args.objectname ?? args.object_name;
+  if (!objectType || !objectName) {
+    return return_error(
+      new Error(
         'objecttype/objectname (or object_type/object_name) are required',
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    const response = await client
-      .getUtils()
-      .getObjectStructure(objectType, objectName);
-    logger?.info(`Fetched object structure for ${objectType}/${objectName}`);
-
-    // Parse XML response
-    const parser = new XMLParser({
-      ignoreAttributes: false,
-      attributeNamePrefix: '',
-    });
-    const parsed = parser.parse(response.data);
-
-    // Get flat node list
-    let nodes = parsed['projectexplorer:objectstructure']?.[
-      'projectexplorer:node'
-    ] as FlatObjectStructureNode | FlatObjectStructureNode[] | undefined;
-    if (!nodes) {
-      return {
-        isError: true,
-        content: [
-          {
-            type: 'text',
-            text: 'No nodes found in object structure response.',
-          },
-        ],
-      };
-    }
-    // Ensure nodes is always an array
-    if (!Array.isArray(nodes)) nodes = [nodes];
-
-    // Build nested tree
-    const tree = buildNestedTree(nodes);
-
-    // Serialize to MCP-compatible text format
-    const treeText = `tree:\n${serializeTree(tree)}`;
-
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: treeText,
-        },
-      ],
-    };
-  } catch (error) {
-    logger?.error(
-      `Failed to fetch object structure for ${args?.objecttype ?? args?.object_type}/${args?.objectname ?? args?.object_name}`,
-      error,
+      ),
     );
-    return return_error(error);
   }
+
+  logger?.info(`Fetching object structure for ${objectType}/${objectName}`);
+  const detail = detailOf(args);
+
+  // `getObjectStructure(objectType, objectName)` takes no options object at
+  // all — no `analyse` to pass, matching the brief.
+  return answer(
+    { tool: 'GetObjectStructure', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getObjectStructure(objectType, objectName),
+    project(detail, (value) => treeText(value)),
+  );
 }

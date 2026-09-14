@@ -1,6 +1,7 @@
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import {
   encodeSapObjectName,
   logger,
@@ -285,101 +286,6 @@ async function determineObjectTypeAndPath(
 }
 
 /**
- * Parses XML response to extract includes information
- * @param xmlData XML response data
- * @returns Array of include objects with name and node_id
- */
-function parseIncludesFromXml(
-  xmlData: string,
-): Array<{ name: string; node_id: string; label: string }> {
-  const includes: Array<{ name: string; node_id: string; label: string }> = [];
-
-  try {
-    // Simple regex-based parsing for XML
-    // Look for OBJECT_TYPE entries that contain "PROG/I" (includes)
-    const objectTypeRegex =
-      /<SEU_ADT_OBJECT_TYPE_INFO>(.*?)<\/SEU_ADT_OBJECT_TYPE_INFO>/gs;
-    const matches = xmlData.match(objectTypeRegex);
-
-    if (matches) {
-      for (const match of matches) {
-        // Check if this is an include type
-        if (match.includes('<OBJECT_TYPE>PROG/I</OBJECT_TYPE>')) {
-          const nodeIdMatch = match.match(/<NODE_ID>(\d+)<\/NODE_ID>/);
-          const labelMatch = match.match(
-            /<OBJECT_TYPE_LABEL>(.*?)<\/OBJECT_TYPE_LABEL>/,
-          );
-
-          if (nodeIdMatch && labelMatch) {
-            includes.push({
-              name: 'PROG/I',
-              node_id: nodeIdMatch[1],
-              label: labelMatch[1],
-            });
-          }
-        }
-      }
-    }
-  } catch (error) {
-    logger?.warn('Error parsing XML for includes:', error);
-  }
-
-  return includes;
-}
-
-/**
- * Parses XML response to extract actual include names from node structure
- * @param xmlData XML response data
- * @returns Array of include names
- */
-function parseIncludeNamesFromXml(xmlData: string): string[] {
-  const includeNames: string[] = [];
-
-  try {
-    // Look for SEU_ADT_REPOSITORY_OBJ_NODE entries with OBJECT_TYPE PROG/I
-    const nodeRegex =
-      /<SEU_ADT_REPOSITORY_OBJ_NODE>(.*?)<\/SEU_ADT_REPOSITORY_OBJ_NODE>/gs;
-    const nodeMatches = xmlData.match(nodeRegex);
-
-    if (nodeMatches) {
-      for (const nodeMatch of nodeMatches) {
-        // Check if this node is for includes (PROG/I)
-        if (nodeMatch.includes('<OBJECT_TYPE>PROG/I</OBJECT_TYPE>')) {
-          // Extract the object name
-          const nameMatch = nodeMatch.match(
-            /<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/,
-          );
-          if (nameMatch?.[1].trim()) {
-            const includeName = nameMatch[1].trim();
-            // Decode URL-encoded names if needed
-            const decodedName = decodeURIComponent(includeName);
-            includeNames.push(decodedName);
-          }
-        }
-      }
-    }
-
-    // If no nodes found, try alternative parsing for OBJECT_NAME tags
-    if (includeNames.length === 0) {
-      const objectNameRegex = /<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/g;
-      let match: RegExpExecArray | null = objectNameRegex.exec(xmlData);
-      while (match !== null) {
-        const name = match[1].trim();
-        if (name && name.length > 0) {
-          const decodedName = decodeURIComponent(name);
-          includeNames.push(decodedName);
-        }
-        match = objectNameRegex.exec(xmlData);
-      }
-    }
-  } catch (error) {
-    logger?.warn('Error parsing XML for include names:', error);
-  }
-
-  return [...new Set(includeNames)]; // Remove duplicates
-}
-
-/**
  * Internal function to get includes list using SAP ADT API
  * @param objectName - Name of the object
  * @param objectType - Type of the object ('program' | 'include' | 'class')
@@ -410,18 +316,20 @@ async function getIncludesListInternal(
       );
     }
 
-    // Create AdtClient and get utilities
+    // Create AdtClient and get utilities. `ourUtils` — not `resultsFor`'s
+    // generic `structured` reading — because the shape this function needs
+    // (objects at a level, and the type→nodeId pairs to descend into) is
+    // exactly `nodeLevel`'s `NodeLevel`, the one reading every node-structure
+    // caller in this migration reuses rather than re-derives.
     const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+    const utils = client.getUtils(ourUtils);
 
-    // Step 1: Get root node structure to find includes node (with timeout)
+    // Step 1: Get root node structure to find the includes node (with timeout)
     const rootResponse = await Promise.race([
-      utils.fetchNodeStructure(
-        parentType,
-        parentName,
-        '000000', // Root node
-        true, // with descriptions
-      ),
+      utils.fetchNodeStructure(parentType, parentName, {
+        nodeId: '000000', // Root node
+        withShortDescriptions: true,
+      }),
       new Promise<never>((_, reject) =>
         setTimeout(
           () =>
@@ -435,9 +343,17 @@ async function getIncludesListInternal(
       ),
     ]);
 
-    // Step 2: Parse response to find includes node ID
-    const includesInfo = parseIncludesFromXml(rootResponse.data);
-    const includesNode = includesInfo.find((info) => info.name === 'PROG/I');
+    if (!rootResponse.ok) {
+      logger?.warn(
+        `Refused while fetching root node structure for ${objectName}`,
+      );
+      return [];
+    }
+
+    // Step 2: Find the includes (PROG/I) node id among the type folders.
+    const includesNode = rootResponse
+      .getResult()
+      .value.childNodes.find((info) => info.type === 'PROG/I');
 
     if (!includesNode) {
       logger?.info(`No includes node found for ${objectType} '${objectName}'`);
@@ -446,12 +362,10 @@ async function getIncludesListInternal(
 
     // Step 3: Get includes list using the found node ID (with timeout)
     const includesResponse = await Promise.race([
-      utils.fetchNodeStructure(
-        parentType,
-        parentName,
-        includesNode.node_id,
-        true, // with descriptions
-      ),
+      utils.fetchNodeStructure(parentType, parentName, {
+        nodeId: includesNode.nodeId,
+        withShortDescriptions: true,
+      }),
       new Promise<never>((_, reject) =>
         setTimeout(
           () =>
@@ -465,8 +379,21 @@ async function getIncludesListInternal(
       ),
     ]);
 
-    // Step 4: Parse the includes response to extract include names
-    const includeNames = parseIncludeNamesFromXml(includesResponse.data);
+    if (!includesResponse.ok) {
+      logger?.warn(`Refused while fetching includes list for ${objectName}`);
+      return [];
+    }
+
+    // Step 4: Names of the objects under that node — de-duplicated, matching
+    // the pre-migration parser's `[...new Set(...)]`.
+    const includeNames = [
+      ...new Set(
+        includesResponse
+          .getResult()
+          .value.objects.filter((o) => o.type === 'PROG/I')
+          .map((o) => o.name),
+      ),
+    ];
 
     logger?.info(
       `Found ${includeNames.length} includes for ${objectType} '${objectName}' using SAP ADT API`,

@@ -11,6 +11,7 @@
 const mockMc = {
   create: jest.fn(),
   read: jest.fn(),
+  readMetadata: jest.fn(),
   update: jest.fn(),
   delete: jest.fn(),
 };
@@ -35,6 +36,7 @@ import { handleGetMessageClass } from '../../handlers/message_class/high/handleG
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
 import { handleReadMessageClass } from '../../handlers/message_class/readonly/handleReadMessageClass';
 import { handleReadMessageClassMessage } from '../../handlers/message_class/readonly/handleReadMessageClassMessage';
+import { okResponse, reading } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -51,23 +53,25 @@ describe('Message Class (MSAG) CRUD tools', () => {
     }
   });
 
-  it('ReadMessageClass returns the parsed message class', async () => {
-    mockMc.read.mockResolvedValue({
-      messageClass: {
-        name: 'ZMY_MSGS',
-        description: 'My messages',
-        packageName: 'ZPKG',
-        messages: [{ msgno: '001', msgtext: 'Hello &1' }],
-      },
-    });
+  // adt-clients 19: a message class has no source resource of its own, so
+  // `read` is gone and `readMetadata` answers the whole document verbatim
+  // (see `handleReadMessageClass.ts`) — there is no longer a parsed
+  // `messageClass.messages[]` to assert against, only the raw document.
+  it('ReadMessageClass answers the class document via readMetadata', async () => {
+    const metadata =
+      '<msag:messageClass adtcore:name="ZMY_MSGS">...</msag:messageClass>';
+    mockMc.readMetadata.mockResolvedValue(okResponse(reading(metadata)));
 
     const result = await handleReadMessageClass(ctx, {
       message_class_name: 'zmy_msgs',
     });
 
     expect(result.isError).toBe(false);
-    expect(mockMc.read).toHaveBeenCalledWith({ name: 'ZMY_MSGS' });
-    expect(payload(result).message_class.messages[0].msgno).toBe('001');
+    expect(mockMc.readMetadata).toHaveBeenCalledWith(
+      { name: 'ZMY_MSGS' },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
+    expect(payload(result).metadata).toBe(metadata);
   });
 
   it('GetMessageClass surfaces "not found" when read returns undefined', async () => {
@@ -155,10 +159,16 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
   });
 
-  it('ReadMessageClassMessage returns the single parsed message', async () => {
-    mockMsg.read.mockResolvedValue({
-      message: { msgno: '001', msgtext: 'Hello &1', selfExplanatory: false },
-    });
+  // adt-clients 19: `AdtMessageClassMessage`'s factory contract only composes
+  // `IAdtCreatable & IAdtReadable & IAdtUpdatable` — no `IAdtMetadataReadable`
+  // — and `read`/`written`/`deleted` are fixed to answer plain `string` (see
+  // `handleReadMessageClassMessage.ts`'s own comment), so this now calls
+  // `read()` and answers the parent class document verbatim rather than a
+  // parsed single message.
+  it('ReadMessageClassMessage answers the parent class document via read', async () => {
+    const classDocument =
+      '<msag:messageClass><mc:messages><mc:message mc:msgno="001">Hello &amp;1</mc:message></mc:messages></msag:messageClass>';
+    mockMsg.read.mockResolvedValue(okResponse(classDocument));
 
     const result = await handleReadMessageClassMessage(ctx, {
       message_class_name: 'ZMY_MSGS',
@@ -166,10 +176,11 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockMsg.read).toHaveBeenCalledWith({
-      className: 'ZMY_MSGS',
-      msgno: '001',
-    });
-    expect(payload(result).message.msgtext).toBe('Hello &1');
+    expect(mockMsg.read).toHaveBeenCalledWith(
+      { className: 'ZMY_MSGS', msgno: '001' },
+      undefined,
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
+    expect(payload(result).metadata).toBe(classDocument);
   });
 });

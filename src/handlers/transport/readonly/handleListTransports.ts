@@ -2,14 +2,18 @@
  * ListTransports Handler - List user's transport requests via ADT API
  *
  * Retrieves transport requests for the current user or specified user.
- * Uses AdtClient.getRequest().list() with proper Accept negotiation.
+ * Uses AdtClient.getRequest().list().
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
+import { parseStructure } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import { getSystemContext } from '../../../lib/systemContext';
-import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ListTransports',
@@ -29,6 +33,7 @@ export const TOOL_DEFINITION = {
         description:
           'Only return modifiable (not yet released) transports. Default: true.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: [],
   },
@@ -37,6 +42,7 @@ export const TOOL_DEFINITION = {
 interface ListTransportsArgs {
   user?: string;
   modifiable_only?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 interface TransportEntry {
@@ -60,6 +66,11 @@ const STATUS_BY_CONTAINER: Record<string, string> = {
 /** Modifiable request statuses: D = modifiable, L = modifiable/protected. */
 const MODIFIABLE_STATUSES = new Set(['D', 'L']);
 
+function attrsOf(node: unknown): Record<string, string> {
+  const a = (node as { '@'?: Record<string, string> } | undefined)?.['@'];
+  return a && typeof a === 'object' ? a : {};
+}
+
 function collectRequestNodes(
   node: unknown,
   containerStatus: string,
@@ -75,6 +86,7 @@ function collectRequestNodes(
     return;
   }
   for (const [key, value] of Object.entries(node as Record<string, unknown>)) {
+    if (key === '@') continue; // attributes of THIS node, not a child to descend into
     if (key === 'tm:request') {
       const requests = Array.isArray(value) ? value : [value];
       for (const req of requests) {
@@ -94,56 +106,57 @@ function collectRequestNodes(
 }
 
 /**
- * Parse the CTS transport list payload.
+ * Parse the CTS transport list payload — same tree walk as before the
+ * migration, adapted to the `structured` reading's `attributesGroupName: '@'`
+ * (`resultSets.ts`'s `READING_BY_SLOT`; `list`'s slot name is `list`, mapped
+ * to `structured` there), where the pre-migration parser had attributes
+ * merged straight onto each node. `request` and `task` are both in
+ * `structured`'s forced-array `REPEATABLE` set (added for this document — see
+ * `reading.ts`), so a tree with exactly one request still parses as one.
  *
  * The endpoint negotiates `application/vnd.sap.adt.transportorganizertree.v1+xml`,
  * a *tree*: requests sit under status containers, one level below the category —
  * `tm:root > tm:workbench > tm:modifiable > tm:request` — and `tm:workbench` may
- * repeat, once per transport target. The previous implementation looked for
- * `tm:request` only directly under the root or directly under `tm:workbench`,
- * so on a real system every lookup missed and the tool reported an empty list
- * while the user owned requests (#168).
- *
- * Requests are therefore collected from anywhere in the tree, which keeps the
- * flatter shapes working too. Duplicates (same request number reached through
- * more than one branch) are collapsed, first occurrence winning.
+ * repeat, once per transport target. Requests are collected from anywhere in
+ * the tree, and duplicates (same request number reached through more than one
+ * branch) are collapsed, first occurrence winning.
  */
-export function parseTransportListXml(xmlData: string): TransportEntry[] {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    isArray: (name) => {
-      return ['tm:request', 'tm:task'].includes(name);
-    },
-  });
-
-  const result = parser.parse(xmlData);
-
+export function parseTransportListValue(value: unknown): TransportEntry[] {
   const found: { req: Record<string, unknown>; containerStatus: string }[] = [];
-  collectRequestNodes(result, '', found);
+  collectRequestNodes(value, '', found);
 
   const seen = new Set<string>();
   const entries: TransportEntry[] = [];
 
   for (const { req, containerStatus } of found) {
-    const number =
-      (req['tm:number'] as string) || (req['adtcore:name'] as string) || '';
+    const a = attrsOf(req);
+    const number = a['tm:number'] || a['adtcore:name'] || '';
     if (!number || seen.has(number)) {
       continue;
     }
     seen.add(number);
     entries.push({
       number,
-      description:
-        (req['tm:desc'] as string) || (req['tm:description'] as string) || '',
-      type: (req['tm:type'] as string) || '',
-      status: (req['tm:status'] as string) || containerStatus || '',
-      owner: (req['tm:owner'] as string) || '',
-      target: (req['tm:target'] as string) || '',
+      description: a['tm:desc'] || a['tm:description'] || '',
+      type: a['tm:type'] || '',
+      status: a['tm:status'] || containerStatus || '',
+      owner: a['tm:owner'] || '',
+      target: a['tm:target'] || '',
     });
   }
 
   return entries;
+}
+
+/**
+ * `parseTransportListValue`, fed a raw XML string instead of an already-parsed
+ * value — kept for `parseTransportListXml.test.ts` (the #168 regression
+ * guard), which predates this migration and asserts against raw fixture XML.
+ * Parses with the same `structured` reading's parser (`reading.ts`), so a
+ * caller of either function sees identical results for identical documents.
+ */
+export function parseTransportListXml(xmlData: string): TransportEntry[] {
+  return parseTransportListValue(parseStructure(xmlData));
 }
 
 /** Unknown status is kept: never hide a request because it was not classified. */
@@ -156,53 +169,47 @@ export async function handleListTransports(
   args: ListTransportsArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const modifiableOnly = args?.modifiable_only !== false;
-    const user =
-      args?.user ||
-      getSystemContext().responsible ||
-      process.env.SAP_USERNAME ||
-      '';
+  const modifiableOnly = args?.modifiable_only !== false;
+  const user =
+    args?.user ||
+    getSystemContext().responsible ||
+    process.env.SAP_USERNAME ||
+    '';
 
-    logger?.debug(
-      `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
-    );
+  logger?.debug(
+    `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,
+  );
 
-    const client = createAdtClient(connection, logger);
-    const state = await client.getRequest().list({
-      user,
-      status: modifiableOnly ? 'D' : undefined,
-    });
+  const detail = detailOf(args);
 
-    const parsed = parseTransportListXml(state.listResult?.data || '');
+  // `IListTransportsOptions` carries `configUri` and NOTHING else since
+  // adt-clients 19 — `user` and `status` (the old `{user, status}` this
+  // handler used to pass to `list()`) have nowhere to go any more.
+  // `list()` without a `configUri` resolves a saved server-side search
+  // configuration instead, and that configuration decides the scope, not the
+  // caller (see `AdtRequest.d.ts`'s doc on `list`/`resolveSearchConfiguration`).
+  // `user` and `modifiable_only` are therefore applied CLIENT-SIDE below, on
+  // whatever `list()` answers — the same backstop this handler already used
+  // for `modifiable_only` ("it is not established that the endpoint honours
+  // the status query param", #168), now load-bearing for `user` too.
+  return answer(
+    { tool: 'ListTransports', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getRequest(resultsFor(transportDocuments))
+        .list(),
+    project(detail, (value) => {
+      const parsed = parseTransportListValue(value);
+      const byUser = user
+        ? parsed.filter((t) => !t.owner || t.owner === user)
+        : parsed;
+      const transports = modifiableOnly
+        ? byUser.filter((t) => isModifiableStatus(t.status))
+        : byUser;
 
-    // The tree representation returns both modifiable and released branches, and
-    // it is not established that the endpoint honours the `status` query param
-    // (#168). Filter here so `modifiable_only` holds regardless.
-    const transports = modifiableOnly
-      ? parsed.filter((t) => isModifiableStatus(t.status))
-      : parsed;
+      logger?.info(`ListTransports: found ${transports.length} transport(s)`);
 
-    logger?.info(`ListTransports: found ${transports.length} transport(s)`);
-
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              count: transports.length,
-              transports,
-            },
-            null,
-            2,
-          ),
-        },
-      ],
-    };
-  } catch (error) {
-    return return_error(error);
-  }
+      return { success: true, count: transports.length, transports };
+    }),
+  );
 }

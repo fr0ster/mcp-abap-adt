@@ -2,21 +2,21 @@
  * GetObjectVersionDiff Handler - read-only unified diff between two versions.
  *
  * Takes two opaque content_uris (from GetObjectVersions entries) plus the
- * object_type (needed to obtain an IAdtObject instance), fetches both sources
- * via getVersionSource and returns a unified diff computed with jsdiff's
+ * object_type (needed to obtain the versions atom), fetches both sources via
+ * getVersionSource and returns a unified diff computed with jsdiff's
  * createTwoFilesPatch. Closes #30.
  */
 
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAdtVersionable,
+} from '@mcp-abap-adt/interfaces';
 import { createTwoFilesPatch } from 'diff';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import {
   resolveVersionedObject,
   VERSIONED_OBJECT_TYPES,
@@ -30,19 +30,45 @@ export interface VersionDiffResult {
 }
 
 /**
+ * Unwrap one `getVersionSource` answer, or throw.
+ *
+ * adt-clients 19 turned this member's failures — including "this type has no
+ * version resource", `AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — into the
+ * answer (`ok: false`) rather than a throw (see `IAdtVersionable` in
+ * `@mcp-abap-adt/interfaces`). `buildVersionDiff` is shared with
+ * `objectVersionTools.ts`, which still catches a THROW and reads `.code` off
+ * it, so the throwing contract is kept here and the unwrap is this function's
+ * job — not a redesign of `buildVersionDiff`'s callers.
+ */
+function unwrapVersionSource(
+  response: IAdtResponse<string, IAdtError>,
+): string | undefined {
+  if (response.ok) return response.getResult().value;
+  const error = response.getError();
+  const failure = new Error(error.message) as Error & {
+    code?: string;
+  };
+  if (error.code !== undefined) failure.code = error.code;
+  throw failure;
+}
+
+/**
  * Shared "fetch two sources + unified patch" logic reused by the generic
  * GetObjectVersionDiff and every per-object Get<X>VersionDiff factory tool.
  * Guards against undefined sources by treating them as empty strings.
  */
 export async function buildVersionDiff(
-  obj: IAdtObject<any, any>,
+  obj: IAdtVersionable<any, any, string>,
   contentUriFrom: string,
   contentUriTo: string,
 ): Promise<VersionDiffResult> {
-  const [rawFrom, rawTo] = await Promise.all([
+  const [respFrom, respTo] = await Promise.all([
     obj.getVersionSource(contentUriFrom),
     obj.getVersionSource(contentUriTo),
   ]);
+
+  const rawFrom = unwrapVersionSource(respFrom);
+  const rawTo = unwrapVersionSource(respTo);
 
   const notes: string[] = [];
   if (rawFrom == null) {
@@ -139,39 +165,37 @@ export async function handleGetObjectVersionDiff(
       );
     }
 
-    try {
-      const { diff, identical, notes } = await buildVersionDiff(
-        resolved.obj,
+    // Two calls of the same member (one per content_uri), not a read+metadata
+    // pair — `pair()`/`sequence()` answer one IAdtResponse each and don't fit
+    // "diff two documents". `buildVersionDiff` already reduces both answers to
+    // one `VersionDiffResult`, throwing (with `.code` preserved) on a refusal
+    // so `objectVersionTools.ts` — which still catches that throw — keeps
+    // working unchanged. `answer()`'s own try/catch turns that throw into the
+    // same failure shape every other handler here surfaces.
+    return answer(
+      { tool: 'GetObjectVersionDiff', detail: 'terse' },
+      () =>
+        buildVersionDiff(resolved.obj, content_uri_from, content_uri_to).then(
+          (value) => ({
+            ok: true,
+            getResult: () => ({ value }),
+            getError: () => {
+              throw new Error(
+                'GetObjectVersionDiff: asked for the error of a success',
+              );
+            },
+          }),
+        ),
+      (result: VersionDiffResult) => ({
+        success: true,
+        object_type,
         content_uri_from,
         content_uri_to,
-      );
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            object_type,
-            content_uri_from,
-            content_uri_to,
-            identical,
-            diff,
-            ...(notes ? { notes } : {}),
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      if (error?.code === AdtObjectErrorCodes.UNSUPPORTED_OPERATION) {
-        return return_error(
-          new Error(
-            `Version diff is not supported for object_type '${object_type}'.`,
-          ),
-        );
-      }
-      return return_error(
-        error instanceof Error ? error : new Error(String(error)),
-      );
-    }
+        identical: result.identical,
+        diff: result.diff,
+        ...(result.notes ? { notes: result.notes } : {}),
+      }),
+    );
   } catch (error: any) {
     return return_error(error);
   }

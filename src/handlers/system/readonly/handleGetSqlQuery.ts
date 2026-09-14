@@ -1,6 +1,11 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AnswerDetail } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
@@ -19,10 +24,35 @@ export const TOOL_DEFINITION = {
         description: '[read-only] Maximum number of rows to return',
         default: 100,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['sql_query'],
   },
 } as const;
+
+/**
+ * `project(detail, terse)` from `projections.ts` hands `terse` only
+ * `reading.value` (the generic `structured` parse of `query`/`contents` — see
+ * `resultSets.ts`'s `READING_BY_SLOT`; both slots default to `rawDocument`
+ * unparsed in `@mcp-abap-adt/adt-clients` itself, so there is no shipped
+ * reading to read real `dataPreview:*` tag names off of, and no fixture under
+ * `tests/fixtures/adt/` captures one either). `parseSqlQueryXml` below is the
+ * pre-migration regex parser, proven against real ADT responses; redesigning
+ * it against the generic parse tree with no corpus and no shipped reference
+ * would be guessing at column/row nesting that the fast-xml-parser
+ * `REPEATABLE` list was never tuned for (`dataPreview:columns` and
+ * `dataPreview:data` are not in it). So this projects `reading.raw` — the
+ * identical bytes the regex always ran against — rather than `reading.value`.
+ */
+export function projectRaw(
+  detail: AnswerDetail,
+  reading: AdtReading<unknown>,
+  terseRaw: (raw: string, status: number) => unknown,
+): unknown {
+  if (detail === 'raw') return reading.raw;
+  if (detail === 'full') return reading.value ?? reading.raw;
+  return terseRaw(reading.raw, reading.status);
+}
 
 /**
  * Interface for SQL query execution response
@@ -169,57 +199,38 @@ export function parseSqlQueryXml(
  * @param args - Tool arguments containing sql_query and optional row_number parameter
  * @returns Response with parsed SQL query results or error
  */
-export async function handleGetSqlQuery(context: HandlerContext, args: any) {
+export async function handleGetSqlQuery(
+  context: HandlerContext,
+  args: { sql_query: string; row_number?: number; detail?: AnswerDetail },
+) {
   const { connection, logger } = context;
-  try {
-    logger?.info('handleGetSqlQuery called');
+  logger?.info('handleGetSqlQuery called');
 
-    if (!args?.sql_query) {
-      return return_error('SQL query is required');
-    }
-
-    const sqlQuery = args.sql_query;
-    const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
-
-    logger?.info(`Executing SQL query (rows=${rowNumber})`);
-
-    const client = createAdtClient(connection, logger);
-    const response = await client
-      .getUtils()
-      .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber });
-
-    if (response.status === 200 && response.data) {
-      logger?.info('SQL query request completed successfully');
-
-      // Parse the XML response
-      const parsedData = parseSqlQueryXml(
-        response.data,
-        sqlQuery,
-        rowNumber,
-        logger,
-      );
-
-      logger?.debug(
-        `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
-      );
-
-      const result = {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(parsedData, null, 2),
-          },
-        ],
-      };
-      return result;
-    } else {
-      return return_error(
-        `Failed to execute SQL query. Status: ${response.status}`,
-      );
-    }
-  } catch (error) {
-    logger?.error('Failed to execute SQL query', error as any);
-    return return_error(error);
+  if (!args?.sql_query) {
+    return return_error('SQL query is required');
   }
+
+  const sqlQuery = args.sql_query;
+  const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
+  const detail = detailOf(args);
+
+  logger?.info(`Executing SQL query (rows=${rowNumber})`);
+
+  // `getSqlQuery(params)` takes no options object at all — no `analyse` to
+  // pass, matching the brief.
+  return answer(
+    { tool: 'GetSqlQuery', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber }),
+    (reading: AdtReading<unknown>) =>
+      projectRaw(detail, reading, (raw) => {
+        const parsedData = parseSqlQueryXml(raw, sqlQuery, rowNumber, logger);
+        logger?.debug(
+          `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
+        );
+        return parsedData;
+      }),
+  );
 }

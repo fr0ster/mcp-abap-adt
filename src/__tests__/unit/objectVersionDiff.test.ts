@@ -22,6 +22,7 @@ import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
 import { handleGetObjectVersionDiff } from '../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
+import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -48,8 +49,8 @@ beforeEach(() => {
 describe('version diff tools (#30)', () => {
   it('generic GetObjectVersionDiff fetches both uris and reports differences', async () => {
     mockClassGetVersionSource
-      .mockResolvedValueOnce('line one\nold middle\nline three\n')
-      .mockResolvedValueOnce('line one\nnew middle\nline three\n');
+      .mockResolvedValueOnce(okResponse('line one\nold middle\nline three\n'))
+      .mockResolvedValueOnce(okResponse('line one\nnew middle\nline three\n'));
 
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'class',
@@ -78,7 +79,7 @@ describe('version diff tools (#30)', () => {
   });
 
   it('generic GetObjectVersionDiff reports identical:true for equal sources', async () => {
-    mockClassGetVersionSource.mockResolvedValue('same\nsource\n');
+    mockClassGetVersionSource.mockResolvedValue(okResponse('same\nsource\n'));
 
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'class',
@@ -103,8 +104,8 @@ describe('version diff tools (#30)', () => {
 
   it('per-object GetClassVersionDiff forwards both content_uris', async () => {
     mockClassGetVersionSource
-      .mockResolvedValueOnce('a\n')
-      .mockResolvedValueOnce('b\n');
+      .mockResolvedValueOnce(okResponse('a\n'))
+      .mockResolvedValueOnce(okResponse('b\n'));
 
     const result = await tool('GetClassVersionDiff').handler(ctx, {
       content_uri_from: '/cls?version=00001',
@@ -133,11 +134,21 @@ describe('version diff tools (#30)', () => {
     expect(mockClassGetVersionSource).not.toHaveBeenCalled();
   });
 
-  it('generic GetObjectVersionDiff returns clean error on UNSUPPORTED_OPERATION', async () => {
-    const err = Object.assign(new Error('version diff not available'), {
-      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-    });
-    mockClassGetVersionSource.mockRejectedValue(err);
+  // adt-clients 19: "no version resource for this type" is a failure IN THE
+  // ANSWER (`ok: false`, `code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION`),
+  // not a throw — see `IAdtVersionable.getVersionSource`'s own doc and
+  // `handleGetObjectVersionDiff.ts`'s `unwrapVersionSource`. The generic
+  // handler no longer special-cases the code into a hand-written sentence
+  // (that branch is gone — see the file's own comment): it answers through
+  // `answer()` like every other handler this migration touches, so the
+  // failure's own message AND code both reach the caller, uniformly, rather
+  // than a clean sentence that hid the code.
+  it('generic GetObjectVersionDiff surfaces UNSUPPORTED_OPERATION as a refusal, code included', async () => {
+    mockClassGetVersionSource.mockResolvedValue(
+      refusedResponse('version diff not available', {
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+      }),
+    );
 
     const result = await handleGetObjectVersionDiff(ctx, {
       object_type: 'class',
@@ -149,16 +160,28 @@ describe('version diff tools (#30)', () => {
     expect(result.isError).toBe(true);
     const errText =
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-    expect(errText).toContain('not supported');
     expect(errText).not.toContain('stack');
-    expect(errText).not.toContain('ADT_UNSUPPORTED_OPERATION');
+    const payload = JSON.parse(errText);
+    // `buildVersionDiff` re-throws (see its own comment: kept throwing for
+    // `objectVersionTools.ts`'s sake), so `answer()` catches it as its own
+    // `client_threw` shape rather than reading `failurePayload` off an
+    // `IAdtResponse` — the message survives, `.code` does not (`local()` in
+    // `lib/answer.ts` never reads one off a thrown value). Documented here as
+    // a known limitation of keeping that shared helper's throwing contract,
+    // not asserted as if it were the richer shape.
+    expect(payload.error).toBe('client_threw');
+    expect(payload.message).toBe('version diff not available');
   });
 
   it('per-object GetClassVersionDiff returns clean error on UNSUPPORTED_OPERATION', async () => {
-    const err = Object.assign(new Error('version diff not available'), {
-      code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
-    });
-    mockClassGetVersionSource.mockRejectedValue(err);
+    // `objectVersionTools.ts` (untouched by this task) still catches
+    // `buildVersionDiff`'s throw and reads `.code` off it directly — a plain
+    // reject here exercises exactly that path, same as before this migration.
+    mockClassGetVersionSource.mockResolvedValue(
+      refusedResponse('version diff not available', {
+        code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION,
+      }),
+    );
 
     const result = await tool('GetClassVersionDiff').handler(ctx, {
       content_uri_from: '/cls?version=00001',

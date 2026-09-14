@@ -2864,7 +2864,7 @@ it.each(profiling)('%s passes the scheduled id to the profiler run', async (_n, 
   const order: string[] = [];
   let passed: unknown;
   programExecutor = {
-    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('trace-1')); },
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('profiler-request-1')); },
     runWithProfiler: async (_target: unknown, options: any) => {
       order.push('run');
       passed = options?.profilerId;
@@ -2904,6 +2904,40 @@ it.each(handlers)('%s finds the trace by difference, not by position', async (_n
   expect(payload.profile?.trace_id ?? payload.trace_id).toBe(COMPLETED_TRACE);
   // Snapshot, then at least one more read. One call means no snapshot.
   expect(listed).toBeGreaterThan(1);
+});
+
+it.each(handlers)('%s reports a refused feed read rather than an empty feed', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  // Refused on the SNAPSHOT, before the run. Nothing should be run at all.
+  profiler = { list: async () => refusedResponse('Profiler feed not authorised') };
+  const result: any = await (handler as any)(context as any, args);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Profiler feed not authorised');
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
+});
+
+it.each(handlers)('%s reports a refusal during the search, not a missing trace', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  let call = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  // The snapshot succeeds; the poll is refused. Reporting "no trace yet" here
+  // would be the masking defect: SAP answered, and it said no.
+  profiler = {
+    list: async () =>
+      ++call === 1 ? okResponse(reading([])) : refusedResponse('Session expired'),
+  };
+  const result: any = await (handler as any)(context as any, {
+    ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
+  });
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Session expired');
 });
 
 it.each(handlers)('%s stops after max_trace_attempts and still reports the run', async (_n, handler, args) => {
@@ -3125,7 +3159,11 @@ let profiler: Record<string, unknown>;
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
   AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
-  AdtRuntime: jest.fn(() => ({ getProfiler: () => profiler })),
+  // `AdtRuntimeClient`, which is what the package exports and what
+  // `handleRuntimeAnalyzeProfilerTrace` and `handleRuntimeListSystemMessages`
+  // already construct. There is no `AdtRuntime`; mocking that name intercepts
+  // nothing and the handler reaches the real dependency.
+  AdtRuntimeClient: jest.fn(() => ({ getProfiler: () => profiler })),
 }));
 
 // Two different ids, deliberately. `scheduleTrace` answers a PROFILER REQUEST
@@ -3157,7 +3195,7 @@ it.each(handlers)('%s passes the scheduled id to the profiler run', async (_n, h
   // The order alone proves nothing about the join: a handler calling
   // `runWithProfiler` with no id, the wrong id or a constant passes an order
   // check and fails in production.
-  expect(passed).toBe('trace-1');
+  expect(passed).toBe(PROFILER_REQUEST);
 });
 
 it.each(handlers)('%s stops at a refused schedule and never runs', async (_n, handler, args) => {
@@ -3231,38 +3269,58 @@ option.** Snapshot the feed, run, then look for an id that was not there:
  * which is what `compareRecordedAt` is exported for.
  */
 export async function newTraceAfter(
-  profiler: { list: (o?: { user?: string }) => Promise<IAdtResponse<ITraceEntry[]>> },
+  profiler: { list: (o?: { user?: string }) => Promise<IAdtResponse<ITraceEntry[], IAdtError>> },
   before: ReadonlySet<string>,
   options: { attempts: number; delayMs: number; sleep?: (ms: number) => Promise<void> },
-): Promise<string | undefined> {
+): Promise<IAdtResponse<string | undefined, IAdtError>> {
   const wait = options.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
+
   for (let attempt = 1; attempt <= options.attempts; attempt += 1) {
     const listed = await profiler.list();
-    if (listed.ok) {
-      const fresh = listed.getResult().value.filter((entry) => !before.has(entry.id));
-      if (fresh.length > 0) {
-        return [...fresh].sort(compareRecordedAt).at(-1)?.id;
-      }
+
+    // A refused feed read goes back untouched — the rule `sequence` and
+    // `withLock` already follow. Looping past it would turn "SAP said no" into
+    // "no trace yet", which is this repository's masking defect in another coat.
+    if (!listed.ok) return listed as unknown as IAdtResponse<string | undefined, IAdtError>;
+
+    const fresh = listed.getResult().value.filter((entry) => !before.has(entry.id));
+    if (fresh.length > 0) {
+      return answered([...fresh].sort(compareRecordedAt).at(-1)?.id);
     }
     if (attempt < options.attempts) await wait(options.delayMs);
   }
-  return undefined;   // the run happened; SAP has not written the trace yet
+
+  // Attempts spent, the feed answering normally every time. A success with no
+  // trace id: SAP writes it asynchronously and it may arrive a week later.
+  // Nothing refused anything, so there is nothing to report as a failure.
+  return answered(undefined);
 }
+
+const answered = (value: string | undefined): IAdtResponse<string | undefined, IAdtError> =>
+  ({
+    ok: true,
+    getResult: () => ({ value }),
+    getError: () => { throw new Error('newTraceAfter: asked for the error of a success'); },
+  }) as unknown as IAdtResponse<string | undefined, IAdtError>;
 ```
 
 and the handler:
 
 ```typescript
-const before = new Set(
-  (await profiler.list()).getResult().value.map((entry) => entry.id),
-);
+// `new AdtRuntimeClient(connection, logger).getProfiler()` — the same
+// construction `handleRuntimeAnalyzeProfilerTrace` already uses.
+const snapshot = await profiler.list();
+if (!snapshot.ok) return snapshot;   // a refused feed read is a refusal, not an empty feed
+const before = new Set(snapshot.getResult().value.map((entry) => entry.id));
 // schedule → run through `sequence`, exactly as the other three handlers,
 // then the search. A run that succeeded with no trace yet is still a
 // successful run: the trace id is absent, not an error.
-const traceId = await newTraceAfter(profiler, before, {
+const found = await newTraceAfter(profiler, before, {
   attempts: max_trace_attempts ?? 5,
   delayMs: trace_retry_delay_ms ?? 2000,
 });
+if (!found.ok) return found;   // untouched, like every other failing step
+const traceId = found.getResult().value;
 ```
 
 Edit the tool definitions only if Step 1 said to.

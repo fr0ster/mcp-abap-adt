@@ -85,6 +85,7 @@ import { handleUpdateDdl } from '../../handlers/ddl/low/handleUpdateDdl';
 import { handleValidateDdl } from '../../handlers/ddl/low/handleValidateDdl';
 import { handleActivateMetadataExtension } from '../../handlers/ddlx/low/handleActivateMetadataExtension';
 import { handleCheckMetadataExtension } from '../../handlers/ddlx/low/handleCheckMetadataExtension';
+import { handleCreateMetadataExtension } from '../../handlers/ddlx/low/handleCreateMetadataExtension';
 import { handleDeleteMetadataExtension } from '../../handlers/ddlx/low/handleDeleteMetadataExtension';
 import {
   handleLockMetadataExtension,
@@ -968,6 +969,27 @@ describe('ddlx (metadataExtension)', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
+  it('CreateMetadataExtensionLow reaches getMetadataExtension with analyseException, forwarding master_language to config.masterLanguage — the shipped create reads it, unlike ddl_source/ddlCode on its sibling families', async () => {
+    await handleCreateMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+      master_language: 'EN',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getMetadataExtension');
+    expect(call?.args[0]).toEqual({
+      name: 'ZI_X_DDLX',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
+      masterLanguage: 'EN',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
   it('LockMetadataExtensionLow passes no analyse and carries no detail parameter', async () => {
     await handleLockMetadataExtension(context as any, { name: 'ZI_X_DDLX' });
     const call = callTo('lock');
@@ -1021,6 +1043,21 @@ describe('ddlx (metadataExtension)', () => {
     expect(
       'detail' in UnlockMetadataExtensionToolDefinition.inputSchema.properties,
     ).toBe(false);
+  });
+
+  it('ValidateMetadataExtensionLow passes packageName through to the validate member — validateMetadataExtension reads it, so dropping it here would be a live regression', async () => {
+    await handleValidateMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
+      package_name: 'zp',
+      description: 'x',
+    });
+    const call = callTo('validate');
+    expect(call?.factory).toBe('getMetadataExtension');
+    expect(call?.args[0]).toEqual({
+      name: 'ZI_X_DDLX',
+      description: 'x',
+      packageName: 'ZP',
+    });
   });
 
   it('ValidateMetadataExtensionLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {

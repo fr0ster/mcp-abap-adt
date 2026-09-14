@@ -110,7 +110,12 @@ The spec's first success criterion is that 362 tools stay as they are. This ratc
 ```bash
 mkdir -p tests/fixtures/tools
 npx tsx scripts/list-tools.ts > tests/fixtures/tools/surface.json
-node -e "const s=require('./tests/fixtures/tools/surface.json');console.log(Object.entries(s).map(([g,t])=>g+':'+t.length).join(' '))"
+node -e "
+const rows = require('./tests/fixtures/tools/surface.json');
+const byGroup = {};
+for (const r of rows) byGroup[r.group] = (byGroup[r.group] ?? 0) + 1;
+console.log(rows.length, 'tools:', JSON.stringify(byGroup));
+"   # expect 362 across six groups
 ```
 
 - [ ] **Step 2: Write the ratchet**
@@ -126,11 +131,25 @@ import { join } from 'node:path';
  * `detail` is the one addition this migration may make; anything else moving is
  * a regression, and this is where it is caught.
  */
+/**
+ * `scripts/list-tools.ts` answers a FLAT ARRAY of `{ group, name, inputs }`,
+ * where `inputs` is a formatted string — `"table_name*, max_rows"`, with `*`
+ * marking required and the sentinel `"(none)"` for a tool that takes nothing.
+ *
+ * Not an object keyed by group, and not a `params` array. An earlier draft of
+ * this test assumed both and would have failed on an unchanged surface, which
+ * would have made the ratchet useless from the first task onward.
+ */
 describe('the MCP tool surface', () => {
-  const frozen = JSON.parse(
+  type Row = { group: string; name: string; inputs: string };
+
+  const read = (rows: Row[]) => new Map(rows.map((r) => [`${r.group}/${r.name}`, r.inputs]));
+  const parameters = (inputs: string) => (inputs === '(none)' ? [] : inputs.split(', '));
+
+  const frozen: Row[] = JSON.parse(
     readFileSync(join(__dirname, '../../../tests/fixtures/tools/surface.json'), 'utf8'),
   );
-  const current = JSON.parse(
+  const current: Row[] = JSON.parse(
     execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], {
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
@@ -138,26 +157,20 @@ describe('the MCP tool surface', () => {
   );
 
   it('has the same tools in the same groups', () => {
-    const names = (surface: any) =>
-      Object.fromEntries(
-        Object.entries(surface).map(([group, tools]: [string, any]) => [
-          group,
-          (tools as any[]).map((t) => t.name).sort(),
-        ]),
-      );
-    expect(names(current)).toEqual(names(frozen));
+    expect([...read(current).keys()].sort()).toEqual([...read(frozen).keys()].sort());
   });
 
   it('changes no parameter except by adding detail', () => {
-    for (const [group, tools] of Object.entries<any>(frozen)) {
-      for (const tool of tools as any[]) {
-        const now = (current[group] as any[]).find((t) => t.name === tool.name);
-        const added = now.params
-          .map((p: any) => p.name)
-          .filter((n: string) => !tool.params.some((p: any) => p.name === n));
-        expect(added.every((n: string) => n === 'detail')).toBe(true);
-        for (const before of tool.params) expect(now.params).toContainEqual(before);
-      }
+    const now = read(current);
+    for (const [tool, before] of read(frozen)) {
+      const after = now.get(tool);
+      if (after === before) continue;
+      const had = parameters(before);
+      const has = parameters(after ?? '(none)');
+      // Nothing may leave, and the only thing that may arrive is `detail` —
+      // optional, so it carries no `*`.
+      expect(had.filter((p) => !has.includes(p))).toEqual([]);
+      expect(has.filter((p) => !had.includes(p))).toEqual(['detail']);
     }
   });
 });
@@ -4273,8 +4286,8 @@ Last, deliberately: adding a parameter before the handlers honour it puts a lie 
 
 ```bash
 npx tsx scripts/list-tools.ts | node -e "
-const groups = JSON.parse(require('fs').readFileSync(0,'utf8'));
-for (const [g, tools] of Object.entries(groups)) for (const t of tools) console.log(g, t.name);
+const rows = JSON.parse(require('fs').readFileSync(0,'utf8'));
+for (const r of rows) console.log(r.group, r.name, '|', r.inputs);
 " > /tmp/all-tools.txt
 ```
 
@@ -4378,16 +4391,17 @@ function answerCallsIn(source: ts.SourceFile): ts.CallExpression[] {
 
 ```typescript
 // src/__tests__/unit/detailSurface.test.ts
-const surface = JSON.parse(
+// The same flat `{ group, name, inputs }` rows Task 1 pins, with `inputs` a
+// formatted string rather than a params array.
+const surface: Array<{ group: string; name: string; inputs: string }> = JSON.parse(
   execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 }),
 );
 
-/** Every tool whose input schema declares the parameter, across all six groups. */
+/** Every tool whose input schema declares the parameter. */
 const toolsDeclaring = (param: string): string[] =>
-  Object.values<any>(surface)
-    .flat()
-    .filter((t: any) => t.params.some((p: any) => p.name === param))
-    .map((t: any) => t.name);
+  surface
+    .filter((t) => (t.inputs === '(none)' ? [] : t.inputs.split(', ')).includes(param))
+    .map((t) => t.name);
 
 it('declares detail on every JSON-answering tool and on no other', () => {
   expect(toolsDeclaring('detail').sort()).toEqual([...JSON_ANSWERING].sort());

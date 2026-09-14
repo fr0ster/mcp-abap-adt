@@ -3090,7 +3090,7 @@ first, not discovered while implementing.
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
-- Create: `src/__tests__/unit/runtimeProfiling.test.ts`, `src/lib/strategies/runProjections.ts`
+- Create: `src/__tests__/unit/runtimeProfiling.test.ts`, `src/lib/strategies/runProjections.ts` — the two projections, the `RuntimeRunValue` they read and the one-parameter `RuntimeProjection` they are typed as, which is **not** `Terse`
 - Create, if Step 1 chose the first option: `src/lib/strategies/newTrace.ts` and `src/__tests__/unit/newTrace.test.ts`
 - Modify, if Step 1 chose the first option: `src/lib/strategies/sequence.ts` — export the one-line `IAdtResponse` builder `pair()` already has, rather than writing a third copy of it
 - Modify, if Step 1 chose the third option: the two tool definitions and `tests/fixtures/tools/surface.json`
@@ -3609,7 +3609,31 @@ projection too:
 
 ```typescript
 // src/lib/strategies/runProjections.ts
-import type { Terse } from './projections';
+
+/**
+ * What a runtime handler hands its projection.
+ *
+ * Assembled here from two or three calls, so there is no document, no parse and
+ * no status — `IAdtResult<T>` is `{ value }` alone.
+ */
+export interface RuntimeRunValue {
+  readonly className: string;
+  readonly output?: string;
+  readonly profilerId?: string;
+  readonly traceId?: string;
+}
+
+/**
+ * **Not `Terse`.** `Terse<T>` is `(value, status) => unknown` and `answer()`
+ * takes `(value) => unknown`: TypeScript lets a function drop a parameter, not
+ * gain a required one, so a `Terse` cannot be passed where `answer()` wants a
+ * projection. Typing these as `Terse` would compile in the file that declares
+ * them and fail at the call.
+ *
+ * There is no status to take here anyway, which is the same reason `project()`
+ * is not used on this path.
+ */
+type RuntimeProjection = (value: RuntimeRunValue) => unknown;
 
 
 /**
@@ -3619,10 +3643,7 @@ import type { Terse } from './projections';
  * `run_status` is gone and cannot come back — see the decision above. Do not add
  * it reading `undefined`.
  */
-// `Terse<T>` is `(value, status) => unknown`. There is no status on this path —
-// `IAdtResult` carries only a value — so the second parameter is left off
-// rather than passed something invented.
-export const terseClassRun: Terse<any> = (value) => ({
+export const terseClassRun: RuntimeProjection = (value) => ({
   success: true,
   class_name: value.className,
   output: value.output ?? '',
@@ -3636,7 +3657,7 @@ export const terseClassRun: Terse<any> = (value) => ({
  * **no `output`** — this tool does not answer one today, and this work does not
  * add fields to a deprecated tool.
  */
-export const terseProfilingRun: Terse<any> = (value) => ({
+export const terseProfilingRun: RuntimeProjection = (value) => ({
   success: true,
   class_name: value.className,
   profiler_id: value.profilerId,

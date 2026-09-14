@@ -28,7 +28,8 @@ own tests pass and it is committed — not when it is described.
 | 7. `detail` | done | `dfc31ef` |
 | 8. Test helpers | done | `47609aa` |
 | 9. The reference read | done | `39c19b9` |
-| 10 – 29 | not started | |
+| 10. The reference write family | done | `d4978a2` |
+| 11 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -1616,7 +1617,7 @@ The template for every `low`-tier family. Seven handlers, covering create, check
 
 `lock` and `unlock` accept no strategy on any class in 19. Do not add an argument the signature does not have.
 
-- [ ] **Step 1: Write the failing test, from the corpus**
+- [x] **Step 1: Write the failing test, from the corpus**
 
 ```typescript
 // src/__tests__/unit/domainLow.test.ts
@@ -1657,9 +1658,9 @@ it('LockDomain passes no analyse, because lock() accepts none', async () => {
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails** — `npx jest src/__tests__/unit/domainLow.test.ts`. Expected: FAIL; no handler passes an `analyse` today.
+- [x] **Step 2: Run it to verify it fails** — `npx jest src/__tests__/unit/domainLow.test.ts`. Expected: FAIL; no handler passes an `analyse` today.
 
-- [ ] **Step 3: Implement, one operation per edit**
+- [x] **Step 3: Implement, one operation per edit**
 
 ```typescript
 // the shape, filled in for handleDeleteDomain
@@ -1674,7 +1675,7 @@ return answer(
 );
 ```
 
-- [ ] **Step 4: Write the omission check as a script, not only as a final test**
+- [x] **Step 4: Write the omission check as a script, not only as a final test**
 
 The spec makes "every call whose resolved signature accepts an `analyse` is given one" a repository-wide criterion. A test that lands after every handler has been migrated finds the first omission a hundred commits too late, so the logic goes into a script now and the test in Task 26 calls the same function over the whole tree.
 
@@ -1946,7 +1947,7 @@ that inspected nothing. The printed count is there for the human — a family of
 eight handlers reporting two inspected calls is worth stopping over, and no
 assertion will tell you that.
 
-- [ ] **Step 5: Run the tests, the check and the compiler**
+- [x] **Step 5: Run the tests, the check and the compiler**
 
 ```bash
 npx jest src/__tests__/unit/domainLow.test.ts src/__tests__/unit/toolSurface.test.ts
@@ -1954,7 +1955,7 @@ npx tsx scripts/check-analyse.ts 'src/handlers/domain/low/**'   # 0 offenders AN
 npx tsc --noEmit 2>&1 | grep "handlers/domain/low" | wc -l      # expect 0
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/handlers/domain/low src/__tests__/unit/domainLow.test.ts scripts/check-analyse.ts src/lib/audit/analyseOmissions.ts

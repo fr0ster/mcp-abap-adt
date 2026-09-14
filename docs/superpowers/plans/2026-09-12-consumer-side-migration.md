@@ -2782,31 +2782,27 @@ it('packageResolver searches through the renamed member, with a strategy', async
 
 // SHAPE 3 — the two program profiling handlers: two calls where there was one.
 //
-// **These four runtime handlers do not go through `createAdtClient`.** Each
-// writes `new AdtExecutor(connection, logger)` directly and reaches the members
-// through `executor.getProgramExecutor()` or `getClassExecutor()`, so the
-// `jest.mock('../../lib/clients')` every other test in this plan relies on does
-// nothing here — the handler would build a real executor and the fake would
-// never be asked. Mock the module they actually import:
-//
-// ```typescript
-// jest.mock('@mcp-abap-adt/adt-clients', () => ({
-//   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
-//   AdtExecutor: jest.fn(() => ({
-//     getProgramExecutor: () => programExecutor,
-//     getClassExecutor: () => classExecutor,
-//   })),
-// }));
-// ```
-//
-// `programExecutor` and `classExecutor` are plain objects built per test with
-// `okResponse` and `refusedResponse`, the same way `fakeClientOf` builds one —
-// they are simply reached through a different door.
+// These two do not go through `createAdtClient`. Each writes
+// `new AdtExecutor(connection, logger)` directly and reaches its members
+// through `executor.getProgramExecutor()`, so the
+// `jest.mock('../../lib/clients')` the rest of this file relies on does nothing
+// for them — the handler would build a real executor and the fake would never
+// be asked.
 //
 // CHECK WHICH DOOR BEFORE WRITING ANY HANDLER TEST.
 // `grep -rl "new AdtExecutor" src/handlers` names the four that take this one;
 // everything else in the plan goes through `createAdtClient`. A test that mocks
 // the wrong dependency compiles, runs, and exercises the real one.
+
+// Declared and mocked for real, at the top of the file beside the other mock.
+// `programExecutor` is a plain object built per test from `okResponse` and
+// `refusedResponse`, the same as `fakeClientOf` builds — a different door, not
+// a different kind of fake.
+let programExecutor: Record<string, unknown>;
+jest.mock('@mcp-abap-adt/adt-clients', () => ({
+  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
+  AdtExecutor: jest.fn(() => ({ getProgramExecutor: () => programExecutor })),
+}));
 
 // Both of them. The compiler catches a handler that still names the removed
 // member; it says nothing about one that calls the two replacements in the
@@ -3143,7 +3139,15 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 // and reach the members through `getClassExecutor()`, so mocking
 // `../../lib/clients` would leave the handler talking to a real executor. Mock
 // `@mcp-abap-adt/adt-clients` and hand back `classExecutor`.
-it('resolves the trace after several attempts and answers its id', async () => {
+// Both class handlers, not one. Step 7 migrates handleRuntimeRunClass and
+// handleRuntimeRunClassWithProfiling; a suite that only ever calls the first
+// stays green while the second keeps the old API or a different order.
+const classHandlers = [
+  ['RuntimeRunClass', handleRuntimeRunClass, { class_name: 'ZCL_X', profile: true }],
+  ['RuntimeRunClassWithProfiling', handleRuntimeRunClassWithProfiling, { class_name: 'ZCL_X' }],
+] as const;
+
+it.each(classHandlers)('%s resolves the trace after several attempts', async (_n, handler, base) => {
   let look = 0;
   classExecutor = ({
     run: async () => okResponse(reading({ done: true })),
@@ -3152,18 +3156,18 @@ it('resolves the trace after several attempts and answers its id', async () => {
     getRuntimeTraces: async () =>
       okResponse(reading(++look >= 3 ? { traces: [{ id: 'trace-1' }] } : { traces: [] })),
   });
-  const result: any = await handleRuntimeRunClass(context as any, {
-    class_name: 'ZCL_X', profile: true, max_trace_attempts: 5, trace_retry_delay_ms: 0,
+  const result: any = await (handler as any)(context as any, {
+    ...base, max_trace_attempts: 5, trace_retry_delay_ms: 0,
   });
   expect(result.isError).toBe(false);
   expect(JSON.parse(result.content[0].text).trace_id).toBe('trace-1');
 });
 
-it('honours max_trace_attempts rather than looking forever', async () => {
+it.each(classHandlers)('%s honours max_trace_attempts rather than looking forever', async (_n, handler, base) => {
   const lookups = jest.fn(async () => okResponse(reading({ traces: [] })));
   classExecutor = { run: async () => okResponse(reading({ done: true })), getRuntimeTraces: lookups };
-  const result: any = await handleRuntimeRunClass(context as any, {
-    class_name: 'ZCL_X', profile: true, max_trace_attempts: 2, trace_retry_delay_ms: 0,
+  const result: any = await (handler as any)(context as any, {
+    ...base, max_trace_attempts: 2, trace_retry_delay_ms: 0,
   });
   // The parameter is in the schema; this is what makes it true.
   expect(lookups).toHaveBeenCalledTimes(2);
@@ -3171,7 +3175,7 @@ it('honours max_trace_attempts rather than looking forever', async () => {
   expect(JSON.parse(result.content[0].text).error).toBe('poll_exhausted');
 });
 
-it('looks in every uri trace_lookup_uris names', async () => {
+it.each(classHandlers)('%s looks in every uri trace_lookup_uris names', async (_n, handler, base) => {
   const seen: string[] = [];
   classExecutor = {
     run: async () => okResponse(reading({ done: true })),
@@ -3180,8 +3184,8 @@ it('looks in every uri trace_lookup_uris names', async () => {
       return okResponse(reading({ traces: [] }));
     },
   };
-  await handleRuntimeRunClass(context as any, {
-    class_name: 'ZCL_X', profile: true, trace_retry_delay_ms: 0,
+  await (handler as any)(context as any, {
+    ...base, trace_retry_delay_ms: 0,
     trace_lookup_uris: ['/sap/bc/adt/runtime/traces/abaptraces', '/sap/bc/adt/runtime/traces/other'],
   });
   expect(seen).toEqual([
@@ -3189,11 +3193,9 @@ it('looks in every uri trace_lookup_uris names', async () => {
   ]);
 });
 
-it('keeps an intermediate refusal as the strategy built it', async () => {
+it.each(classHandlers)('%s keeps an intermediate refusal as the strategy built it', async (_n, handler, base) => {
   classExecutor = { run: async () => refusedResponse('Trace creation refused') };
-  const result: any = await handleRuntimeRunClass(context as any, {
-    class_name: 'ZCL_X', profile: true,
-  });
+  const result: any = await (handler as any)(context as any, base);
   const payload = JSON.parse(result.content[0].text);
   expect(payload.message).toBe('Trace creation refused');
   expect(payload.origin).toBe('refusal');

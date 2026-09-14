@@ -1,10 +1,12 @@
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadServiceDefinition',
@@ -37,58 +39,39 @@ export async function handleReadServiceDefinition(
   },
 ) {
   const { connection, logger } = context;
-  try {
-    const { service_definition_name, version = 'active' } = args;
-    if (!service_definition_name)
-      return return_error(new Error('service_definition_name is required'));
+  const { service_definition_name, version = 'active' } = args;
+  if (!service_definition_name)
+    return return_error(new Error('service_definition_name is required'));
 
-    const client = createAdtClient(connection, logger);
-    const serviceDefinitionName = service_definition_name.toUpperCase();
-    const obj = client.getServiceDefinition();
+  const serviceDefinitionName = service_definition_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getServiceDefinition(
+    resultsFor(serviceDefinitionDocuments),
+  );
 
-    let source_code: string | null = null;
-    const readResult = await obj.read(
-      { serviceDefinitionName },
-      version as 'active' | 'inactive',
-    );
-    if (readResult?.readResult?.data) {
-      source_code =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : safeStringify(readResult.readResult.data);
-    }
-
-    let metadata: string | null = null;
-    const metaResult = await obj.readMetadata({ serviceDefinitionName });
-    if (metaResult?.metadataResult?.data) {
-      metadata =
-        typeof metaResult.metadataResult.data === 'string'
-          ? metaResult.metadataResult.data
-          : safeStringify(metaResult.metadataResult.data);
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          service_definition_name: serviceDefinitionName,
-          version,
-          source_code,
-          metadata,
-        },
-        null,
-        2,
+  // Two calls, so the order is ours — 19 removed the members that made several.
+  // Each carries its own `analyse`: a refused read and a refused metadata read
+  // are different failures, and whichever comes back is the one the caller
+  // sees, built by the strategy rather than summarised here.
+  return answer(
+    { tool: 'ReadServiceDefinition', detail: 'terse' },
+    () =>
+      pair(
+        () =>
+          obj.read({ serviceDefinitionName }, version, {
+            analyse: analyseException,
+          }),
+        () =>
+          obj.readMetadata(
+            { serviceDefinitionName },
+            { analyse: analyseException },
+          ),
       ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
-  }
-}
-
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
+    ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
+      success: true,
+      service_definition_name: serviceDefinitionName,
+      version,
+      source_code: source.raw,
+      metadata: metadata.raw,
+    }),
+  );
 }

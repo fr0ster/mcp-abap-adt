@@ -1,10 +1,11 @@
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadPackage',
@@ -34,58 +35,28 @@ export async function handleReadPackage(
   args: { package_name: string; version?: 'active' | 'inactive' },
 ) {
   const { connection, logger } = context;
-  try {
-    const { package_name, version = 'active' } = args;
-    if (!package_name)
-      return return_error(new Error('package_name is required'));
+  const { package_name, version = 'active' } = args;
+  if (!package_name) return return_error(new Error('package_name is required'));
 
-    const client = createAdtClient(connection, logger);
-    const packageName = package_name.toUpperCase();
-    const obj = client.getPackage();
+  const packageName = package_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getPackage(
+    resultsFor(packageDocuments),
+  );
 
-    let source_code: string | null = null;
-    const readResult = await obj.read(
-      { packageName },
-      version as 'active' | 'inactive',
-    );
-    if (readResult?.readResult?.data) {
-      source_code =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : safeStringify(readResult.readResult.data);
-    }
-
-    let metadata: string | null = null;
-    const metaResult = await obj.readMetadata({ packageName });
-    if (metaResult?.metadataResult?.data) {
-      metadata =
-        typeof metaResult.metadataResult.data === 'string'
-          ? metaResult.metadataResult.data
-          : safeStringify(metaResult.metadataResult.data);
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          package_name: packageName,
-          version,
-          source_code,
-          metadata,
-        },
-        null,
-        2,
-      ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
-  }
-}
-
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
+  // A package is a container: it has no source of its own —
+  // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
+  // unlike its siblings in this family there is no `.read()` to call at all:
+  // `read` and `readMetadata` fetched the identical document even before 19.
+  // One call, used for both fields this tool has always answered.
+  return answer(
+    { tool: 'ReadPackage', detail: 'terse' },
+    () => obj.readMetadata({ packageName }, { analyse: analyseException }),
+    (metadata: AdtReading<string>) => ({
+      success: true,
+      package_name: packageName,
+      version,
+      source_code: metadata.raw,
+      metadata: metadata.raw,
+    }),
+  );
 }

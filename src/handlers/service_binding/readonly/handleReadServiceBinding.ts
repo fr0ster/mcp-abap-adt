@@ -1,10 +1,12 @@
+import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadServiceBinding',
@@ -28,54 +30,34 @@ export async function handleReadServiceBinding(
   args: { service_binding_name: string },
 ) {
   const { connection, logger } = context;
-  try {
-    const { service_binding_name } = args;
-    if (!service_binding_name)
-      return return_error(new Error('service_binding_name is required'));
+  const { service_binding_name } = args;
+  if (!service_binding_name)
+    return return_error(new Error('service_binding_name is required'));
 
-    const client = createAdtClient(connection, logger);
-    const bindingName = service_binding_name.trim().toUpperCase();
-    const obj = client.getServiceBinding();
+  // The config field is `bindingName`, not `serviceBindingName` — confirmed
+  // against `IServiceBindingConfig`, which the tool's own arg name does not
+  // spell out. Also unlike its siblings, a binding's `read` has no `version`
+  // in the tool surface, so `undefined` is passed through explicitly.
+  const bindingName = service_binding_name.trim().toUpperCase();
+  const obj = createAdtClient(connection, logger).getServiceBinding(
+    resultsFor(serviceDocuments),
+  );
 
-    let source_code: string | null = null;
-    const readResult = await obj.read({ bindingName });
-    if (readResult?.readResult?.data) {
-      source_code =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : safeStringify(readResult.readResult.data);
-    }
-
-    let metadata: string | null = null;
-    const metaResult = await obj.readMetadata({ bindingName });
-    if (metaResult?.metadataResult?.data) {
-      metadata =
-        typeof metaResult.metadataResult.data === 'string'
-          ? metaResult.metadataResult.data
-          : safeStringify(metaResult.metadataResult.data);
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          service_binding_name: bindingName,
-          source_code,
-          metadata,
-        },
-        null,
-        2,
+  return answer(
+    { tool: 'ReadServiceBinding', detail: 'terse' },
+    () =>
+      pair(
+        () =>
+          obj.read({ bindingName }, undefined, {
+            analyse: analyseException,
+          }),
+        () => obj.readMetadata({ bindingName }, { analyse: analyseException }),
       ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
-  }
-}
-
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
+    ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
+      success: true,
+      service_binding_name: bindingName,
+      source_code: source.raw,
+      metadata: metadata.raw,
+    }),
+  );
 }

@@ -52,7 +52,12 @@ import { return_error } from '../../../lib/utils';
  * `node` reading instead (`resultSets.ts`: "ourUtils... keeps our own node
  * reading") — `nodeLevel` in `packageWalk.ts`, which trades `techName`/`uri`
  * for `description`, and is the one every node-structure caller in this
- * migration is told to reuse rather than re-derive. `format: 'raw'` is
+ * migration is told to reuse rather than re-derive. `TECH_NAME` is therefore
+ * left off the cached rows rather than defaulted to the object name: a
+ * fabricated value would be wrong for precisely the objects a caller passes
+ * a technical name to find (an include or a function module whose technical
+ * name differs from its display name), and a lookup that needs it should
+ * fail honestly rather than match on a wrong one. `format: 'raw'` is
  * consequently unserved too: there is no raw XML behind `NodeLevel`, only
  * `objects`/`childNodes`. See this task's report for the cross-file
  * consequence: `handleGetObjectNodeFromCache` (untouched by this task) reads
@@ -69,10 +74,6 @@ function formatObjects(
   const cached = objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
-    // No distinct technical name reaches this reading — same fallback the
-    // pre-migration parser already used when TECH_NAME was absent from the
-    // document.
-    TECH_NAME: o.name,
   }));
 
   if (objects.length === 0) {

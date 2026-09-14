@@ -2,7 +2,7 @@ import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { NodeLevel } from '../../../lib/strategies/packageWalk';
+import { kindOf, type NodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { handleSearchObject } from '../../search/readonly/handleSearchObject';
@@ -26,7 +26,8 @@ export const TOOL_DEFINITION = {
       },
       maxDepth: {
         type: 'integer',
-        description: '[read-only] Maximum tree depth (default depends on type)',
+        description:
+          "[read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.",
         default: 1,
       },
       enrich: {
@@ -133,42 +134,67 @@ type NodeSource = ReturnType<ReturnType<typeof createAdtClient>['getUtils']>;
  * matching `walkPackage`'s own two-tier walk in `packageWalk.ts`, which is
  * exercised by `handleGetPackageContents`/`handleGetPackageTree` today. Also
  * dropped: `PARENT_NODE_ID` — the pre-migration handler read that field name,
- * but the fixtures only ever carry `PARENT_NAME`; `PARENT_NODE_ID` was
- * therefore always `undefined` and never appeared in the JSON `answer`
- * serialises (`JSON.stringify` drops `undefined` values), so nothing observable
- * changes by not carrying it forward.
+ * but the corpus shows the real field is `PARENT_NAME` (`PARENT_NODE_ID`
+ * never appears at all); `PARENT_NODE_ID` was therefore always `undefined`
+ * and `JSON.stringify` drops `undefined` values, so nothing observable
+ * changes by not carrying it forward. Likewise the root call sends no
+ * `nodeId` at all (`{withShortDescriptions:true}` only) — the corpus shows
+ * ADT's own root request omits it too; the pre-migration handler's `'0000'`
+ * was that handler's own invention, not something the wire ever needed.
  *
- * A refusal at ANY fetch — the root's or a type folder's — is returned as-is
- * and bubbles to `answer()` unchanged, the same short-circuit
- * `handleGetObjectsList.ts` uses.
+ * `maxDepth` is a real recursion limit, not a boolean gate. `depth < maxDepth`
+ * still controls whether THIS node's own children are fetched at all — so
+ * `maxDepth: 0` answers a leaf with no `CHILDREN`, matching the pre-migration
+ * contract. Beyond that first tier, a child that is itself a PACKAGE
+ * (`kindOf(o.type) === 'package'`, the same test `walkPackage` already uses
+ * for exactly this) is recursed into as a fresh subtree when `depth + 1 <
+ * maxDepth`, so `maxDepth: 2`/`3`/… genuinely walks further into nested
+ * subpackages — the one case the corpus's `walkPackage` precedent actually
+ * evidences. Every other object type's own children (a function group's
+ * function modules, a program's includes, …) are added as leaves without a
+ * further fetch: no captured document shows those usefully recursable this
+ * same way, and inventing that behaviour blind is exactly what this task's
+ * corpus-first rule forbids. Named in `maxDepth`'s own schema description
+ * rather than left to silently do nothing past two tiers.
+ *
+ * A refusal at ANY fetch — the root's, a type folder's, or a recursed
+ * subpackage's — is returned as-is and bubbles to `answer()` unchanged, the
+ * same short-circuit `handleGetObjectsList.ts` uses.
  */
 async function buildTree(
   context: HandlerContext,
   utils: NodeSource,
   objectType: string,
   objectName: string,
-  expandTypeFolders: boolean,
+  depth: number,
+  maxDepth: number,
   enrich: boolean,
 ): Promise<IAdtResponse<TreeNode, IAdtError>> {
   const enrichment = enrich
     ? await enrichNodeWithSearchObject(context, objectType, objectName)
     : { type: objectType, description: undefined, packageName: undefined };
 
-  const rootResponse = await utils.fetchNodeStructure(objectType, objectName, {
-    withShortDescriptions: true,
-  });
-  if (!rootResponse.ok) {
-    return rootResponse as IAdtResponse<TreeNode, IAdtError>;
-  }
-  const root = rootResponse.getResult().value as NodeLevel;
+  const children: TreeNode[] = [];
 
-  const children: TreeNode[] = root.objects.map((o) => ({
-    OBJECT_TYPE: o.type,
-    OBJECT_NAME: o.name,
-    ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
-  }));
+  if (depth < maxDepth) {
+    const rootResponse = await utils.fetchNodeStructure(
+      objectType,
+      objectName,
+      { withShortDescriptions: true },
+    );
+    if (!rootResponse.ok) {
+      return rootResponse as IAdtResponse<TreeNode, IAdtError>;
+    }
+    const root = rootResponse.getResult().value as NodeLevel;
 
-  if (expandTypeFolders) {
+    for (const o of root.objects) {
+      children.push({
+        OBJECT_TYPE: o.type,
+        OBJECT_NAME: o.name,
+        ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+      });
+    }
+
     for (const child of root.childNodes) {
       const childResponse = await utils.fetchNodeStructure(
         objectType,
@@ -180,11 +206,27 @@ async function buildTree(
       }
       const childLevel = childResponse.getResult().value as NodeLevel;
       for (const o of childLevel.objects) {
-        children.push({
-          OBJECT_TYPE: o.type,
-          OBJECT_NAME: o.name,
-          ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
-        });
+        if (kindOf(o.type) === 'package' && depth + 1 < maxDepth) {
+          const subtree = await buildTree(
+            context,
+            utils,
+            o.type,
+            o.name,
+            depth + 1,
+            maxDepth,
+            enrich,
+          );
+          if (!subtree.ok) {
+            return subtree as IAdtResponse<TreeNode, IAdtError>;
+          }
+          children.push(subtree.getResult().value);
+        } else {
+          children.push({
+            OBJECT_TYPE: o.type,
+            OBJECT_NAME: o.name,
+            ...(o.description ? { OBJECT_DESCRIPTION: o.description } : {}),
+          });
+        }
       }
     }
   }
@@ -233,7 +275,8 @@ export async function handleGetObjectInfo(
         utils,
         args.parent_type,
         args.parent_name,
-        maxDepth >= 1,
+        0,
+        maxDepth,
         enrich,
       ),
     (tree: TreeNode) => tree,

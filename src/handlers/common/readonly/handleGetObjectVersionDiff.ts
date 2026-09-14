@@ -16,6 +16,7 @@ import { createTwoFilesPatch } from 'diff';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { pair } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 import {
   resolveVersionedObject,
@@ -30,46 +31,16 @@ export interface VersionDiffResult {
 }
 
 /**
- * Unwrap one `getVersionSource` answer, or throw.
- *
- * adt-clients 19 turned this member's failures — including "this type has no
- * version resource", `AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — into the
- * answer (`ok: false`) rather than a throw (see `IAdtVersionable` in
- * `@mcp-abap-adt/interfaces`). `buildVersionDiff` is shared with
- * `objectVersionTools.ts`, which still catches a THROW and reads `.code` off
- * it, so the throwing contract is kept here and the unwrap is this function's
- * job — not a redesign of `buildVersionDiff`'s callers.
+ * The pure half: two sources in, one patch out. Guards against undefined
+ * sources by treating them as empty strings — kept separate from the two
+ * callers below so neither has to repeat the jsdiff/notes logic.
  */
-function unwrapVersionSource(
-  response: IAdtResponse<string, IAdtError>,
-): string | undefined {
-  if (response.ok) return response.getResult().value;
-  const error = response.getError();
-  const failure = new Error(error.message) as Error & {
-    code?: string;
-  };
-  if (error.code !== undefined) failure.code = error.code;
-  throw failure;
-}
-
-/**
- * Shared "fetch two sources + unified patch" logic reused by the generic
- * GetObjectVersionDiff and every per-object Get<X>VersionDiff factory tool.
- * Guards against undefined sources by treating them as empty strings.
- */
-export async function buildVersionDiff(
-  obj: IAdtVersionable<any, any, string>,
+function diffSources(
   contentUriFrom: string,
   contentUriTo: string,
-): Promise<VersionDiffResult> {
-  const [respFrom, respTo] = await Promise.all([
-    obj.getVersionSource(contentUriFrom),
-    obj.getVersionSource(contentUriTo),
-  ]);
-
-  const rawFrom = unwrapVersionSource(respFrom);
-  const rawTo = unwrapVersionSource(respTo);
-
+  rawFrom: string | undefined,
+  rawTo: string | undefined,
+): VersionDiffResult {
   const notes: string[] = [];
   if (rawFrom == null) {
     notes.push(`Source for content_uri_from was empty/undefined.`);
@@ -95,6 +66,55 @@ export async function buildVersionDiff(
     identical: srcFrom === srcTo,
     ...(notes.length ? { notes } : {}),
   };
+}
+
+/**
+ * Unwrap one `getVersionSource` answer, or throw.
+ *
+ * adt-clients 19 turned this member's failures — including "this type has no
+ * version resource", `AdtObjectErrorCodes.UNSUPPORTED_OPERATION` — into the
+ * answer (`ok: false`) rather than a throw (see `IAdtVersionable` in
+ * `@mcp-abap-adt/interfaces`). Used only by `buildVersionDiff` below, which
+ * exists for `objectVersionTools.ts` (out of this task's fifteen), whose own
+ * `catch` still reads `.code` off a thrown error — so the throwing contract
+ * is kept there. `handleGetObjectVersionDiff` itself, below, does NOT use
+ * this: it reads the two `IAdtResponse`s directly, so a refusal reaches
+ * `answer()` as the answer it already is (code, origin, adtType, namespace,
+ * messages, request, raw body — everything `failurePayload` carries), rather
+ * than being collapsed into a throw and losing all of that but the message.
+ */
+function unwrapVersionSource(
+  response: IAdtResponse<string, IAdtError>,
+): string | undefined {
+  if (response.ok) return response.getResult().value;
+  const error = response.getError();
+  const failure = new Error(error.message) as Error & {
+    code?: string;
+  };
+  if (error.code !== undefined) failure.code = error.code;
+  throw failure;
+}
+
+/**
+ * Shared "fetch two sources + unified patch" logic reused by every per-object
+ * Get<X>VersionDiff factory tool in `objectVersionTools.ts`. NOT used by
+ * `handleGetObjectVersionDiff` below any more — see `unwrapVersionSource`'s
+ * own comment for why.
+ */
+export async function buildVersionDiff(
+  obj: IAdtVersionable<any, any, string>,
+  contentUriFrom: string,
+  contentUriTo: string,
+): Promise<VersionDiffResult> {
+  const [respFrom, respTo] = await Promise.all([
+    obj.getVersionSource(contentUriFrom),
+    obj.getVersionSource(contentUriTo),
+  ]);
+
+  const rawFrom = unwrapVersionSource(respFrom);
+  const rawTo = unwrapVersionSource(respTo);
+
+  return diffSources(contentUriFrom, contentUriTo, rawFrom, rawTo);
 }
 
 export const TOOL_DEFINITION = {
@@ -166,35 +186,38 @@ export async function handleGetObjectVersionDiff(
     }
 
     // Two calls of the same member (one per content_uri), not a read+metadata
-    // pair — `pair()`/`sequence()` answer one IAdtResponse each and don't fit
-    // "diff two documents". `buildVersionDiff` already reduces both answers to
-    // one `VersionDiffResult`, throwing (with `.code` preserved) on a refusal
-    // so `objectVersionTools.ts` — which still catches that throw — keeps
-    // working unchanged. `answer()`'s own try/catch turns that throw into the
-    // same failure shape every other handler here surfaces.
+    // pair — but `pair()` fits regardless: it answers `IAdtResponse<[A,B]>`,
+    // short-circuiting on the FIRST refusal and handing it back untouched, and
+    // `getVersionSource` answers `IAdtResponse<string>` already, with no
+    // reading to inject (`VersionsCapability` hardcodes `TSource = string`
+    // regardless of what a factory was given — see `resolveVersionedObject.ts`).
+    // A refusal here therefore reaches `answer()` as the real answer, not a
+    // thrown message — see `unwrapVersionSource`'s comment for what that
+    // otherwise throws away.
     return answer(
       { tool: 'GetObjectVersionDiff', detail: 'terse' },
       () =>
-        buildVersionDiff(resolved.obj, content_uri_from, content_uri_to).then(
-          (value) => ({
-            ok: true,
-            getResult: () => ({ value }),
-            getError: () => {
-              throw new Error(
-                'GetObjectVersionDiff: asked for the error of a success',
-              );
-            },
-          }),
+        pair(
+          () => resolved.obj.getVersionSource(content_uri_from),
+          () => resolved.obj.getVersionSource(content_uri_to),
         ),
-      (result: VersionDiffResult) => ({
-        success: true,
-        object_type,
-        content_uri_from,
-        content_uri_to,
-        identical: result.identical,
-        diff: result.diff,
-        ...(result.notes ? { notes: result.notes } : {}),
-      }),
+      ([srcFrom, srcTo]: [string, string]) => {
+        const result = diffSources(
+          content_uri_from,
+          content_uri_to,
+          srcFrom,
+          srcTo,
+        );
+        return {
+          success: true,
+          object_type,
+          content_uri_from,
+          content_uri_to,
+          identical: result.identical,
+          diff: result.diff,
+          ...(result.notes ? { notes: result.notes } : {}),
+        };
+      },
     );
   } catch (error: any) {
     return return_error(error);

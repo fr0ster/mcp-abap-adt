@@ -33,15 +33,19 @@ import { handleSearchObject } from '../../handlers/search/readonly/handleSearchO
 import { handleGetAdtTypes } from '../../handlers/system/readonly/handleGetAllTypes';
 import { handleGetInactiveObjects } from '../../handlers/system/readonly/handleGetInactiveObjects';
 import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
+import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery';
 import { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
 import { corpusBody } from '../../lib/adtCorpus';
+import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
+import { parseStructure } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
   okResponse,
+  reading,
   recordAnalyse,
   refusingClient,
 } from '../helpers/fakeClient';
@@ -104,6 +108,176 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
     const result: any = await (handler as any)(context as any, args);
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text).message).toBe('Not found');
+  });
+});
+
+/**
+ * `refusingClient` answers a refusal for ANY factory and ANY member, so the
+ * `it.each` above proves a handler surfaces a refusal without proving it
+ * called the right member with the right arguments — a handler pointed at a
+ * wrong-but-still-refusing member would pass it too. This is the other half:
+ * one row per handler, asserting the member actually called and the
+ * identity arguments actually passed, through `recordAnalyse()` (which
+ * records both, ignoring only the trailing options object the two
+ * `analyse`-carrying calls append — that identity is already covered by "the
+ * two members that accept an analyse strategy" below).
+ */
+describe('readonlySingleCall handlers call the member the brief names, with the arguments the caller gave', () => {
+  it('ReadMessageClass calls getMessageClass().readMetadata({name})', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleReadMessageClass(context as any, { message_class_name: 'ZMC' });
+    const call = seen.calls.filter((c) => c.member === 'readMetadata').at(-1);
+    expect(call?.args[0]).toEqual({ name: 'ZMC' });
+  });
+
+  it('ReadMessageClassMessage calls getMessageClassMessage().read({className, msgno}, undefined, ...)', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleReadMessageClassMessage(context as any, {
+      message_class_name: 'ZMC',
+      msgno: '001',
+    });
+    const call = seen.calls.filter((c) => c.member === 'read').at(-1);
+    expect(call?.args[0]).toEqual({ className: 'ZMC', msgno: '001' });
+    expect(call?.args[1]).toBeUndefined();
+  });
+
+  it('GetObjectsByType calls fetchNodeStructure(parent_type, parent_name, {nodeId, withShortDescriptions})', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetObjectsByType(context as any, {
+      parent_name: 'ZPKG',
+      parent_tech_name: 'ZPKG',
+      parent_type: 'DEVC/K',
+      node_id: '000001',
+    });
+    const call = seen.calls
+      .filter((c) => c.member === 'fetchNodeStructure')
+      .at(-1);
+    expect(call?.args).toEqual([
+      'DEVC/K',
+      'ZPKG',
+      { nodeId: '000001', withShortDescriptions: true },
+    ]);
+  });
+
+  it('GetObjectsList calls fetchNodeStructure(parent_type, parent_name, {nodeId: "000000", withShortDescriptions})', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetObjectsList(context as any, {
+      parent_name: 'ZPKG',
+      parent_tech_name: 'ZPKG',
+      parent_type: 'DEVC/K',
+    });
+    // recordAnalyse's client answers an empty NodeLevel (no childNodes), so
+    // the recursion makes exactly this one root call.
+    const call = seen.calls
+      .filter((c) => c.member === 'fetchNodeStructure')
+      .at(-1);
+    expect(call?.args).toEqual([
+      'DEVC/K',
+      'ZPKG',
+      { nodeId: '000000', withShortDescriptions: true },
+    ]);
+  });
+
+  it('SearchObject calls search({query, maxResults})', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleSearchObject(context as any, { object_name: 'ZCL*' });
+    const call = seen.calls.filter((c) => c.member === 'search').at(-1);
+    expect(call?.args).toEqual([{ query: 'ZCL*', maxResults: 100 }]);
+  });
+
+  it('GetAdtTypes calls getAllTypes(999, "*", "usedByProvider")', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetAdtTypes(context as any, {});
+    const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
+    expect(call?.args).toEqual([999, '*', 'usedByProvider']);
+  });
+
+  it('GetInactiveObjects calls getInactiveObjects() with no arguments', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetInactiveObjects(context as any, {});
+    const call = seen.calls
+      .filter((c) => c.member === 'getInactiveObjects')
+      .at(-1);
+    expect(call?.args).toEqual([]);
+  });
+
+  it('GetObjectInfo calls fetchNodeStructure(parent_type, parent_name, {withShortDescriptions}) — no node id at the root', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetObjectInfo(context as any, {
+      parent_type: 'DEVC/K',
+      parent_name: 'ZPKG',
+    });
+    // enrich defaults true, so `search` is also called (best-effort
+    // enrichment) — this checks fetchNodeStructure specifically.
+    const call = seen.calls
+      .filter((c) => c.member === 'fetchNodeStructure')
+      .at(-1);
+    expect(call?.args).toEqual([
+      'DEVC/K',
+      'ZPKG',
+      { withShortDescriptions: true },
+    ]);
+  });
+
+  it('GetObjectStructure calls getObjectStructure(objectType, objectName)', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetObjectStructure(context as any, {
+      object_name: 'ZCL_X',
+      object_type: 'class',
+    });
+    const call = seen.calls
+      .filter((c) => c.member === 'getObjectStructure')
+      .at(-1);
+    expect(call?.args).toEqual(['class', 'ZCL_X']);
+  });
+
+  it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetSqlQuery(context as any, { sql_query: 'SELECT 1' });
+    const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
+    expect(call?.args).toEqual([{ sql_query: 'SELECT 1', row_number: 100 }]);
+  });
+
+  it('GetTableContents calls getTableContents({table_name, max_rows, sql_query})', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetTableContents(context as any, { table_name: 'ZT' });
+    const call = seen.calls
+      .filter((c) => c.member === 'getTableContents')
+      .at(-1);
+    expect(call?.args).toEqual([
+      { table_name: 'ZT', max_rows: 100, sql_query: 'SELECT * FROM ZT' },
+    ]);
+  });
+
+  it('ListTransports calls list() with no arguments', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleListTransports(context as any, {});
+    const call = seen.calls.filter((c) => c.member === 'list').at(-1);
+    expect(call?.args).toEqual([]);
+  });
+
+  it('GetObjectVersionDiff calls getVersionSource once per content_uri, both uris', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+    await handleGetObjectVersionDiff(context as any, {
+      object_type: 'class',
+      content_uri_from: 'uri1',
+      content_uri_to: 'uri2',
+    });
+    const calls = seen.calls.filter((c) => c.member === 'getVersionSource');
+    expect(calls.map((c) => c.args)).toEqual([['uri1'], ['uri2']]);
   });
 });
 
@@ -266,5 +440,140 @@ describe('GetObjectsByType, mapped from a real captured node-structure document'
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toContain('ZMCP_SHR_I_ROOT');
     expect(result.content[0].text).toContain('BDEF/BDO');
+  });
+});
+
+describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row shape', () => {
+  // The bug this guards: `handleGetObjectsList` wrote `{name, type,
+  // tech_name}` while its sibling `handleGetObjectsByType` wrote
+  // `{OBJECT_TYPE, OBJECT_NAME, TECH_NAME, OBJECT_URI}` — after either
+  // handler populated the cache, `handleGetObjectNodeFromCache` (which
+  // matches on the uppercase keys) found nothing, for every input. Populates
+  // the SAME shared cache through one handler, then the other, and checks
+  // both write the identical row shape — no fabricated `TECH_NAME`.
+  const level = {
+    objects: [{ name: 'ZINCL1', type: 'PROG/I' }],
+    childNodes: [],
+  };
+
+  it('write compatible row shapes for the same underlying object', async () => {
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async () => okResponse(level),
+    });
+
+    await handleGetObjectsByType(context as any, {
+      parent_name: 'ZPROG',
+      parent_tech_name: 'ZPROG',
+      parent_type: 'PROG/P',
+      node_id: '31',
+    });
+    const byTypeRow = objectsListCache.getCache().objects[0];
+
+    await handleGetObjectsList(context as any, {
+      parent_name: 'ZPROG',
+      parent_tech_name: 'ZPROG',
+      parent_type: 'PROG/P',
+    });
+    const listRow = objectsListCache.getCache().objects[0];
+
+    expect(Object.keys(byTypeRow).sort()).toEqual([
+      'OBJECT_NAME',
+      'OBJECT_TYPE',
+    ]);
+    expect(Object.keys(listRow).sort()).toEqual(['OBJECT_NAME', 'OBJECT_TYPE']);
+    expect(byTypeRow).toEqual({ OBJECT_TYPE: 'PROG/I', OBJECT_NAME: 'ZINCL1' });
+    expect(listRow).toEqual({ OBJECT_TYPE: 'PROG/I', OBJECT_NAME: 'ZINCL1' });
+  });
+
+  it('GetObjectNodeFromCache reads a row either handler wrote, and fails honestly rather than matching a wrong TECH_NAME', async () => {
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async () => okResponse(level),
+    });
+    await handleGetObjectsByType(context as any, {
+      parent_name: 'ZPROG',
+      parent_tech_name: 'ZPROG',
+      parent_type: 'PROG/P',
+      node_id: '31',
+    });
+
+    // No TECH_NAME reaches the cache (the shared node reading never carries
+    // one — see the note in `handleGetObjectsByType.ts`), so a lookup that
+    // requires one — `handleGetObjectNodeFromCache`'s own contract, unchanged
+    // by this task — cannot match. Honest absence, not a wrong match: this
+    // is the OBJECT_URI-style gap recorded for a later task, not silently
+    // worked around here with a fabricated value.
+    const result: any = await handleGetObjectNodeFromCache(context as any, {
+      object_type: 'PROG/I',
+      object_name: 'ZINCL1',
+      tech_name: 'ZINCL1',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).toBe('Node not found in cache');
+  });
+});
+
+describe('GetObjectInfo, mapped from a real matched pair of captured node-structure documents', () => {
+  // Fixtures 01 and 02 are a real two-step exchange against the SAME
+  // package: step 1 queries `parent_type=DEVC/K, parent_name=ZMCP_SHR_PKG`
+  // with no node id (the root — its `DATA.OBJECT_TYPES` lists `BDEF/BDO`
+  // at `NODE_ID: "000031"`); step 2 re-queries the identical parent with
+  // `node_id=31` and answers one BDEF object. This is exactly the two-tier
+  // walk `buildTree` runs, so the mock below answers per `nodeId` rather
+  // than a single canned response — real bytes for both tiers, not one.
+  it('answers the root two-tier tree for a real package', async () => {
+    const rootBody = corpusBody('read-object-tree-structure--01-nodestructure');
+    const bdefBody = corpusBody('read-object-tree-structure--02-nodestructure');
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async (...args: any[]) => {
+        const options = args[2] as { nodeId?: string } | undefined;
+        if (!options?.nodeId) return okResponse(nodeLevel({ data: rootBody }));
+        if (options.nodeId === '31') {
+          return okResponse(nodeLevel({ data: bdefBody }));
+        }
+        // The other six type folders fixture 01 lists have no captured
+        // response — answered empty rather than invented.
+        return okResponse(nodeLevel({ data: '' }));
+      },
+    });
+
+    const result: any = await handleGetObjectInfo(context as any, {
+      parent_type: 'DEVC/K',
+      parent_name: 'ZMCP_SHR_PKG',
+      enrich: false, // isolate the tree walk from SearchObject enrichment
+    });
+
+    expect(result.isError).toBe(false);
+    const tree = JSON.parse(result.content[0].text);
+    expect(tree.OBJECT_TYPE).toBe('DEVC/K');
+    expect(tree.OBJECT_NAME).toBe('ZMCP_SHR_PKG');
+    const bdef = tree.CHILDREN.find(
+      (c: any) => c.OBJECT_NAME === 'ZMCP_SHR_I_ROOT',
+    );
+    expect(bdef).toBeDefined();
+    expect(bdef.OBJECT_TYPE).toBe('BDEF/BDO');
+    expect(bdef.OBJECT_DESCRIPTION).toContain('Shared BDEF');
+  });
+});
+
+describe('ListTransports, mapped from a real captured (empty) transport list', () => {
+  // `read-transport-list-structure--01-cts-transportrequests` is a real
+  // `tm:root` response with no requests at all (see
+  // `parseTransportListXml.test.ts`'s own note on it) — the honest-empty
+  // case, not a synthetic tree.
+  it('answers count: 0 for a real empty transport list', async () => {
+    const body = corpusBody(
+      'read-transport-list-structure--01-cts-transportrequests',
+    );
+    fakeClient = fakeClientOf({
+      list: async () => okResponse(reading(parseStructure(body), body)),
+    });
+
+    const result: any = await handleListTransports(context as any, {});
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.count).toBe(0);
+    expect(payload.transports).toEqual([]);
   });
 });

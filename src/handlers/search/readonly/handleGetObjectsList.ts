@@ -42,10 +42,20 @@ function utilsOf(context: HandlerContext) {
 
 type NodeSource = ReturnType<typeof utilsOf>;
 
+/**
+ * The cache row shape `handleGetObjectNodeFromCache.ts` (out of this task's
+ * scope, untouched) matches on — `OBJECT_TYPE`/`OBJECT_NAME`/`TECH_NAME`,
+ * uppercase, the same spelling `handleGetObjectsByType.ts` already writes.
+ * No `TECH_NAME`: `ourUtils.node` (`nodeLevel`) never carries a technical
+ * name distinct from the object name (see `packageWalk.ts`'s own doc), and
+ * inventing one by defaulting it to `OBJECT_NAME` would be wrong for exactly
+ * the objects a caller passes a technical name to find — an include or a
+ * function module whose technical name differs from its display name. Left
+ * absent rather than fabricated; a lookup that needs it fails honestly.
+ */
 interface FlatObject {
-  name: string;
-  type: string;
-  tech_name: string;
+  OBJECT_TYPE: string;
+  OBJECT_NAME: string;
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
@@ -65,9 +75,7 @@ function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
  * step keeps IAdtResponse's `ok`/`getResult`/`getError` shape rather than
  * throwing, so the FIRST refusal anywhere in the tree — not just at the
  * root — reaches `answer()` and is formatted the same way every other
- * handler in this migration formats one. `tech_name` falls back to `name`:
- * see the note in `handleGetObjectsByType.ts` on what `ourUtils.node` does
- * and does not carry.
+ * handler in this migration formats one.
  */
 async function collectValidObjects(
   utils: NodeSource,
@@ -88,9 +96,8 @@ async function collectValidObjects(
 
   const level = response.getResult().value as NodeLevel;
   let objects: FlatObject[] = level.objects.map((o) => ({
-    name: o.name,
-    type: o.type,
-    tech_name: o.name,
+    OBJECT_TYPE: o.type,
+    OBJECT_NAME: o.name,
   }));
 
   for (const child of level.childNodes) {

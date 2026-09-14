@@ -136,13 +136,14 @@ describe('version diff tools (#30)', () => {
 
   // adt-clients 19: "no version resource for this type" is a failure IN THE
   // ANSWER (`ok: false`, `code: AdtObjectErrorCodes.UNSUPPORTED_OPERATION`),
-  // not a throw — see `IAdtVersionable.getVersionSource`'s own doc and
-  // `handleGetObjectVersionDiff.ts`'s `unwrapVersionSource`. The generic
-  // handler no longer special-cases the code into a hand-written sentence
-  // (that branch is gone — see the file's own comment): it answers through
-  // `answer()` like every other handler this migration touches, so the
-  // failure's own message AND code both reach the caller, uniformly, rather
-  // than a clean sentence that hid the code.
+  // not a throw — see `IAdtVersionable.getVersionSource`'s own doc. The
+  // generic handler reads both `getVersionSource` answers directly (via
+  // `pair()`), so a refusal reaches `answer()` as the real `IAdtResponse` it
+  // already is, and `failurePayload` carries the code alongside the message
+  // — richer than the hand-written "not supported" sentence this handler
+  // used to build, and richer than the `client_threw` shape a throw would
+  // produce (see `handleGetObjectVersionDiff.ts`'s own comment on why
+  // `unwrapVersionSource`/`buildVersionDiff` are no longer used here).
   it('generic GetObjectVersionDiff surfaces UNSUPPORTED_OPERATION as a refusal, code included', async () => {
     mockClassGetVersionSource.mockResolvedValue(
       refusedResponse('version diff not available', {
@@ -162,15 +163,9 @@ describe('version diff tools (#30)', () => {
       (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
     expect(errText).not.toContain('stack');
     const payload = JSON.parse(errText);
-    // `buildVersionDiff` re-throws (see its own comment: kept throwing for
-    // `objectVersionTools.ts`'s sake), so `answer()` catches it as its own
-    // `client_threw` shape rather than reading `failurePayload` off an
-    // `IAdtResponse` — the message survives, `.code` does not (`local()` in
-    // `lib/answer.ts` never reads one off a thrown value). Documented here as
-    // a known limitation of keeping that shared helper's throwing contract,
-    // not asserted as if it were the richer shape.
-    expect(payload.error).toBe('client_threw');
     expect(payload.message).toBe('version diff not available');
+    expect(payload.code).toBe(AdtObjectErrorCodes.UNSUPPORTED_OPERATION);
+    expect(payload.origin).toBe('refusal');
   });
 
   it('per-object GetClassVersionDiff returns clean error on UNSUPPORTED_OPERATION', async () => {

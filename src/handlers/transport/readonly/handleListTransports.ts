@@ -19,19 +19,19 @@ export const TOOL_DEFINITION = {
   name: 'ListTransports',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests.',
+    "[read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers — not sent to ADT as filters.",
   inputSchema: {
     type: 'object',
     properties: {
       user: {
         type: 'string',
         description:
-          'SAP user name. If not provided, returns transports for the current user.',
+          "SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.",
       },
       modifiable_only: {
         type: 'boolean',
         description:
-          'Only return modifiable (not yet released) transports. Default: true.',
+          'Only return modifiable (not yet released) transports; applied client-side. Default: true.',
       },
       ...DETAIL_PROPERTY,
     },
@@ -192,6 +192,18 @@ export async function handleListTransports(
   // whatever `list()` answers — the same backstop this handler already used
   // for `modifiable_only` ("it is not established that the endpoint honours
   // the status query param", #168), now load-bearing for `user` too.
+  //
+  // **This is an observable behaviour change, not merely an implementation
+  // one.** Before, `user`/`status` were sent to the server and never proven
+  // to be honoured — so the answer, in practice, was every owner's
+  // modifiable transports. `user` defaults to `getSystemContext().responsible`
+  // (or `SAP_USERNAME`) when the caller passes nothing, and the filter above
+  // is now always applied — so a caller who passes no `user` gets a
+  // NARROWER list than before: only the session user's transports, not
+  // everyone's. Believed to be what the tool should answer (its own
+  // description always said "for the current or specified user"), kept
+  // deliberately rather than reverted, and named here and in the tool's own
+  // description rather than left implicit.
   return answer(
     { tool: 'ListTransports', detail },
     () =>

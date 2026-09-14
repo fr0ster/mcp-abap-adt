@@ -30,7 +30,8 @@ own tests pass and it is committed — not when it is described.
 | 9. The reference read | done | `39c19b9` |
 | 10. The reference write family | done | `d4978a2` |
 | 11. Sixteen two-call reads | done | `9281c35` |
-| 12 – 29 | not started | |
+| 12. Single-call reads and listings | done | `141ac27` |
+| 13 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2064,7 +2065,7 @@ Confirm the list before starting: a file that turns out to call `readMetadata` a
 - Consumes: `answer`, `resultsFor`, `ourUtils`, `project`, `detailOf`.
 - Note: `search` accepts an `analyse` and gets one. The other utils-backed members here — `getObjectStructure`, `getAllTypes`, `getInactiveObjects`, `getSqlQuery`, `getTableContents` — accept none. Do not add an argument the signature does not have; the rule is written by signature for this reason.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/readonlySingleCall.test.ts
@@ -2087,9 +2088,9 @@ it.each([
 });
 ```
 
-- [ ] **Step 2: Run it to verify it fails** — `npx jest src/__tests__/unit/readonlySingleCall.test.ts`
+- [x] **Step 2: Run it to verify it fails** — `npx jest src/__tests__/unit/readonlySingleCall.test.ts`
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // the one-call shape, filled in for handleReadMessageClass
@@ -2107,8 +2108,8 @@ return answer(
 
 The searches and listings answer JSON built from a parse, so they project `reading.value` through `project(detailOf(args), terse)` rather than reading `raw`. Their terse projection is whatever field set that tool already returns — copy it out of the handler as it stands, do not redesign it here.
 
-- [ ] **Step 4: Run the tests and measure**
-- [ ] **Step 5: Commit** — `refactor(readonly): the single-call reads, searches and listings`
+- [x] **Step 4: Run the tests and measure**
+- [x] **Step 5: Commit** — `refactor(readonly): the single-call reads, searches and listings`
 
 ---
 

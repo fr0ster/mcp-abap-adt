@@ -2855,6 +2855,11 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 // Both of them. The compiler catches a handler that still names the removed
 // member; it says nothing about one that calls the two replacements in the
 // wrong order, or calls only one of them.
+// The id `scheduleTrace` answers is a PROFILER REQUEST id, which
+// `runWithProfiler` consumes. It is not the id of a completed trace — that one
+// appears in the profiler feed later, and Task 24 is where it is searched for.
+const PROGRAM_REQUEST = 'profiler-request-1';
+
 const profiling = [
   ['RuntimeRunProgram', handleRuntimeRunProgram, { program_name: 'ZP', profile: true }],
   ['RuntimeRunProgramWithProfiling', handleRuntimeRunProgramWithProfiling, { program_name: 'ZP' }],
@@ -2864,7 +2869,7 @@ it.each(profiling)('%s passes the scheduled id to the profiler run', async (_n, 
   const order: string[] = [];
   let passed: unknown;
   programExecutor = {
-    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading('profiler-request-1')); },
+    scheduleTrace: async () => { order.push('schedule'); return okResponse(reading(PROGRAM_REQUEST)); },
     runWithProfiler: async (_target: unknown, options: any) => {
       order.push('run');
       passed = options?.profilerId;
@@ -2877,88 +2882,7 @@ it.each(profiling)('%s passes the scheduled id to the profiler run', async (_n, 
   // `runWithProfiler` with no id, the wrong id, or a constant passes an
   // order check and fails in production, so the id that came back from
   // `scheduleTrace` is what must arrive.
-  expect(passed).toBe(PROFILER_REQUEST);
-});
-
-it.each(handlers)('%s finds the trace by difference, not by position', async (_n, handler, args) => {
-  if (OPTION !== 'find-the-trace') return;
-  // The feed already holds an entry, and it is LAST in document order with the
-  // newest `recordedAt`. An implementation that takes the first entry, or the
-  // last, or sorts the strings, picks the wrong one — only the difference
-  // against the snapshot gives the right answer.
-  const existing = { id: 'completed-trace-1', recordedAt: '2026-09-14T10:00:00+02:00' };
-  const produced = { id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' };
-  let listed = 0;
-  classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
-  };
-  profiler = {
-    list: async () => okResponse(reading(++listed === 1 ? [existing] : [existing, produced])),
-  };
-
-  const result: any = await (handler as any)(context as any, {
-    ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
-  });
-  const payload = JSON.parse(result.content[0].text);
-  expect(payload.profile?.trace_id ?? payload.trace_id).toBe(COMPLETED_TRACE);
-  // Snapshot, then at least one more read. One call means no snapshot.
-  expect(listed).toBeGreaterThan(1);
-});
-
-it.each(handlers)('%s reports a refused feed read rather than an empty feed', async (_n, handler, args) => {
-  if (OPTION !== 'find-the-trace') return;
-  classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
-  };
-  // Refused on the SNAPSHOT, before the run. Nothing should be run at all.
-  profiler = { list: async () => refusedResponse('Profiler feed not authorised') };
-  const result: any = await (handler as any)(context as any, args);
-  expect(result.isError).toBe(true);
-  expect(JSON.parse(result.content[0].text).message).toBe('Profiler feed not authorised');
-  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
-});
-
-it.each(handlers)('%s reports a refusal during the search, not a missing trace', async (_n, handler, args) => {
-  if (OPTION !== 'find-the-trace') return;
-  let call = 0;
-  classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
-  };
-  // The snapshot succeeds; the poll is refused. Reporting "no trace yet" here
-  // would be the masking defect: SAP answered, and it said no.
-  profiler = {
-    list: async () =>
-      ++call === 1 ? okResponse(reading([])) : refusedResponse('Session expired'),
-  };
-  const result: any = await (handler as any)(context as any, {
-    ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
-  });
-  expect(result.isError).toBe(true);
-  expect(JSON.parse(result.content[0].text).message).toBe('Session expired');
-});
-
-it.each(handlers)('%s stops after max_trace_attempts and still reports the run', async (_n, handler, args) => {
-  if (OPTION !== 'find-the-trace') return;
-  let listed = 0;
-  classExecutor = {
-    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
-    runWithProfiler: async () => okResponse(reading('done')),
-  };
-  profiler = { list: async () => { listed += 1; return okResponse(reading([])); } };
-
-  const result: any = await (handler as any)(context as any, {
-    ...args, max_trace_attempts: 2, trace_retry_delay_ms: 0,
-  });
-  // The snapshot plus two attempts.
-  expect(listed).toBe(3);
-  // A run that worked with no trace written yet is a SUCCESS with no trace id.
-  // SAP writes it asynchronously and it may arrive a week later.
-  expect(result.isError).toBe(false);
-  const payload = JSON.parse(result.content[0].text);
-  expect(payload.profile?.trace_id ?? payload.trace_id).toBeUndefined();
+  expect(passed).toBe(PROGRAM_REQUEST);
 });
 
 it.each(profiling)('%s stops at the first refused step', async (_n, handler, args) => {
@@ -3212,6 +3136,90 @@ it.each(handlers)('%s stops at a refused schedule and never runs', async (_n, ha
   expect(run).not.toHaveBeenCalled();
 });
 
+it.each(handlers)('%s finds the trace by difference, not by position', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  // The feed already holds an entry, and it is LAST in document order with the
+  // newest `recordedAt`. An implementation that takes the first entry, or the
+  // last, or sorts the strings, picks the wrong one — only the difference
+  // against the snapshot gives the right answer.
+  const existing = { id: 'completed-trace-1', recordedAt: '2026-09-14T10:00:00+02:00' };
+  const produced = { id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' };
+  // The FIRST call is the snapshot and must not contain the produced id — an
+  // id already in `before` can never be the new one, and a mock that returns
+  // it from the start asks the implementation to be wrong.
+  let listed = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  profiler = {
+    list: async () => okResponse(reading(++listed === 1 ? [existing] : [existing, produced])),
+  };
+
+  const result: any = await (handler as any)(context as any, {
+    ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
+  });
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.profile?.trace_id ?? payload.trace_id).toBe(COMPLETED_TRACE);
+  // Snapshot, then at least one more read. One call means no snapshot.
+  expect(listed).toBeGreaterThan(1);
+});
+
+it.each(handlers)('%s reports a refused feed read rather than an empty feed', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  // Refused on the SNAPSHOT, before the run. Nothing should be run at all.
+  profiler = { list: async () => refusedResponse('Profiler feed not authorised') };
+  const result: any = await (handler as any)(context as any, args);
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Profiler feed not authorised');
+  expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
+});
+
+it.each(handlers)('%s reports a refusal during the search, not a missing trace', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  let call = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  // The snapshot succeeds; the poll is refused. Reporting "no trace yet" here
+  // would be the masking defect: SAP answered, and it said no.
+  profiler = {
+    list: async () =>
+      ++call === 1 ? okResponse(reading([])) : refusedResponse('Session expired'),
+  };
+  const result: any = await (handler as any)(context as any, {
+    ...args, max_trace_attempts: 3, trace_retry_delay_ms: 0,
+  });
+  expect(result.isError).toBe(true);
+  expect(JSON.parse(result.content[0].text).message).toBe('Session expired');
+});
+
+it.each(handlers)('%s stops after max_trace_attempts and still reports the run', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  let listed = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
+    runWithProfiler: async () => okResponse(reading('done')),
+  };
+  profiler = { list: async () => { listed += 1; return okResponse(reading([])); } };
+
+  const result: any = await (handler as any)(context as any, {
+    ...args, max_trace_attempts: 2, trace_retry_delay_ms: 0,
+  });
+  // The snapshot plus two attempts.
+  expect(listed).toBe(3);
+  // A run that worked with no trace written yet is a SUCCESS with no trace id.
+  // SAP writes it asynchronously and it may arrive a week later.
+  expect(result.isError).toBe(false);
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.profile?.trace_id ?? payload.trace_id).toBeUndefined();
+});
+
 // The two answer the id in DIFFERENT PLACES, so this cannot be parametrised
 // on the field: `RuntimeRunClass` nests it under `profile`, and the deprecated
 // `RuntimeRunClassWithProfiling` puts it at the top level. A shared assertion
@@ -3226,7 +3234,12 @@ it.each([
     scheduleTrace: async () => okResponse(reading(PROFILER_REQUEST)),
     runWithProfiler: async () => okResponse(reading('done')),
   };
-  profiler = { list: async () => okResponse(reading([{ id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' }])) };
+  // Empty snapshot, then the produced trace — the same order as a real run.
+  let seen = 0;
+  profiler = {
+    list: async () =>
+      okResponse(reading(++seen === 1 ? [] : [{ id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' }])),
+  };
   const result: any = await (handler as any)(context as any, args);
   const found = (at as any)(JSON.parse(result.content[0].text));
 
@@ -3307,21 +3320,43 @@ const answered = (value: string | undefined): IAdtResponse<string | undefined, I
 and the handler:
 
 ```typescript
-// `new AdtRuntimeClient(connection, logger).getProfiler()` — the same
-// construction `handleRuntimeAnalyzeProfilerTrace` already uses.
-const snapshot = await profiler.list();
-if (!snapshot.ok) return snapshot;   // a refused feed read is a refusal, not an empty feed
-const before = new Set(snapshot.getResult().value.map((entry) => entry.id));
-// schedule → run through `sequence`, exactly as the other three handlers,
-// then the search. A run that succeeded with no trace yet is still a
-// successful run: the trace id is absent, not an error.
-const found = await newTraceAfter(profiler, before, {
-  attempts: max_trace_attempts ?? 5,
-  delayMs: trace_retry_delay_ms ?? 2000,
-});
-if (!found.ok) return found;   // untouched, like every other failing step
-const traceId = found.getResult().value;
+// All three phases INSIDE the callback `answer()` runs. Every `return` below
+// hands back an `IAdtResponse`, which is what `answer()` renders; returning one
+// from the handler itself would hand the caller an internal object instead of
+// an MCP result with `content` and `isError`, and the tests parse that result.
+const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+
+return answer(
+  { tool: 'RuntimeRunClass', detail: detailOf(args) },
+  async () => {
+    // 1. the snapshot. A refused feed read is a refusal, not an empty feed.
+    const snapshot = await profiler.list();
+    if (!snapshot.ok) return snapshot;
+    const before = new Set(snapshot.getResult().value.map((entry) => entry.id));
+
+    // 2. schedule, then run — the same two calls as the program handlers.
+    const ran = await sequence(
+      () => executor.scheduleTrace(profilerParameters),
+      (profilerId) => executor.runWithProfiler(target, { profilerId }),
+    );
+    if (!ran.ok) return ran;
+
+    // 3. the search. A run that succeeded with no trace written yet is still a
+    // successful run: the id is absent, not an error.
+    const found = await newTraceAfter(profiler, before, {
+      attempts: max_trace_attempts ?? 5,
+      delayMs: trace_retry_delay_ms ?? 2000,
+    });
+    if (!found.ok) return found;
+
+    return succeededWith({ run: ran.getResult().value, traceId: found.getResult().value });
+  },
+  project(detailOf(args), terseProfilingRun),
+);
 ```
+
+`succeededWith` is the same one-line `IAdtResponse` builder `pair()` uses to
+join two values; lift it out of `sequence.ts` rather than writing a third copy.
 
 Edit the tool definitions only if Step 1 said to.
 

@@ -1,14 +1,35 @@
 /**
  * DeleteObject Handler - Delete ABAP objects via ADT API
+ *
+ * A dispatcher: one branch runs per call, over the same family clients every
+ * low-level DeleteX handler in this migration uses. Each branch carries its
+ * own `resultsFor(xDocuments)` and `analyseDeletion`, so a refusal ADT embeds
+ * in a 200 (deletion answers `del:deletionResult`/`del:checkResponse` the same
+ * way for every family) is read as a failure here too.
  */
 
+import {
+  behaviorDefinitionDocuments,
+  classDocuments,
+  dataElementDocuments,
+  ddlDocuments,
+  domainDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  interfaceDocuments,
+  metadataExtensionDocuments,
+  programDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteObjectLow',
@@ -35,6 +56,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Transport request number',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['object_name', 'object_type'],
   },
@@ -45,214 +67,185 @@ interface DeleteObjectArgs {
   object_type: string;
   function_group_name?: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
+
+const VALID_TYPES = [
+  'class',
+  'clas/oc',
+  'program',
+  'prog/p',
+  'interface',
+  'intf/oi',
+  'function_group',
+  'fugr/f',
+  'function_module',
+  'fugr/ff',
+  'table',
+  'tabl/dt',
+  'structure',
+  'ttyp/st',
+  'ddl',
+  'ddls/df',
+  'domain',
+  'doma/dm',
+  'data_element',
+  'dtel/de',
+  'behavior_definition',
+  'bdef/bd',
+  'metadata_extension',
+  'ddlx/ex',
+];
 
 export async function handleDeleteObject(
   context: HandlerContext,
   args: DeleteObjectArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { object_name, object_type, function_group_name, transport_request } =
-      args as DeleteObjectArgs;
+  const { object_name, object_type, function_group_name, transport_request } =
+    args as DeleteObjectArgs;
 
-    if (!object_name || !object_type) {
+  if (!object_name || !object_type) {
+    return return_error(new Error('object_name and object_type are required'));
+  }
+
+  const objectType = object_type.toLowerCase();
+  if (!VALID_TYPES.includes(objectType)) {
+    return return_error(new Error(`Unsupported object_type: ${object_type}`));
+  }
+  const objectName = object_name.toUpperCase();
+
+  // function_module needs a second name the others don't carry; that stays a
+  // request-shape check ahead of the client call, same as before.
+  let functionGroupName: string | undefined;
+  if (objectType === 'function_module' || objectType === 'fugr/ff') {
+    if (!function_group_name) {
       return return_error(
-        new Error('object_name and object_type are required'),
+        new Error(
+          'function_group_name is required for function_module deletion.',
+        ),
       );
     }
+    functionGroupName = function_group_name.toUpperCase();
+  }
 
-    const crudClient = createAdtClient(connection, logger);
-    const objectName = object_name.toUpperCase();
-    const objectType = object_type.toLowerCase();
+  const detail = detailOf(args);
+  const client = createAdtClient(connection, logger);
 
-    logger?.info(
-      `Starting object deletion: ${objectName} (type: ${object_type})`,
-    );
-
-    try {
-      let response: unknown;
-
+  return answer(
+    { tool: 'DeleteObjectLow', detail },
+    () => {
       switch (objectType) {
         case 'class':
         case 'clas/oc':
-          response = (
-            await crudClient.getClass().delete({
-              className: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getClass(resultsFor(classDocuments))
+            .delete(
+              { className: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         case 'program':
         case 'prog/p':
-          response = (
-            await crudClient.getProgram().delete({
-              programName: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getProgram(resultsFor(programDocuments))
+            .delete(
+              { programName: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         case 'interface':
         case 'intf/oi':
-          response = (
-            await crudClient.getInterface().delete({
+          return client.getInterface(resultsFor(interfaceDocuments)).delete(
+            {
               interfaceName: objectName,
               transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+            },
+            { analyse: analyseDeletion },
+          );
         case 'function_group':
         case 'fugr/f':
-          response = (
-            await crudClient.getFunctionGroup().delete({
-              functionGroupName: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
+            .delete(
+              {
+                functionGroupName: objectName,
+                transportRequest: transport_request,
+              },
+              { analyse: analyseDeletion },
+            );
         case 'function_module':
         case 'fugr/ff':
-          if (!function_group_name) {
-            return return_error(
-              new Error(
-                'function_group_name is required for function_module deletion.',
-              ),
+          return client
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .delete(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: objectName,
+                transportRequest: transport_request,
+              },
+              { analyse: analyseDeletion },
             );
-          }
-          response = (
-            await crudClient.getFunctionModule().delete({
-              functionGroupName: function_group_name.toUpperCase(),
-              functionModuleName: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
         case 'table':
         case 'tabl/dt':
-          response = (
-            await crudClient.getTable().delete({
-              tableName: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getTable(resultsFor(tableDocuments))
+            .delete(
+              { tableName: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         case 'structure':
         case 'ttyp/st':
-          response = (
-            await crudClient.getStructure().delete({
+          return client.getStructure(resultsFor(structureDocuments)).delete(
+            {
               structureName: objectName,
               transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+            },
+            { analyse: analyseDeletion },
+          );
         case 'ddl':
         case 'ddls/df':
-          response = (
-            await crudClient.getDdl().delete({
-              ddlName: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getDdl(resultsFor(ddlDocuments))
+            .delete(
+              { ddlName: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         case 'domain':
         case 'doma/dm':
-          response = (
-            await crudClient.getDomain().delete({
-              domainName: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getDomain(resultsFor(domainDocuments))
+            .delete(
+              { domainName: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         case 'data_element':
         case 'dtel/de':
-          response = (
-            await crudClient.getDataElement().delete({
+          return client.getDataElement(resultsFor(dataElementDocuments)).delete(
+            {
               dataElementName: objectName,
               transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+            },
+            { analyse: analyseDeletion },
+          );
         case 'behavior_definition':
         case 'bdef/bd':
-          response = (
-            await crudClient.getBehaviorDefinition().delete({
-              name: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+            .delete(
+              { name: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         case 'metadata_extension':
         case 'ddlx/ex':
-          response = (
-            await crudClient.getMetadataExtension().delete({
-              name: objectName,
-              transportRequest: transport_request,
-            })
-          ).deleteResult;
-          break;
+          return client
+            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+            .delete(
+              { name: objectName, transportRequest: transport_request },
+              { analyse: analyseDeletion },
+            );
         default:
-          return return_error(
-            new Error(`Unsupported object_type: ${object_type}`),
-          );
+          throw new Error(`Unsupported object_type: ${object_type}`);
       }
-
-      if (!response) {
-        throw new Error(
-          `Delete did not return a response for object ${objectName}`,
-        );
-      }
-
-      logger?.info(`✅ DeleteObject completed successfully: ${objectName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            object_name: objectName,
-            object_type: objectType,
-            transport_request: transport_request || null,
-            message: `Object ${objectName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error deleting object ${objectName}:`, error);
-
-      let errorMessage = `Failed to delete object: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Object ${objectName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Object ${objectName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch {
-          // ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    },
+    project(detail, terseDeletion),
+  );
 }

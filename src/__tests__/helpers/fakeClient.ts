@@ -25,7 +25,7 @@ export function refusedResponse(
   } as unknown as IAdtResponse<never, IAdtError>;
 }
 
-/** A reading, as `resultsFor` would have built it. */
+/** A reading, mirroring what invoking one of the result strategies produces. */
 export const reading = <T>(
   value: T,
   raw = String(value ?? ''),
@@ -40,6 +40,11 @@ type Members = Record<string, (...args: unknown[]) => unknown>;
  * Handlers reach members through `client.getX(results)`, and a test does not
  * care which X. Anything not named answers a success with `undefined`, so a
  * test says only what it is about.
+ *
+ * **Known limitation:** The outer proxy ignores the factory name (getX), so every
+ * factory accessor returns the same member table. A test can therefore exercise
+ * a handler that calls the wrong factory, or calls a member never named, without
+ * the test failing — only an explicit assertion on the call will catch it.
  */
 export function fakeClientOf(members: Members) {
   const object = new Proxy(members, {
@@ -71,16 +76,26 @@ export function refusingClient(
  * wrong strategy, and that is visible from the call rather than from the answer.
  */
 export function recordAnalyse() {
-  const calls: Array<{ member: string; analyse: unknown; args: unknown[] }> =
-    [];
+  const calls: Array<{
+    member: string;
+    analyse: unknown;
+    hadOptions: boolean;
+    args: unknown[];
+  }> = [];
   const client = new Proxy({} as Record<string, unknown>, {
     get: () => () =>
       new Proxy({} as Members, {
         get:
           (_t, member: string) =>
           async (...args: unknown[]) => {
+            const hadOptions = args.length > 1;
             const options = args.at(-1) as { analyse?: unknown } | undefined;
-            calls.push({ member, analyse: options?.analyse, args });
+            calls.push({
+              member,
+              analyse: hadOptions ? options?.analyse : undefined,
+              hadOptions,
+              args,
+            });
             return okResponse(reading(undefined, '', 200));
           },
       }),
@@ -89,7 +104,10 @@ export function recordAnalyse() {
     client,
     calls,
     get last() {
-      return calls.at(-1)?.analyse;
+      const lastCall = calls.at(-1);
+      return lastCall
+        ? { analyse: lastCall.analyse, hadOptions: lastCall.hadOptions }
+        : undefined;
     },
     countOf: (member: string) =>
       calls.filter((c) => c.member === member).length,

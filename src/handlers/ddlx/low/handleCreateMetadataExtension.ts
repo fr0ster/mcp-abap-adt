@@ -1,18 +1,28 @@
 /**
- * CreateMetadataExtension Handler - Create ABAP Metadata Extension
+ * CreateMetadataExtensionLow Handler - Create ABAP Metadata Extension
  *
- * Uses AdtClient.createMetadataExtension from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getMetadataExtension().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
+ *
+ * **No source here.** `createMetadataExtension` never reads a source; the
+ * source is `UpdateMetadataExtensionLow`'s job, after `LockMetadataExtensionLow`.
+ * `master_language` does reach the wire, through `config.masterLanguage`.
+ * Verified against `AdtMetadataExtension.js`.
  */
 
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtensionLow',
@@ -58,6 +68,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name', 'description', 'package_name'],
   },
@@ -75,118 +86,52 @@ interface CreateMetadataExtensionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateMetadataExtension MCP tool
- *
- * Uses AdtClient.createMetadataExtension - low-level single method call
- */
 export async function handleCreateMetadataExtension(
   context: HandlerContext,
   args: CreateMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      name,
-      description,
-      package_name,
-      transport_request,
-      master_language,
-      session_id,
-      session_state,
-    } = args as CreateMetadataExtensionArgs;
+  const {
+    name,
+    description,
+    package_name,
+    transport_request,
+    master_language,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!name || !description || !package_name) {
-      return return_error(
-        new Error('name, description, and package_name are required'),
-      );
-    }
+  if (!name || !description || !package_name) {
+    return return_error(
+      new Error('name, description, and package_name are required'),
+    );
+  }
 
-    const client = createAdtClient(connection, logger);
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
 
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
+  const ddlxName = name.toUpperCase();
+  const detail = detailOf(args);
 
-    const ddlxName = name.toUpperCase();
-
-    logger?.info(`Starting metadata extension creation: ${ddlxName}`);
-
-    try {
-      // Create metadata extension
-      const createState = await client.getMetadataExtension().create({
-        name: ddlxName,
-        description,
-        packageName: package_name,
-        transportRequest: transport_request,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for metadata extension ${ddlxName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateMetadataExtension completed: ${ddlxName}`);
-
-      return return_response({
-        data: JSON.stringify(
+  return answer(
+    { tool: 'CreateMetadataExtensionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+        .create(
           {
-            success: true,
             name: ddlxName,
             description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Metadata Extension ${ddlxName} created successfully. Use LockMetadataExtension and UpdateMetadataExtension to add source code, then UnlockMetadataExtension and ActivateObject.`,
+            packageName: package_name,
+            transportRequest: transport_request,
+            masterLanguage: master_language,
           },
-          null,
-          2,
+          { analyse: analyseException },
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating metadata extension ${ddlxName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to create metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Metadata Extension ${ddlxName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    project(detail, terseWrite),
+  );
 }

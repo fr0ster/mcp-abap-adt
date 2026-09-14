@@ -1,19 +1,23 @@
 /**
- * CheckMetadataExtension Handler - Syntax check for ABAP MetadataExtension
+ * CheckMetadataExtensionLow Handler - Syntax check for ABAP Metadata Extension
  *
- * Uses AdtClient.checkMetadataExtension from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getMetadataExtension().check from @mcp-abap-adt/adt-clients 19.
+ *
+ * `status` left undefined: the shipped default checks the inactive version,
+ * which is what a caller wants right after a write. `checkMetadataExtension`
+ * also takes no source parameter at all — unlike ddl/structure, there is no
+ * unsaved-code check here to forward.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckMetadataExtensionLow',
@@ -42,6 +46,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name'],
   },
@@ -55,114 +60,33 @@ interface CheckMetadataExtensionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckMetadataExtension MCP tool
- *
- * Uses AdtClient.checkMetadataExtension - low-level single method call
- */
 export async function handleCheckMetadataExtension(
   context: HandlerContext,
   args: CheckMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, session_id, session_state } =
-      args as CheckMetadataExtensionArgs;
+  const { name, session_id, session_state } = args;
 
-    // Validation
-    if (!name) {
-      return return_error(new Error('name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlxName = name.toUpperCase();
-
-    logger?.info(`Starting metadata extension check: ${ddlxName}`);
-
-    try {
-      // Check metadata extension
-      const checkState = await client
-        .getMetadataExtension()
-        .check({ name: ddlxName });
-      const response = checkState.checkResult;
-
-      if (!response) {
-        throw new Error(
-          `Check did not return a response for metadata extension ${ddlxName}`,
-        );
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckMetadataExtension completed: ${ddlxName}`);
-      logger?.debug(
-        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            name: ddlxName,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `MetadataExtension ${ddlxName} has no syntax errors`
-              : `MetadataExtension ${ddlxName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking metadata extension ${ddlxName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to check metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `MetadataExtension ${ddlxName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!name) {
+    return return_error(new Error('name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlxName = name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckMetadataExtensionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+        .check({ name: ddlxName }, undefined, { analyse: analyseCheck }),
+    project(detail, terseCheck),
+  );
 }

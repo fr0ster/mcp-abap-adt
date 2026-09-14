@@ -82,6 +82,19 @@ import {
 } from '../../handlers/ddl/low/handleUnlockDdl';
 import { handleUpdateDdl } from '../../handlers/ddl/low/handleUpdateDdl';
 import { handleValidateDdl } from '../../handlers/ddl/low/handleValidateDdl';
+import { handleActivateMetadataExtension } from '../../handlers/ddlx/low/handleActivateMetadataExtension';
+import { handleCheckMetadataExtension } from '../../handlers/ddlx/low/handleCheckMetadataExtension';
+import { handleDeleteMetadataExtension } from '../../handlers/ddlx/low/handleDeleteMetadataExtension';
+import {
+  handleLockMetadataExtension,
+  TOOL_DEFINITION as LockMetadataExtensionToolDefinition,
+} from '../../handlers/ddlx/low/handleLockMetadataExtension';
+import {
+  handleUnlockMetadataExtension,
+  TOOL_DEFINITION as UnlockMetadataExtensionToolDefinition,
+} from '../../handlers/ddlx/low/handleUnlockMetadataExtension';
+import { handleUpdateMetadataExtension } from '../../handlers/ddlx/low/handleUpdateMetadataExtension';
+import { handleValidateMetadataExtension } from '../../handlers/ddlx/low/handleValidateMetadataExtension';
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
 import { handleDeleteInterface } from '../../handlers/interface/low/handleDeleteInterface';
@@ -176,6 +189,19 @@ it.each([
     'getDdl',
     {
       ddl_name: 'ZVW_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'ddlx (metadataExtension)',
+    handleActivateMetadataExtension,
+    handleDeleteMetadataExtension,
+    handleValidateMetadataExtension,
+    'getMetadataExtension',
+    {
+      name: 'ZI_X_DDLX',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',
@@ -814,6 +840,132 @@ describe('ddl', () => {
 
     const result: any = await handleActivateDdl(context as any, {
       ddl_name: 'ZVW_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+});
+
+describe('ddlx (metadataExtension)', () => {
+  it("CheckMetadataExtensionLow leaves the check member's status undefined (the shipped inactive default) — checkMetadataExtension takes no source parameter at all", async () => {
+    await handleCheckMetadataExtension(context as any, { name: 'ZI_X_DDLX' });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getMetadataExtension');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
+    expect(call?.args[1]).toBeUndefined();
+  });
+
+  it('UpdateMetadataExtensionLow passes sourceCode via options, not config — the shipped AdtMetadataExtension.update() reads options.sourceCode only, with no config fallback (the exact empty-write shape found four times in cluster 14)', async () => {
+    await handleUpdateMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
+      source_code: '@Metadata.layer: #CORE\nannotate view ZI_X_DDLX with {}',
+      lock_handle: 'h',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getMetadataExtension');
+    expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: '@Metadata.layer: #CORE\nannotate view ZI_X_DDLX with {}',
+      lockHandle: 'h',
+    });
+    // The negative half of the assertion: config carries no sourceCode at
+    // all, so a regression that moves it back cannot pass silently.
+    expect((call?.args[0] as any)?.sourceCode).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockMetadataExtensionLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockMetadataExtension(context as any, { name: 'ZI_X_DDLX' });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getMetadataExtension');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in LockMetadataExtensionToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it("LockMetadataExtensionLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'DDLX_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.name).toBe('ZI_X_DDLX');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockMetadataExtensionLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'DDLX_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockMetadataExtension(
+      connectionSessionContext as any,
+      { name: 'ZI_X_DDLX', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockMetadataExtensionLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getMetadataExtension');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in UnlockMetadataExtensionToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it('ValidateMetadataExtensionLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
+    // No ddlx-specific validation fixture exists in the corpus; the
+    // `asx:abap`/`DATA`/`SEVERITY` shape is shared across every DDIC/OO
+    // validation endpoint — ValidateDdlLow's own test proves the same shape
+    // against the same projection, captured here for a table instead.
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
+      package_name: 'ZP',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('ActivateMetadataExtensionLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateMetadataExtension(context as any, {
+      name: 'ZI_X_DDLX',
     });
 
     expect(result.isError).toBe(false);

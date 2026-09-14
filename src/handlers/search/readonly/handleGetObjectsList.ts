@@ -45,17 +45,17 @@ type NodeSource = ReturnType<typeof utilsOf>;
 /**
  * The cache row shape `handleGetObjectNodeFromCache.ts` (out of this task's
  * scope, untouched) matches on — `OBJECT_TYPE`/`OBJECT_NAME`/`TECH_NAME`,
- * uppercase, the same spelling `handleGetObjectsByType.ts` already writes.
- * No `TECH_NAME`: `ourUtils.node` (`nodeLevel`) never carries a technical
- * name distinct from the object name (see `packageWalk.ts`'s own doc), and
- * inventing one by defaulting it to `OBJECT_NAME` would be wrong for exactly
- * the objects a caller passes a technical name to find — an include or a
- * function module whose technical name differs from its display name. Left
- * absent rather than fabricated; a lookup that needs it fails honestly.
+ * uppercase, the same spelling `handleGetObjectsByType.ts` already writes,
+ * `OBJECT_URI` included so that handler's own follow-up-request feature
+ * keeps working. `ourUtils.node` (`nodeLevel`, `packageWalk.ts`) carries
+ * both `techName` and `uri` — see that file's own doc for why they were
+ * ever thought absent, and corrected.
  */
 interface FlatObject {
   OBJECT_TYPE: string;
   OBJECT_NAME: string;
+  TECH_NAME?: string;
+  OBJECT_URI?: string;
 }
 
 function ok(objects: FlatObject[]): IAdtResponse<FlatObject[], IAdtError> {
@@ -98,6 +98,8 @@ async function collectValidObjects(
   let objects: FlatObject[] = level.objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
+    ...(o.techName ? { TECH_NAME: o.techName } : {}),
+    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
   }));
 
   for (const child of level.childNodes) {

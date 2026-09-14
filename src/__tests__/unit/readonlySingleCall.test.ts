@@ -444,72 +444,88 @@ describe('GetObjectsByType, mapped from a real captured node-structure document'
 });
 
 describe('GetObjectsByType and GetObjectsList agree on the objectsListCache row shape', () => {
-  // The bug this guards: `handleGetObjectsList` wrote `{name, type,
-  // tech_name}` while its sibling `handleGetObjectsByType` wrote
-  // `{OBJECT_TYPE, OBJECT_NAME, TECH_NAME, OBJECT_URI}` — after either
-  // handler populated the cache, `handleGetObjectNodeFromCache` (which
-  // matches on the uppercase keys) found nothing, for every input. Populates
-  // the SAME shared cache through one handler, then the other, and checks
-  // both write the identical row shape — no fabricated `TECH_NAME`.
-  const level = {
-    objects: [{ name: 'ZINCL1', type: 'PROG/I' }],
-    childNodes: [],
-  };
+  // The bug this guarded (round 1): the two handlers wrote different key
+  // CASINGS, so `handleGetObjectNodeFromCache` found nothing either wrote.
+  // The bug found in round 2's re-review: fixed the casing but then dropped
+  // `TECH_NAME`/`OBJECT_URI` entirely rather than reading them — `ourUtils`'s
+  // `node` reading (`nodeLevel`, `packageWalk.ts`) carries both; they were
+  // never traded away, only the description was added. `nodeLevel` fed real
+  // bytes here (`read-object-tree-structure--05-nodestructure`, a function
+  // group) rather than a hand-built level, because it is the one captured
+  // fixture where the technical name genuinely differs from the object name
+  // — `ZMCP_SHR_FGRP` / `SAPLZMCP_SHR_FGRP` — the exact case a fabricated or
+  // absent `TECH_NAME` cannot round-trip.
+  const level = nodeLevel({
+    data: corpusBody('read-object-tree-structure--05-nodestructure'),
+  });
+  // Read straight from the fixture body, NOT off `level.objects` — deriving
+  // the expected URI from the same `nodeLevel()` call under test would make
+  // a regression that drops `uri` invisible (both sides go `undefined`
+  // together). Verified: reverted this to `level.objects.find(...).uri` and
+  // separately deleted `nodeLevel`'s `uri` field — the test still passed.
+  const FUGR_URI = '/sap/bc/adt/functions/groups/zmcp_shr_fgrp';
 
-  it('write compatible row shapes for the same underlying object', async () => {
+  it('write compatible row shapes, TECH_NAME and OBJECT_URI included, for the same underlying object', async () => {
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => okResponse(level),
     });
 
     await handleGetObjectsByType(context as any, {
-      parent_name: 'ZPROG',
-      parent_tech_name: 'ZPROG',
-      parent_type: 'PROG/P',
-      node_id: '31',
+      parent_name: 'ZMCP_SHR_PKG',
+      parent_tech_name: 'ZMCP_SHR_PKG',
+      parent_type: 'DEVC/K',
+      node_id: '28',
     });
-    const byTypeRow = objectsListCache.getCache().objects[0];
+    const byTypeRow = objectsListCache
+      .getCache()
+      .objects.find((o: any) => o.OBJECT_NAME === 'ZMCP_SHR_FGRP');
 
     await handleGetObjectsList(context as any, {
-      parent_name: 'ZPROG',
-      parent_tech_name: 'ZPROG',
-      parent_type: 'PROG/P',
+      parent_name: 'ZMCP_SHR_PKG',
+      parent_tech_name: 'ZMCP_SHR_PKG',
+      parent_type: 'DEVC/K',
     });
-    const listRow = objectsListCache.getCache().objects[0];
+    const listRow = objectsListCache
+      .getCache()
+      .objects.find((o: any) => o.OBJECT_NAME === 'ZMCP_SHR_FGRP');
 
-    expect(Object.keys(byTypeRow).sort()).toEqual([
-      'OBJECT_NAME',
-      'OBJECT_TYPE',
-    ]);
-    expect(Object.keys(listRow).sort()).toEqual(['OBJECT_NAME', 'OBJECT_TYPE']);
-    expect(byTypeRow).toEqual({ OBJECT_TYPE: 'PROG/I', OBJECT_NAME: 'ZINCL1' });
-    expect(listRow).toEqual({ OBJECT_TYPE: 'PROG/I', OBJECT_NAME: 'ZINCL1' });
+    const expected = {
+      OBJECT_TYPE: 'FUGR/F',
+      OBJECT_NAME: 'ZMCP_SHR_FGRP',
+      TECH_NAME: 'SAPLZMCP_SHR_FGRP',
+      OBJECT_URI: FUGR_URI,
+    };
+    expect(byTypeRow).toEqual(expected);
+    expect(listRow).toEqual(expected);
   });
 
-  it('GetObjectNodeFromCache reads a row either handler wrote, and fails honestly rather than matching a wrong TECH_NAME', async () => {
+  it('GetObjectNodeFromCache finds a row either handler wrote, by its real technical name', async () => {
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => okResponse(level),
     });
-    await handleGetObjectsByType(context as any, {
-      parent_name: 'ZPROG',
-      parent_tech_name: 'ZPROG',
-      parent_type: 'PROG/P',
-      node_id: '31',
+    await handleGetObjectsList(context as any, {
+      parent_name: 'ZMCP_SHR_PKG',
+      parent_tech_name: 'ZMCP_SHR_PKG',
+      parent_type: 'DEVC/K',
     });
 
-    // No TECH_NAME reaches the cache (the shared node reading never carries
-    // one — see the note in `handleGetObjectsByType.ts`), so a lookup that
-    // requires one — `handleGetObjectNodeFromCache`'s own contract, unchanged
-    // by this task — cannot match. Honest absence, not a wrong match: this
-    // is the OBJECT_URI-style gap recorded for a later task, not silently
-    // worked around here with a fabricated value.
-    const result: any = await handleGetObjectNodeFromCache(context as any, {
-      object_type: 'PROG/I',
-      object_name: 'ZINCL1',
-      tech_name: 'ZINCL1',
-    });
+    const lookupContext = {
+      connection: { makeAdtRequest: async () => ({ data: 'stub' }) } as any,
+      logger: undefined,
+    };
+    const result: any = await handleGetObjectNodeFromCache(
+      lookupContext as any,
+      {
+        object_type: 'FUGR/F',
+        object_name: 'ZMCP_SHR_FGRP',
+        tech_name: 'SAPLZMCP_SHR_FGRP',
+      },
+    );
 
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toBe('Node not found in cache');
+    expect(result.content[0].type).toBe('json');
+    expect(result.content[0].json.OBJECT_TYPE).toBe('FUGR/F');
+    expect(result.content[0].json.OBJECT_NAME).toBe('ZMCP_SHR_FGRP');
+    expect(result.content[0].json.OBJECT_URI).toBe(FUGR_URI);
   });
 });
 

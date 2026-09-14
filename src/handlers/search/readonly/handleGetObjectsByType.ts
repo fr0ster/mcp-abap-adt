@@ -46,23 +46,16 @@ import { return_error } from '../../../lib/utils';
  * migration, built off `ourUtils.node` (`nodeLevel`) instead of a hand-rolled
  * regex over the raw node-structure XML.
  *
- * **`tech_name` and `uri` are gone.** The shipped `nodeContents` reading
- * carries `techName`/`objectUri` (see `IRepositoryObjectNode` in
- * `@mcp-abap-adt/interfaces`), but `ourUtils` deliberately keeps its OWN
- * `node` reading instead (`resultSets.ts`: "ourUtils... keeps our own node
- * reading") — `nodeLevel` in `packageWalk.ts`, which trades `techName`/`uri`
- * for `description`, and is the one every node-structure caller in this
- * migration is told to reuse rather than re-derive. `TECH_NAME` is therefore
- * left off the cached rows rather than defaulted to the object name: a
- * fabricated value would be wrong for precisely the objects a caller passes
- * a technical name to find (an include or a function module whose technical
- * name differs from its display name), and a lookup that needs it should
- * fail honestly rather than match on a wrong one. `format: 'raw'` is
- * consequently unserved too: there is no raw XML behind `NodeLevel`, only
- * `objects`/`childNodes`. See this task's report for the cross-file
- * consequence: `handleGetObjectNodeFromCache` (untouched by this task) reads
- * `OBJECT_URI` back out of this tool's cached output to make a follow-up
- * request, and will find none.
+ * `ourUtils` deliberately keeps its OWN `node` reading (`resultSets.ts`:
+ * "ourUtils... keeps our own node reading") — `nodeLevel` in
+ * `packageWalk.ts` — rather than the shipped `nodeContents`, but that
+ * reading carries `techName`/`uri` too (added the description; never traded
+ * either away — see that file's own doc), so the cached rows below carry
+ * `TECH_NAME`/`OBJECT_URI` from it, matching `IRepositoryObjectNode`'s field
+ * set. `format: 'raw'` stays unserved: there is no raw XML behind
+ * `NodeLevel`, only `objects`/`childNodes`, and restoring it needs a reading
+ * that carries the document itself, not more fields — deferred, not
+ * attempted here.
  */
 function formatObjects(
   level: NodeLevel,
@@ -74,6 +67,8 @@ function formatObjects(
   const cached = objects.map((o) => ({
     OBJECT_TYPE: o.type,
     OBJECT_NAME: o.name,
+    ...(o.techName ? { TECH_NAME: o.techName } : {}),
+    ...(o.uri ? { OBJECT_URI: o.uri } : {}),
   }));
 
   if (objects.length === 0) {

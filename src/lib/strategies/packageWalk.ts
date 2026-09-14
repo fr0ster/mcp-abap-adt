@@ -22,10 +22,25 @@ export interface NodeStructureSource {
  * The shipped `nodeContents` answers `objectType`, `objectName`, `techName` and
  * `objectUri` — and no description. A package listing shows descriptions, so
  * this repository supplies its own reading of the same one answer. That is the
- * injection point working as intended: one request, one reading, ours.
+ * injection point working as intended: one request, one reading, ours — but
+ * the trade was ADDING the description, never dropping `techName`/`objectUri`
+ * (a mistake this file shipped with and task 12 then perpetuated in two
+ * handlers before it was caught in review; see the task's own report). Every
+ * `SEU_ADT_REPOSITORY_OBJ_NODE` in all seven captured `read-object-tree-
+ * structure` fixtures under `tests/fixtures/adt/` carries both `TECH_NAME`
+ * and `OBJECT_URI` — fixture 05's function group is the one that actually
+ * exercises the distinction (`OBJECT_NAME: ZMCP_SHR_FGRP`,
+ * `TECH_NAME: SAPLZMCP_SHR_FGRP`) — so both are read here, from the same
+ * element `name`/`type`/`description` already come from.
  */
 export interface NodeLevel {
-  objects: Array<{ name: string; type: string; description?: string }>;
+  objects: Array<{
+    name: string;
+    type: string;
+    description?: string;
+    techName?: string;
+    uri?: string;
+  }>;
   childNodes: Array<{ type: string; nodeId: string }>;
 }
 
@@ -39,6 +54,8 @@ export function nodeLevel(answer: unknown): NodeLevel {
         name: textOf(n?.OBJECT_NAME),
         type: textOf(n?.OBJECT_TYPE),
         description: textOf(n?.DESCRIPTION) || undefined,
+        techName: textOf(n?.TECH_NAME) || undefined,
+        uri: textOf(n?.OBJECT_URI) || undefined,
       }))
       .filter((o) => o.name),
     childNodes: asArray(data?.OBJECT_TYPES?.SEU_ADT_OBJECT_TYPE_INFO)

@@ -1,5 +1,6 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { return_answer } from '../../lib/answer';
+import { corpusBody } from '../../lib/adtCorpus';
+import { answer, return_answer } from '../../lib/answer';
 
 function failure(
   error: Partial<IAdtError> & { messages?: unknown },
@@ -118,23 +119,26 @@ describe('return_answer — failure', () => {
     expect(JSON.parse(result.content[0].text).response).toBeUndefined();
   });
 
-  it('includes raw_body only at detail raw and only for a string body', () => {
+  it('includes raw_body for a string body, at every detail', () => {
+    // Changed deliberately. This used to assert that `terse` omitted the body,
+    // which made `detail` the only way to reach the document SAP refused with
+    // — and a tool that declares no `detail` could then never reach it at all.
+    // `detail` shapes the result projection; a failure is not a projection.
     const error = {
       message: 'boom',
       origin: 'refusal' as const,
       response: { data: '<exc:exception/>' } as never,
     };
-    const raw = return_answer(failure(error), project, {
-      tool: 'GetClass',
-      detail: 'raw',
-    });
-    expect(JSON.parse(raw.content[0].text).raw_body).toBe('<exc:exception/>');
 
-    const terse = return_answer(failure(error), project, {
-      tool: 'GetClass',
-      detail: 'terse',
-    });
-    expect(JSON.parse(terse.content[0].text).raw_body).toBeUndefined();
+    for (const detail of ['terse', 'full', 'raw'] as const) {
+      const result = return_answer(failure(error), project, {
+        tool: 'GetClass',
+        detail,
+      });
+      expect(JSON.parse(result.content[0].text).raw_body).toBe(
+        '<exc:exception/>',
+      );
+    }
 
     const parsed = return_answer(
       failure({
@@ -201,5 +205,110 @@ describe('return_answer — failure', () => {
     // key no system knows.
     expect(typeof first.t100.no).toBe('string');
     expect(first.t100.no).toBe('026');
+  });
+});
+
+describe('the failure payload carries everything it has', () => {
+  const document = corpusBody('refusal-object-not-found--01-read-source');
+
+  it.each([
+    'terse',
+    'full',
+    'raw',
+  ] as const)('carries raw_body at detail=%s', (detail) => {
+    // `detail` is a parameter of the RESULT projection, and a failure is not
+    // a projection: on this path the consumer wants everything.
+    const result = return_answer(
+      failure({
+        message: 'Not found',
+        origin: 'refusal',
+        response: { data: document },
+      } as never),
+      project,
+      { tool: 'ReadClass', detail },
+    );
+    expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
+  });
+
+  it.each([
+    ['a connection failure', {}],
+    ['an empty answer', { response: { data: '' } }],
+    ['a parsed body', { response: { data: { a: 1 } } }],
+  ])('leaves raw_body absent for %s', (_name, extra) => {
+    // The empty string is not a document: emitting `raw_body: ""` would read as
+    // "SAP sent an empty body" when nothing was sent at all.
+    const result = return_answer(
+      failure({ message: 'Nope', origin: 'refusal', ...extra } as never),
+      project,
+      { tool: 'ReadClass', detail: 'raw' },
+    );
+    expect('raw_body' in JSON.parse(result.content[0].text)).toBe(false);
+  });
+
+  it('carries cleanup, narrowed, on a refusal', () => {
+    const SECRET = 'Bearer eyJhbGciOiJIUzI1NiJ9.tolkien';
+    const result = return_answer(
+      failure({
+        message: 'Update refused',
+        origin: 'refusal',
+        cleanup: {
+          message: 'Unlock refused',
+          origin: 'refusal',
+          request: {
+            method: 'POST',
+            url: '/u',
+            headers: { authorization: SECRET },
+          },
+        },
+      } as never),
+      project,
+      { tool: 'UpdateDomain', detail: 'terse' },
+    );
+    expect(result.content[0].text).not.toContain(SECRET);
+    expect(JSON.parse(result.content[0].text).cleanup).toEqual({
+      message: 'Unlock refused',
+      origin: 'refusal',
+      request: { method: 'POST', url: '/u' },
+    });
+  });
+
+  it('carries operation on a refusal that succeeded under a failed release', () => {
+    const result = return_answer(
+      failure({
+        message: 'Unlock refused',
+        origin: 'refusal',
+        operation: 'succeeded',
+      } as never),
+      project,
+      { tool: 'UpdateDomain', detail: 'terse' },
+    );
+    expect(JSON.parse(result.content[0].text).operation).toBe('succeeded');
+  });
+
+  it('carries cleanup and operation on the client_threw payload', async () => {
+    // The only report a caller gets when the write landed and the unlock threw.
+    const thrown = Object.assign(new Error('unlock called with no handle'), {
+      operation: 'succeeded',
+      cleanup: {
+        error: 'client_threw',
+        message: 'unlock called with no handle',
+      },
+    });
+    const result = await answer(
+      { tool: 'UpdateDomain', detail: 'terse' },
+      async () => {
+        throw thrown;
+      },
+      project,
+    );
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toBe('client_threw');
+    expect(payload.operation).toBe('succeeded');
+    expect(payload.cleanup).toEqual({
+      error: 'client_threw',
+      message: 'unlock called with no handle',
+    });
+    // A local defect borrows no AdtFailureOrigin.
+    expect(payload.origin).toBeUndefined();
   });
 });

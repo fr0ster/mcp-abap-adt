@@ -111,22 +111,21 @@ describe('a real refusal, read and then answered', () => {
     expect(payload.messages[0].text).toContain('already editing');
   });
 
-  it('gives the document back at detail raw, and only there', () => {
+  it('gives the document back at every detail, not only raw', () => {
+    // The real refusal document, character for character, whatever `detail`
+    // the caller asked for. `detail` selects between the layers of a reading
+    // on the SUCCESS path; on this one the consumer wants everything, and a
+    // tool that declares no `detail` must still be able to see what SAP sent.
     const name = 'refusal-activation-fails--01-activation';
-    const raw = JSON.parse(
-      return_answer(failureFrom(name), (v) => v, {
-        tool: 'ActivateClass',
-        detail: 'raw',
-      }).content[0].text,
-    );
-    expect(raw.raw_body).toBe(corpusBody(name));
 
-    const terse = JSON.parse(
-      return_answer(failureFrom(name), (v) => v, {
-        tool: 'ActivateClass',
-        detail: 'terse',
-      }).content[0].text,
-    );
-    expect(terse.raw_body).toBeUndefined();
+    for (const detail of ['terse', 'full', 'raw'] as const) {
+      const payload = JSON.parse(
+        return_answer(failureFrom(name), (v) => v, {
+          tool: 'ActivateClass',
+          detail,
+        }).content[0].text,
+      );
+      expect(payload.raw_body).toBe(corpusBody(name));
+    }
   });
 });

@@ -71,6 +71,7 @@ import { handleUpdateClass } from '../../handlers/class/low/handleUpdateClass';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
 import { handleActivateDdl } from '../../handlers/ddl/low/handleActivateDdl';
 import { handleCheckDdl } from '../../handlers/ddl/low/handleCheckDdl';
+import { handleCreateDdl } from '../../handlers/ddl/low/handleCreateDdl';
 import { handleDeleteDdl } from '../../handlers/ddl/low/handleDeleteDdl';
 import {
   handleLockDdl,
@@ -811,6 +812,25 @@ describe('ddl', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
+  it('CreateDdlLow reaches getDdl with analyseException, forwarding no source (createDdl never reads one)', async () => {
+    await handleCreateDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getDdl');
+    expect(call?.args[0]).toEqual({
+      ddlName: 'ZVW_X',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
   it('LockDdlLow passes no analyse and carries no detail parameter', async () => {
     await handleLockDdl(context as any, { ddl_name: 'ZVW_X' });
     const call = callTo('lock');
@@ -864,6 +884,21 @@ describe('ddl', () => {
     expect('detail' in UnlockDdlToolDefinition.inputSchema.properties).toBe(
       false,
     );
+  });
+
+  it('ValidateDdlLow passes packageName through to the validate member — validateDdlName reads it, so dropping it here would be a live regression', async () => {
+    await handleValidateDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      package_name: 'zp',
+      description: 'x',
+    });
+    const call = callTo('validate');
+    expect(call?.factory).toBe('getDdl');
+    expect(call?.args[0]).toEqual({
+      ddlName: 'ZVW_X',
+      description: 'x',
+      packageName: 'ZP',
+    });
   });
 
   it('ValidateDdlLow reads a real corpus document (ddl-specific fixture) through terseValidation', async () => {

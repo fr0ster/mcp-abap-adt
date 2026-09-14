@@ -3048,7 +3048,7 @@ first, not discovered while implementing.
 
 **Files:**
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
-- Create: `src/__tests__/unit/runtimeProfiling.test.ts`
+- Create: `src/__tests__/unit/runtimeProfiling.test.ts`, `src/lib/strategies/runProjections.ts`
 - Create, if Step 1 chose the first option: `src/lib/strategies/newTrace.ts` and `src/__tests__/unit/newTrace.test.ts`
 - Modify, if Step 1 chose the first option: `src/lib/strategies/sequence.ts` — export the one-line `IAdtResponse` builder `pair()` already has, rather than writing a third copy of it
 - Modify, if Step 1 chose the third option: the two tool definitions and `tests/fixtures/tools/surface.json`
@@ -3104,6 +3104,32 @@ const handlers = [
   ['RuntimeRunClass', handleRuntimeRunClass, { class_name: 'ZCL_X', profile: true }],
   ['RuntimeRunClassWithProfiling', handleRuntimeRunClassWithProfiling, { class_name: 'ZCL_X' }],
 ] as const;
+
+// `RuntimeRunClass` has TWO branches and only one of them profiles. Without
+// this, a migration that routes every run through the profiler workflow passes
+// every other test in this file — they all pass `profile: true`.
+it('RuntimeRunClass without profile runs the class and touches no profiler', async () => {
+  const run = jest.fn(async () => okResponse(reading('output')));
+  const schedule = jest.fn();
+  const withProfiler = jest.fn();
+  const list = jest.fn();
+  classExecutor = { run, scheduleTrace: schedule, runWithProfiler: withProfiler };
+  profiler = { list };
+
+  const result: any = await handleRuntimeRunClass(context as any, {
+    class_name: 'ZCL_X', profile: false,
+  });
+
+  expect(run).toHaveBeenCalledTimes(1);
+  expect(schedule).not.toHaveBeenCalled();
+  expect(withProfiler).not.toHaveBeenCalled();
+  // Not even the snapshot: a plain run must not read the profiler feed, and
+  // must not construct AdtRuntimeClient at all.
+  expect(list).not.toHaveBeenCalled();
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.output).toBe('output');
+  expect(payload.profile).toBeUndefined();
+});
 
 it.each(handlers)('%s passes the scheduled id to the profiler run', async (_n, handler, args) => {
   const order: string[] = [];
@@ -3267,7 +3293,15 @@ it.each([
       okResponse(reading(++seen === 1 ? [] : [{ id: COMPLETED_TRACE, recordedAt: '2026-09-14T09:00:00Z' }])),
   };
   const result: any = await (handler as any)(context as any, args);
-  const found = (at as any)(JSON.parse(result.content[0].text));
+  const payload = JSON.parse(result.content[0].text);
+  const found = (at as any)(payload);
+  // Every field this tool answers today, not only the id. A projection that
+  // keeps trace_id and drops run_status passes an id assertion and breaks the
+  // tool for anyone reading the output.
+  expect(payload.success).toBe(true);
+  expect(payload.class_name).toBe('ZCL_X');
+  expect(payload).toHaveProperty('output');
+  expect(payload).toHaveProperty('run_status');
 
   // Under option one, the id the feed search produced. Under the other two it
   // is absent, and the assertion flips with the decision Step 1 recorded —
@@ -3378,6 +3412,9 @@ option.** Snapshot the feed, run, then look for an id that was not there:
 
 ```typescript
 // src/lib/strategies/newTrace.ts
+import { compareRecordedAt } from '@mcp-abap-adt/adt-clients';
+import type { IAdtError, IAdtResponse, ITraceEntry } from '@mcp-abap-adt/interfaces';
+
 
 /**
  * The id this run produced, found by difference.
@@ -3458,12 +3495,53 @@ return answer(
 
     return succeededWith({ run: ran.getResult().value, traceId: found.getResult().value });
   },
-  project(detailOf(args), terseProfilingRun),
+  project(detailOf(args), terseClassRun),
 );
 ```
 
 `succeededWith` is the same one-line `IAdtResponse` builder `pair()` uses to
 join two values; lift it out of `sequence.ts` rather than writing a third copy.
+
+**Two projections, not one, because the two tools answer differently.** This is
+the same fact the trace-id test already parametrises on, and it reaches the
+projection too:
+
+```typescript
+// src/lib/strategies/runProjections.ts
+
+/** `RuntimeRunClass`: the profiler fields nested under `profile`. */
+export const terseClassRun: Terse<any> = (value) => ({
+  success: true,
+  class_name: value.className,
+  output: value.run?.output ?? '',
+  run_status: value.run?.status,
+  ...(value.profiled
+    ? {
+        profile: {
+          profiler_id: value.profilerId,
+          trace_id: value.traceId,
+          trace_requests_status: value.traceRequestsStatus,
+        },
+      }
+    : {}),
+});
+
+/** The deprecated `RuntimeRunClassWithProfiling`: the same fields, flat. */
+export const terseProfilingRun: Terse<any> = (value) => ({
+  success: true,
+  class_name: value.className,
+  output: value.run?.output ?? '',
+  run_status: value.run?.status,
+  profiler_id: value.profilerId,
+  trace_id: value.traceId,
+  trace_requests_status: value.traceRequestsStatus,
+});
+```
+
+Copy the field names out of each handler as it stands rather than from here —
+this is the shape, and the handler is the authority on the names. Assert **every
+field each one answers today**, not only `trace_id`: a projection that keeps the
+id and drops `run_status` passes the trace-id test and breaks the tool.
 
 Edit the tool definitions only if Step 1 said to.
 
@@ -3490,7 +3568,7 @@ Option one, find the trace on this side:
 
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
-        src/__tests__/unit/runtimeProfiling.test.ts \
+        src/__tests__/unit/runtimeProfiling.test.ts src/lib/strategies/runProjections.ts \
         src/lib/strategies/newTrace.ts src/lib/strategies/sequence.ts \
         src/__tests__/unit/newTrace.test.ts
 git status --short
@@ -3503,7 +3581,7 @@ Option two, accepted no-ops:
 
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
-        src/__tests__/unit/runtimeProfiling.test.ts
+        src/__tests__/unit/runtimeProfiling.test.ts src/lib/strategies/runProjections.ts
 git status --short
 git commit --no-verify -m "refactor(system): the class profiling handlers schedule, then run
 
@@ -3517,7 +3595,7 @@ same commit:
 
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
-        src/__tests__/unit/runtimeProfiling.test.ts \
+        src/__tests__/unit/runtimeProfiling.test.ts src/lib/strategies/runProjections.ts \
         tests/fixtures/tools/surface.json
 git status --short
 git commit --no-verify -m "refactor(system)!: the class profiling handlers schedule, then run

@@ -1,4 +1,4 @@
-import { utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { unitTestDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nodeLevel } from './packageWalk';
 import { statusOnly, structured, verbatim } from './reading';
@@ -128,3 +128,15 @@ export const ourUtils = {
   ...resultsFor(utilDocuments, ['activation']),
   node: nodeLevel,
 };
+
+/**
+ * The unit-test set, kept as shipped. `run` is kept as shipped because
+ * `runId` reads the `Location` header a started run answers with, which is
+ * not a question any of `verbatim`, `structured` or `statusOnly` can see —
+ * the same reason `ourUtils` keeps `activation`. A later task that calls
+ * `getUnitTest`/`getCdsUnitTest` imports this instead of re-deriving the
+ * exception: `getClass(resultsFor(classDocuments))`'s pattern, applied to
+ * `unitTestDocuments` without a keep-list, would silently discard the run id
+ * again.
+ */
+export const ourUnitTest = resultsFor(unitTestDocuments, ['run']);

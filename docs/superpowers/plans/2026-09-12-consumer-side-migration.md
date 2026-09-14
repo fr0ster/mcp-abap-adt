@@ -1015,7 +1015,7 @@ adt-clients 19 exports 31 shipped result sets holding 308 slots, and those 308 c
 
 **Interfaces:**
 - Consumes: `verbatim`, `structured`, `statusOnly` from `reading.ts`; `nodeLevel` from `packageWalk.ts`.
-- Produces: `READING_BY_SLOT`, `resultsFor<R>(shipped: R, keep?: ReadonlyArray<keyof R>): R`, `ourUtils`
+- Produces: `READING_BY_SLOT`, `resultsFor<R>(shipped: R, keep?: ReadonlyArray<keyof R>): R`, `ourUtils`, `ourUnitTest`
 
 **The slot-name premise has two named exceptions, found in review (round 1 of 5).** Which
 reading a slot wants is a property of the slot's name for roughly 300 of the 308 slots, and
@@ -1028,6 +1028,14 @@ named there are left exactly as the shipped set had them, at the call site, rath
 into the table. Do not reintroduce `created: statusOnly`, and do not fold `activation` or `run`
 back into the table for the sets where they read headers — see the exceptions documented on
 `READING_BY_SLOT` in `resultSets.ts` for the full evidence.
+
+**The second exception is exported, not left to memory (round 2 of 5).** `unitTestDocuments.run`
+was, for one review round, kept only at a test call site — nothing in `src` outside
+`__tests__` named it, so a later task calling `getUnitTest(resultsFor(unitTestDocuments))` the
+way Task 9 calls `getClass(resultsFor(classDocuments))` would silently reintroduce the bug on
+modern (non-legacy) systems. `ourUnitTest = resultsFor(unitTestDocuments, ['run'])` is exported
+beside `ourUtils` for exactly this reason: a later task imports it instead of re-deriving the
+exception.
 
 - [ ] **Step 1: Write the failing test**
 
@@ -1070,7 +1078,10 @@ describe('the slot table', () => {
   });
 
   it('reads a write as its status, and still carries the document', () => {
-    const reading: any = resultsFor(classDocuments).created({ data: '', status: 200 } as any);
+    // `created` moved to `verbatim` in review round 1 — `updated` is the slot
+    // that is still genuinely `statusOnly`, and the corpus backs it: every
+    // write fixture is a zero-byte 200.
+    const reading: any = resultsFor(classDocuments).updated({ data: '', status: 200 } as any);
     expect(reading.value).toBeUndefined();
     expect(reading.status).toBe(200);
     expect(reading.raw).toBe('');
@@ -1098,7 +1109,7 @@ Expected: FAIL — cannot find module `resultSets`.
 
 ```typescript
 // src/lib/strategies/resultSets.ts
-import { utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { unitTestDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nodeLevel } from './packageWalk';
 import { statusOnly, structured, verbatim } from './reading';
@@ -1112,9 +1123,10 @@ import { statusOnly, structured, verbatim } from './reading';
  *    never parsed it.
  *  - **named fields are promised** → `structured`. A check's messages, an
  *    activation's verdict, a deletion's `isDeleted`, a validation's verdict.
- *  - **there is no body** → `statusOnly`. A create answers 200 with zero bytes,
- *    and so does a successful write. It still carries `raw` and `status`, so
- *    `detail: 'raw'` is answerable and `terseWrite` has a status to read.
+ *  - **there is no body** → `statusOnly`. A successful write answers 200 with
+ *    zero bytes. It still carries `raw` and `status`, so `detail: 'raw'` is
+ *    answerable and `terseWrite` has a status to read. (`created` is
+ *    `verbatim`, not this — see the exceptions paragraph above.)
  */
 export const READING_BY_SLOT: Record<string, IResultStrategy<unknown>> = {
   source: verbatim, sourceDocument: verbatim, metadata: verbatim,
@@ -1167,6 +1179,15 @@ export const ourUtils = {
   ...resultsFor(utilDocuments, ['activation']),
   node: nodeLevel,
 };
+
+/**
+ * The unit-test set, kept as shipped. `run` is kept as shipped because
+ * `runId` reads the `Location` header a started run answers with, which is
+ * not a question any of `verbatim`, `structured` or `statusOnly` can see —
+ * the same reason `ourUtils` keeps `activation`. A later task imports this
+ * instead of re-deriving the exception.
+ */
+export const ourUnitTest = resultsFor(unitTestDocuments, ['run']);
 ```
 
 - [ ] **Step 4: Run the tests**

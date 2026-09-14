@@ -8,6 +8,7 @@ import {
 } from '@mcp-abap-adt/adt-clients';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
+  ourUnitTest,
   ourUtils,
   READING_BY_SLOT,
   resultsFor,
@@ -92,6 +93,7 @@ describe('the slot table', () => {
       utilDocuments.activation,
     );
     expect(ourUtils.activation).toBe(utilDocuments.activation);
+    expect(ourUnitTest.run).toBe(unitTestDocuments.run);
   });
 
   it('reads the unit-test run id out of the Location header, not the empty body', () => {
@@ -102,7 +104,10 @@ describe('the slot table', () => {
       status: sidecar.response.status,
       headers: sidecar.response.headers,
     };
-    const reading = resultsFor(unitTestDocuments, ['run']).run(wire as any);
+    // Through `ourUnitTest`, not an inline `resultsFor(...)` call — this is
+    // the set a later task actually imports, so this is what the fixture
+    // has to exercise.
+    const reading = ourUnitTest.run(wire as any);
     expect(reading).toBe('FA53C505DD7B1FD1ABB8599833A05D44');
   });
 

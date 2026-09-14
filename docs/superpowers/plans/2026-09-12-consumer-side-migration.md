@@ -3086,6 +3086,7 @@ edits the tool definitions and whether the feed search is written at all.
 
 ```typescript
 // src/__tests__/unit/runtimeProfiling.test.ts
+import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
 // The answer Step 1 recorded. Written once, here, so the assertions below

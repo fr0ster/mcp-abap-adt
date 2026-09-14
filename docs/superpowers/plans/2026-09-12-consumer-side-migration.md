@@ -3030,6 +3030,18 @@ difference against the snapshot, never by position. And:
 `src/__tests__/helpers/traceHelpers.ts` in adt-clients is the worked example the
 reference points at. Read it before writing the loop.
 
+**Two output fields cannot survive any option, and that is a third decision.**
+`run_status` and `trace_requests_status` come from the transport envelope, and
+19 does not expose it to a caller: `ClassExecutor` takes no result strategy in
+its constructor, `run` and `runWithProfiler` answer `IAdtResponse<string>`, and
+`IAdtResult<T>` is `{ readonly value: T }` — one field, deliberately. There is
+nowhere to read a status from.
+
+So both fields are lost whatever Step 1 decides about the polling parameters.
+Say so in the release note and in the tool descriptions; do not leave them in a
+projection reading `undefined`, which is how a tool ends up answering
+`"run_status": null` forever.
+
 **`trace_lookup_uris` does not survive even option one, and that needs its own
 answer.** `IProfilerListOptions` is `{ user?: string }` — the whole interface —
 so there is nowhere to put a URI. Two ways out, and the first is preferred:
@@ -3115,6 +3127,10 @@ it('RuntimeRunClass without profile runs the class and touches no profiler', asy
   const list = jest.fn();
   classExecutor = { run, scheduleTrace: schedule, runWithProfiler: withProfiler };
   profiler = { list };
+  // The mocked constructor itself, so "does not construct AdtRuntimeClient" is
+  // asserted rather than approximated by "did not call list()". A handler that
+  // builds the client and asks it nothing passes the weaker check.
+  (AdtRuntimeClient as unknown as jest.Mock).mockClear();
 
   const result: any = await handleRuntimeRunClass(context as any, {
     class_name: 'ZCL_X', profile: false,
@@ -3126,6 +3142,7 @@ it('RuntimeRunClass without profile runs the class and touches no profiler', asy
   // Not even the snapshot: a plain run must not read the profiler feed, and
   // must not construct AdtRuntimeClient at all.
   expect(list).not.toHaveBeenCalled();
+  expect(AdtRuntimeClient as unknown as jest.Mock).not.toHaveBeenCalled();
   const payload = JSON.parse(result.content[0].text);
   expect(payload.output).toBe('output');
   expect(payload.profile).toBeUndefined();
@@ -3295,13 +3312,15 @@ it.each([
   const result: any = await (handler as any)(context as any, args);
   const payload = JSON.parse(result.content[0].text);
   const found = (at as any)(payload);
-  // Every field this tool answers today, not only the id. A projection that
-  // keeps trace_id and drops run_status passes an id assertion and breaks the
-  // tool for anyone reading the output.
+  // Each tool's own shape, not a shared one: `RuntimeRunClass` answers
+  // `output`, and the deprecated handler does not and must not start to.
   expect(payload.success).toBe(true);
   expect(payload.class_name).toBe('ZCL_X');
-  expect(payload).toHaveProperty('output');
-  expect(payload).toHaveProperty('run_status');
+  expect('output' in payload).toBe(_n === 'RuntimeRunClass');
+  // `run_status` and `trace_requests_status` are gone on both — the status is
+  // not in the 19 contract. Absent, not null.
+  expect('run_status' in payload).toBe(false);
+  expect('trace_requests_status' in payload).toBe(false);
 
   // Under option one, the id the feed search produced. Under the other two it
   // is absent, and the assertion flips with the decision Step 1 recorded —
@@ -3479,9 +3498,15 @@ return answer(
     const before = new Set(snapshot.getResult().value.map((entry) => entry.id));
 
     // 2. schedule, then run — the same two calls as the program handlers.
+    // `sequence` hands the id to the next step and then forgets it, so capture
+    // it on the way through — the projection needs it and cannot reach back.
+    let profilerId = '';
     const ran = await sequence(
       () => executor.scheduleTrace(profilerParameters),
-      (profilerId) => executor.runWithProfiler(target, { profilerId }),
+      (id: string) => {
+        profilerId = id;
+        return executor.runWithProfiler(target, { profilerId: id });
+      },
     );
     if (!ran.ok) return ran;
 
@@ -3493,7 +3518,15 @@ return answer(
     });
     if (!found.ok) return found;
 
-    return succeededWith({ run: ran.getResult().value, traceId: found.getResult().value });
+    // The WHOLE value the projection reads, built here. A projection cannot
+    // reach the class name, which came from `args`, nor the profiler request
+    // id, which `sequence` consumed on its way through.
+    return succeededWith({
+      className,
+      output: ran.getResult().value,
+      profilerId,          // captured from the schedule step, see below
+      traceId: found.getResult().value,
+    });
   },
   project(detailOf(args), terseClassRun),
 );
@@ -3509,32 +3542,32 @@ projection too:
 ```typescript
 // src/lib/strategies/runProjections.ts
 
-/** `RuntimeRunClass`: the profiler fields nested under `profile`. */
+/**
+ * `RuntimeRunClass`: profiler fields nested under `profile`, and `output` at the
+ * top whether or not it profiled.
+ *
+ * `run_status` is gone and cannot come back — see the decision above. Do not add
+ * it reading `undefined`.
+ */
 export const terseClassRun: Terse<any> = (value) => ({
   success: true,
   class_name: value.className,
-  output: value.run?.output ?? '',
-  run_status: value.run?.status,
-  ...(value.profiled
-    ? {
-        profile: {
-          profiler_id: value.profilerId,
-          trace_id: value.traceId,
-          trace_requests_status: value.traceRequestsStatus,
-        },
-      }
+  output: value.output ?? '',
+  ...(value.traceId !== undefined || value.profilerId
+    ? { profile: { profiler_id: value.profilerId, trace_id: value.traceId } }
     : {}),
 });
 
-/** The deprecated `RuntimeRunClassWithProfiling`: the same fields, flat. */
+/**
+ * The deprecated `RuntimeRunClassWithProfiling`: the profiler fields flat, and
+ * **no `output`** — this tool does not answer one today, and this work does not
+ * add fields to a deprecated tool.
+ */
 export const terseProfilingRun: Terse<any> = (value) => ({
   success: true,
   class_name: value.className,
-  output: value.run?.output ?? '',
-  run_status: value.run?.status,
   profiler_id: value.profilerId,
   trace_id: value.traceId,
-  trace_requests_status: value.traceRequestsStatus,
 });
 ```
 

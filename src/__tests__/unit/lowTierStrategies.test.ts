@@ -18,11 +18,15 @@
 import {
   analyseActivation,
   analyseDeletion,
+  analyseException,
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
 import { handleValidateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
+import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/low/handleCreateBehaviorImplementation';
+import { handleLockBehaviorImplementation } from '../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
+import { handleValidateBehaviorImplementation } from '../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { handleActivateClass } from '../../handlers/class/low/handleActivateClass';
 import { handleActivateClassTestClasses } from '../../handlers/class/low/handleActivateClassTestClasses';
 import { handleDeleteClass } from '../../handlers/class/low/handleDeleteClass';
@@ -135,5 +139,46 @@ describe('class — the test-classes trio shares getClass(), not a family of its
     expect(unlockCall?.carriedAnalyse).toBe(false);
     expect(unlockCall?.analyse).toBeUndefined();
     expect(unlockCall?.factory).toBe('getClass');
+  });
+});
+
+describe('behavior_implementation — declared over the class document set', () => {
+  // behavior_implementation has no Activate/Delete tool, so it cannot join
+  // the it.each row above: Create, Lock and Validate are its only low-tier
+  // operations. The ruling this task carries forward: behavior_implementation
+  // and class share an identical result-set shape (both
+  // `resultsFor(classDocuments)`) and the same config key (`className`), so a
+  // handler that reached `getClass` instead of `getBehaviorImplementation`
+  // would be invisible to every reading and every projection — only the
+  // factory name proves which one ran.
+  it('Create, Lock and Validate all reach getBehaviorImplementation, never getClass', async () => {
+    await handleCreateBehaviorImplementation(context as any, {
+      class_name: 'ZBP_X',
+      behavior_definition: 'ZI_X',
+      description: 'x',
+      package_name: 'ZP',
+    });
+    const createCall = seen.calls.at(-1);
+    expect(createCall?.factory).toBe('getBehaviorImplementation');
+    expect(createCall?.carriedAnalyse).toBe(true);
+    expect(createCall?.analyse).toBe(analyseException);
+
+    await handleLockBehaviorImplementation(context as any, {
+      class_name: 'ZBP_X',
+    });
+    const lockCall = seen.calls.filter((c) => c.member === 'lock').at(-1);
+    expect(lockCall?.factory).toBe('getBehaviorImplementation');
+    expect(lockCall?.carriedAnalyse).toBe(false);
+
+    await handleValidateBehaviorImplementation(context as any, {
+      class_name: 'ZBP_X',
+      behavior_definition: 'ZI_X',
+      package_name: 'ZP',
+      description: 'x',
+    });
+    const validateCall = seen.calls.at(-1);
+    expect(validateCall?.factory).toBe('getBehaviorImplementation');
+    expect(validateCall?.carriedAnalyse).toBe(true);
+    expect(validateCall?.analyse).toBe(analyseValidation);
   });
 });

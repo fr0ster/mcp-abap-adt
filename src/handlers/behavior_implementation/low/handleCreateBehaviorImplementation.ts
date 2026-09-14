@@ -11,34 +11,40 @@
  * both answer identically-shaped readings, and only the factory name tells
  * the two families apart on the wire (see the low-tier strategy test).
  *
- * **`implementation_code` no longer reaches this call.** v19's `create()` is
- * typed `Omit<IBehaviorImplementationConfig, 'sourceCode'> & { sourceCode?:
- * never }` — the class is created plain, because the implementations
+ * **`implementation_code` cannot reach `create()` itself.** v19's `create()`
+ * is typed `Omit<IBehaviorImplementationConfig, 'sourceCode'> & {sourceCode?:
+ * never}` — the class is created plain, because the implementations
  * include's `FOR BEHAVIOR OF` clause cannot be written until the class shell
- * exists. This is a real removal, not an oversight this migration is
- * papering over: a caller who needs the include written now locks the class
- * (`LockBehaviorImplementationLow`) and writes both sources through the
- * high-level `UpdateBehaviorImplementation`, which is what already does the
- * two-source write `AdtBehaviorImplementation.update()` describes. The
- * parameter stays on this tool's surface (removing it would be a surface
- * change beyond the one this migration is allowed), but it is now inert here.
+ * exists. But this repository's own invariant (`create()` = shell, `update()`
+ * writes the body — see `project_create_shell_update_writes_body`, the fix for
+ * the ServiceDefinition empty-body bug) still applies: a caller who passed a
+ * body expects it written, not silently discarded. So when `implementation_code`
+ * is given, this locks the class it just created, writes it through `update()`
+ * (which writes both the main source's `FOR BEHAVIOR OF` clause and the
+ * implementations include, per `AdtBehaviorImplementation.update()`'s own doc
+ * comment), and unlocks on every path out via `withLock` — never a bare
+ * `sequence`, because a refused or throwing `update()` must not leave the
+ * object locked.
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementationLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Create a new ABAP behavior implementation class (shell only — no source). - use CreateBehaviorImplementation (high-level) for the full workflow with validation, lock, update, unlock, and activate. implementation_code is ignored here: v19 cannot create a behavior implementation with a body in one call; use LockBehaviorImplementation and the high-level UpdateBehaviorImplementation to write it.',
+    '[low-level] Create a new ABAP behavior implementation class. With implementation_code, also locks, writes it (main source plus the implementations include), and unlocks. - use CreateBehaviorImplementation (high-level) for additional validation.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -67,7 +73,7 @@ export const TOOL_DEFINITION = {
       implementation_code: {
         type: 'string',
         description:
-          'Ignored. v19 creates the class shell only — the implementations include cannot be written before the class exists. Use LockBehaviorImplementation, then the high-level UpdateBehaviorImplementation, to write it.',
+          'Implementation code for the implementations include (optional). When given, the class is locked, the code is written (with the FOR BEHAVIOR OF main source), and unlocked, right after creation.',
       },
       session_id: {
         type: 'string',
@@ -122,6 +128,7 @@ export async function handleCreateBehaviorImplementation(
     description,
     package_name,
     transport_request,
+    implementation_code,
     session_id,
     session_state,
   } = args;
@@ -144,19 +151,38 @@ export async function handleCreateBehaviorImplementation(
 
   return answer(
     { tool: 'CreateBehaviorImplementationLow', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getBehaviorImplementation(resultsFor(classDocuments))
-        .create(
-          {
-            className,
-            behaviorDefinition,
-            description,
-            packageName: package_name.toUpperCase(),
-            transportRequest: transport_request,
-          },
-          { analyse: analyseException },
-        ),
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const client = createAdtClient(
+        connection,
+        logger,
+      ).getBehaviorImplementation(resultsFor(classDocuments));
+
+      const created = await client.create(
+        {
+          className,
+          behaviorDefinition,
+          description,
+          packageName: package_name.toUpperCase(),
+          transportRequest: transport_request,
+        },
+        { analyse: analyseException },
+      );
+
+      if (!created.ok || !implementation_code) {
+        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // The body was passed; write it under a lock this call also releases.
+      return withLock(
+        () => client.lock({ className }),
+        (lockHandle) =>
+          client.update(
+            { className, behaviorDefinition, sourceCode: implementation_code },
+            { lockHandle, analyse: analyseException },
+          ),
+        (lockHandle) => client.unlock({ className }, lockHandle),
+      ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+    },
     project(detail, terseWrite),
   );
 }

@@ -1,5 +1,6 @@
 /**
  * Cluster 14: `class`, `interface`, `behavior_definition`, `behavior_implementation`.
+ * Cluster 15: `ddl`, `ddlx` (metadataExtension), `structure`, `table`.
  *
  * Task 10's per-operation table (Create/Update -> analyseException, statusOnly,
  * terseWrite; Check -> analyseCheck, structured, terseCheck; Activate ->
@@ -68,6 +69,19 @@ import {
 import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { handleUpdateClass } from '../../handlers/class/low/handleUpdateClass';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
+import { handleActivateDdl } from '../../handlers/ddl/low/handleActivateDdl';
+import { handleCheckDdl } from '../../handlers/ddl/low/handleCheckDdl';
+import { handleDeleteDdl } from '../../handlers/ddl/low/handleDeleteDdl';
+import {
+  handleLockDdl,
+  TOOL_DEFINITION as LockDdlToolDefinition,
+} from '../../handlers/ddl/low/handleLockDdl';
+import {
+  handleUnlockDdl,
+  TOOL_DEFINITION as UnlockDdlToolDefinition,
+} from '../../handlers/ddl/low/handleUnlockDdl';
+import { handleUpdateDdl } from '../../handlers/ddl/low/handleUpdateDdl';
+import { handleValidateDdl } from '../../handlers/ddl/low/handleValidateDdl';
 import { handleActivateInterface } from '../../handlers/interface/low/handleActivateInterface';
 import { handleCheckInterface } from '../../handlers/interface/low/handleCheckInterface';
 import { handleDeleteInterface } from '../../handlers/interface/low/handleDeleteInterface';
@@ -151,6 +165,19 @@ it.each([
       description: 'x',
       root_entity: 'ZI_X',
       implementation_type: 'Managed',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'ddl',
+    handleActivateDdl,
+    handleDeleteDdl,
+    handleValidateDdl,
+    'getDdl',
+    {
+      ddl_name: 'ZVW_X',
+      package_name: 'ZP',
+      description: 'x',
       lock_handle: 'h',
     },
   ],
@@ -660,5 +687,139 @@ describe('behavior_implementation — declared over the class document set', () 
 
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+});
+
+describe('ddl', () => {
+  it("CheckDdlLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_source via config.ddlSource — checkDdl reads it, unlike most sibling families in this cluster", async () => {
+    await handleCheckDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      ddl_source: 'define view ZVW_X as select from t000 {client};',
+    });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getDdl');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[0]).toEqual({
+      ddlName: 'ZVW_X',
+      ddlSource: 'define view ZVW_X as select from t000 {client};',
+    });
+    expect(call?.args[1]).toBe('inactive');
+  });
+
+  it('CheckDdlLow passes "active" through to the check member\'s second parameter when asked', async () => {
+    await handleCheckDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      version: 'active',
+    });
+    const call = callTo('check');
+    expect(call?.args[1]).toBe('active');
+  });
+
+  it('UpdateDdlLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
+    await handleUpdateDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      ddl_source: 'define view ZVW_X as select from t000 {client};',
+      lock_handle: 'h',
+    });
+    const call = callTo('update');
+    expect(call?.factory).toBe('getDdl');
+    expect(call?.args[0]).toEqual({ ddlName: 'ZVW_X' });
+    expect(call?.args[1]).toMatchObject({
+      sourceCode: 'define view ZVW_X as select from t000 {client};',
+      lockHandle: 'h',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockDdlLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockDdl(context as any, { ddl_name: 'ZVW_X' });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getDdl');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in LockDdlToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it("LockDdlLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'DDL_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.ddl_name).toBe('ZVW_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockDdlLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'DDL_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockDdl(connectionSessionContext as any, {
+      ddl_name: 'ZVW_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockDdlLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockDdl(context as any, {
+      ddl_name: 'ZVW_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getDdl');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in UnlockDdlToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it('ValidateDdlLow reads a real corpus document (ddl-specific fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody('validation-name-free-ddl--01-ddl-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateDdl(context as any, {
+      ddl_name: 'ZMCP_BLD_FREE_V1',
+      package_name: 'ZADT_BLD_PKG03',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('ActivateDdlLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateDdl(context as any, {
+      ddl_name: 'ZVW_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
   });
 });

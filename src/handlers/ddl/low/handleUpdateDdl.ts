@@ -1,18 +1,25 @@
 /**
  * UpdateDdlLow Handler - Update ABAP DDL Source
  *
- * Uses AdtClient.getDdl().update from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes through `options.sourceCode`.** Unlike `AdtInterface` or
+ * `AdtMetadataExtension`, `AdtDdl.update()`'s shipped body does keep a
+ * fallback — `const source = options?.sourceCode || config.ddlSource` — but
+ * this handler writes through `options` only, the one channel every sibling
+ * family in this cluster shares, and never puts a source string on `config`.
+ * Verified against `AdtDdl.js`, not the declaration file.
  */
 
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDdlLow',
@@ -52,6 +59,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name', 'ddl_source', 'lock_handle'],
   },
@@ -67,112 +75,42 @@ interface UpdateDdlArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateDdl MCP tool
- *
- * Uses AdtClient.getDdl().update - low-level single method call
- */
 export async function handleUpdateDdl(
   context: HandlerContext,
   args: UpdateDdlArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { ddl_name, ddl_source, lock_handle, session_id, session_state } =
-      args as UpdateDdlArgs;
+  const { ddl_name, ddl_source, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!ddl_name || !ddl_source || !lock_handle) {
-      return return_error(
-        new Error('ddl_name, ddl_source, and lock_handle are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlName = ddl_name.toUpperCase();
-
-    logger?.info(`Starting DDL source update: ${ddlName}`);
-
-    try {
-      // Update DDL source
-      const updateState = await client
-        .getDdl()
-        .update(
-          { ddlName: ddlName, ddlSource: ddl_source },
-          { lockHandle: lock_handle },
-        );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for DDL source ${ddlName}`,
-        );
-      }
-
-      // Get updated session state after update
-
-      logger?.info(`✅ UpdateDdlLow completed: ${ddlName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            ddl_name: ddlName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `DDL source ${ddlName} updated successfully. Remember to unlock using UnlockDdlLow.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DDL source ${ddlName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `DDL source ${ddlName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!ddl_name || !ddl_source || !lock_handle) {
+    return return_error(
+      new Error('ddl_name, ddl_source, and lock_handle are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlName = ddl_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateDdlLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl(resultsFor(ddlDocuments))
+        .update(
+          { ddlName },
+          {
+            sourceCode: ddl_source,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

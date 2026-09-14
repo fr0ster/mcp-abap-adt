@@ -1,18 +1,27 @@
 /**
  * CreateDdlLow Handler - Create ABAP DDL Source
  *
- * Uses AdtClient.getDdl().create from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
+ *
+ * **No source here.** `createDdl` never reads `ddl_source`: a create posts
+ * metadata, and the source is a PUT to `.../source/main` under a lock, which
+ * is `UpdateDdlLow`'s job. Verified against `AdtDdl.js`.
  */
 
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateDdlLow',
@@ -59,6 +68,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name', 'description', 'package_name'],
   },
@@ -75,120 +85,50 @@ interface CreateDdlArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateDdl MCP tool
- *
- * Uses AdtClient.getDdl().create - low-level single method call
- */
 export async function handleCreateDdl(
   context: HandlerContext,
   args: CreateDdlArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      ddl_name,
-      description,
-      package_name,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as CreateDdlArgs;
+  const {
+    ddl_name,
+    description,
+    package_name,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!ddl_name || !description || !package_name) {
-      return return_error(
-        new Error('ddl_name, description, and package_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlName = ddl_name.toUpperCase();
-
-    logger?.info(`Starting DDL source creation: ${ddlName}`);
-
-    try {
-      // Create DDL source
-      const createState = await client.getDdl().create({
-        ddlName: ddlName,
-        description,
-        packageName: package_name,
-        ddlSource: '',
-        transportRequest: transport_request,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for DDL source ${ddlName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateDdlLow completed: ${ddlName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            ddl_name: ddlName,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `DDL source ${ddlName} created successfully. Use LockDdlLow and UpdateDdlLow to add source code, then UnlockDdlLow and ActivateDdlLow.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to create DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `DDL source ${ddlName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!ddl_name || !description || !package_name) {
+    return return_error(
+      new Error('ddl_name, description, and package_name are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlName = ddl_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateDdlLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl(resultsFor(ddlDocuments))
+        .create(
+          {
+            ddlName,
+            description,
+            packageName: package_name,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

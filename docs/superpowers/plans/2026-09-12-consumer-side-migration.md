@@ -3092,7 +3092,7 @@ first, not discovered while implementing.
 - Modify: `src/handlers/system/readonly/handleRuntimeRunClass.ts`, `handleRuntimeRunClassWithProfiling.ts`
 - Create: `src/__tests__/unit/runtimeProfiling.test.ts`, `src/lib/strategies/runProjections.ts` — the two projections, the `RuntimeRunValue` they read and the one-parameter `RuntimeProjection` they are typed as, which is **not** `Terse`
 - Create, if Step 1 chose the first option: `src/lib/strategies/newTrace.ts` and `src/__tests__/unit/newTrace.test.ts`
-- Modify, if Step 1 chose the first option: `src/lib/strategies/sequence.ts` — export the one-line `IAdtResponse` builder `pair()` already has, rather than writing a third copy of it
+- Modify, **in every option**: `src/lib/strategies/sequence.ts` — export the one-line `IAdtResponse` builder `pair()` already has, rather than writing a third copy of it. All three options call `succeededWith` to join the class name with what the run answered; only the trace id is particular to the first
 - Modify, if Step 1 chose the third option: the two tool definitions and `tests/fixtures/tools/surface.json`
 
 **These two handlers are mocked differently from every other task.** They
@@ -3117,7 +3117,13 @@ edits the tool definitions and whether the feed search is written at all.
 ```typescript
 // src/__tests__/unit/runtimeProfiling.test.ts
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { handleRuntimeRunClass } from '../../handlers/system/readonly/handleRuntimeRunClass';
+import { handleRuntimeRunClassWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
+
+// A new file, so nothing is in scope from anywhere else — unlike the tasks that
+// extend an existing test.
+const context = { connection: {} as any, logger: undefined };
 
 // The answer Step 1 recorded. Written once, here, so the assertions below
 // follow the decision instead of being edited into agreement with whatever
@@ -3710,7 +3716,8 @@ Option two, accepted no-ops:
 
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
-        src/__tests__/unit/runtimeProfiling.test.ts src/lib/strategies/runProjections.ts
+        src/__tests__/unit/runtimeProfiling.test.ts src/lib/strategies/runProjections.ts \
+        src/lib/strategies/sequence.ts
 git status --short
 git commit --no-verify -m "refactor(system): the class profiling handlers schedule, then run
 
@@ -3725,7 +3732,7 @@ same commit:
 ```bash
 git add src/handlers/system/readonly/handleRuntimeRunClass*.ts \
         src/__tests__/unit/runtimeProfiling.test.ts src/lib/strategies/runProjections.ts \
-        tests/fixtures/tools/surface.json
+        src/lib/strategies/sequence.ts tests/fixtures/tools/surface.json
 git status --short
 git commit --no-verify -m "refactor(system)!: the class profiling handlers schedule, then run
 

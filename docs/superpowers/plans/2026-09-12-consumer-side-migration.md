@@ -43,7 +43,8 @@ own tests pass and it is committed — not when it is described.
 | 22. The read-modify-write families | done | `c6bc755` |
 | 23. Members 19 removed or renamed | done | `37c500d` |
 | 24. The class profiling handlers | done | `3bb6d2c` |
-| 25 – 29 | not started | |
+| 25. The library files, and the last of the compiler's list | done | `244d2a9` |
+| 26 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -3853,15 +3854,15 @@ tsc: <before> → <after>"
 
 **Files:** `src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver}.ts`, `src/embeddable/BaseMcpServer.ts`, and whatever the compiler still names.
 
-- [ ] **Step 1: Regenerate the list**
+- [x] **Step 1: Regenerate the list**
 
 ```bash
 npx tsc --noEmit 2>&1 | grep -E '^src/.*error' | sed -E 's/\(.*//' | sort | uniq -c | sort -rn
 ```
 
-- [ ] **Step 2: Write a test for each behaviour about to change**, from the corpus. `checkRunParser.ts` has `normalizeCheckResponse.test.ts` already — extend it rather than starting a new file.
-- [ ] **Step 3: Run them to verify they fail**, then fix file by file, most errors first.
-- [ ] **Step 4: Run the full check**
+- [x] **Step 2: Write a test for each behaviour about to change**, from the corpus. `checkRunParser.ts` has `normalizeCheckResponse.test.ts` already — extend it rather than starting a new file.
+- [x] **Step 3: Run them to verify they fail**, then fix file by file, most errors first.
+- [x] **Step 4: Run the full check**
 
 ```bash
 npx tsc --noEmit && echo CLEAN
@@ -3870,7 +3871,9 @@ npx jest
 
 Expected: `CLEAN`, and the whole unit suite green. From here the pre-commit hook works, so drop `--no-verify`.
 
-- [ ] **Step 5: Commit** — `refactor(lib): the last of the envelope reads`
+`packageResolver.ts` (named in the file list) had zero errors — already migrated (an earlier task's work), confirmed correct on inspection and left untouched. `npx jest` in full was not run: the unit suite (`src/__tests__/unit`, 1234 tests) is green, but the full run includes integration tests against a real SAP system, out of scope under this task's "no live SAP calls" constraint — `npx jest src/__tests__/unit` is the gate actually quoted. `tsc --noEmit -p tsconfig.test.json` (81 → 44) still names nine test-only files untouched by this task and not in its file list or the ledger's orphans — recorded in the commit message, not fixed here.
+
+- [x] **Step 5: Commit** — `refactor(lib): the last of the envelope reads` (`244d2a9`)
 
 ---
 

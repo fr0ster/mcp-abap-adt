@@ -1,14 +1,19 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import {
+  MAX_STATUS_POLLS,
+  pollUntilFinished,
+  type RunOutcome,
+} from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
-  description: 'Retrieve ABAP Unit test run result for a run_id.',
+  description:
+    'Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -45,24 +50,42 @@ export async function handleGetUnitTestResult(
   const { run_id, with_navigation_uris, format } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
-  // Same v18-convenience departure as `GetUnitTestStatus`: fetching a
-  // finished run's result is `getResult(runId, options?:
-  // IUnitTestResultOptions)`, and `IUnitTestResultOptions` is
-  // `{withNavigationUris?, format?}` — confirmed against the shipped
-  // `AdtUnitTest.d.ts` — with no `analyse` field, so none is passed.
+  // Same v18-convenience departure as `GetUnitTest`: the old `.read({runId})`
+  // this handler called polled status internally before ever answering a
+  // result. This tool has no status of its own to poll (`with_long_polling`
+  // is not in its surface), so — per the fix ruling — it polls status first
+  // via `pollUntilFinished` rather than guessing what `getResult` answers on
+  // an unfinished run (uncaptured in the corpus). `getResult`'s options
+  // (`IUnitTestResultOptions`) carry no `analyse` field, confirmed against
+  // the shipped `AdtUnitTest.d.ts`.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
 
   return answer(
     { tool: 'GetUnitTestResult', detail: 'terse' },
     () =>
-      unitTest.getResult(run_id, {
-        withNavigationUris: with_navigation_uris,
-        format,
-      }),
-    (result: AdtReading<unknown>) => ({
-      success: true,
-      run_id,
-      run_result: result.value,
-    }),
+      pollUntilFinished(
+        (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
+        run_id,
+        () =>
+          unitTest.getResult(run_id, {
+            withNavigationUris: with_navigation_uris,
+            format,
+          }),
+      ),
+    (outcome: RunOutcome<unknown>) =>
+      outcome.finished
+        ? {
+            success: true,
+            run_id,
+            finished: true,
+            run_result: outcome.result,
+          }
+        : {
+            success: true,
+            run_id,
+            finished: false,
+            run_status: outcome.status.value,
+            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
+          },
   );
 }

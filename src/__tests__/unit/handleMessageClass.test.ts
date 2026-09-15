@@ -74,8 +74,15 @@ describe('Message Class (MSAG) CRUD tools', () => {
     expect(payload(result).metadata).toBe(metadata);
   });
 
-  it('GetMessageClass surfaces "not found" when read returns undefined', async () => {
-    mockMc.read.mockResolvedValue(undefined);
+  // GetMessageClass calls readMetadata, not read (task 18: `.read()` does
+  // not exist on `IMessageClassContract` in v19 — see
+  // `handleGetMessageClass.ts`'s own comment). A `readMetadata` answering
+  // `undefined` is not a shape `answer()`'s adapter can destructure, so it
+  // surfaces as a local `client_threw`/`adapter_threw` failure rather than
+  // a structured "not found" — still `isError: true`, for a different
+  // reason than this test's name once assumed.
+  it('GetMessageClass surfaces an error when readMetadata returns undefined', async () => {
+    mockMc.readMetadata.mockResolvedValue(undefined);
     const result = await handleGetMessageClass(ctx, {
       message_class_name: 'ZNOPE',
     });
@@ -165,6 +172,16 @@ describe('Message Class (MSAG) CRUD tools', () => {
   // `handleReadMessageClassMessage.ts`'s own comment), so this now calls
   // `read()` and answers the parent class document verbatim rather than a
   // parsed single message.
+  //
+  // Fix round 1 (task 18 review): no `analyse` is passed here, deliberately.
+  // `AdtMessageClassMessage.read` is one of only two read-shaped members in
+  // the whole distribution that ship their own default strategy — it checks
+  // whether `msgno` is actually in the parsed class document and refuses
+  // `OBJECT_NOT_FOUND` when it is not. Passing `{ analyse: analyseException }`
+  // (this test's own original shape) REPLACED that check rather than
+  // composing with it, since the member reads `options?.analyse ??
+  // defaultCheck` — see `handleReadMessageClassMessage.ts`'s own comment for
+  // the full finding.
   it('ReadMessageClassMessage answers the parent class document via read', async () => {
     const classDocument =
       '<msag:messageClass><mc:messages><mc:message mc:msgno="001">Hello &amp;1</mc:message></mc:messages></msag:messageClass>';
@@ -179,7 +196,6 @@ describe('Message Class (MSAG) CRUD tools', () => {
     expect(mockMsg.read).toHaveBeenCalledWith(
       { className: 'ZMY_MSGS', msgno: '001' },
       undefined,
-      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(payload(result).metadata).toBe(classDocument);
   });

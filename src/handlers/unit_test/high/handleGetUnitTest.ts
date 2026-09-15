@@ -1,16 +1,19 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
-import { pair } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
+import {
+  MAX_STATUS_POLLS,
+  pollUntilFinished,
+  type RunOutcome,
+} from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Retrieve ABAP Unit test run status and result for a previously started run_id.',
+    'Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -37,11 +40,10 @@ export async function handleGetUnitTest(
 
   // The pre-migration handler called the v18 convenience `.read({runId})`,
   // which answered status and result together. That method no longer
-  // exists on `AdtUnitTest` in v19 — `read`/`readMetadata` there take
-  // `IUnitTestConfig` (`className`, the tests' source), not a run id.
-  // Getting both halves of a run now needs two calls of its own, so this
-  // is the one Get* handler in the unit-test family that follows the pair
-  // shape, not the single-call one every sibling in this file uses.
+  // exists on `AdtUnitTest` in v19. Its work moved here: `pollUntilFinished`
+  // reconstructs it (bounded status polling, only fetching the result once
+  // the run is confirmed `FINISHED`) rather than fetching both blindly —
+  // see `pollRun.ts`'s own comment for why a naive `pair()` was wrong here.
   // Neither `getStatus` nor `getResult` takes an options object at all —
   // confirmed against the shipped `AdtUnitTest.d.ts` — so no `analyse` is
   // passed to either.
@@ -50,15 +52,26 @@ export async function handleGetUnitTest(
   return answer(
     { tool: 'GetUnitTest', detail: 'terse' },
     () =>
-      pair(
-        () => unitTest.getStatus(run_id),
+      pollUntilFinished(
+        (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
+        run_id,
         () => unitTest.getResult(run_id),
       ),
-    ([status, result]: [AdtReading<unknown>, AdtReading<unknown>]) => ({
-      success: true,
-      run_id,
-      run_status: status.value,
-      run_result: result.value,
-    }),
+    (outcome: RunOutcome<unknown>) =>
+      outcome.finished
+        ? {
+            success: true,
+            run_id,
+            finished: true,
+            run_status: outcome.status.value,
+            run_result: outcome.result,
+          }
+        : {
+            success: true,
+            run_id,
+            finished: false,
+            run_status: outcome.status.value,
+            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; call GetUnitTest again to keep polling.`,
+          },
   );
 }

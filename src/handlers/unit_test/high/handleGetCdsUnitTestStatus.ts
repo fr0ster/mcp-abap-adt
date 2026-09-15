@@ -4,6 +4,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import { runIsFinished } from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
@@ -53,6 +54,7 @@ export async function handleGetCdsUnitTestStatus(
     (status: AdtReading<unknown>) => ({
       success: true,
       run_id,
+      finished: runIsFinished(status.value),
       run_status: status.value,
     }),
   );

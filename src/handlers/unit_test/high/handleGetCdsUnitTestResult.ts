@@ -1,14 +1,19 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
+import {
+  MAX_STATUS_POLLS,
+  pollUntilFinished,
+  type RunOutcome,
+} from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
-  description: 'Retrieve CDS unit test run result for a run_id.',
+  description:
+    'Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -46,8 +51,8 @@ export async function handleGetCdsUnitTestResult(
   if (!run_id) return return_error(new Error('run_id is required'));
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getResult` unchanged
-  // — same v18-convenience departure and same "no `analyse` field on
-  // `IUnitTestResultOptions`" as `GetUnitTestResult`.
+  // — same `pollUntilFinished` reconstruction as `GetUnitTestResult`, for
+  // the same reason (no status of its own to poll on this tool's surface).
   const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
     ourUnitTest,
   );
@@ -55,14 +60,29 @@ export async function handleGetCdsUnitTestResult(
   return answer(
     { tool: 'GetCdsUnitTestResult', detail: 'terse' },
     () =>
-      cdsUnitTest.getResult(run_id, {
-        withNavigationUris: with_navigation_uris,
-        format,
-      }),
-    (result: AdtReading<unknown>) => ({
-      success: true,
-      run_id,
-      run_result: result.value,
-    }),
+      pollUntilFinished(
+        (id, withLongPolling) => cdsUnitTest.getStatus(id, withLongPolling),
+        run_id,
+        () =>
+          cdsUnitTest.getResult(run_id, {
+            withNavigationUris: with_navigation_uris,
+            format,
+          }),
+      ),
+    (outcome: RunOutcome<unknown>) =>
+      outcome.finished
+        ? {
+            success: true,
+            run_id,
+            finished: true,
+            run_result: outcome.result,
+          }
+        : {
+            success: true,
+            run_id,
+            finished: false,
+            run_status: outcome.status.value,
+            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
+          },
   );
 }

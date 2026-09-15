@@ -70,12 +70,14 @@ import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGet
 import { corpusBody } from '../../lib/adtCorpus';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
-import { parseStructure } from '../../lib/strategies/reading';
+import { parseStructure, structured } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
+  fakeClientOfWithFactory,
   okResponse,
   reading,
   recordAnalyse,
+  refusedResponse,
   refusingClient,
 } from '../helpers/fakeClient';
 
@@ -395,18 +397,36 @@ describe('resolveVersionedObject', () => {
   });
 });
 
-describe('the two members that accept an analyse strategy, and only those two', () => {
+describe('the members that accept an analyse strategy, which one is deliberately withheld, and the rest that never had one', () => {
   // Verified against the installed declarations, not the brief's list:
-  // `AdtMessageClass.readMetadata` and `AdtMessageClassMessage.read` both
-  // take one; `AdtUtils.search` (the one member the brief itself names) does
-  // NOT when reached through the typed contract `getUtils(ourUtils)` hands
-  // back — see `handleSearchObject.ts`'s own comment — and none of
-  // `getObjectStructure`, `getAllTypes`, `getInactiveObjects`, `getSqlQuery`,
-  // `getTableContents`, `fetchNodeStructure`, `getRequest().list()` or
-  // `getVersionSource` take options at all. `scripts/check-analyse.ts` finds
-  // zero analyse-eligible calls in every directory this task touched except
-  // `message_class/readonly` (2) and `table/readonly` (2, the second
-  // pre-existing) — quoted in the task report.
+  // `AdtMessageClass.readMetadata` takes one and gets one; `AdtUtils.search`
+  // (the one member the brief itself names) does NOT when reached through
+  // the typed contract `getUtils(ourUtils)` hands back — see
+  // `handleSearchObject.ts`'s own comment — and none of `getObjectStructure`,
+  // `getAllTypes`, `getInactiveObjects`, `getSqlQuery`, `getTableContents`,
+  // `fetchNodeStructure`, `getRequest().list()` or `getVersionSource` take
+  // options at all. `scripts/check-analyse.ts` finds zero analyse-eligible
+  // calls in every directory this task touched except `message_class/readonly`
+  // (2, since fix round 1 — see below) and `table/readonly` (2, pre-existing)
+  // — quoted in the task report.
+  //
+  // `AdtMessageClassMessage.read` is the one exception, and NOT because its
+  // signature refuses `analyse` — `IAdtOperationOptions<E>` is right there in
+  // its type. It is one of only two read-shaped members in the whole
+  // distribution that ship their own default strategy (confirmed against the
+  // shipped `AdtMessageClassMessage.js`): `options?.analyse ?? ((verdict,
+  // answer) => { ... checks whether msgno is actually in the parsed class
+  // document ...})`. Fix round 1, task 18 review: this file's original
+  // `{ analyse: analyseException }` REPLACED that check — `analyseException`
+  // only reads an `exc:exception` element, which a missing-msgno answer never
+  // carries (ADT answers 200 with the unrelated whole-class document) — so a
+  // request for a message that does not exist used to answer `success: true`
+  // with that document, silently ignoring the `msgno` it echoed.
+  // `parseMessageClass`, which the default's check is built from, is an
+  // internal of the messageClass module and not part of this package's
+  // public surface, so it cannot be composed with `analyseException` from
+  // here; passing nothing and letting the shipped default stand is the fix,
+  // in `ReadMessageClassMessage.ts` and `GetMessageClassMessage.ts` both.
   it('ReadMessageClass hands getMessageClass().readMetadata its own analyse', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
@@ -420,7 +440,7 @@ describe('the two members that accept an analyse strategy, and only those two', 
     expect(seen.last?.analyse).toBe(analyseException);
   });
 
-  it('ReadMessageClassMessage hands getMessageClassMessage().read its own analyse', async () => {
+  it('ReadMessageClassMessage carries NO analyse into getMessageClassMessage().read, deliberately, so the shipped default OBJECT_NOT_FOUND check stands', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
@@ -430,8 +450,8 @@ describe('the two members that accept an analyse strategy, and only those two', 
     });
 
     expect(seen.countOf('read')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(true);
-    expect(seen.last?.analyse).toBe(analyseException);
+    expect(seen.last?.carriedAnalyse).toBe(false);
+    expect(seen.last?.analyse).toBeUndefined();
   });
 
   it('SearchObject does NOT carry an analyse into search — none was given, matching the signature', async () => {
@@ -714,5 +734,664 @@ describe('the high-tier Get*/List* handlers answer through the adapter and surfa
     const result: any = await (handler as any)(context as any, args);
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text).message).toBe('Not found');
+  });
+});
+
+/**
+ * Fix round 1: the refusal-only rows above pin only the failure envelope —
+ * a handler pointed at a wrong-but-still-refusing member, or one that
+ * dropped its strategy entirely, would pass every row above too. This is
+ * the bar the sibling read tests already set (`domainLow.test.ts`,
+ * `readHandlersSuccessMapping.test.ts`'s own "the two members..." block):
+ * one recorded row per handler naming the factory, the member, the
+ * identity arguments the caller's own input maps to, and the strategy's
+ * identity where the signature accepts one — its deliberate absence where
+ * it does not.
+ *
+ * Handlers whose call is a single, ordinary `read`/`readMetadata` — no
+ * bounded polling, no group-verification gate to defeat — are table-driven
+ * below. Three that carry the identity in a POSITIONAL argument rather than
+ * a config object (`getStatus`, `getServiceBindingTypes`), and the four
+ * whose own `pollUntilFinished` loop needs a fake client that actually
+ * answers a finished run to ever reach its second call, are each their own
+ * `it` further down.
+ */
+describe('the high-tier Get* handlers call the member the brief names, with the arguments the caller gave', () => {
+  const rows: Array<{
+    name: string;
+    handler: (context: unknown, args: unknown) => Promise<unknown>;
+    args: Record<string, unknown>;
+    factory: string;
+    member: string;
+    identity: Record<string, unknown>;
+    hasAnalyse: boolean;
+  }> = [
+    {
+      name: 'GetClass',
+      handler: handleGetClass as any,
+      args: { class_name: 'zcl_x' },
+      factory: 'getClass',
+      member: 'read',
+      identity: { className: 'ZCL_X' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetDomain',
+      handler: handleGetDomain as any,
+      args: { domain_name: 'zd' },
+      factory: 'getDomain',
+      member: 'readMetadata',
+      identity: { domainName: 'ZD' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetTable',
+      handler: handleGetTable as any,
+      args: { table_name: 'zt' },
+      factory: 'getTable',
+      member: 'read',
+      identity: { tableName: 'ZT' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetStructure',
+      handler: handleGetStructure as any,
+      args: { structure_name: 'zs' },
+      factory: 'getStructure',
+      member: 'read',
+      identity: { structureName: 'ZS' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetProgram',
+      handler: handleGetProgram as any,
+      args: { program_name: 'zp' },
+      factory: 'getProgram',
+      member: 'read',
+      identity: { programName: 'ZP' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetInterface',
+      handler: handleGetInterface as any,
+      args: { interface_name: 'zif' },
+      factory: 'getInterface',
+      member: 'read',
+      identity: { interfaceName: 'ZIF' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetDdl',
+      handler: handleGetDdl as any,
+      args: { ddl_name: 'zddl' },
+      factory: 'getDdl',
+      member: 'read',
+      identity: { ddlName: 'ZDDL' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetDataElement',
+      handler: handleGetDataElement as any,
+      args: { data_element_name: 'zde' },
+      factory: 'getDataElement',
+      member: 'readMetadata',
+      identity: { dataElementName: 'ZDE' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetPackage',
+      handler: handleGetPackage as any,
+      args: { package_name: 'zpkg' },
+      factory: 'getPackage',
+      member: 'readMetadata',
+      identity: { packageName: 'ZPKG' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetMessageClass',
+      handler: handleGetMessageClass as any,
+      args: { message_class_name: 'zmc' },
+      factory: 'getMessageClass',
+      member: 'readMetadata',
+      identity: { name: 'ZMC' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetMessageClassMessage',
+      handler: handleGetMessageClassMessage as any,
+      args: { message_class_name: 'zmc', msgno: '001' },
+      factory: 'getMessageClassMessage',
+      member: 'read',
+      identity: { className: 'ZMC', msgno: '001' },
+      // Deliberately none — the shipped default OBJECT_NOT_FOUND check
+      // would be replaced by any strategy this handler supplied (see the
+      // "members that accept an analyse strategy" describe block above).
+      hasAnalyse: false,
+    },
+    {
+      name: 'GetFunctionGroup',
+      handler: handleGetFunctionGroup as any,
+      args: { function_group_name: 'zfg' },
+      factory: 'getFunctionGroup',
+      member: 'readMetadata',
+      identity: { functionGroupName: 'ZFG' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetServiceBinding',
+      handler: handleGetServiceBinding as any,
+      args: { service_binding_name: 'zsb' },
+      factory: 'getServiceBinding',
+      member: 'read',
+      identity: { bindingName: 'ZSB' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetServiceDefinition',
+      handler: handleGetServiceDefinition as any,
+      args: { service_definition_name: 'zsd' },
+      factory: 'getServiceDefinition',
+      member: 'read',
+      identity: { serviceDefinitionName: 'ZSD' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetMetadataExtension',
+      handler: handleGetMetadataExtension as any,
+      args: { metadata_extension_name: 'zme' },
+      factory: 'getMetadataExtension',
+      member: 'read',
+      identity: { name: 'ZME' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetBehaviorDefinition',
+      handler: handleGetBehaviorDefinition as any,
+      args: { behavior_definition_name: 'zbd' },
+      factory: 'getBehaviorDefinition',
+      member: 'read',
+      identity: { name: 'ZBD' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetBehaviorImplementation',
+      handler: handleGetBehaviorImplementation as any,
+      args: { behavior_implementation_name: 'zbi' },
+      factory: 'getBehaviorImplementation',
+      member: 'read',
+      identity: { className: 'ZBI' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetLocalTypes',
+      handler: handleGetLocalTypes as any,
+      args: { class_name: 'zcl_x' },
+      factory: 'getLocalTypes',
+      member: 'read',
+      identity: { className: 'ZCL_X' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetLocalDefinitions',
+      handler: handleGetLocalDefinitions as any,
+      args: { class_name: 'zcl_x' },
+      factory: 'getLocalDefinitions',
+      member: 'read',
+      identity: { className: 'ZCL_X' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetLocalMacros',
+      handler: handleGetLocalMacros as any,
+      args: { class_name: 'zcl_x' },
+      factory: 'getLocalMacros',
+      member: 'read',
+      identity: { className: 'ZCL_X' },
+      hasAnalyse: true,
+    },
+    {
+      name: 'GetLocalTestClass',
+      handler: handleGetLocalTestClass as any,
+      args: { class_name: 'zcl_x' },
+      factory: 'getLocalTestClass',
+      member: 'read',
+      identity: { className: 'ZCL_X' },
+      hasAnalyse: true,
+    },
+  ];
+
+  it.each(
+    rows,
+  )("$name calls the right factory and member, with the caller's own identity, and its strategy exactly where the signature accepts one", async ({
+    handler,
+    args,
+    factory,
+    member,
+    identity,
+    hasAnalyse,
+  }) => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+
+    await handler(context as any, args);
+
+    const call = seen.calls.filter((c) => c.member === member).at(-1);
+    expect(call?.factory).toBe(factory);
+    expect(call?.args[0]).toEqual(identity);
+    expect(call?.carriedAnalyse).toBe(hasAnalyse);
+    if (hasAnalyse) expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('ListServiceBindingTypes calls getServiceBinding().getServiceBindingTypes() with no arguments at all', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+
+    await handleListServiceBindingTypes(context as any, {});
+
+    const call = seen.calls
+      .filter((c) => c.member === 'getServiceBindingTypes')
+      .at(-1);
+    expect(call?.factory).toBe('getServiceBinding');
+    expect(call?.args).toEqual([]);
+    expect(call?.carriedAnalyse).toBe(false);
+  });
+
+  it('GetUnitTestStatus calls getUnitTest().getStatus(run_id, with_long_polling)', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+
+    await handleGetUnitTestStatus(context as any, { run_id: 'r1' });
+
+    const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
+    expect(call?.factory).toBe('getUnitTest');
+    expect(call?.args).toEqual(['r1', true]);
+    expect(call?.carriedAnalyse).toBe(false);
+  });
+
+  it('GetCdsUnitTestStatus calls getCdsUnitTest().getStatus(run_id, with_long_polling)', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+
+    await handleGetCdsUnitTestStatus(context as any, { run_id: 'r1' });
+
+    const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
+    expect(call?.factory).toBe('getCdsUnitTest');
+    expect(call?.args).toEqual(['r1', true]);
+    expect(call?.carriedAnalyse).toBe(false);
+  });
+});
+
+/**
+ * `GetFunctionModule` is the one high-tier Get* handler that already made
+ * two calls before the migration, and it is the only one whose second call
+ * depends on the first (the group-verification gate — see below). A bare
+ * `recordAnalyse()` double cannot exercise it: its canned reading has no
+ * `<adtcore:containerRef/>` to parse, so `assertFunctionGroupMatches` throws
+ * before the second call is ever made. This uses the real captured metadata
+ * fixture instead, which both proves the identity arguments of BOTH calls
+ * and doubles as this handler's corpus-driven success mapping.
+ */
+describe('GetFunctionModule, mapped from a real captured metadata+source pair', () => {
+  it('calls readMetadata then read, both through getFunctionModule(), and answers the real source under function_module_data', async () => {
+    const metadata = corpusBody(
+      'read-metadata-function-module--01-fmodules-zmcpshrfm',
+    );
+    const source = corpusBody(
+      'read-function-module-source-text--01-read-source',
+    );
+    const calls: Array<{ member: string; args: unknown[] }> = [];
+    const record =
+      (member: string) =>
+      (...args: unknown[]) => {
+        calls.push({ member, args });
+      };
+    const double = fakeClientOfWithFactory({
+      readMetadata: async (...args: unknown[]) => {
+        record('readMetadata')(...args);
+        return okResponse(structured({ data: metadata, status: 200 } as any));
+      },
+      read: async (...args: unknown[]) => {
+        record('read')(...args);
+        return okResponse(structured({ data: source, status: 200 } as any));
+      },
+    });
+    fakeClient = double.client;
+
+    const result: any = await handleGetFunctionModule(context as any, {
+      function_module_name: 'z_mcp_shr_fm',
+      function_group_name: 'zmcp_shr_fgrp',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.function_module_name).toBe('Z_MCP_SHR_FM');
+    expect(payload.function_group_name).toBe('ZMCP_SHR_FGRP');
+    expect(payload.function_module_data).toBe(source);
+    expect(double.factory).toBe('getFunctionModule');
+
+    const readMetadataCall = calls
+      .filter((c) => c.member === 'readMetadata')
+      .at(-1);
+    expect(readMetadataCall?.args[0]).toEqual({
+      functionModuleName: 'Z_MCP_SHR_FM',
+      functionGroupName: 'ZMCP_SHR_FGRP',
+    });
+    const readMetadataOptions = readMetadataCall?.args.at(-1) as
+      | { analyse?: unknown }
+      | undefined;
+    expect(readMetadataOptions?.analyse).toBe(analyseException);
+
+    const readCall = calls.filter((c) => c.member === 'read').at(-1);
+    expect(readCall?.args[0]).toEqual({
+      functionModuleName: 'Z_MCP_SHR_FM',
+      functionGroupName: 'ZMCP_SHR_FGRP',
+    });
+    const readOptions = readCall?.args.at(-1) as
+      | { analyse?: unknown }
+      | undefined;
+    expect(readOptions?.analyse).toBe(analyseException);
+  });
+});
+
+/**
+ * Fix round 1: two behaviours the failure-envelope rows and the identity
+ * table above both let pass unpinned — deleting either one changed nothing
+ * in any test that existed before this block.
+ */
+describe('two behaviours unpinned before fix round 1', () => {
+  // Mirrors `ReadPackage passes the caller-requested version to readMetadata`
+  // in `readHandlersSuccessMapping.test.ts` — the same fix, on the sibling
+  // Get* tool. Reverting `handleGetPackage.ts` to drop `version` from the
+  // call (while still echoing the caller's own `version` in the answer, the
+  // way it did before this fix) fails this test with `Expected: "inactive",
+  // Received: undefined` — checked before writing it down here.
+  it('GetPackage passes the caller-requested version to readMetadata', async () => {
+    const seen = recordAnalyse();
+    fakeClient = seen.client;
+
+    await handleGetPackage(context as any, {
+      package_name: 'zpkg',
+      version: 'inactive',
+    });
+
+    const call = seen.calls.filter((c) => c.member === 'readMetadata').at(-1);
+    const options = call?.args.at(-1) as { version?: string } | undefined;
+    expect(options?.version).toBe('inactive');
+  });
+
+  // The group-match check itself, mirroring
+  // `ReadFunctionModule refuses when the caller-supplied group does not
+  // match the metadata containerRef` in `readHandlersSuccessMapping.test.ts`.
+  // The metadata's own containerRef names ZMCP_SHR_FGRP; the caller asks for
+  // a different group, and `read` must never be reached — if the gate were
+  // removed, `read`'s stub answer below would come back as a success
+  // instead, handing back source from a group the caller never verified.
+  it('GetFunctionModule refuses when the caller-supplied group does not match the metadata containerRef', async () => {
+    const metadata = corpusBody(
+      'read-metadata-function-module--01-fmodules-zmcpshrfm',
+    );
+    fakeClient = fakeClientOf({
+      readMetadata: async () =>
+        okResponse(structured({ data: metadata, status: 200 } as any)),
+      read: async () =>
+        okResponse(
+          structured({ data: 'SHOULD NOT BE READ', status: 200 } as any),
+        ),
+    });
+
+    const result: any = await handleGetFunctionModule(context as any, {
+      function_module_name: 'z_mcp_shr_fm',
+      function_group_name: 'zwrong_group',
+    });
+
+    expect(result.isError).toBe(true);
+  });
+});
+
+/**
+ * Fix round 1's main finding: `GetUnitTest`/`GetUnitTestResult`/
+ * `GetCdsUnitTest`/`GetCdsUnitTestResult` reconstruct the v18 convenience
+ * `.read({runId})` (bounded status polling, only fetching the result once
+ * `<aunit:progress status="FINISHED"/>` is seen) rather than a naive
+ * `pair(getStatus, getResult)`. These tests exist to fail if that
+ * reconstruction regresses to the naive shape: an empty/refused result
+ * silently becoming a success, a not-yet-finished run's result being
+ * fetched at all, or a status refusal being discarded once a result call
+ * was attempted.
+ *
+ * `GetUnitTest`/`GetUnitTestStatus`/`GetUnitTestResult` use the two real
+ * captured fixtures for a passing run (`unittest-run-passing--02-runs-*`,
+ * the status; `--03-results-*`, the result). No fixture in the corpus
+ * captures a CDS run or a still-running (non-`FINISHED`) status, so
+ * `GetCdsUnitTest*`'s own tests and the "not yet finished" tests below use
+ * synthetic markers, named as such rather than presented as corpus evidence.
+ */
+describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking a refusal or an unfinished run', () => {
+  const passingStatus = corpusBody(
+    'unittest-run-passing--02-runs-fa53c505dd7b1fd1abb8599833a05d44',
+  );
+  const passingResult = corpusBody(
+    'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44',
+  );
+  // Synthetic (no fixture): a run ADT has not finished yet.
+  const runningStatus =
+    '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING" percentage="40"/></aunit:run>';
+
+  it('GetUnitTest answers a real finished run from the captured status+result fixtures, and calls both members through getUnitTest()', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: passingStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () =>
+      okResponse(structured({ data: passingResult, status: 200 } as any)),
+    );
+    const double = fakeClientOfWithFactory({ getStatus, getResult });
+    fakeClient = double.client;
+
+    const result: any = await handleGetUnitTest(context as any, {
+      run_id: 'FA53C505DD7B1FD1ABB8599833A05D44',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.finished).toBe(true);
+    expect(payload.run_id).toBe('FA53C505DD7B1FD1ABB8599833A05D44');
+    expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
+    expect(getStatus).toHaveBeenCalledWith(
+      'FA53C505DD7B1FD1ABB8599833A05D44',
+      true,
+    );
+    expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44');
+    // Read AFTER invoking the handler — `factory` is a getter on the
+    // double, and destructuring it eagerly captures `undefined` (the value
+    // before any factory was ever accessed).
+    expect(double.factory).toBe('getUnitTest');
+  });
+
+  it('GetUnitTest answers finished:false after MAX_STATUS_POLLS status checks, and never calls getResult on a run that has not finished', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: runningStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () => {
+      throw new Error('must not be called — the run never finished');
+    });
+    fakeClient = fakeClientOf({ getStatus, getResult });
+
+    const result: any = await handleGetUnitTest(context as any, {
+      run_id: 'r1',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.finished).toBe(false);
+    expect(payload.run_result).toBeUndefined();
+    expect(getStatus).toHaveBeenCalledTimes(5);
+    expect(getResult).not.toHaveBeenCalled();
+  });
+
+  it('GetUnitTest surfaces a refused result as an error once the run is confirmed finished, not success with an empty result', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: passingStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () =>
+      refusedResponse('Result not available'),
+    );
+    fakeClient = fakeClientOf({ getStatus, getResult });
+
+    const result: any = await handleGetUnitTest(context as any, {
+      run_id: 'r1',
+    });
+
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.message).toBe('Result not available');
+    expect(result.content[0].text).not.toContain('"success": true');
+  });
+
+  it('GetUnitTest surfaces a refused status as an error without ever calling getResult', async () => {
+    const getStatus = jest.fn(async () =>
+      refusedResponse('Status endpoint down'),
+    );
+    const getResult = jest.fn(async () => {
+      throw new Error('must not be called — status itself refused');
+    });
+    fakeClient = fakeClientOf({ getStatus, getResult });
+
+    const result: any = await handleGetUnitTest(context as any, {
+      run_id: 'r1',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Status endpoint down',
+    );
+    expect(getResult).not.toHaveBeenCalled();
+  });
+
+  it('GetUnitTestResult answers the real captured result once the real captured status says FINISHED', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: passingStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () =>
+      okResponse(structured({ data: passingResult, status: 200 } as any)),
+    );
+    fakeClient = fakeClientOf({ getStatus, getResult });
+
+    const result: any = await handleGetUnitTestResult(context as any, {
+      run_id: 'r1',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.finished).toBe(true);
+    expect(JSON.stringify(payload.run_result)).toContain('TEST_METHOD');
+  });
+
+  it('GetUnitTestResult answers finished:false with no run_result, rather than guessing, when the run has not finished', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: runningStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () => {
+      throw new Error('must not be called — the run never finished');
+    });
+    fakeClient = fakeClientOf({ getStatus, getResult });
+
+    const result: any = await handleGetUnitTestResult(context as any, {
+      run_id: 'r1',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.finished).toBe(false);
+    expect(payload.run_result).toBeUndefined();
+    expect(getResult).not.toHaveBeenCalled();
+  });
+
+  // CDS variants: `AdtCdsUnitTest extends AdtUnitTest` and inherits both
+  // members unchanged, so these exercise the identical `pollUntilFinished`
+  // path through a different factory — synthetic markers throughout, since
+  // no CDS run is captured in the corpus.
+  const cdsStatus =
+    '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="FINISHED" percentage="100"/></aunit:run>';
+  const cdsResult =
+    '<?xml version="1.0" encoding="utf-8"?><aunit:runResult xmlns:aunit="http://www.sap.com/adt/aunit">CDS RESULT MARKER (no fixture)</aunit:runResult>';
+
+  it('GetCdsUnitTest answers finished:true from a synthetic FINISHED status, and calls both members through getCdsUnitTest()', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: cdsStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () =>
+      okResponse(structured({ data: cdsResult, status: 200 } as any)),
+    );
+    const double = fakeClientOfWithFactory({ getStatus, getResult });
+    fakeClient = double.client;
+
+    const result: any = await handleGetCdsUnitTest(context as any, {
+      run_id: 'r1',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.finished).toBe(true);
+    // Read AFTER invoking the handler — see the comment on the analogous
+    // assertion in `GetUnitTest`'s own test above.
+    expect(double.factory).toBe('getCdsUnitTest');
+    expect(getStatus).toHaveBeenCalledWith('r1', true);
+    expect(getResult).toHaveBeenCalledWith('r1');
+  });
+
+  it('GetCdsUnitTest answers finished:false and never calls getResult when the (synthetic) run has not finished', async () => {
+    const getStatus = jest.fn(async () =>
+      okResponse(structured({ data: runningStatus, status: 200 } as any)),
+    );
+    const getResult = jest.fn(async () => {
+      throw new Error('must not be called — the run never finished');
+    });
+    fakeClient = fakeClientOf({ getStatus, getResult });
+
+    const result: any = await handleGetCdsUnitTest(context as any, {
+      run_id: 'r1',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.finished).toBe(false);
+    expect(getStatus).toHaveBeenCalledTimes(5);
+    expect(getResult).not.toHaveBeenCalled();
+  });
+
+  it('GetCdsUnitTestResult answers finished:true from a synthetic finished run, and finished:false with no result otherwise', async () => {
+    const getStatusFinished = jest.fn(async () =>
+      okResponse(structured({ data: cdsStatus, status: 200 } as any)),
+    );
+    const getResultSpy = jest.fn(async () =>
+      okResponse(structured({ data: cdsResult, status: 200 } as any)),
+    );
+    fakeClient = fakeClientOf({
+      getStatus: getStatusFinished,
+      getResult: getResultSpy,
+    });
+
+    const finished: any = await handleGetCdsUnitTestResult(context as any, {
+      run_id: 'r1',
+    });
+    expect(JSON.parse(finished.content[0].text).finished).toBe(true);
+
+    const getStatusRunning = jest.fn(async () =>
+      okResponse(structured({ data: runningStatus, status: 200 } as any)),
+    );
+    const getResultNeverCalled = jest.fn(async () => {
+      throw new Error('must not be called — the run never finished');
+    });
+    fakeClient = fakeClientOf({
+      getStatus: getStatusRunning,
+      getResult: getResultNeverCalled,
+    });
+
+    const notFinished: any = await handleGetCdsUnitTestResult(context as any, {
+      run_id: 'r1',
+    });
+    const payload = JSON.parse(notFinished.content[0].text);
+    expect(payload.finished).toBe(false);
+    expect(payload.run_result).toBeUndefined();
+    expect(getResultNeverCalled).not.toHaveBeenCalled();
   });
 });

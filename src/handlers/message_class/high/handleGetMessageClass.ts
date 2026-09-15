@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve an ABAP message class (MSAG/T100) with its messages: name, description, package, master language and the message list (msgno, msgtext, self-explanatory).',
+    'Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.',
   inputSchema: {
     type: 'object',
     properties: {

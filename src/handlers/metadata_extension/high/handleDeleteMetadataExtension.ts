@@ -1,21 +1,36 @@
 /**
- * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension via ADT
- * deletion API
+ * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension via its
+ * own URL
  *
  * Uses AdtClient.getMetadataExtension().delete from
- * @mcp-abap-adt/adt-clients 19. See `handleDeleteDomain.ts` for the shape and
- * the masking this follows: a refusal answers 200, `analyseDeletion` reads
- * it rather than the status, and no lock is taken because a held lock is
- * what makes ADT refuse.
+ * @mcp-abap-adt/adt-clients 19.
+ *
+ * **Not a deletion-service call.** Confirmed against
+ * `AdtMetadataExtension.d.ts`'s own comment ("Its delete is a DELETE on its
+ * own URL rather than the deletion service") and `delete.js`: `delete()`
+ * issues a plain `DELETE /sap/bc/adt/ddic/ddlx/sources/{name}`, not a POST
+ * to `/sap/bc/adt/deletion/delete`. That endpoint answers no
+ * `del:deletionResult`/`del:checkResponse` document — `terseDeletion` would
+ * find no `del:object` in an empty body and mask every success as a local
+ * `projection_failed`, the same defect class task 20 found in two handlers
+ * and this task's own fix round found here. Fixed the same way the four
+ * class-include deletes are: `analyseException` (an empty-body 2xx has
+ * nothing for `analyseDeletion`'s document read to find either, but
+ * `analyseException` names what the endpoint actually is) and `terseWrite`,
+ * a status-derived projection. No lock: the wire function takes no
+ * `lockHandle`.
+ *
+ * The low-tier sibling, `ddlx/low/handleDeleteMetadataExtension.ts`, shares
+ * this object and the same pre-fix defect; fixed alongside this file.
  */
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -23,7 +38,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -69,8 +84,8 @@ export async function handleDeleteMetadataExtension(
         .getMetadataExtension(resultsFor(metadataExtensionDocuments))
         .delete(
           { name, transportRequest: transport_request },
-          { analyse: analyseDeletion },
+          { analyse: analyseException },
         ),
-    project(detail, terseDeletion),
+    project(detail, terseWrite),
   );
 }

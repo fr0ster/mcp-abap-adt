@@ -263,6 +263,7 @@ it.each([
     handleDeleteClass,
     handleValidateClass,
     'getClass',
+    analyseDeletion,
     {
       class_name: 'ZCL_X',
       package_name: 'ZP',
@@ -276,6 +277,7 @@ it.each([
     handleDeleteInterface,
     handleValidateInterface,
     'getInterface',
+    analyseDeletion,
     {
       interface_name: 'ZIF_X',
       package_name: 'ZP',
@@ -289,6 +291,7 @@ it.each([
     handleDeleteBehaviorDefinition,
     handleValidateBehaviorDefinition,
     'getBehaviorDefinition',
+    analyseDeletion,
     {
       name: 'ZBDEF_X',
       package_name: 'ZP',
@@ -304,6 +307,7 @@ it.each([
     handleDeleteDdl,
     handleValidateDdl,
     'getDdl',
+    analyseDeletion,
     {
       ddl_name: 'ZVW_X',
       package_name: 'ZP',
@@ -317,6 +321,7 @@ it.each([
     handleDeleteMetadataExtension,
     handleValidateMetadataExtension,
     'getMetadataExtension',
+    analyseException,
     {
       name: 'ZI_X_DDLX',
       package_name: 'ZP',
@@ -330,6 +335,7 @@ it.each([
     handleDeleteStructure,
     handleValidateStructure,
     'getStructure',
+    analyseDeletion,
     {
       structure_name: 'ZST_X',
       package_name: 'ZP',
@@ -343,6 +349,7 @@ it.each([
     handleDeleteTable,
     handleValidateTable,
     'getTable',
+    analyseDeletion,
     {
       table_name: 'ZT_X',
       package_name: 'ZP',
@@ -356,6 +363,7 @@ it.each([
     handleDeleteProgram,
     handleValidateProgram,
     'getProgram',
+    analyseDeletion,
     {
       program_name: 'Z_X',
       package_name: 'ZP',
@@ -369,6 +377,7 @@ it.each([
     handleDeleteFunctionGroup,
     handleValidateFunctionGroup,
     'getFunctionGroup',
+    analyseDeletion,
     {
       function_group_name: 'ZFG_X',
       package_name: 'ZP',
@@ -382,6 +391,7 @@ it.each([
     handleDeleteFunctionModule,
     handleValidateFunctionModule,
     'getFunctionModule',
+    analyseDeletion,
     {
       function_module_name: 'ZFM_X',
       function_group_name: 'ZFG_X',
@@ -396,6 +406,7 @@ it.each([
     handleDeleteDataElement,
     handleValidateDataElement,
     'getDataElement',
+    analyseDeletion,
     {
       data_element_name: 'ZDT_X',
       package_name: 'ZP',
@@ -405,18 +416,23 @@ it.each([
   ],
   // behavior_implementation has no Activate/Delete tool — it cannot join
   // this row; see its own describe block below.
-])('%s pairs each operation with its own strategy, on its own factory', async (_family, activate, remove, validate, factory, args) => {
+])('%s pairs each operation with its own strategy, on its own factory', async (_family, activate, remove, validate, factory, expectedDeleteAnalyse, args) => {
   await (activate as any)(context as any, args);
   const activateCall = callTo('activate');
   expect(activateCall?.factory).toBe(factory);
   expect(activateCall?.carriedAnalyse).toBe(true);
   expect(activateCall?.analyse).toBe(analyseActivation);
 
+  // Delete -> analyseDeletion, except `ddlx (metadataExtension)`: its
+  // `delete()` is a plain DELETE on the object's own URL, never a POST to
+  // the deletion service, so it never answers a `del:deletionResult`
+  // document and takes `analyseException` instead — see
+  // `ddlx/low/handleDeleteMetadataExtension.ts`'s own doc comment.
   await (remove as any)(context as any, args);
   const deleteCall = callTo('delete');
   expect(deleteCall?.factory).toBe(factory);
   expect(deleteCall?.carriedAnalyse).toBe(true);
-  expect(deleteCall?.analyse).toBe(analyseDeletion);
+  expect(deleteCall?.analyse).toBe(expectedDeleteAnalyse);
 
   await (validate as any)(context as any, args);
   const validateCall = callTo('validate');

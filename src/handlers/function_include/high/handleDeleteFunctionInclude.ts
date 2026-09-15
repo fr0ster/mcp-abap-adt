@@ -1,24 +1,31 @@
 /**
- * DeleteFunctionInclude Handler - Delete ABAP Function Group Include via AdtClient
+ * DeleteFunctionInclude Handler - Delete ABAP Function Group Include via ADT
+ * deletion API
  *
- * Uses AdtClient.getFunctionInclude().delete() for the high-level delete operation.
- * Note: the ADT backend rejects deletion of function module includes (those must be
- * deleted via the Function Builder); that server message propagates as an error.
+ * Uses AdtClient.getFunctionInclude().delete from
+ * @mcp-abap-adt/adt-clients 19. See `handleDeleteDomain.ts` for the shape and
+ * the masking this follows: a refusal answers 200, `analyseDeletion` reads
+ * it rather than the status, and no lock is taken because a held lock is
+ * what makes ADT refuse. Note: the ADT backend rejects deletion of function
+ * module includes (those must be deleted via the Function Builder); that
+ * server message comes back the same way, as a refusal.
  */
 
+import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteFunctionInclude',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.',
+    'Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -36,6 +43,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['function_group_name', 'include_name'],
   },
@@ -45,103 +53,39 @@ interface DeleteFunctionIncludeArgs {
   function_group_name: string;
   include_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteFunctionInclude MCP tool
- */
 export async function handleDeleteFunctionInclude(
   context: HandlerContext,
   args: DeleteFunctionIncludeArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { function_group_name, include_name, transport_request } =
-      args as DeleteFunctionIncludeArgs;
+  const { function_group_name, include_name, transport_request } = args;
 
-    if (!function_group_name || !include_name) {
-      return return_error(
-        new Error('function_group_name and include_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    const functionGroupName = function_group_name.toUpperCase();
-    const includeName = include_name.toUpperCase();
-
-    logger?.info(
-      `Starting function include deletion: ${includeName} in ${functionGroupName}`,
+  if (!function_group_name || !include_name) {
+    return return_error(
+      new Error('function_group_name and include_name are required'),
     );
-
-    try {
-      const obj = client.getFunctionInclude();
-      const r = await obj.delete({
-        functionGroupName,
-        includeName,
-        transportRequest: transport_request,
-      });
-
-      if (!r || !r.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for function include ${includeName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteFunctionInclude completed successfully: ${includeName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            function_group_name: functionGroupName,
-            include_name: includeName,
-            transport_request: transport_request || null,
-            message: `Function include ${includeName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting function include ${includeName}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to delete function include: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Function include ${includeName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Function include ${includeName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  const functionGroupName = function_group_name.toUpperCase();
+  const includeName = include_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteFunctionInclude', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionInclude(resultsFor(functionIncludeDocuments))
+        .delete(
+          {
+            functionGroupName,
+            includeName,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

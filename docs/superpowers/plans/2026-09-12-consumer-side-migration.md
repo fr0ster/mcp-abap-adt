@@ -34,7 +34,8 @@ own tests pass and it is committed — not when it is described.
 | 13. `common/low`, six generic ops | done | `ef6074c` |
 | 14. `low` tier, cluster one | done | `92b0d7c` |
 | 15. `low` tier, cluster two | done | `5285a23` |
-| 16 – 29 | not started | |
+| 16. `low` tier, cluster three | done | `9a2fad1` |
+| 17 – 29 | not started | |
 
 Verify without reading anything above:
 

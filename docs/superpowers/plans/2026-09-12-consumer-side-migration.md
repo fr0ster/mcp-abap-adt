@@ -40,7 +40,8 @@ own tests pass and it is committed — not when it is described.
 | 19. High-tier writes under a lock | done | `33a1a99` |
 | 20. High-tier writes without a lock | done | `ed68752` |
 | 21. High-tier deletes and checks | done | `99824ff` |
-| 22 – 29 | not started | |
+| 22. The read-modify-write families | done | `c6bc755` |
+| 23 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2724,7 +2725,7 @@ npx tsx scripts/capture-adt-corpus.ts --env <session> --only read-metadata-data-
 - Modify: `data_element/{low,high}/handleUpdateDataElement.ts`, `package/low/handleUpdatePackage.ts`, `function/high/handleUpdateFunctionGroup.ts`, `table/high/handleUpdateTable.ts`
 - Test: `src/__tests__/unit/readModifyWrite.test.ts` (exists — extend), one patch test per family
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/packagePatch.test.ts
@@ -2760,8 +2761,8 @@ it.todo('keeps every unnamed field — unverified: no data-element metadata in t
 
 The empty-input case matters most: ADT answers a read of a not-yet-ready object with 200 and an empty body, so a silent `String.replace` turns a slow read into a malformed write the server blames on the caller.
 
-- [ ] **Step 2: Run them to verify they fail**
-- [ ] **Step 3: Implement the patch, then wire the handler inside the lock**
+- [x] **Step 2: Run them to verify they fail**
+- [x] **Step 3: Implement the patch, then wire the handler inside the lock**
 
 ```typescript
 // read, patch, write — inside withLock where the handler owns the lock
@@ -2789,8 +2790,8 @@ withLock(
 
 A `low`-tier update takes the handle as an argument and must not acquire or release one — it uses `sequence` alone.
 
-- [ ] **Step 4: Run the tests** — `readModifyWrite.test.ts` must still show both halves: every metadata fixture survives `verbatim` character for character, and rebuilding one from its parse does not reproduce it.
-- [ ] **Step 5: Commit** — `feat(update): four more families read, patch and write`
+- [x] **Step 4: Run the tests** — `readModifyWrite.test.ts` must still show both halves: every metadata fixture survives `verbatim` character for character, and rebuilding one from its parse does not reproduce it.
+- [x] **Step 5: Commit** — `feat(update): four more families read, patch and write`
 
 ---
 

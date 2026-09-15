@@ -42,7 +42,8 @@ own tests pass and it is committed — not when it is described.
 | 21. High-tier deletes and checks | done | `99824ff` |
 | 22. The read-modify-write families | done | `c6bc755` |
 | 23. Members 19 removed or renamed | done | `37c500d` |
-| 24 – 29 | not started | |
+| 24. The class profiling handlers | done | `3bb6d2c` |
+| 25 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -3204,7 +3205,7 @@ construct `new AdtExecutor(connection, logger)` rather than calling
 stub from `getClassExecutor()`. Mocking `../../lib/clients` here would compile,
 run, and test a real executor.
 
-- [ ] **Step 1: Put the surface question to the user**
+- [x] **Step 1: Put the surface question to the user**
 
 Show them the table above, and recommend the first option: it is the only one
 that keeps the contract the tools already advertise, and the package documents
@@ -3215,7 +3216,7 @@ the assertions below flip with it rather than being edited by hand into
 agreement with whatever was built. Their answer decides whether Step 3 also
 edits the tool definitions and whether the feed search is written at all.
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 ```typescript
 // src/__tests__/unit/runtimeProfiling.test.ts
@@ -3486,7 +3487,7 @@ it.each([
 The corpus holds no profiling exchange, so these run on fakes. Say so in the
 file's header rather than implying the behaviour is measured.
 
-- [ ] **Step 3: Write the helper's own tests, if Step 1 chose the first option**
+- [x] **Step 3: Write the helper's own tests, if Step 1 chose the first option**
 
 Everything that can go wrong in the search lives in `newTraceAfter`, and the
 handler tests exercise it only through two handlers and one happy path. These
@@ -3563,9 +3564,9 @@ it('hands a refused read straight back and stops asking', async () => {
 });
 ```
 
-- [ ] **Step 4: Run them all to verify they fail**
+- [x] **Step 4: Run them all to verify they fail**
 
-- [ ] **Step 5: Implement**
+- [x] **Step 5: Implement**
 
 Under options two and three there are two calls rather than three — but **not a
 bare `sequence`**, for the same reason option one is not: a sequence answers the
@@ -3781,7 +3782,7 @@ id and drops `run_status` passes the trace-id test and breaks the tool.
 
 Edit the tool definitions only if Step 1 said to.
 
-- [ ] **Step 6: Run everything and measure**
+- [x] **Step 6: Run everything and measure**
 
 ```bash
 # every option
@@ -3796,7 +3797,7 @@ If Step 1 chose to remove the parameters, `toolSurface.test.ts` fails by design:
 regenerate the snapshot in the same commit and say in the message that the
 surface changed on the user's instruction.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 **Run only the block for the option Step 1 chose.** The three are alternatives,
 not a sequence: the first names files the others never create, and the third

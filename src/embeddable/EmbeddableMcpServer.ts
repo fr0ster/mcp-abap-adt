@@ -18,6 +18,7 @@ import type {
   SapEnvironment,
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
+import type { SystemContextResolver } from '../lib/requestSystemResolution.js';
 import type { IAdtSystemContext } from '../lib/systemContext.js';
 import { setSystemContext } from '../lib/systemContext.js';
 import { BaseMcpServer } from './BaseMcpServer.js';
@@ -96,6 +97,15 @@ export interface EmbeddableMcpServerOptions {
    * bespoke role-based rules.
    */
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
+
+  /**
+   * Fills the responsible person and master system a call lacks — neither in
+   * its request scope nor in the process context — from the connection's
+   * system. The default resolves them on ABAP Cloud (one lookup per
+   * connection) and does nothing on-premise. `null` disables it.
+   * @default defaultSystemContextResolver
+   */
+  systemContextResolver?: SystemContextResolver | null;
 }
 
 /**
@@ -131,6 +141,7 @@ export class EmbeddableMcpServer extends BaseMcpServer {
       version: options.version ?? DEFAULT_VERSION,
       logger: options.logger,
       systemType: options.systemType,
+      systemContextResolver: options.systemContextResolver,
     });
 
     this.injectedConnection = options.connection;

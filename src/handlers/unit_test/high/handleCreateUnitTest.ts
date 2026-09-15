@@ -1,186 +1,112 @@
 /**
- * CreateUnitTest Handler - Start ABAP Unit test run via AdtClient
+ * CreateUnitTest Handler - Create the container class for a class's ABAP
+ * Unit tests
  *
- * Uses AdtClient.getUnitTest().create() for high-level test run operation.
- * Starts unit test execution and returns run_id for status/result queries.
+ * Uses AdtClient.getUnitTest().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * **`create` no longer means "start a run".** In adt-clients 18, `AdtUnitTest
+ * .create()` meant "start a run" — this tool's own pre-migration schema
+ * (`tests`, `title`, `context`, `scope`, `risk_level`, `duration`) was built
+ * for that call. adt-clients 19's `AdtUnitTest` splits the two apart (its own
+ * doc comment: "until 12.0.0 they shared one method: `create` meant 'start a
+ * run', which is why `update` and `delete` looked like capabilities ADT
+ * withheld"): `create` now posts the **container class** — the CLAS/OC a
+ * class's local test classes live in — and `run` (a separate member, used by
+ * the pre-existing `RunUnitTest` tool, not part of this task) starts one.
+ * This tool's surface changes beyond `detail` accordingly — see the task
+ * report for why.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`. `create()` posts the class shell only — no
+ * tests; write them afterward with `UpdateUnitTest`, taking the lock handle
+ * from a `LockClass`-style lock on this same container class. No lock here.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateUnitTest',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.',
+    'Operation: Create. Subject: the container class for a set of ABAP Unit tests. Creates the class in initial state, with no tests written yet. Use UpdateUnitTest (with a lock handle from a class lock) to write the tests, and RunUnitTest to run them.',
   inputSchema: {
     type: 'object',
     properties: {
-      tests: {
-        type: 'array',
-        description: 'List of container/test class pairs to execute.',
-        items: {
-          type: 'object',
-          properties: {
-            container_class: {
-              type: 'string',
-              description:
-                'Class that owns the test include (e.g., ZCL_MAIN_CLASS).',
-            },
-            test_class: {
-              type: 'string',
-              description:
-                'Test class name inside the include (e.g., LTCL_MAIN_CLASS).',
-            },
-          },
-          required: ['container_class', 'test_class'],
-        },
-      },
-      title: {
+      class_name: {
         type: 'string',
-        description: 'Optional title for the ABAP Unit run.',
+        description:
+          'Container class name (e.g., ZCL_MY_TESTS). Must follow SAP naming conventions.',
       },
-      context: {
+      package_name: {
         type: 'string',
-        description: 'Optional context string shown in SAP tools.',
+        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
       },
-      scope: {
-        type: 'object',
-        properties: {
-          own_tests: { type: 'boolean' },
-          foreign_tests: { type: 'boolean' },
-          add_foreign_tests_as_preview: { type: 'boolean' },
-        },
+      description: {
+        type: 'string',
+        description: 'Optional description. Defaults to class_name.',
       },
-      risk_level: {
-        type: 'object',
-        properties: {
-          harmless: { type: 'boolean' },
-          dangerous: { type: 'boolean' },
-          critical: { type: 'boolean' },
-        },
+      class_template: {
+        type: 'string',
+        description: 'Optional template the container class is created from.',
       },
-      duration: {
-        type: 'object',
-        properties: {
-          short: { type: 'boolean' },
-          medium: { type: 'boolean' },
-          long: { type: 'boolean' },
-        },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages).',
       },
+      ...DETAIL_PROPERTY,
     },
-    required: ['tests'],
+    required: ['class_name', 'package_name'],
   },
 } as const;
 
 interface CreateUnitTestArgs {
-  tests: Array<{
-    container_class: string;
-    test_class: string;
-  }>;
-  title?: string;
-  context?: string;
-  scope?: {
-    own_tests?: boolean;
-    foreign_tests?: boolean;
-    add_foreign_tests_as_preview?: boolean;
-  };
-  risk_level?: {
-    harmless?: boolean;
-    dangerous?: boolean;
-    critical?: boolean;
-  };
-  duration?: {
-    short?: boolean;
-    medium?: boolean;
-    long?: boolean;
-  };
+  class_name: string;
+  package_name: string;
+  description?: string;
+  class_template?: string;
+  transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateUnitTest MCP tool
- *
- * Uses AdtClient.getUnitTest().create() - high-level test run operation
- */
 export async function handleCreateUnitTest(
   context: HandlerContext,
   args: CreateUnitTestArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      tests,
-      title,
-      context: contextStr,
-      scope,
-      risk_level,
-      duration,
-    } = args as CreateUnitTestArgs;
 
-    // Validation
-    if (!Array.isArray(tests) || tests.length === 0) {
-      return return_error(
-        new Error('tests array with at least one entry is required'),
-      );
-    }
-
-    const formattedTests = tests.map((test) => ({
-      containerClass: test.container_class.toUpperCase(),
-      testClass: test.test_class.toUpperCase(),
-    }));
-
-    const client = createAdtClient(connection, logger);
-    const unitTest = client.getUnitTest();
-
-    logger?.info(
-      `Starting ABAP Unit run for ${formattedTests.length} test definition(s)`,
-    );
-
-    try {
-      const createResult = await unitTest.create({
-        tests: formattedTests,
-        options: {
-          title,
-          context: contextStr,
-          scope: scope
-            ? {
-                ownTests: scope.own_tests,
-                foreignTests: scope.foreign_tests,
-                addForeignTestsAsPreview: scope.add_foreign_tests_as_preview,
-              }
-            : undefined,
-          riskLevel: risk_level,
-          duration,
-        },
-      });
-
-      if (!createResult.runId) {
-        throw new Error('Failed to start unit test run: run_id not returned');
-      }
-
-      logger?.info(`✅ CreateUnitTest started. Run ID: ${createResult.runId}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id: createResult.runId,
-            message: `ABAP Unit run started. Use GetUnitTest with run_id ${createResult.runId} to get status and results.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error starting ABAP Unit run: ${error?.message || error}`);
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  const className = args.class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateUnitTest', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getUnitTest(ourUnitTest)
+        .create(
+          {
+            className,
+            packageName: args.package_name,
+            description: args.description || className,
+            classTemplate: args.class_template,
+            transportRequest: args.transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

@@ -1,28 +1,50 @@
 /**
- * CreateCdsUnitTest Handler - Create CDS unit test class via AdtClient
+ * CreateCdsUnitTest Handler - Create the container class for a CDS view's
+ * ABAP Unit tests
  *
- * Uses AdtClient.getCdsUnitTest().validate() and .create() for CDS-specific lifecycle.
+ * Uses AdtClient.getCdsUnitTest().{checkCdsTestDoubles,create} from
+ * @mcp-abap-adt/adt-clients 19.
+ *
+ * Workflow: checkCdsTestDoubles -> create. No lock: the test-doubles check is
+ * a plain GET-shaped request (`checkCdsTestDoubles(cdsViewName)` takes no
+ * lock, no `options`, and ships its own `testDoublesVerdict` reading — there
+ * is no `analyse` to inject), and `create()` — called here without
+ * `classTemplate`/`testClassSource`, which routes it through
+ * `AdtUnitTest.create()`'s plain path rather than the CDS-specific one — is a
+ * bare POST of the class shell.
+ *
+ * `cds_view_name` is real work here, not a dead parameter: it is what the
+ * test-doubles check is about, asked first because a view the doubles
+ * framework cannot handle makes everything after it pointless. It does not
+ * itself reach `create()`'s request body — `AdtUnitTest.create()` never reads
+ * a CDS view name — so the created class is not otherwise bound to the view;
+ * that binding lives in the test source written afterward, via
+ * `UpdateCdsUnitTest`, under a lock this handler does not hold.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Create a CDS unit test class with CDS validation. Creates the test class in initial state.',
+    "Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest (with a lock handle from a class lock) to write the tests.",
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Global test class name (e.g., ZCL_CDS_TEST).',
+        description: 'Container class name (e.g., ZCL_CDS_TEST).',
       },
       package_name: {
         type: 'string',
@@ -30,17 +52,19 @@ export const TOOL_DEFINITION = {
       },
       cds_view_name: {
         type: 'string',
-        description: 'CDS view name to validate for unit test doubles.',
+        description:
+          'CDS view name to check for unit test doubles before creating the class.',
       },
       description: {
         type: 'string',
-        description: 'Optional description for the global test class.',
+        description: 'Optional description for the container class.',
       },
       transport_request: {
         type: 'string',
         description:
           'Transport request number (required for transportable packages).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'package_name', 'cds_view_name'],
   },
@@ -50,98 +74,52 @@ interface CreateCdsUnitTestArgs {
   class_name: string;
   package_name: string;
   cds_view_name: string;
-  class_template?: string;
-  test_class_source?: string;
   description?: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateCdsUnitTest MCP tool
- *
- * Uses AdtClient.getCdsUnitTest().validate() and .create()
- */
 export async function handleCreateCdsUnitTest(
   context: HandlerContext,
   args: CreateCdsUnitTestArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      package_name,
-      cds_view_name,
-      class_template,
-      test_class_source,
-      description,
-      transport_request,
-    } = args as CreateCdsUnitTestArgs;
 
-    if (!class_name || !package_name || !cds_view_name) {
-      return return_error(
-        new Error(
-          'Missing required parameters: class_name, package_name, cds_view_name',
-        ),
-      );
-    }
-
-    const className = class_name.toUpperCase();
-    const cdsViewName = cds_view_name.toUpperCase();
-
-    const client = createAdtClient(connection, logger);
-    const cdsUnitTest = client.getCdsUnitTest();
-
-    logger?.info(
-      `Creating CDS unit test class ${className} for CDS view ${cdsViewName}`,
-    );
-
-    try {
-      const createResult = await cdsUnitTest.create({
-        className,
-        packageName: package_name,
-        cdsViewName,
-        classTemplate: class_template || '',
-        testClassSource: test_class_source || '',
-        description,
-        transportRequest: transport_request,
-      });
-
-      if (!createResult?.testClassState) {
-        throw new Error(
-          `Create did not return a response for CDS unit test class ${className}`,
-        );
-      }
-
-      logger?.info(`✅ CreateCdsUnitTest completed successfully: ${className}`);
-
-      // Extract safe fields — testClassState contains AxiosResponse objects
-      // with circular references that cannot be JSON.stringified
-      const safeState = {
-        testClassCode: createResult.testClassState?.testClassCode,
-        lockHandle: createResult.testClassState?.lockHandle,
-        errors: createResult.testClassState?.errors,
-      };
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            cds_view_name: cdsViewName,
-            test_class_state: safeState,
-            message: `CDS unit test class ${className} created successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating CDS unit test class ${className}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+  if (!args?.cds_view_name) {
+    return return_error(new Error('cds_view_name is required'));
+  }
+
+  const className = args.class_name.toUpperCase();
+  const cdsViewName = args.cds_view_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateCdsUnitTest', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getCdsUnitTest(
+        ourUnitTest,
+      );
+
+      return sequence(
+        () => obj.checkCdsTestDoubles(cdsViewName),
+        () =>
+          obj.create(
+            {
+              className,
+              packageName: args.package_name,
+              description: args.description || className,
+              transportRequest: args.transport_request,
+            },
+            { analyse: analyseException },
+          ),
+      );
+    },
+    project(detail, terseWrite),
+  );
 }

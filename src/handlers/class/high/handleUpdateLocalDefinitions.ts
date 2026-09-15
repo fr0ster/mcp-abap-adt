@@ -1,21 +1,36 @@
 /**
- * UpdateLocalDefinitions Handler - Update Local Definitions via AdtClient
+ * UpdateLocalDefinitions Handler - Write a class's local definitions include
+ *
+ * Uses AdtClient.getLocalDefinitions().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **This handler holds no lock — it takes the caller's lock handle as an
+ * argument.** Same shape as `UpdateLocalTestClass`: `AdtLocalDefinitions
+ * .update()` never takes a lock and never releases one — the lock is the
+ * *class's*, taken with `getClass().lock()` and shared across every include.
+ * Without a lock handle the shipped endpoint answers "400 Parameter
+ * lockHandle could not be found". This changes the tool's surface beyond
+ * `detail` — see the task report for why.
+ *
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode ?? config.definitionsCode`. Verified against
+ * `AdtLocalDefinitions.js`.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  extractAdtErrorMessage,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalDefinitions',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.',
+    'Write the local definitions include of an existing ABAP class. Takes the lock handle from a prior LockClass call — this tool does not lock or unlock the class itself.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -23,29 +38,32 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Parent class name (e.g., ZCL_MY_CLASS).',
       },
-      definitions_code: {
+      source_code: {
         type: 'string',
-        description: 'Updated source code for local definitions.',
+        description: 'Complete source code for the local definitions include.',
+      },
+      lock_handle: {
+        type: 'string',
+        description:
+          'Lock handle from a LockClass call on this class. Required — the shipped write endpoint answers "400 Parameter lockHandle could not be found" without one.',
       },
       transport_request: {
         type: 'string',
-        description: 'Transport request number.',
+        description:
+          'Transport request number (required for transportable objects).',
       },
-      activate_on_update: {
-        type: 'boolean',
-        description: 'Activate parent class after updating. Default: false',
-        default: false,
-      },
+      ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'definitions_code'],
+    required: ['class_name', 'source_code', 'lock_handle'],
   },
 } as const;
 
 interface UpdateLocalDefinitionsArgs {
   class_name: string;
-  definitions_code: string;
+  source_code: string;
+  lock_handle: string;
   transport_request?: string;
-  activate_on_update?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateLocalDefinitions(
@@ -53,77 +71,33 @@ export async function handleUpdateLocalDefinitions(
   args: UpdateLocalDefinitionsArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      definitions_code,
-      transport_request,
-      activate_on_update = false,
-    } = args as UpdateLocalDefinitionsArgs;
 
-    if (!class_name || !definitions_code) {
-      return return_error(
-        new Error('class_name and definitions_code are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Updating local definitions for ${className}`);
-
-    try {
-      const localDefinitions = client.getLocalDefinitions();
-      const updateResult = await localDefinitions.update(
-        {
-          className,
-          definitionsCode: definitions_code,
-          transportRequest: transport_request,
-        },
-        { activateOnUpdate: activate_on_update },
-      );
-
-      if (!updateResult) {
-        throw new Error(`Update did not return a result for ${className}`);
-      }
-
-      logger?.info(
-        `✅ UpdateLocalDefinitions completed successfully: ${className}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            transport_request: transport_request || null,
-            activated: activate_on_update,
-            message: `Local definitions updated successfully in ${className}.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating local definitions for ${className}: ${error?.message || error}`,
-      );
-
-      const detailedError = extractAdtErrorMessage(
-        error,
-        `Failed to update local definitions in ${className}`,
-      );
-      let errorMessage = `Failed to update local definitions: ${detailedError}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Local definitions for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+  if (!args?.source_code) {
+    return return_error(new Error('source_code is required'));
+  }
+  if (!args?.lock_handle) {
+    return return_error(new Error('lock_handle is required'));
+  }
+
+  const className = args.class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateLocalDefinitions', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getLocalDefinitions(resultsFor(classDocuments))
+        .update(
+          { className, transportRequest: args.transport_request },
+          {
+            sourceCode: args.source_code,
+            lockHandle: args.lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

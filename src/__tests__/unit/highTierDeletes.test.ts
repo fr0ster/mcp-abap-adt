@@ -10,37 +10,68 @@
  * about the strategy object's own identity (`o.analyse === analyseDeletion`),
  * which only a mock that hands the call's own arguments back can make —
  * a channel test can show the same *result* but not which strategy produced
- * it.
+ * it, and a channel test cannot fail differently for `analyseDeletion` vs.
+ * `analyseException` on a document it controls either way.
  *
- * The thirteen checks (`analyseCheck`/`terseCheck`) are proven the same way,
- * for the same reason.
+ * **This file's deletion-service table and its lock-never test were cut
+ * once, when `highTierDeleteChannelReal.test.ts` was written, on the
+ * reasoning that a channel test proves more.** It proves different things,
+ * not more: the reviewer restored this file as a probe and found four
+ * mutations the channel table lets straight through — most importantly,
+ * swapping `analyseDeletion` for `analyseException` on any of the
+ * seventeen deletion-service deletes, which re-opens the exact
+ * HTTP-200-with-the-refusal-inside masking this task exists to close,
+ * because the channel table's own seeded response never carries a refusal
+ * to catch. Restored, and kept for good this time: this file proves which
+ * strategy and which projection a handler chose; the channel file proves
+ * what reaches the wire. Neither is a substitute for the other.
  *
- * **What this file does NOT prove — see `highTierDeleteChannelReal.test.ts`
- * for the rest.** A mocked member answers whatever the test told it to,
- * regardless of what the handler actually passed as the object's name, which
- * factory it reached, or whether a lock handle a `withLock` chain took
- * actually made it onto the write. Those are real-channel questions, run
- * through a real `AdtClient` against `recordingConnection`, in the sibling
- * file — this one and that one cannot share a test file, because this one's
- * `jest.mock('../../lib/clients', …)` would swallow the real client the
- * channel table depends on.
+ * The thirteen checks (`analyseCheck`/`terseCheck`) and the six
+ * not-deletion-service exceptions (`analyseException`, not
+ * `analyseDeletion`) are proven the same way, for the same reason.
  */
 
-import { analyseCheck, analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseCheck,
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
+import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
+import { handleDeleteBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleDeleteBehaviorImplementation';
 import { handleCheckClass } from '../../handlers/class/high/handleCheckClass';
 import { handleDeleteClass } from '../../handlers/class/high/handleDeleteClass';
+import { handleDeleteLocalDefinitions } from '../../handlers/class/high/handleDeleteLocalDefinitions';
+import { handleDeleteLocalMacros } from '../../handlers/class/high/handleDeleteLocalMacros';
+import { handleDeleteLocalTestClass } from '../../handlers/class/high/handleDeleteLocalTestClass';
+import { handleDeleteLocalTypes } from '../../handlers/class/high/handleDeleteLocalTypes';
 import { handleCheckDataElement } from '../../handlers/data_element/high/handleCheckDataElement';
+import { handleDeleteDataElement } from '../../handlers/data_element/high/handleDeleteDataElement';
 import { handleCheckDdl } from '../../handlers/ddl/high/handleCheckDdl';
+import { handleDeleteDdl } from '../../handlers/ddl/high/handleDeleteDdl';
 import { handleCheckMetadataExtension } from '../../handlers/ddlx/high/handleCheckMetadataExtension';
 import { handleCheckDomain } from '../../handlers/domain/high/handleCheckDomain';
+import { handleDeleteDomain } from '../../handlers/domain/high/handleDeleteDomain';
 import { handleCheckFunctionGroup } from '../../handlers/function/high/handleCheckFunctionGroup';
 import { handleCheckFunctionModule } from '../../handlers/function/high/handleCheckFunctionModule';
+import { handleDeleteFunctionGroup } from '../../handlers/function_group/high/handleDeleteFunctionGroup';
+import { handleDeleteFunctionInclude } from '../../handlers/function_include/high/handleDeleteFunctionInclude';
+import { handleDeleteFunctionModule } from '../../handlers/function_module/high/handleDeleteFunctionModule';
 import { handleCheckInterface } from '../../handlers/interface/high/handleCheckInterface';
+import { handleDeleteInterface } from '../../handlers/interface/high/handleDeleteInterface';
+import { handleDeleteMessageClass } from '../../handlers/message_class/high/handleDeleteMessageClass';
+import { handleDeleteMessageClassMessage } from '../../handlers/message_class/high/handleDeleteMessageClassMessage';
+import { handleDeleteMetadataExtension } from '../../handlers/metadata_extension/high/handleDeleteMetadataExtension';
 import { handleCheckPackage } from '../../handlers/package/high/handleCheckPackage';
 import { handleCheckProgram } from '../../handlers/program/high/handleCheckProgram';
+import { handleDeleteProgram } from '../../handlers/program/high/handleDeleteProgram';
+import { handleDeleteServiceBinding } from '../../handlers/service_binding/high/handleDeleteServiceBinding';
+import { handleDeleteServiceDefinition } from '../../handlers/service_definition/high/handleDeleteServiceDefinition';
 import { handleCheckStructure } from '../../handlers/structure/high/handleCheckStructure';
+import { handleDeleteStructure } from '../../handlers/structure/high/handleDeleteStructure';
 import { handleCheckTable } from '../../handlers/table/high/handleCheckTable';
+import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
+import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { corpusBody } from '../../lib/adtCorpus';
 import { parseStructure } from '../../lib/strategies/reading';
 import {
@@ -76,6 +107,171 @@ describe('a refused deletion, masked as a 200 by ADT itself', () => {
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text).origin).toBe('refusal');
     expect(result.content[0].text).not.toContain('"success": true');
+  });
+
+  it('never acquires a lock, because a held lock is what makes a deletion refuse', async () => {
+    const lock = jest.fn();
+    fakeClient = fakeClientOf({
+      delete: async () => okResponse(reading({})),
+      lock,
+    });
+    await handleDeleteClass(context as any, { class_name: 'ZCL_X' });
+    expect(lock).not.toHaveBeenCalled();
+  });
+});
+
+describe('the seventeen deletion-service deletes: analyseDeletion, and terseDeletion fields', () => {
+  it.each([
+    [
+      'DeleteBehaviorDefinition',
+      handleDeleteBehaviorDefinition,
+      { behavior_definition_name: 'Z_BDEF' },
+    ],
+    [
+      'DeleteBehaviorImplementation',
+      handleDeleteBehaviorImplementation,
+      { behavior_implementation_name: 'Z_BIMPL' },
+    ],
+    ['DeleteClass', handleDeleteClass, { class_name: 'ZCL_X' }],
+    [
+      'DeleteDataElement',
+      handleDeleteDataElement,
+      { data_element_name: 'Z_DE' },
+    ],
+    ['DeleteDdl', handleDeleteDdl, { ddl_name: 'ZDDL' }],
+    ['DeleteDomain', handleDeleteDomain, { domain_name: 'ZD' }],
+    [
+      'DeleteFunctionGroup',
+      handleDeleteFunctionGroup,
+      { function_group_name: 'ZFG' },
+    ],
+    [
+      'DeleteFunctionInclude',
+      handleDeleteFunctionInclude,
+      { function_group_name: 'ZFG', include_name: 'LZFGF01' },
+    ],
+    [
+      'DeleteFunctionModule',
+      handleDeleteFunctionModule,
+      { function_module_name: 'Z_FM', function_group_name: 'ZFG' },
+    ],
+    ['DeleteInterface', handleDeleteInterface, { interface_name: 'ZIF_X' }],
+    [
+      'DeleteMessageClass',
+      handleDeleteMessageClass,
+      { message_class_name: 'ZMSG' },
+    ],
+    ['DeleteProgram', handleDeleteProgram, { program_name: 'ZPROG' }],
+    [
+      'DeleteServiceBinding',
+      handleDeleteServiceBinding,
+      { service_binding_name: 'Z_SB' },
+    ],
+    [
+      'DeleteServiceDefinition',
+      handleDeleteServiceDefinition,
+      { service_definition_name: 'Z_SRV' },
+    ],
+    ['DeleteStructure', handleDeleteStructure, { structure_name: 'ZST' }],
+    ['DeleteTable', handleDeleteTable, { table_name: 'ZTAB' }],
+    [
+      'DeleteCdsUnitTest',
+      handleDeleteCdsUnitTest,
+      { class_name: 'ZCL_CDS_TEST' },
+    ],
+  ])('%s takes analyseDeletion and projects the deletion result', async (_n, handler, args) => {
+    const document = corpusBody('delete-success--01-deletion-delete');
+    const seen: unknown[] = [];
+    const lock = jest.fn();
+    fakeClient = fakeClientOf({
+      delete: async (_c: unknown, o: any) => {
+        seen.push(o.analyse);
+        return okResponse(reading(parseStructure(document), document, 200));
+      },
+      lock,
+    });
+    const result: any = await (handler as any)(context as any, args);
+    expect(seen).toEqual([analyseDeletion]);
+    expect(lock).not.toHaveBeenCalled();
+    // terseDeletion's own fields (`deleted`, `object`), so a projection
+    // swapped for terseCheck/terseWrite fails here.
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      deleted: true,
+      object: 'ZMCP_BLD_ANSCH01',
+    });
+  });
+});
+
+describe('the six not-deletion-service exceptions: analyseException, never analyseDeletion', () => {
+  it.each([
+    ['DeleteLocalDefinitions', handleDeleteLocalDefinitions],
+    ['DeleteLocalMacros', handleDeleteLocalMacros],
+    ['DeleteLocalTypes', handleDeleteLocalTypes],
+    ['DeleteLocalTestClass', handleDeleteLocalTestClass],
+  ])('%s empties the include under the class lock, with analyseException — not analyseDeletion', async (_n, handler) => {
+    const order: string[] = [];
+    const seenSourceCode: unknown[] = [];
+    const seenAnalyse: unknown[] = [];
+    fakeClient = fakeClientOf({
+      lock: async () => {
+        order.push('lock');
+        return okResponse('handle-1');
+      },
+      update: async (_c: unknown, o: any) => {
+        order.push('update');
+        seenSourceCode.push(o.sourceCode);
+        seenAnalyse.push(o.analyse);
+        return okResponse(reading(undefined, '', 200));
+      },
+      unlock: async () => {
+        order.push('unlock');
+        return okResponse(undefined);
+      },
+    });
+    const result: any = await (handler as any)(context as any, {
+      class_name: 'ZCL_X',
+    });
+    expect(result.isError).toBe(false);
+    expect(order).toEqual(['lock', 'update', 'unlock']);
+    expect(seenSourceCode).toEqual(['']);
+    expect(seenAnalyse).toEqual([analyseException]);
+  });
+
+  it('DeleteMessageClassMessage calls delete with analyseException, no lock available to take', async () => {
+    const lock = jest.fn();
+    let seenAnalyse: unknown;
+    fakeClient = fakeClientOf({
+      delete: async (_c: unknown, o: any) => {
+        seenAnalyse = o.analyse;
+        return okResponse(reading(undefined, '', 200));
+      },
+      lock,
+    });
+    const result: any = await handleDeleteMessageClassMessage(context as any, {
+      message_class_name: 'ZMSG',
+      msgno: '001',
+    });
+    expect(result.isError).toBe(false);
+    expect(seenAnalyse).toBe(analyseException);
+    expect(lock).not.toHaveBeenCalled();
+  });
+
+  it('DeleteMetadataExtension calls delete with analyseException and projects terseWrite (status-derived)', async () => {
+    let seenAnalyse: unknown;
+    fakeClient = fakeClientOf({
+      delete: async (_c: unknown, o: any) => {
+        seenAnalyse = o.analyse;
+        return okResponse(reading(undefined, '', 200));
+      },
+    });
+    const result: any = await handleDeleteMetadataExtension(context as any, {
+      metadata_extension_name: 'Z_DDLX',
+    });
+    expect(result.isError).toBe(false);
+    expect(seenAnalyse).toBe(analyseException);
+    // terseWrite's own shape: a bare string, not a `deleted`/`object` JSON
+    // object — a projection swapped back to terseDeletion fails here.
+    expect(result.content[0].text).toBe('SUCCESS');
   });
 });
 

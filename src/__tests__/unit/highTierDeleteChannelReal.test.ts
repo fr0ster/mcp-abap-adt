@@ -19,10 +19,26 @@
  * its row sits in the deletion-service table below rather than getting a
  * pass because its strategy identity checks out elsewhere.
  *
+ * **The deletion-service rows assert the whole `adtcore:uri`, not the
+ * object's name alone.** A first cut of this table asserted only that the
+ * name reached the request, which a wrong-factory or wrong-type delete can
+ * still satisfy: a table named X deleted through the structure family's
+ * endpoint carries "X" in its `adtcore:uri` (`/ddic/structures/X`) just as
+ * validly as a genuine structure delete does. The type lives in the path
+ * segment in front of the name, so `carriesUri` checks the full
+ * `adtcore:uri="…"` attribute, type and name together — see its own
+ * comment.
+ *
  * This file does NOT mock `../../lib/clients` — the real `AdtClass`,
  * `AdtDomain`, `AdtLocalDefinitions`, … build and send the wire request, and
  * every assertion here reads the request `recordingConnection` captured
  * rather than the object a double was told to hand back.
+ *
+ * Neither this file nor `highTierDeletes.test.ts` is a substitute for the
+ * other. This one proves what reaches the wire; that one proves which
+ * strategy and which projection a handler chose (a channel test cannot see
+ * an `analyse` function's identity, only its effect on a document this
+ * table controls anyway) — keep both.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
@@ -105,32 +121,40 @@ function deletionSuccessXml(objectName: string): string {
   );
 }
 
-/** Every part of `objectNameParts` reaches the given request. */
-function carriesAll(request: RecordedRequest, parts: string[]): boolean {
-  return parts.every((p) => carries(request, p));
+/** Whether the exact `adtcore:uri="{uri}"` attribute appears in the given
+ * request's body, case-insensitively. Deliberately the *whole* URI, not a
+ * substring: the object's type is the path prefix in front of its name
+ * (`/oo/classes/` vs `/ddic/tables/` vs `/ddic/structures/`, …), and a
+ * substring match on the name alone cannot tell a table named X apart from
+ * a structure named X, or a class deleted through the wrong family's
+ * factory — the reviewer confirmed both of those pass a name-only check
+ * silently. `carries` (the loose, name-or-fragment check) stays in use
+ * below only where a single technical name is genuinely the whole
+ * question — the four include writes' class name in a PUT URL, and
+ * `DeleteMetadataExtension`'s name in its own plain-DELETE URL, neither of
+ * which has a second family whose path shape could collide with it. */
+function carriesUri(request: RecordedRequest, uri: string): boolean {
+  return carries(request, `adtcore:uri="${uri}"`);
 }
 
 interface DeletionCase {
   name: string;
-  /** Every technical identifier the caller supplied, as the caller supplied
-   * it — every one of these, not just one, must reach the request. A
-   * family with two identifying fields (a function module's group and
-   * module name) proves nothing about the second field if only the first
-   * is checked: `handleDeleteFunctionModule` with `functionGroupName`
-   * silently dropped from its `.delete()` call still produces a request
-   * (`.../groups/undefined/fmodules/ZFM_DEL_X`) that carries the module
-   * name fine — only asserting the group name too catches it. Unique
-   * across rows, so a handler that ignored its own arguments in favour of
-   * some other row's name (or a constant) is caught rather than
-   * accidentally matched. */
-  objectNameParts: string[];
+  /** The exact `adtcore:uri` value the deletion-service body must carry —
+   * the object's type (the path segment) and its name both, built from the
+   * same technical names `run` passes to the handler. See `carriesUri`'s
+   * own comment for why a name-only check is not enough. Unique across
+   * rows, so a handler that ignored its own arguments in favour of some
+   * other row's name (or a constant) is caught rather than accidentally
+   * matched. */
+  expectedUri: string;
   run: (connection: IAbapConnection) => Promise<unknown>;
 }
 
 const deletionServiceCases: DeletionCase[] = [
   {
     name: 'DeleteBehaviorDefinition',
-    objectNameParts: ['ZBDEF_DEL_X'],
+    // AdtBehaviorDefinition's delete.js lowercases the encoded name.
+    expectedUri: '/sap/bc/adt/bo/behaviordefinitions/zbdef_del_x',
     run: (c) =>
       handleDeleteBehaviorDefinition(ctx(c) as any, {
         behavior_definition_name: 'ZBDEF_DEL_X',
@@ -138,7 +162,8 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteBehaviorImplementation',
-    objectNameParts: ['ZBIMP_DEL_X'],
+    // Routes through getClass()'s own deletion; see class/delete.js.
+    expectedUri: '/sap/bc/adt/oo/classes/ZBIMP_DEL_X',
     run: (c) =>
       handleDeleteBehaviorImplementation(ctx(c) as any, {
         behavior_implementation_name: 'ZBIMP_DEL_X',
@@ -146,12 +171,12 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteClass',
-    objectNameParts: ['ZCL_DEL_X'],
+    expectedUri: '/sap/bc/adt/oo/classes/ZCL_DEL_X',
     run: (c) => handleDeleteClass(ctx(c) as any, { class_name: 'ZCL_DEL_X' }),
   },
   {
     name: 'DeleteDataElement',
-    objectNameParts: ['ZDE_DEL_X'],
+    expectedUri: '/sap/bc/adt/ddic/dataelements/ZDE_DEL_X',
     run: (c) =>
       handleDeleteDataElement(ctx(c) as any, {
         data_element_name: 'ZDE_DEL_X',
@@ -159,26 +184,27 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteDdl',
-    objectNameParts: ['ZVW_DEL_X'],
+    expectedUri: '/sap/bc/adt/ddic/ddl/sources/ZVW_DEL_X',
     run: (c) => handleDeleteDdl(ctx(c) as any, { ddl_name: 'ZVW_DEL_X' }),
   },
   {
     name: 'DeleteDomain',
-    objectNameParts: ['ZDOM_DEL_X'],
+    expectedUri: '/sap/bc/adt/ddic/domains/ZDOM_DEL_X',
     run: (c) =>
       handleDeleteDomain(ctx(c) as any, { domain_name: 'ZDOM_DEL_X' }),
   },
   {
     name: 'DeleteFunctionGroup',
-    objectNameParts: ['ZFG_DEL_X'],
+    expectedUri: '/sap/bc/adt/functions/groups/ZFG_DEL_X',
     run: (c) =>
       handleDeleteFunctionGroup(ctx(c) as any, {
         function_group_name: 'ZFG_DEL_X',
       }),
   },
   {
+    // functionInclude/delete.js lowercases the group segment only.
     name: 'DeleteFunctionInclude',
-    objectNameParts: ['ZFG_DEL_X', 'ZINC_DEL_X'],
+    expectedUri: '/sap/bc/adt/functions/groups/zfg_del_x/includes/ZINC_DEL_X',
     run: (c) =>
       handleDeleteFunctionInclude(ctx(c) as any, {
         function_group_name: 'ZFG_DEL_X',
@@ -186,8 +212,9 @@ const deletionServiceCases: DeletionCase[] = [
       }),
   },
   {
+    // functionModule/delete.js keeps both segments as given (no lowercase).
     name: 'DeleteFunctionModule',
-    objectNameParts: ['ZFG_DEL_X', 'ZFM_DEL_X'],
+    expectedUri: '/sap/bc/adt/functions/groups/ZFG_DEL_X/fmodules/ZFM_DEL_X',
     run: (c) =>
       handleDeleteFunctionModule(ctx(c) as any, {
         function_module_name: 'ZFM_DEL_X',
@@ -196,13 +223,14 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteInterface',
-    objectNameParts: ['ZIF_DEL_X'],
+    expectedUri: '/sap/bc/adt/oo/interfaces/ZIF_DEL_X',
     run: (c) =>
       handleDeleteInterface(ctx(c) as any, { interface_name: 'ZIF_DEL_X' }),
   },
   {
+    // messageClass/delete.js lowercases the encoded name.
     name: 'DeleteMessageClass',
-    objectNameParts: ['ZMSGC_DEL_X'],
+    expectedUri: '/sap/bc/adt/messageclass/zmsgc_del_x',
     run: (c) =>
       handleDeleteMessageClass(ctx(c) as any, {
         message_class_name: 'ZMSGC_DEL_X',
@@ -210,13 +238,14 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteProgram',
-    objectNameParts: ['ZPROG_DEL_X'],
+    expectedUri: '/sap/bc/adt/programs/programs/ZPROG_DEL_X',
     run: (c) =>
       handleDeleteProgram(ctx(c) as any, { program_name: 'ZPROG_DEL_X' }),
   },
   {
+    // AdtServiceBinding.encodeName lowercases.
     name: 'DeleteServiceBinding',
-    objectNameParts: ['ZSB_DEL_X'],
+    expectedUri: '/sap/bc/adt/businessservices/bindings/zsb_del_x',
     run: (c) =>
       handleDeleteServiceBinding(ctx(c) as any, {
         service_binding_name: 'ZSB_DEL_X',
@@ -224,7 +253,7 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteServiceDefinition',
-    objectNameParts: ['ZSRV_DEL_X'],
+    expectedUri: '/sap/bc/adt/ddic/srvd/sources/ZSRV_DEL_X',
     run: (c) =>
       handleDeleteServiceDefinition(ctx(c) as any, {
         service_definition_name: 'ZSRV_DEL_X',
@@ -232,13 +261,13 @@ const deletionServiceCases: DeletionCase[] = [
   },
   {
     name: 'DeleteStructure',
-    objectNameParts: ['ZST_DEL_X'],
+    expectedUri: '/sap/bc/adt/ddic/structures/ZST_DEL_X',
     run: (c) =>
       handleDeleteStructure(ctx(c) as any, { structure_name: 'ZST_DEL_X' }),
   },
   {
     name: 'DeleteTable',
-    objectNameParts: ['ZTAB_DEL_X'],
+    expectedUri: '/sap/bc/adt/ddic/tables/ZTAB_DEL_X',
     run: (c) => handleDeleteTable(ctx(c) as any, { table_name: 'ZTAB_DEL_X' }),
   },
   {
@@ -246,16 +275,16 @@ const deletionServiceCases: DeletionCase[] = [
     // comment) — the same wire request as `DeleteClass`, so it belongs in
     // this table rather than its own.
     name: 'DeleteCdsUnitTest',
-    objectNameParts: ['ZCL_CDS_DEL_X'],
+    expectedUri: '/sap/bc/adt/oo/classes/ZCL_CDS_DEL_X',
     run: (c) =>
       handleDeleteCdsUnitTest(ctx(c) as any, { class_name: 'ZCL_CDS_DEL_X' }),
   },
 ];
 
-describe.each(deletionServiceCases)('$name', ({ objectNameParts, run }) => {
-  it(`reaches /sap/bc/adt/deletion/delete, POSTs a request naming ${objectNameParts.join(' + ')}, and takes no lock`, async () => {
+describe.each(deletionServiceCases)('$name', ({ expectedUri, run }) => {
+  it(`reaches /sap/bc/adt/deletion/delete, POSTs a request naming adtcore:uri="${expectedUri}", and takes no lock`, async () => {
     const conn = recordingConnection([
-      { data: deletionSuccessXml(objectNameParts[objectNameParts.length - 1]) },
+      { data: deletionSuccessXml(expectedUri.split('/').pop() as string) },
     ]);
 
     const result: any = await run(conn);
@@ -268,9 +297,9 @@ describe.each(deletionServiceCases)('$name', ({ objectNameParts, run }) => {
       '/sap/bc/adt/deletion/delete',
     );
     expect(hits.length).toBeGreaterThan(0);
-    // The caller's own object name reached the request — not a
-    // hard-coded one, and not another row's.
-    expect(hits.some((r) => carriesAll(r, objectNameParts))).toBe(true);
+    // The exact object — type and name both, not a name-only substring
+    // match a wrong-family or wrong-type delete could still satisfy.
+    expect(hits.some((r) => carriesUri(r, expectedUri))).toBe(true);
     // A held lock is what makes ADT refuse a deletion; these must never
     // take one.
     expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(

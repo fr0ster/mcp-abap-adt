@@ -5,11 +5,14 @@
  * Uses AdtClient.getMetadataExtension().delete from
  * @mcp-abap-adt/adt-clients 19.
  *
- * **Not a deletion-service call.** Confirmed against
- * `AdtMetadataExtension.d.ts`'s own comment ("Its delete is a DELETE on its
- * own URL rather than the deletion service") and `delete.js`: `delete()`
- * issues a plain `DELETE /sap/bc/adt/ddic/ddlx/sources/{name}`, not a POST
- * to `/sap/bc/adt/deletion/delete`. That endpoint answers no
+ * **Not a deletion-service call.** `AdtMetadataExtension.d.ts`'s
+ * `checkDeletion()` doc comment says so of the resource generally — "Its
+ * delete is a DELETE on its own URL rather than the deletion service, but
+ * the question is the service's either way" — sitting directly above
+ * `delete()`, which carries no comment of its own. The primary evidence is
+ * `delete.js`: `delete()` issues a plain
+ * `DELETE /sap/bc/adt/ddic/ddlx/sources/{name}`, not a POST to
+ * `/sap/bc/adt/deletion/delete`. That endpoint answers no
  * `del:deletionResult`/`del:checkResponse` document — `terseDeletion` would
  * find no `del:object` in an empty body and mask every success as a local
  * `projection_failed`, the same defect class task 20 found in two handlers

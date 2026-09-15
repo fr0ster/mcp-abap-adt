@@ -39,7 +39,8 @@ own tests pass and it is committed — not when it is described.
 | 18. The `high` tier `Get*` handlers | done | `3c60dd2` |
 | 19. High-tier writes under a lock | done | `33a1a99` |
 | 20. High-tier writes without a lock | done | `ed68752` |
-| 21 – 29 | not started | |
+| 21. High-tier deletes and checks | done | `99824ff` |
+| 22 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2626,7 +2627,7 @@ this migration does not add one — adding a tool or a mode is a change to the
 tool surface, which this work is not allowed to make. Recorded here so the
 next person meets the fact rather than the gap.
 
-- [ ] **Step 1: Write the failing test, from the corpus**
+- [x] **Step 1: Write the failing test, from the corpus**
 
 ```typescript
 // src/__tests__/unit/highTierDeletes.test.ts
@@ -2682,10 +2683,10 @@ it('never acquires a lock, because a held lock is what makes a deletion refuse',
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail**
-- [ ] **Step 3: Implement**, one family per commit.
-- [ ] **Step 4: Run the tests and measure**
-- [ ] **Step 5: Commit per family** — `refactor(<family>): the high-tier delete, on the deletion strategy`
+- [x] **Step 2: Run them to verify they fail**
+- [x] **Step 3: Implement**, one family per commit.
+- [x] **Step 4: Run the tests and measure**
+- [x] **Step 5: Commit per family** — `refactor(<family>): the high-tier delete, on the deletion strategy`
 
 ---
 

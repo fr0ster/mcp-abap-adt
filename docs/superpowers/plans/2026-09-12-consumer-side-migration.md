@@ -41,7 +41,8 @@ own tests pass and it is committed — not when it is described.
 | 20. High-tier writes without a lock | done | `ed68752` |
 | 21. High-tier deletes and checks | done | `99824ff` |
 | 22. The read-modify-write families | done | `c6bc755` |
-| 23 – 29 | not started | |
+| 23. Members 19 removed or renamed | done | `37c500d` |
+| 24 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2845,7 +2846,7 @@ which is this task's shape exactly.
 Most are a rename and stay one call. `handleUpdateServiceBinding` and the two
 program profiling handlers are the ones that become sequences.
 
-- [ ] **Step 1: Establish what each removed member did, from the changelog and the corpus**
+- [x] **Step 1: Establish what each removed member did, from the changelog and the corpus**
 
 ```bash
 # every member the table names, not the four an earlier draft happened to list
@@ -2869,7 +2870,7 @@ until it is written down.
 
 Write down the endpoint sequence each one issued **before** writing code. A sequence guessed from the old arguments is a guess.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 **Take every test's arguments from the tool's own `required` list.** A handler
 validates its input before it builds a client, so a row missing a required field
@@ -3018,7 +3019,7 @@ it.todo('UpdateServiceBinding, once Step 1 has named the members it maps onto');
 
 ```
 
-- [ ] **Step 3: Replace the `it.todo` with a failing test**
+- [x] **Step 3: Replace the `it.todo` with a failing test**
 
 Step 1 has now named which members `updateServiceBinding` maps onto. Write the
 test before the handler, like every other shape in this task, and assert three
@@ -3080,14 +3081,14 @@ so the suite is green either way — which makes this the one consumer that coul
 ship with no behavioural test at all, and it is also the least determined one in
 the table.
 
-- [ ] **Step 4: Run the tests to verify they fail**
-- [ ] **Step 5: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`.
+- [x] **Step 4: Run the tests to verify they fail**
+- [x] **Step 5: Implement** each as `answer(ctx, () => sequence(...), project)`, every step whose member accepts one carrying its own `analyse`.
 
 **Two axes, and only one of them is missing here.** The where-used and node-structure members accept **no per-call `analyse`** — their verdict stays adt-clients'. They do still take **our injected result set**: `client.getUtils(ourUtils)`, never `client.getUtils()`. Omitting it selects the shipped `node` strategy, which drops the descriptions `nodeLevel` keeps, and a tree without descriptions is one a caller has to walk again. Absent strategy and absent injection are different absences; do not read the first as licence for the second.
 
 `packageEnumerator` uses `walkPackage` from `packageWalk.ts`, which already replaced `getPackageContentsList` in `handleGetPackageTree`.
-- [ ] **Step 6: Run the tests and measure**
-- [ ] **Step 7: Commit** — `refactor(system): the eleven consumers of members 19 removed`
+- [x] **Step 6: Run the tests and measure**
+- [x] **Step 7: Commit** — `refactor(system): the eleven consumers of members 19 removed`
 
 ---
 

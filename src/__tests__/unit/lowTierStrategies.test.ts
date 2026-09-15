@@ -39,7 +39,9 @@ import {
   analyseException,
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
+import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
@@ -2433,6 +2435,68 @@ describe('data_element', () => {
 
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+});
+
+describe('service_binding — Activate only, over AdtServiceBinding', () => {
+  it('ActivateServiceBindingLow reaches getServiceBinding with analyseActivation', async () => {
+    await handleActivateServiceBinding(context as any, { name: 'ZSB_X' });
+    const call = callTo('activate');
+    expect(call?.factory).toBe('getServiceBinding');
+    expect(call?.args[0]).toEqual({ bindingName: 'ZSB_X' });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseActivation);
+  });
+
+  it('ActivateServiceBindingLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateServiceBinding(context as any, {
+      name: 'ZSB_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
+  });
+
+  it('ActivateServiceBindingLow reports a refused activation as an error, on the real refusal-activation-fails fixture (200 with activationExecuted="false")', async () => {
+    // The library's own verdict for a 200 is ADT_NO_FAILURE — this is the
+    // HTTP-200-with-a-refusal-inside case the injection exists for, so
+    // `analyseActivation` has to read the document itself to find it.
+    const document = corpusBody('refusal-activation-fails--01-activation');
+    fakeClient = fakeClientOf({
+      activate: async (_config: unknown, options: any) => {
+        const verdict = options.analyse(ADT_NO_FAILURE, {
+          data: document,
+          status: 200,
+        });
+        if (verdict === ADT_NO_FAILURE) {
+          throw new Error('test fixture expected a refusal, got none');
+        }
+        return {
+          ok: false,
+          getError: () => verdict,
+          getResult: () => {
+            throw new Error('asked for the result of a failure');
+          },
+        };
+      },
+    });
+
+    const result: any = await handleActivateServiceBinding(context as any, {
+      name: 'ZSB_X',
+    });
+
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.origin).toBe('refusal');
   });
 });
 

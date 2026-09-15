@@ -37,6 +37,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -104,27 +105,31 @@ export async function handleUpdateClass(
 
       const written = await withLock(
         () => obj.lock({ className }),
-        async (
-          lockHandle,
-        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          if (shouldActivate) {
-            const checked = await obj.check(
-              { className, sourceCode: args.source_code },
-              'inactive',
-              { analyse: analyseCheck },
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          const update = () =>
+            obj.update(
+              { className, transportRequest: args.transport_request },
+              {
+                sourceCode: args.source_code,
+                lockHandle,
+                analyse: analyseException,
+              },
             );
-            if (!checked.ok) {
-              return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
-            }
-          }
-          return obj.update(
-            { className, transportRequest: args.transport_request },
-            {
-              sourceCode: args.source_code,
-              lockHandle,
-              analyse: analyseException,
-            },
-          );
+          // A conditional phase of the sequence, not a hand-rolled
+          // short-circuit: when activating, the check is a real first step
+          // and a refusal stops the write via `sequence`'s own discipline;
+          // when not, there is no first step and `update` runs alone.
+          return shouldActivate
+            ? sequence(
+                () =>
+                  obj.check(
+                    { className, sourceCode: args.source_code },
+                    'inactive',
+                    { analyse: analyseCheck },
+                  ),
+                update,
+              )
+            : update();
         },
         (lockHandle) => obj.unlock({ className }, lockHandle),
       );

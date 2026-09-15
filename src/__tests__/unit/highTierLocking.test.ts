@@ -185,8 +185,10 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     const result: any = await handleCreateDomain(context as any, lifecycleArgs);
     expect(result.isError).toBe(false);
     // The order the handler performs today: validate, create, then the
-    // read-modify-write held under one lock, then check, then a best-effort
-    // wait (a second `readMetadata`, discarded) before activate.
+    // read-modify-write held under one lock, then a best-effort wait (a
+    // second `readMetadata`, discarded) immediately before `check` — the
+    // first call after the write that reads it back, and so the one the
+    // wait has to sit ahead of, not after — then activate.
     expect(order).toEqual([
       'validate',
       'create',
@@ -194,8 +196,8 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       'read',
       'update',
       'unlock',
-      'check',
       'read',
+      'check',
       'activate',
     ]);
   });

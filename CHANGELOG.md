@@ -31,13 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fix.
 
   Everything else that changed shape during the underlying `withLock`
-  migration and still holds after review: the pre-write and post-unlock
-  syntax checks and the long-polling wait for write visibility are restored
-  to their pre-migration shape (checks now carry the check strategy, so a
-  refusal is reported the way every other refusal in this migration is), and
-  `config.packageName` is no longer sent on `UpdateDomain`/`CreateDomain`/
-  `UpdateDataElement`/`CreateDataElement`'s metadata write — the shipped wire
-  function never read it.
+  migration and still holds after review: the long-polling wait for write
+  visibility is restored, in its pre-migration position, on every handler
+  that had one. The pre-write syntax check on `UpdateClass`, `UpdateDdl`,
+  `UpdateInterface`, `UpdateProgram`, `UpdateStructure` and `UpdateTable` is
+  restored too, gated by `activate` exactly as before — it runs only when
+  `activate` is set, and a refusal there stops the write. No handler
+  restores a *post*-unlock check: the pre-migration one existed only on
+  these same six, its own `catch` never rethrew, and it is dropped rather
+  than restored — every check in this migration now carries the check
+  strategy, so a refusal is reported the way every other refusal is, and a
+  check that could never have changed the answer is not worth the round
+  trip. `config.packageName` is no longer sent on `UpdateDomain`/
+  `CreateDomain`/`UpdateDataElement`/`CreateDataElement`'s metadata write —
+  the shipped wire function never read it. `CreateStructure` no longer
+  holds a lock while it creates — nothing between `create` and `check` ever
+  wrote through it.
 
 - **`ActivateObjectLow` (multi-object activation) now answers acceptance, not
   a verdict.** Activating a single object still reads a real pass/fail

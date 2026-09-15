@@ -6,15 +6,19 @@
  *
  * A lifecycle, not one call: validate the name, create the bare object, lock
  * it, read-patch-write the properties the caller gave (through `withLock`,
- * released on every path out), check the inactive version, wait for the
- * write to be visible, and optionally activate. The lock wraps only the
+ * released on every path out), wait for the write to be visible, check the
+ * inactive version, and optionally activate. The lock wraps only the
  * read-modify-write in the middle — `create` and `check` are their own
  * requests outside it, matching the order the pre-migration handler ran
- * them in. The wait before `activate` is the pre-migration handler's
- * long-polling `read({withLongPolling: true})`, discarded for its result
- * but not for what it does — this repository's own `xmlPatch.ts` documents
- * the live incident behind it: a read of a not-yet-ready object answers 200
- * with an empty body, never a 404.
+ * them in: `unlock` then the wait then `check`, not the other way round —
+ * `check` is the first call after the write that reads it back, so it is
+ * the one the wait has to sit ahead of. The pre-migration handler's own
+ * wait was `read({withLongPolling: true})`; domain exposes no plain `read`
+ * in adt-clients 19 (only `readMetadata`), so the wait here is
+ * `readMetadata({withLongPolling: true})`, discarded for its result but not
+ * for what it does — this repository's own `xmlPatch.ts` documents the live
+ * incident behind it: a read of a not-yet-ready object answers 200 with an
+ * empty body, never a 404.
  *
  * **`config.packageName` never reaches the wire on `updateMetadata`.** The
  * shipped `updateDomain()` wire function (`core/domain/update.js`) builds
@@ -250,22 +254,25 @@ export async function handleCreateDomain(
               ),
             (lockHandle) => obj.unlock({ domainName }, lockHandle),
           ),
-        () => obj.check({ domainName }, undefined, { analyse: analyseCheck }),
+        // Best-effort: wait for the write to be visible, right before the
+        // first call that reads it back — this is the call most likely to
+        // meet a not-yet-ready object (see `xmlPatch.ts`), so the wait sits
+        // immediately ahead of it, exactly where the pre-migration handler
+        // put it (between `unlock` and `check`).
+        async () => {
+          await obj
+            .readMetadata(
+              { domainName },
+              { withLongPolling: true, analyse: analyseException },
+            )
+            .catch(() => undefined);
+          return obj.check({ domainName }, undefined, {
+            analyse: analyseCheck,
+          });
+        },
       );
 
-      if (!checked.ok) {
-        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
-      }
-
-      // Best-effort: wait for the write to be visible before activating.
-      await obj
-        .readMetadata(
-          { domainName },
-          { withLongPolling: true, analyse: analyseException },
-        )
-        .catch(() => undefined);
-
-      if (!shouldActivate) {
+      if (!checked.ok || !shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 

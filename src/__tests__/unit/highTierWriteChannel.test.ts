@@ -107,15 +107,18 @@ interface WireCase {
   run: () => Promise<Captured>;
 }
 
+/** Matches `fakeClient.ts`'s own (unexported) `Members` shape. */
+type AnyMembers = Record<string, (...args: unknown[]) => unknown>;
+
 function capture(
-  extra: Record<string, unknown>,
+  extra: AnyMembers,
   target: string,
-): { members: Record<string, unknown>; captured: () => Captured['config'] } {
+): { members: AnyMembers; captured: () => Captured['config'] } {
   let seen: { config: any; options: any } = {
     config: undefined,
     options: undefined,
   };
-  const members = {
+  const members: AnyMembers = {
     ...baseMembers(),
     ...extra,
     [target]: async (config: unknown, options?: unknown) => {

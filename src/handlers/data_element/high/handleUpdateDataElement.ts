@@ -10,13 +10,15 @@
  * write to be visible) -> (activate). `check` runs unconditionally, not
  * gated by `activate` — the pre-migration handler ran it the same way (a
  * refusal there stopped the answer), and it is now a step of the `sequence`
- * below rather than a hand-rolled rethrow. The wait between `unlock` and
- * `activate` is the pre-migration handler's long-polling
- * `readMetadata({withLongPolling: true})`, discarded for its result but not
- * for what it does — see `handleUpdateDomain.ts` (high) for the live
- * incident this guards against, documented in `xmlPatch.ts`. The pre-write
- * "already exists" validation is gone — it tolerated exactly one refusal
- * shape from an endpoint an update never needs to call.
+ * below rather than a hand-rolled rethrow. The pre-migration handler's own
+ * wait was `read({withLongPolling: true})`; data element exposes no plain
+ * `read` in adt-clients 19 (only `readMetadata`), so the wait between
+ * `unlock` and `activate` here is `readMetadata({withLongPolling: true})`,
+ * discarded for its result but not for what it does — see
+ * `handleUpdateDomain.ts` (high) for the live incident this guards against,
+ * documented in `xmlPatch.ts`. The pre-write "already exists" validation is
+ * gone — it tolerated exactly one refusal shape from an endpoint an update
+ * never needs to call.
  *
  * **The patched document goes in `config.document`, not `options.xmlContent`.**
  * See `UpdateDataElementLow` — the shipped `AdtDataElement.updateMetadata()`

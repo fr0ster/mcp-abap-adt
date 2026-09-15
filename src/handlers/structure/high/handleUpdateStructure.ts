@@ -33,6 +33,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -100,27 +101,29 @@ export async function handleUpdateStructure(
 
       const written = await withLock(
         () => obj.lock({ structureName }),
-        async (
-          lockHandle,
-        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          if (shouldActivate) {
-            const checked = await obj.check(
-              { structureName, ddlCode: args.ddl_code },
-              'inactive',
-              { analyse: analyseCheck },
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          const update = () =>
+            obj.update(
+              { structureName, transportRequest: args.transport_request },
+              {
+                sourceCode: args.ddl_code,
+                lockHandle,
+                analyse: analyseException,
+              },
             );
-            if (!checked.ok) {
-              return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
-            }
-          }
-          return obj.update(
-            { structureName, transportRequest: args.transport_request },
-            {
-              sourceCode: args.ddl_code,
-              lockHandle,
-              analyse: analyseException,
-            },
-          );
+          // A conditional phase of the sequence, not a hand-rolled
+          // short-circuit: see UpdateClass for the reasoning.
+          return shouldActivate
+            ? sequence(
+                () =>
+                  obj.check(
+                    { structureName, ddlCode: args.ddl_code },
+                    'inactive',
+                    { analyse: analyseCheck },
+                  ),
+                update,
+              )
+            : update();
         },
         (lockHandle) => obj.unlock({ structureName }, lockHandle),
       );

@@ -1,12 +1,28 @@
-import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+/**
+ * RuntimeRunClassWithProfiling Handler - Execute ABAP class with profiler
+ * enabled [deprecated, kept for backward compatibility]
+ *
+ * Uses `new AdtExecutor(connection, logger).getClassExecutor()` from
+ * @mcp-abap-adt/adt-clients 19. Same `scheduleTrace` → `runWithProfiler` →
+ * feed-search shape as `handleRuntimeRunClass.ts` (see that file's header for
+ * the full reasoning and citations) — this tool always takes the profiled
+ * path, and never answers `output`: it did not before the migration either,
+ * and this work adds no field to a deprecated tool.
+ */
+
+import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { newTraceAfter } from '../../../lib/strategies/newTrace';
+import { terseProfilingRun } from '../../../lib/strategies/runProjections';
+import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunClassWithProfiling',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime][deprecated] Execute ABAP class with profiler enabled and return created profilerId + traceId. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
+    '[runtime][deprecated] Execute ABAP class with profiler enabled: schedules a trace, runs the class under it, then searches the profiler feed for the trace id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). trace_id is absent if the trace has not appeared within that bound. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -35,19 +51,19 @@ export const TOOL_DEFINITION = {
         type: 'integer',
         minimum: 1,
         description:
-          'Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).',
+          'Max attempts to poll the profiler feed for the trace this run produced (default 5). Increase for slow systems (e.g. SAP trial cloud).',
       },
       trace_retry_delay_ms: {
         type: 'integer',
         minimum: 0,
         description:
-          'Delay in ms between trace polling attempts (default 2000).',
+          'Delay in ms between profiler-feed polling attempts (default 2000).',
       },
       trace_lookup_uris: {
         type: 'array',
         items: { type: 'string', minLength: 1 },
         description:
-          'Additional URIs to consult when resolving the trace (advanced).',
+          'Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.',
       },
     },
     required: ['class_name'],
@@ -72,6 +88,7 @@ interface RuntimeRunClassWithProfilingArgs {
   max_time_for_tracing?: number;
   max_trace_attempts?: number;
   trace_retry_delay_ms?: number;
+  /** Accepted, no longer read — see the tool description and the file header. */
   trace_lookup_uris?: string[];
 }
 
@@ -81,78 +98,80 @@ export async function handleRuntimeRunClassWithProfiling(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.class_name) {
-      throw new Error('Parameter "class_name" is required');
-    }
-
-    const className = args.class_name.trim().toUpperCase();
-    const executor = new AdtExecutor(connection, logger);
-    const classExecutor = executor.getClassExecutor();
-
-    const maxTraceAttempts =
-      typeof args.max_trace_attempts === 'number' &&
-      Number.isFinite(args.max_trace_attempts) &&
-      args.max_trace_attempts >= 1
-        ? Math.trunc(args.max_trace_attempts)
-        : undefined;
-    const traceRetryDelayMs =
-      typeof args.trace_retry_delay_ms === 'number' &&
-      Number.isFinite(args.trace_retry_delay_ms) &&
-      args.trace_retry_delay_ms >= 0
-        ? Math.trunc(args.trace_retry_delay_ms)
-        : undefined;
-    const traceLookupUris = Array.isArray(args.trace_lookup_uris)
-      ? args.trace_lookup_uris.filter(
-          (uri): uri is string => typeof uri === 'string' && uri.length > 0,
-        )
-      : undefined;
-
-    const result = await classExecutor.runWithProfiling(
-      { className },
-      {
-        maxTraceAttempts,
-        traceRetryDelayMs,
-        traceLookupUris,
-        profilerParameters: {
-          description: args.description,
-          allProceduralUnits: args.all_procedural_units,
-          allMiscAbapStatements: args.all_misc_abap_statements,
-          allInternalTableEvents: args.all_internal_table_events,
-          allDynproEvents: args.all_dynpro_events,
-          aggregate: args.aggregate,
-          explicitOnOff: args.explicit_on_off,
-          withRfcTracing: args.with_rfc_tracing,
-          allSystemKernelEvents: args.all_system_kernel_events,
-          sqlTrace: args.sql_trace,
-          allDbEvents: args.all_db_events,
-          maxSizeForTraceFile: args.max_size_for_trace_file,
-          amdpTrace: args.amdp_trace,
-          maxTimeForTracing: args.max_time_for_tracing,
-        },
-      },
-    );
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          class_name: className,
-          profiler_id: result.profilerId,
-          trace_id: result.traceId,
-          run_status: result.response?.status,
-          trace_requests_status: result.traceRequestsResponse?.status,
-        },
-        null,
-        2,
-      ),
-      status: result.response?.status,
-      statusText: result.response?.statusText,
-      headers: result.response?.headers,
-      config: result.response?.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error running class with profiling:', error);
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('Parameter "class_name" is required'));
   }
+
+  const className = args.class_name.trim().toUpperCase();
+  const executor = new AdtExecutor(connection, logger);
+  const classExecutor = executor.getClassExecutor();
+
+  const maxTraceAttempts =
+    typeof args.max_trace_attempts === 'number' &&
+    Number.isFinite(args.max_trace_attempts) &&
+    args.max_trace_attempts >= 1
+      ? Math.trunc(args.max_trace_attempts)
+      : 5;
+  const traceRetryDelayMs =
+    typeof args.trace_retry_delay_ms === 'number' &&
+    Number.isFinite(args.trace_retry_delay_ms) &&
+    args.trace_retry_delay_ms >= 0
+      ? Math.trunc(args.trace_retry_delay_ms)
+      : 2000;
+
+  const profilerParameters = {
+    description: args.description,
+    allProceduralUnits: args.all_procedural_units,
+    allMiscAbapStatements: args.all_misc_abap_statements,
+    allInternalTableEvents: args.all_internal_table_events,
+    allDynproEvents: args.all_dynpro_events,
+    aggregate: args.aggregate,
+    explicitOnOff: args.explicit_on_off,
+    withRfcTracing: args.with_rfc_tracing,
+    allSystemKernelEvents: args.all_system_kernel_events,
+    sqlTrace: args.sql_trace,
+    allDbEvents: args.all_db_events,
+    maxSizeForTraceFile: args.max_size_for_trace_file,
+    amdpTrace: args.amdp_trace,
+    maxTimeForTracing: args.max_time_for_tracing,
+  };
+
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+
+  return answer(
+    { tool: 'RuntimeRunClassWithProfiling', detail: 'terse' },
+    async () => {
+      const snapshot = await profiler.list();
+      if (!snapshot.ok) return snapshot;
+      const before = new Set(
+        snapshot.getResult().value.map((entry) => entry.id),
+      );
+
+      let profilerId = '';
+      const ran = await sequence(
+        () => classExecutor.scheduleTrace(profilerParameters),
+        (id: string) => {
+          profilerId = id;
+          return classExecutor.runWithProfiler(
+            { className },
+            { profilerId: id },
+          );
+        },
+      );
+      if (!ran.ok) return ran;
+
+      const found = await newTraceAfter(profiler, before, {
+        attempts: maxTraceAttempts,
+        delayMs: traceRetryDelayMs,
+      });
+      if (!found.ok) return found;
+
+      return succeededWith({
+        className,
+        profilerId,
+        traceId: found.getResult().value,
+      });
+    },
+    terseProfilingRun,
+  );
 }

@@ -93,6 +93,23 @@ export async function sequence(
 }
 
 /**
+ * The one-line success builder every combinator in this file that manufactures
+ * its own `IAdtResponse` needs — `pair` for its joined tuple, `newTraceAfter`
+ * (`newTrace.ts`) for the id it found or the `undefined` it didn't. Lifted out
+ * here rather than writing a third copy: the failing `getError` sentinel is
+ * the one thing worth keeping identical across every caller.
+ */
+export function succeededWith<T>(value: T): IAdtResponse<T, IAdtError> {
+  return {
+    ok: true,
+    getResult: () => ({ value }),
+    getError: () => {
+      throw new Error('succeededWith: asked for the error of a success');
+    },
+  } as unknown as IAdtResponse<T, IAdtError>;
+}
+
+/**
  * Two calls whose BOTH answers are the result.
  *
  * `sequence` answers the last step, which is what a read-modify-write wants. A
@@ -115,11 +132,5 @@ export async function pair<A, B>(
   if (!b.ok) return b as unknown as IAdtResponse<[A, B], IAdtError>;
 
   const both: [A, B] = [valueA, b.getResult().value];
-  return {
-    ok: true,
-    getResult: () => ({ value: both }),
-    getError: () => {
-      throw new Error('pair: asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<[A, B], IAdtError>;
+  return succeededWith(both);
 }

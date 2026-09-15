@@ -69,6 +69,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@mcp-abap-adt/adt-clients` (giving the member the `<E extends IAdtError>`
   shape every sibling member already has); not fixed by this change.
 
+- **`RuntimeRunClass` and `RuntimeRunClassWithProfiling` now find a profiled
+  run's trace themselves, and two fields they used to answer are gone.**
+  adt-clients 19 split the old composite `runWithProfiling` into
+  `scheduleTrace` + `runWithProfiler`, neither of which waits for a trace or
+  answers a `traceId` — a run only schedules and executes, and reading a
+  trace is `IProfiler.list()`/`read()`, whenever the caller is ready. Both
+  tools still advertise `trace_id`, `max_trace_attempts` and
+  `trace_retry_delay_ms`, so this repository now composes what the library
+  no longer does: it snapshots the profiler feed before scheduling, runs,
+  then polls the feed for an id that was not in the snapshot — by set
+  difference, ordered by the library's own `compareRecordedAt` (never by
+  feed position, and never by sorting `recordedAt` as a string, both of
+  which pick the wrong trace on a real feed). `max_trace_attempts` and
+  `trace_retry_delay_ms` keep bounding that search exactly as before. A run
+  that finishes before its trace is written still answers success, with
+  `trace_id` absent rather than fabricated — poll `RuntimeListProfilerTraceFiles`
+  or `RuntimeAnalyzeProfilerTrace` afterwards in that case.
+
+  `trace_lookup_uris` is now accepted and ignored: adt-clients 19's
+  `IProfilerListOptions` is `{ user?: string }`, the whole interface, so
+  there is nowhere left to put a URI — the profiler feed is one endpoint,
+  not one per lookup URI.
+
+  `run_status` and `trace_requests_status` are gone from both tools' answers
+  and cannot come back under any of the three options considered: `run` and
+  `runWithProfiler` answer `IAdtResponse<string>` and `ClassExecutor` takes
+  no result strategy in its constructor, so there is no transport envelope
+  left to read a status from.
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

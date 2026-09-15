@@ -1,12 +1,55 @@
-import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+/**
+ * RuntimeRunClass Handler - Execute an ABAP class, optionally profiled
+ *
+ * Uses `new AdtExecutor(connection, logger).getClassExecutor()` from
+ * @mcp-abap-adt/adt-clients 19 — not `createAdtClient` (see
+ * `handleRuntimeRunProgram.ts` for the same door on the program side).
+ *
+ * **`runWithProfiling` was split, not deleted**, exactly as it was for
+ * programs: `ClassExecutor`'s own doc comment says "Not `IClassExecutor` since
+ * 19.0.0 ... a caller who wants the old member writes `scheduleTrace`, then
+ * `runWithProfiler` with the id it answered."
+ *
+ * **This family does not stop there, unlike the program one.** 19 also
+ * dropped `traceId` from the run itself — `IAdtExecutors.d.ts`: "`traceId` is
+ * gone because a run cannot promise a trace that may not exist yet, may never
+ * exist, and may be read a week later. Reading a trace is `IProfiler.list()`
+ * and `read()`, whenever the caller is ready." Both class tools here still
+ * advertise `trace_id`, and the repository owner ruled (task 24) that the
+ * work of finding it moves onto this repository rather than off the
+ * contract: snapshot the profiler feed before scheduling, run, then poll
+ * `IProfiler.list()` for an id that was not in the snapshot — by SET
+ * DIFFERENCE, never by position and never by a text sort of `recordedAt`. See
+ * `newTrace.ts` for the search itself and its own reasoning.
+ *
+ * `max_trace_attempts`/`trace_retry_delay_ms` keep their pre-migration
+ * meaning under this search. `trace_lookup_uris` does not survive it —
+ * `IProfilerListOptions` is `{ user?: string }`, the whole interface, so
+ * there is nowhere to put a URI. It is accepted and ignored, per the same
+ * ruling, rather than rebuilt with raw requests below `IProfiler` — going
+ * underneath the library's own abstraction to replace a capability it
+ * dropped puts this repository back in the business of speaking ADT
+ * directly, which is the boundary the two packages exist to keep.
+ *
+ * `run_status`/`trace_requests_status` are gone in every case: `run` and
+ * `runWithProfiler` answer `IAdtResponse<string>` and `ClassExecutor` takes no
+ * result strategy, so there is no transport envelope left to read a status
+ * from. See CHANGELOG.md.
+ */
+
+import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { newTraceAfter } from '../../../lib/strategies/newTrace';
+import { terseClassRun } from '../../../lib/strategies/runProjections';
+import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace (returns profilerId/traceId alongside output).',
+    '[runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -17,7 +60,7 @@ export const TOOL_DEFINITION = {
       profile: {
         type: 'boolean',
         description:
-          'When true, run with the profiler and resolve the resulting traceId. Default false.',
+          'When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.',
       },
       description: {
         type: 'string',
@@ -41,19 +84,19 @@ export const TOOL_DEFINITION = {
         type: 'integer',
         minimum: 1,
         description:
-          'Max polling attempts to resolve traceId after execution (default 5). Only used when profile=true.',
+          'Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.',
       },
       trace_retry_delay_ms: {
         type: 'integer',
         minimum: 0,
         description:
-          'Delay in ms between trace polling attempts (default 2000). Only used when profile=true.',
+          'Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.',
       },
       trace_lookup_uris: {
         type: 'array',
         items: { type: 'string', minLength: 1 },
         description:
-          'Additional URIs to consult when resolving the trace (advanced, profile=true).',
+          'Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.',
       },
     },
     required: ['class_name'],
@@ -79,6 +122,7 @@ interface RuntimeRunClassArgs {
   max_time_for_tracing?: number;
   max_trace_attempts?: number;
   trace_retry_delay_ms?: number;
+  /** Accepted, no longer read — see the tool description and the file header. */
   trace_lookup_uris?: string[];
 }
 
@@ -88,104 +132,98 @@ export async function handleRuntimeRunClass(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.class_name) {
-      throw new Error('Parameter "class_name" is required');
-    }
-
-    const className = args.class_name.trim().toUpperCase();
-    const executor = new AdtExecutor(connection, logger);
-    const classExecutor = executor.getClassExecutor();
-
-    if (!args.profile) {
-      const response = await classExecutor.run({ className });
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            output: typeof response.data === 'string' ? response.data : '',
-            run_status: response.status,
-          },
-          null,
-          2,
-        ),
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        config: response.config,
-      });
-    }
-
-    const maxTraceAttempts =
-      typeof args.max_trace_attempts === 'number' &&
-      Number.isFinite(args.max_trace_attempts) &&
-      args.max_trace_attempts >= 1
-        ? Math.trunc(args.max_trace_attempts)
-        : undefined;
-    const traceRetryDelayMs =
-      typeof args.trace_retry_delay_ms === 'number' &&
-      Number.isFinite(args.trace_retry_delay_ms) &&
-      args.trace_retry_delay_ms >= 0
-        ? Math.trunc(args.trace_retry_delay_ms)
-        : undefined;
-    const traceLookupUris = Array.isArray(args.trace_lookup_uris)
-      ? args.trace_lookup_uris.filter(
-          (uri): uri is string => typeof uri === 'string' && uri.length > 0,
-        )
-      : undefined;
-
-    const result = await classExecutor.runWithProfiling(
-      { className },
-      {
-        maxTraceAttempts,
-        traceRetryDelayMs,
-        traceLookupUris,
-        profilerParameters: {
-          description: args.description,
-          allProceduralUnits: args.all_procedural_units,
-          allMiscAbapStatements: args.all_misc_abap_statements,
-          allInternalTableEvents: args.all_internal_table_events,
-          allDynproEvents: args.all_dynpro_events,
-          aggregate: args.aggregate,
-          explicitOnOff: args.explicit_on_off,
-          withRfcTracing: args.with_rfc_tracing,
-          allSystemKernelEvents: args.all_system_kernel_events,
-          sqlTrace: args.sql_trace,
-          allDbEvents: args.all_db_events,
-          maxSizeForTraceFile: args.max_size_for_trace_file,
-          amdpTrace: args.amdp_trace,
-          maxTimeForTracing: args.max_time_for_tracing,
-        },
-      },
-    );
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          class_name: className,
-          output:
-            typeof result.response?.data === 'string'
-              ? result.response.data
-              : '',
-          run_status: result.response?.status,
-          profile: {
-            profiler_id: result.profilerId,
-            trace_id: result.traceId,
-            trace_requests_status: result.traceRequestsResponse?.status,
-          },
-        },
-        null,
-        2,
-      ),
-      status: result.response?.status,
-      statusText: result.response?.statusText,
-      headers: result.response?.headers,
-      config: result.response?.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error running class:', error);
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('Parameter "class_name" is required'));
   }
+
+  const className = args.class_name.trim().toUpperCase();
+  const executor = new AdtExecutor(connection, logger);
+  const classExecutor = executor.getClassExecutor();
+
+  if (!args.profile) {
+    // No `AdtRuntimeClient`, no profiler feed touched — a plain run does not
+    // search for a trace it never asked for.
+    return answer(
+      { tool: 'RuntimeRunClass', detail: 'terse' },
+      () => classExecutor.run({ className }),
+      (output: string) => terseClassRun({ className, output }),
+    );
+  }
+
+  const maxTraceAttempts =
+    typeof args.max_trace_attempts === 'number' &&
+    Number.isFinite(args.max_trace_attempts) &&
+    args.max_trace_attempts >= 1
+      ? Math.trunc(args.max_trace_attempts)
+      : 5;
+  const traceRetryDelayMs =
+    typeof args.trace_retry_delay_ms === 'number' &&
+    Number.isFinite(args.trace_retry_delay_ms) &&
+    args.trace_retry_delay_ms >= 0
+      ? Math.trunc(args.trace_retry_delay_ms)
+      : 2000;
+
+  const profilerParameters = {
+    description: args.description,
+    allProceduralUnits: args.all_procedural_units,
+    allMiscAbapStatements: args.all_misc_abap_statements,
+    allInternalTableEvents: args.all_internal_table_events,
+    allDynproEvents: args.all_dynpro_events,
+    aggregate: args.aggregate,
+    explicitOnOff: args.explicit_on_off,
+    withRfcTracing: args.with_rfc_tracing,
+    allSystemKernelEvents: args.all_system_kernel_events,
+    sqlTrace: args.sql_trace,
+    allDbEvents: args.all_db_events,
+    maxSizeForTraceFile: args.max_size_for_trace_file,
+    amdpTrace: args.amdp_trace,
+    maxTimeForTracing: args.max_time_for_tracing,
+  };
+
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+
+  return answer(
+    { tool: 'RuntimeRunClass', detail: 'terse' },
+    async () => {
+      // 1. The snapshot. A refused feed read is a refusal, not an empty feed —
+      // reported as-is, before scheduling or running anything.
+      const snapshot = await profiler.list();
+      if (!snapshot.ok) return snapshot;
+      const before = new Set(
+        snapshot.getResult().value.map((entry) => entry.id),
+      );
+
+      // 2. Schedule, then run. `sequence` hands the id to the next step and
+      // then forgets it, so it is captured here — the projection needs it and
+      // cannot reach back into a finished sequence.
+      let profilerId = '';
+      const ran = await sequence(
+        () => classExecutor.scheduleTrace(profilerParameters),
+        (id: string) => {
+          profilerId = id;
+          return classExecutor.runWithProfiler(
+            { className },
+            { profilerId: id },
+          );
+        },
+      );
+      if (!ran.ok) return ran;
+
+      // 3. The search. A run that succeeded with no trace written yet is
+      // still a successful run: the id is absent, not an error.
+      const found = await newTraceAfter(profiler, before, {
+        attempts: maxTraceAttempts,
+        delayMs: traceRetryDelayMs,
+      });
+      if (!found.ok) return found;
+
+      return succeededWith({
+        className,
+        output: ran.getResult().value,
+        profilerId,
+        traceId: found.getResult().value,
+      });
+    },
+    terseClassRun,
+  );
 }

@@ -1,14 +1,11 @@
-/**
- * GetLocalTestClass Handler - Read Local Test Class via AdtClient
- *
- * Uses AdtClient.getLocalTestClass().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
@@ -39,84 +36,29 @@ interface GetLocalTestClassArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetLocalTestClass MCP tool
- *
- * Uses AdtClient.getLocalTestClass().read() - high-level read operation
- */
 export async function handleGetLocalTestClass(
   context: HandlerContext,
   args: GetLocalTestClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { class_name, version = 'active' } = args as GetLocalTestClassArgs;
+  const { class_name, version = 'active' } = args;
+  if (!class_name) return return_error(new Error('class_name is required'));
 
-    // Validation
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
+  // `getLocalTestClass()` is typed against `classDocuments`/`IClassResults`,
+  // same shipped set as `getClass()` — confirmed against `AdtClient.d.ts`.
+  const className = class_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getLocalTestClass(
+    resultsFor(classDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(
-      `Reading local test class for ${className}, version: ${version}`,
-    );
-
-    try {
-      // Read local test class using AdtClient
-      const localTestClass = client.getLocalTestClass();
-      const readResult = await localTestClass.read(
-        { className },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`Local test class for ${className} not found`);
-      }
-
-      // Extract source code from read result
-      const sourceCode =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(`✅ GetLocalTestClass completed successfully: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            version,
-            test_class_code: sourceCode,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as IAdtResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading local test class for ${className}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read local test class: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Local test class for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
-      } else if (error.response?.status === 406) {
-        errorMessage = `Local test class read not supported on this system (HTTP 406).`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetLocalTestClass', detail: 'terse' },
+    () => obj.read({ className }, version, { analyse: analyseException }),
+    (source: AdtReading<string>) => ({
+      success: true,
+      class_name: className,
+      version,
+      test_class_code: source.raw,
+    }),
+  );
 }

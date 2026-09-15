@@ -1,14 +1,11 @@
-/**
- * GetStructure Handler - Read ABAP Structure via AdtClient
- */
-
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetStructure',
@@ -44,66 +41,25 @@ export async function handleGetStructure(
   args: GetStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { structure_name, version = 'active' } = args as GetStructureArgs;
+  const { structure_name, version = 'active' } = args;
+  if (!structure_name)
+    return return_error(new Error('structure_name is required'));
 
-    if (!structure_name) {
-      return return_error(new Error('structure_name is required'));
-    }
+  const structureName = structure_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getStructure(
+    resultsFor(structureDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(`Reading structure ${structureName}, version: ${version}`);
-
-    try {
-      const structureObject = client.getStructure();
-      const readResult = await structureObject.read(
-        { structureName },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`Structure ${structureName} not found`);
-      }
-
-      const structureData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(`✅ GetStructure completed successfully: ${structureName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            structure_name: structureName,
-            version,
-            structure_data: structureData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading structure ${structureName}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to read structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Structure ${structureName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Structure ${structureName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  // GetStructure has only ever answered the source, not the metadata — one
+  // call, unlike ReadStructure's pair.
+  return answer(
+    { tool: 'GetStructure', detail: 'terse' },
+    () => obj.read({ structureName }, version, { analyse: analyseException }),
+    (source: AdtReading<string>) => ({
+      success: true,
+      structure_name: structureName,
+      version,
+      structure_data: source.raw,
+    }),
+  );
 }

@@ -1,17 +1,10 @@
-/**
- * GetUnitTest Handler - Read ABAP Unit test status/result via AdtClient
- *
- * Uses AdtClient.getUnitTest().read() for high-level read operation.
- * Retrieves test run status and result for a previously started run.
- */
-
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
@@ -34,68 +27,38 @@ interface GetUnitTestArgs {
   run_id: string;
 }
 
-/**
- * Main handler for GetUnitTest MCP tool
- *
- * Uses AdtClient.getUnitTest().read() - high-level read operation
- */
 export async function handleGetUnitTest(
   context: HandlerContext,
   args: GetUnitTestArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { run_id } = args as GetUnitTestArgs;
+  const { run_id } = args;
+  if (!run_id) return return_error(new Error('run_id is required'));
 
-    // Validation
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
+  // The pre-migration handler called the v18 convenience `.read({runId})`,
+  // which answered status and result together. That method no longer
+  // exists on `AdtUnitTest` in v19 — `read`/`readMetadata` there take
+  // `IUnitTestConfig` (`className`, the tests' source), not a run id.
+  // Getting both halves of a run now needs two calls of its own, so this
+  // is the one Get* handler in the unit-test family that follows the pair
+  // shape, not the single-call one every sibling in this file uses.
+  // Neither `getStatus` nor `getResult` takes an options object at all —
+  // confirmed against the shipped `AdtUnitTest.d.ts` — so no `analyse` is
+  // passed to either.
+  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
 
-    const client = createAdtClient(connection, logger);
-    const unitTest = client.getUnitTest();
-
-    logger?.info(`Reading unit test run status/result for run_id: ${run_id}`);
-
-    try {
-      // Read test run using AdtClient
-      const readResult = await unitTest.read({ runId: run_id });
-
-      if (!readResult) {
-        throw new Error(`Unit test run ${run_id} not found`);
-      }
-
-      logger?.info(
-        `✅ GetUnitTest completed successfully for run_id: ${run_id}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id: readResult.runId,
-            run_status: readResult.runStatus,
-            run_result: readResult.runResult,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading unit test run ${run_id}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read unit test run: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Unit test run ${run_id} not found.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetUnitTest', detail: 'terse' },
+    () =>
+      pair(
+        () => unitTest.getStatus(run_id),
+        () => unitTest.getResult(run_id),
+      ),
+    ([status, result]: [AdtReading<unknown>, AdtReading<unknown>]) => ({
+      success: true,
+      run_id,
+      run_status: status.value,
+      run_result: result.value,
+    }),
+  );
 }

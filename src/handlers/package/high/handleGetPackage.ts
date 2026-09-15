@@ -1,17 +1,11 @@
-/**
- * GetPackage Handler - Read ABAP Package via AdtClient
- *
- * Uses AdtClient.getPackage().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackage',
@@ -42,80 +36,35 @@ interface GetPackageArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetPackage MCP tool
- *
- * Uses AdtClient.getPackage().read() - high-level read operation
- */
 export async function handleGetPackage(
   context: HandlerContext,
   args: GetPackageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { package_name, version = 'active' } = args as GetPackageArgs;
+  const { package_name, version = 'active' } = args;
+  if (!package_name) return return_error(new Error('package_name is required'));
 
-    // Validation
-    if (!package_name) {
-      return return_error(new Error('package_name is required'));
-    }
+  const packageName = package_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getPackage(
+    resultsFor(packageDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const packageName = package_name.toUpperCase();
-
-    logger?.info(`Reading package ${packageName}, version: ${version}`);
-
-    try {
-      // Read package using AdtClient
-      const packageObject = client.getPackage();
-      const readResult = await packageObject.read(
-        { packageName },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`Package ${packageName} not found`);
-      }
-
-      // Extract data from read result
-      const packageData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(`✅ GetPackage completed successfully: ${packageName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            package_name: packageName,
-            version,
-            package_data: packageData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading package ${packageName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read package: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Package ${packageName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Package ${packageName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  // A package is a container: it has no source of its own —
+  // `IPackageContract` composes `IAdtMetadataReadable` and nothing else, so
+  // unlike its siblings there is no `.read()` to call at all (same
+  // defect/fix as `ReadPackage`). Unlike Domain, DataElement and
+  // FunctionGroup, `AdtPackage` actually honours `version` — it forwards
+  // `options.version` into the query string — so it is passed through here,
+  // the same fix `ReadPackage` carries (task 11 fix round 1).
+  return answer(
+    { tool: 'GetPackage', detail: 'terse' },
+    () =>
+      obj.readMetadata({ packageName }, { version, analyse: analyseException }),
+    (metadata: AdtReading<string>) => ({
+      success: true,
+      package_name: packageName,
+      version,
+      package_data: metadata.raw,
+    }),
+  );
 }

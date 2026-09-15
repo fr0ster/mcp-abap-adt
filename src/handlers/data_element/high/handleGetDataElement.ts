@@ -1,17 +1,11 @@
-/**
- * GetDataElement Handler - Read ABAP Data Element via AdtClient
- *
- * Uses AdtClient.getDataElement().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetDataElement',
@@ -42,85 +36,36 @@ interface GetDataElementArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetDataElement MCP tool
- *
- * Uses AdtClient.getDataElement().read() - high-level read operation
- */
 export async function handleGetDataElement(
   context: HandlerContext,
   args: GetDataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { data_element_name, version = 'active' } =
-      args as GetDataElementArgs;
+  const { data_element_name, version = 'active' } = args;
+  if (!data_element_name)
+    return return_error(new Error('data_element_name is required'));
 
-    // Validation
-    if (!data_element_name) {
-      return return_error(new Error('data_element_name is required'));
-    }
+  const dataElementName = data_element_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getDataElement(
+    resultsFor(dataElementDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const dataElementName = data_element_name.toUpperCase();
-
-    logger?.info(
-      `Reading data element ${dataElementName}, version: ${version}`,
-    );
-
-    try {
-      // Read data element using AdtClient
-      const dataElementObject = client.getDataElement();
-      const readResult = await dataElementObject.read(
-        { dataElementName },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`Data element ${dataElementName} not found`);
-      }
-
-      // Extract data from read result
-      const dataElementData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(
-        `✅ GetDataElement completed successfully: ${dataElementName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            version,
-            data_element_data: dataElementData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Data element ${dataElementName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Data element ${dataElementName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  // A data element has no source of its own — `IDataElementContract`
+  // composes `IAdtMetadataReadable` and nothing else, so unlike its
+  // siblings there is no `.read()` to call at all (same defect/fix as
+  // `ReadDataElement`). `version` is not forwarded — the library ignores
+  // it at every level for this family, matching `ReadDataElement`'s own
+  // deliberately unfixed echo (task 11 fix round 1, deferred to the
+  // documentation task). One call, used for the one field this tool has
+  // always answered.
+  return answer(
+    { tool: 'GetDataElement', detail: 'terse' },
+    () => obj.readMetadata({ dataElementName }, { analyse: analyseException }),
+    (metadata: AdtReading<string>) => ({
+      success: true,
+      data_element_name: dataElementName,
+      version,
+      data_element_data: metadata.raw,
+    }),
+  );
 }

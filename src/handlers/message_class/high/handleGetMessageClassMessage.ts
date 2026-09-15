@@ -1,16 +1,8 @@
-/**
- * GetMessageClassMessage Handler - Read a single message from a Message Class (MSAG).
- *
- * Uses AdtClient.getMessageClassMessage().read().
- */
-
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetMessageClassMessage',
@@ -43,42 +35,37 @@ export async function handleGetMessageClassMessage(
   args: GetMessageClassMessageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { message_class_name, msgno } = args;
-    if (!message_class_name) {
-      return return_error(new Error('message_class_name is required'));
-    }
-    if (!msgno) {
-      return return_error(new Error('msgno is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const className = message_class_name.toUpperCase();
-
-    logger?.info(`Reading message ${msgno} of message class ${className}`);
-
-    const state = await client
-      .getMessageClassMessage()
-      .read({ className, msgno });
-    if (!state) {
-      return return_error(new Error(`Message class ${className} not found.`));
-    }
-
-    logger?.info(`✅ GetMessageClassMessage completed: ${className}/${msgno}`);
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          message_class_name: className,
-          msgno,
-          message: state.message ?? null,
-        },
-        null,
-        2,
-      ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
+  const { message_class_name, msgno } = args;
+  if (!message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+  if (!msgno) {
+    return return_error(new Error('msgno is required'));
+  }
+
+  const className = message_class_name.toUpperCase();
+
+  // No `resultsFor(messageDocuments)` and `.read()`, not `.readMetadata()`
+  // — same two disagreements with a naive port that `ReadMessageClassMessage`
+  // found and documents in full: `IMessageClassMessageResults` fixes
+  // `read`/`written`/`deleted` to literal `string`, so `resultsFor(...)`
+  // does not type-check against it, and `.readMetadata` is not on this
+  // contract at all. A message has no resource of its own — `read` fetches
+  // the whole PARENT CLASS document — and adt-clients 19 dropped the
+  // per-message parse the v18 SDK built `message` from, same as
+  // `ReadMessageClassMessage` found. The caller gets the full document,
+  // as that sibling tool already does, under this tool's own field name.
+  return answer(
+    { tool: 'GetMessageClassMessage', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getMessageClassMessage()
+        .read({ className, msgno }, undefined, { analyse: analyseException }),
+    (document: string) => ({
+      success: true,
+      message_class_name: className,
+      msgno,
+      message: document,
+    }),
+  );
 }

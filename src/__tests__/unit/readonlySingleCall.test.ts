@@ -22,22 +22,51 @@
  *    makes no call of its own.
  */
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { handleGetBehaviorDefinition } from '../../handlers/behavior_definition/high/handleGetBehaviorDefinition';
+import { handleGetBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleGetBehaviorImplementation';
+import { handleGetClass } from '../../handlers/class/high/handleGetClass';
+import { handleGetLocalDefinitions } from '../../handlers/class/high/handleGetLocalDefinitions';
+import { handleGetLocalMacros } from '../../handlers/class/high/handleGetLocalMacros';
+import { handleGetLocalTestClass } from '../../handlers/class/high/handleGetLocalTestClass';
+import { handleGetLocalTypes } from '../../handlers/class/high/handleGetLocalTypes';
 import { handleGetObjectVersionDiff } from '../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { resolveVersionedObject } from '../../handlers/common/readonly/resolveVersionedObject';
+import { handleGetDataElement } from '../../handlers/data_element/high/handleGetDataElement';
+import { handleGetDdl } from '../../handlers/ddl/high/handleGetDdl';
+import { handleGetDomain } from '../../handlers/domain/high/handleGetDomain';
 import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handleGetEnhancements';
+import { handleGetFunctionGroup } from '../../handlers/function_group/high/handleGetFunctionGroup';
+import { handleGetFunctionModule } from '../../handlers/function_module/high/handleGetFunctionModule';
+import { handleGetInterface } from '../../handlers/interface/high/handleGetInterface';
+import { handleGetMessageClass } from '../../handlers/message_class/high/handleGetMessageClass';
+import { handleGetMessageClassMessage } from '../../handlers/message_class/high/handleGetMessageClassMessage';
 import { handleReadMessageClass } from '../../handlers/message_class/readonly/handleReadMessageClass';
 import { handleReadMessageClassMessage } from '../../handlers/message_class/readonly/handleReadMessageClassMessage';
+import { handleGetMetadataExtension } from '../../handlers/metadata_extension/high/handleGetMetadataExtension';
+import { handleGetPackage } from '../../handlers/package/high/handleGetPackage';
+import { handleGetProgram } from '../../handlers/program/high/handleGetProgram';
 import { handleGetObjectsByType } from '../../handlers/search/readonly/handleGetObjectsByType';
 import { handleGetObjectsList } from '../../handlers/search/readonly/handleGetObjectsList';
 import { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject';
+import { handleGetServiceBinding } from '../../handlers/service_binding/high/handleGetServiceBinding';
+import { handleListServiceBindingTypes } from '../../handlers/service_binding/high/handleListServiceBindingTypes';
+import { handleGetServiceDefinition } from '../../handlers/service_definition/high/handleGetServiceDefinition';
+import { handleGetStructure } from '../../handlers/structure/high/handleGetStructure';
 import { handleGetAdtTypes } from '../../handlers/system/readonly/handleGetAllTypes';
 import { handleGetInactiveObjects } from '../../handlers/system/readonly/handleGetInactiveObjects';
 import { handleGetObjectInfo } from '../../handlers/system/readonly/handleGetObjectInfo';
 import { handleGetObjectNodeFromCache } from '../../handlers/system/readonly/handleGetObjectNodeFromCache';
 import { handleGetObjectStructure } from '../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery';
+import { handleGetTable } from '../../handlers/table/high/handleGetTable';
 import { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
+import { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest';
+import { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult';
+import { handleGetCdsUnitTestStatus } from '../../handlers/unit_test/high/handleGetCdsUnitTestStatus';
+import { handleGetUnitTest } from '../../handlers/unit_test/high/handleGetUnitTest';
+import { handleGetUnitTestResult } from '../../handlers/unit_test/high/handleGetUnitTestResult';
+import { handleGetUnitTestStatus } from '../../handlers/unit_test/high/handleGetUnitTestStatus';
 import { corpusBody } from '../../lib/adtCorpus';
 import { objectsListCache } from '../../lib/getObjectsListCache';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
@@ -591,5 +620,99 @@ describe('ListTransports, mapped from a real captured (empty) transport list', (
     const payload = JSON.parse(result.content[0].text);
     expect(payload.count).toBe(0);
     expect(payload.transports).toEqual([]);
+  });
+});
+
+/**
+ * The high-tier `Get*` handlers (task 18): twenty-nine handlers under each
+ * object family's `high` directory that predate — and are semantically
+ * thinner than —
+ * their `readonly/Read*` siblings above. Historically each answered exactly
+ * one field from a single `.read()` call; where v19 dropped `.read()`
+ * entirely for a family (`Domain`, `DataElement`, `Package`, `FunctionGroup`
+ * — the same four `ReadX` found has no source resource of its own) the
+ * single call is `.readMetadata()` instead. `GetFunctionModule` is the one
+ * exception that already made two calls before the migration (a metadata
+ * read to verify the caller's group, then the source read) and keeps that
+ * pair shape, mirroring `ReadFunctionModule`. The six unit-test readers
+ * (`GetUnitTest`/`GetCdsUnitTest` and their `Status`/`Result` halves) reach
+ * `getStatus`/`getResult` on `AdtUnitTest`/`AdtCdsUnitTest`, not `read` —
+ * the v18 convenience `.read({runId})` this family used no longer exists —
+ * and neither of those two members takes an options object at all, so they
+ * carry no `analyse` (see each handler's own comment).
+ *
+ * `refusingClient` answers a refusal for any factory and any member, so this
+ * proves each handler surfaces a refusal through the adapter without
+ * proving which member it called — same limitation the top `it.each` in
+ * this file already documents for its own rows.
+ */
+describe('the high-tier Get*/List* handlers answer through the adapter and surface a refusal', () => {
+  it.each([
+    ['GetClass', handleGetClass, { class_name: 'ZCL_X' }],
+    ['GetDomain', handleGetDomain, { domain_name: 'ZD' }],
+    ['GetTable', handleGetTable, { table_name: 'ZT' }],
+    ['GetStructure', handleGetStructure, { structure_name: 'ZS' }],
+    ['GetProgram', handleGetProgram, { program_name: 'ZP' }],
+    ['GetInterface', handleGetInterface, { interface_name: 'ZIF' }],
+    ['GetDdl', handleGetDdl, { ddl_name: 'ZDDL' }],
+    ['GetDataElement', handleGetDataElement, { data_element_name: 'ZDE' }],
+    ['GetPackage', handleGetPackage, { package_name: 'ZPKG' }],
+    ['GetMessageClass', handleGetMessageClass, { message_class_name: 'ZMC' }],
+    [
+      'GetMessageClassMessage',
+      handleGetMessageClassMessage,
+      { message_class_name: 'ZMC', msgno: '001' },
+    ],
+    [
+      'GetFunctionGroup',
+      handleGetFunctionGroup,
+      { function_group_name: 'ZFG' },
+    ],
+    [
+      'GetFunctionModule',
+      handleGetFunctionModule,
+      { function_module_name: 'ZFM', function_group_name: 'ZFG' },
+    ],
+    [
+      'GetServiceBinding',
+      handleGetServiceBinding,
+      { service_binding_name: 'ZSB' },
+    ],
+    ['ListServiceBindingTypes', handleListServiceBindingTypes, {}],
+    [
+      'GetServiceDefinition',
+      handleGetServiceDefinition,
+      { service_definition_name: 'ZSD' },
+    ],
+    [
+      'GetMetadataExtension',
+      handleGetMetadataExtension,
+      { metadata_extension_name: 'ZME' },
+    ],
+    [
+      'GetBehaviorDefinition',
+      handleGetBehaviorDefinition,
+      { behavior_definition_name: 'ZBD' },
+    ],
+    [
+      'GetBehaviorImplementation',
+      handleGetBehaviorImplementation,
+      { behavior_implementation_name: 'ZBI' },
+    ],
+    ['GetLocalTypes', handleGetLocalTypes, { class_name: 'ZCL_X' }],
+    ['GetLocalDefinitions', handleGetLocalDefinitions, { class_name: 'ZCL_X' }],
+    ['GetLocalMacros', handleGetLocalMacros, { class_name: 'ZCL_X' }],
+    ['GetLocalTestClass', handleGetLocalTestClass, { class_name: 'ZCL_X' }],
+    ['GetUnitTest', handleGetUnitTest, { run_id: 'r1' }],
+    ['GetUnitTestStatus', handleGetUnitTestStatus, { run_id: 'r1' }],
+    ['GetUnitTestResult', handleGetUnitTestResult, { run_id: 'r1' }],
+    ['GetCdsUnitTest', handleGetCdsUnitTest, { run_id: 'r1' }],
+    ['GetCdsUnitTestStatus', handleGetCdsUnitTestStatus, { run_id: 'r1' }],
+    ['GetCdsUnitTestResult', handleGetCdsUnitTestResult, { run_id: 'r1' }],
+  ])('%s answers through the adapter and surfaces a refusal', async (_n, handler, args) => {
+    fakeClient = refusingClient('Not found');
+    const result: any = await (handler as any)(context as any, args);
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe('Not found');
   });
 });

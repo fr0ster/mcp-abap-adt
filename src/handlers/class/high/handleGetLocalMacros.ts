@@ -1,17 +1,11 @@
-/**
- * GetLocalMacros Handler - Read Local Macros via AdtClient
- *
- * Uses AdtClient.getLocalMacros().read() for high-level read operation.
- * Note: Macros are supported in older ABAP versions but not in newer ones.
- */
-
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalMacros',
@@ -47,65 +41,24 @@ export async function handleGetLocalMacros(
   args: GetLocalMacrosArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { class_name, version = 'active' } = args as GetLocalMacrosArgs;
+  const { class_name, version = 'active' } = args;
+  if (!class_name) return return_error(new Error('class_name is required'));
 
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
+  // `getLocalMacros()` is typed against `classDocuments`/`IClassResults`,
+  // same shipped set as `getClass()` — confirmed against `AdtClient.d.ts`.
+  const className = class_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getLocalMacros(
+    resultsFor(classDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Reading local macros for ${className}, version: ${version}`);
-
-    try {
-      const localMacros = client.getLocalMacros();
-      const readResult = await localMacros.read(
-        { className },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`Local macros for ${className} not found`);
-      }
-
-      const sourceCode =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(`✅ GetLocalMacros completed successfully: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            version,
-            macros_code: sourceCode,
-            status: readResult.readResult.status,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading local macros for ${className}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to read local macros: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Local macros for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetLocalMacros', detail: 'terse' },
+    () => obj.read({ className }, version, { analyse: analyseException }),
+    (source: AdtReading<string>) => ({
+      success: true,
+      class_name: className,
+      version,
+      macros_code: source.raw,
+    }),
+  );
 }

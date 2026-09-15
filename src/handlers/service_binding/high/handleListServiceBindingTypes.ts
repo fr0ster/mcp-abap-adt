@@ -1,6 +1,9 @@
+import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import {
   parseServiceBindingPayload,
   type ServiceBindingResponseFormat,
@@ -32,30 +35,24 @@ export async function handleListServiceBindingTypes(
   args: ListServiceBindingTypesArgs = {},
 ) {
   const { connection, logger } = context;
+  const responseFormat = args.response_format ?? 'xml';
+  const obj = createAdtClient(connection, logger).getServiceBinding(
+    resultsFor(serviceDocuments),
+  );
 
-  try {
-    const responseFormat = args.response_format ?? 'xml';
-    const client = createAdtClient(connection, logger);
-    const response = await client.getServiceBinding().getServiceBindingTypes();
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          response_format: responseFormat,
-          status: response.status,
-          payload: parseServiceBindingPayload(response.data, responseFormat),
-        },
-        null,
-        2,
-      ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error listing service binding types:', error);
-    return return_error(error);
-  }
+  // `getServiceBindingTypes()` takes no arguments at all — no `analyse` to
+  // hand it, confirmed against the shipped `AdtServiceBinding.d.ts`
+  // signature (`getServiceBindingTypes(): Promise<IAdtResponse<...>>`).
+  // `bindingTypes` is `structured` in `READING_BY_SLOT`, which still
+  // carries `.raw` beside its parse, so the payload keeps parsing the raw
+  // body exactly as before.
+  return answer(
+    { tool: 'ListServiceBindingTypes', detail: 'terse' },
+    () => obj.getServiceBindingTypes(),
+    (reading: AdtReading<unknown>) => ({
+      success: true,
+      response_format: responseFormat,
+      payload: parseServiceBindingPayload(reading.raw, responseFormat),
+    }),
+  );
 }

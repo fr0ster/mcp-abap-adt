@@ -1,16 +1,9 @@
-/**
- * GetUnitTestStatus Handler - Read ABAP Unit test run status via AdtClient
- *
- * Uses AdtClient.getUnitTest().getStatus() for status retrieval.
- */
-
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
@@ -38,49 +31,30 @@ interface GetUnitTestStatusArgs {
   with_long_polling?: boolean;
 }
 
-/**
- * Main handler for GetUnitTestStatus MCP tool
- *
- * Uses AdtClient.getUnitTest().getStatus()
- */
 export async function handleGetUnitTestStatus(
   context: HandlerContext,
   args: GetUnitTestStatusArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { run_id } = args as GetUnitTestStatusArgs;
+  const { run_id, with_long_polling = true } = args;
+  if (!run_id) return return_error(new Error('run_id is required'));
 
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
+  // The pre-migration handler called the v18 convenience `.read({runId})`,
+  // which no longer exists on `AdtUnitTest` in v19 — that config shape is
+  // `IUnitTestConfig` (`className`, not `runId`) and belongs to reading the
+  // tests' source, not a run. Polling a run is `getStatus(runId,
+  // withLongPolling?)`, which — confirmed against the shipped
+  // `AdtUnitTest.d.ts` — takes NO options object at all, so there is no
+  // `analyse` to hand it, unlike `read`/`readMetadata` on this same class.
+  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
 
-    const client = createAdtClient(connection, logger);
-    const unitTest = client.getUnitTest();
-
-    logger?.info(`Reading unit test status for run_id: ${run_id}`);
-
-    try {
-      const readResult = await unitTest.read({ runId: run_id });
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id,
-            run_status: readResult?.runStatus,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading unit test status ${run_id}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetUnitTestStatus', detail: 'terse' },
+    () => unitTest.getStatus(run_id, with_long_polling),
+    (status: AdtReading<unknown>) => ({
+      success: true,
+      run_id,
+      run_status: status.value,
+    }),
+  );
 }

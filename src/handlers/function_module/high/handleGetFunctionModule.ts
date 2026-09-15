@@ -1,17 +1,12 @@
-/**
- * GetFunctionModule Handler - Read ABAP FunctionModule via AdtClient
- *
- * Uses AdtClient.getFunctionModule().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
+import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 import { assertFunctionGroupMatches } from '../shared/parseContainerGroup';
 
 export const TOOL_DEFINITION = {
@@ -49,115 +44,64 @@ interface GetFunctionModuleArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetFunctionModule MCP tool
- *
- * Uses AdtClient.getFunctionModule().read() - high-level read operation
- */
 export async function handleGetFunctionModule(
   context: HandlerContext,
   args: GetFunctionModuleArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      function_module_name,
-      function_group_name,
-      version = 'active',
-    } = args as GetFunctionModuleArgs;
-
-    // Validation
-    if (!function_module_name || !function_group_name) {
-      return return_error(
-        new Error('function_module_name and function_group_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    const functionModuleName = function_module_name.toUpperCase();
-    const functionGroupName = function_group_name.toUpperCase();
-
-    logger?.info(
-      `Reading function module ${functionModuleName} in ${functionGroupName}, version: ${version}`,
+  const {
+    function_module_name,
+    function_group_name,
+    version = 'active',
+  } = args;
+  if (!function_module_name || !function_group_name)
+    return return_error(
+      new Error('function_module_name and function_group_name are required'),
     );
 
-    try {
-      const functionModuleObject = client.getFunctionModule();
+  const functionModuleName = function_module_name.toUpperCase();
+  const functionGroupName = function_group_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getFunctionModule(
+    resultsFor(functionModuleDocuments),
+  );
 
-      // Verify ownership first — ADT resolves FM by name regardless of group
-      // segment in URL, so we reject mismatches before returning source.
-      const metaResult = await functionModuleObject.readMetadata({
-        functionModuleName,
-        functionGroupName,
-      });
-      const metadataXml =
-        typeof metaResult?.metadataResult?.data === 'string'
-          ? metaResult.metadataResult.data
-          : null;
-      const realGroup = assertFunctionGroupMatches(
-        metadataXml,
-        functionGroupName,
-        functionModuleName,
-      );
-
-      const readResult = await functionModuleObject.read(
-        { functionModuleName, functionGroupName: realGroup },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`FunctionModule ${functionModuleName} not found`);
-      }
-
-      // Extract data from read result
-      let functionModuleData: string;
-      if (typeof readResult.readResult.data === 'string') {
-        functionModuleData = readResult.readResult.data;
-      } else {
-        try {
-          functionModuleData = JSON.stringify(readResult.readResult.data);
-        } catch {
-          // Fallback for circular references (e.g. raw Axios response objects)
-          functionModuleData = String(readResult.readResult.data);
-        }
-      }
-
-      logger?.info(
-        `GetFunctionModule completed successfully: ${functionModuleName} in ${realGroup}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            function_module_name: functionModuleName,
-            function_group_name: realGroup,
+  // Metadata first, exactly like `ReadFunctionModule` — this is the one
+  // Get* handler that already made two calls before the migration (to
+  // verify the caller-supplied group against metadata's own
+  // `<adtcore:containerRef/>` before trusting a source read; ADT resolves a
+  // function module by name alone regardless of the group segment in the
+  // URL). `realGroup` is assigned inside the pair step that parses
+  // `containerRef`, carried out through the closure so the projection below
+  // can answer it without a second parse.
+  let realGroup = functionGroupName;
+  return answer(
+    { tool: 'GetFunctionModule', detail: 'terse' },
+    () =>
+      pair(
+        () =>
+          obj.readMetadata(
+            { functionModuleName, functionGroupName },
+            { analyse: analyseException },
+          ),
+        (metadata: AdtReading<string>) => {
+          realGroup = assertFunctionGroupMatches(
+            metadata.raw,
+            functionGroupName,
+            functionModuleName,
+          );
+          return obj.read(
+            { functionModuleName, functionGroupName: realGroup },
             version,
-            function_module_data: functionModuleData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading function module ${functionModuleName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read function module: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `FunctionModule ${functionModuleName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `FunctionModule ${functionModuleName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+            { analyse: analyseException },
+          );
+        },
+      ),
+    ([, source]: [AdtReading<string>, AdtReading<string>]) => ({
+      success: true,
+      function_module_name: functionModuleName,
+      function_group_name: realGroup,
+      version,
+      function_module_data: source.raw,
+    }),
+  );
 }

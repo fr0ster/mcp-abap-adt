@@ -1,16 +1,9 @@
-/**
- * GetCdsUnitTestStatus Handler - Read CDS unit test run status via AdtClient
- *
- * Uses AdtClient.getCdsUnitTest().getStatus() for status retrieval.
- */
-
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
@@ -38,49 +31,29 @@ interface GetCdsUnitTestStatusArgs {
   with_long_polling?: boolean;
 }
 
-/**
- * Main handler for GetCdsUnitTestStatus MCP tool
- *
- * Uses AdtClient.getCdsUnitTest().getStatus()
- */
 export async function handleGetCdsUnitTestStatus(
   context: HandlerContext,
   args: GetCdsUnitTestStatusArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { run_id } = args as GetCdsUnitTestStatusArgs;
+  const { run_id, with_long_polling = true } = args;
+  if (!run_id) return return_error(new Error('run_id is required'));
 
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
+  // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getStatus` unchanged
+  // — same v18-convenience departure and same "no options object at all,
+  // so no `analyse`" as `GetUnitTestStatus` (confirmed against the shipped
+  // `AdtUnitTest.d.ts`/`AdtCdsUnitTest.d.ts`).
+  const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
+    ourUnitTest,
+  );
 
-    const client = createAdtClient(connection, logger);
-    const cdsUnitTest = client.getCdsUnitTest();
-
-    logger?.info(`Reading CDS unit test status for run_id: ${run_id}`);
-
-    try {
-      const readResult = await cdsUnitTest.read({ runId: run_id });
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id,
-            run_status: readResult?.runStatus,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading CDS unit test status ${run_id}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetCdsUnitTestStatus', detail: 'terse' },
+    () => cdsUnitTest.getStatus(run_id, with_long_polling),
+    (status: AdtReading<unknown>) => ({
+      success: true,
+      run_id,
+      run_status: status.value,
+    }),
+  );
 }

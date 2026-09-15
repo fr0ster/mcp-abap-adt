@@ -1,16 +1,9 @@
-/**
- * GetCdsUnitTestResult Handler - Read CDS unit test run result via AdtClient
- *
- * Uses AdtClient.getCdsUnitTest().getResult() for result retrieval.
- */
-
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
@@ -44,50 +37,32 @@ interface GetCdsUnitTestResultArgs {
   format?: 'abapunit' | 'junit';
 }
 
-/**
- * Main handler for GetCdsUnitTestResult MCP tool
- *
- * Uses AdtClient.getCdsUnitTest().getResult()
- */
 export async function handleGetCdsUnitTestResult(
   context: HandlerContext,
   args: GetCdsUnitTestResultArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { run_id, with_navigation_uris, format } =
-      args as GetCdsUnitTestResultArgs;
+  const { run_id, with_navigation_uris, format } = args;
+  if (!run_id) return return_error(new Error('run_id is required'));
 
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
+  // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getResult` unchanged
+  // — same v18-convenience departure and same "no `analyse` field on
+  // `IUnitTestResultOptions`" as `GetUnitTestResult`.
+  const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
+    ourUnitTest,
+  );
 
-    const client = createAdtClient(connection, logger);
-    const cdsUnitTest = client.getCdsUnitTest();
-
-    logger?.info(`Reading CDS unit test result for run_id: ${run_id}`);
-
-    try {
-      const readResult = await cdsUnitTest.read({ runId: run_id });
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id,
-            run_result: readResult?.runResult,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading CDS unit test result ${run_id}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetCdsUnitTestResult', detail: 'terse' },
+    () =>
+      cdsUnitTest.getResult(run_id, {
+        withNavigationUris: with_navigation_uris,
+        format,
+      }),
+    (result: AdtReading<unknown>) => ({
+      success: true,
+      run_id,
+      run_result: result.value,
+    }),
+  );
 }

@@ -1,16 +1,9 @@
-/**
- * GetUnitTestResult Handler - Read ABAP Unit test run result via AdtClient
- *
- * Uses AdtClient.getUnitTest().getResult() for result retrieval.
- */
-
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
@@ -44,50 +37,32 @@ interface GetUnitTestResultArgs {
   format?: 'abapunit' | 'junit';
 }
 
-/**
- * Main handler for GetUnitTestResult MCP tool
- *
- * Uses AdtClient.getUnitTest().getResult()
- */
 export async function handleGetUnitTestResult(
   context: HandlerContext,
   args: GetUnitTestResultArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { run_id, with_navigation_uris, format } =
-      args as GetUnitTestResultArgs;
+  const { run_id, with_navigation_uris, format } = args;
+  if (!run_id) return return_error(new Error('run_id is required'));
 
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
+  // Same v18-convenience departure as `GetUnitTestStatus`: fetching a
+  // finished run's result is `getResult(runId, options?:
+  // IUnitTestResultOptions)`, and `IUnitTestResultOptions` is
+  // `{withNavigationUris?, format?}` — confirmed against the shipped
+  // `AdtUnitTest.d.ts` — with no `analyse` field, so none is passed.
+  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
 
-    const client = createAdtClient(connection, logger);
-    const unitTest = client.getUnitTest();
-
-    logger?.info(`Reading unit test result for run_id: ${run_id}`);
-
-    try {
-      const readResult = await unitTest.read({ runId: run_id });
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id,
-            run_result: readResult?.runResult,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading unit test result ${run_id}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetUnitTestResult', detail: 'terse' },
+    () =>
+      unitTest.getResult(run_id, {
+        withNavigationUris: with_navigation_uris,
+        format,
+      }),
+    (result: AdtReading<unknown>) => ({
+      success: true,
+      run_id,
+      run_result: result.value,
+    }),
+  );
 }

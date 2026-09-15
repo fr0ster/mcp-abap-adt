@@ -1,24 +1,25 @@
 /**
  * CreateServiceDefinition Handler - ABAP Service Definition Creation via ADT API
  *
- * Uses AdtClient.getServiceDefinition().{create,activate} from
- * @mcp-abap-adt/adt-clients 19.
+ * Uses AdtClient.getServiceDefinition().{create,lock,update,unlock,activate}
+ * from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: create -> (activate). No lock: `create` posts a metadata document
- * only (`AdtServiceDefinition.js`'s `create()` never reads `sourceCode`), and
- * `activate` is its own unlocked request.
+ * Workflow: create -> (write the body, under a lock, iff source_code is
+ * given) -> (activate). `create` posts a metadata document only —
+ * `AdtServiceDefinition.js`'s `create()` never reads `sourceCode` — so a
+ * caller who passed `source_code` and got only the shell back would have an
+ * object created and activated empty. This repository has fixed that exact
+ * bug once already (`project_create_shell_update_writes_body`: "create()=
+ * shell/initial-state only, update() writes body; a CreateX handler taking
+ * `source_code` MUST call update() after create()"); the fix round 1 excuse
+ * for dropping the write here — that a lock lifecycle was out of this
+ * task's scope — is contradicted by this very file's siblings
+ * (`UpdateLocalTestClass` and seven others), which take exactly that
+ * lifecycle through the same accessor's own `lock`/`unlock`.
  *
- * **`source_code` reaches nothing here, and did not reach the wire from the
- * pre-migration handler's own `create()` call either** — the pre-migration
- * handler wrote it with a *second*, separate `update()` call after create,
- * which held a lock internally (adt-clients 18's fat `update()`). That second
- * call is out of scope for this task: "these ten updates take the [caller's]
- * lock handle... Do not give these a lock lifecycle" applies to creates too,
- * and `update()`'s v19 shape needs one (see `UpdateServiceDefinition`,
- * already migrated with `withLock` in a prior task). A caller who passes
- * `source_code` here should call `LockServiceDefinition` +
- * `UpdateServiceDefinition` + `UnlockServiceDefinition` afterward — kept on
- * this tool's schema for compatibility, but not forwarded.
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode` — `config.sourceCode` belongs to `check`
+ * alone. Verified against `AdtServiceDefinition.js`.
  */
 
 import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
@@ -34,6 +35,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -67,7 +69,7 @@ export const TOOL_DEFINITION = {
       source_code: {
         type: 'string',
         description:
-          'Does not reach creation — the shipped create endpoint posts a metadata document only. Lock the object (LockServiceDefinition), then use UpdateServiceDefinition with that lock handle to write the source.',
+          'Service definition source code (optional). If not provided, a minimal template will be created.',
       },
       activate: {
         type: 'boolean',
@@ -133,8 +135,35 @@ export async function handleCreateServiceDefinition(
         { analyse: analyseException },
       );
 
-      if (!created.ok || !shouldActivate) {
+      if (!created.ok) {
         return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // The shell was created empty. Write the body, under a lock this call
+      // also releases, before any activation — an activated empty object is
+      // the bug this write exists to avoid.
+      let written = created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      if (args.source_code) {
+        written = await withLock(
+          () => obj.lock({ serviceDefinitionName }),
+          (lockHandle) =>
+            obj.update(
+              {
+                serviceDefinitionName,
+                transportRequest: args.transport_request,
+              },
+              {
+                sourceCode: args.source_code,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+          (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),
+        );
+      }
+
+      if (!written.ok || !shouldActivate) {
+        return written;
       }
 
       return obj.activate(

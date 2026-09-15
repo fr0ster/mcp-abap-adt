@@ -1,7 +1,7 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
-import { parseRuntimePayloadToJson } from './runtimePayloadParser';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeAnalyzeProfilerTrace',
@@ -126,50 +126,64 @@ export async function handleRuntimeAnalyzeProfilerTrace(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.trace_id_or_uri) {
-      throw new Error('Parameter "trace_id_or_uri" is required');
-    }
-
-    const view = args.view ?? 'hitlist';
-    const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const profiler = runtimeClient.getProfiler();
-    const response =
-      view === 'hitlist'
-        ? await profiler.getHitList(args.trace_id_or_uri, {
-            withSystemEvents: args.with_system_events,
-          })
-        : view === 'statements'
-          ? await profiler.getStatements(args.trace_id_or_uri, {
-              withSystemEvents: args.with_system_events,
-            })
-          : await profiler.getDbAccesses(args.trace_id_or_uri, {
-              withSystemEvents: args.with_system_events,
-            });
-
-    const parsedPayload = parseRuntimePayloadToJson(response.data);
-    const summary = pickTopEntries(parsedPayload, args.top ?? 10);
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          trace_id_or_uri: args.trace_id_or_uri,
-          view,
-          status: response.status,
-          summary,
-          payload: parsedPayload,
-        },
-        null,
-        2,
-      ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: unknown) {
-    logger?.error('Error analyzing profiler trace:', error);
-    return return_error(error);
+  if (!args?.trace_id_or_uri) {
+    return return_error(new Error('Parameter "trace_id_or_uri" is required'));
   }
+
+  const view = args.view ?? 'hitlist';
+  const traceIdOrUri = args.trace_id_or_uri;
+  const top = args.top ?? 10;
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+
+  // Same view-reading change as `handleRuntimeGetProfilerTraceData.ts` (see
+  // that file's header): `read(traceId, view, options)` over the three named
+  // views, already parsed, so `parseRuntimePayloadToJson` and the transport
+  // fields (`status`/`statusText`/`headers`/`config`) are dropped here too.
+  // `pickTopEntries` still works unchanged — it walks whatever object graph
+  // it is given looking for numeric fields, and a typed `IAbapTraceHitList`/
+  // `IAbapTraceStatements`/`IAbapTraceDbAccesses` is exactly such a graph.
+  //
+  // Three separate `answer()` calls, not one `call()` with a branch per
+  // view — same reason as `handleRuntimeGetProfilerTraceData.ts`: the three
+  // instantiations of `read<K>` have no exported union name, and the
+  // projection below reads `payload` only through `pickTopEntries(payload:
+  // unknown, …)`, so nothing is lost keeping each view's own type to the
+  // point `answer()` erases it into the response.
+  const project = (payload: unknown) => ({
+    success: true,
+    trace_id_or_uri: traceIdOrUri,
+    view,
+    summary: pickTopEntries(payload, top),
+    payload,
+  });
+  const ctx = { tool: 'RuntimeAnalyzeProfilerTrace', detail: 'terse' as const };
+
+  if (view === 'hitlist') {
+    return answer(
+      ctx,
+      () =>
+        profiler.read(traceIdOrUri, 'hitlist', {
+          withSystemEvents: args.with_system_events,
+        }),
+      project,
+    );
+  }
+  if (view === 'statements') {
+    return answer(
+      ctx,
+      () =>
+        profiler.read(traceIdOrUri, 'statements', {
+          withSystemEvents: args.with_system_events,
+        }),
+      project,
+    );
+  }
+  return answer(
+    ctx,
+    () =>
+      profiler.read(traceIdOrUri, 'dbAccesses', {
+        withSystemEvents: args.with_system_events,
+      }),
+    project,
+  );
 }

@@ -1,12 +1,34 @@
-import { AdtRuntimeClient, type Profiler } from '@mcp-abap-adt/adt-clients';
+/**
+ * `Profiler.createParameters()` is gone in adt-clients 19: `IProfiler` no
+ * longer composes `ITraceScheduling`. Scheduling a measurement moved to
+ * `IClassExecutor`/`IProgramExecutor` instead — "This is an argument to a
+ * *run*, not to a read, which is why it travels with scheduling rather than
+ * staying on the reading surface" (`IProfiler`'s own doc). `scheduleTrace`
+ * is what `createParameters` used to be: "Configure a measurement from
+ * parameters alone, without the catalogues. Resolves to the request id,
+ * taken from the `Location` header" (`ITraceScheduling.scheduleTrace`'s
+ * doc) — same request, same answer, reached through an executor instead of
+ * the profiler.
+ *
+ * `ClassExecutor`'s constructor takes only a connection and logger — no
+ * class name — and `scheduleTrace` itself takes none either (see
+ * `handleRuntimeRunClassWithProfiling.ts`, which calls the identical member
+ * the same way to feed its own run). This tool's schema never named an
+ * object to run, and the tool surface is frozen for this migration (only an
+ * optional `detail` parameter may be added — see the migration's ruling),
+ * so `getClassExecutor()` is used as the one available door to
+ * `scheduleTrace`, not because this is somehow a class-scoped trace.
+ */
+import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeCreateProfilerTraceParameters',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Create ABAP profiler trace parameters and return profilerId (URI) for profiled execution.',
+    '[runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -55,49 +77,34 @@ export async function handleRuntimeCreateProfilerTraceParameters(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.description) {
-      throw new Error('Parameter "description" is required');
-    }
-
-    const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const profiler = runtimeClient.getProfiler();
-    const response = await profiler.createParameters({
-      description: args.description,
-      allMiscAbapStatements: args.all_misc_abap_statements,
-      allProceduralUnits: args.all_procedural_units,
-      allInternalTableEvents: args.all_internal_table_events,
-      allDynproEvents: args.all_dynpro_events,
-      aggregate: args.aggregate,
-      explicitOnOff: args.explicit_on_off,
-      withRfcTracing: args.with_rfc_tracing,
-      allSystemKernelEvents: args.all_system_kernel_events,
-      sqlTrace: args.sql_trace,
-      allDbEvents: args.all_db_events,
-      maxSizeForTraceFile: args.max_size_for_trace_file,
-      amdpTrace: args.amdp_trace,
-      maxTimeForTracing: args.max_time_for_tracing,
-    });
-
-    const profilerId = (profiler as Profiler).extractIdFromResponse(response);
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          profiler_id: profilerId,
-          status: response.status,
-        },
-        null,
-        2,
-      ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error creating profiler trace parameters:', error);
-    return return_error(error);
+  if (!args?.description) {
+    return return_error(new Error('Parameter "description" is required'));
   }
+
+  const classExecutor = new AdtExecutor(connection, logger).getClassExecutor();
+
+  return answer(
+    { tool: 'RuntimeCreateProfilerTraceParameters', detail: 'terse' },
+    () =>
+      classExecutor.scheduleTrace({
+        description: args.description,
+        allMiscAbapStatements: args.all_misc_abap_statements,
+        allProceduralUnits: args.all_procedural_units,
+        allInternalTableEvents: args.all_internal_table_events,
+        allDynproEvents: args.all_dynpro_events,
+        aggregate: args.aggregate,
+        explicitOnOff: args.explicit_on_off,
+        withRfcTracing: args.with_rfc_tracing,
+        allSystemKernelEvents: args.all_system_kernel_events,
+        sqlTrace: args.sql_trace,
+        allDbEvents: args.all_db_events,
+        maxSizeForTraceFile: args.max_size_for_trace_file,
+        amdpTrace: args.amdp_trace,
+        maxTimeForTracing: args.max_time_for_tracing,
+      }),
+    (profilerId) => ({
+      success: true,
+      profiler_id: profilerId,
+    }),
+  );
 }

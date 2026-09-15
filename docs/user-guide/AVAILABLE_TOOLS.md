@@ -1102,7 +1102,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimecreateprofilertraceparameters-read-only-system"></a>
 #### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [runtime] Create ABAP profiler trace parameters and return profilerId (URI) for profiled execution.
+**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -1185,7 +1185,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns parsed JSON payload.
+**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 

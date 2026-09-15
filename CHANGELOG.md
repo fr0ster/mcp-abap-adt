@@ -116,6 +116,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   correctly to `RuntimeRunClassWithProfiling` above), should not have started
   answering `output`. Recorded here rather than fixed by this entry.
 
+- **The rest of the profiler/dump/feed readers (Task 25) lose the same
+  transport fields the class/program runners above lost, and two of them
+  answer a genuinely different shape.**
+
+  `RuntimeListProfilerTraceFiles` used to hand `response.data` — the raw feed
+  XML — to a hand-rolled parser and answer `{success, status, payload:
+  <whatever that parse produced>}`. `IProfiler.list()` answers
+  `IAdtResponse<IAbapTraceEntry[]>` now — already the parsed entries, with
+  named fields (`id`, `recordedAt`, `user`, `objectName`, `state`,
+  `expiresAt`, `system`, `client`, `host`, `size`, `runtime`/`runtimeABAP`/
+  `runtimeSystem`/`runtimeDatabase`, `isAggregated`, `amdpFileSize`) — so the
+  tool now answers `{success, count, entries: IAbapTraceEntry[]}` instead.
+
+  `RuntimeGetProfilerTraceData` and `RuntimeAnalyzeProfilerTrace` read the
+  same view differently too: `Profiler.getHitList`/`getStatements`/
+  `getDbAccesses` are gone (`IProfiler` composes `ITraceReading` since
+  31.0.0 — one `read(traceId, view, options)` over three named views
+  instead), and each view already answers its own typed, parsed shape
+  (`IAbapTraceHitList`'s `entries`, `IAbapTraceStatements`'s `statements`,
+  `IAbapTraceDbAccesses`'s `accesses`) rather than the free-form
+  attribute-prefixed object the old hand-rolled XML parser produced. Both
+  tools' `payload` field now carries that typed shape.
+
+  `RuntimeGetDumpById`, `RuntimeGetProfilerTraceData` and
+  `RuntimeAnalyzeProfilerTrace` all drop the `status` field they used to
+  answer (the HTTP status of the underlying request) — `IAdtResponse` carries
+  no transport envelope to read it from any more, the same reason the
+  class/program runners above lost `run_status`.
+
+  `RuntimeCreateProfilerTraceParameters` changes mechanism, not contract:
+  `Profiler.createParameters()` is gone (`IProfiler` no longer composes
+  `ITraceScheduling` as of 19.0.0 — scheduling a measurement moved onto
+  `IClassExecutor`/`IProgramExecutor`, the same `scheduleTrace` member
+  `RuntimeRunClassWithProfiling` already calls). The tool still answers
+  `{success, profiler_id}`, now reached through `AdtExecutor.
+  getClassExecutor().scheduleTrace(...)`.
+
+  `RuntimeGetGatewayErrorLog`'s `error_url` branch was silently wrong before
+  this task touched it: the pre-19 code handed the whole envelope object to
+  `error:` with nothing unwrapping it, which — once `gatewayErrorDetail()`
+  started answering `IAdtResponse<T>` instead of `T` directly — would have
+  serialised as `{"ok":true}` (its `getResult`/`getError` methods dropped by
+  `JSON.stringify`) rather than the actual detail document. No `tsc` error
+  ever named this, because nothing in the old code read a field off the
+  envelope that `IAdtResponse` didn't have. Fixed as part of this task's
+  pass over the same file for its one genuine compile error
+  (`errors.length`).
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

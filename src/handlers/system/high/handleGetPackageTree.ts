@@ -84,17 +84,20 @@ export async function handleGetPackageTree(
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
-    // Verify package exists before building tree (fixes #38)
-    try {
-      const readResult = await client.getPackage().read({ packageName });
-      if (!readResult || !readResult.readResult) {
-        return return_error(new Error(`Package ${packageName} not found`));
-      }
-    } catch (readError: any) {
-      if (readError.response?.status === 404) {
-        return return_error(new Error(`Package ${packageName} not found`));
-      }
-      throw readError;
+    // Verify package exists before building tree (fixes #38).
+    // `IPackageContract` has no `.read()` — a package is a container with no
+    // source of its own, so `readMetadata` is the one call (see
+    // `handleReadPackage.ts`, migrated the same way). Without an `analyse`
+    // strategy the default error contract still answers `ok: false` for a
+    // refusal (not-found included), which is all a plain existence check
+    // needs — no message enrichment is read here, only the boolean.
+    const readResult = await client.getPackage().readMetadata({ packageName });
+    if (!readResult.ok) {
+      return return_error(
+        new Error(
+          `Package ${packageName} not found: ${readResult.getError().message}`,
+        ),
+      );
     }
 
     // Walked here, not in the client. `getPackageHierarchy` makes one request

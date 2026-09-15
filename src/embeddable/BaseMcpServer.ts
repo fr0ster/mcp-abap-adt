@@ -1,11 +1,9 @@
 import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import {
-  type AbapConnection,
-  createAbapConnection,
-} from '@mcp-abap-adt/connection';
+import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import { createAbapConnection } from '../lib/connectionFactory.js';
 import type {
   IHandlersRegistry,
   SapEnvironment,

@@ -11,14 +11,20 @@
  * strategy — and it stays on `client.getUnitTest() as any` until the task
  * that wires the unit-test members and that shared result set migrates it
  * (it is one of the "twenty-three tools that reach a legacy contract").
- * The `IAdtResponse` compiler error below is pre-existing and known, not an
- * omission this task's gate missed.
+ *
+ * Task 25 fixed the one `tsc` error this file owed the build (`IAdtResponse`
+ * requiring type arguments under adt-clients 19 — TS2707): `statusResponse`
+ * is still the legacy transport-frame object `client.getUnitTest() as any`
+ * always returned, so the cast is now `as AxiosResponse` (which still has
+ * `.data`) instead of `as IAdtResponse` (which as of 19.0.0 no longer does).
+ * No behaviour changed — this is the same object, read the same way; only
+ * the name of the lie in the cast changed to a true one.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
+  type AxiosResponse,
   restoreSessionInConnection,
   return_error,
   return_response,
@@ -107,7 +113,7 @@ export async function handleGetClassUnitTestStatus(
         throw new Error('SAP did not return ABAP Unit status response');
       }
 
-      return return_response(statusResponse as IAdtResponse);
+      return return_response(statusResponse as AxiosResponse);
     } catch (error: any) {
       logger?.error(
         `Error retrieving ABAP Unit status for run ${run_id}: ${error?.message || error}`,

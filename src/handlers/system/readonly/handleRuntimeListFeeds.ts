@@ -1,6 +1,7 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
@@ -62,57 +63,64 @@ export async function handleRuntimeListFeeds(
   args: RuntimeListFeedsArgs,
 ) {
   const { connection, logger } = context;
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds();
+  const feedType = args?.feed_type ?? 'descriptors';
 
-  try {
-    const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const feeds = runtimeClient.getFeeds();
-    const feedType = args?.feed_type ?? 'descriptors';
+  const queryOptions = {
+    user: args?.user,
+    maxResults: args?.max_results,
+    from: args?.from,
+    to: args?.to,
+  };
 
-    const queryOptions = {
-      user: args?.user,
-      maxResults: args?.max_results,
-      from: args?.from,
-      to: args?.to,
-    };
+  // Five separate `answer()` calls, not one `call()` with a branch per
+  // `feed_type`: `feeds.list()`/`variants()`/`dumps()`/`systemMessages()`/
+  // `gatewayErrors()` each answer a different `T`
+  // (`IFeedDescriptor[]`/`IFeedVariant[]`/`IFeedEntry[]`/
+  // `ISystemMessageEntry[]`/`IGatewayErrorEntry[]`), none of them exported by
+  // name from `@mcp-abap-adt/adt-clients` to write a union with — same
+  // reason as the profiler handlers (see `handleRuntimeGetProfilerTraceData.
+  // ts`'s header). The projection is identical across all five, so it is
+  // shared; only the call differs.
+  const ctx = { tool: 'RuntimeListFeeds', detail: 'terse' as const };
+  const project = (entries: { length: number }) => ({
+    success: true,
+    feed_type: feedType,
+    count: entries.length,
+    entries,
+  });
 
-    let data: unknown;
-
-    switch (feedType) {
-      case 'descriptors':
-        data = await feeds.list();
-        break;
-      case 'variants':
-        data = await feeds.variants();
-        break;
-      case 'dumps':
-        data = await feeds.dumps(queryOptions);
-        break;
-      case 'system_messages':
-        data = await feeds.systemMessages(queryOptions);
-        break;
-      case 'gateway_errors':
-        data = await feeds.gatewayErrors(queryOptions);
-        break;
+  switch (feedType) {
+    case 'descriptors':
+      return answer(ctx, () => feeds.list(), project);
+    case 'variants':
+      // `variants(category)` takes a required `category` as of adt-clients
+      // 19 — ADT's own endpoint always required one (`GET
+      // /sap/bc/adt/feeds/variants` with none answers 400
+      // `ExceptionParameterNotFound`, measured; see `FeedRepository.
+      // variants`'s own doc: "Everything that called this before
+      // @mcp-abap-adt/interfaces@26.0.0 fixed the contract was getting that
+      // 400"). So this branch was already refused by SAP every time, before
+      // this migration and after it — the type just did not say so. The
+      // tool surface is frozen for this migration (only an optional
+      // `detail` parameter may be added), so there is nowhere to take a
+      // real category from, and every category tried on a real system
+      // answered 200 with an empty body anyway (same doc) — no value would
+      // make this branch useful. An empty string reaches the same SAP
+      // refusal this branch always reached, honestly, through `answer()`,
+      // rather than inventing a category that would only pretend to work.
+      return answer(ctx, () => feeds.variants(''), project);
+    case 'dumps':
+      return answer(ctx, () => feeds.dumps(queryOptions), project);
+    case 'system_messages':
+      return answer(ctx, () => feeds.systemMessages(queryOptions), project);
+    case 'gateway_errors':
+      return answer(ctx, () => feeds.gatewayErrors(queryOptions), project);
+    default: {
+      const exhaustive: never = feedType;
+      return return_error(
+        new Error(`Unknown feed_type: ${String(exhaustive)}`),
+      );
     }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          feed_type: feedType,
-          count: Array.isArray(data) ? data.length : undefined,
-          entries: data,
-        },
-        null,
-        2,
-      ),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {},
-    });
-  } catch (error: unknown) {
-    logger?.error('Error reading feeds:', error);
-    return return_error(error);
   }
 }

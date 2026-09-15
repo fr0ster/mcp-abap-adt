@@ -2,13 +2,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import * as crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import {
-  createAbapConnection,
   getTimeout,
   getTimeoutConfig,
   type SapConfig,
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -16,6 +15,7 @@ import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
 } from './connectionEvents';
+import { createAbapConnection } from './connectionFactory.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 
@@ -98,7 +98,7 @@ export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }
 
-export function return_response(response: IAdtResponse | AxiosResponse) {
+export function return_response(response: AxiosResponse) {
   return {
     isError: false,
     content: [
@@ -1011,12 +1011,10 @@ export function isCloudConnection(config?: SapConfig): boolean {
 /**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
- * @param response - IAdtResponse or AxiosResponse from validation endpoint
+ * @param response - AxiosResponse from validation endpoint
  * @returns Parsed validation result with valid, severity, message, exists fields
  */
-export function parseValidationResponse(
-  response: IAdtResponse | AxiosResponse,
-): {
+export function parseValidationResponse(response: AxiosResponse): {
   valid: boolean;
   severity?: string;
   message?: string;

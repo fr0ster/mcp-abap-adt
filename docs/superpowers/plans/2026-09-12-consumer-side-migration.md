@@ -38,7 +38,8 @@ own tests pass and it is committed — not when it is described.
 | 17. `low` tier, cluster four | done | `d7e192e` |
 | 18. The `high` tier `Get*` handlers | done | `3c60dd2` |
 | 19. High-tier writes under a lock | done | `33a1a99` |
-| 20 – 29 | not started | |
+| 20. High-tier writes without a lock | done | `ed68752` |
+| 21 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2499,7 +2500,7 @@ adt-clients 19 — `tsc` says so at line 101 and suggests `generateServiceBindin
 handle to assert. It belongs to Task 23 with the other removed members. The same
 goes for `handleValidateServiceBinding` and `validateServiceBinding`.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/highTierWrites.test.ts
@@ -2588,10 +2589,10 @@ it('never acquires a lock', async () => {
 says so. These tests therefore assert the handler's behaviour given a refusal,
 not the shape of the document ADT sends; say that in the file's header.
 
-- [ ] **Step 2: Run them to verify they fail**
-- [ ] **Step 3: Implement**, one family per commit, as single-call `answer()`.
-- [ ] **Step 4: Run the tests and measure**
-- [ ] **Step 5: Commit per family** — `refactor(<family>): the high-tier create, single call`
+- [x] **Step 2: Run them to verify they fail**
+- [x] **Step 3: Implement**, one family per commit, as single-call `answer()`.
+- [x] **Step 4: Run the tests and measure**
+- [x] **Step 5: Commit per family** — `refactor(<family>): the high-tier create, single call`
 
 ---
 

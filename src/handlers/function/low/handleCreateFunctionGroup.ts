@@ -16,6 +16,17 @@
  * — a function group is a container, and `LockFunctionModuleLow`/
  * `UpdateFunctionModuleLow` add the members that carry source. Verified
  * against `AdtFunctionGroup.js`.
+ *
+ * **A pre-migration compensation was dropped here, deliberately.** The old
+ * handler special-cased ADT's 400 for "Interface SAPL* ... has not been
+ * created" by re-reading the object and reporting success anyway — a genuine
+ * masking of a refusal ADT never softened into a 200. This handler now
+ * reports that 400 as the refusal it is. The high-tier `CreateFunctionGroup`
+ * still does the equivalent for two other 400 messages ("Kerberos library
+ * not loaded", "Business partner does not exist"), without even the
+ * read-back this low handler used to have — an inconsistency this task did
+ * not introduce and does not have in scope to fix, since it sits one
+ * directory over.
  */
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';

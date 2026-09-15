@@ -187,7 +187,12 @@ import { handleValidateTable } from '../../handlers/table/low/handleValidateTabl
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
-import { fakeClientOf, okResponse, recordAnalyse } from '../helpers/fakeClient';
+import {
+  fakeClientOf,
+  okResponse,
+  recordAnalyse,
+  refusedResponse,
+} from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
 // that reads `seen.calls` needs this wiring; tests that need a real document
@@ -1672,6 +1677,7 @@ describe('program', () => {
       generated: true,
     });
   });
+
   // `ProgramLow` tools declare `available_in: ['onprem', 'legacy']` —
   // cloud excluded. That field is a registration-time hint only:
   // `BaseHandlerGroup.registerHandlers` (the path `LowLevelHandlersGroup`
@@ -1784,6 +1790,51 @@ describe('function (function group)', () => {
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateFunctionGroupLow reports a refused create as an error — the dropped compensation used to turn a 400 into a masked success', async () => {
+    // A real captured `exc:exception` document (analyseException's own
+    // shape), not a fabricated one — refusal-object-not-found is the
+    // corpus's own instance of the generic exception form every create
+    // refusal arrives in, whatever the concrete SAP message says.
+    const document = corpusBody('refusal-object-not-found--01-read-source');
+    fakeClient = fakeClientOf({
+      create: async (_config: unknown, options: any) => {
+        const verdict = options.analyse(
+          { origin: 'refusal', message: 'Request failed with status code 400' },
+          { data: document, status: 400 },
+        );
+        return refusedResponse(verdict.message, verdict);
+      },
+    });
+
+    const result: any = await handleCreateFunctionGroup(context as any, {
+      function_group_name: 'ZMCP_SHR_FGRP',
+      description: 'x',
+      package_name: 'ZP',
+    });
+
+    // The behaviour the pre-migration handler masked: a 400 answers as an
+    // error, never as `{success: true}` recovered by a best-effort re-read.
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.origin).toBe('refusal');
+    expect(result.content[0].text).not.toContain('"success": true');
+  });
+
+  it('DeleteFunctionGroupLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
+    await handleDeleteFunctionGroup(context as any, {
+      function_group_name: 'ZFG_X',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('delete');
+    expect(call?.factory).toBe('getFunctionGroup');
+    expect(call?.args[0]).toEqual({
+      functionGroupName: 'ZFG_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseDeletion);
   });
 
   it('LockFunctionGroupLow passes no analyse and carries no detail parameter', async () => {
@@ -1975,6 +2026,23 @@ describe('function (function module)', () => {
     expect((call?.args[0] as any)?.packageName).toBeUndefined();
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('DeleteFunctionModuleLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
+    await handleDeleteFunctionModule(context as any, {
+      function_module_name: 'ZFM_X',
+      function_group_name: 'ZFG_X',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('delete');
+    expect(call?.factory).toBe('getFunctionModule');
+    expect(call?.args[0]).toEqual({
+      functionModuleName: 'ZFM_X',
+      functionGroupName: 'ZFG_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseDeletion);
   });
 
   it('LockFunctionModuleLow passes no analyse and carries no detail parameter', async () => {

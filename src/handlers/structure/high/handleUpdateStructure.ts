@@ -1,21 +1,35 @@
 /**
  * UpdateStructure Handler - Update Existing ABAP Structure DDL Source
  *
- * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getStructure().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
+ * write, released on every path out.
  *
- * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
+ * Workflow: lock -> update -> unlock -> (activate). The pre-write and
+ * post-unlock syntax checks the pre-migration handler ran are gone: they
+ * duplicated what `update`'s own `analyseException` already verdicts, and
+ * dropping them matches this tool's documented contract ("Locks, updates,
+ * unlocks, and optionally activates") and every low-tier sibling.
+ *
+ * **The source goes through `options.sourceCode`.** See
+ * `UpdateStructureLow`.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateStructure',
@@ -44,6 +58,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate structure after source update. Default: true.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['structure_name', 'ddl_code'],
   },
@@ -54,269 +69,50 @@ interface UpdateStructureArgs {
   ddl_code: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateStructure MCP tool
- *
- * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleUpdateStructure(
   context: HandlerContext,
   args: UpdateStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      structure_name,
-      ddl_code,
-      transport_request,
-      activate = true,
-    } = args as UpdateStructureArgs;
 
-    // Validation
-    if (!structure_name || !ddl_code) {
-      return return_error(
-        new Error('structure_name and ddl_code are required'),
-      );
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(`Starting structure source update: ${structureName}`);
-
-    try {
-      // Get configuration from environment variables
-      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-      // Create connection directly for this handler call
-      // Get connection from session context (set by ProtocolHandler)
-      // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger?.debug(
-        `[UpdateStructure] Created separate connection for handler call: ${structureName}`,
-      );
-    } catch (connectionError: any) {
-      const errorMessage =
-        connectionError instanceof Error
-          ? connectionError.message
-          : String(connectionError);
-      logger?.error(
-        `[UpdateStructure] Failed to create connection: ${errorMessage}`,
-      );
-      return return_error(
-        new Error(`Failed to create connection: ${errorMessage}`),
-      );
-    }
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-
-      // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
-      // Note: No validation needed for update - structure must already exist
-      const shouldActivate = activate !== false; // Default to true if not specified
-      let activateResponse: any | undefined;
-      let lockHandle: string | undefined;
-
-      try {
-        // Lock
-        lockHandle = await client.getStructure().lock({ structureName });
-
-        // Step 1: Check new code BEFORE update (only when activating)
-        if (shouldActivate) {
-          logger?.info(
-            `[UpdateStructure] Checking new DDL code before update: ${structureName}`,
-          );
-          try {
-            await safeCheckOperation(
-              () =>
-                client
-                  .getStructure()
-                  .check({ structureName, ddlCode: ddl_code }, 'inactive'),
-              structureName,
-              {
-                debug: (message: string) =>
-                  logger?.debug(`[UpdateStructure] ${message}`),
-              },
-            );
-            logger?.info(
-              `[UpdateStructure] New code check passed: ${structureName}`,
-            );
-          } catch (checkError: any) {
-            if ((checkError as any).isAlreadyChecked) {
-              logger?.info(
-                `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
-              );
-            } else {
-              logger?.error(
-                `[UpdateStructure] New code check failed: ${structureName}`,
-                {
-                  error:
-                    checkError instanceof Error
-                      ? checkError.message
-                      : String(checkError),
-                },
-              );
-              throw new Error(
-                `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-              );
-            }
-          }
-        } else {
-          logger?.info(
-            `[UpdateStructure] Skipping syntax check (activate=false): ${structureName}`,
-          );
-        }
-
-        // Step 2: Update
-        logger?.info(
-          `[UpdateStructure] Updating structure with DDL code: ${structureName}`,
-        );
-        await client.getStructure().update(
-          {
-            structureName,
-            ddlCode: ddl_code,
-            transportRequest: args.transport_request,
-          },
-          { lockHandle },
-        );
-        logger?.info(
-          `[UpdateStructure] Structure source code updated: ${structureName}`,
-        );
-      } finally {
-        if (lockHandle) {
-          try {
-            await client.getStructure().unlock({ structureName }, lockHandle);
-            logger?.info(
-              `[UpdateStructure] Structure unlocked: ${structureName}`,
-            );
-          } catch (unlockError: any) {
-            logger?.warn(
-              `Failed to unlock structure ${structureName}: ${unlockError?.message || unlockError}`,
-            );
-          }
-        }
-      }
-
-      // Step 4: Check inactive version (after unlock, only when activating)
-      if (shouldActivate) {
-        logger?.info(
-          `[UpdateStructure] Checking inactive version: ${structureName}`,
-        );
-        try {
-          await safeCheckOperation(
-            () => client.getStructure().check({ structureName }, 'inactive'),
-            structureName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateStructure] ${message}`),
-            },
-          );
-          logger?.info(
-            `[UpdateStructure] Inactive version check completed: ${structureName}`,
-          );
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
-            );
-          } else {
-            logger?.warn(
-              `[UpdateStructure] Inactive version check had issues: ${structureName}`,
-              {
-                error:
-                  checkError instanceof Error
-                    ? checkError.message
-                    : String(checkError),
-              },
-            );
-          }
-        }
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        const activateState = await client
-          .getStructure()
-          .activate({ structureName });
-        activateResponse = activateState.activateResult;
-      }
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
-      logger?.info(
-        `✅ UpdateStructure completed successfully: ${structureName}`,
-      );
-
-      // Return success result
-      const stepsCompleted = [
-        'lock',
-        'check_new_code',
-        'update',
-        'unlock',
-        'check_inactive',
-      ];
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
-
-      const result = {
-        success: true,
-        structure_name: structureName,
-        transport_request: transport_request || 'local',
-        activated: shouldActivate,
-        message: shouldActivate
-          ? `Structure ${structureName} source updated and activated successfully`
-          : `Structure ${structureName} source updated successfully (not activated)`,
-        uri: `/sap/bc/adt/ddic/structures/${encodeSapObjectName(structureName)}`,
-        steps_completed: stepsCompleted,
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-        source_size_bytes: ddl_code.length,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(`Error updating structure source ${structureName}:`, error);
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        new Error(`Failed to update structure: ${errorMessage}`),
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args.structure_name || !args.ddl_code) {
+    return return_error(new Error('structure_name and ddl_code are required'));
   }
+
+  const structureName = args.structure_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateStructure', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getStructure(
+        resultsFor(structureDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ structureName }),
+        (lockHandle) =>
+          obj.update(
+            { structureName, transportRequest: args.transport_request },
+            {
+              sourceCode: args.ddl_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ structureName }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ structureName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

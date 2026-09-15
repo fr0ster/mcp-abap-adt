@@ -1,15 +1,33 @@
 /**
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
+ *
+ * Uses AdtClient.getBehaviorDefinition().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` when this handler owns the
+ * lock — held for the whole write, released on every path out. A caller who
+ * passes `lock_handle` already holds it, so `withLock` is skipped and the
+ * update runs as the one request it is.
+ *
+ * **The source goes in `options`, not `config`.** See
+ * `UpdateBehaviorDefinitionLow` — the shipped `AdtBehaviorDefinition.update()`
+ * reads `options?.sourceCode` only.
  */
 
-import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/interfaces';
+import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  extractAdtErrorMessage,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
+
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
@@ -40,6 +58,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate after update. Default: true',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name', 'source_code'],
   },
@@ -51,104 +70,54 @@ interface UpdateBehaviorDefinitionArgs {
   transport_request?: string;
   lock_handle?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateBehaviorDefinition(
   context: HandlerContext,
-  params: any,
+  args: UpdateBehaviorDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  const args: UpdateBehaviorDefinitionArgs = params;
 
   if (!args.name || !args.source_code) {
     return return_error(new Error('Missing required parameters'));
   }
 
   const name = args.name.toUpperCase();
-  // Get connection from session context (set by ProtocolHandler)
-  // Connection is managed and cached per session, with proper token refresh via AuthBroker
-  logger?.info(`Starting BDEF update: ${name}`);
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
 
-  try {
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = args.activate !== false;
-    let lockHandle = args.lock_handle;
+  return answer(
+    { tool: 'UpdateBehaviorDefinition', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getBehaviorDefinition(
+        resultsFor(behaviorDefinitionDocuments),
+      );
 
-    // Lock if not provided - using types from adt-clients
-    if (!lockHandle) {
-      const lockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-        name,
-      };
-      lockHandle = await client.getBehaviorDefinition().lock(lockConfig);
-    }
+      const update = (lockHandle: string) =>
+        obj.update(
+          { name, transportRequest: args.transport_request },
+          {
+            sourceCode: args.source_code,
+            lockHandle,
+            analyse: analyseException,
+          },
+        );
 
-    try {
-      // Update - using types from adt-clients
-      const updateConfig: Pick<
-        IBehaviorDefinitionConfig,
-        'name' | 'sourceCode'
-      > & { transportRequest?: string } = {
-        name,
-        sourceCode: args.source_code,
-        transportRequest: args.transport_request,
-      };
-      await client
-        .getBehaviorDefinition()
-        .update(updateConfig, { lockHandle: lockHandle });
-    } finally {
-      // Always unlock if we locked it internally - using types from adt-clients
-      if (!args.lock_handle && lockHandle) {
-        try {
-          const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-            name,
-          };
-          await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
-        } catch (unlockError: any) {
-          logger?.warn(
-            `Failed to unlock BDEF ${name}: ${unlockError?.message || unlockError}`,
+      const written = args.lock_handle
+        ? await update(args.lock_handle)
+        : await withLock(
+            () => obj.lock({ name }),
+            update,
+            (lockHandle) => obj.unlock({ name }, lockHandle),
           );
-        }
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
-    }
 
-    // Wait for object to be ready after update (long polling)
-    try {
-      await client
-        .getBehaviorDefinition()
-        .read({ name }, 'inactive', { withLongPolling: true });
-    } catch {
-      // Continue anyway — activation will fail explicitly if object isn't ready
-    }
-
-    // Activate if requested - using types from adt-clients
-    if (shouldActivate) {
-      const activateConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-        name,
-      };
-      await client.getBehaviorDefinition().activate(activateConfig);
-    }
-
-    const result = {
-      success: true,
-      name: name,
-      message: shouldActivate
-        ? `Behavior Definition ${name} updated and activated successfully`
-        : `Behavior Definition ${name} updated successfully`,
-    };
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    });
-  } catch (error: any) {
-    const detailedError = extractAdtErrorMessage(
-      error,
-      `Failed to update behavior definition ${name}`,
-    );
-    logger?.error(`Error updating BDEF ${name}: ${detailedError}`);
-    return return_error(new Error(detailedError));
-  }
+      return obj.activate({ name }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

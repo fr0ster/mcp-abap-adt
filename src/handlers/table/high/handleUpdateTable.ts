@@ -1,21 +1,34 @@
 /**
  * UpdateTable Handler - Update Existing ABAP Table DDL Source
  *
- * Uses TableBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getTable().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
+ * write, released on every path out.
  *
- * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
+ * Workflow: lock -> update -> unlock -> (activate). The pre-write and
+ * post-unlock syntax checks the pre-migration handler ran are gone: they
+ * duplicated what `update`'s own `analyseException` already verdicts, and
+ * dropping them matches this tool's documented contract ("Locks, updates,
+ * unlocks, and optionally activates") and every low-tier sibling.
+ *
+ * **The source goes through `options.sourceCode`.** See `UpdateTableLow`.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { tableDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateTable',
@@ -44,6 +57,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate table after source update. Default: true.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['table_name', 'ddl_code'],
   },
@@ -54,253 +68,50 @@ interface UpdateTableArgs {
   ddl_code: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateTable MCP tool
- *
- * Uses TableBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleUpdateTable(
   context: HandlerContext,
   args: UpdateTableArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      table_name,
-      ddl_code,
-      transport_request,
-      activate = true,
-    } = args as UpdateTableArgs;
 
-    // Validation
-    if (!table_name || !ddl_code) {
-      return return_error(new Error('table_name and ddl_code are required'));
-    }
-
-    const tableName = table_name.toUpperCase();
-
-    logger?.info(`Starting table source update: ${tableName}`);
-
-    try {
-      // Get configuration from environment variables
-      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-      // Create connection directly for this handler call
-      // Get connection from session context (set by ProtocolHandler)
-      // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger?.debug(
-        `[UpdateTable] Created separate connection for handler call: ${tableName}`,
-      );
-    } catch (connectionError: any) {
-      const errorMessage =
-        connectionError instanceof Error
-          ? connectionError.message
-          : String(connectionError);
-      logger?.error(
-        `[UpdateTable] Failed to create connection: ${errorMessage}`,
-      );
-      return return_error(
-        new Error(`Failed to create connection: ${errorMessage}`),
-      );
-    }
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-
-      // Build operation chain: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive version) -> (activate)
-      // Note: No validation needed for update - table must already exist
-      const shouldActivate = activate !== false; // Default to true if not specified
-      let activateResponse: any | undefined;
-      let lockHandle: string | undefined;
-
-      try {
-        // Lock
-        lockHandle = await client.getTable().lock({ tableName });
-
-        // Step 1: Check new code BEFORE update (only when activating)
-        if (shouldActivate) {
-          logger?.info(
-            `[UpdateTable] Checking new DDL code before update: ${tableName}`,
-          );
-          try {
-            await safeCheckOperation(
-              () =>
-                client
-                  .getTable()
-                  .check({ tableName, ddlCode: ddl_code }, 'inactive'),
-              tableName,
-              {
-                debug: (message: string) =>
-                  logger?.debug(`[UpdateTable] ${message}`),
-              },
-            );
-            logger?.info(`[UpdateTable] New code check passed: ${tableName}`);
-          } catch (checkError: any) {
-            if ((checkError as any).isAlreadyChecked) {
-              logger?.info(
-                `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
-              );
-            } else {
-              logger?.error(
-                `[UpdateTable] New code check failed: ${tableName}`,
-                {
-                  error:
-                    checkError instanceof Error
-                      ? checkError.message
-                      : String(checkError),
-                },
-              );
-              throw new Error(
-                `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-              );
-            }
-          }
-        } else {
-          logger?.info(
-            `[UpdateTable] Skipping syntax check (activate=false): ${tableName}`,
-          );
-        }
-
-        // Step 2: Update
-        logger?.info(
-          `[UpdateTable] Updating table with DDL code: ${tableName}`,
-        );
-        await client.getTable().update(
-          {
-            tableName,
-            ddlCode: ddl_code,
-            transportRequest: transport_request,
-          },
-          { lockHandle },
-        );
-        logger?.info(`[UpdateTable] Table source code updated: ${tableName}`);
-      } finally {
-        if (lockHandle) {
-          try {
-            await client.getTable().unlock({ tableName }, lockHandle);
-            logger?.info(`[UpdateTable] Table unlocked: ${tableName}`);
-          } catch (unlockError: any) {
-            logger?.warn(
-              `Failed to unlock table ${tableName}: ${unlockError?.message || unlockError}`,
-            );
-          }
-        }
-      }
-
-      // Step 4: Check inactive version (after unlock, only when activating)
-      if (shouldActivate) {
-        logger?.info(`[UpdateTable] Checking inactive version: ${tableName}`);
-        try {
-          await safeCheckOperation(
-            () => client.getTable().check({ tableName }, 'inactive'),
-            tableName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateTable] ${message}`),
-            },
-          );
-          logger?.info(
-            `[UpdateTable] Inactive version check completed: ${tableName}`,
-          );
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[UpdateTable] Table ${tableName} was already checked - this is OK, continuing`,
-            );
-          } else {
-            logger?.warn(
-              `[UpdateTable] Inactive version check had issues: ${tableName}`,
-              {
-                error:
-                  checkError instanceof Error
-                    ? checkError.message
-                    : String(checkError),
-              },
-            );
-          }
-        }
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        const activateState = await client.getTable().activate({ tableName });
-        activateResponse = activateState.activateResult;
-      }
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
-      logger?.info(`✅ UpdateTable completed successfully: ${tableName}`);
-
-      // Return success result
-      const stepsCompleted = [
-        'lock',
-        'check_new_code',
-        'update',
-        'unlock',
-        'check_inactive',
-      ];
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
-
-      const result = {
-        success: true,
-        table_name: tableName,
-        transport_request: transport_request || 'local',
-        activated: shouldActivate,
-        message: shouldActivate
-          ? `Table ${tableName} source updated and activated successfully`
-          : `Table ${tableName} source updated successfully (not activated)`,
-        uri: `/sap/bc/adt/ddic/tables/${encodeSapObjectName(tableName)}`,
-        steps_completed: stepsCompleted,
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-        source_size_bytes: ddl_code.length,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(`Error updating table source ${tableName}:`, error);
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(new Error(`Failed to update table: ${errorMessage}`));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args.table_name || !args.ddl_code) {
+    return return_error(new Error('table_name and ddl_code are required'));
   }
+
+  const tableName = args.table_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateTable', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getTable(
+        resultsFor(tableDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ tableName }),
+        (lockHandle) =>
+          obj.update(
+            { tableName, transportRequest: args.transport_request },
+            {
+              sourceCode: args.ddl_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ tableName }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ tableName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

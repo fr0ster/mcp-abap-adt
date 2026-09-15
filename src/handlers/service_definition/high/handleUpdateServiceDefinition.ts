@@ -1,21 +1,36 @@
 /**
  * UpdateServiceDefinition Handler - Update Existing ABAP Service Definition Source
  *
- * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by client.
+ * Uses AdtClient.getServiceDefinition().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
+ * write, released on every path out.
  *
- * Workflow: lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> update -> unlock -> (activate). The `check` the
+ * pre-migration handler ran between `update` and `unlock` (swallowed except
+ * for a genuine, non-"already checked" refusal) is gone: it duplicated what
+ * `update`'s own `analyseException` already verdicts.
+ *
+ * **The source goes in `options`, not `config`.** The shipped
+ * `AdtServiceDefinition.update()` reads `options?.sourceCode` only and
+ * passes `config.transportRequest` straight through — verified against the
+ * compiled `AdtServiceDefinition.js`, not the declaration file.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceDefinition',
@@ -43,6 +58,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate service definition after update. Default: true.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['service_definition_name', 'source_code'],
   },
@@ -53,195 +69,58 @@ interface UpdateServiceDefinitionArgs {
   source_code: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateServiceDefinition MCP tool
- *
- * Uses AdtClient for all operations
- * Session and lock management handled internally by client
- */
 export async function handleUpdateServiceDefinition(
   context: HandlerContext,
   args: UpdateServiceDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      service_definition_name,
-      source_code,
-      transport_request,
-      activate = true,
-    } = args as UpdateServiceDefinitionArgs;
 
-    // Validation
-    if (!service_definition_name || !source_code) {
-      return return_error(
-        new Error('service_definition_name and source_code are required'),
-      );
-    }
-
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const serviceDefinitionName = service_definition_name.toUpperCase();
-
-    logger?.info(
-      `Starting service definition source update: ${serviceDefinitionName}`,
+  if (!args.service_definition_name || !args.source_code) {
+    return return_error(
+      new Error('service_definition_name and source_code are required'),
     );
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-
-      // Build operation chain: lock -> update -> check -> unlock -> (activate)
-      // Note: No validation needed for update - service definition must already exist
-      const shouldActivate = activate !== false; // Default to true if not specified
-
-      // Lock
-      let lockHandle: string | undefined;
-      let activateResponse: any | undefined;
-
-      try {
-        lockHandle = await client
-          .getServiceDefinition()
-          .lock({ serviceDefinitionName });
-
-        // Update source code
-        await client.getServiceDefinition().update(
-          {
-            serviceDefinitionName,
-            sourceCode: source_code,
-            transportRequest: args.transport_request,
-          },
-          { lockHandle },
-        );
-
-        // Check
-        try {
-          await safeCheckOperation(
-            () =>
-              client.getServiceDefinition().check({ serviceDefinitionName }),
-            serviceDefinitionName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[UpdateServiceDefinition] ${message}`),
-            },
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
-          }
-        }
-      } finally {
-        if (lockHandle) {
-          try {
-            await client
-              .getServiceDefinition()
-              .unlock({ serviceDefinitionName }, lockHandle);
-            logger?.info(
-              `[UpdateServiceDefinition] Service definition unlocked: ${serviceDefinitionName}`,
-            );
-          } catch (unlockError: any) {
-            logger?.warn(
-              `Failed to unlock service definition ${serviceDefinitionName}: ${unlockError?.message || unlockError}`,
-            );
-          }
-        }
-      }
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getServiceDefinition()
-          .read({ serviceDefinitionName }, 'inactive', {
-            withLongPolling: true,
-          });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        const activateState = await client
-          .getServiceDefinition()
-          .activate({ serviceDefinitionName });
-        activateResponse = activateState.activateResult;
-      }
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
-      logger?.info(
-        `✅ UpdateServiceDefinition completed successfully: ${serviceDefinitionName}`,
-      );
-
-      // Return success result
-      const stepsCompleted = ['lock', 'update', 'check', 'unlock'];
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
-
-      const result = {
-        success: true,
-        service_definition_name: serviceDefinitionName,
-        transport_request: transport_request || 'local',
-        activated: shouldActivate,
-        message: shouldActivate
-          ? `Service Definition ${serviceDefinitionName} updated and activated successfully`
-          : `Service Definition ${serviceDefinitionName} updated successfully (not activated)`,
-        uri: `/sap/bc/adt/ddic/srvd/sources/${encodeSapObjectName(serviceDefinitionName)}`,
-        steps_completed: stepsCompleted,
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-        source_size_bytes: source_code.length,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(
-        `Error updating service definition source ${serviceDefinitionName}:`,
-        error,
-      );
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        new Error(`Failed to update service definition: ${errorMessage}`),
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  const serviceDefinitionName = args.service_definition_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateServiceDefinition', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getServiceDefinition(
+        resultsFor(serviceDefinitionDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ serviceDefinitionName }),
+        (lockHandle) =>
+          obj.update(
+            {
+              serviceDefinitionName,
+              transportRequest: args.transport_request,
+            },
+            {
+              sourceCode: args.source_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate(
+        { serviceDefinitionName },
+        { analyse: analyseActivation },
+      );
+    },
+    project(detail, terseWrite),
+  );
 }

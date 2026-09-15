@@ -1,18 +1,37 @@
 /**
  * UpdateClass Handler - Update existing ABAP class source code (optional activation)
  *
- * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
+ * Uses AdtClient.getClass().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — the lock is held for the
+ * whole write, and released on every path out (a refused update, a thrown
+ * projection, a refused unlock all still unlock).
+ *
+ * Workflow: lock -> update -> unlock -> (activate). The pre-write and
+ * post-unlock syntax checks the pre-migration handler ran are gone: they
+ * duplicated what `update`'s own `analyseException` already verdicts, and the
+ * pre-write one silently swallowed its own "already checked" case. Dropping
+ * them matches this tool's documented contract ("Locks, updates, unlocks, and
+ * optionally activates") and every low-tier sibling in this cluster.
+ *
+ * **The source goes in `options`, not `config`.** See `UpdateClassLow` — the
+ * shipped `AdtClass.update()` reads `options?.sourceCode` only.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateClass',
@@ -39,6 +58,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate after update. Default: false.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'source_code'],
   },
@@ -49,13 +69,13 @@ interface UpdateClassArgs {
   source_code: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateClass(
   context: HandlerContext,
-  params: UpdateClassArgs,
+  args: UpdateClassArgs,
 ) {
-  const args: UpdateClassArgs = params;
   const { connection, logger } = context;
 
   if (!args.class_name || !args.source_code) {
@@ -65,152 +85,35 @@ export async function handleUpdateClass(
   }
 
   const className = args.class_name.toUpperCase();
-  logger?.info(
-    `Starting UpdateClass for ${className} (activate=${args.activate === true})`,
+  const shouldActivate = args.activate === true;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateClass', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getClass(
+        resultsFor(classDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            { className, transportRequest: args.transport_request },
+            {
+              sourceCode: args.source_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ className }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
   );
-
-  try {
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = args.activate === true;
-    let lockHandle: string | undefined;
-
-    try {
-      // Lock
-      logger?.debug(`Locking class: ${className}`);
-      lockHandle = await client.getClass().lock({ className: className });
-      logger?.debug(
-        `Class locked: ${className} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
-      );
-
-      // Check new code before update (only when activating)
-      if (shouldActivate) {
-        logger?.debug(`Checking new code before update: ${className}`);
-        try {
-          await safeCheckOperation(
-            () =>
-              client
-                .getClass()
-                .check(
-                  { className: className, sourceCode: args.source_code },
-                  'inactive',
-                ),
-            className,
-            { debug: (message: string) => logger?.debug(message) },
-          );
-          logger?.debug(`New code check passed: ${className}`);
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(
-              `Class ${className} was already checked - continuing`,
-            );
-          } else {
-            logger?.error(
-              `New code check failed: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-            throw new Error(
-              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-          }
-        }
-      } else {
-        logger?.debug(`Skipping syntax check (activate=false): ${className}`);
-      }
-
-      // Update
-      logger?.debug(`Updating class source code: ${className}`);
-      await client.getClass().update(
-        {
-          className: className,
-          sourceCode: args.source_code,
-          transportRequest: args.transport_request,
-        },
-        { lockHandle },
-      );
-      logger?.info(`Class source code updated: ${className}`);
-    } finally {
-      if (lockHandle) {
-        try {
-          logger?.debug(`Unlocking class: ${className}`);
-          await client.getClass().unlock({ className: className }, lockHandle);
-          logger?.info(`Class unlocked: ${className}`);
-        } catch (unlockError: any) {
-          logger?.warn(
-            `Failed to unlock class ${className}: ${unlockError?.message || unlockError}`,
-          );
-        }
-      }
-    }
-
-    // Check inactive after unlock (only when activating)
-    if (shouldActivate) {
-      logger?.debug(`Checking inactive version: ${className}`);
-      try {
-        await safeCheckOperation(
-          () => client.getClass().check({ className: className }, 'inactive'),
-          className,
-          { debug: (message: string) => logger?.debug(message) },
-        );
-        logger?.debug(`Inactive version check completed: ${className}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(`Class ${className} was already checked - continuing`);
-        } else {
-          logger?.warn(
-            `Inactive version check had issues: ${className} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
-        }
-      }
-    }
-
-    // Activate if requested
-    if (shouldActivate) {
-      logger?.debug(`Activating class: ${className}`);
-      await client.getClass().activate({ className: className });
-      logger?.info(`Class activated: ${className}`);
-    } else {
-      logger?.debug(`Skipping activation for: ${className}`);
-    }
-
-    logger?.info(`UpdateClass completed successfully: ${className}`);
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          class_name: className,
-          activated: shouldActivate,
-          message: `Class ${className} updated${shouldActivate ? ' and activated' : ''} successfully`,
-        },
-        null,
-        2,
-      ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    // Parse error message
-    let errorMessage = error instanceof Error ? error.message : String(error);
-
-    // Attempt to parse ADT XML error
-    try {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_',
-      });
-      const errorData = error?.response?.data
-        ? parser.parse(error.response.data)
-        : null;
-      const errorMsg =
-        errorData?.['exc:exception']?.message?.['#text'] ||
-        errorData?.['exc:exception']?.message;
-      if (errorMsg) {
-        errorMessage = `SAP Error: ${errorMsg}`;
-      }
-    } catch {
-      // ignore parse errors
-    }
-
-    logger?.error(
-      `Unexpected error in UpdateClass handler: ${className} - ${errorMessage}`,
-    );
-    return return_error(new Error(errorMessage));
-  }
 }

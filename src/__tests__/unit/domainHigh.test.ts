@@ -1,6 +1,6 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
-import { fakeClientOf, okResponse } from '../helpers/fakeClient';
+import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 
 let fakeClient: unknown;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
@@ -11,15 +11,15 @@ const context = {
 };
 
 /**
- * Fix round 3, task 14. `handleUpdateDomain.ts` (high) is not this cluster's
- * family, but it carried the exact mirror of the defect this task fixed
- * across class/interface/behavior_definition/behavior_implementation:
- * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only
- * and never `options.xmlContent` — verified against `AdtDomain.js` and
- * `core/domain/update.js`. This file exists only to pin that one request
- * shape; it does not attempt to cover the rest of this handler's chain
- * (lock, check, long-polling read, activate), per instruction to keep the
- * change to the channel and not restructure the handler.
+ * Fix round 3, task 14, carried forward by task 19's `withLock` migration.
+ * `handleUpdateDomain.ts` (high) carried the exact mirror of the defect
+ * task 14 fixed across class/interface/behavior_definition/
+ * behavior_implementation: `AdtDomain.updateMetadata()`'s shipped body reads
+ * `config.document` only and never `options.xmlContent` — verified against
+ * `AdtDomain.js` and `core/domain/update.js`. This file pins that one
+ * request shape, now through the `withLock`-held read-modify-write task 19
+ * introduced (the pre-write/post-unlock syntax checks and the long-polling
+ * read are gone from the handler as of that task).
  */
 describe('UpdateDomain (high) — updateMetadata request shape', () => {
   it('passes the patched document via config.document, and no stray xmlContent survives in options', async () => {
@@ -29,12 +29,11 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
 
     fakeClient = fakeClientOf({
       lock: async () => okResponse('LOCK123'),
-      readMetadata: async () => okResponse(currentXml),
+      readMetadata: async () => okResponse(reading(currentXml)),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
-        return okResponse(undefined);
+        return okResponse(reading(undefined, '', 200));
       },
-      check: async () => okResponse(undefined),
       unlock: async () => okResponse(undefined),
     });
 
@@ -52,6 +51,8 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
 
     expect(updateCall?.config).toEqual({
       domainName: 'ZD',
+      packageName: 'ZP',
+      transportRequest: undefined,
       document: expect.stringContaining('adtcore:description="after"'),
     });
     expect(updateCall?.options).toEqual({

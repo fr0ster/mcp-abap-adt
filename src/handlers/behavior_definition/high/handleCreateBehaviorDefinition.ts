@@ -1,14 +1,35 @@
 /**
  * CreateBehaviorDefinition Handler - ABAP Behavior Definition Creation via ADT API
+ *
+ * Uses AdtClient.getBehaviorDefinition().{create,lock,check,unlock,activate}
+ * from @mcp-abap-adt/adt-clients 19.
+ *
+ * Workflow: create -> lock+check+unlock (through `withLock`) -> (activate).
+ * `create` takes every field this tool accepts (no separate body write), so
+ * the lock's body is the syntax check the pre-migration handler ran while
+ * holding it.
  */
 
+import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type {
   BehaviorDefinitionImplementationType,
-  IBehaviorDefinitionConfig,
+  IAdtError,
+  IAdtResponse,
 } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -55,6 +76,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name', 'package_name', 'root_entity', 'implementation_type'],
   },
@@ -69,14 +91,14 @@ interface CreateBehaviorDefinitionArgs {
   implementation_type: BehaviorDefinitionImplementationType;
   activate?: boolean;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateBehaviorDefinition(
   context: HandlerContext,
-  params: any,
+  args: CreateBehaviorDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  const args: CreateBehaviorDefinitionArgs = params;
 
   if (
     !args.name ||
@@ -94,104 +116,41 @@ export async function handleCreateBehaviorDefinition(
   }
 
   const name = args.name.toUpperCase();
-  // Get connection from session context (set by ProtocolHandler)
-  // Connection is managed and cached per session, with proper token refresh via AuthBroker
-  logger?.info(`Starting BDEF creation: ${name}`);
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
 
-  try {
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = args.activate !== false;
+  return answer(
+    { tool: 'CreateBehaviorDefinition', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getBehaviorDefinition(
+        resultsFor(behaviorDefinitionDocuments),
+      );
 
-    // Create - using types from adt-clients
-    const createConfig: Pick<
-      IBehaviorDefinitionConfig,
-      | 'name'
-      | 'description'
-      | 'packageName'
-      | 'transportRequest'
-      | 'rootEntity'
-      | 'implementationType'
-      | 'masterLanguage'
-    > = {
-      name,
-      description: args.description || name,
-      packageName: args.package_name,
-      transportRequest: args.transport_request || '',
-      rootEntity: args.root_entity,
-      implementationType: args.implementation_type,
-      masterLanguage: args.master_language,
-    };
-    await client.getBehaviorDefinition().create(createConfig);
-
-    // Lock - using types from adt-clients
-    const lockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = { name };
-    const lockHandle = await client.getBehaviorDefinition().lock(lockConfig);
-
-    try {
-      // Check (optional, but good practice) - using types from adt-clients
-      const checkConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-        name,
-      };
-      await client.getBehaviorDefinition().check(checkConfig);
-
-      // Unlock - using types from adt-clients
-      const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-        name,
-      };
-      await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getBehaviorDefinition()
-          .read({ name }, 'inactive', { withLongPolling: true });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
-      }
-
-      // Activate if requested - using types from adt-clients
-      if (shouldActivate) {
-        const activateConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
+      const created = await obj.create(
+        {
           name,
-        };
-        await client.getBehaviorDefinition().activate(activateConfig);
-      }
-    } catch (error) {
-      // Unlock on error (principle 1: if lock was done, unlock is mandatory)
-      try {
-        const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-          name,
-        };
-        await client.getBehaviorDefinition().unlock(unlockConfig, lockHandle);
-      } catch (unlockError) {
-        logger?.error(
-          `Failed to unlock behavior definition after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
-        );
-      }
-      // Principle 2: first error and exit
-      throw error;
-    }
+          description: args.description || name,
+          packageName: args.package_name,
+          transportRequest: args.transport_request,
+          rootEntity: args.root_entity,
+          implementationType: args.implementation_type,
+          masterLanguage: args.master_language,
+        },
+        { analyse: analyseException },
+      );
+      if (!created.ok) return created;
 
-    const result = {
-      success: true,
-      name: name,
-      package_name: args.package_name,
-      type: 'BDEF',
-      message: shouldActivate
-        ? `Behavior Definition ${name} created and activated successfully`
-        : `Behavior Definition ${name} created successfully`,
-    };
-    logger?.info(`✅ CreateBehaviorDefinition completed successfully: ${name}`);
+      const checked = await withLock(
+        () => obj.lock({ name }),
+        () => obj.check({ name }, undefined, { analyse: analyseCheck }),
+        (lockHandle) => obj.unlock({ name }, lockHandle),
+      );
+      if (!checked.ok || !shouldActivate) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
 
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    });
-  } catch (error: any) {
-    logger?.error(`Error creating BDEF ${name}: ${error?.message || error}`);
-    return return_error(error);
-  }
+      return obj.activate({ name }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

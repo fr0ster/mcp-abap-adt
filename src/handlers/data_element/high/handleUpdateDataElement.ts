@@ -1,21 +1,42 @@
 /**
  * UpdateDataElement Handler - Update Existing ABAP Data Element
  *
- * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getDataElement().{lock,readMetadata,updateMetadata,unlock,
+ * activate} from @mcp-abap-adt/adt-clients 19, through `withLock` — the lock
+ * is held for the read-modify-write in its body, released on every path out.
  *
- * Workflow: lock -> update -> check -> unlock -> (activate)
+ * Workflow: lock -> (read, patch, write) -> unlock -> (activate). The
+ * post-write syntax check the pre-migration handler ran (swallowed except
+ * for a genuine, non-"already checked" refusal) is gone: it duplicated what
+ * `updateMetadata`'s own `analyseException` already verdicts. The pre-write
+ * "already exists" validation is also gone — it tolerated exactly one
+ * refusal shape from an endpoint an update never needs to call.
+ *
+ * **The patched document goes in `config.document`, not `options.xmlContent`.**
+ * See `UpdateDataElementLow` — the shipped `AdtDataElement.updateMetadata()`
+ * reads `config.document` only.
  */
 
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
-  type AxiosResponse,
-  isAlreadyExistsError,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+  type DataElementChanges,
+  patchDataElementXml,
+} from '../../../lib/strategies/dataElementPatch';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -109,6 +130,7 @@ export const TOOL_DEFINITION = {
         description: 'Activate data element after update (default: true)',
         default: true,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['data_element_name', 'package_name'],
   },
@@ -132,213 +154,91 @@ interface DataElementArgs {
   search_help_parameter?: string;
   set_get_parameter?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateDataElement tool
- *
- * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
+function changesOf(args: DataElementArgs): DataElementChanges {
+  return {
+    description: args.description,
+    type_kind: args.type_kind,
+    type_name: args.type_name,
+    data_type: args.data_type,
+    length: args.length,
+    decimals: args.decimals,
+    short_label: args.field_label_short,
+    medium_label: args.field_label_medium,
+    long_label: args.field_label_long,
+    heading_label: args.field_label_heading,
+    search_help: args.search_help,
+    search_help_parameter: args.search_help_parameter,
+    set_get_parameter: args.set_get_parameter,
+  };
+}
+
 export async function handleUpdateDataElement(
   context: HandlerContext,
   args: DataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    if (!args?.data_element_name) {
-      return return_error('Data element name is required');
-    }
-    if (!args?.package_name) {
-      return return_error('Package name is required');
-    }
 
-    // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(args.package_name, args.transport_request);
-
-    const typedArgs = args as DataElementArgs;
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const dataElementName = typedArgs.data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element update: ${dataElementName}`);
-
-    try {
-      type AdtClientsTypeKind =
-        | 'domain'
-        | 'predefinedAbapType'
-        | 'refToPredefinedAbapType'
-        | 'refToDictionaryType'
-        | 'refToClifType';
-      const rawTypeKind = (typedArgs.type_kind || 'domain')
-        .toString()
-        .toLowerCase();
-      const typeKindMap: Record<string, AdtClientsTypeKind> = {
-        domain: 'domain',
-        builtin: 'predefinedAbapType',
-        predefinedabaptype: 'predefinedAbapType',
-        reftopredefinedabaptype: 'refToPredefinedAbapType',
-        reftodictionarytype: 'refToDictionaryType',
-        reftocliftype: 'refToClifType',
-      };
-      const typeKind = typeKindMap[rawTypeKind] || 'domain';
-
-      // Create client
-      const client = createAdtClient(connection, logger);
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
-
-      // Validate (for update, "already exists" is expected - object must exist)
-      let updateState: any | undefined;
-      try {
-        await client.getDataElement().validate({
-          dataElementName,
-          packageName: typedArgs.package_name,
-          description: typedArgs.description || dataElementName,
-        });
-      } catch (validateError: any) {
-        // For update operations, "already exists" is expected - object must exist
-        if (!isAlreadyExistsError(validateError)) {
-          // Real validation error - rethrow
-          throw validateError;
-        }
-        // "Already exists" is OK for update - continue
-        logger?.info(
-          `Data element ${dataElementName} already exists - this is expected for update operation`,
-        );
-      }
-
-      // Lock
-      let lockHandle: string | undefined;
-
-      try {
-        lockHandle = await client
-          .getDataElement()
-          .lock({ dataElementName: dataElementName });
-
-        // Update with properties
-        const properties = {
-          dataType: typedArgs.data_type,
-          length: typedArgs.length,
-          decimals: typedArgs.decimals,
-          shortLabel: typedArgs.field_label_short,
-          mediumLabel: typedArgs.field_label_medium,
-          longLabel: typedArgs.field_label_long,
-          headingLabel: typedArgs.field_label_heading,
-          typeKind: typeKind,
-          typeName: typedArgs.type_name?.toUpperCase(),
-          searchHelp: typedArgs.search_help,
-          searchHelpParameter: typedArgs.search_help_parameter,
-          setGetParameter: typedArgs.set_get_parameter,
-        };
-        updateState = await client.getDataElement().update(
-          {
-            dataElementName,
-            packageName: typedArgs.package_name,
-            transportRequest: typedArgs.transport_request,
-            description: typedArgs.description || dataElementName,
-            ...properties,
-          },
-          { lockHandle },
-        );
-
-        // Check
-        try {
-          await safeCheckOperation(
-            () => client.getDataElement().check({ dataElementName }),
-            dataElementName,
-            {
-              debug: (message: string) => logger?.debug(message),
-            },
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
-          }
-        }
-      } finally {
-        if (lockHandle) {
-          try {
-            await client
-              .getDataElement()
-              .unlock({ dataElementName }, lockHandle);
-            logger?.info(`Data element unlocked: ${dataElementName}`);
-          } catch (unlockError: any) {
-            logger?.warn(
-              `Failed to unlock data element ${dataElementName}: ${unlockError?.message || unlockError}`,
-            );
-          }
-        }
-      }
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getDataElement()
-          .read({ dataElementName }, 'inactive', { withLongPolling: true });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        await client.getDataElement().activate({ dataElementName });
-      }
-
-      // Get data element details from update result
-      const updateResult = updateState?.updateResult;
-      let dataElementDetails = null;
-      if (
-        updateResult?.data &&
-        typeof updateResult.data === 'object' &&
-        'data_element_details' in updateResult.data
-      ) {
-        dataElementDetails = (updateResult.data as any).data_element_details;
-      }
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          data_element_name: dataElementName,
-          package: typedArgs.package_name,
-          transport_request: typedArgs.transport_request,
-          data_type: typedArgs.data_type || null,
-          status: shouldActivate ? 'active' : 'inactive',
-          message: `Data element ${dataElementName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-          data_element_details: dataElementDetails,
-        }),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // Handle specific error cases
-      if (
-        error.message?.includes('not found') ||
-        error.response?.status === 404
-      ) {
-        return return_error(`Data element ${dataElementName} not found.`);
-      }
-
-      if (error.message?.includes('locked') || error.response?.status === 403) {
-        return return_error(
-          `Data element ${dataElementName} is locked by another user or session. Please try again later.`,
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        `Failed to update data element ${dataElementName}: ${errorMessage}`,
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.data_element_name) {
+    return return_error('Data element name is required');
   }
+  if (!args?.package_name) {
+    return return_error('Package name is required');
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const dataElementName = args.data_element_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+  const changes = changesOf(args);
+
+  return answer(
+    { tool: 'UpdateDataElement', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getDataElement(
+        resultsFor(dataElementDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ dataElementName }),
+        async (
+          lockHandle,
+        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          const current = await obj.readMetadata(
+            { dataElementName },
+            { analyse: analyseException },
+          );
+          if (!current.ok) {
+            return current as IAdtResponse<AdtReading<unknown>, IAdtError>;
+          }
+          return obj.updateMetadata(
+            {
+              dataElementName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              document: patchDataElementXml(
+                extractXmlString(
+                  current.getResult().value.raw,
+                  `data element ${dataElementName}`,
+                ),
+                changes,
+              ),
+            },
+            { lockHandle, analyse: analyseException },
+          );
+        },
+        (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ dataElementName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

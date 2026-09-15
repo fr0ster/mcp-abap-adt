@@ -1,20 +1,41 @@
 /**
  * CreateStructure Handler - ABAP Structure Creation via ADT API
  *
- * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getStructure().{validate,create,lock,unlock,check,activate}
+ * from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: validate -> create -> lock -> check (inactive version) -> unlock -> (activate)
+ * Workflow: validate -> create -> lock+unlock (through `withLock`) -> check
+ * -> (activate) — the order the pre-migration handler ran them in.
+ *
+ * **`fields`/`includes` never reach the object.** They did not before this
+ * migration either: the pre-migration handler's own comment said as much
+ * ("skip update as structure creation already includes field definitions",
+ * which it does not — `create()` posts a metadata document only, see
+ * `CreateStructureLow`). Nothing between `lock` and `unlock` writes a body,
+ * so `withLock`'s body here is the acquire/release pair itself — there is
+ * nothing yet to compose it with. The parameters stay on this tool's surface
+ * with their pre-migration descriptions; wiring DDL generation from
+ * `fields`/`includes` is a separate change, not part of this task.
  */
 
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+  analyseValidation,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -46,7 +67,8 @@ export const TOOL_DEFINITION = {
       },
       fields: {
         type: 'array',
-        description: 'Array of structure fields',
+        description:
+          'Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.',
         items: {
           type: 'object',
           properties: {
@@ -94,7 +116,8 @@ export const TOOL_DEFINITION = {
       },
       includes: {
         type: 'array',
-        description: 'Include other structures in this structure',
+        description:
+          'Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.',
         items: {
           type: 'object',
           properties: {
@@ -120,6 +143,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['structure_name', 'package_name', 'fields'],
   },
@@ -151,188 +175,94 @@ interface CreateStructureArgs {
   includes?: StructureInclude[];
   activate?: boolean;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateStructure MCP tool
- *
- * Uses StructureBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
+/** A synthetic success, for a lock whose body writes nothing. */
+function okOf<T>(value: T): IAdtResponse<T, IAdtError> {
+  return {
+    ok: true,
+    getResult: () => ({ value }),
+    getError: () => {
+      throw new Error('okOf: asked for the error of a success');
+    },
+  } as unknown as IAdtResponse<T, IAdtError>;
+}
+
 export async function handleCreateStructure(
   context: HandlerContext,
   args: CreateStructureArgs,
-): Promise<any> {
+) {
   const { connection, logger } = context;
-  try {
-    const createStructureArgs = args as CreateStructureArgs;
 
-    // Validate required parameters
-    if (!createStructureArgs?.structure_name) {
-      return return_error('Structure name is required');
-    }
-    if (!createStructureArgs?.package_name) {
-      return return_error('Package name is required');
-    }
-
-    // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(
-      createStructureArgs.package_name,
-      createStructureArgs.transport_request,
-    );
-
-    if (
-      !createStructureArgs?.fields ||
-      !Array.isArray(createStructureArgs.fields) ||
-      createStructureArgs.fields.length === 0
-    ) {
-      return return_error('At least one field is required');
-    }
-
-    const structureName = createStructureArgs.structure_name.toUpperCase();
-
-    logger?.info(`Starting structure creation: ${structureName}`);
-
-    try {
-      // Get configuration from environment variables
-      // Create logger for connection (only logs when DEBUG_CONNECTORS is enabled)
-      // Create connection directly for this handler call
-      // Get connection from session context (set by ProtocolHandler)
-      // Connection is managed and cached per session, with proper token refresh via AuthBroker
-      logger?.debug(
-        `[CreateStructure] Created separate connection for handler call: ${structureName}`,
-      );
-    } catch (connectionError: any) {
-      const errorMessage =
-        connectionError instanceof Error
-          ? connectionError.message
-          : String(connectionError);
-      return return_error(`Failed to create connection: ${errorMessage}`);
-    }
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-      const shouldActivate = createStructureArgs.activate !== false; // Default to true if not specified
-
-      // Validate
-      await client.getStructure().validate({
-        structureName,
-        packageName: createStructureArgs.package_name,
-        description: createStructureArgs.description || structureName,
-      });
-
-      // Create
-      await client.getStructure().create({
-        structureName,
-        description: createStructureArgs.description || structureName,
-        packageName: createStructureArgs.package_name,
-        ddlCode: '',
-        transportRequest: createStructureArgs.transport_request,
-        masterLanguage: createStructureArgs.master_language,
-      });
-
-      // Lock
-      const lockHandle = await client.getStructure().lock({ structureName });
-
-      try {
-        // Note: StructureBuilder internally generates DDL from fields/includes
-        // For now, skip update as structure creation already includes field definitions
-        // TODO: Implement DDL generation or enhance AdtClient to accept fields directly
-
-        // Unlock (MANDATORY after lock)
-        await client.getStructure().unlock({ structureName }, lockHandle);
-        logger?.info(`[CreateStructure] Structure unlocked: ${structureName}`);
-
-        // Check inactive version (after unlock)
-        logger?.info(
-          `[CreateStructure] Checking inactive version: ${structureName}`,
-        );
-        try {
-          await safeCheckOperation(
-            () => client.getStructure().check({ structureName }, 'inactive'),
-            structureName,
-            {
-              debug: (message: string) =>
-                logger?.debug(`[CreateStructure] ${message}`),
-            },
-          );
-          logger?.info(
-            `[CreateStructure] Inactive version check completed: ${structureName}`,
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.info(
-              `[CreateStructure] Structure ${structureName} was already checked - this is OK, continuing`,
-            );
-          } else {
-            // Log warning but don't fail - inactive check is informational
-            logger?.warn(
-              `[CreateStructure] Inactive version check had issues: ${structureName}`,
-              {
-                error:
-                  checkError instanceof Error
-                    ? checkError.message
-                    : String(checkError),
-              },
-            );
-          }
-        }
-
-        // Activate
-        if (shouldActivate) {
-          await client.getStructure().activate({ structureName });
-        }
-      } catch (error) {
-        // Unlock on error (principle 1: if lock was done, unlock is mandatory)
-        try {
-          await client.getStructure().unlock({ structureName }, lockHandle);
-        } catch (unlockError) {
-          logger?.error('Failed to unlock structure after error:', unlockError);
-        }
-        // Principle 2: first error and exit
-        throw error;
-      }
-
-      logger?.info(
-        `✅ CreateStructure completed successfully: ${structureName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          structure_name: structureName,
-          package_name: createStructureArgs.package_name,
-          transport_request: createStructureArgs.transport_request || 'local',
-          activated: shouldActivate,
-          message: `Structure ${structureName} created successfully${shouldActivate ? ' and activated' : ''}`,
-        }),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error creating structure ${structureName}:`, error);
-
-      // Check if structure already exists
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.status === 409
-      ) {
-        return return_error(
-          `Structure ${structureName} already exists. Please delete it first or use a different name.`,
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        `Failed to create structure ${structureName}: ${errorMessage}`,
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.structure_name) {
+    return return_error('Structure name is required');
   }
+  if (!args?.package_name) {
+    return return_error('Package name is required');
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  if (
+    !args?.fields ||
+    !Array.isArray(args.fields) ||
+    args.fields.length === 0
+  ) {
+    return return_error('At least one field is required');
+  }
+
+  const structureName = args.structure_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateStructure', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getStructure(
+        resultsFor(structureDocuments),
+      );
+
+      const checked = await sequence(
+        () =>
+          obj.validate(
+            {
+              structureName,
+              description: args.description || structureName,
+              packageName: args.package_name,
+            },
+            { analyse: analyseValidation },
+          ),
+        () =>
+          obj.create(
+            {
+              structureName,
+              description: args.description || structureName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { analyse: analyseException },
+          ),
+        () =>
+          withLock<string, AdtReading<unknown>>(
+            () => obj.lock({ structureName }),
+            () =>
+              Promise.resolve(
+                okOf(undefined as unknown as AdtReading<unknown>),
+              ),
+            (lockHandle) => obj.unlock({ structureName }, lockHandle),
+          ),
+        () =>
+          obj.check({ structureName }, 'inactive', { analyse: analyseCheck }),
+      );
+
+      if (!checked.ok || !shouldActivate) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ structureName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

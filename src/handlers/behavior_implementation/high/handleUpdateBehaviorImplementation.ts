@@ -1,199 +1,119 @@
 /**
- * UpdateBehaviorImplementation Handler - Update Existing ABAP Behavior Implementation
+ * UpdateBehaviorImplementation Handler - Write a Behavior Implementation's
+ * implementations include
  *
- * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by client.
+ * Uses AdtClient.getBehaviorImplementation().update from
+ * @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: lock -> update main source -> update implementations -> check -> unlock -> (activate)
+ * **This handler holds no lock — it takes the caller's lock handle as an
+ * argument.** `AdtBehaviorImplementation.update()`'s own doc comment: "The
+ * lock is the *class's*, not the include's: `getClass().lock()` is what takes
+ * it, and the same handle serves every include." The caller locks the class
+ * (e.g. via LockClass) once and can then write the main source (UpdateClass),
+ * the implementations include (this tool) and the other class members under
+ * that one window; acquiring a second lock here would either collide with the
+ * caller's or, if it succeeded, require releasing a lock the caller still
+ * needs. This changes the tool's surface beyond `detail` — see the task
+ * report for why.
+ *
+ * **`update()` writes the implementations include only, one request.** The
+ * declaration file's own doc comment describes a two-write chain (main source
+ * then include); the shipped `AdtBehaviorImplementation.js` does not match
+ * it — `update()` makes exactly one `updateBehaviorImplementation()` call,
+ * and no longer reads `behaviorDefinition` at all (its own comment: "this
+ * writes the implementation include and never reads the definition's name").
+ * A class written through this handler does not get its `FOR BEHAVIOR OF`
+ * clause from this call — that is `UpdateClass`'s, under the same lock.
+ *
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode` only (`const source = options?.sourceCode;`).
+ * Verified against `AdtBehaviorImplementation.js`, not the declaration file.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.',
+    'Operation: Update. Subject: BehaviorImplementation. Write the implementations include (handler code) of an existing ABAP behavior implementation class. Takes the lock handle from a prior LockClass call — this tool does not lock or unlock the class itself, so the caller releases it separately. Does not write the FOR BEHAVIOR OF main source; use UpdateClass (under the same lock handle) for that.',
   inputSchema: {
     type: 'object',
     properties: {
-      class_name: {
+      behavior_implementation_name: {
         type: 'string',
         description:
           'Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.',
       },
-      behavior_definition: {
-        type: 'string',
-        description:
-          'Behavior Definition name (e.g., ZI_MY_ENTITY). Must match the behavior definition used when creating the class.',
-      },
-      implementation_code: {
+      source_code: {
         type: 'string',
         description:
           'Implementation code for the implementations include. Contains the actual behavior implementation methods.',
+      },
+      lock_handle: {
+        type: 'string',
+        description:
+          'Lock handle from a LockClass call on this class. Required — the shipped write endpoint answers "400 Parameter lockHandle could not be found" without one.',
       },
       transport_request: {
         type: 'string',
         description:
           'Transport request number (e.g., E19K905635). Optional if object is local or already in transport.',
       },
-      activate: {
-        type: 'boolean',
-        description:
-          'Activate behavior implementation after update. Default: true.',
-      },
+      ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'behavior_definition', 'implementation_code'],
+    required: ['behavior_implementation_name', 'source_code', 'lock_handle'],
   },
 } as const;
 
 interface UpdateBehaviorImplementationArgs {
-  class_name: string;
-  behavior_definition: string;
-  implementation_code: string;
+  behavior_implementation_name: string;
+  source_code: string;
+  lock_handle: string;
   transport_request?: string;
-  activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateBehaviorImplementation MCP tool
- *
- * Uses AdtClient for all operations
- * Session and lock management handled internally by client
- */
 export async function handleUpdateBehaviorImplementation(
   context: HandlerContext,
   args: UpdateBehaviorImplementationArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      behavior_definition,
-      implementation_code,
-      transport_request,
-      activate = true,
-    } = args as UpdateBehaviorImplementationArgs;
-    // Validation
-    if (!class_name || !behavior_definition || !implementation_code) {
-      return return_error(
-        new Error(
-          'class_name, behavior_definition, and implementation_code are required',
-        ),
-      );
-    }
 
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const className = class_name.toUpperCase();
-    const behaviorDefinition = behavior_definition.toUpperCase();
-
-    logger?.info(
-      `Starting behavior implementation source update: ${className} for ${behaviorDefinition}`,
-    );
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-
-      // Update behavior implementation using AdtClient chain
-      const shouldActivate = activate !== false; // Default to true if not specified
-      const updateState = await client.getBehaviorImplementation().update(
-        {
-          className,
-          behaviorDefinition,
-          implementationCode: implementation_code,
-          transportRequest: transport_request,
-        },
-        { activateOnUpdate: shouldActivate },
-      );
-
-      const activateResponse = updateState.activateResult;
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
-      logger?.info(
-        `✅ UpdateBehaviorImplementation completed successfully: ${className}`,
-      );
-
-      // Return success result
-      const stepsCompleted = [
-        'lock',
-        'update_main_source',
-        'update_implementations',
-        'check',
-        'unlock',
-      ];
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
-
-      const result = {
-        success: true,
-        class_name: className,
-        behavior_definition: behaviorDefinition,
-        transport_request: transport_request || 'local',
-        activated: shouldActivate,
-        message: shouldActivate
-          ? `Behavior Implementation ${className} updated and activated successfully`
-          : `Behavior Implementation ${className} updated successfully (not activated)`,
-        uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
-        steps_completed: stepsCompleted,
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(
-        `Error updating behavior implementation source ${className}: ${error?.message || error}`,
-      );
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        new Error(`Failed to update behavior implementation: ${errorMessage}`),
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.behavior_implementation_name) {
+    return return_error(new Error('behavior_implementation_name is required'));
   }
+  if (!args?.source_code) {
+    return return_error(new Error('source_code is required'));
+  }
+  if (!args?.lock_handle) {
+    return return_error(new Error('lock_handle is required'));
+  }
+
+  const className = args.behavior_implementation_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateBehaviorImplementation', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorImplementation(resultsFor(classDocuments))
+        .update(
+          { className, transportRequest: args.transport_request },
+          {
+            sourceCode: args.source_code,
+            lockHandle: args.lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

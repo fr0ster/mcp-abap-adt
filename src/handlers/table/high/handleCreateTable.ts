@@ -1,17 +1,30 @@
 /**
  * CreateTable Handler - ABAP Table Creation via ADT API
  *
- * Workflow: validate -> create (object in initial state)
- * DDL code is set via UpdateTable handler.
+ * Uses AdtClient.getTable().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it. The pre-migration handler's own `validate()`
+ * call is dropped — this is a bare create, matching `CreateTableLow`.
+ *
+ * **`description` reaches nothing.** The shipped `createTable` reads five
+ * fields — table name, package, transport, master and responsible — plus
+ * `masterLanguage`; `description` is not among them. Kept on this tool's
+ * schema for compatibility, but not forwarded. No source, no DDL — that is
+ * `UpdateTable`'s job, after `LockTable`. Verified against `AdtTable.js`.
  */
 
+import { tableDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -29,7 +42,8 @@ export const TOOL_DEFINITION = {
       },
       description: {
         type: 'string',
-        description: 'Table description for validation and creation.',
+        description:
+          'Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.',
       },
       package_name: {
         type: 'string',
@@ -45,6 +59,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['table_name', 'package_name'],
   },
@@ -56,95 +71,41 @@ interface CreateTableArgs {
   package_name: string;
   transport_request?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateTable MCP tool
- */
 export async function handleCreateTable(
   context: HandlerContext,
   args: CreateTableArgs,
-): Promise<any> {
+) {
   const { connection, logger } = context;
-  try {
-    const createTableArgs = args as CreateTableArgs;
 
-    // Validate required parameters
-    if (!createTableArgs?.table_name) {
-      return return_error('Table name is required');
-    }
-    if (!createTableArgs?.package_name) {
-      return return_error('Package name is required');
-    }
-
-    // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(
-      createTableArgs.package_name,
-      createTableArgs.transport_request,
-    );
-
-    const tableName = createTableArgs.table_name.toUpperCase();
-
-    logger?.info(`Starting table creation: ${tableName}`);
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-
-      // Validate
-      await client.getTable().validate({
-        tableName,
-        packageName: createTableArgs.package_name,
-        description: createTableArgs.description || tableName,
-      });
-
-      // Create
-      await client.getTable().create({
-        tableName,
-        packageName: createTableArgs.package_name,
-        description: createTableArgs.description || tableName,
-        ddlCode: '',
-        transportRequest: createTableArgs.transport_request,
-        masterLanguage: createTableArgs.master_language,
-      });
-
-      logger?.info(`Table created: ${tableName}`);
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          table_name: tableName,
-          package_name: createTableArgs.package_name,
-          transport_request: createTableArgs.transport_request || 'local',
-          message: `Table ${tableName} created successfully. Use UpdateTable to set DDL code.`,
-        }),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating table ${tableName}: ${error?.message || error}`,
-      );
-
-      // Check if table already exists
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.status === 409
-      ) {
-        return return_error(
-          `Table ${tableName} already exists. Please delete it first or use a different name.`,
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        `Failed to create table ${tableName}: ${errorMessage}`,
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.table_name) {
+    return return_error(new Error('table_name is required'));
   }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const tableName = args.table_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateTable', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getTable(resultsFor(tableDocuments))
+        .create(
+          {
+            tableName,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

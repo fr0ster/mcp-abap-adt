@@ -578,7 +578,8 @@ Outside any scope (stdio) nothing changes.
 
 - `responsible` ← the system's user name, `masterSystem` ← its system id.
 - One lookup per connection, only when a call lacks a value. On-premise: no lookup, nothing filled.
-- A failed lookup is logged; the call runs anyway.
+- Only a key that is **absent** counts as missing. A scope carrying `responsible: undefined` has said this request has no responsible, and nothing fills it.
+- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs.
 
 Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
 

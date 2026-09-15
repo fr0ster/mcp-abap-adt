@@ -171,6 +171,36 @@ describe('withResolvedSystemContext', () => {
     });
   });
 
+  it('a scope carrying responsible as undefined keeps it empty, and still fills the master system', async () => {
+    // 10.1.0's rule, which this must not quietly overturn: a key the scope
+    // carries has answered the question, even when its value is `undefined`.
+    // Deciding by truthiness instead would fill exactly the case a host
+    // deliberately emptied, and would make CLIENT_CONFIGURATION.md's
+    // "present (even `undefined`) → the scope's value" row false on cloud.
+    const conn = cloudConn();
+    await runWithRequestContext({ responsible: undefined }, () =>
+      withResolvedSystemContext(conn, () => {
+        createAdtClient(conn);
+      }),
+    );
+    expect(lastOptions()?.responsible).toBeUndefined();
+    expect(lastOptions()).toMatchObject({ masterSystem: 'CLD' });
+  });
+
+  it('a scope carrying both keys as undefined asks the system nothing', async () => {
+    const conn = cloudConn();
+    await runWithRequestContext(
+      { responsible: undefined, masterSystem: undefined },
+      () =>
+        withResolvedSystemContext(conn, () => {
+          createAdtClient(conn);
+        }),
+    );
+    expect(lookup).not.toHaveBeenCalled();
+    expect(lastOptions()?.responsible).toBeUndefined();
+    expect(lastOptions()?.masterSystem).toBeUndefined();
+  });
+
   it('with no scope and an empty process context, fills and keeps the process language', async () => {
     setSystemContext({ masterLanguage: 'EN' });
     const conn = cloudConn();

@@ -124,7 +124,18 @@ export async function withResolvedSystemContext<T>(
   if (!resolver || !connection) return fn();
 
   const effective = getEffectiveSystemContext();
-  if (effective.responsible && effective.masterSystem) return fn();
+  // Key presence, not truthiness — the same rule 10.1.0 established and
+  // documents: a scope that carries the key, even as `undefined`, has said
+  // "this request has no responsible", and that answer wins over every other
+  // source. Deciding by truthiness instead would fill exactly the case a host
+  // deliberately emptied, and would make `CLIENT_CONFIGURATION.md`'s
+  // "present (even `undefined`) → the scope's value" row false on cloud.
+  const scope = getRequestContext();
+  const wantsResponsible =
+    !effective.responsible && !(scope && 'responsible' in scope);
+  const wantsMasterSystem =
+    !effective.masterSystem && !(scope && 'masterSystem' in scope);
+  if (!wantsResponsible && !wantsMasterSystem) return fn();
 
   let resolved: ResolvedSystemContext;
   try {
@@ -140,8 +151,12 @@ export async function withResolvedSystemContext<T>(
   return runWithRequestContext(
     {
       ...getRequestContext(),
-      responsible: effective.responsible ?? resolved.responsible,
-      masterSystem: effective.masterSystem ?? resolved.masterSystem,
+      responsible: wantsResponsible
+        ? resolved.responsible
+        : effective.responsible,
+      masterSystem: wantsMasterSystem
+        ? resolved.masterSystem
+        : effective.masterSystem,
       // The effective value, not the scope's: inside a scope it IS the scope's
       // value, so an outer scope's language is kept; outside any scope it is
       // the process language, which entering this new scope would otherwise

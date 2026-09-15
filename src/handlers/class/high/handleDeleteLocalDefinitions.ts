@@ -1,14 +1,46 @@
 /**
- * DeleteLocalDefinitions Handler - Delete Local Definitions via AdtClient
+ * DeleteLocalDefinitions Handler - Empty a class's local definitions include
+ *
+ * Uses AdtClient.getLocalDefinitions().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`.
+ *
+ * **Calls `update()` with empty source, not `delete()`.** Two findings,
+ * both confirmed against the shipped `.js`, not the `.d.ts`:
+ *
+ * 1. `ILocalDefinitionsContract` (what `getLocalDefinitions()` is declared to
+ *    return) is not `IAdtDeletable` at all, and its own file's doc comment
+ *    says why: "there is no resource to DELETE and none to ask about" — a
+ *    class include has no deletion-service endpoint. `AdtLocalDefinitions`
+ *    implements a `delete()` method regardless, but its body is exactly
+ *    `return this.update({ ...config, definitionsCode: '' }, options)` — a
+ *    convenience name for the empty write, not a different call. Calling
+ *    `update()` with `sourceCode: ''` directly is the identical wire
+ *    request, made through a method the declared type actually has.
+ * 2. `update()` never locks itself. The same accessor composes
+ *    `IAdtLockable`, delegating to the class's own lock, so this handler
+ *    acquires it exactly as `UpdateLocalDefinitions` does, through
+ *    `withLock`.
+ *
+ * `analyseException`, not `analyseDeletion`: the answer is a PUT result
+ * (`updated` slot), not a `del:deletionResult`/`del:checkResponse` document,
+ * so the deletion strategy has nothing to read here.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalDefinitions',
@@ -31,6 +63,7 @@ export const TOOL_DEFINITION = {
         description: 'Activate parent class after deleting. Default: false',
         default: false,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name'],
   },
@@ -40,6 +73,7 @@ interface DeleteLocalDefinitionsArgs {
   class_name: string;
   transport_request?: string;
   activate_on_delete?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleDeleteLocalDefinitions(
@@ -47,70 +81,38 @@ export async function handleDeleteLocalDefinitions(
   args: DeleteLocalDefinitionsArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      transport_request,
-      activate_on_delete = false,
-    } = args as DeleteLocalDefinitionsArgs;
 
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Deleting local definitions for ${className}`);
-
-    try {
-      const localDefinitions = client.getLocalDefinitions();
-      const deleteResult = await localDefinitions.delete({
-        className,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult) {
-        throw new Error(`Delete did not return a result for ${className}`);
-      }
-
-      if (activate_on_delete) {
-        await client.getClass().activate({ className });
-      }
-
-      logger?.info(
-        `✅ DeleteLocalDefinitions completed successfully: ${className}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            transport_request: transport_request || null,
-            activated: activate_on_delete,
-            message: `Local definitions deleted successfully from ${className}.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting local definitions for ${className}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to delete local definitions: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Local definitions for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+
+  const className = args.class_name.toUpperCase();
+  const shouldActivate = args.activate_on_delete === true;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteLocalDefinitions', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getLocalDefinitions(
+        resultsFor(classDocuments),
+      );
+
+      const deleted = await withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            { className, transportRequest: args.transport_request },
+            { sourceCode: '', lockHandle, analyse: analyseException },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
+
+      if (!deleted.ok || !shouldActivate) {
+        return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ className }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

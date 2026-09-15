@@ -1,14 +1,30 @@
 /**
- * DeleteLocalTypes Handler - Delete Local Types via AdtClient
+ * DeleteLocalTypes Handler - Empty a class's local types include
+ *
+ * Uses AdtClient.getLocalTypes().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`. Same shape as
+ * `DeleteLocalDefinitions` — see its own doc comment for the full reasoning:
+ * `AdtLocalTypes.delete()` is `update({...config, localTypesCode: ''})`
+ * under a different name, and the declared `ILocalTypesContract` type does
+ * not carry `delete` at all, so this calls `update()` with empty source
+ * directly, under the class's own lock via `withLock`.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteLocalTypes',
@@ -31,6 +47,7 @@ export const TOOL_DEFINITION = {
         description: 'Activate parent class after deleting. Default: false',
         default: false,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name'],
   },
@@ -40,6 +57,7 @@ interface DeleteLocalTypesArgs {
   class_name: string;
   transport_request?: string;
   activate_on_delete?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleDeleteLocalTypes(
@@ -47,68 +65,38 @@ export async function handleDeleteLocalTypes(
   args: DeleteLocalTypesArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      transport_request,
-      activate_on_delete = false,
-    } = args as DeleteLocalTypesArgs;
 
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
+  }
 
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
+  const className = args.class_name.toUpperCase();
+  const shouldActivate = args.activate_on_delete === true;
+  const detail = detailOf(args);
 
-    logger?.info(`Deleting local types for ${className}`);
-
-    try {
-      const localTypes = client.getLocalTypes();
-      const deleteResult = await localTypes.delete({
-        className,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult) {
-        throw new Error(`Delete did not return a result for ${className}`);
-      }
-
-      if (activate_on_delete) {
-        await client.getClass().activate({ className });
-      }
-
-      logger?.info(`✅ DeleteLocalTypes completed successfully: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            transport_request: transport_request || null,
-            activated: activate_on_delete,
-            message: `Local types deleted successfully from ${className}.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting local types for ${className}: ${error?.message || error}`,
+  return answer(
+    { tool: 'DeleteLocalTypes', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getLocalTypes(
+        resultsFor(classDocuments),
       );
 
-      let errorMessage = `Failed to delete local types: ${error.message || String(error)}`;
+      const deleted = await withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            { className, transportRequest: args.transport_request },
+            { sourceCode: '', lockHandle, analyse: analyseException },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
 
-      if (error.response?.status === 404) {
-        errorMessage = `Local types for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
+      if (!deleted.ok || !shouldActivate) {
+        return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+      return obj.activate({ className }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

@@ -1,19 +1,18 @@
 /**
  * CheckPackage Handler - Syntax check for ABAP Package
  *
- * Uses AdtClient.checkPackage from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getPackage().check from @mcp-abap-adt/adt-clients 19.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckPackageLow',
@@ -30,7 +29,7 @@ export const TOOL_DEFINITION = {
       super_package: {
         type: 'string',
         description:
-          'Super package (parent package) name (e.g., ZOK_PACKAGE). Required.',
+          'Does not reach the check endpoint — the shipped checkPackage() call takes only the package name. Kept for compatibility with LockPackage/ValidatePackage/CreatePackage, which do read it.',
       },
       session_id: {
         type: 'string',
@@ -47,6 +46,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['package_name', 'super_package'],
   },
@@ -61,119 +61,37 @@ interface CheckPackageArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckPackage MCP tool
- *
- * Uses AdtClient.checkPackage - low-level single method call
- */
 export async function handleCheckPackage(
   context: HandlerContext,
   args: CheckPackageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { package_name, super_package, session_id, session_state } =
-      args as CheckPackageArgs;
+  const { package_name, super_package, session_id, session_state } = args;
 
-    // Validation
-    if (!package_name || !super_package) {
-      return return_error(
-        new Error('package_name and super_package are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const packageName = package_name.toUpperCase();
-    const superPackage = super_package.toUpperCase();
-
-    logger?.info(`Starting package check: ${packageName} in ${superPackage}`);
-
-    try {
-      // Check package
-      const checkState = await client.getPackage().check({
-        packageName: packageName,
-        superPackage: superPackage,
-      });
-      const response = checkState.checkResult;
-
-      if (!response) {
-        throw new Error(
-          `Check did not return a response for package ${packageName}`,
-        );
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckPackage completed: ${packageName}`);
-      logger?.debug(
-        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            package_name: packageName,
-            super_package: superPackage,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Package ${packageName} has no syntax errors`
-              : `Package ${packageName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking package ${packageName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to check package: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Package ${packageName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!package_name || !super_package) {
+    return return_error(
+      new Error('package_name and super_package are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const packageName = package_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckPackageLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getPackage(resultsFor(packageDocuments))
+        // `status` left undefined: the shipped default checks the inactive
+        // version, which is what a caller wants right after a write.
+        .check({ packageName }, undefined, { analyse: analyseCheck }),
+    project(detail, terseCheck),
+  );
 }

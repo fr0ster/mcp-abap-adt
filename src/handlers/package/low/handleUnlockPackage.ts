@@ -1,18 +1,20 @@
 /**
  * UnlockPackage Handler - Unlock ABAP Package
  *
- * Uses AdtClient.unlockPackage from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getPackage().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockPackageLow',
@@ -30,7 +32,7 @@ export const TOOL_DEFINITION = {
       super_package: {
         type: 'string',
         description:
-          'Super package (parent package) name. Required for package operations.',
+          'Does not reach the unlock endpoint — the shipped unlockPackage() call takes only the package name and lock handle. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.',
       },
       lock_handle: {
         type: 'string',
@@ -68,120 +70,39 @@ interface UnlockPackageArgs {
   };
 }
 
-/**
- * Main handler for UnlockPackage MCP tool
- *
- * Uses AdtClient.unlockPackage - low-level single method call
- */
 export async function handleUnlockPackage(
   context: HandlerContext,
   args: UnlockPackageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      package_name,
-      super_package,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UnlockPackageArgs;
+  const {
+    package_name,
+    super_package,
+    lock_handle,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!package_name || !super_package || !lock_handle || !session_id) {
-      return return_error(
-        new Error(
-          'package_name, super_package, lock_handle, and session_id are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_state) {
-      // CRITICAL: Use restoreSessionInConnection to properly restore session
-      // This will set sessionId in connection and enable stateful session mode
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const packageName = package_name.toUpperCase();
-    const superPackage = super_package.toUpperCase();
-
-    logger?.info(
-      `Starting package unlock: ${packageName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!package_name || !super_package || !lock_handle || !session_id) {
+    return return_error(
+      new Error(
+        'package_name, super_package, lock_handle, and session_id are required',
+      ),
     );
-
-    try {
-      // Unlock package using AdtClient (with proper session state restored)
-      const unlockState = await client
-        .getPackage()
-        .unlock({ packageName, superPackage }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for package ${packageName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockPackage completed: ${packageName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            package_name: packageName,
-            super_package: superPackage,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Package ${packageName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking package ${packageName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock package: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Package ${packageName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockObject.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const packageName = package_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockPackageLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getPackage()
+        .unlock({ packageName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

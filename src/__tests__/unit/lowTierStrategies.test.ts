@@ -40,6 +40,19 @@ import {
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
+import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
+import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
+import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
+import {
+  handleLockPackage,
+  TOOL_DEFINITION as LockPackageToolDefinition,
+} from '../../handlers/package/low/handleLockPackage';
+import {
+  handleUnlockPackage,
+  TOOL_DEFINITION as UnlockPackageToolDefinition,
+} from '../../handlers/package/low/handleUnlockPackage';
+import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
+import { handleValidatePackage } from '../../handlers/package/low/handleValidatePackage';
 import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
 import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
 import { handleCreateDataElement } from '../../handlers/data_element/low/handleCreateDataElement';
@@ -2420,5 +2433,208 @@ describe('data_element', () => {
 
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+});
+
+describe('package — no Activate tool (a package is a container, no activation)', () => {
+  it("CheckPackageLow forwards no superPackage — checkPackage takes only the package name — and leaves the check member's status undefined", async () => {
+    await handleCheckPackage(context as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+    });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getPackage');
+    expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
+    expect(call?.args[1]).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+  });
+
+  it('CreatePackageLow reaches getPackage with analyseException, forwarding superPackage — createPackage reads it, unlike check/lock/unlock', async () => {
+    await handleCreatePackage(context as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+      description: 'x',
+      software_component: 'ZLOCAL',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getPackage');
+    expect(call?.args[0]).toEqual({
+      packageName: 'ZP_X',
+      superPackage: 'ZP',
+      description: 'x',
+      packageType: undefined,
+      softwareComponent: 'ZLOCAL',
+      transportLayer: undefined,
+      transportRequest: 'E19K900001',
+      recordChanges: undefined,
+      applicationComponent: undefined,
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('LockPackageLow passes no analyse, forwards no superPackage to the lock member, and carries no detail parameter', async () => {
+    await handleLockPackage(context as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+    });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getPackage');
+    expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect('detail' in LockPackageToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it("LockPackageLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'PKG_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockPackage(context as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.package_name).toBe('ZP_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockPackageLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'PKG_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockPackage(connectionSessionContext as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockPackageLow passes no analyse, forwards no superPackage to the unlock member, and carries no detail parameter', async () => {
+    await handleUnlockPackage(context as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getPackage');
+    expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in UnlockPackageToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it('DeletePackageLow passes transportRequest through to the delete member, taking analyseDeletion explicitly over the shipped packageDeletionRefusal default', async () => {
+    await handleDeletePackage(context as any, {
+      package_name: 'ZP_X',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('delete');
+    expect(call?.factory).toBe('getPackage');
+    expect(call?.args[0]).toEqual({
+      packageName: 'ZP_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseDeletion);
+  });
+
+  it('DeletePackageLow answers the structured delete-success fixture through terseDeletion', async () => {
+    const reading = structured({
+      data: corpusBody('delete-success--01-deletion-delete'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ delete: async () => okResponse(reading) });
+
+    const result: any = await handleDeletePackage(context as any, {
+      package_name: 'zp_x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      deleted: true,
+      object: 'ZMCP_BLD_ANSCH01',
+    });
+  });
+
+  it('ValidatePackageLow reaches getPackage with analyseValidation, forwarding superPackage — validatePackageBasic reads it as the parent package', async () => {
+    await handleValidatePackage(context as any, {
+      package_name: 'zp_x',
+      super_package: 'zp',
+    });
+    const call = callTo('validate');
+    expect(call?.factory).toBe('getPackage');
+    expect(call?.args[0]).toEqual({ packageName: 'ZP_X', superPackage: 'ZP' });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseValidation);
+  });
+
+  it('ValidatePackageLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidatePackage(context as any, {
+      package_name: 'ZP_X',
+      super_package: 'ZP',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
+  });
+
+  it('UpdatePackageLow reads the real read-metadata-package fixture, patches only adtcore:description, and passes it via config.document — no stray xmlContent survives in options', async () => {
+    const currentXml = corpusBody(
+      'read-metadata-package--01-packages-zmcpshrpkg',
+    );
+    let updateCall: { config: any; options: any } | undefined;
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (config: unknown, options: unknown) => {
+        updateCall = { config, options };
+        return okResponse(undefined);
+      },
+    });
+
+    const result: any = await handleUpdatePackage(context as any, {
+      package_name: 'zmcp_shr_pkg',
+      super_package: 'zadt_bld_pkg03',
+      updated_description: 'after',
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(updateCall?.config).toEqual({
+      packageName: 'ZMCP_SHR_PKG',
+      document: expect.stringContaining('adtcore:description="after"'),
+    });
+    // The real document's own super package (`ZADT_BLD_PKG03`) survives
+    // unpatched — only the field the caller named changed.
+    expect(updateCall?.config.document).toContain(
+      'adtcore:name="ZADT_BLD_PKG03"',
+    );
+    expect(updateCall?.options).toEqual({
+      lockHandle: 'h',
+      analyse: analyseException,
+    });
+    expect(
+      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+    ).toBeUndefined();
   });
 });

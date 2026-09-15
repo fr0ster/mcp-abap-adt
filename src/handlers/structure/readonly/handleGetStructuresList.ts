@@ -1,5 +1,7 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import { fetchWhereUsedReferences } from '../../../lib/strategies/whereUsedList';
 import {
   type AxiosResponse,
   return_error,
@@ -153,7 +155,7 @@ export async function handleGetStructuresList(
 
     const client = createAdtClient(connection, logger);
     const obj = client.getStructure();
-    const utils = client.getUtils();
+    const utils = client.getUtils(ourUtils);
     const rootName = structure_name.toUpperCase();
 
     /**
@@ -209,15 +211,16 @@ export async function handleGetStructuresList(
       let lastErr: unknown;
       for (const objectType of ['structure', 'table'] as const) {
         try {
-          const wu = await utils.getWhereUsedList({
+          const wu = await fetchWhereUsedReferences(utils, {
             object_name: baseName,
             object_type: objectType,
             enableOnlyTypes: ['TABL/DS'],
-          } as any);
-          references = (wu?.references ?? []) as Array<{
-            name?: string;
-            type?: string;
-          }>;
+          });
+          if (!wu.ok) {
+            lastErr = new Error(wu.getError().message);
+            continue;
+          }
+          references = wu.getResult().value.references;
           resolved = true;
           break;
         } catch (e) {

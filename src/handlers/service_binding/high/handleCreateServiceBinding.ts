@@ -1,11 +1,59 @@
-import type { ServiceBindingVariant } from '@mcp-abap-adt/interfaces';
+/**
+ * CreateServiceBinding Handler - Create ABAP Service Binding, then activate
+ * and generate its service
+ *
+ * Uses AdtClient.getServiceBinding().{create,activate,generateServiceBinding}
+ * from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The pre-migration handler's `create()` was already a composite the .d.ts
+ * comment still half-describes and the shipped `.js` no longer is.**
+ * `AdtServiceBinding.create()`'s doc comment says "Create the binding, and
+ * activate and generate its service... What the chain does after it — the
+ * check, the activation, the generation — is this implementation's business
+ * and reaches a caller only if it fails" — but `AdtService.js`'s `create()`
+ * body (around line 226) issues exactly one request, `createRequest`, and
+ * nothing else. The comment is stale against the compiled behaviour; the
+ * compiled behaviour is what this handler is built against. `create()` now
+ * posts the shell only, matching the general v19 rule ("one member, one
+ * endpoint call") and this repository's own create/update split.
+ *
+ * The pre-migration composite's three captured results —
+ * `state.createResult`, `state.readResult`, `state.generatedInfoResult` —
+ * are rebuilt as a sequence: `create()`, then, only when `activate` is
+ * requested (as `activateOnCreate` used to gate it), `activate()` and
+ * `generateServiceBinding()`. `generateServiceBinding` accepts no
+ * `options.analyse` at all (confirmed against its declared signature and its
+ * one-request `generateRequest` body) — its verdict is the library's
+ * unjudged HTTP-status default, the same absence `classifyServiceBinding`
+ * and the node-structure members in this migration share.
+ *
+ * **Assumption, not corpus-verified:** no captured fixture in
+ * `tests/fixtures/adt/` covers a service-binding create, so the order
+ * "activate before generate" follows ADT's general rule that only an active
+ * object's OData service can be generated, not a recorded trace. Flagged
+ * here for verification against a real system rather than asserted as fact.
+ */
+
+import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import {
+  type IAdtError,
+  type IAdtResponse,
+  SERVICE_BINDING_VARIANT_MAP,
+  type ServiceBindingVariant,
+} from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
-import {
-  parseServiceBindingPayload,
-  type ServiceBindingResponseFormat,
-} from './serviceBindingPayloadUtils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
+import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
@@ -59,19 +107,23 @@ export const TOOL_DEFINITION = {
       },
       activate: {
         type: 'boolean',
-        description: 'Activate service binding after create. Default: true.',
+        description:
+          'Activate and generate the service binding after create. Default: true.',
         default: true,
       },
       response_format: {
         type: 'string',
         enum: ['xml', 'json', 'plain'],
         default: 'xml',
+        description:
+          'Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.',
       },
       master_language: {
         type: 'string',
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: [
       'service_binding_name',
@@ -93,6 +145,7 @@ interface CreateServiceBindingArgs {
   activate?: boolean;
   response_format?: ServiceBindingResponseFormat;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateServiceBinding(
@@ -101,88 +154,73 @@ export async function handleCreateServiceBinding(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.service_binding_name) {
-      throw new Error('service_binding_name is required');
-    }
-    if (!args?.service_definition_name) {
-      throw new Error('service_definition_name is required');
-    }
-    if (!args?.package_name) {
-      throw new Error('package_name is required');
-    }
+  if (!args?.service_binding_name) {
+    return return_error(new Error('service_binding_name is required'));
+  }
+  if (!args?.service_definition_name) {
+    return return_error(new Error('service_definition_name is required'));
+  }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
 
-    const serviceBindingName = args.service_binding_name.trim().toUpperCase();
-    const serviceDefinitionName = args.service_definition_name
-      .trim()
-      .toUpperCase();
-    const packageName = args.package_name.trim().toUpperCase();
-    const responseFormat = args.response_format ?? 'xml';
-    const bindingVariant: ServiceBindingVariant =
-      args.binding_variant ?? 'ODATA_V4_UI';
-    const serviceName = (args.service_name || serviceBindingName)
-      .trim()
-      .toUpperCase();
-    const serviceVersion = (args.service_version || '0001').trim();
+  const serviceBindingName = args.service_binding_name.trim().toUpperCase();
+  const serviceDefinitionName = args.service_definition_name
+    .trim()
+    .toUpperCase();
+  const packageName = args.package_name.trim().toUpperCase();
+  const bindingVariant: ServiceBindingVariant =
+    args.binding_variant ?? 'ODATA_V4_UI';
+  const { serviceType } = SERVICE_BINDING_VARIANT_MAP[bindingVariant];
+  const serviceName = (args.service_name || serviceBindingName)
+    .trim()
+    .toUpperCase();
+  const serviceVersion = (args.service_version || '0001').trim();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
 
-    const client = createAdtClient(connection, logger);
-    const state = await client.getServiceBinding().create(
-      {
+  return answer(
+    { tool: 'CreateServiceBinding', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getServiceBinding(
+        resultsFor(serviceDocuments),
+      );
+
+      const created = await obj.create(
+        {
+          bindingName: serviceBindingName,
+          packageName,
+          description: (args.description || serviceBindingName).trim(),
+          serviceDefinitionName,
+          serviceName,
+          serviceVersion,
+          bindingVariant,
+          transportRequest: args.transport_request,
+          masterLanguage: args.master_language,
+        },
+        { analyse: analyseException },
+      );
+
+      if (!created.ok || !shouldActivate) {
+        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      const activated = await obj.activate(
+        { bindingName: serviceBindingName },
+        { analyse: analyseActivation },
+      );
+      if (!activated.ok) {
+        return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return (await obj.generateServiceBinding({
+        serviceType,
         bindingName: serviceBindingName,
-        packageName: packageName,
-        description: (args.description || serviceBindingName).trim(),
-        serviceDefinitionName,
         serviceName,
         serviceVersion,
-        bindingVariant,
-        transportRequest: args.transport_request,
-        masterLanguage: args.master_language,
-      },
-      { activateOnCreate: args.activate !== false },
-    );
-    const response = state.createResult;
-    if (!response) {
-      throw new Error(
-        `Create did not return a response for service binding ${serviceBindingName}`,
-      );
-    }
-    const readPayload = state.readResult
-      ? parseServiceBindingPayload(state.readResult.data, responseFormat)
-      : undefined;
-    const generatedPayload = state.generatedInfoResult
-      ? parseServiceBindingPayload(
-          state.generatedInfoResult.data,
-          responseFormat,
-        )
-      : undefined;
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          service_binding_name: serviceBindingName,
-          service_definition_name: serviceDefinitionName,
-          package_name: packageName,
-          binding_variant: bindingVariant,
-          service_name: serviceName,
-          service_version: serviceVersion,
-          activated: args.activate !== false,
-          response_format: responseFormat,
-          status: response.status,
-          payload: parseServiceBindingPayload(response.data, responseFormat),
-          read_payload: readPayload,
-          generated_info: generatedPayload,
-        },
-        null,
-        2,
-      ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: unknown) {
-    logger?.error('Error creating service binding:', error);
-    return return_error(error);
-  }
+        serviceDefinitionName,
+      })) as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+    },
+    project(detail, terseWrite),
+  );
 }

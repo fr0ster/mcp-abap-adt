@@ -1,6 +1,35 @@
+/**
+ * RuntimeRunProgram Handler - Execute an ABAP program, optionally profiled
+ *
+ * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
+ * @mcp-abap-adt/adt-clients 19 — not `createAdtClient`, per
+ * `AdtExecutor`'s own shape (see `handleRuntimeRunProgramWithProfiling.ts`
+ * and Task 24's class-profiling pair for the same door).
+ *
+ * **`runWithProfiling` was split, not deleted.** `ProgramExecutor`'s own
+ * doc comment: "Not `IProgramExecutor` since 19.0.0. That composite
+ * includes `IRunnableWithProfiling`, whose `runWithProfiling` scheduled a
+ * trace, ran the program under it, and answered both — three requests in
+ * one member... a caller who wants the old member writes `scheduleTrace`,
+ * then `runWithProfiler` with the id it answered." Composed here with
+ * `pair()` rather than `sequence()`: the final answer needs BOTH halves —
+ * the scheduled `profilerId` and the run's own output — where `sequence()`
+ * keeps only the last step.
+ *
+ * Neither `run`, `scheduleTrace` nor `runWithProfiler` accepts an
+ * `options.analyse` (confirmed against `ProgramExecutor.d.ts`: `run` takes
+ * no options at all, `scheduleTrace`'s only parameter is
+ * `IProfilerTraceParameters`, and `runWithProfiler`'s is
+ * `IProgramExecuteWithProfilerOptions` — just `{ profilerId }`). Their
+ * verdict is the library's own, the same absence the where-used and
+ * node-structure members in this migration share.
+ */
+
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgram',
@@ -67,82 +96,58 @@ export async function handleRuntimeRunProgram(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.program_name) {
-      throw new Error('Parameter "program_name" is required');
-    }
-
-    const programName = args.program_name.trim().toUpperCase();
-    const executor = new AdtExecutor(connection, logger);
-    const programExecutor = executor.getProgramExecutor();
-
-    if (!args.profile) {
-      const response = await programExecutor.run({ programName });
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            program_name: programName,
-            output: typeof response.data === 'string' ? response.data : '',
-            run_status: response.status,
-          },
-          null,
-          2,
-        ),
-        status: response.status,
-        statusText: response.statusText,
-        headers: response.headers,
-        config: response.config,
-      });
-    }
-
-    const result = await programExecutor.runWithProfiling(
-      { programName },
-      {
-        profilerParameters: {
-          description: args.description,
-          allProceduralUnits: args.all_procedural_units,
-          allMiscAbapStatements: args.all_misc_abap_statements,
-          allInternalTableEvents: args.all_internal_table_events,
-          allDynproEvents: args.all_dynpro_events,
-          aggregate: args.aggregate,
-          explicitOnOff: args.explicit_on_off,
-          withRfcTracing: args.with_rfc_tracing,
-          allSystemKernelEvents: args.all_system_kernel_events,
-          sqlTrace: args.sql_trace,
-          allDbEvents: args.all_db_events,
-          maxSizeForTraceFile: args.max_size_for_trace_file,
-          amdpTrace: args.amdp_trace,
-          maxTimeForTracing: args.max_time_for_tracing,
-        },
-      },
-    );
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          program_name: programName,
-          output:
-            typeof result.response?.data === 'string'
-              ? result.response.data
-              : '',
-          run_status: result.response?.status,
-          profile: {
-            profiler_id: result.profilerId,
-            // traceId is not returned for programs — use RuntimeListProfilerTraceFiles to find it.
-          },
-        },
-        null,
-        2,
-      ),
-      status: result.response?.status,
-      statusText: result.response?.statusText,
-      headers: result.response?.headers,
-      config: result.response?.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error running program:', error);
-    return return_error(error);
+  if (!args?.program_name) {
+    return return_error(new Error('Parameter "program_name" is required'));
   }
+
+  const programName = args.program_name.trim().toUpperCase();
+  const executor = new AdtExecutor(connection, logger);
+  const programExecutor = executor.getProgramExecutor();
+
+  if (!args.profile) {
+    return answer(
+      { tool: 'RuntimeRunProgram', detail: 'terse' },
+      () => programExecutor.run({ programName }),
+      (output: string) => ({
+        success: true,
+        program_name: programName,
+        output: output ?? '',
+      }),
+    );
+  }
+
+  return answer(
+    { tool: 'RuntimeRunProgram', detail: 'terse' },
+    () =>
+      pair(
+        () =>
+          programExecutor.scheduleTrace({
+            description: args.description,
+            allProceduralUnits: args.all_procedural_units,
+            allMiscAbapStatements: args.all_misc_abap_statements,
+            allInternalTableEvents: args.all_internal_table_events,
+            allDynproEvents: args.all_dynpro_events,
+            aggregate: args.aggregate,
+            explicitOnOff: args.explicit_on_off,
+            withRfcTracing: args.with_rfc_tracing,
+            allSystemKernelEvents: args.all_system_kernel_events,
+            sqlTrace: args.sql_trace,
+            allDbEvents: args.all_db_events,
+            maxSizeForTraceFile: args.max_size_for_trace_file,
+            amdpTrace: args.amdp_trace,
+            maxTimeForTracing: args.max_time_for_tracing,
+          }),
+        (profilerId: string) =>
+          programExecutor.runWithProfiler({ programName }, { profilerId }),
+      ),
+    ([profilerId, output]: [string, string]) => ({
+      success: true,
+      program_name: programName,
+      output: output ?? '',
+      profile: {
+        profiler_id: profilerId,
+        // traceId is not returned for programs — use RuntimeListProfilerTraceFiles to find it.
+      },
+    }),
+  );
 }

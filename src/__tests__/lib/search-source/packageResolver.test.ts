@@ -2,19 +2,29 @@ import {
   createPackagePatternResolver,
   resolvePackagePatterns,
 } from '../../../lib/search-source/packageResolver';
+import { okResponse } from '../../helpers/fakeClient';
 
+/**
+ * `searchObjects` is gone in adt-clients 19 — `createPackagePatternResolver`
+ * now calls `search(criteria, { analyse })` on the bare `client.getUtils()`
+ * (no result set injected), which keeps the shipped `utilDocuments.search`
+ * reading — already-parsed `ISearchResult[]` hits, `name` included — so
+ * this mock answers that shape directly instead of raw `objectReference`
+ * XML for the resolver to walk by hand (see `packageResolver.ts`'s own
+ * comment on the `getUtils()`-with-no-result-set asymmetry).
+ */
 jest.mock('../../../lib/clients', () => ({
   createAdtClient: (_conn: unknown, _logger: unknown) => ({
     getUtils: () => ({
-      searchObjects: async ({ query }: { query: string }) => ({
-        data:
+      search: async ({ query }: { query: string }) =>
+        okResponse(
           query === 'EMPTY*'
-            ? '<adtcore:objectReferences/>'
-            : '<adtcore:objectReferences>' +
-              '<adtcore:objectReference adtcore:name="ZFI" adtcore:type="DEVC"/>' +
-              '<adtcore:objectReference adtcore:name="ZFI_BUDGET" adtcore:type="DEVC"/>' +
-              '</adtcore:objectReferences>',
-      }),
+            ? []
+            : [
+                { name: 'ZFI', type: 'DEVC', description: '' },
+                { name: 'ZFI_BUDGET', type: 'DEVC', description: '' },
+              ],
+        ),
     }),
   }),
 }));
@@ -63,10 +73,10 @@ describe('resolvePackagePatterns — wildcard detection', () => {
   });
 });
 
-describe('createPackagePatternResolver — XML parsing', () => {
+describe('createPackagePatternResolver — hits from `search`', () => {
   const fakeCtx = { connection: {} as any, logger: undefined } as any;
 
-  it('extracts adtcore:name attributes from objectReference elements', async () => {
+  it('extracts names from the search hits', async () => {
     const fn = createPackagePatternResolver(fakeCtx);
     const names = await fn({
       query: 'ZFI*',
@@ -76,7 +86,7 @@ describe('createPackagePatternResolver — XML parsing', () => {
     expect(names).toEqual(['ZFI', 'ZFI_BUDGET']);
   });
 
-  it('returns empty array when ADT XML has no objectReference elements', async () => {
+  it('returns empty array when search answers no hits', async () => {
     const fn = createPackagePatternResolver(fakeCtx);
     const names = await fn({
       query: 'EMPTY*',

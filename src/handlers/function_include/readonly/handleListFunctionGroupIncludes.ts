@@ -1,10 +1,20 @@
+/**
+ * ListFunctionGroupIncludes Handler
+ *
+ * Uses AdtClient.getUtils(ourUtils).fetchNodeStructure from
+ * @mcp-abap-adt/adt-clients 19 — `listFunctionGroupIncludes`'s replacement,
+ * per the guide's "Walks are yours" table: the function group's own node
+ * structure, then the FUGR/I child node's. Composed in
+ * `src/lib/strategies/functionGroupChildren.ts`, shared with
+ * `handleListFunctionModules.ts`'s own FUGR/FF lookup.
+ */
+
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ListFunctionGroupIncludes',
@@ -28,30 +38,22 @@ export async function handleListFunctionGroupIncludes(
   args: { function_group_name: string },
 ) {
   const { connection, logger } = context;
-  try {
-    const { function_group_name } = args;
-    if (!function_group_name)
-      return return_error(new Error('function_group_name is required'));
-
-    const client = createAdtClient(connection, logger);
-    const functionGroupName = function_group_name.toUpperCase();
-    const includes = await client
-      .getUtils()
-      .listFunctionGroupIncludes(functionGroupName);
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          function_group_name: functionGroupName,
-          total: includes.length,
-          includes,
-        },
-        null,
-        2,
-      ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
+  const { function_group_name } = args;
+  if (!function_group_name) {
+    return return_error(new Error('function_group_name is required'));
   }
+
+  const functionGroupName = function_group_name.toUpperCase();
+  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+
+  return answer(
+    { tool: 'ListFunctionGroupIncludes', detail: 'terse' },
+    () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/I'),
+    (objects) => ({
+      success: true,
+      function_group_name: functionGroupName,
+      total: objects.length,
+      includes: objects.map((o) => o.name),
+    }),
+  );
 }

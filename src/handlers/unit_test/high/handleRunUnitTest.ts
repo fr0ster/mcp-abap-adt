@@ -1,17 +1,20 @@
 /**
  * RunUnitTest Handler - Start ABAP Unit test run via AdtClient
  *
- * Uses AdtClient.getUnitTest().create() for high-level test run operation.
+ * Uses AdtClient.getUnitTest().run() for high-level test run operation.
  * Starts unit test execution and returns run_id for status/result queries.
+ *
+ * Byte-identical logic to `handleCreateUnitTest.ts` under a different tool
+ * name — see that file's header for why `run(tests, options)` replaces the
+ * pre-migration `create({ tests, options })` call and why no `analyse` is
+ * passed.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RunUnitTest',
@@ -105,84 +108,59 @@ interface RunUnitTestArgs {
 /**
  * Main handler for RunUnitTest MCP tool
  *
- * Uses AdtClient.getUnitTest().create() - high-level test run operation
+ * Uses AdtClient.getUnitTest().run() - starts a run for named test pairs.
  */
 export async function handleRunUnitTest(
   context: HandlerContext,
   args: RunUnitTestArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      tests,
-      title,
-      context: contextStr,
-      scope,
-      risk_level,
-      duration,
-    } = args as RunUnitTestArgs;
+  const {
+    tests,
+    title,
+    context: contextStr,
+    scope,
+    risk_level,
+    duration,
+  } = args as RunUnitTestArgs;
 
-    // Validation
-    if (!Array.isArray(tests) || tests.length === 0) {
-      return return_error(
-        new Error('tests array with at least one entry is required'),
-      );
-    }
-
-    // Format tests for AdtClient
-    const formattedTests = tests.map((test) => ({
-      containerClass: test.container_class.toUpperCase(),
-      testClass: test.test_class.toUpperCase(),
-    }));
-
-    const client = createAdtClient(connection, logger);
-    const unitTest = client.getUnitTest();
-
-    logger?.info(
-      `Starting ABAP Unit run for ${formattedTests.length} test definition(s)`,
+  if (!Array.isArray(tests) || tests.length === 0) {
+    return return_error(
+      new Error('tests array with at least one entry is required'),
     );
-
-    try {
-      // Create test run using AdtClient
-      const createResult = await unitTest.create({
-        tests: formattedTests,
-        options: {
-          title,
-          context: contextStr,
-          scope: scope
-            ? {
-                ownTests: scope.own_tests,
-                foreignTests: scope.foreign_tests,
-                addForeignTestsAsPreview: scope.add_foreign_tests_as_preview,
-              }
-            : undefined,
-          riskLevel: risk_level,
-          duration,
-        },
-      });
-
-      if (!createResult.runId) {
-        throw new Error('Failed to start unit test run: run_id not returned');
-      }
-
-      logger?.info(`✅ RunUnitTest started. Run ID: ${createResult.runId}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            run_id: createResult.runId,
-            message: `ABAP Unit run started. Use GetUnitTest with run_id ${createResult.runId} to get status and results.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error starting ABAP Unit run: ${error?.message || error}`);
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  const formattedTests = tests.map((test) => ({
+    containerClass: test.container_class.toUpperCase(),
+    testClass: test.test_class.toUpperCase(),
+  }));
+
+  logger?.info(
+    `Starting ABAP Unit run for ${formattedTests.length} test definition(s)`,
+  );
+
+  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+
+  return answer(
+    { tool: 'RunUnitTest', detail: 'terse' },
+    () =>
+      unitTest.run(formattedTests, {
+        title,
+        context: contextStr,
+        scope: scope
+          ? {
+              ownTests: scope.own_tests,
+              foreignTests: scope.foreign_tests,
+              addForeignTestsAsPreview: scope.add_foreign_tests_as_preview,
+            }
+          : undefined,
+        riskLevel: risk_level,
+        duration,
+      }),
+    (runId: string) => ({
+      success: true,
+      run_id: runId,
+      message: `ABAP Unit run started. Use GetUnitTest with run_id ${runId} to get status and results.`,
+    }),
+  );
 }

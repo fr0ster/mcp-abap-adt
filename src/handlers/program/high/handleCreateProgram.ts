@@ -1,20 +1,26 @@
 /**
  * CreateProgram Handler - ABAP Program Creation via ADT API
  *
- * Workflow: validate -> create (object in initial state)
- * Source code is set via UpdateProgram handler.
+ * Uses AdtClient.getProgram().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it. The pre-migration handler's own `validate()`
+ * call is dropped — this is a bare create, matching `CreateProgramLow`.
+ * `description`, `programType` and `application` all reach the wire; no
+ * source — that is `UpdateProgram`'s job, after `LockProgram`.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { programDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  isCloudConnection,
-  parseValidationResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { isCloudConnection, return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -67,6 +73,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['program_name', 'package_name'],
   },
@@ -80,23 +87,21 @@ interface CreateProgramArgs {
   program_type?: string;
   application?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateProgram(
   context: HandlerContext,
-  params: any,
+  args: CreateProgramArgs,
 ) {
   const { connection, logger } = context;
-  const args: CreateProgramArgs = params;
 
-  // Validate required parameters
   if (!args.program_name || !args.package_name) {
     return return_error(
       new Error('Missing required parameters: program_name and package_name'),
     );
   }
 
-  // Check if cloud - programs are not available on cloud systems
   if (isCloudConnection()) {
     return return_error(
       new Error(
@@ -105,77 +110,28 @@ export async function handleCreateProgram(
     );
   }
 
-  // Validate transport_request: required for non-$TMP packages
-  try {
-    validateTransportRequest(args.package_name, args.transport_request);
-  } catch (error) {
-    return return_error(error as Error);
-  }
+  validateTransportRequest(args.package_name, args.transport_request);
 
   const programName = args.program_name.toUpperCase();
-  logger?.info(`Starting program creation: ${programName}`);
+  const detail = detailOf(args);
 
-  try {
-    const client = createAdtClient(connection, logger);
-
-    // Validate
-    logger?.debug(`Validating program: ${programName}`);
-    const validationState = await client.getProgram().validate({
-      programName,
-      description: args.description || programName,
-      packageName: args.package_name,
-    });
-    const validationResponse = validationState.validationResponse;
-    if (!validationResponse) {
-      throw new Error('Validation did not return a result');
-    }
-    const validationResult = parseValidationResponse(
-      validationResponse as IAdtResponse,
-    );
-    if (!validationResult || validationResult.valid === false) {
-      throw new Error(
-        `Program name validation failed: ${validationResult?.message || 'Invalid program name'}`,
-      );
-    }
-    logger?.debug(`Program validation passed: ${programName}`);
-
-    // Create
-    logger?.debug(`Creating program: ${programName}`);
-    await client.getProgram().create({
-      programName,
-      description: args.description || programName,
-      packageName: args.package_name,
-      transportRequest: args.transport_request,
-      programType: args.program_type,
-      application: args.application,
-      masterLanguage: args.master_language,
-    });
-    logger?.info(`Program created: ${programName}`);
-
-    const result = {
-      success: true,
-      program_name: programName,
-      package_name: args.package_name,
-      transport_request: args.transport_request || null,
-      program_type: args.program_type || 'executable',
-      type: 'PROG/P',
-      message: `Program ${programName} created successfully. Use UpdateProgram to set source code.`,
-      uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
-      steps_completed: ['validate', 'create'],
-    };
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    });
-  } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger?.error(`Error creating program ${programName}: ${errorMessage}`);
-    return return_error(
-      new Error(`Failed to create program ${programName}: ${errorMessage}`),
-    );
-  }
+  return answer(
+    { tool: 'CreateProgram', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getProgram(resultsFor(programDocuments))
+        .create(
+          {
+            programName,
+            description: args.description || programName,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            programType: args.program_type,
+            application: args.application,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

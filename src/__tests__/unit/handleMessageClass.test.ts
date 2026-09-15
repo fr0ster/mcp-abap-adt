@@ -89,8 +89,11 @@ describe('Message Class (MSAG) CRUD tools', () => {
     expect(result.isError).toBe(true);
   });
 
+  // Task 20: `create()` is one request now (adt-clients 18's fat workflow —
+  // validate/create/check — is gone), answered through `answer()`/
+  // `IAdtResponse`, not the old `{ createResult }` state bag.
   it('CreateMessageClass dispatches create() with camelCase config', async () => {
-    mockMc.create.mockResolvedValue({ createResult: { status: 201 } });
+    mockMc.create.mockResolvedValue(okResponse(reading(undefined, '', 201)));
 
     const result = await handleCreateMessageClass(ctx, {
       message_class_name: 'zmy_msgs',
@@ -100,13 +103,16 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockMc.create).toHaveBeenCalledWith({
-      name: 'ZMY_MSGS',
-      description: 'My messages',
-      packageName: '$TMP',
-      transportRequest: undefined,
-      masterLanguage: 'EN',
-    });
+    expect(mockMc.create).toHaveBeenCalledWith(
+      {
+        name: 'ZMY_MSGS',
+        description: 'My messages',
+        packageName: '$TMP',
+        transportRequest: undefined,
+        masterLanguage: 'EN',
+      },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
   });
 
   it('DeleteMessageClass dispatches delete() with name + transport', async () => {
@@ -124,8 +130,14 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
   });
 
+  // Task 20: dispatched through `answer()`/`IAdtResponse`, not the old
+  // `{ createResult }` state bag; `getMessageClassMessage()` is called with
+  // no results argument (`IMessageClassMessageResults`'s generic bound fixes
+  // its slots to literal `string`, so `resultsFor(...)` does not type-check
+  // against it — see `CreateMessageClassMessage.ts`'s own comment) and the
+  // write carries `{ analyse }` as a second argument.
   it('CreateMessageClassMessage dispatches to getMessageClassMessage().create', async () => {
-    mockMsg.create.mockResolvedValue({ createResult: { status: 200 } });
+    mockMsg.create.mockResolvedValue(okResponse(reading(undefined, '', 200)));
 
     const result = await handleCreateMessageClassMessage(ctx, {
       message_class_name: 'zmy_msgs',
@@ -136,18 +148,24 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockMsg.create).toHaveBeenCalledWith({
-      className: 'ZMY_MSGS',
-      msgno: '001',
-      msgtext: 'Hello &1',
-      selfExplanatory: true,
-      description: undefined,
-      transportRequest: 'E19K900001',
-    });
+    expect(mockMsg.create).toHaveBeenCalledWith(
+      {
+        className: 'ZMY_MSGS',
+        msgno: '001',
+        msgtext: 'Hello &1',
+        selfExplanatory: true,
+        description: undefined,
+        transportRequest: 'E19K900001',
+      },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
   });
 
+  // Task 20: `AdtMessageClassMessage` is not `IAdtLockable` — its write locks
+  // and unlocks itself internally — so `lock_handle` is optional here and,
+  // when omitted, `options.lockHandle` is `undefined`.
   it('UpdateMessageClassMessage dispatches update() with the new text', async () => {
-    mockMsg.update.mockResolvedValue({ updateResult: { status: 200 } });
+    mockMsg.update.mockResolvedValue(okResponse(reading(undefined, '', 200)));
 
     const result = await handleUpdateMessageClassMessage(ctx, {
       message_class_name: 'ZMY_MSGS',
@@ -156,14 +174,20 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockMsg.update).toHaveBeenCalledWith({
-      className: 'ZMY_MSGS',
-      msgno: '001',
-      msgtext: 'Updated &1',
-      selfExplanatory: undefined,
-      description: undefined,
-      transportRequest: undefined,
-    });
+    expect(mockMsg.update).toHaveBeenCalledWith(
+      {
+        className: 'ZMY_MSGS',
+        msgno: '001',
+        msgtext: 'Updated &1',
+        selfExplanatory: undefined,
+        description: undefined,
+        transportRequest: undefined,
+      },
+      expect.objectContaining({
+        lockHandle: undefined,
+        analyse: expect.any(Function),
+      }),
+    );
   });
 
   // adt-clients 19: `AdtMessageClassMessage`'s factory contract only composes

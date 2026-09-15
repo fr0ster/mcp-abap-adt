@@ -20,11 +20,21 @@ import { handleGetClassUnitTestStatus } from '../../handlers/class/low/handleGet
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
 let unitTest: Record<string, unknown>;
+let throwOnClientCreate = false;
 jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({ getUnitTest: () => unitTest }),
+  createAdtClient: () => {
+    if (throwOnClientCreate) {
+      throw new Error('connection lost');
+    }
+    return { getUnitTest: () => unitTest };
+  },
 }));
 
 const context = { connection: {} as any, logger: undefined };
+
+afterEach(() => {
+  throwOnClientCreate = false;
+});
 
 describe('GetClassUnitTestResultLow', () => {
   it('answers the result document as text on success', async () => {
@@ -58,6 +68,19 @@ describe('GetClassUnitTestResultLow', () => {
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain('Run run-1 not found');
   });
+
+  it('answers an error result, does not reject, when client construction throws — fix round 2: the outer guard removed by fix round 1', async () => {
+    throwOnClientCreate = true;
+
+    await expect(
+      handleGetClassUnitTestResult(
+        context as any,
+        {
+          run_id: 'run-1',
+        } as any,
+      ),
+    ).resolves.toMatchObject({ isError: true });
+  });
 });
 
 describe('GetClassUnitTestStatusLow', () => {
@@ -88,5 +111,18 @@ describe('GetClassUnitTestStatusLow', () => {
 
     expect(result.isError).toBe(true);
     expect(JSON.stringify(result)).toContain('Run run-2 not found');
+  });
+
+  it('answers an error result, does not reject, when client construction throws — fix round 2: the outer guard removed by fix round 1', async () => {
+    throwOnClientCreate = true;
+
+    await expect(
+      handleGetClassUnitTestStatus(
+        context as any,
+        {
+          run_id: 'run-2',
+        } as any,
+      ),
+    ).resolves.toMatchObject({ isError: true });
   });
 });

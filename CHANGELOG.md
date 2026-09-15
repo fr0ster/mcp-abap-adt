@@ -145,31 +145,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`IAbapTraceHitList`'s `entries`, `IAbapTraceStatements`'s `statements`,
   `IAbapTraceDbAccesses`'s `accesses`) rather than the free-form
   attribute-prefixed object the old hand-rolled XML parser produced. Both
-  tools' `payload` field now carries that typed shape. `RuntimeAnalyzeProfilerTrace`'s
-  `summary` (`total_records`/`top_records`) now reads the view's own named
-  collection and ranks by that collection's real numeric field
-  (`grossTime.time` for `hitlist`/`statements`, `accessTime.total` for
-  `db_accesses`) — a fix-round-1 correction: the first pass walked the whole
-  typed document for "anything with a number on it", which counted each
-  row's own timing sub-object as a second row and ranked against a fixed
-  list of key names (`'runtime'`, `'calls'`, `'hits'`, …) that do not exist
-  on any of the three typed shapes, so `top_records` was document order with
-  roughly half its slots taken by timing objects rather than real entries.
+  tools' `payload` field now carries that typed shape. **What that costs a
+  caller, same as `RuntimeListProfilerTraceFiles` above:** the old
+  hand-rolled parse turned every attribute and element the raw XML document
+  carried into JSON; `IAbapTraceHitList`/`IAbapTraceStatements`/
+  `IAbapTraceDbAccesses` are curated, measured field lists too (each one
+  says so in its own doc in `adt-clients`' `runtime/traces/types.d.ts`), not
+  the whole document — a consumer reading a field the old freeform payload
+  had that one of these three types does not name has nothing left to read
+  it from. `RuntimeAnalyzeProfilerTrace`'s `summary` (`total_records`/
+  `top_records`) now reads the view's own named collection and ranks by
+  that collection's real numeric field (`grossTime.time` for
+  `hitlist`/`statements`, `accessTime.total` for `db_accesses`) — a
+  fix-round-1 correction: the first pass walked the whole typed document for
+  "anything with a number on it", which counted each row's own timing
+  sub-object as a second row and ranked against a fixed list of key names
+  (`'runtime'`, `'calls'`, `'hits'`, …) that do not exist on any of the
+  three typed shapes, so `top_records` was document order with roughly half
+  its slots taken by timing objects rather than real entries.
 
   `RuntimeListProfilerTraceFiles`, `RuntimeGetDumpById`,
-  `RuntimeGetProfilerTraceData` and `RuntimeAnalyzeProfilerTrace` all drop
-  the `status` field they used to answer (the HTTP status of the underlying
-  request) — `IAdtResponse` carries no transport envelope to read it from
-  any more, the same reason the class/program runners above lost
-  `run_status`.
+  `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace` and
+  `RuntimeCreateProfilerTraceParameters` all drop the `status` field they
+  used to answer (the HTTP status of the underlying request) —
+  `IAdtResponse` carries no transport envelope to read it from any more, the
+  same reason the class/program runners above lost `run_status`.
 
-  `RuntimeCreateProfilerTraceParameters` changes mechanism, not contract:
+  `RuntimeCreateProfilerTraceParameters` also changes mechanism:
   `Profiler.createParameters()` is gone (`IProfiler` no longer composes
   `ITraceScheduling` as of 19.0.0 — scheduling a measurement moved onto
   `IClassExecutor`/`IProgramExecutor`, the same `scheduleTrace` member
-  `RuntimeRunClassWithProfiling` already calls). The tool still answers
-  `{success, profiler_id}`, now reached through `AdtExecutor.
-  getClassExecutor().scheduleTrace(...)`.
+  `RuntimeRunClassWithProfiling` already calls), now reached through
+  `AdtExecutor.getClassExecutor().scheduleTrace(...)`. `profiler_id` is
+  still answered; `status` is not (see the paragraph above — this is one of
+  the five, not an exception to it).
 
   `RuntimeGetGatewayErrorLog`'s `error_url` branch was silently wrong before
   this task touched it: the pre-19 code handed the whole envelope object to
@@ -213,7 +222,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the shipped class implements exactly that. `IAdtResponse` has no `.data`,
   so both tools answered success with empty content regardless of `.ok` —
   a refusal reported as success. Both now unwrap through `answer()`; neither
-  tool's answer shape changes for a caller once the masking is removed.
+  tool's answer shape changes for a caller once the masking is removed. A
+  fix-round-2 correction on top of that: fix round 1 dropped the outer
+  `try`/`catch` both handlers had before it, so a thrown error from
+  `createAdtClient`/`restoreSessionInConnection` (unreachable through the
+  server, which always calls a handler inside its own guard, but reachable
+  from a direct caller — a soft-mode integration test, or an embedder) would
+  reject the returned promise instead of answering an error result. Restored.
 
 ## [10.0.1] - 2026-09-11
 

@@ -11,9 +11,11 @@
  * strategy — and it stays on `client.getUnitTest() as any` until the task
  * that wires the unit-test members and that shared result set migrates it
  * (it is one of the "twenty-three tools that reach a legacy contract"). The
- * carve-out is still real: this file does not go through `resultsFor`/
- * `ourUnitTest`, and the marker below exists so the compiler keeps naming it
- * until that later task does.
+ * carve-out is real, but nothing holds it in place any more: `client.
+ * getUnitTest() as any` silences the compiler rather than naming an error
+ * for it to keep finding, and the build reports zero errors with this file
+ * exactly as it is. Nothing but this comment marks the carve-out until the
+ * task that wires the unit-test members reads it.
  *
  * **Fix round 1, task 25.** The first pass here cast `statusResponse as
  * AxiosResponse`, on the wrong belief that `getUnitTest()`'s members still
@@ -26,6 +28,14 @@
  * `.ok` — a refusal reported as success, the masking class this repository
  * has removed three times elsewhere. Fixed by unwrapping through `answer()`
  * instead of guessing at a shape.
+ *
+ * **Fix round 2, task 25.** The outer `try`/`catch` this handler had before
+ * fix round 1 is restored: `createAdtClient`/`restoreSessionInConnection`
+ * run before `answer()` is reached and are not inside it, so a throw there
+ * (a direct caller, e.g. a soft-mode integration test that calls the
+ * handler function itself rather than through the server) used to surface
+ * as a rejected promise instead of an error result. `RunClassUnitTests.ts`,
+ * the still-unmigrated sibling in this directory, keeps the same guard.
  */
 
 import { answer } from '../../../lib/answer';
@@ -85,29 +95,33 @@ export async function handleGetClassUnitTestStatus(
   args: GetStatusArgs,
 ) {
   const { connection, logger } = context;
-  const {
-    run_id,
-    with_long_polling = true,
-    session_id,
-    session_state,
-  } = args as GetStatusArgs;
+  try {
+    const {
+      run_id,
+      with_long_polling = true,
+      session_id,
+      session_state,
+    } = args as GetStatusArgs;
 
-  if (!run_id) {
-    return return_error(new Error('run_id is required'));
+    if (!run_id) {
+      return return_error(new Error('run_id is required'));
+    }
+    const client = createAdtClient(connection, logger);
+
+    if (session_id && session_state) {
+      await restoreSessionInConnection(connection, session_id, session_state);
+    }
+
+    logger?.info(`Fetching ABAP Unit status for run ${run_id}`);
+
+    const unitTest = client.getUnitTest() as any;
+
+    return await answer(
+      { tool: 'GetClassUnitTestStatusLow', detail: 'terse' },
+      () => unitTest.getStatus(run_id, with_long_polling),
+      (value: string) => value,
+    );
+  } catch (error: any) {
+    return return_error(error);
   }
-  const client = createAdtClient(connection, logger);
-
-  if (session_id && session_state) {
-    await restoreSessionInConnection(connection, session_id, session_state);
-  }
-
-  logger?.info(`Fetching ABAP Unit status for run ${run_id}`);
-
-  const unitTest = client.getUnitTest() as any;
-
-  return answer(
-    { tool: 'GetClassUnitTestStatusLow', detail: 'terse' },
-    () => unitTest.getStatus(run_id, with_long_polling),
-    (value: string) => value,
-  );
 }

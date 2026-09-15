@@ -1,17 +1,34 @@
 /**
  * CreateTransport Handler - Create ABAP Transport Request
  *
- * Uses AdtClient.createTransport from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getRequest().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * **`created` is kept as shipped, not remapped through `resultsFor`'s
+ * `verbatim`.** `transportDocuments.created` is already its own reading —
+ * `parseCreatedTransport`, which reads `tm:root`/`tm:request` into
+ * `{ transportNumber, description, type, targetSystem, … }` — not the
+ * generic `rawDocument` every other slot in this set answers. `resultsFor`
+ * without a `keep` list would silently replace it with `verbatim` (the
+ * table's default for the slot name `created`), discarding the transport
+ * number a caller needs for every subsequent object-transport assignment and
+ * handing back the raw XML instead. `resultsFor(transportDocuments,
+ * ['created'])` is the same mechanism `ourUtils` uses to keep `activation`
+ * for the same reason: the shipped reading sees something the table's three
+ * generic readings cannot.
+ *
+ * No corpus fixture for `/cts/transportrequests` POST exists — the README's
+ * coverage table lists only the GET (an empty list, for `ListTransports`) —
+ * so the field names below are read from the shipped `parseCreatedTransport`
+ * and `create.js`, not proven against a captured document.
  */
 
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransportLow',
@@ -40,83 +57,50 @@ interface CreateTransportArgs {
   transport_type?: 'workbench' | 'customizing';
 }
 
-/**
- * Main handler for CreateTransport MCP tool
- *
- * Uses AdtClient.createTransport - low-level single method call
- */
+interface CreatedTransport {
+  transportNumber: string;
+  description?: string;
+  type?: string;
+  targetSystem?: string;
+  targetDescription?: string;
+  ctsProject?: string;
+  ctsProjectDescription?: string;
+  uri?: string;
+  parent?: string;
+  owner?: string;
+}
+
 export async function handleCreateTransport(
   context: HandlerContext,
   args: CreateTransportArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { description, transport_type } = args as CreateTransportArgs;
+  const { description, transport_type } = args;
 
-    // Validation
-    if (!description) {
-      return return_error(new Error('description is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Ensure connection is established
-    logger?.info(`Starting transport creation: ${description}`);
-
-    try {
-      // Create transport
-      const createState = await client.getRequest().create({
-        description,
-        transportType: transport_type || 'workbench',
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(`Create did not return a response for transport`);
-      }
-
-      logger?.info(`✅ CreateTransport completed`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            description,
-            transport_type: transport_type || 'workbench',
-            message: `Transport request created successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error creating transport:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to create transport: ${error.message || String(error)}`;
-
-      if (error.response?.data && typeof error.response.data === 'string') {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!description) {
+    return return_error(new Error('description is required'));
   }
+
+  return answer(
+    { tool: 'CreateTransportLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getRequest(resultsFor(transportDocuments, ['created']))
+        .create(
+          {
+            description,
+            transportType: transport_type || 'workbench',
+          },
+          { analyse: analyseException },
+        ),
+    (value: CreatedTransport) => ({
+      success: true,
+      transport_number: value.transportNumber,
+      description: value.description ?? description,
+      transport_type: transport_type || 'workbench',
+      target_system: value.targetSystem ?? null,
+      owner: value.owner ?? null,
+      message: `Transport request ${value.transportNumber} created successfully.`,
+    }),
+  );
 }

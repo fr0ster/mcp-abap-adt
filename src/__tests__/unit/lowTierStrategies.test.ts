@@ -46,6 +46,7 @@ import { handleActivateServiceDefinition } from '../../handlers/service_definiti
 import { handleGetNodeStructure } from '../../handlers/system/low/handleGetNodeStructure';
 import { handleGetObjectStructure as handleGetObjectStructureLow } from '../../handlers/system/low/handleGetObjectStructure';
 import { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirtualFolders';
+import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
@@ -2855,5 +2856,80 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(
       (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
     ).toBeUndefined();
+  });
+});
+
+// transport/low has exactly one file: CreateTransportLow. No lock, unlock,
+// check, update, delete or validate tool exists at this tier for transport
+// requests. No corpus fixture for the create response exists either (the
+// README's coverage table lists only the GET, an empty list, for
+// ListTransports) — the "real captured document" requirement for this
+// family is not met by any test below, and this is why: there is no
+// captured document to drive.
+describe('transport — Create only, no lock/unlock/check/update/delete/validate tool exists at this tier', () => {
+  it('CreateTransportLow reaches getRequest with analyseException, forwarding description and transportType', async () => {
+    await handleCreateTransport(context as any, {
+      description: 'x',
+      transport_type: 'customizing',
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getRequest');
+    expect(call?.args[0]).toEqual({
+      description: 'x',
+      transportType: 'customizing',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateTransportLow defaults transportType to workbench when not given', async () => {
+    await handleCreateTransport(context as any, { description: 'x' });
+    const call = callTo('create');
+    expect(call?.args[0]).toEqual({
+      description: 'x',
+      transportType: 'workbench',
+    });
+  });
+
+  it('CreateTransportLow answers the transport number the kept parseCreatedTransport reading extracts — not discarded by a blanket resultsFor(transportDocuments)', async () => {
+    fakeClient = fakeClientOf({
+      create: async () =>
+        okResponse({
+          transportNumber: 'E19K900042',
+          description: 'x',
+          type: 'K',
+          targetSystem: 'LOCAL',
+          owner: 'SAPUSER01',
+        }),
+    });
+
+    const result: any = await handleCreateTransport(context as any, {
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload).toEqual({
+      success: true,
+      transport_number: 'E19K900042',
+      description: 'x',
+      transport_type: 'workbench',
+      target_system: 'LOCAL',
+      owner: 'SAPUSER01',
+      message: 'Transport request E19K900042 created successfully.',
+    });
+  });
+
+  it('reports a refused create as an error, not as success with a null body', async () => {
+    fakeClient = fakeClientOf({
+      create: async () => refusedResponse('No transport layer assigned'),
+    });
+
+    const result: any = await handleCreateTransport(context as any, {
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).not.toContain('"success": true');
   });
 });

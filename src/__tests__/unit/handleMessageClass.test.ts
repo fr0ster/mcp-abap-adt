@@ -36,6 +36,7 @@ import { handleGetMessageClass } from '../../handlers/message_class/high/handleG
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
 import { handleReadMessageClass } from '../../handlers/message_class/readonly/handleReadMessageClass';
 import { handleReadMessageClassMessage } from '../../handlers/message_class/readonly/handleReadMessageClassMessage';
+import { parseStructure } from '../../lib/strategies/reading';
 import { okResponse, reading } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
@@ -115,8 +116,20 @@ describe('Message Class (MSAG) CRUD tools', () => {
     );
   });
 
+  // Task 21: the deletion service, not the old `{ deleteResult }` state bag —
+  // `delete()` is dispatched through `answer()`/`IAdtResponse`, with
+  // `analyseDeletion` reading the deletion document (`del:deletionResult`) for
+  // a refusal masked as a 200, and `terseDeletion` projecting `deleted`/
+  // `object` out of it.
   it('DeleteMessageClass dispatches delete() with name + transport', async () => {
-    mockMc.delete.mockResolvedValue({ deleteResult: { status: 200 } });
+    const deletionDoc =
+      '<del:deletionResult xmlns:del="http://www.sap.com/adt/deletion" ' +
+      'xmlns:adtcore="http://www.sap.com/adt/core">' +
+      '<del:object del:isDeleted="true" adtcore:name="ZMY_MSGS"/>' +
+      '</del:deletionResult>';
+    mockMc.delete.mockResolvedValue(
+      okResponse(reading(parseStructure(deletionDoc), deletionDoc, 200)),
+    );
 
     const result = await handleDeleteMessageClass(ctx, {
       message_class_name: 'ZMY_MSGS',
@@ -124,9 +137,13 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockMc.delete).toHaveBeenCalledWith({
-      name: 'ZMY_MSGS',
-      transportRequest: 'E19K900001',
+    expect(mockMc.delete).toHaveBeenCalledWith(
+      { name: 'ZMY_MSGS', transportRequest: 'E19K900001' },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
+    expect(payload(result)).toMatchObject({
+      deleted: true,
+      object: 'ZMY_MSGS',
     });
   });
 

@@ -94,6 +94,11 @@ interface ChannelCase {
    * (a real lock handle for `_action=LOCK`, 200/empty otherwise) — a create
    * whose own answer is parsed for named fields, not just status. */
   seedAnswers?: Array<Record<string, unknown> | undefined>;
+  /** Extra assertions past "the marker landed somewhere in the right URL
+   * with the right method" — for a field the shipped member sends
+   * somewhere `landedIn`'s body-only search cannot see, like a query
+   * parameter. */
+  extraChecks?: (marker: string, requests: RecordedRequest[]) => void;
 }
 
 const TEST_DOUBLES_OK =
@@ -403,6 +408,14 @@ const cases: ChannelCase[] = [
     // sends it to, through the real `getServiceBinding()` factory (not a
     // different family's), with the caller's `description` landing in the
     // body `create()`'s own XML builder puts it in.
+    //
+    // `transportRequest` travels a different channel entirely —
+    // `createRequest`'s own body reads `params.transportRequest ?
+    // { corrNr: params.transportRequest } : undefined`, a query parameter,
+    // never the body `landedIn` searches. The same marker is passed as
+    // `transport_request` too, and `extraChecks` proves it reached
+    // `corrNr` — a dropped transport now fails this row exactly the way a
+    // dropped one already fails the task 20 rows above.
     name: 'CreateServiceBinding',
     method: 'POST',
     urlContains: '/sap/bc/adt/businessservices/bindings',
@@ -412,8 +425,20 @@ const cases: ChannelCase[] = [
         service_definition_name: 'ZSD_X',
         package_name: 'ZP',
         description: marker,
+        transport_request: marker,
         activate: false,
       }),
+    extraChecks: (marker, requests) => {
+      const bindingRequests = requests.filter((r) =>
+        r.url.toLowerCase().includes('/sap/bc/adt/businessservices/bindings'),
+      );
+      expect(
+        bindingRequests.some(
+          (r) =>
+            (r.params as { corrNr?: string } | undefined)?.corrNr === marker,
+        ),
+      ).toBe(true);
+    },
   },
   {
     // `publishByServiceType`'s body carries no free-text field at all — only
@@ -485,5 +510,7 @@ describe('every write in task 20 and task 23 lands where its shipped member send
         r.url.toLowerCase().includes(c.urlContains.toLowerCase()),
       ),
     ).toBe(true);
+
+    c.extraChecks?.(marker, conn.requests);
   });
 });

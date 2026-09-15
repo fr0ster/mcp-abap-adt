@@ -8,12 +8,13 @@
  * guide's "Sequences are yours" table does not list it either.** Grepping
  * the shipped package (`dist/core/service/AdtService.js`, `dist/**\/*.d.ts`)
  * for `updateServiceBinding` finds nothing — no method, no re-export, not
- * even a legacy alias. `update()`'s own doc comment is short ("one POST to
- * a job endpoint, and nothing before it"); the doc comment that actually
- * settles what replaced the composite sits 77 lines further down in the
- * same `.d.ts`, on `updateRequest` — the *private* method `update()` calls
- * internally, easy to miss because it is nowhere near the public member it
- * explains:
+ * even a legacy alias. `update()`'s own doc comment is short ("Change the
+ * binding's publication state — one POST to a job endpoint"); the doc
+ * comment that actually settles what replaced the composite is further
+ * down the same `.d.ts`, on `updateRequest` — the *private* method
+ * `update()` calls internally, easy to miss because it sits well past
+ * `lock`/`unlock`/`delete`/`activate`/`check`/`readTransport`, nowhere near
+ * the public member it explains:
  *
  * > "This used to read the binding first. The read filled in the service
  * > name and version from the object's own document, short-circuited when
@@ -97,7 +98,7 @@ import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils'
  * the job is still genuinely running server-side is worse than a caller
  * waiting.
  */
-const PUBLISH_TIMEOUT_MS = 11 * 60 * 1000;
+export const PUBLISH_TIMEOUT_MS = 11 * 60 * 1000;
 
 type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 

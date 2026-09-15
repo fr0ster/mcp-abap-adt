@@ -46,7 +46,10 @@ import {
 import { handleListFunctionGroupIncludes } from '../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
-import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
+import {
+  handleUpdateServiceBinding,
+  PUBLISH_TIMEOUT_MS,
+} from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding';
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram';
@@ -336,7 +339,7 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     service_name: 'ZSRV',
   };
 
-  it('locks before update and unlocks after, passing a timeout but no analyse — the library default (publicationRefusal) is the tailored verdict', async () => {
+  it('locks before update and unlocks after with the SAME handle, passing the documented timeout but no analyse — the library default (publicationRefusal) is the tailored verdict', async () => {
     const order: string[] = [];
     const seen: Record<string, unknown> = {};
     fakeClient = fakeClientOf({
@@ -350,8 +353,9 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
         seen.options = options;
         return okResponse(reading(undefined, '', 200));
       },
-      unlock: async () => {
+      unlock: async (_config: unknown, lockHandle: unknown) => {
         order.push('unlock');
+        seen.unlockedWith = lockHandle;
         return okResponse(undefined);
       },
     });
@@ -367,8 +371,14 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     // strategy. `classifyServiceBinding` is not called either: there was
     // never a second member in the removed composite's replacement to call.
     expect((seen.options as any).lockHandle).toBe('LOCK_HANDLE_1');
-    expect((seen.options as any).timeout).toBeGreaterThan(120_000);
+    // Against the documented worst case itself, not "anything past the
+    // 120s default" — a value one second past the default would satisfy a
+    // loose bound and still fall short of what the job is measured to take.
+    expect((seen.options as any).timeout).toBe(PUBLISH_TIMEOUT_MS);
     expect('analyse' in (seen.options as any)).toBe(false);
+    // The handle `unlock` releases is the one `lock` answered — a wrong or
+    // constant handle would still pass every assertion above.
+    expect(seen.unlockedWith).toBe('LOCK_HANDLE_1');
   });
 
   it("refuses 'unchanged' before building any client", async () => {
@@ -414,6 +424,28 @@ describe('SHAPE 4b — CreateServiceBinding: create, then activate and generate'
     const result: any = await handleCreateServiceBinding(context as any, args);
     expect(order).toEqual(['create', 'activate', 'generate']);
     expect(result.isError).toBe(false);
+  });
+
+  // The "answer is the create's own" fix bites only past `terse`: both a
+  // correct handler and one that (wrongly) answered `generated`'s response
+  // say the same word, `'SUCCESS'`, at the default detail — `terseWrite`
+  // only reads the HTTP status, not which step it came from. `detail: 'full'`
+  // is what actually shows which document travelled back to the caller.
+  it("answers create's own document at detail:'full', not generate's", async () => {
+    fakeClient = fakeClientOf({
+      create: async () => okResponse(reading('<CREATED_DOCUMENT/>')),
+      activate: async () => okResponse(reading(undefined, '', 200)),
+      generateServiceBinding: async () =>
+        okResponse(reading({ marker: 'GENERATED_DOCUMENT' })),
+    });
+    const result: any = await handleCreateServiceBinding(context as any, {
+      ...args,
+      detail: 'full',
+    });
+    expect(result.isError).toBe(false);
+    const text = result.content[0].text;
+    expect(text).toContain('CREATED_DOCUMENT');
+    expect(text).not.toContain('GENERATED_DOCUMENT');
   });
 
   it('stops at the first refused step and never reaches activate/generate', async () => {

@@ -1,23 +1,32 @@
 /**
- * DeleteDomain Handler - Delete ABAP Domain via AdtClient
+ * DeleteDomain Handler - Delete ABAP Domain via ADT deletion API
  *
- * Uses AdtClient.getDomain().delete() for high-level delete operation.
- * Includes deletion check before actual deletion.
+ * Uses AdtClient.getDomain().delete from @mcp-abap-adt/adt-clients 19.
+ *
+ * The deletion service answers a refusal inside a 200 (`del:isDeleted="false"`,
+ * a `del:message` alongside it) — `analyseDeletion` reads that rather than the
+ * HTTP status, which is why this handler never inspects `response.status`
+ * itself. No lock is taken: a held lock is what makes ADT refuse a deletion,
+ * so acquiring one here would be self-defeating, and adt-clients 19 removed
+ * the pre-check (`assertDeletable`) that `delete()` used to run internally —
+ * there is nothing left for this handler to compose in front of the call.
  */
 
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +39,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['domain_name'],
   },
@@ -38,98 +48,32 @@ export const TOOL_DEFINITION = {
 interface DeleteDomainArgs {
   domain_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteDomain MCP tool
- *
- * Uses AdtClient.getDomain().delete() - high-level delete operation with deletion check
- */
 export async function handleDeleteDomain(
   context: HandlerContext,
   args: DeleteDomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { domain_name, transport_request } = args as DeleteDomainArgs;
+  const { domain_name, transport_request } = args;
 
-    // Validation
-    if (!domain_name) {
-      return return_error(new Error('domain_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const domainName = domain_name.toUpperCase();
-
-    logger?.info(`Starting domain deletion: ${domainName}`);
-
-    try {
-      // Delete domain using AdtClient (includes deletion check)
-      const domainObject = client.getDomain();
-      const deleteResult = await domainObject.delete({
-        domainName,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for domain ${domainName}`,
-        );
-      }
-
-      logger?.info(`✅ DeleteDomain completed successfully: ${domainName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            domain_name: domainName,
-            transport_request: transport_request || null,
-            message: `Domain ${domainName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Domain ${domainName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Domain ${domainName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!domain_name) {
+    return return_error(new Error('domain_name is required'));
   }
+
+  const domainName = domain_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteDomain', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDomain(resultsFor(domainDocuments))
+        .delete(
+          { domainName, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

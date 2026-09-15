@@ -130,6 +130,18 @@ export async function handleDeleteMessageClassMessage(
         },
         { analyse: analyseException },
       ),
+    // A constant success, reading nothing from the answer — safe here, and
+    // only here, because `answer()` never reaches this projection unless the
+    // call already came back clean: a non-2xx status throws at the
+    // connection layer before this runs, and `analyseException` (`enrich` /
+    // `readExceptionRefusal`) still inspects a 2xx body for an
+    // `exc:exception` refusal on the way past, the same HTTP-200-with-a-
+    // refusal-inside shape this whole design exists to catch. Nothing about
+    // this PUT's own success shape (a message-class document, not a verdict)
+    // can be read for more than that, so there is nothing this projection
+    // could add by looking — but a hard-coded success on a delete path is
+    // the one shape this repository has been burned by twice already, so it
+    // does not get to skip saying why it is not lying.
     () => ({
       success: true,
       message_class_name: className,

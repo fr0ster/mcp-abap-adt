@@ -35,7 +35,8 @@ own tests pass and it is committed — not when it is described.
 | 14. `low` tier, cluster one | done | `92b0d7c` |
 | 15. `low` tier, cluster two | done | `5285a23` |
 | 16. `low` tier, cluster three | done | `9a2fad1` |
-| 17 – 29 | not started | |
+| 17. `low` tier, cluster four | done | `d7e192e` |
+| 18 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2227,8 +2228,8 @@ npx tsx scripts/check-analyse.ts 'src/handlers/common/low/**'   # 0 offenders AN
 
 For each family, in order:
 
-- [ ] **Step 1: Measure** — `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l`
-- [ ] **Step 2: Write the family's test row** in `src/__tests__/unit/lowTierStrategies.test.ts`, asserting the pairing rather than the prose: what goes wrong at this scale is a handler taking the wrong `analyse`, and that is visible from the call.
+- [x] **Step 1: Measure** — `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l`
+- [x] **Step 2: Write the family's test row** in `src/__tests__/unit/lowTierStrategies.test.ts`, asserting the pairing rather than the prose: what goes wrong at this scale is a handler taking the wrong `analyse`, and that is visible from the call.
 
 ```typescript
 // src/__tests__/unit/lowTierStrategies.test.ts
@@ -2258,15 +2259,15 @@ it.each([
 });
 ```
 
-- [ ] **Step 3: Run it to verify it fails**
-- [ ] **Step 4: Migrate the family**, then `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l` — expect 0
-- [ ] **Step 5: Run the omission check on the family just touched**
+- [x] **Step 3: Run it to verify it fails**
+- [x] **Step 4: Migrate the family**, then `npx tsc --noEmit 2>&1 | grep "handlers/<family>/low" | wc -l` — expect 0
+- [x] **Step 5: Run the omission check on the family just touched**
 
 ```bash
 npx tsx scripts/check-analyse.ts 'src/handlers/<family>/low/**'   # 0 offenders AND a non-zero count
 npx jest src/__tests__/unit/toolSurface.test.ts
 ```
-- [ ] **Step 6: Commit the family** — `refactor(<family>): the low tier, on strategies`
+- [x] **Step 6: Commit the family** — `refactor(<family>): the low tier, on strategies`
 
 Do not batch two families into one commit.
 

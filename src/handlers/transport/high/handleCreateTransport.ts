@@ -1,15 +1,33 @@
 /**
- * CreateTransport Handler - Create new ABAP transport request via ADT API
+ * CreateTransport Handler - Create ABAP Transport Request
  *
- * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getRequest().create from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: create
+ * **`created` is NOT kept as shipped — `resultsFor(transportDocuments)`
+ * plain, then the number is parsed out here.** Same reasoning as
+ * `CreateTransportLow`: `transportDocuments.created` (the shipped
+ * `parseCreatedTransport`) reads the body, which `verbatim` (the table's
+ * default for the slot name `created`) already carries whole, as a string,
+ * in `AdtReading.value`. Parsing the number out of that value in the
+ * projection is what keeps `resultsFor`'s two-exception keep-list at two.
+ *
+ * No corpus fixture for `/cts/transportrequests` POST exists — the document
+ * below is hand-built from the shipped `parseCreatedTransport` and
+ * `create.js`'s own XML, not proven against a captured response.
  */
 
+import {
+  parseCreatedTransport,
+  transportDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, type Terse } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateTransport',
@@ -39,153 +57,59 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Transport owner (optional, defaults to current user)',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['description'],
   },
 } as const;
 
 interface CreateTransportArgs {
-  transport_type?: string;
+  transport_type?: 'workbench' | 'customizing';
   description: string;
   target_system?: string;
   owner?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateTransport MCP tool
- *
- * Uses TransportBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleCreateTransport(
   context: HandlerContext,
   args: CreateTransportArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.description) {
-      return return_error('Transport description is required');
-    }
 
-    const typedArgs = args as CreateTransportArgs;
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger?.info(`Starting transport creation: ${typedArgs.description}`);
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-
-      // Create transport
-      const createState = await client.getRequest().create({
-        description: typedArgs.description,
-        transportType:
-          typedArgs.transport_type === 'customizing'
-            ? 'customizing'
-            : 'workbench',
-        targetSystem: typedArgs.target_system,
-        owner: typedArgs.owner,
-      });
-
-      // Get create result
-      const createResult = createState.createResult;
-
-      logger?.info(`✅ CreateTransport completed successfully`);
-
-      // Parse response data if available
-      let transportInfo: any = {};
-      let transportNumber: string | undefined;
-      let taskNumber: string | undefined;
-
-      if (createResult?.data) {
-        if (typeof createResult.data === 'string') {
-          // If data is XML string, try to parse it
-          try {
-            const { XMLParser } = require('fast-xml-parser');
-            const parser = new XMLParser({
-              ignoreAttributes: false,
-              attributeNamePrefix: '',
-              parseAttributeValue: true,
-            });
-            const result = parser.parse(createResult.data);
-            const root = result['tm:root'] || result.root;
-            const request = root?.['tm:request'] || {};
-            const task = request?.['tm:task'] || {};
-            transportInfo = {
-              transport_number: request['tm:number'] || transportNumber,
-              description:
-                request['tm:desc'] ||
-                request['tm:description'] ||
-                typedArgs.description,
-              type: request['tm:type'],
-              target_system: request['tm:target'],
-              target_desc: request['tm:target_desc'],
-              cts_project: request['tm:cts_project'],
-              uri: request['tm:uri'],
-              owner: task['tm:owner'] || request['tm:owner'] || typedArgs.owner,
-            };
-          } catch (_parseError) {
-            // If parsing fails, use basic info
-            transportInfo = {
-              transport_number: transportNumber,
-              description: typedArgs.description,
-              type: typedArgs.transport_type === 'customizing' ? 'T' : 'K',
-              owner: typedArgs.owner,
-            };
-          }
-        } else if (typeof createResult.data === 'object') {
-          transportInfo = createResult.data;
-        }
-      }
-
-      // Use builder state if response parsing didn't provide transport number
-      if (!transportInfo.transport_number && transportNumber) {
-        transportInfo.transport_number = transportNumber;
-      }
-      if (!transportInfo.task_number && taskNumber) {
-        transportInfo.task_number = taskNumber;
-      }
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            transport_request:
-              transportInfo.transport_number || transportNumber,
-            task_number: transportInfo.task_number || taskNumber,
-            description: transportInfo.description || typedArgs.description,
-            type:
-              transportInfo.type ||
-              (typedArgs.transport_type === 'customizing' ? 'T' : 'K'),
-            target_system:
-              transportInfo.target_system || typedArgs.target_system || 'LOCAL',
-            target_desc: transportInfo.target_desc,
-            cts_project: transportInfo.cts_project,
-            owner: transportInfo.owner || typedArgs.owner,
-            uri: transportInfo.uri,
-            message: `Transport request ${transportInfo.transport_number || transportNumber || 'unknown'} created successfully`,
-          },
-          null,
-          2,
-        ),
-        status: createResult?.status || 200,
-        statusText: createResult?.statusText || 'OK',
-        headers: (createResult?.headers || {}) as any,
-        config: createResult?.config || ({} as any),
-      });
-    } catch (error: any) {
-      logger?.error(`Error creating transport:`, error);
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(`Failed to create transport: ${errorMessage}`);
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.description) {
+    return return_error(new Error('description is required'));
   }
+
+  const detail = detailOf(args);
+
+  const terseCreatedTransport: Terse<string> = (value) => {
+    const created = parseCreatedTransport(value);
+    return {
+      success: true,
+      transport_number: created.transportNumber,
+      description: created.description ?? args.description,
+      transport_type: args.transport_type || 'workbench',
+      target_system: created.targetSystem ?? args.target_system ?? null,
+      owner: created.owner ?? args.owner ?? null,
+      message: `Transport request ${created.transportNumber} created successfully.`,
+    };
+  };
+
+  return answer(
+    { tool: 'CreateTransport', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getRequest(resultsFor(transportDocuments))
+        .create(
+          {
+            description: args.description,
+            transportType: args.transport_type || 'workbench',
+            targetSystem: args.target_system,
+            owner: args.owner,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseCreatedTransport),
+  );
 }

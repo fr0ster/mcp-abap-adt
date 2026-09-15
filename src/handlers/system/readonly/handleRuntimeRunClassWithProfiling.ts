@@ -22,7 +22,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeRunClassWithProfiling',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime][deprecated] Execute ABAP class with profiler enabled: schedules a trace, runs the class under it, then searches the profiler feed for the trace id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). trace_id is absent if the trace has not appeared within that bound. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
+    '[runtime][deprecated] Execute ABAP class with profiler enabled: schedules a trace, runs the class under it, then searches the profiler feed for the trace id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). trace_id is absent if the trace has not appeared within that bound. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.',
   inputSchema: {
     type: 'object',
     properties: {

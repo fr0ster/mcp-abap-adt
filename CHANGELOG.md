@@ -98,6 +98,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   no result strategy in its constructor, so there is no transport envelope
   left to read a status from.
 
+- **`RuntimeRunProgram` and `RuntimeRunProgramWithProfiling` (Task 23) no
+  longer answer `run_status`, and `RuntimeRunProgramWithProfiling` gained an
+  `output` field it never had before — neither was documented at the time.**
+  `ProgramExecutor.run()`/`runWithProfiler()` answer `IAdtResponse<string>`
+  with no transport envelope to read a status from, the same reason the class
+  tools above lost it; `run_status` is gone from `RuntimeRunProgram`'s
+  non-profiled answer, its profiled answer, and
+  `RuntimeRunProgramWithProfiling`'s answer — three answers across the two
+  tools. Unlike the class tools, the program tools never had
+  `max_trace_attempts`, `trace_retry_delay_ms`, `trace_lookup_uris` or a
+  `trace_id` to begin with (program execution has always been
+  fire-and-forget; a trace is located afterwards via
+  `RuntimeListProfilerTraceFiles`), so none of those were removed — an
+  earlier account of this task claimed otherwise and was wrong.
+  `RuntimeRunProgramWithProfiling` is deprecated and, by the rule this
+  repository otherwise follows (a deprecated tool gains no field — applied
+  correctly to `RuntimeRunClassWithProfiling` above), should not have started
+  answering `output`; Task 23 added it inconsistently with that rule. Recorded
+  here rather than fixed by this entry.
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

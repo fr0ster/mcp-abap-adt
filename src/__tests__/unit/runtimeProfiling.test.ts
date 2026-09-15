@@ -153,20 +153,23 @@ it.each(
   handlers,
 )('%s finds the trace by difference, not by position', async (_n, handler, args) => {
   if (OPTION !== 'find-the-trace') return;
-  // The feed already holds an entry, and it is LAST in document order with the
-  // newest `recordedAt`. An implementation that takes the first entry, or the
-  // last, or sorts the strings, picks the wrong one — only the difference
-  // against the snapshot gives the right answer.
-  // The feed is built to fail three wrong implementations at once.
+  // The feed is built to fail FOUR wrong implementations at once, not three:
+  // taking a raw document position ignores `before` entirely, and picking the
+  // first entry OF THE FRESH SET (correct differencing, no sort) is a distinct
+  // mistake from either — `decoy` sits before `produced` in document order
+  // among the fresh entries, so "the difference, unsorted" fails exactly where
+  // "the difference, sorted" succeeds.
   //
-  //  · no snapshot, take the first entry        → picks `older`, which was there
-  //  · no snapshot, take the last entry         → picks `decoy`, which was there
-  //  · difference, but sort recordedAt as text  → picks `decoy`, see below
+  //  · no snapshot, take the first entry            → picks `older`, which was there
+  //  · no snapshot, take the last entry              → picks `stale`, which was there
+  //  · difference, but take the first FRESH entry    → picks `decoy`, not the newest
+  //  · difference, but sort recordedAt as text        → picks `decoy`, see below
   //
-  // `COMPLETED_TRACE` sits in the MIDDLE of document order, and its timestamp
-  // is 09:00 UTC against the decoy's 10:30+02:00, which is 08:30 UTC. So it is
-  // the newer of the two fresh entries while sorting LOWER as a string — the
-  // exact trap `compareRecordedAt` exists for.
+  // `COMPLETED_TRACE` sits AFTER `decoy` among the fresh entries, and its
+  // timestamp is 09:00 UTC against the decoy's 10:30+02:00, which is 08:30
+  // UTC. So it is the newer of the two fresh entries by time while sorting
+  // LOWER as a string and LATER in document position — the exact traps
+  // `compareRecordedAt` and the sort (not a raw take-first) exist for.
   const older = {
     id: 'completed-trace-1',
     recordedAt: '2026-09-13T10:00:00+02:00',
@@ -192,7 +195,7 @@ it.each(
   profiler = {
     list: async () =>
       okResponse(
-        ++listed === 1 ? [older, stale] : [older, produced, stale, decoy],
+        ++listed === 1 ? [older, stale] : [older, decoy, produced, stale],
       ),
   };
 
@@ -205,6 +208,97 @@ it.each(
   expect(payload.profile?.trace_id ?? payload.trace_id).toBe(COMPLETED_TRACE);
   // Snapshot, then at least one more read. One call means no snapshot.
   expect(listed).toBeGreaterThan(1);
+});
+
+it.each(
+  handlers,
+)('%s does not answer an id the snapshot already had, even when it is newest by time', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  // A mutant that still REQUESTS the snapshot but throws its CONTENTS away
+  // — answers with an empty `before` set — passes every other test in this
+  // file: their fixtures happen to make the correct answer the newest entry
+  // in the whole feed too, so ignoring the snapshot lands on it by
+  // coincidence. This one does not: `ALREADY_THERE` sits in the snapshot
+  // AND is newer by `recordedAt` than what this run actually produced, so
+  // only a `before` set built from the snapshot's real contents filters it
+  // out and leaves the genuinely new entry.
+  const ALREADY_THERE = {
+    id: 'already-there',
+    recordedAt: '2026-09-15T12:00:00Z',
+  };
+  const ourTrace = {
+    id: COMPLETED_TRACE,
+    recordedAt: '2026-09-15T08:00:00Z',
+  };
+  let listed = 0;
+  classExecutor = {
+    scheduleTrace: async () => okResponse(PROFILER_REQUEST),
+    runWithProfiler: async () => okResponse('done'),
+  };
+  profiler = {
+    list: async () =>
+      okResponse(++listed === 1 ? [ALREADY_THERE] : [ALREADY_THERE, ourTrace]),
+  };
+
+  const result: any = await (handler as any)(context as any, {
+    ...args,
+    max_trace_attempts: 3,
+    trace_retry_delay_ms: 0,
+  });
+  const payload = JSON.parse(result.content[0].text);
+  expect(payload.profile?.trace_id ?? payload.trace_id).toBe(COMPLETED_TRACE);
+});
+
+it.each(
+  handlers,
+)('%s waits trace_retry_delay_ms, not a value of its own choosing, between polling attempts', async (_n, handler, args) => {
+  if (OPTION !== 'find-the-trace') return;
+  // A handler that hardcodes the wait (to 0, say) passes every other test
+  // in this file, because every other case that cares about the delay also
+  // sets `trace_retry_delay_ms: 0` in its own arguments — the parameter and
+  // the hardcoded value agree by construction. Fake timers are the only way
+  // to see the delay actually asked for travel from the argument to the
+  // wait: `newTraceAfter`'s default `sleep` is a real `setTimeout`, and
+  // nothing observes it unless time itself is under the test's control.
+  jest.useFakeTimers();
+  try {
+    let listed = 0;
+    classExecutor = {
+      scheduleTrace: async () => okResponse(PROFILER_REQUEST),
+      runWithProfiler: async () => okResponse('done'),
+    };
+    profiler = {
+      list: async () => {
+        listed += 1;
+        return okResponse([]);
+      },
+    };
+
+    const pending = (handler as any)(context as any, {
+      ...args,
+      max_trace_attempts: 2,
+      trace_retry_delay_ms: 5000,
+    });
+
+    // The snapshot and the first search attempt are both immediate; no
+    // timer is pending yet.
+    await jest.advanceTimersByTimeAsync(0);
+    expect(listed).toBe(2);
+
+    // A hardcoded (or merely wrong, smaller) delay would already have made
+    // the second attempt by here. The real 5000 ms has not elapsed.
+    await jest.advanceTimersByTimeAsync(4999);
+    expect(listed).toBe(2);
+
+    // The remaining millisecond fires the wait; the second attempt runs.
+    await jest.advanceTimersByTimeAsync(1);
+    expect(listed).toBe(3);
+
+    const result: any = await pending;
+    expect(result.isError).toBe(false);
+  } finally {
+    jest.useRealTimers();
+  }
 });
 
 it.each(

@@ -46,15 +46,17 @@ it('ignores every id that was already in the snapshot', async () => {
   expect(found.getResult().value).toBeUndefined();
 });
 
-it('picks the newest of several new ids, by time and not by text', async () => {
-  // 09:00Z is 09:00 UTC; 10:30+02:00 is 08:30 UTC. The first is later in time
-  // and lower as a string, which is what compareRecordedAt is for.
+it('picks the newest of several new ids, by time and not by text — and not by document position either', async () => {
+  // 09:00Z is 09:00 UTC; 10:30+02:00 is 08:30 UTC. `new-late` is later in
+  // time despite sorting lower as a string, which is what compareRecordedAt
+  // is for — and it is listed SECOND, not first, so a comparator dropped in
+  // favour of "take the first fresh entry" fails here too.
   const found = await newTraceAfter(
     {
       list: async () =>
         feed(
-          entry('new-late', '2026-09-14T09:00:00Z'),
           entry('new-early', '2026-09-14T10:30:00+02:00'),
+          entry('new-late', '2026-09-14T09:00:00Z'),
         ),
     } as any,
     new Set(),

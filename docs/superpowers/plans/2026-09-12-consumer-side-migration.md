@@ -43,7 +43,7 @@ own tests pass and it is committed — not when it is described.
 | 22. The read-modify-write families | done | `c6bc755` |
 | 23. Members 19 removed or renamed | done | `37c500d` |
 | 24. The class profiling handlers | done | `3bb6d2c` |
-| 25. The library files, and the last of the compiler's list | done | `244d2a9` |
+| 25. The library files, and the last of the compiler's list | done | `16fdb3d` |
 | 26 – 29 | not started | |
 
 Verify without reading anything above:

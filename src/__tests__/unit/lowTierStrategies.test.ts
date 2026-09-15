@@ -43,6 +43,9 @@ import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
 import { handleActivateServiceDefinition } from '../../handlers/service_definition/low/handleActivateServiceDefinition';
+import { handleGetNodeStructure } from '../../handlers/system/low/handleGetNodeStructure';
+import { handleGetObjectStructure as handleGetObjectStructureLow } from '../../handlers/system/low/handleGetObjectStructure';
+import { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirtualFolders';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
@@ -215,6 +218,7 @@ import {
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { corpusBody } from '../../lib/adtCorpus';
+import { nodeLevel } from '../../lib/strategies/packageWalk';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
 import {
@@ -222,6 +226,7 @@ import {
   okResponse,
   recordAnalyse,
   refusedResponse,
+  refusingClient,
 } from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
@@ -2527,6 +2532,126 @@ describe('service_definition — Activate only', () => {
       activated: true,
       generated: true,
     });
+  });
+});
+
+describe('system — three getUtils() reads, none of which accept an analyse', () => {
+  // None of fetchNodeStructure/getObjectStructure/getVirtualFoldersContents
+  // takes an `options` parameter at all in the shipped AdtUtils — verified
+  // against the compiled AdtUtils.js, not the declaration file. This is why
+  // `npx tsx scripts/check-analyse.ts 'src/handlers/system/low/**'` reports
+  // 0 inspected calls and exits non-zero for this family alone: the script's
+  // own "check one signature by hand before believing this" is what these
+  // three tests are.
+  it('GetNodeStructureLow reaches getUtils, carrying no analyse', async () => {
+    await handleGetNodeStructure(context as any, {
+      parent_type: 'DEVC/K',
+      parent_name: 'ZP_X',
+    });
+    const call = callTo('fetchNodeStructure');
+    expect(call?.factory).toBe('getUtils');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.args).toEqual([
+      'DEVC/K',
+      'ZP_X',
+      { nodeId: '0000', withShortDescriptions: true },
+    ]);
+  });
+
+  it('GetNodeStructureLow reads the real read-object-tree-structure fixture (fixture 05, the one with descriptions) through the nodeLevel reading', async () => {
+    const document = corpusBody(
+      'read-object-tree-structure--05-nodestructure',
+    );
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async () => okResponse(nodeLevel({ data: document })),
+    });
+
+    const result: any = await handleGetNodeStructure(context as any, {
+      parent_type: 'DEVC/K',
+      parent_name: 'ZMCP_SHR_PKG',
+      node_id: '28',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      objects: [
+        {
+          name: 'ZMCP_BLD_SHR_FGR',
+          type: 'FUGR/F',
+          description: 'Shared function group for read tests',
+          techName: 'SAPLZMCP_BLD_SHR_FGR',
+          uri: '/sap/bc/adt/functions/groups/zmcp_bld_shr_fgr',
+        },
+        {
+          name: 'ZMCP_SHR_FGRP',
+          type: 'FUGR/F',
+          description: 'Shared FUGR for include/FM tests',
+          techName: 'SAPLZMCP_SHR_FGRP',
+          uri: '/sap/bc/adt/functions/groups/zmcp_shr_fgrp',
+        },
+      ],
+      childNodes: [{ type: 'FUGR/F', nodeId: '29' }],
+    });
+  });
+
+  it('GetNodeStructureLow surfaces a refusal as an error, not as an empty tree', async () => {
+    fakeClient = refusingClient('Package ZMCP_BLD_NOPKG9X not found');
+
+    const result: any = await handleGetNodeStructure(context as any, {
+      parent_type: 'DEVC/K',
+      parent_name: 'ZMCP_BLD_NOPKG9X',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Package ZMCP_BLD_NOPKG9X not found',
+    );
+  });
+
+  it('GetVirtualFoldersLow reaches getUtils, carrying no analyse, forwarding the caller\'s facets and defaulting the rest', async () => {
+    await handleGetVirtualFolders(context as any, {
+      object_search_pattern: 'Z*',
+      preselection: [{ facet: 'package', values: ['ZP_X'] }],
+    });
+    const call = callTo('getVirtualFoldersContents');
+    expect(call?.factory).toBe('getUtils');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.args[0]).toEqual({
+      objectSearchPattern: 'Z*',
+      preselection: [{ facet: 'package', values: ['ZP_X'] }],
+      facetOrder: ['package', 'group', 'type'],
+      withVersions: undefined,
+      ignoreShortDescriptions: undefined,
+    });
+  });
+
+  it('GetObjectStructureLow reaches getUtils, carrying no analyse', async () => {
+    await handleGetObjectStructureLow(context as any, {
+      object_type: 'DEVC/K',
+      object_name: 'ZP_X',
+    });
+    const call = callTo('getObjectStructure');
+    expect(call?.factory).toBe('getUtils');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.args).toEqual(['DEVC/K', 'ZP_X']);
+  });
+
+  it('GetObjectStructureLow reads the same tree-text projection GetObjectStructure (read-only) uses', async () => {
+    const reading = structured({
+      data: '<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/ris/projectExplorer"><projectexplorer:node nodeid="1" objecttype="DEVC/K" objectname="ZP_X"/><projectexplorer:node nodeid="2" parentid="1" objecttype="CLAS/OC" objectname="ZCL_X"/></projectexplorer:objectstructure>',
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ getObjectStructure: async () => okResponse(reading) });
+
+    const result: any = await handleGetObjectStructureLow(context as any, {
+      object_type: 'DEVC/K',
+      object_name: 'ZP_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe(
+      'tree:\n- DEVC/K: ZP_X\n  - CLAS/OC: ZCL_X\n',
+    );
   });
 });
 

@@ -1,13 +1,27 @@
 /**
  * GetNodeStructure Handler - Low-level handler for node structure
  *
- * Uses fetchNodeStructure from @mcp-abap-adt/adt-clients AdtUtils.
- * Fetches node structure from ADT repository for object tree navigation.
+ * Uses AdtClient.getUtils().fetchNodeStructure from @mcp-abap-adt/adt-clients
+ * 19. `fetchNodeStructure(parentType, parentName, options)` takes no
+ * `options.analyse` at all — nothing to inject beyond the result set.
+ *
+ * `ourUtils.node` is `nodeLevel` (`src/lib/strategies/packageWalk.ts`), not
+ * the table's own `structured` default — the shipped reading answers
+ * `objectType`/`objectName`/`techName`/`objectUri` with no description, and a
+ * package listing wants one. Because the injected reading already collapses
+ * the answer into `{ objects, childNodes }` rather than an `AdtReading`
+ * (`{ value, raw, status }`), `project()` from `projections.ts` — which reads
+ * that shape — cannot be used here: the level itself is the value, not
+ * something to project `detail` over. `detail` is therefore not on this
+ * tool's surface, the same reason `LockDomainLow` and its siblings leave it
+ * off.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetNodeStructureLow',
@@ -69,59 +83,40 @@ interface GetNodeStructureArgs {
   };
 }
 
-/**
- * Main handler for GetNodeStructureLow MCP tool
- *
- * Uses fetchNodeStructure from AdtUtils
- */
 export async function handleGetNodeStructure(
   context: HandlerContext,
   args: GetNodeStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.parent_type) {
-      return return_error(new Error('parent_type is required'));
-    }
-    if (!args?.parent_name) {
-      return return_error(new Error('parent_name is required'));
-    }
+  const {
+    parent_type,
+    parent_name,
+    node_id,
+    with_short_descriptions,
+    session_id,
+    session_state,
+  } = args;
 
-    // Restore session state if provided
-    if (args.session_id && args.session_state) {
-      const { restoreSessionInConnection } = await import(
-        '../../../lib/utils.js'
-      );
-      await restoreSessionInConnection(
-        connection,
-        args.session_id,
-        args.session_state,
-      );
-    }
-
-    // Create AdtClient and get utilities
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
-
-    logger?.info(
-      `Fetching node structure for ${args.parent_type}/${args.parent_name}`,
-    );
-
-    const result = await utils.fetchNodeStructure(
-      args.parent_type,
-      args.parent_name,
-      args.node_id || '0000',
-      args.with_short_descriptions !== false,
-    );
-
-    logger?.debug(
-      `Node structure fetched successfully for ${args.parent_type}/${args.parent_name}`,
-    );
-
-    return return_response(result);
-  } catch (error: any) {
-    logger?.error('Failed to fetch node structure', error);
-    return return_error(error);
+  if (!parent_type) {
+    return return_error(new Error('parent_type is required'));
   }
+  if (!parent_name) {
+    return return_error(new Error('parent_name is required'));
+  }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  return answer(
+    { tool: 'GetNodeStructureLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .fetchNodeStructure(parent_type, parent_name, {
+          nodeId: node_id || '0000',
+          withShortDescriptions: with_short_descriptions !== false,
+        }),
+    (value) => value,
+  );
 }

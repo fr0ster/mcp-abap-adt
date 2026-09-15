@@ -105,7 +105,13 @@ function serializeTree(
   return result;
 }
 
-function treeText(value: unknown): string {
+/**
+ * Exported so `GetObjectStructureLow` (`src/handlers/system/low/`) can answer
+ * the same tree text without a second copy of `flatNodesOf`/`buildNestedTree`/
+ * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
+ * document through the same `ourUtils.objectStructure` (`structured`) reading.
+ */
+export function treeText(value: unknown): string {
   const nodes = flatNodesOf(value);
   if (nodes.length === 0) return 'No nodes found in object structure response.';
   return `tree:\n${serializeTree(buildNestedTree(nodes))}`;

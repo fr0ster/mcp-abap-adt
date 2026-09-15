@@ -574,6 +574,14 @@ How the scope combines with the process context:
 
 Outside any scope (stdio) nothing changes.
 
+**ABAP Cloud fills the gaps.** If a tool call still has no `responsible` or `masterSystem` after the rules above, and its connection is to ABAP Cloud, the library asks the system and fills only the missing one:
+
+- `responsible` ← the system's user name, `masterSystem` ← its system id.
+- One lookup per connection, only when a call lacks a value. On-premise: no lookup, nothing filled.
+- A failed lookup is logged; the call runs anyway.
+
+Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
+
 **Example `.env` for on-premise:**
 ```env
 SAP_URL=http://your-sap-system:8000

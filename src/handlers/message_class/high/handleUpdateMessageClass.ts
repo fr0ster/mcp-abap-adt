@@ -1,22 +1,25 @@
 /**
  * UpdateMessageClass Handler - Write a Message Class's own metadata
  *
- * Uses AdtClient.getMessageClass().updateMetadata from
- * @mcp-abap-adt/adt-clients 19.
+ * Uses AdtClient.getMessageClass().{lock,updateMetadata,unlock} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`.
  *
- * **This handler holds no lock — it takes the caller's lock handle as an
- * argument.** `updateMetadata()` reads `options?.lockHandle` and issues one
- * PUT; there is no internal lock/unlock (the pre-migration handler's
- * `getMessageClass().update()` doesn't exist in v19 — `updateMetadata` is the
- * atomic member, and the caller supplies the lock it needs). This changes
- * the tool's surface beyond `detail` — see the task report for why.
+ * **This handler acquires its own lock.** `IMessageClassContract` composes
+ * `IAdtLockable` — `lock({name})`/`unlock({name}, lockHandle)` are on the
+ * same accessor `updateMetadata()` is called through, verified against
+ * `AdtMessageClass.js` (`lock()`/`unlock()` call `lockMessageClass`/
+ * `unlockMessageClass` directly). Fix round 1: a caller-supplied
+ * `lock_handle` param was tried here first and reverted — adt-clients 19
+ * moving a lock out of a member does not move it onto the caller, it moves
+ * it onto this handler.
  *
  * **The member is `updateMetadata`, not `update`.** `IMessageClassContract`
  * declares `IAdtMetadataUpdatable`, whose method is `updateMetadata`; there
- * is no plain `update` on this factory. Verified against `AdtMessageClass.js`
- * (`updateMetadata()` calls `updateMessageClass(connection, name,
- * options?.lockHandle, config.description, config.transportRequest)`) —
- * `description` goes in `config`, not `options`.
+ * is no plain `update` on this factory.
+ *
+ * **`description` goes in `config`, not `options`.** Verified against
+ * `AdtMessageClass.js`'s `updateMetadata()`: `updateMessageClass(connection,
+ * name, options?.lockHandle, config.description, config.transportRequest)`.
  */
 
 import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
@@ -27,13 +30,14 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update. Subject: Message Class (MSAG). Update a message class header (its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage. Takes the lock handle from a prior lock call — this tool does not lock or unlock the message class itself.',
+    'Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -45,11 +49,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'New short description for the message class.',
       },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from a prior lock call on this message class. Required — the shipped write endpoint answers a refusal without one.',
-      },
       transport_request: {
         type: 'string',
         description:
@@ -57,14 +56,13 @@ export const TOOL_DEFINITION = {
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['message_class_name', 'lock_handle'],
+    required: ['message_class_name', 'description'],
   },
 } as const;
 
 interface UpdateMessageClassArgs {
   message_class_name: string;
-  description?: string;
-  lock_handle: string;
+  description: string;
   transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -78,8 +76,8 @@ export async function handleUpdateMessageClass(
   if (!args?.message_class_name) {
     return return_error(new Error('message_class_name is required'));
   }
-  if (!args?.lock_handle) {
-    return return_error(new Error('lock_handle is required'));
+  if (!args?.description) {
+    return return_error(new Error('description is required'));
   }
 
   const name = args.message_class_name.toUpperCase();
@@ -87,17 +85,25 @@ export async function handleUpdateMessageClass(
 
   return answer(
     { tool: 'UpdateMessageClass', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getMessageClass(resultsFor(messageClassDocuments))
-        .updateMetadata(
-          {
-            name,
-            description: args.description,
-            transportRequest: args.transport_request,
-          },
-          { lockHandle: args.lock_handle, analyse: analyseException },
-        ),
+    () => {
+      const obj = createAdtClient(connection, logger).getMessageClass(
+        resultsFor(messageClassDocuments),
+      );
+
+      return withLock(
+        () => obj.lock({ name }),
+        (lockHandle) =>
+          obj.updateMetadata(
+            {
+              name,
+              description: args.description,
+              transportRequest: args.transport_request,
+            },
+            { lockHandle, analyse: analyseException },
+          ),
+        (lockHandle) => obj.unlock({ name }, lockHandle),
+      );
+    },
     project(detail, terseWrite),
   );
 }

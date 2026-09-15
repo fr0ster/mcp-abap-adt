@@ -2,20 +2,22 @@
  * UpdateCdsUnitTest Handler - Write a CDS unit test container class's
  * testclasses include
  *
- * Uses AdtClient.getCdsUnitTest().update from @mcp-abap-adt/adt-clients 19.
+ * Uses AdtClient.getCdsUnitTest().{lock,update,unlock} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`.
  *
  * `getCdsUnitTest()` now returns the real `AdtCdsUnitTest` (typed with
- * `update`/`delete` on its declared contract), so the `CdsUnitTestWrites`
- * cast this handler used to need is gone. `cdsUnitTestWrites.ts` stays —
- * `DeleteCdsUnitTest` still imports it, and that handler is outside this
- * task's scope.
+ * `update`/`delete`/`lock`/`unlock` on its declared contract), so the
+ * `CdsUnitTestWrites` cast this handler used to need is gone. `cdsUnitTestWrites.ts`
+ * stays — `DeleteCdsUnitTest` still imports it, and that handler is outside
+ * this task's scope.
  *
- * **This handler holds no lock — it takes the caller's lock handle as an
- * argument.** Same shape as `UpdateUnitTest`: `AdtCdsUnitTest.update()`
- * delegates to `AdtLocalTestClass.update()`, which never takes a lock and
- * never releases one. Without a lock handle the shipped endpoint answers
- * "400 Parameter lockHandle could not be found". This changes the tool's
- * surface beyond `detail` — see the task report for why.
+ * **This handler acquires its own lock.** `AdtCdsUnitTest`'s `lock()`/
+ * `unlock()` are inherited from `AdtUnitTest`, which delegate to
+ * `this.adtLocalTestClass.lock({className})`/`.unlock(...)` — the same
+ * accessor `update()` is called through. Fix round 1: a caller-supplied
+ * `lock_handle` param was tried here first and reverted — adt-clients 19
+ * moving a lock out of a member does not move it onto the caller, it moves
+ * it onto this handler.
  *
  * **The source goes in `config.testClassSource`, and it is the field that
  * selects the CDS-specific path.** `AdtCdsUnitTest.update()`'s shipped body:
@@ -33,13 +35,14 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Update a CDS unit test class local test class source code. Forces activation of the container class after the write. Takes the lock handle from a prior lock on the container class — this tool does not lock or unlock it itself.',
+    'Update a CDS unit test class local test class source code. Forces activation of the container class after the write. Manages lock, update, and unlock of the container class.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -51,11 +54,6 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Updated local test class ABAP source code.',
       },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from a prior lock call on this container class. Required — the shipped write endpoint answers "400 Parameter lockHandle could not be found" without one.',
-      },
       transport_request: {
         type: 'string',
         description:
@@ -63,14 +61,13 @@ export const TOOL_DEFINITION = {
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'test_class_source', 'lock_handle'],
+    required: ['class_name', 'test_class_source'],
   },
 } as const;
 
 interface UpdateCdsUnitTestArgs {
   class_name: string;
   test_class_source: string;
-  lock_handle: string;
   transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -87,24 +84,31 @@ export async function handleUpdateCdsUnitTest(
   if (!args?.test_class_source) {
     return return_error(new Error('test_class_source is required'));
   }
-  if (!args?.lock_handle) {
-    return return_error(new Error('lock_handle is required'));
-  }
 
   const className = args.class_name.toUpperCase();
   const detail = detailOf(args);
 
   return answer(
     { tool: 'UpdateCdsUnitTest', detail },
-    () =>
-      createAdtClient(connection, logger).getCdsUnitTest(ourUnitTest).update(
-        {
-          className,
-          testClassSource: args.test_class_source,
-          transportRequest: args.transport_request,
-        },
-        { lockHandle: args.lock_handle, analyse: analyseException },
-      ),
+    () => {
+      const obj = createAdtClient(connection, logger).getCdsUnitTest(
+        ourUnitTest,
+      );
+
+      return withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            {
+              className,
+              testClassSource: args.test_class_source,
+              transportRequest: args.transport_request,
+            },
+            { lockHandle, analyse: analyseException },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
+    },
     project(detail, terseWrite),
   );
 }

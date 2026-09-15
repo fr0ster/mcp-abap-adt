@@ -13,19 +13,24 @@
  * being created IS the object this create is about, and `superPackage` is
  * genuinely optional — a top-level package has none by design.
  *
- * **The `inputSchema` moves from a bare zod raw shape to plain JSON Schema.**
- * Both are read identically by `scripts/list-tools.ts` (see its own comment
- * on the two shapes it supports), so this changes nothing about the tool
- * surface — it only lets `...DETAIL_PROPERTY` spread the same way every
- * other migrated handler in this repository does.
+ * **The `inputSchema` stays a bare zod raw shape.** Fix round 1: this was
+ * converted to plain JSON Schema, reasoning the two are read identically by
+ * `scripts/list-tools.ts`. True for the tool's own surface (only `detail`
+ * moved), but the conversion also changed what
+ * `compactSchemaCompleteness.test.ts` could see: a zod-shaped handler's
+ * `required[]` is unreadable to that test's `requiredOf()` helper, which is
+ * why it had never flagged `compactCreateSchema` missing `super_package` in
+ * the first place. Reverted to zod, `detail` added as a proper zod field
+ * (not a plain object mixed into a zod raw shape) alongside its siblings.
  */
 
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -36,61 +41,67 @@ export const TOOL_DEFINITION = {
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
   inputSchema: {
-    type: 'object',
-    properties: {
-      package_name: {
-        type: 'string',
-        description:
-          'Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions (start with Z or Y for customer namespace).',
-      },
-      description: {
-        type: 'string',
-        description:
-          'Package description. If not provided, package_name will be used.',
-      },
-      super_package: {
-        type: 'string',
-        description:
-          'Parent package name (e.g., ZOK_PACKAGE). Required for structure packages.',
-      },
-      package_type: {
-        type: 'string',
-        enum: ['development', 'structure'],
-        default: 'development',
-        description: "Package type: 'development' (default) or 'structure'",
-      },
-      software_component: {
-        type: 'string',
-        description:
-          'Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).',
-      },
-      transport_layer: {
-        type: 'string',
-        description:
-          'Transport layer (e.g., ZE19). Required for transportable packages.',
-      },
-      transport_request: {
-        type: 'string',
-        description:
-          'Transport request number (e.g., E19K905635). Required if package is transportable.',
-      },
-      record_changes: {
-        type: 'boolean',
-        description:
-          'Enable change recording for the package. Required for transportable packages. Default: false.',
-      },
-      application_component: {
-        type: 'string',
-        description: 'Application component (optional, e.g., BC-ABA)',
-      },
-      master_language: {
-        type: 'string',
-        description:
-          'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
-      },
-      ...DETAIL_PROPERTY,
-    },
-    required: ['package_name', 'super_package'],
+    package_name: z
+      .string()
+      .describe(
+        'Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions (start with Z or Y for customer namespace).',
+      ),
+    description: z
+      .string()
+      .optional()
+      .describe(
+        'Package description. If not provided, package_name will be used.',
+      ),
+    super_package: z
+      .string()
+      .describe(
+        'Parent package name (e.g., ZOK_PACKAGE). Required for structure packages.',
+      ),
+    package_type: z
+      .enum(['development', 'structure'])
+      .default('development')
+      .describe("Package type: 'development' (default) or 'structure'"),
+    software_component: z
+      .string()
+      .optional()
+      .describe(
+        'Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).',
+      ),
+    transport_layer: z
+      .string()
+      .optional()
+      .describe(
+        'Transport layer (e.g., ZE19). Required for transportable packages.',
+      ),
+    transport_request: z
+      .string()
+      .optional()
+      .describe(
+        'Transport request number (e.g., E19K905635). Required if package is transportable.',
+      ),
+    record_changes: z
+      .boolean()
+      .optional()
+      .describe(
+        'Enable change recording for the package. Required for transportable packages. Default: false.',
+      ),
+    application_component: z
+      .string()
+      .optional()
+      .describe('Application component (optional, e.g., BC-ABA)'),
+    master_language: z
+      .string()
+      .optional()
+      .describe(
+        'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
+      ),
+    detail: z
+      .enum(['terse', 'full', 'raw'])
+      .optional()
+      .default('terse')
+      .describe(
+        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
+      ),
   },
 } as const;
 

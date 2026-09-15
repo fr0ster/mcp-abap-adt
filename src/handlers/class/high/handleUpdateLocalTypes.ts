@@ -1,15 +1,13 @@
 /**
  * UpdateLocalTypes Handler - Write a class's local types include
  *
- * Uses AdtClient.getLocalTypes().update from @mcp-abap-adt/adt-clients 19.
- *
- * **This handler holds no lock — it takes the caller's lock handle as an
- * argument.** Same shape as `UpdateLocalTestClass`: `AdtLocalTypes.update()`
- * never takes a lock and never releases one — the lock is the *class's*,
- * taken with `getClass().lock()` and shared across every include. Without a
- * lock handle the shipped endpoint answers "400 Parameter lockHandle could
- * not be found". This changes the tool's surface beyond `detail` — see the
- * task report for why.
+ * Uses AdtClient.getLocalTypes().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`. Same shape as
+ * `UpdateLocalTestClass` — see its own doc comment for the full reasoning:
+ * `AdtLocalTypes.update()` never locks itself, but the same accessor
+ * composes `IAdtLockable`, delegating to the class's own lock, so this
+ * handler acquires it rather than asking the caller for a handle it has no
+ * other way to obtain.
  *
  * **The source goes in `options`, not `config`.** The shipped `update()`
  * reads `options?.sourceCode ?? config.localTypesCode`. Verified against
@@ -17,20 +15,26 @@
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTypes',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    'Write the local types include of an existing ABAP class. Takes the lock handle from a prior LockClass call — this tool does not lock or unlock the class itself.',
+    'Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -38,31 +42,32 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Parent class name (e.g., ZCL_MY_CLASS).',
       },
-      source_code: {
+      local_types_code: {
         type: 'string',
-        description: 'Complete source code for the local types include.',
-      },
-      lock_handle: {
-        type: 'string',
-        description:
-          'Lock handle from a LockClass call on this class. Required — the shipped write endpoint answers "400 Parameter lockHandle could not be found" without one.',
+        description: 'Updated source code for local types.',
       },
       transport_request: {
         type: 'string',
         description:
           'Transport request number (required for transportable objects).',
       },
+      activate_on_update: {
+        type: 'boolean',
+        description:
+          'Activate parent class after updating local types. Default: false',
+        default: false,
+      },
       ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'source_code', 'lock_handle'],
+    required: ['class_name', 'local_types_code'],
   },
 } as const;
 
 interface UpdateLocalTypesArgs {
   class_name: string;
-  source_code: string;
-  lock_handle: string;
+  local_types_code: string;
   transport_request?: string;
+  activate_on_update?: boolean;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -75,29 +80,41 @@ export async function handleUpdateLocalTypes(
   if (!args?.class_name) {
     return return_error(new Error('class_name is required'));
   }
-  if (!args?.source_code) {
-    return return_error(new Error('source_code is required'));
-  }
-  if (!args?.lock_handle) {
-    return return_error(new Error('lock_handle is required'));
+  if (!args?.local_types_code) {
+    return return_error(new Error('local_types_code is required'));
   }
 
   const className = args.class_name.toUpperCase();
+  const shouldActivate = args.activate_on_update === true;
   const detail = detailOf(args);
 
   return answer(
     { tool: 'UpdateLocalTypes', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getLocalTypes(resultsFor(classDocuments))
-        .update(
-          { className, transportRequest: args.transport_request },
-          {
-            sourceCode: args.source_code,
-            lockHandle: args.lock_handle,
-            analyse: analyseException,
-          },
-        ),
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getLocalTypes(
+        resultsFor(classDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            { className, transportRequest: args.transport_request },
+            {
+              sourceCode: args.local_types_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ className }, { analyse: analyseActivation });
+    },
     project(detail, terseWrite),
   );
 }

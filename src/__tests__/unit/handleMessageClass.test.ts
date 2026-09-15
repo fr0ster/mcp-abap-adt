@@ -162,8 +162,8 @@ describe('Message Class (MSAG) CRUD tools', () => {
   });
 
   // Task 20: `AdtMessageClassMessage` is not `IAdtLockable` — its write locks
-  // and unlocks itself internally — so `lock_handle` is optional here and,
-  // when omitted, `options.lockHandle` is `undefined`.
+  // and unlocks itself internally — so there is no `lock_handle` parameter
+  // here at all, and `options` carries only `analyse`.
   it('UpdateMessageClassMessage dispatches update() with the new text', async () => {
     mockMsg.update.mockResolvedValue(okResponse(reading(undefined, '', 200)));
 
@@ -183,10 +183,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
         description: undefined,
         transportRequest: undefined,
       },
-      expect.objectContaining({
-        lockHandle: undefined,
-        analyse: expect.any(Function),
-      }),
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
   });
 

@@ -1,28 +1,44 @@
 /**
- * The seventeen high-tier creates and ten high-tier updates that hold no
- * lock — task 20 of the consumer-side migration.
+ * The seventeen high-tier creates and (most of) the ten high-tier updates
+ * task 20 of the consumer-side migration was given — task 20 fix round 1
+ * corrects a wrong first cut. `CreateUnitTest` and `UpdateUnitTest` are
+ * excluded here: adt-clients 19's `create()`/`update()` on `AdtUnitTest`
+ * answer a structurally different capability than the v18 members these two
+ * tools were built for (v18's `create()` meant "start a run"; v18 had no
+ * `update()` at all), and repurposing a tool's required parameters to make
+ * the compiler quiet is not this task's call to make — both handlers are
+ * reverted to their pre-migration content and left failing to compile,
+ * for whichever task addresses adt-clients 19's removed/renamed members.
  *
  * A create is a bare POST (`create-class--01-oo-classes`,
- * `create-domain--01-ddic-domains` in the corpus, one exchange each), and the
- * ten updates take the caller's lock handle as an argument rather than
- * acquiring one — `AdtLocalTestClass.update()`'s own doc comment: "This
- * never takes a lock and never releases one... The lock is the *class's*,
- * not the include's."
+ * `create-domain--01-ddic-domains` in the corpus, one exchange each) and
+ * never acquires a lock.
+ *
+ * **Every update that still has a lock to take, takes it and releases it —
+ * it does not ask the caller for one.** Fix round 1: the first cut added a
+ * `lock_handle` parameter to nine tools whose *write* member no longer locks
+ * (`AdtLocalTestClass.update()` and its siblings never take a lock and never
+ * release one, by their own doc comments), reasoning the caller must
+ * already hold one. Wrong: the very same accessor (`getLocalTestClass()`,
+ * `getBehaviorImplementation()`, `getFunctionInclude()`, `getMessageClass()`,
+ * `getCdsUnitTest()`) also composes `IAdtLockable`, delegating to the
+ * object's own lock — so this handler acquires it, exactly as every
+ * already-migrated high-tier locked write in this repository does, through
+ * `withLock`. `UpdateMessageClassMessage` is the one genuine exception:
+ * `AdtMessageClassMessage` is not `IAdtLockable` at all — its write locks
+ * and unlocks itself internally, through direct module calls never exposed
+ * on this accessor — so there is truly no lock for this handler to take,
+ * and it calls `update()` directly.
  *
  * **A refused create is unrecorded in the corpus for every family** — the
- * spec says so. These tests therefore assert the handler's behaviour given a
- * refusal, not the shape of the document ADT sends.
+ * spec says so. These tests therefore assert the handler's behaviour given
+ * a refusal, not the shape of the document ADT sends.
  *
- * **Two members answer a refused write differently from the other nine.**
- * `UpdateMessageClass` calls `getMessageClass().updateMetadata`, not
- * `.update` — `IMessageClassContract` declares `IAdtMetadataUpdatable`, whose
- * method is `updateMetadata`, and there is no plain `update` on that factory
- * (verified against `AdtMessageClass.js`). `UpdateMessageClassMessage` calls
- * `.update`, but `AdtMessageClassMessage` is not `IAdtLockable` at all: its
- * write locks and unlocks itself internally through direct module calls, so
- * `lock_handle` reaches it but is never read. Both are mocked under both key
- * names (`update` and `updateMetadata`, pointed at the same spy) in the
- * shared blocks below so one table covers all ten without special-casing the
+ * **`UpdateMessageClass` calls `updateMetadata`, not `update`.**
+ * `IMessageClassContract` declares `IAdtMetadataUpdatable`, whose method is
+ * `updateMetadata` — there is no plain `update` on that factory. Mocked
+ * under both key names (pointed at the same spy) in the shared blocks below
+ * so one table covers every lock-holding update without special-casing the
  * assertions.
  */
 
@@ -51,9 +67,7 @@ import { handleCreateStructure } from '../../handlers/structure/high/handleCreat
 import { handleCreateTable } from '../../handlers/table/high/handleCreateTable';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
-import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import { handleUpdateUnitTest } from '../../handlers/unit_test/high/handleUpdateUnitTest';
 import {
   fakeClientOf,
   okResponse,
@@ -151,11 +165,6 @@ describe('high-tier creates: no lock, single POST', () => {
       handleCreateCdsUnitTest,
       { class_name: 'ZCL_X', package_name: 'ZP', cds_view_name: 'ZI_VIEW' },
     ],
-    [
-      'CreateUnitTest',
-      handleCreateUnitTest,
-      { class_name: 'ZCL_X', package_name: 'ZP' },
-    ],
   ])('%s reports a refused create as an error', async (_n, handler, args) => {
     fakeClient = fakeClientOf({
       create: async () => refusedResponse('Name already taken'),
@@ -194,114 +203,147 @@ describe('high-tier creates: no lock, single POST', () => {
   });
 });
 
-describe("high-tier updates: no lock, the caller's handle as an argument", () => {
-  const updateCases: Array<[string, any, Record<string, unknown>]> = [
+describe('high-tier updates that still have a lock to take: they take it themselves', () => {
+  // Every row here maps to a handler whose write member does not lock, but
+  // whose accessor also exposes lock()/unlock() delegating to the real lock
+  // (the class's, the include's, the message class's, or the container
+  // class's). `config` is what `lock`/`unlock` are called with.
+  const lockingCases: Array<
+    [string, any, Record<string, unknown>, Record<string, unknown>]
+  > = [
     [
       'UpdateLocalTestClass',
       handleUpdateLocalTestClass,
-      { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' },
+      { class_name: 'ZCL_X', test_class_code: 'x' },
+      { className: 'ZCL_X' },
     ],
     [
       'UpdateLocalTypes',
       handleUpdateLocalTypes,
-      { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' },
+      { class_name: 'ZCL_X', local_types_code: 'x' },
+      { className: 'ZCL_X' },
     ],
     [
       'UpdateLocalDefinitions',
       handleUpdateLocalDefinitions,
-      { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' },
+      { class_name: 'ZCL_X', definitions_code: 'x' },
+      { className: 'ZCL_X' },
     ],
     [
       'UpdateLocalMacros',
       handleUpdateLocalMacros,
-      { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' },
+      { class_name: 'ZCL_X', macros_code: 'x' },
+      { className: 'ZCL_X' },
     ],
     [
       'UpdateBehaviorImplementation',
       handleUpdateBehaviorImplementation,
       {
-        behavior_implementation_name: 'ZBI',
-        source_code: 'x',
-        lock_handle: 'h',
+        class_name: 'ZBP_X',
+        behavior_definition: 'ZI_X',
+        implementation_code: 'x',
+        activate: false,
       },
+      { className: 'ZBP_X' },
     ],
     [
       'UpdateFunctionInclude',
       handleUpdateFunctionInclude,
       {
-        include_name: 'ZINC',
         function_group_name: 'ZFG',
+        include_name: 'ZINC',
         source_code: 'x',
-        lock_handle: 'h',
       },
+      { functionGroupName: 'ZFG', includeName: 'ZINC' },
     ],
     [
       'UpdateMessageClass',
       handleUpdateMessageClass,
-      { message_class_name: 'ZMC', lock_handle: 'h' },
-    ],
-    [
-      'UpdateMessageClassMessage',
-      handleUpdateMessageClassMessage,
-      {
-        message_class_name: 'ZMC',
-        msgno: '001',
-        msgtext: 'x',
-        lock_handle: 'h',
-      },
-    ],
-    [
-      'UpdateUnitTest',
-      handleUpdateUnitTest,
-      { class_name: 'ZCL_X', source_code: 'x', lock_handle: 'h' },
+      { message_class_name: 'ZMC', description: 'new desc' },
+      { name: 'ZMC' },
     ],
     [
       'UpdateCdsUnitTest',
       handleUpdateCdsUnitTest,
-      { class_name: 'ZDDL', test_class_source: 'x', lock_handle: 'h' },
+      { class_name: 'ZDDL', test_class_source: 'x' },
+      { className: 'ZDDL' },
     ],
   ];
 
   it.each(
-    updateCases,
-  )('%s reports a refused update as an error', async (_n, handler, args) => {
+    lockingCases,
+  )('%s reports a refused write as an error, and releases the lock it took', async (_n, handler, args) => {
+    const unlock = jest.fn(async () => okResponse(undefined));
     const update = async () =>
       refusedResponse('Object is locked by another user');
-    fakeClient = fakeClientOf({ update, updateMetadata: update });
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      update,
+      updateMetadata: update,
+      unlock,
+    });
     const result: any = await (handler as any)(context as any, args);
+    expect(unlock).toHaveBeenCalledTimes(1);
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text).message).toBe(
       'Object is locked by another user',
     );
   });
 
-  // All ten in this task, not a sample. Two rows would leave eight handlers
-  // free to acquire a lock nobody asked them for, and this is the assertion
-  // that stops that.
   it.each(
-    updateCases,
-  )('%s takes the lock handle as an argument and acquires none', async (_n, handler, args) => {
-    // These ten are `high`-tier by name and `low`-tier by shape: the caller
-    // already holds the lock. Acquiring one here would take a second lock
-    // on an object the caller has open, and releasing it would drop theirs.
-    const lock = jest.fn();
-    const unlock = jest.fn();
+    lockingCases,
+  )('%s locks, writes under that handle, and unlocks — the caller supplies none of it', async (_n, handler, args, lockConfig) => {
+    const lock = jest.fn(async () => okResponse('handle-1'));
+    const unlock = jest.fn(async () => okResponse(undefined));
     const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
-    fakeClient = fakeClientOf({
-      update,
-      updateMetadata: update,
-      lock,
-      unlock,
-    });
-    await (handler as any)(context as any, args);
-    expect(lock).not.toHaveBeenCalled();
-    expect(unlock).not.toHaveBeenCalled();
+    fakeClient = fakeClientOf({ lock, update, updateMetadata: update, unlock });
+
+    const result: any = await (handler as any)(context as any, args);
+
+    expect(result.isError).toBe(false);
+    expect(lock).toHaveBeenCalledWith(lockConfig);
     expect(update).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({
-        lockHandle: 'h',
+        lockHandle: 'handle-1',
         analyse: analyseException,
       }),
     );
+    expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1');
+  });
+});
+
+describe('UpdateMessageClassMessage: no lock to take, and none is asked for', () => {
+  it('reports a refused update as an error', async () => {
+    fakeClient = fakeClientOf({
+      update: async () => refusedResponse('Object is locked by another user'),
+    });
+    const result: any = await handleUpdateMessageClassMessage(context as any, {
+      message_class_name: 'ZMC',
+      msgno: '001',
+      msgtext: 'x',
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Object is locked by another user',
+    );
+  });
+
+  it('never calls lock or unlock — AdtMessageClassMessage is not IAdtLockable', async () => {
+    const lock = jest.fn();
+    const unlock = jest.fn();
+    fakeClient = fakeClientOf({
+      update: async () => okResponse(reading(undefined, '', 200)),
+      lock,
+      unlock,
+    });
+    const result: any = await handleUpdateMessageClassMessage(context as any, {
+      message_class_name: 'ZMC',
+      msgno: '001',
+      msgtext: 'x',
+    });
+    expect(result.isError).toBe(false);
+    expect(lock).not.toHaveBeenCalled();
+    expect(unlock).not.toHaveBeenCalled();
   });
 });

@@ -29,10 +29,6 @@ export const compactCreateSchema = {
       description: 'ABAP function group name.',
     },
     package_name: { type: 'string', description: 'ABAP package name.' },
-    super_package: {
-      type: 'string',
-      description: 'Parent package name (PACKAGE create).',
-    },
     ddl_name: {
       type: 'string',
       description: 'DDL source name (CDS view, AMDP table function, etc.).',
@@ -133,10 +129,23 @@ export const compactCreateSchema = {
         required: ['name'],
       },
     },
-    class_template: {
-      type: 'string',
-      description:
-        'Optional template the container class is created from (UNIT_TEST create).',
+    tests: {
+      type: 'array',
+      description: 'Container/test class pairs (for UNIT_TEST create).',
+      items: {
+        type: 'object',
+        properties: {
+          container_class: {
+            type: 'string',
+            description: 'Class that owns the test include.',
+          },
+          test_class: {
+            type: 'string',
+            description: 'Test class inside the include.',
+          },
+        },
+        required: ['container_class', 'test_class'],
+      },
     },
   },
   required: ['object_type'],
@@ -219,11 +228,6 @@ export const compactUpdateSchema = {
       type: 'string',
       description: 'Complete DDL source code (for DDL update).',
     },
-    lock_handle: {
-      type: 'string',
-      description:
-        "Lock handle from a prior lock on the object. Required by the writes that take the caller's lock rather than acquiring one (LOCAL_TEST_CLASS, LOCAL_TYPES, LOCAL_DEFINITIONS, LOCAL_MACROS, BEHAVIOR_IMPLEMENTATION, FUNCTION_INCLUDE, MESSAGE_CLASS, UNIT_TEST, CDS_UNIT_TEST update).",
-    },
     transport_request: {
       type: 'string',
       description: 'Transport request id (if required by system).',
@@ -284,22 +288,37 @@ export const compactUpdateSchema = {
       description:
         'Referenced behavior definition name (behavior implementation update).',
     },
-    behavior_implementation_name: {
-      type: 'string',
-      description:
-        'Behavior implementation class name (BEHAVIOR_IMPLEMENTATION update).',
-    },
     ddl_code: {
       type: 'string',
       description: 'Complete DDL source code (for TABLE/STRUCTURE update).',
+    },
+    implementation_code: {
+      type: 'string',
+      description: 'Behavior implementation methods source code.',
     },
     test_class_source: {
       type: 'string',
       description: 'Updated local test class source (CDS_UNIT_TEST update).',
     },
+    test_class_code: {
+      type: 'string',
+      description: 'Updated source for the local test class.',
+    },
+    local_types_code: {
+      type: 'string',
+      description: 'Updated source for class local types.',
+    },
+    definitions_code: {
+      type: 'string',
+      description: 'Updated source for class local definitions.',
+    },
+    macros_code: {
+      type: 'string',
+      description: 'Updated source for class local macros.',
+    },
     run_id: {
       type: 'string',
-      description: 'Unit test run id (UNIT_TEST delete).',
+      description: 'Unit test run id (UNIT_TEST update).',
     },
     binding_variant: {
       type: 'string',

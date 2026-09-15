@@ -5,21 +5,33 @@
  * 19. `fetchNodeStructure(parentType, parentName, options)` takes no
  * `options.analyse` at all — nothing to inject beyond the result set.
  *
- * `ourUtils.node` is `nodeLevel` (`src/lib/strategies/packageWalk.ts`), not
- * the table's own `structured` default — the shipped reading answers
- * `objectType`/`objectName`/`techName`/`objectUri` with no description, and a
- * package listing wants one. Because the injected reading already collapses
- * the answer into `{ objects, childNodes }` rather than an `AdtReading`
- * (`{ value, raw, status }`), `project()` from `projections.ts` — which reads
- * that shape — cannot be used here: the level itself is the value, not
- * something to project `detail` over. `detail` is therefore not on this
- * tool's surface, the same reason `LockDomainLow` and its siblings leave it
- * off.
+ * **The guard this file exists for.** `refusal-package-not-found-objectslist-
+ * empty--01-nodestructure.body.txt` and `read-empty-package-contents--01-
+ * nodestructure.body.txt` are byte-for-byte identical: zero bytes, HTTP 200,
+ * one for a package that does not exist, the other for one that exists and
+ * holds nothing. `isIndeterminateWalkAnswer`
+ * (`@mcp-abap-adt/adt-strategies`) documents exactly this and says what a
+ * caller without a separate existence check should do: treat it as
+ * indeterminate rather than guess. `GetPackageTree`
+ * (`src/handlers/system/high/handleGetPackageTree.ts`) pays a `getPackage()
+ * .read()` round trip first and reports "not found" when that fails — but
+ * this tool answers node structure for any object type, not only packages,
+ * so it has no equivalent existence check to pay. `fetchNodeStructure` also
+ * takes no `options.analyse`, so no strategy downstream of the reading can
+ * ever turn the 200 into a refusal — the reading itself is the only place
+ * left, so `readNodeLevel` checks the raw body before handing it to
+ * `nodeLevel` and throws rather than answering an empty level it cannot
+ * back up. `answering()` (adt-clients) runs the reading outside its own
+ * failure classification and lets the reading's own exception surface as
+ * itself; `answer()` (this repository) then turns that throw into
+ * `client_threw`, an error a caller can see.
  */
 
+import { isIndeterminateWalkAnswer } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
@@ -83,6 +95,22 @@ interface GetNodeStructureArgs {
   };
 }
 
+/**
+ * `ourUtils.node` (`nodeLevel`), guarded against the one document it cannot
+ * read honestly. Exported so a test can drive the real captured fixture
+ * through it directly, the same way `treeText` is exported for
+ * `GetObjectStructureLow`.
+ */
+export function readNodeLevel(answer: unknown): NodeLevel {
+  const xml = (answer as { data?: unknown } | undefined)?.data;
+  if (isIndeterminateWalkAnswer(xml)) {
+    throw new Error(
+      'ADT answered an empty node structure (HTTP 200, zero bytes) for this parent — that answer means either the parent does not exist or it genuinely holds nothing, and this endpoint gives no way to tell the two apart. fetchNodeStructure carries no analyse, so nothing downstream of this reading can decide either.',
+    );
+  }
+  return nodeLevel(answer);
+}
+
 export async function handleGetNodeStructure(
   context: HandlerContext,
   args: GetNodeStructureArgs,
@@ -112,7 +140,7 @@ export async function handleGetNodeStructure(
     { tool: 'GetNodeStructureLow', detail: 'terse' },
     () =>
       createAdtClient(connection, logger)
-        .getUtils(ourUtils)
+        .getUtils({ ...ourUtils, node: readNodeLevel })
         .fetchNodeStructure(parent_type, parent_name, {
           nodeId: node_id || '0000',
           withShortDescriptions: with_short_descriptions !== false,

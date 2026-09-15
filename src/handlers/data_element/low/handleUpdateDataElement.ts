@@ -19,6 +19,16 @@
  * `core/dataElement/update.js`, not the declaration file — the exact mistake
  * found four times in cluster 14 and once more in domain (fix round 3, task
  * 14) is the one this handler avoids by construction.
+ *
+ * **No corpus fixture exists for `GET /sap/bc/adt/ddic/dataelements/{name}`**
+ * (the read half of this sequence) — the corpus has a data element `create`
+ * response (`create-dataelement--01-ddic-dataelements`) but never a
+ * metadata read. The `dtel:`-tagged document `patchDataElementXml` patches
+ * is ported field-for-field from `v18.0.2`'s own patcher (see
+ * `dataElementPatch.ts`), and the tests exercising this sequence build a
+ * hand-written document with those same tags rather than a captured one —
+ * the same disclosure `CreateTransportLow` makes for its own missing
+ * fixture, made here for the same reason.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';

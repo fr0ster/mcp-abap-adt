@@ -41,39 +41,6 @@ import {
 } from '@mcp-abap-adt/adt-strategies';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
-import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
-import { handleActivateServiceDefinition } from '../../handlers/service_definition/low/handleActivateServiceDefinition';
-import { handleGetNodeStructure } from '../../handlers/system/low/handleGetNodeStructure';
-import { handleGetObjectStructure as handleGetObjectStructureLow } from '../../handlers/system/low/handleGetObjectStructure';
-import { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirtualFolders';
-import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
-import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
-import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
-import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
-import {
-  handleLockPackage,
-  TOOL_DEFINITION as LockPackageToolDefinition,
-} from '../../handlers/package/low/handleLockPackage';
-import {
-  handleUnlockPackage,
-  TOOL_DEFINITION as UnlockPackageToolDefinition,
-} from '../../handlers/package/low/handleUnlockPackage';
-import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
-import { handleValidatePackage } from '../../handlers/package/low/handleValidatePackage';
-import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
-import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
-import { handleCreateDataElement } from '../../handlers/data_element/low/handleCreateDataElement';
-import { handleDeleteDataElement } from '../../handlers/data_element/low/handleDeleteDataElement';
-import {
-  handleLockDataElement,
-  TOOL_DEFINITION as LockDataElementToolDefinition,
-} from '../../handlers/data_element/low/handleLockDataElement';
-import {
-  handleUnlockDataElement,
-  TOOL_DEFINITION as UnlockDataElementToolDefinition,
-} from '../../handlers/data_element/low/handleUnlockDataElement';
-import { handleUpdateDataElement } from '../../handlers/data_element/low/handleUpdateDataElement';
-import { handleValidateDataElement } from '../../handlers/data_element/low/handleValidateDataElement';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
 import {
@@ -108,6 +75,20 @@ import {
 import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { handleUpdateClass } from '../../handlers/class/low/handleUpdateClass';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
+import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
+import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
+import { handleCreateDataElement } from '../../handlers/data_element/low/handleCreateDataElement';
+import { handleDeleteDataElement } from '../../handlers/data_element/low/handleDeleteDataElement';
+import {
+  handleLockDataElement,
+  TOOL_DEFINITION as LockDataElementToolDefinition,
+} from '../../handlers/data_element/low/handleLockDataElement';
+import {
+  handleUnlockDataElement,
+  TOOL_DEFINITION as UnlockDataElementToolDefinition,
+} from '../../handlers/data_element/low/handleUnlockDataElement';
+import { handleUpdateDataElement } from '../../handlers/data_element/low/handleUpdateDataElement';
+import { handleValidateDataElement } from '../../handlers/data_element/low/handleValidateDataElement';
 import { handleActivateDdl } from '../../handlers/ddl/low/handleActivateDdl';
 import { handleCheckDdl } from '../../handlers/ddl/low/handleCheckDdl';
 import { handleCreateDdl } from '../../handlers/ddl/low/handleCreateDdl';
@@ -176,6 +157,19 @@ import {
 } from '../../handlers/interface/low/handleUnlockInterface';
 import { handleUpdateInterface } from '../../handlers/interface/low/handleUpdateInterface';
 import { handleValidateInterface } from '../../handlers/interface/low/handleValidateInterface';
+import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
+import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
+import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
+import {
+  handleLockPackage,
+  TOOL_DEFINITION as LockPackageToolDefinition,
+} from '../../handlers/package/low/handleLockPackage';
+import {
+  handleUnlockPackage,
+  TOOL_DEFINITION as UnlockPackageToolDefinition,
+} from '../../handlers/package/low/handleUnlockPackage';
+import { handleUpdatePackage } from '../../handlers/package/low/handleUpdatePackage';
+import { handleValidatePackage } from '../../handlers/package/low/handleValidatePackage';
 import { handleActivateProgram } from '../../handlers/program/low/handleActivateProgram';
 import { handleCheckProgram } from '../../handlers/program/low/handleCheckProgram';
 import { handleCreateProgram } from '../../handlers/program/low/handleCreateProgram';
@@ -190,6 +184,8 @@ import {
 } from '../../handlers/program/low/handleUnlockProgram';
 import { handleUpdateProgram } from '../../handlers/program/low/handleUpdateProgram';
 import { handleValidateProgram } from '../../handlers/program/low/handleValidateProgram';
+import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
+import { handleActivateServiceDefinition } from '../../handlers/service_definition/low/handleActivateServiceDefinition';
 import { handleActivateStructure } from '../../handlers/structure/low/handleActivateStructure';
 import { handleCheckStructure } from '../../handlers/structure/low/handleCheckStructure';
 import { handleCreateStructure } from '../../handlers/structure/low/handleCreateStructure';
@@ -204,6 +200,12 @@ import {
 } from '../../handlers/structure/low/handleUnlockStructure';
 import { handleUpdateStructure } from '../../handlers/structure/low/handleUpdateStructure';
 import { handleValidateStructure } from '../../handlers/structure/low/handleValidateStructure';
+import {
+  handleGetNodeStructure,
+  readNodeLevel,
+} from '../../handlers/system/low/handleGetNodeStructure';
+import { handleGetObjectStructure as handleGetObjectStructureLow } from '../../handlers/system/low/handleGetObjectStructure';
+import { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirtualFolders';
 import { handleActivateTable } from '../../handlers/table/low/handleActivateTable';
 import { handleCheckTable } from '../../handlers/table/low/handleCheckTable';
 import { handleCreateTable } from '../../handlers/table/low/handleCreateTable';
@@ -218,16 +220,17 @@ import {
 } from '../../handlers/table/low/handleUnlockTable';
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
+import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
 import { corpusBody } from '../../lib/adtCorpus';
 import { nodeLevel } from '../../lib/strategies/packageWalk';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
 import {
   fakeClientOf,
+  fakeClientOfWithFactory,
   okResponse,
   recordAnalyse,
   refusedResponse,
-  refusingClient,
 } from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
@@ -2218,12 +2221,50 @@ describe('function (function module)', () => {
 
 describe('data_element', () => {
   it("CheckDataElementLow leaves the check member's status undefined (the shipped inactive default)", async () => {
-    await handleCheckDataElement(context as any, { data_element_name: 'ZDT_X' });
+    await handleCheckDataElement(context as any, {
+      data_element_name: 'ZDT_X',
+    });
     const call = callTo('check');
     expect(call?.factory).toBe('getDataElement');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseCheck);
     expect(call?.args[1]).toBeUndefined();
+  });
+
+  it('CheckDataElementLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {
+    const reading = structured({
+      data: corpusBody('check-success-verdict--01-checkrun'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ check: async () => okResponse(reading) });
+
+    const result: any = await handleCheckDataElement(context as any, {
+      data_element_name: 'zd',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      ran: true,
+      status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
+    });
+  });
+
+  it('ActivateDataElementLow reads the real activation-success-verdict fixture through terseActivation — pinning the projection, not only the analyse', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateDataElement(context as any, {
+      data_element_name: 'zd',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
   });
 
   it('CreateDataElementLow reaches getDataElement with analyseException, forwarding no type/length/decimals — the shipped create endpoint never reads them', async () => {
@@ -2302,17 +2343,23 @@ describe('data_element', () => {
     expect(result.content[0].text).not.toContain('"success": true');
   });
 
-  it('UpdateDataElementLow passes the patched document via config.document, and no stray xmlContent survives in options — packageName/typeKind never merge into a body either, matching the shipped updateMetadata', async () => {
+  // No corpus fixture exists for GET /sap/bc/adt/ddic/dataelements/{name} —
+  // only a create response was captured. The two `currentXml` documents
+  // below are hand-built from patchDataElementXml's own dtel: tag names
+  // (ported from adt-clients v18.0.2), the same disclosure the transport
+  // block below makes for its own missing fixture.
+  it('UpdateDataElementLow passes the patched document via config.document, reaches getDataElement (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and no stray xmlContent survives in options', async () => {
     const currentXml =
       '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="before"/>';
     let updateCall: { config: any; options: any } | undefined;
-    fakeClient = fakeClientOf({
+    const double = fakeClientOfWithFactory({
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
         return okResponse(undefined);
       },
     });
+    fakeClient = double.client;
 
     const result: any = await handleUpdateDataElement(context as any, {
       data_element_name: 'zdt_x',
@@ -2321,6 +2368,7 @@ describe('data_element', () => {
     });
 
     expect(result.isError).toBe(false);
+    expect(double.factory).toBe('getDataElement');
     expect(updateCall?.config).toEqual({
       dataElementName: 'ZDT_X',
       transportRequest: 'E19K900001',
@@ -2412,6 +2460,19 @@ describe('data_element', () => {
     ).toBe(false);
   });
 
+  it('UnlockDataElementLow answers SUCCESS through terseWrite — pinning the projection, not only the absence of analyse', async () => {
+    fakeClient = fakeClientOf({ unlock: async () => okResponse(undefined) });
+
+    const result: any = await handleUnlockDataElement(context as any, {
+      data_element_name: 'zd',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe('SUCCESS');
+  });
+
   it('DeleteDataElementLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
     await handleDeleteDataElement(context as any, {
       data_element_name: 'ZDT_X',
@@ -2425,6 +2486,24 @@ describe('data_element', () => {
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
+  });
+
+  it('DeleteDataElementLow reads the real delete-success fixture through terseDeletion — pinning the projection, not only the analyse', async () => {
+    const reading = structured({
+      data: corpusBody('delete-success--01-deletion-delete'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ delete: async () => okResponse(reading) });
+
+    const result: any = await handleDeleteDataElement(context as any, {
+      data_element_name: 'zd',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      deleted: true,
+      object: 'ZMCP_BLD_ANSCH01',
+    });
   });
 
   it('ValidateDataElementLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
@@ -2509,7 +2588,9 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
 
 describe('service_definition — Activate only', () => {
   it('ActivateServiceDefinitionLow reaches getServiceDefinition with analyseActivation', async () => {
-    await handleActivateServiceDefinition(context as any, { name: 'ZI_X_SRVD' });
+    await handleActivateServiceDefinition(context as any, {
+      name: 'ZI_X_SRVD',
+    });
     const call = callTo('activate');
     expect(call?.factory).toBe('getServiceDefinition');
     expect(call?.args[0]).toEqual({ serviceDefinitionName: 'ZI_X_SRVD' });
@@ -2560,9 +2641,7 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
   });
 
   it('GetNodeStructureLow reads the real read-object-tree-structure fixture (fixture 05, the one with descriptions) through the nodeLevel reading', async () => {
-    const document = corpusBody(
-      'read-object-tree-structure--05-nodestructure',
-    );
+    const document = corpusBody('read-object-tree-structure--05-nodestructure');
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => okResponse(nodeLevel({ data: document })),
     });
@@ -2595,8 +2674,41 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     });
   });
 
-  it('GetNodeStructureLow surfaces a refusal as an error, not as an empty tree', async () => {
-    fakeClient = refusingClient('Package ZMCP_BLD_NOPKG9X not found');
+  it('readNodeLevel refuses the real refusal-package-not-found-objectslist-empty fixture (zero bytes, HTTP 200) rather than reading it as an empty level', () => {
+    // Byte-for-byte identical to read-empty-package-contents (a package that
+    // EXISTS and is empty) — that is the whole point: no reading can tell
+    // these two apart, so this one refuses to guess at either.
+    const document = corpusBody(
+      'refusal-package-not-found-objectslist-empty--01-nodestructure',
+    );
+    expect(document).toBe('');
+    expect(() => readNodeLevel({ data: document })).toThrow(
+      /empty node structure/i,
+    );
+  });
+
+  it('readNodeLevel still answers the real read-empty-package-contents fixture the same way — it is the same bytes, and this reading cannot honestly answer differently', () => {
+    const document = corpusBody(
+      'read-empty-package-contents--01-nodestructure',
+    );
+    expect(() => readNodeLevel({ data: document })).toThrow(
+      /empty node structure/i,
+    );
+  });
+
+  it('GetNodeStructureLow surfaces the real refusal-package-not-found-objectslist-empty fixture as an error, not as an empty tree — driven through the real reading this handler wires in, not a refusal the member cannot produce', async () => {
+    // `fetchNodeStructure` accepts no `analyse` at all: the only way a wire
+    // this shape reaches an error is the reading itself throwing, exactly
+    // as `readNodeLevel` does. This double calls the exact function
+    // `handleGetNodeStructure` wires in, so the assertion is on the real
+    // guard, not on a refusal the member could never answer with.
+    const document = corpusBody(
+      'refusal-package-not-found-objectslist-empty--01-nodestructure',
+    );
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async () =>
+        okResponse(readNodeLevel({ data: document })),
+    });
 
     const result: any = await handleGetNodeStructure(context as any, {
       parent_type: 'DEVC/K',
@@ -2604,12 +2716,12 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     });
 
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Package ZMCP_BLD_NOPKG9X not found',
+    expect(JSON.parse(result.content[0].text).message).toMatch(
+      /empty node structure/i,
     );
   });
 
-  it('GetVirtualFoldersLow reaches getUtils, carrying no analyse, forwarding the caller\'s facets and defaulting the rest', async () => {
+  it("GetVirtualFoldersLow reaches getUtils, carrying no analyse, forwarding the caller's facets and defaulting the rest", async () => {
     await handleGetVirtualFolders(context as any, {
       object_search_pattern: 'Z*',
       preselection: [{ facet: 'package', values: ['ZP_X'] }],
@@ -2642,7 +2754,9 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
       data: '<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/ris/projectExplorer"><projectexplorer:node nodeid="1" objecttype="DEVC/K" objectname="ZP_X"/><projectexplorer:node nodeid="2" parentid="1" objecttype="CLAS/OC" objectname="ZCL_X"/></projectexplorer:objectstructure>',
       status: 200,
     } as any);
-    fakeClient = fakeClientOf({ getObjectStructure: async () => okResponse(reading) });
+    fakeClient = fakeClientOf({
+      getObjectStructure: async () => okResponse(reading),
+    });
 
     const result: any = await handleGetObjectStructureLow(context as any, {
       object_type: 'DEVC/K',
@@ -2652,6 +2766,46 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe(
       'tree:\n- DEVC/K: ZP_X\n  - CLAS/OC: ZCL_X\n',
+    );
+  });
+
+  it("GetObjectStructureLow surfaces an absent projectexplorer:objectstructure root as an error, not as 'No nodes found' — the same class of masking readNodeLevel guards against, and for the same reason: getObjectStructure carries no analyse either", async () => {
+    // An empty body (or any document without the expected root) parses to
+    // `{}` here — indistinguishable from "this object has no substructure"
+    // unless the root itself is checked for.
+    const reading = structured({ data: '', status: 200 } as any);
+    fakeClient = fakeClientOf({
+      getObjectStructure: async () => okResponse(reading),
+    });
+
+    const result: any = await handleGetObjectStructureLow(context as any, {
+      object_type: 'DEVC/K',
+      object_name: 'ZMCP_BLD_NOPKG9X',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toMatch(
+      /no object structure document/i,
+    );
+  });
+
+  it("GetObjectStructureLow still answers 'No nodes found' for a document that is genuinely present and empty — the root exists, it just has no children", async () => {
+    const reading = structured({
+      data: '<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/ris/projectExplorer"/>',
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({
+      getObjectStructure: async () => okResponse(reading),
+    });
+
+    const result: any = await handleGetObjectStructureLow(context as any, {
+      object_type: 'CLAS/OC',
+      object_name: 'ZCL_LEAF',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe(
+      'No nodes found in object structure response.',
     );
   });
 });
@@ -2668,6 +2822,25 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(call?.args[1]).toBeUndefined();
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseCheck);
+  });
+
+  it('CheckPackageLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {
+    const reading = structured({
+      data: corpusBody('check-success-verdict--01-checkrun'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ check: async () => okResponse(reading) });
+
+    const result: any = await handleCheckPackage(context as any, {
+      package_name: 'zp_x',
+      super_package: 'zp',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      ran: true,
+      status_text: 'Object ZBP_MCP_SHR_I_ROOT has been checked',
+    });
   });
 
   it('CreatePackageLow reaches getPackage with analyseException, forwarding superPackage — createPackage reads it, unlike check/lock/unlock', async () => {
@@ -2693,6 +2866,21 @@ describe('package — no Activate tool (a package is a container, no activation)
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreatePackageLow answers SUCCESS at terse, on a real DDIC create document (create-dataelement — no create-package fixture exists in the corpus, and created is verbatim for every DDIC create in this cluster the same way)', async () => {
+    const document = corpusBody('create-dataelement--01-ddic-dataelements');
+    const reading = verbatim({ data: document, status: 201 } as any);
+    fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
+
+    const result: any = await handleCreatePackage(context as any, {
+      package_name: 'zp_x',
+      super_package: 'zp',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe('SUCCESS');
   });
 
   it('LockPackageLow passes no analyse, forwards no superPackage to the lock member, and carries no detail parameter', async () => {
@@ -2731,11 +2919,14 @@ describe('package — no Activate tool (a package is a container, no activation)
     const handle = 'PKG_LOCK_HANDLE_2';
     fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
 
-    const result: any = await handleLockPackage(connectionSessionContext as any, {
-      package_name: 'ZP_X',
-      super_package: 'ZP',
-      session_id: 'caller-session',
-    });
+    const result: any = await handleLockPackage(
+      connectionSessionContext as any,
+      {
+        package_name: 'ZP_X',
+        super_package: 'ZP',
+        session_id: 'caller-session',
+      },
+    );
 
     const payload = JSON.parse(result.content[0].text);
     expect(payload.session_id).toBe('CONN_SESSION');
@@ -2753,9 +2944,23 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
     expect(call?.carriedAnalyse).toBe(false);
     expect(call?.analyse).toBeUndefined();
-    expect(
-      'detail' in UnlockPackageToolDefinition.inputSchema.properties,
-    ).toBe(false);
+    expect('detail' in UnlockPackageToolDefinition.inputSchema.properties).toBe(
+      false,
+    );
+  });
+
+  it('UnlockPackageLow answers SUCCESS through terseWrite — pinning the projection, not only the absence of analyse', async () => {
+    fakeClient = fakeClientOf({ unlock: async () => okResponse(undefined) });
+
+    const result: any = await handleUnlockPackage(context as any, {
+      package_name: 'zp_x',
+      super_package: 'zp',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe('SUCCESS');
   });
 
   it('DeletePackageLow passes transportRequest through to the delete member, taking analyseDeletion explicitly over the shipped packageDeletionRefusal default', async () => {
@@ -2819,18 +3024,19 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
   });
 
-  it('UpdatePackageLow reads the real read-metadata-package fixture, patches only adtcore:description, and passes it via config.document — no stray xmlContent survives in options', async () => {
+  it('UpdatePackageLow reads the real read-metadata-package fixture, patches only adtcore:description, reaches getPackage (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and passes it via config.document — no stray xmlContent survives in options', async () => {
     const currentXml = corpusBody(
       'read-metadata-package--01-packages-zmcpshrpkg',
     );
     let updateCall: { config: any; options: any } | undefined;
-    fakeClient = fakeClientOf({
+    const double = fakeClientOfWithFactory({
       readMetadata: async () => okResponse(currentXml),
       updateMetadata: async (config: unknown, options: unknown) => {
         updateCall = { config, options };
         return okResponse(undefined);
       },
     });
+    fakeClient = double.client;
 
     const result: any = await handleUpdatePackage(context as any, {
       package_name: 'zmcp_shr_pkg',
@@ -2840,6 +3046,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     });
 
     expect(result.isError).toBe(false);
+    expect(double.factory).toBe('getPackage');
     expect(updateCall?.config).toEqual({
       packageName: 'ZMCP_SHR_PKG',
       document: expect.stringContaining('adtcore:description="after"'),
@@ -2863,10 +3070,12 @@ describe('package — no Activate tool (a package is a container, no activation)
 // check, update, delete or validate tool exists at this tier for transport
 // requests. No corpus fixture for the create response exists either (the
 // README's coverage table lists only the GET, an empty list, for
-// ListTransports) — the "real captured document" requirement for this
-// family is not met by any test below, and this is why: there is no
-// captured document to drive.
+// ListTransports) — the document below is hand-built from the shipped
+// parseCreatedTransport/create.js field names, not a captured one.
 describe('transport — Create only, no lock/unlock/check/update/delete/validate tool exists at this tier', () => {
+  const createdTransportXml =
+    '<?xml version="1.0" encoding="ASCII"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request tm:number="E19K900042" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project=""><tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
+
   it('CreateTransportLow reaches getRequest with analyseException, forwarding description and transportType', async () => {
     await handleCreateTransport(context as any, {
       description: 'x',
@@ -2891,17 +3100,17 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
     });
   });
 
-  it('CreateTransportLow answers the transport number the kept parseCreatedTransport reading extracts — not discarded by a blanket resultsFor(transportDocuments)', async () => {
-    fakeClient = fakeClientOf({
-      create: async () =>
-        okResponse({
-          transportNumber: 'E19K900042',
-          description: 'x',
-          type: 'K',
-          targetSystem: 'LOCAL',
-          owner: 'SAPUSER01',
-        }),
-    });
+  it('CreateTransportLow parses the transport number out of the real verbatim document in its own projection — resultsFor(transportDocuments) plain, no keep-list; the number comes from parsing AdtReading.value, not from a kept shipped reading', async () => {
+    // `created` maps to `verbatim` here (the table's default), so the fake
+    // hands back the same shape the real `verbatim` reading would: the raw
+    // XML string as `value`, alongside `raw` and `status`. If a future
+    // change reverted to keeping `transportDocuments.created` as shipped,
+    // `value` would already be a `parseCreatedTransport`-shaped object with
+    // no `raw`/`status` beside it, and the `detail: 'raw'` test below would
+    // have nothing to answer — this is the pairing that tells the two
+    // designs apart.
+    const reading = verbatim({ data: createdTransportXml, status: 201 } as any);
+    fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
 
     const result: any = await handleCreateTransport(context as any, {
       description: 'x',
@@ -2918,6 +3127,18 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
       owner: 'SAPUSER01',
       message: 'Transport request E19K900042 created successfully.',
     });
+  });
+
+  it('CreateTransportLow answers the raw document at detail: raw — only possible because created is verbatim, not a kept reading with no raw to give', async () => {
+    const reading = verbatim({ data: createdTransportXml, status: 201 } as any);
+    fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
+
+    const result: any = await handleCreateTransport(context as any, {
+      description: 'x',
+      detail: 'raw',
+    });
+
+    expect(result.content[0].text).toBe(createdTransportXml);
   });
 
   it('reports a refused create as an error, not as success with a null body', async () => {

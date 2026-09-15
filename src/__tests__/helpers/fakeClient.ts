@@ -56,6 +56,42 @@ export function fakeClientOf(members: Members) {
   });
 }
 
+/**
+ * `fakeClientOf`, with the one thing its own doc comment names as missing:
+ * which factory (`getX`) was actually asked for.
+ *
+ * A read-modify-write handler (`readMetadata` then `updateMetadata`) is
+ * exactly the shape `fakeClientOf`'s blindness can hide a real defect
+ * behind: two families can carry the identical `{readMetadata,
+ * updateMetadata}` member pair, so a handler that called the wrong factory
+ * — `getPackage()` where `getDataElement()` belonged — would still read and
+ * write through this double without a single assertion noticing, because
+ * every factory name resolves to the same table. `factory` is filled in as
+ * soon as any accessor is read, the same way `recordAnalyse`'s `calls[].
+ * factory` is, but here the caller still controls each member's answer
+ * directly instead of taking the recorder's canned one — which is what a
+ * document-driven read-modify-write test needs.
+ */
+export function fakeClientOfWithFactory(members: Members) {
+  let factory: string | undefined;
+  const object = new Proxy(members, {
+    get: (target, name: string) =>
+      target[name] ?? (async () => okResponse(undefined)),
+  });
+  const client = new Proxy({} as Record<string, unknown>, {
+    get: (_target, name: string) => () => {
+      factory = name;
+      return object;
+    },
+  });
+  return {
+    client,
+    get factory() {
+      return factory;
+    },
+  };
+}
+
 /** A client that refuses whatever it is asked. */
 export function refusingClient(
   message: string,

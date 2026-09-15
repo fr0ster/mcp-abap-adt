@@ -1,23 +1,29 @@
 /**
- * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension via AdtClient
+ * DeleteMetadataExtension Handler - Delete ABAP MetadataExtension via ADT
+ * deletion API
  *
- * Uses AdtClient.getMetadataExtension().delete() for high-level delete operation.
- * Includes deletion check before actual deletion.
+ * Uses AdtClient.getMetadataExtension().delete from
+ * @mcp-abap-adt/adt-clients 19. See `handleDeleteDomain.ts` for the shape and
+ * the masking this follows: a refusal answers 200, `analyseDeletion` reads
+ * it rather than the status, and no lock is taken because a held lock is
+ * what makes ADT refuse.
  */
 
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP metadata extension from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +36,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['metadata_extension_name'],
   },
@@ -38,103 +45,32 @@ export const TOOL_DEFINITION = {
 interface DeleteMetadataExtensionArgs {
   metadata_extension_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteMetadataExtension MCP tool
- *
- * Uses AdtClient.getMetadataExtension().delete() - high-level delete operation with deletion check
- */
 export async function handleDeleteMetadataExtension(
   context: HandlerContext,
   args: DeleteMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { metadata_extension_name, transport_request } =
-      args as DeleteMetadataExtensionArgs;
+  const { metadata_extension_name, transport_request } = args;
 
-    // Validation
-    if (!metadata_extension_name) {
-      return return_error(new Error('metadata_extension_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const metadataExtensionName = metadata_extension_name.toUpperCase();
-
-    logger?.info(
-      `Starting metadata extension deletion: ${metadataExtensionName}`,
-    );
-
-    try {
-      // Delete metadata extension using AdtClient (includes deletion check)
-      const metadataExtensionObject = client.getMetadataExtension();
-      const deleteResult = await metadataExtensionObject.delete({
-        name: metadataExtensionName,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for metadata extension ${metadataExtensionName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteMetadataExtension completed successfully: ${metadataExtensionName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            metadata_extension_name: metadataExtensionName,
-            transport_request: transport_request || null,
-            message: `MetadataExtension ${metadataExtensionName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting metadata extension ${metadataExtensionName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `MetadataExtension ${metadataExtensionName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `MetadataExtension ${metadataExtensionName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!metadata_extension_name) {
+    return return_error(new Error('metadata_extension_name is required'));
   }
+
+  const name = metadata_extension_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteMetadataExtension', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+        .delete(
+          { name, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

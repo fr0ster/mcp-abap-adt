@@ -40,6 +40,20 @@ import {
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
+import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
+import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
+import { handleCreateDataElement } from '../../handlers/data_element/low/handleCreateDataElement';
+import { handleDeleteDataElement } from '../../handlers/data_element/low/handleDeleteDataElement';
+import {
+  handleLockDataElement,
+  TOOL_DEFINITION as LockDataElementToolDefinition,
+} from '../../handlers/data_element/low/handleLockDataElement';
+import {
+  handleUnlockDataElement,
+  TOOL_DEFINITION as UnlockDataElementToolDefinition,
+} from '../../handlers/data_element/low/handleUnlockDataElement';
+import { handleUpdateDataElement } from '../../handlers/data_element/low/handleUpdateDataElement';
+import { handleValidateDataElement } from '../../handlers/data_element/low/handleValidateDataElement';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
 import {
@@ -185,7 +199,7 @@ import {
 import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { corpusBody } from '../../lib/adtCorpus';
-import { structured } from '../../lib/strategies/reading';
+import { structured, verbatim } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
 import {
   fakeClientOf,
@@ -350,6 +364,19 @@ it.each([
     {
       function_module_name: 'ZFM_X',
       function_group_name: 'ZFG_X',
+      package_name: 'ZP',
+      description: 'x',
+      lock_handle: 'h',
+    },
+  ],
+  [
+    'data_element',
+    handleActivateDataElement,
+    handleDeleteDataElement,
+    handleValidateDataElement,
+    'getDataElement',
+    {
+      data_element_name: 'ZDT_X',
       package_name: 'ZP',
       description: 'x',
       lock_handle: 'h',
@@ -2159,5 +2186,239 @@ describe('function (function module)', () => {
       activated: true,
       generated: true,
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 17: data_element, package, service_binding, service_definition,
+// system, transport.
+// ---------------------------------------------------------------------------
+
+describe('data_element', () => {
+  it("CheckDataElementLow leaves the check member's status undefined (the shipped inactive default)", async () => {
+    await handleCheckDataElement(context as any, { data_element_name: 'ZDT_X' });
+    const call = callTo('check');
+    expect(call?.factory).toBe('getDataElement');
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.args[1]).toBeUndefined();
+  });
+
+  it('CreateDataElementLow reaches getDataElement with analyseException, forwarding no type/length/decimals — the shipped create endpoint never reads them', async () => {
+    await handleCreateDataElement(context as any, {
+      data_element_name: 'ZDT_X',
+      description: 'x',
+      package_name: 'ZP',
+      transport_request: 'E19K900001',
+      type_kind: 'domain',
+      data_type: 'ZD',
+      type_name: 'ZD',
+      length: 10,
+      decimals: 2,
+    });
+    const call = callTo('create');
+    expect(call?.factory).toBe('getDataElement');
+    // The whole first argument, not a subset: a regression that starts
+    // forwarding typeKind/dataType/length/decimals again would pass a
+    // `toMatchObject` check silently.
+    expect(call?.args[0]).toEqual({
+      dataElementName: 'ZDT_X',
+      description: 'x',
+      packageName: 'ZP',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+  });
+
+  it('CreateDataElementLow answers SUCCESS at terse, on the verbatim reading create-dataelement--01-ddic-dataelements proves', async () => {
+    // `created` is `verbatim`, not `statusOnly` (see `resultSets.ts`):
+    // create-dataelement answers 1345 bytes of blue:wbobj, and this is the
+    // second of the two named exceptions to the slot-name premise.
+    const document = corpusBody('create-dataelement--01-ddic-dataelements');
+    const reading = verbatim({ data: document, status: 201 } as any);
+    fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
+
+    const result: any = await handleCreateDataElement(context as any, {
+      data_element_name: 'zmcp_bld_crt_dtel',
+      description: 'x',
+      package_name: 'ZADT_BLD_PKG03',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe('SUCCESS');
+  });
+
+  it('CreateDataElementLow answers the document itself at detail raw — the DDIC create is not discarded', async () => {
+    const document = corpusBody('create-dataelement--01-ddic-dataelements');
+    const reading = verbatim({ data: document, status: 201 } as any);
+    fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
+
+    const result: any = await handleCreateDataElement(context as any, {
+      data_element_name: 'zmcp_bld_crt_dtel',
+      description: 'x',
+      package_name: 'ZADT_BLD_PKG03',
+      detail: 'raw',
+    });
+
+    expect(result.content[0].text).toBe(document);
+  });
+
+  it('reports a refused create as an error, not as success with a null body', async () => {
+    fakeClient = fakeClientOf({
+      create: async () =>
+        refusedResponse('DataElement ZMCP_BLD_CRT_DTEL already exists'),
+    });
+
+    const result: any = await handleCreateDataElement(context as any, {
+      data_element_name: 'zmcp_bld_crt_dtel',
+      description: 'x',
+      package_name: 'ZADT_BLD_PKG03',
+    });
+
+    expect(result.isError).toBe(true);
+    expect(result.content[0].text).not.toContain('"success": true');
+  });
+
+  it('UpdateDataElementLow passes the patched document via config.document, and no stray xmlContent survives in options — packageName/typeKind never merge into a body either, matching the shipped updateMetadata', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="before"/>';
+    let updateCall: { config: any; options: any } | undefined;
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (config: unknown, options: unknown) => {
+        updateCall = { config, options };
+        return okResponse(undefined);
+      },
+    });
+
+    const result: any = await handleUpdateDataElement(context as any, {
+      data_element_name: 'zdt_x',
+      properties: { description: 'after', transport_request: 'E19K900001' },
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(updateCall?.config).toEqual({
+      dataElementName: 'ZDT_X',
+      transportRequest: 'E19K900001',
+      document: expect.stringContaining('adtcore:description="after"'),
+    });
+    expect(updateCall?.options).toEqual({
+      lockHandle: 'h',
+      analyse: analyseException,
+    });
+    expect(
+      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+    ).toBeUndefined();
+  });
+
+  it('UpdateDataElementLow patches typeKind/typeName/dataType into the document read from readMetadata', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="x"><dtel:typeKind>predefinedAbapType</dtel:typeKind><dtel:typeName></dtel:typeName><dtel:dataType>CHAR</dtel:dataType></blue:wbobj>';
+    let patched = '';
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (config: any) => {
+        patched = config.document;
+        return okResponse(undefined);
+      },
+    });
+
+    await handleUpdateDataElement(context as any, {
+      data_element_name: 'zdt_x',
+      properties: { type_kind: 'domain', type_name: 'zd_domain' },
+      lock_handle: 'h',
+    });
+
+    expect(patched).toContain('<dtel:typeKind>domain</dtel:typeKind>');
+    expect(patched).toContain('<dtel:typeName>ZD_DOMAIN</dtel:typeName>');
+  });
+
+  it('LockDataElementLow passes no analyse and carries no detail parameter', async () => {
+    await handleLockDataElement(context as any, { data_element_name: 'ZDT_X' });
+    const call = callTo('lock');
+    expect(call?.factory).toBe('getDataElement');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in LockDataElementToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it("LockDataElementLow answers the session id in its own envelope (connection.getSessionId() || the caller's session_id || null)", async () => {
+    const handle = 'DTEL_LOCK_HANDLE';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockDataElement(context as any, {
+      data_element_name: 'ZDT_X',
+      session_id: 'caller-session',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.success).toBe(true);
+    expect(payload.data_element_name).toBe('ZDT_X');
+    expect(payload.lock_handle).toBe(handle);
+    expect(payload.session_id).toBe('caller-session');
+  });
+
+  it("LockDataElementLow prefers the connection's own session id over the caller's, when the connection has one", async () => {
+    const handle = 'DTEL_LOCK_HANDLE_2';
+    fakeClient = fakeClientOf({ lock: async () => okResponse(handle) });
+
+    const result: any = await handleLockDataElement(
+      connectionSessionContext as any,
+      { data_element_name: 'ZDT_X', session_id: 'caller-session' },
+    );
+
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.session_id).toBe('CONN_SESSION');
+  });
+
+  it('UnlockDataElementLow passes no analyse and carries no detail parameter', async () => {
+    await handleUnlockDataElement(context as any, {
+      data_element_name: 'ZDT_X',
+      lock_handle: 'h',
+      session_id: 's',
+    });
+    const call = callTo('unlock');
+    expect(call?.factory).toBe('getDataElement');
+    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.analyse).toBeUndefined();
+    expect(
+      'detail' in UnlockDataElementToolDefinition.inputSchema.properties,
+    ).toBe(false);
+  });
+
+  it('DeleteDataElementLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
+    await handleDeleteDataElement(context as any, {
+      data_element_name: 'ZDT_X',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('delete');
+    expect(call?.factory).toBe('getDataElement');
+    expect(call?.args[0]).toEqual({
+      dataElementName: 'ZDT_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseDeletion);
+  });
+
+  it('ValidateDataElementLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
+    const reading = structured({
+      data: corpusBody('validation-name-free-table--01-tables-validation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ validate: async () => okResponse(reading) });
+
+    const result: any = await handleValidateDataElement(context as any, {
+      data_element_name: 'ZDT_X',
+      package_name: 'ZP',
+      description: 'x',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
   });
 });

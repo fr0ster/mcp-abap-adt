@@ -1,18 +1,18 @@
 /**
- * LockDataElement Handler - Lock ABAP DataElement
+ * LockDataElement Handler - Lock ABAP Data Element
  *
- * Uses AdtClient.lockDataElement from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDataElement().lock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `lock()` accepts no options at all — not even `analyse` — so there is no
+ * strategy to inject here. Its answer is the lock handle itself, and the
+ * projection is the envelope the tool already returned: nothing about `lock`
+ * varies with `detail`, so the parameter is not added to this tool's surface.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockDataElementLow',
@@ -56,107 +56,36 @@ interface LockDataElementArgs {
   };
 }
 
-/**
- * Main handler for LockDataElement MCP tool
- *
- * Uses AdtClient.lockDataElement - low-level single method call
- */
 export async function handleLockDataElement(
   context: HandlerContext,
   args: LockDataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { data_element_name, session_id, session_state } =
-      args as LockDataElementArgs;
+  const { data_element_name, session_id, session_state } = args;
 
-    // Validation
-    if (!data_element_name) {
-      return return_error(new Error('data_element_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const dataElementName = data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element lock: ${dataElementName}`);
-
-    try {
-      // Lock data element
-      const lockHandle = await client
-        .getDataElement()
-        .lock({ dataElementName: dataElementName });
-
-      if (!lockHandle) {
-        logger?.error(
-          `Lock did not return a lock handle for data element ${dataElementName}`,
-        );
-        throw new Error(
-          `Lock did not return a lock handle for data element ${dataElementName}`,
-        );
-      }
-
-      // Get updated session state after lock
-
-      logger?.info(`✅ LockDataElement completed: ${dataElementName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            session_id: session_id || null,
-            lock_handle: lockHandle,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `DataElement ${dataElementName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error locking data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to lock data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DataElement ${dataElementName} not found.`;
-      } else if (error.response?.status === 409) {
-        errorMessage = `DataElement ${dataElementName} is already locked by another user.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!data_element_name) {
+    return return_error(new Error('data_element_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const dataElementName = data_element_name.toUpperCase();
+
+  return answer(
+    { tool: 'LockDataElementLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getDataElement()
+        .lock({ dataElementName }),
+    (lockHandle: string) => ({
+      success: true,
+      data_element_name: dataElementName,
+      session_id: connection.getSessionId() || session_id || null,
+      lock_handle: lockHandle,
+      session_state: null, // Session state management is now handled by auth-broker
+      message: `DataElement ${dataElementName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+    }),
+  );
 }

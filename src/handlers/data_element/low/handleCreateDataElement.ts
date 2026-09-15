@@ -1,18 +1,41 @@
 /**
- * CreateDataElement Handler - Create ABAP DataElement
+ * CreateDataElement Handler - Create ABAP Data Element
  *
- * Uses AdtClient.createDataElement from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDataElement().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim` (not `statusOnly` — a DDIC create answers a
+ * document, measured at 1345 bytes for `create-dataelement--01-ddic-
+ * dataelements`), so `project(detail, terseWrite)` still reads the status
+ * for `terse` while `full`/`raw` now answer the document ADT actually sent
+ * instead of discarding it.
+ *
+ * **`type_kind`/`data_type`/`type_name`/`length`/`decimals` never reach the
+ * wire on a create, and never have.** Read against the shipped
+ * `core/dataElement/create.js`: the wire-level `create()` function builds its
+ * XML body from `data_element_name`, `description`, `package_name`,
+ * `masterLanguage`/`masterSystem`/`responsible` and the `transport_request`
+ * query param only — nothing else in `ICreateDataElementParams` is read.
+ * Checked against `v18.0.2` of `@mcp-abap-adt/adt-clients` too: identical, so
+ * this is not something 19 changed. "Create sends minimal XML (root element +
+ * packageRef only). Type details … are set via update after creation,
+ * matching Eclipse ADT behavior" is the shipped comment on both versions.
+ * The parameters stay on this tool's surface (the ratchet compares names,
+ * not descriptions) with descriptions corrected to say so — a caller who
+ * wants them applied calls `UpdateDataElementLow` next, exactly the sibling
+ * pattern `CreateDdlLow`/`CreateStructureLow`/`CreateTableLow` already use
+ * for their own create-time fields.
  */
 
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateDataElementLow',
@@ -43,27 +66,27 @@ export const TOOL_DEFINITION = {
       data_type: {
         type: 'string',
         description:
-          "Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'E' or 'domain'.",
+          'Does not reach creation — the shipped create endpoint never reads it (only sends name/description/package/transport). Use UpdateDataElementLow (with lock_handle) after creating to set the data type or domain name.',
       },
       type_kind: {
         type: 'string',
         description:
-          "Type kind: 'E' for domain-based, 'P' for predefined type, etc.",
+          "Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type kind ('E'/'domain', 'P'/'predefinedAbapType', etc.).",
       },
       type_name: {
         type: 'string',
         description:
-          "Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')",
+          'Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type name (domain, data element, or class name depending on type_kind).',
       },
       length: {
         type: 'number',
         description:
-          'Data type length (for predefinedAbapType or refToPredefinedAbapType)',
+          'Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the data type length.',
       },
       decimals: {
         type: 'number',
         description:
-          'Decimal places (for predefinedAbapType or refToPredefinedAbapType)',
+          'Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the decimal places.',
       },
       session_id: {
         type: 'string',
@@ -80,6 +103,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['data_element_name', 'description', 'package_name'],
   },
@@ -101,161 +125,52 @@ interface CreateDataElementArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateDataElement MCP tool
- *
- * Uses AdtClient.createDataElement - low-level single method call
- */
 export async function handleCreateDataElement(
   context: HandlerContext,
   args: CreateDataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      data_element_name,
-      description,
-      package_name,
-      transport_request,
-      data_type,
-      type_kind,
-      type_name,
-      length,
-      decimals,
-      session_id,
-      session_state,
-    } = args as CreateDataElementArgs;
+  const {
+    data_element_name,
+    description,
+    package_name,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!data_element_name || !description || !package_name) {
-      return return_error(
-        new Error(
-          'data_element_name, description, and package_name are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const dataElementName = data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element creation: ${dataElementName}`);
-
-    try {
-      // Determine typeKind based on type_kind parameter
-      // Supports both short form ('E', 'P') and full form ('domain', 'predefinedAbapType')
-      const typeKindMap: Record<
-        string,
-        | 'domain'
-        | 'predefinedAbapType'
-        | 'refToPredefinedAbapType'
-        | 'refToDictionaryType'
-        | 'refToClifType'
-      > = {
-        // Short forms
-        E: 'domain',
-        P: 'predefinedAbapType',
-        R: 'refToPredefinedAbapType',
-        D: 'refToDictionaryType',
-        C: 'refToClifType',
-        // Full forms
-        domain: 'domain',
-        predefinedAbapType: 'predefinedAbapType',
-        refToPredefinedAbapType: 'refToPredefinedAbapType',
-        refToDictionaryType: 'refToDictionaryType',
-        refToClifType: 'refToClifType',
-      };
-      const rawTypeKind = type_kind || 'E';
-      const typeKind = typeKindMap[rawTypeKind] || 'domain';
-
-      // Create data element
-      const createConfig: any = {
-        dataElementName,
-        description,
-        packageName: package_name,
-        typeKind,
-        dataType: data_type,
-        typeName: type_name,
-        length: length,
-        decimals: decimals,
-        transportRequest: transport_request,
-      };
-
-      const createState = await client.getDataElement().create(createConfig);
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        logger?.error(
-          `Create did not return a response for data element ${dataElementName}`,
-        );
-        throw new Error(
-          `Create did not return a response for data element ${dataElementName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateDataElement completed: ${dataElementName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `DataElement ${dataElementName} created successfully. Use LockDataElement and UpdateDataElement to add source code, then UnlockDataElement and ActivateObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to create data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `DataElement ${dataElementName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!data_element_name || !description || !package_name) {
+    return return_error(
+      new Error(
+        'data_element_name, description, and package_name are required',
+      ),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const dataElementName = data_element_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateDataElementLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDataElement(resultsFor(dataElementDocuments))
+        .create(
+          {
+            dataElementName,
+            description,
+            packageName: package_name,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

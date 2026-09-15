@@ -12,6 +12,11 @@ import type {
 } from '../lib/handlers/interfaces.js';
 import { CompositeHandlersRegistry } from '../lib/handlers/registry/CompositeHandlersRegistry.js';
 import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
+import {
+  defaultSystemContextResolver,
+  type SystemContextResolver,
+  withResolvedSystemContext,
+} from '../lib/requestSystemResolution.js';
 import { resolveSystemContext } from '../lib/systemContext.js';
 import {
   normalizeToolContent,
@@ -51,15 +56,26 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly systemType?: SapEnvironment;
 
+  /**
+   * Fills a call's missing responsible/master system from its connection.
+   * `null` disables. See src/lib/requestSystemResolution.ts.
+   */
+  protected readonly systemContextResolver: SystemContextResolver | null;
+
   constructor(options: {
     name: string;
     version?: string;
     logger?: Logger;
     systemType?: SapEnvironment;
+    systemContextResolver?: SystemContextResolver | null;
   }) {
     super({ name: options.name, version: options.version ?? '1.0.0' });
     this.logger = options.logger ?? getDefaultLogger();
     this.systemType = options.systemType;
+    this.systemContextResolver =
+      options.systemContextResolver === undefined
+        ? defaultSystemContextResolver
+        : options.systemContextResolver;
   }
 
   /**
@@ -370,11 +386,15 @@ export abstract class BaseMcpServer extends McpServer {
               // If handler expects context+args (preferred), pass both.
               // Otherwise, update group context and call with args only for backward compatibility.
               // NOTE: Always await the handler result to ensure we get the resolved value for normalization
+              // Both branches run inside withResolvedSystemContext: a call that
+              // lacks responsible/master system gets them from an ABAP Cloud
+              // connection (src/lib/requestSystemResolution.ts).
               let handlerPromise: Promise<unknown>;
               if ((entry.handler as HandlerFnWithContext).length >= 2) {
-                handlerPromise = (entry.handler as HandlerFnWithContext)(
-                  context,
-                  args,
+                handlerPromise = withResolvedSystemContext(
+                  context.connection,
+                  () => (entry.handler as HandlerFnWithContext)(context, args),
+                  this.systemContextResolver,
                 );
               } else {
                 try {
@@ -390,7 +410,11 @@ export abstract class BaseMcpServer extends McpServer {
                 } catch {
                   // ignore if group doesn't expose context setter
                 }
-                handlerPromise = (entry.handler as HandlerFnArgsOnly)(args);
+                handlerPromise = withResolvedSystemContext(
+                  context.connection,
+                  () => (entry.handler as HandlerFnArgsOnly)(args),
+                  this.systemContextResolver,
+                );
               }
 
               const result = await handlerPromise;

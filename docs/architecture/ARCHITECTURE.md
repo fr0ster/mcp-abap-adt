@@ -345,6 +345,8 @@ All transports extend `BaseMcpServer` which handles handler registration, connec
 > **Design invariant:** One MCP session always maps to one SAP system, and switching SAP systems within the same session is not a supported scenario.
 >
 > Where the identity behind a call comes from is a separate question, and since 10.1.0 it has one answer. `masterLanguage`, `responsible` and `masterSystem` are read from the request scope when a scope carries them, and from the process-wide system context otherwise. A host that serves several SAP users side by side wraps each run in `runWithRequestContext`; a stdio session carries no scope and keeps the process context, unchanged. The singleton cache remains the fallback, not the source: a concurrent host that relied on it saw every create attributed to whichever user wrote it last.
+>
+> Since 10.2.0 there is a third source, and it is last. When a call still has no `responsible` or `masterSystem` and its connection is to ABAP Cloud, the library asks the system once per connection and fills only what is absent. A key the scope carries wins even when its value is `undefined`, because carrying it is how a host says this request has none. On-premise nothing is asked and nothing is filled. A host can pass its own resolver, or `null` to switch the whole thing off.
 
 ---
 

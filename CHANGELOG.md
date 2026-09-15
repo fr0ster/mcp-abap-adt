@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.2.0] - 2026-09-15
+
+### Added
+
+- **On ABAP Cloud, a request without a responsible person or master system
+  gets them from the system.** 10.1.0 let a host scope both per request, but a
+  host that does not know them for a cloud destination had to look them up
+  itself — a second adt-clients import and a second connection type to keep in
+  step. The library now does it.
+
+  Every tool call — through `EmbeddableMcpServer`/`BaseMcpServer`, a handler
+  group registered on a server, or the handlers `HandlerExporter.getHandlerEntries()`
+  returns — runs inside the new `withResolvedSystemContext`. When the call's
+  effective context lacks `responsible` or `masterSystem` and the connection is
+  to ABAP Cloud, it asks the system (`systeminformation`) and fills only what
+  is missing: the user name as responsible, the system id as master system.
+  On-premise it does nothing. There is one lookup per connection, and only when
+  a request actually lacks a value; concurrent calls share it, and a lookup
+  that throws never fails the call.
+
+  "Lacks a value" means the key is absent. A request scope that carries
+  `responsible` as `undefined` has said this request has no responsible, and
+  that answer stands — the same rule 10.1.0 established.
+
+  A lookup that answers nothing is cached as nothing for that connection: the
+  system-information call swallows its own errors and answers null, so a
+  timeout and a system with nothing to give are indistinguishable from here.
+  Only a lookup that throws outright is retried.
+
+  Opt out with `systemContextResolver: null` on `EmbeddableMcpServer` or
+  `HandlerExporter`, or pass your own resolver. A handler group registering
+  itself directly uses the default resolver and has no opt-out yet. `withResolvedSystemContext`,
+  `defaultSystemContextResolver` and the `SystemContextResolver` type are
+  exported from `@mcp-abap-adt/lib/request-context`.
+
+  Not breaking: a value the request scope or the process context carries still
+  wins, and the wrapped handlers keep their arity, so an embedder that picks
+  `handler(context, args)` or `handler(args)` by `handler.length` is unaffected.
+  `@mcp-abap-adt/core` is unchanged and stays at 10.0.1.
+
 ## [10.1.0] - 2026-09-15
 
 ### Added

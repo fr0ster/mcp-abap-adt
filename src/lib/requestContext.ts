@@ -43,3 +43,15 @@ export function runWithRequestContext<T>(ctx: RequestContext, fn: () => T): T {
 export function getRequestContext(): RequestContext | undefined {
   return storage.getStore();
 }
+
+// Re-exported so embedding hosts reach it through the same
+// `@mcp-abap-adt/lib/request-context` entry point. It imports this module back;
+// the cycle is safe because neither side reads the other at load time — every
+// use is inside a function body. Kept at the bottom so this module's own
+// bindings exist before the other is loaded.
+export {
+  defaultSystemContextResolver,
+  type ResolvedSystemContext,
+  type SystemContextResolver,
+  withResolvedSystemContext,
+} from './requestSystemResolution';

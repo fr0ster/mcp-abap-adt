@@ -1,5 +1,6 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../../../handlers/interfaces.js';
+import { withResolvedSystemContext } from '../../requestSystemResolution.js';
 import { normalizeToolContent } from '../../toolResult.js';
 import { return_error } from '../../utils.js';
 import type {
@@ -77,7 +78,12 @@ export abstract class BaseHandlerGroup implements IHandlerGroup {
       },
       async (args: any) => {
         try {
-          const result = await handler(this.context, args);
+          // A request that lacks responsible/master system gets them from an
+          // ABAP Cloud connection — see src/lib/requestSystemResolution.ts.
+          const result = await withResolvedSystemContext(
+            this.context?.connection,
+            () => handler(this.context, args),
+          );
 
           // Same normalizer as BaseMcpServer — see src/lib/toolResult.ts.
           // Note this also fixes a pre-existing divergence: the old inline copy

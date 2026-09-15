@@ -106,24 +106,24 @@ function serializeTree(
 }
 
 /**
- * Exported so `GetObjectStructureLow` (`src/handlers/system/low/`) can answer
- * the same tree text without a second copy of `flatNodesOf`/`buildNestedTree`/
- * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
- * document through the same `ourUtils.objectStructure` (`structured`) reading.
- *
- * **The same masking `GetNodeStructureLow` guards against.**
- * `getObjectStructure(objectType, objectName)` takes no `options` at all — no
- * `analyse` — so nothing downstream of this reading can ever turn a
- * content-free answer into a refusal; the only place left to catch it is
- * here. An **absent root** (`value['projectexplorer:objectstructure']` is
- * `undefined` — what a zero-byte body, or a document this reading does not
- * recognise, both parse to) is not the same claim as "this object has no
- * substructure": the second is a real, present, empty document, and this
- * function only says "No nodes found" for that one. The first throws, the
- * same way `readNodeLevel` throws on `isIndeterminateWalkAnswer` rather than
- * answer an empty tree it cannot back up.
+ * The same masking `GetNodeStructureLow` guards against, over a different
+ * document. `getObjectStructure(objectType, objectName)` takes no `options`
+ * at all — no `analyse` — so nothing downstream of this reading can ever
+ * turn a content-free answer into a refusal. An **absent root**
+ * (`value['projectexplorer:objectstructure']` is `undefined` — what a
+ * zero-byte body, or a document this reading does not recognise, both parse
+ * to) is not the same claim as "this object has no substructure": the second
+ * is a real, present, empty document. Exported (not only `treeText`) so both
+ * `handleGetObjectStructure` (here) and `GetObjectStructureLow` can run this
+ * check inside their own `call()` — the same place `GetNodeStructureLow`'s
+ * guard runs — rather than inside the projection: a throw here and a throw
+ * from `readNodeLevel` then both surface through `answer()`'s `client_threw`
+ * path, not one `client_threw` and one `adapter_threw` for what is the same
+ * class of defect. `treeText` below keeps its own copy of this same check as
+ * a second line of defence for any caller that reaches it without going
+ * through `call()` first — cheap, since the check is synchronous and idempotent.
  */
-export function treeText(value: unknown): string {
+export function assertObjectStructurePresent(value: unknown): void {
   const root = (
     value as { 'projectexplorer:objectstructure'?: unknown } | null | undefined
   )?.['projectexplorer:objectstructure'];
@@ -132,6 +132,16 @@ export function treeText(value: unknown): string {
       'No object structure document was returned for this object — getObjectStructure carries no analyse, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',
     );
   }
+}
+
+/**
+ * Exported so `GetObjectStructureLow` (`src/handlers/system/low/`) can answer
+ * the same tree text without a second copy of `flatNodesOf`/`buildNestedTree`/
+ * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
+ * document through the same `ourUtils.objectStructure` (`structured`) reading.
+ */
+export function treeText(value: unknown): string {
+  assertObjectStructurePresent(value);
   const nodes = flatNodesOf(value);
   if (nodes.length === 0) return 'No nodes found in object structure response.';
   return `tree:\n${serializeTree(buildNestedTree(nodes))}`;
@@ -162,13 +172,21 @@ export async function handleGetObjectStructure(
   const detail = detailOf(args);
 
   // `getObjectStructure(objectType, objectName)` takes no options object at
-  // all — no `analyse` to pass, matching the brief.
+  // all — no `analyse` to pass, matching the brief. The presence check runs
+  // here, inside the call, only for `terse` — `raw`/`full` always answer the
+  // document exactly as it arrived, indeterminate or not, the same invariant
+  // every other `detail: 'raw'` in this migration keeps.
   return answer(
     { tool: 'GetObjectStructure', detail },
-    () =>
-      createAdtClient(connection, logger)
+    async () => {
+      const response = await createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getObjectStructure(objectType, objectName),
+        .getObjectStructure(objectType, objectName);
+      if (detail === 'terse' && response.ok) {
+        assertObjectStructurePresent(response.getResult().value.value);
+      }
+      return response;
+    },
     project(detail, (value) => treeText(value)),
   );
 }

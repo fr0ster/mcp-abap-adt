@@ -200,10 +200,7 @@ import {
 } from '../../handlers/structure/low/handleUnlockStructure';
 import { handleUpdateStructure } from '../../handlers/structure/low/handleUpdateStructure';
 import { handleValidateStructure } from '../../handlers/structure/low/handleValidateStructure';
-import {
-  handleGetNodeStructure,
-  readNodeLevel,
-} from '../../handlers/system/low/handleGetNodeStructure';
+import { handleGetNodeStructure } from '../../handlers/system/low/handleGetNodeStructure';
 import { handleGetObjectStructure as handleGetObjectStructureLow } from '../../handlers/system/low/handleGetObjectStructure';
 import { handleGetVirtualFolders } from '../../handlers/system/low/handleGetVirtualFolders';
 import { handleActivateTable } from '../../handlers/table/low/handleActivateTable';
@@ -222,7 +219,6 @@ import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
 import { corpusBody } from '../../lib/adtCorpus';
-import { nodeLevel } from '../../lib/strategies/packageWalk';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
 import {
@@ -2642,8 +2638,16 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
 
   it('GetNodeStructureLow reads the real read-object-tree-structure fixture (fixture 05, the one with descriptions) through the nodeLevel reading', async () => {
     const document = corpusBody('read-object-tree-structure--05-nodestructure');
+    const calls: string[] = [];
     fakeClient = fakeClientOf({
-      fetchNodeStructure: async () => okResponse(nodeLevel({ data: document })),
+      fetchNodeStructure: async () => {
+        calls.push('fetchNodeStructure');
+        return okResponse(document);
+      },
+      readMetadata: async () => {
+        calls.push('readMetadata');
+        return okResponse('<pak:package/>');
+      },
     });
 
     const result: any = await handleGetNodeStructure(context as any, {
@@ -2672,42 +2676,74 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
       ],
       childNodes: [{ type: 'FUGR/F', nodeId: '29' }],
     });
+    // A non-blank body never triggers the disambiguating read — one request,
+    // not two.
+    expect(calls).toEqual(['fetchNodeStructure']);
   });
 
-  it('readNodeLevel refuses the real refusal-package-not-found-objectslist-empty fixture (zero bytes, HTTP 200) rather than reading it as an empty level', () => {
-    // Byte-for-byte identical to read-empty-package-contents (a package that
-    // EXISTS and is empty) — that is the whole point: no reading can tell
-    // these two apart, so this one refuses to guess at either.
+  // Fix round 2: a blank body from /repository/nodestructure is genuinely
+  // ambiguous — refusal-package-not-found-objectslist-empty (package does
+  // not exist) and read-empty-package-contents (package exists, holds
+  // nothing) are byte-for-byte identical, zero bytes, HTTP 200. Round 1's
+  // guard treated every blank body as a refusal, which answered the second
+  // fixture wrong. The fix disambiguates the one type it has an existence
+  // check for (DEVC/K, via getPackage().readMetadata() — the same call
+  // GetPackageTree already makes) and pins BOTH outcomes here, driven from
+  // both real fixtures. Each assertion on `calls` fails if the follow-up
+  // read is removed: without it, `readMetadata` is never reached at all.
+  it('GetNodeStructureLow answers an empty listing, not an error, for the real read-empty-package-contents fixture — the follow-up read finds the package', async () => {
+    const document = corpusBody(
+      'read-empty-package-contents--01-nodestructure',
+    );
+    expect(document).toBe('');
+    const calls: string[] = [];
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async () => {
+        calls.push('fetchNodeStructure');
+        return okResponse(document);
+      },
+      readMetadata: async () => {
+        calls.push('readMetadata');
+        // A real package document proves existence; borrowed from a
+        // different package (no read-metadata fixture exists for
+        // ZMCP_BLD_PKG01 itself) the same way sibling families already
+        // reuse a generic fixture across a mismatched name.
+        return okResponse(
+          corpusBody('read-metadata-package--01-packages-zmcpshrpkg'),
+        );
+      },
+    });
+
+    const result: any = await handleGetNodeStructure(context as any, {
+      parent_type: 'DEVC/K',
+      parent_name: 'ZMCP_BLD_PKG01',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      objects: [],
+      childNodes: [],
+    });
+    expect(calls).toEqual(['fetchNodeStructure', 'readMetadata']);
+  });
+
+  it('GetNodeStructureLow answers an error naming the missing package for the real refusal-package-not-found-objectslist-empty fixture — the follow-up read refuses', async () => {
     const document = corpusBody(
       'refusal-package-not-found-objectslist-empty--01-nodestructure',
     );
     expect(document).toBe('');
-    expect(() => readNodeLevel({ data: document })).toThrow(
-      /empty node structure/i,
-    );
-  });
-
-  it('readNodeLevel still answers the real read-empty-package-contents fixture the same way — it is the same bytes, and this reading cannot honestly answer differently', () => {
-    const document = corpusBody(
-      'read-empty-package-contents--01-nodestructure',
-    );
-    expect(() => readNodeLevel({ data: document })).toThrow(
-      /empty node structure/i,
-    );
-  });
-
-  it('GetNodeStructureLow surfaces the real refusal-package-not-found-objectslist-empty fixture as an error, not as an empty tree — driven through the real reading this handler wires in, not a refusal the member cannot produce', async () => {
-    // `fetchNodeStructure` accepts no `analyse` at all: the only way a wire
-    // this shape reaches an error is the reading itself throwing, exactly
-    // as `readNodeLevel` does. This double calls the exact function
-    // `handleGetNodeStructure` wires in, so the assertion is on the real
-    // guard, not on a refusal the member could never answer with.
-    const document = corpusBody(
-      'refusal-package-not-found-objectslist-empty--01-nodestructure',
-    );
+    const calls: string[] = [];
     fakeClient = fakeClientOf({
-      fetchNodeStructure: async () =>
-        okResponse(readNodeLevel({ data: document })),
+      fetchNodeStructure: async () => {
+        calls.push('fetchNodeStructure');
+        return okResponse(document);
+      },
+      readMetadata: async () => {
+        calls.push('readMetadata');
+        return refusedResponse('Package ZMCP_BLD_NOPKG9X does not exist', {
+          origin: 'refusal',
+        });
+      },
     });
 
     const result: any = await handleGetNodeStructure(context as any, {
@@ -2716,9 +2752,40 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     });
 
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toMatch(
-      /empty node structure/i,
-    );
+    const payload = JSON.parse(result.content[0].text);
+    // The package's own refusal, forwarded — not a sentence this handler
+    // composed about a call it never made. `origin: 'refusal'` (only set by
+    // `failurePayload`, never by a plain thrown Error) is what proves this
+    // came from the follow-up read and not from round 1's generic throw.
+    expect(payload.origin).toBe('refusal');
+    expect(payload.message).toBe('Package ZMCP_BLD_NOPKG9X does not exist');
+    expect(calls).toEqual(['fetchNodeStructure', 'readMetadata']);
+  });
+
+  it('GetNodeStructureLow still throws, undecided, on a blank body for a non-package parent type — no fixture and no existence check exists to disambiguate one', async () => {
+    const calls: string[] = [];
+    fakeClient = fakeClientOf({
+      fetchNodeStructure: async () => {
+        calls.push('fetchNodeStructure');
+        return okResponse('');
+      },
+      readMetadata: async () => {
+        calls.push('readMetadata');
+        return okResponse('<pak:package/>');
+      },
+    });
+
+    const result: any = await handleGetNodeStructure(context as any, {
+      parent_type: 'CLAS/OC',
+      parent_name: 'ZCL_NOPE',
+    });
+
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toBe('client_threw');
+    expect(payload.message).toMatch(/empty node structure/i);
+    // No existence check exists for a class, so none is attempted.
+    expect(calls).toEqual(['fetchNodeStructure']);
   });
 
   it("GetVirtualFoldersLow reaches getUtils, carrying no analyse, forwarding the caller's facets and defaulting the rest", async () => {
@@ -2769,7 +2836,7 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     );
   });
 
-  it("GetObjectStructureLow surfaces an absent projectexplorer:objectstructure root as an error, not as 'No nodes found' — the same class of masking readNodeLevel guards against, and for the same reason: getObjectStructure carries no analyse either", async () => {
+  it("GetObjectStructureLow surfaces an absent projectexplorer:objectstructure root as an error, not as 'No nodes found' — the same class of masking GetNodeStructureLow's guard fixes, and for the same reason: getObjectStructure carries no analyse either", async () => {
     // An empty body (or any document without the expected root) parses to
     // `{}` here — indistinguishable from "this object has no substructure"
     // unless the root itself is checked for.
@@ -2784,9 +2851,12 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     });
 
     expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toMatch(
-      /no object structure document/i,
-    );
+    const payload = JSON.parse(result.content[0].text);
+    // `client_threw`, not `adapter_threw`: the check now runs inside the
+    // call, the same place GetNodeStructureLow's guard runs, so a caller
+    // branching on `error` sees one kind for this class of defect, not two.
+    expect(payload.error).toBe('client_threw');
+    expect(payload.message).toMatch(/no object structure document/i);
   });
 
   it("GetObjectStructureLow still answers 'No nodes found' for a document that is genuinely present and empty — the root exists, it just has no children", async () => {

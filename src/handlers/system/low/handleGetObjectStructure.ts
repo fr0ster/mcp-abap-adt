@@ -18,7 +18,10 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
-import { treeText } from '../readonly/handleGetObjectStructure';
+import {
+  assertObjectStructurePresent,
+  treeText,
+} from '../readonly/handleGetObjectStructure';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructureLow',
@@ -90,12 +93,23 @@ export async function handleGetObjectStructure(
 
   const detail = detailOf(args);
 
+  // The presence check runs here, inside the call, only for `terse` — the
+  // same place and the same condition `GetObjectStructure` (read-only) uses,
+  // so both surface an indeterminate answer through `answer()`'s
+  // `client_threw` path, matching `GetNodeStructureLow`'s guard rather than
+  // disagreeing with it on which kind a caller sees for the same class of
+  // defect. `raw`/`full` always answer the document exactly as it arrived.
   return answer(
     { tool: 'GetObjectStructureLow', detail },
-    () =>
-      createAdtClient(connection, logger)
+    async () => {
+      const response = await createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getObjectStructure(object_type, object_name),
+        .getObjectStructure(object_type, object_name);
+      if (detail === 'terse' && response.ok) {
+        assertObjectStructurePresent(response.getResult().value.value);
+      }
+      return response;
+    },
     project(detail, (value) => treeText(value)),
   );
 }

@@ -5,34 +5,51 @@
  * 19. `fetchNodeStructure(parentType, parentName, options)` takes no
  * `options.analyse` at all — nothing to inject beyond the result set.
  *
- * **The guard this file exists for.** `refusal-package-not-found-objectslist-
- * empty--01-nodestructure.body.txt` and `read-empty-package-contents--01-
- * nodestructure.body.txt` are byte-for-byte identical: zero bytes, HTTP 200,
- * one for a package that does not exist, the other for one that exists and
- * holds nothing. `isIndeterminateWalkAnswer`
- * (`@mcp-abap-adt/adt-strategies`) documents exactly this and says what a
- * caller without a separate existence check should do: treat it as
- * indeterminate rather than guess. `GetPackageTree`
- * (`src/handlers/system/high/handleGetPackageTree.ts`) pays a `getPackage()
- * .read()` round trip first and reports "not found" when that fails — but
- * this tool answers node structure for any object type, not only packages,
- * so it has no equivalent existence check to pay. `fetchNodeStructure` also
- * takes no `options.analyse`, so no strategy downstream of the reading can
- * ever turn the 200 into a refusal — the reading itself is the only place
- * left, so `readNodeLevel` checks the raw body before handing it to
- * `nodeLevel` and throws rather than answering an empty level it cannot
- * back up. `answering()` (adt-clients) runs the reading outside its own
- * failure classification and lets the reading's own exception surface as
- * itself; `answer()` (this repository) then turns that throw into
- * `client_threw`, an error a caller can see.
+ * **The guard this file exists for, and why one guess was not enough.**
+ * `refusal-package-not-found-objectslist-empty--01-nodestructure.body.txt`
+ * and `read-empty-package-contents--01-nodestructure.body.txt` are
+ * byte-for-byte identical: zero bytes, HTTP 200, one for a package that does
+ * not exist, the other for one that exists and holds nothing. A first pass
+ * treated every blank body as a refusal — that traded a false success on
+ * "not found" for a false error on "genuinely empty", which is the same
+ * defect with the sign flipped, not a fix. `fetchNodeStructure` takes no
+ * `options.analyse`, so no strategy downstream of the reading can ever
+ * settle this either — the only way to know which one a blank body means is
+ * to ask, which is what this file now does, on the blank-body path only.
+ *
+ * **Disambiguating the way this repository already does.**
+ * `GetPackageTree` (`src/handlers/system/high/handleGetPackageTree.ts`) pays
+ * a `getPackage().read()` round trip before walking, and reports "not found"
+ * when that fails. This tool answers node structure for any object type, not
+ * only packages, and has no generic per-type existence check to pay — but
+ * every corpus fixture proving the ambiguity is for `DEVC/K` (a package), and
+ * that is the one type this tool can check the same way `GetPackageTree`
+ * does: `getPackage().readMetadata()`. So: a blank body for a `DEVC/K` parent
+ * triggers that one extra request — success (empty listing) if the package
+ * reads back, the package's own refusal if it does not. A blank body for any
+ * other parent type still throws, undecided, because there is no fixture and
+ * no existence check to decide it with; inventing one would be exactly the
+ * mistake the corpus exists to prevent.
+ *
+ * **Where the throw lives, and why it agrees with `GetObjectStructureLow`'s.**
+ * Both guards now run inside the `call()` passed to `answer()`, not inside a
+ * projection — a document this handler cannot honestly read is a client-side
+ * fact, the same class of thing a real `analyse` would have decided if one
+ * existed, and `answer()`'s `client_threw` is the kind that names it for
+ * both tools alike.
  */
 
-import { isIndeterminateWalkAnswer } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  isIndeterminateWalkAnswer,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { type NodeLevel, nodeLevel } from '../../../lib/strategies/packageWalk';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -96,19 +113,23 @@ interface GetNodeStructureArgs {
 }
 
 /**
- * `ourUtils.node` (`nodeLevel`), guarded against the one document it cannot
- * read honestly. Exported so a test can drive the real captured fixture
- * through it directly, the same way `treeText` is exported for
- * `GetObjectStructureLow`.
+ * The raw body, nothing parsed — this handler needs to see whether it was
+ * blank before `nodeLevel` collapses either a blank body or a genuinely
+ * empty one into the identical `{objects: [], childNodes: []}`.
  */
-export function readNodeLevel(answer: unknown): NodeLevel {
-  const xml = (answer as { data?: unknown } | undefined)?.data;
-  if (isIndeterminateWalkAnswer(xml)) {
-    throw new Error(
-      'ADT answered an empty node structure (HTTP 200, zero bytes) for this parent — that answer means either the parent does not exist or it genuinely holds nothing, and this endpoint gives no way to tell the two apart. fetchNodeStructure carries no analyse, so nothing downstream of this reading can decide either.',
-    );
-  }
-  return nodeLevel(answer);
+function rawNodeStructureXml(wire: unknown): string {
+  return String((wire as { data?: unknown } | undefined)?.data ?? '');
+}
+
+/** A success carrying a `NodeLevel` — the shape `sequence()`'s steps answer with. */
+function succeededLevel(level: NodeLevel): IAdtResponse<NodeLevel, IAdtError> {
+  return {
+    ok: true,
+    getResult: () => ({ value: level }),
+    getError: () => {
+      throw new Error('asked for the error of a success');
+    },
+  } as unknown as IAdtResponse<NodeLevel, IAdtError>;
 }
 
 export async function handleGetNodeStructure(
@@ -138,13 +159,49 @@ export async function handleGetNodeStructure(
 
   return answer(
     { tool: 'GetNodeStructureLow', detail: 'terse' },
-    () =>
-      createAdtClient(connection, logger)
-        .getUtils({ ...ourUtils, node: readNodeLevel })
-        .fetchNodeStructure(parent_type, parent_name, {
-          nodeId: node_id || '0000',
-          withShortDescriptions: with_short_descriptions !== false,
-        }),
+    () => {
+      const client = createAdtClient(connection, logger);
+      return sequence(
+        () =>
+          client
+            .getUtils({ ...ourUtils, node: rawNodeStructureXml })
+            .fetchNodeStructure(parent_type, parent_name, {
+              nodeId: node_id || '0000',
+              withShortDescriptions: with_short_descriptions !== false,
+            }),
+        async (rawXml) => {
+          if (!isIndeterminateWalkAnswer(rawXml)) {
+            return succeededLevel(nodeLevel({ data: rawXml }));
+          }
+
+          if (parent_type.toUpperCase() !== 'DEVC/K') {
+            throw new Error(
+              `ADT answered an empty node structure (HTTP 200, zero bytes) for ${parent_type}/${parent_name} — that answer means either the parent does not exist or it genuinely holds nothing, and this endpoint gives no way to tell the two apart for a non-package parent type. fetchNodeStructure carries no analyse, so nothing downstream of this reading can decide either.`,
+            );
+          }
+
+          // The one existence check this tool can pay: the same one
+          // GetPackageTree pays, over the same object, through the
+          // already-migrated getPackage().readMetadata().
+          const packageRead = await client
+            .getPackage()
+            .readMetadata(
+              { packageName: parent_name.toUpperCase() },
+              { analyse: analyseException },
+            );
+
+          if (!packageRead.ok) {
+            // The package's own refusal, named — not a sentence this
+            // handler composed about a call it did not make.
+            return packageRead as unknown as IAdtResponse<NodeLevel, IAdtError>;
+          }
+
+          // The package exists; the blank body was the genuinely-empty
+          // answer, not the not-found one.
+          return succeededLevel({ objects: [], childNodes: [] });
+        },
+      );
+    },
     (value) => value,
   );
 }

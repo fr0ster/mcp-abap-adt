@@ -42,6 +42,7 @@ import {
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleActivateServiceBinding } from '../../handlers/service_binding/low/handleActivateServiceBinding';
+import { handleActivateServiceDefinition } from '../../handlers/service_definition/low/handleActivateServiceDefinition';
 import { handleCheckPackage } from '../../handlers/package/low/handleCheckPackage';
 import { handleCreatePackage } from '../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../handlers/package/low/handleDeletePackage';
@@ -2497,6 +2498,35 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
     expect(result.isError).toBe(true);
     const payload = JSON.parse(result.content[0].text);
     expect(payload.origin).toBe('refusal');
+  });
+});
+
+describe('service_definition — Activate only', () => {
+  it('ActivateServiceDefinitionLow reaches getServiceDefinition with analyseActivation', async () => {
+    await handleActivateServiceDefinition(context as any, { name: 'ZI_X_SRVD' });
+    const call = callTo('activate');
+    expect(call?.factory).toBe('getServiceDefinition');
+    expect(call?.args[0]).toEqual({ serviceDefinitionName: 'ZI_X_SRVD' });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseActivation);
+  });
+
+  it('ActivateServiceDefinitionLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
+    const reading = structured({
+      data: corpusBody('activation-success-verdict--01-activation'),
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({ activate: async () => okResponse(reading) });
+
+    const result: any = await handleActivateServiceDefinition(context as any, {
+      name: 'ZI_X_SRVD',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      activated: true,
+      generated: true,
+    });
   });
 });
 

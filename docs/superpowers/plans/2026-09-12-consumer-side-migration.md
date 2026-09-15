@@ -36,7 +36,8 @@ own tests pass and it is committed — not when it is described.
 | 15. `low` tier, cluster two | done | `5285a23` |
 | 16. `low` tier, cluster three | done | `9a2fad1` |
 | 17. `low` tier, cluster four | done | `d7e192e` |
-| 18 – 29 | not started | |
+| 18. The `high` tier `Get*` handlers | done | `3c60dd2` |
+| 19 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2283,11 +2284,11 @@ Do not batch two families into one commit.
 
 Each follows Task 9 (two calls, `pair`) or Task 12 (one call). The six unit-test readers take `analyseUnitTest` and `structured`; note that `AdtUnitTestLegacy` accepts no strategy on `run`, `getStatus` and `getResult`, which Task 26 pins.
 
-- [ ] **Step 1: Extend `readonlySingleCall.test.ts` with one row per `Get*` handler**, asserting a refusal surfaces as `isError: true`
-- [ ] **Step 2: Run it to verify it fails**
-- [ ] **Step 3: Migrate**
-- [ ] **Step 4: Run the tests and measure**
-- [ ] **Step 5: Commit** — `refactor(high): the Get handlers answer through the adapter`
+- [x] **Step 1: Extend `readonlySingleCall.test.ts` with one row per `Get*` handler**, asserting a refusal surfaces as `isError: true`
+- [x] **Step 2: Run it to verify it fails**
+- [x] **Step 3: Migrate**
+- [x] **Step 4: Run the tests and measure**
+- [x] **Step 5: Commit** — `refactor(high): the Get handlers answer through the adapter`
 
 ---
 

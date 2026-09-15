@@ -52,8 +52,9 @@ export async function resolvePackagePatterns(
 /**
  * `searchObjects`'s replacement: `search`. `searchObjects` sat beside
  * `search` doing the identical request until adt-clients 31.0.0, per
- * `AdtUtils`'s own class doc comment — this is the rename the guide's
- * `search` migration is, everywhere but `handleSearchObject.ts`.
+ * `search()`'s own doc comment (not `AdtUtils`'s class-level one, which says
+ * nothing about the rename) — this is the rename the guide's `search`
+ * migration is, everywhere but `handleSearchObject.ts`.
  *
  * **`analyse` is passed here, unlike `handleSearchObject.ts`.** That file's
  * own comment establishes the asymmetry with `tsc`: `getUtils(ourUtils)`

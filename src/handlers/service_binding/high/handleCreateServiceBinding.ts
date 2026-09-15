@@ -213,13 +213,31 @@ export async function handleCreateServiceBinding(
         return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return (await obj.generateServiceBinding({
+      const generated = await obj.generateServiceBinding({
         serviceType,
         bindingName: serviceBindingName,
         serviceName,
         serviceVersion,
         serviceDefinitionName,
-      })) as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      });
+      if (!generated.ok) {
+        return generated as unknown as IAdtResponse<
+          AdtReading<unknown>,
+          IAdtError
+        >;
+      }
+
+      // **The answer is the create's own.** `AdtServiceBinding.create()`'s
+      // own doc comment: "The answer is the create's own. What the chain
+      // does after it — the check, the activation, the generation — is
+      // this implementation's business and reaches a caller only if it
+      // fails." That sentence describes a chain the compiled `create()` no
+      // longer runs internally (see this file's header), but the RULE it
+      // states is still the one this handler's own composed chain follows:
+      // a create+activate+generate that all succeed report the create's
+      // answer, not generate's — generate's own document (a service group
+      // read, not a write) reaches the caller only through a refusal.
+      return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
     },
     project(detail, terseWrite),
   );

@@ -7,13 +7,28 @@
  * structure, then the FUGR/FF child node's. Composed in
  * `src/lib/strategies/functionGroupChildren.ts`, which
  * `handleListFunctionGroupIncludes.ts` shares for its own FUGR/I lookup.
+ *
+ * **A nonexistent function group and an empty one are not told apart by the
+ * walk alone.** The guide's "Walks are yours" section says so explicitly:
+ * `/repository/nodestructure` "answers 200 with zero bytes for a package
+ * that does not exist, and 200 with a tree for one that does... that
+ * distinction is now yours to make, on the body." A function group with no
+ * function modules answers the same zero-child-node body a function group
+ * that does not exist at all would. Disambiguated here the same way
+ * `handleGetPackageTree.ts` already disambiguates the identical package
+ * case (`#38`): a cheap existence read (`getFunctionGroup().readMetadata`)
+ * runs first, composed with the walk via `sequence` — a function group that
+ * does not exist refuses here, before the walk ever answers an empty list
+ * that would otherwise be indistinguishable from "no function modules".
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -44,11 +59,19 @@ export async function handleListFunctionModules(
   }
 
   const functionGroupName = function_group_name.toUpperCase();
-  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+  const client = createAdtClient(connection, logger);
+  const utils = client.getUtils(ourUtils);
 
   return answer(
     { tool: 'ListFunctionModules', detail: 'terse' },
-    () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/FF'),
+    () =>
+      sequence(
+        () =>
+          client
+            .getFunctionGroup()
+            .readMetadata({ functionGroupName }, { analyse: analyseException }),
+        () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/FF'),
+      ),
     (objects) => ({
       success: true,
       function_group_name: functionGroupName,

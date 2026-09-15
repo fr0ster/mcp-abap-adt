@@ -8,9 +8,12 @@
  * guide's "Sequences are yours" table does not list it either.** Grepping
  * the shipped package (`dist/core/service/AdtService.js`, `dist/**\/*.d.ts`)
  * for `updateServiceBinding` finds nothing — no method, no re-export, not
- * even a legacy alias. `AdtServiceBinding.update()`'s own doc comment
- * settles what replaced it, in the compiled source rather than only the
- * `.d.ts`:
+ * even a legacy alias. `update()`'s own doc comment is short ("one POST to
+ * a job endpoint, and nothing before it"); the doc comment that actually
+ * settles what replaced the composite sits 77 lines further down in the
+ * same `.d.ts`, on `updateRequest` — the *private* method `update()` calls
+ * internally, easy to miss because it is nowhere near the public member it
+ * explains:
  *
  * > "This used to read the binding first. The read filled in the service
  * > name and version from the object's own document, short-circuited when
@@ -32,6 +35,22 @@
  * `update()`'s implementation calls it, and nothing in this handler's
  * pre-migration behaviour ever touched a classification endpoint.
  *
+ * **One call does not mean no lock.** `AdtServiceBinding.lock()`'s own doc
+ * comment: "Publishing is what editing a service binding is — it is not
+ * edited any other way — so this is the lock a publication takes. Measured
+ * from Eclipse (ADT 3.60.3), 2026-09-05: `_action=LOCK&accessMode=MODIFY`
+ * on a stateful session before the job, and `_action=UNLOCK&lockHandle=…`
+ * when the editor closes... The caller takes it, and the caller gives it
+ * back. This member does not lock inside `update` on the caller's behalf."
+ * `unlock()`'s own comment names the cost of skipping it: "Without it the
+ * binding stays 'currently being edited': its own delete is refused with
+ * `You are already editing`, and a `_action=LOCK` from anywhere else —
+ * another session, another process, the same user — is answered `403
+ * ExceptionResourceNoAccess`." So this handler takes the lock itself,
+ * through `withLock` — the same combinator every other locked write in this
+ * repository uses — releasing it on every path out of `update()`, refused
+ * or not.
+ *
  * **`service_name`/`service_version` stay on the tool surface but no longer
  * reach the wire.** `IServiceBindingPublicationConfig` doesn't carry them at
  * all — "the service name and version have nowhere to go" per
@@ -45,6 +64,16 @@
  * same refusal as a normal `return_error` instead of a `client_threw`
  * adapter failure, and the type narrows `'published' | 'unpublished'` for
  * the call that follows.
+ *
+ * **An explicit timeout, well past the measured job.**
+ * `IServiceBindingPublicationParams.timeout`'s own doc comment: "A
+ * publication is the slowest request this library makes — ~135s measured on
+ * a trial, and one unpublish still unsettled after eleven minutes — so the
+ * 120s `SAP_TIMEOUT_LONG` default is a floor." Leaving `options.timeout`
+ * unset would take that 120s floor into a job already measured to run
+ * longer than it, on a system that this handler cannot know is the fast
+ * case or the eleven-minute one. `PUBLISH_TIMEOUT_MS` below is the
+ * documented worst case, not a guess at a middle ground.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -58,8 +87,17 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
+
+/**
+ * The documented worst case ("one unpublish still unsettled after eleven
+ * minutes"), not the common one — a client-side timeout that fires while
+ * the job is still genuinely running server-side is worse than a caller
+ * waiting.
+ */
+const PUBLISH_TIMEOUT_MS = 11 * 60 * 1000;
 
 type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 
@@ -165,14 +203,20 @@ export async function handleUpdateServiceBinding(
 
   return answer(
     { tool: 'UpdateServiceBinding', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getServiceBinding(resultsFor(serviceDocuments))
-        .update({
-          bindingName,
-          desiredPublicationState,
-          serviceType,
-        }),
+    () => {
+      const obj = createAdtClient(connection, logger).getServiceBinding(
+        resultsFor(serviceDocuments),
+      );
+      return withLock(
+        () => obj.lock({ bindingName }),
+        (lockHandle) =>
+          obj.update(
+            { bindingName, desiredPublicationState, serviceType },
+            { lockHandle, timeout: PUBLISH_TIMEOUT_MS },
+          ),
+        (lockHandle) => obj.unlock({ bindingName }, lockHandle),
+      );
+    },
     project(detail, terseWrite),
   );
 }

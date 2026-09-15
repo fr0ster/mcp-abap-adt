@@ -7,13 +7,22 @@
  * structure, then the FUGR/I child node's. Composed in
  * `src/lib/strategies/functionGroupChildren.ts`, shared with
  * `handleListFunctionModules.ts`'s own FUGR/FF lookup.
+ *
+ * **A nonexistent function group and an empty one are not told apart by the
+ * walk alone** — see `handleListFunctionModules.ts`'s header for the full
+ * reasoning (the guide's own words on the shared 200-with-zero-bytes
+ * ambiguity) and why a cheap existence read composed ahead of the walk,
+ * the same shape `handleGetPackageTree.ts` already uses for a package,
+ * disambiguates it here too.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -44,11 +53,19 @@ export async function handleListFunctionGroupIncludes(
   }
 
   const functionGroupName = function_group_name.toUpperCase();
-  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
+  const client = createAdtClient(connection, logger);
+  const utils = client.getUtils(ourUtils);
 
   return answer(
     { tool: 'ListFunctionGroupIncludes', detail: 'terse' },
-    () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/I'),
+    () =>
+      sequence(
+        () =>
+          client
+            .getFunctionGroup()
+            .readMetadata({ functionGroupName }, { analyse: analyseException }),
+        () => fetchFunctionGroupChildren(utils, functionGroupName, 'FUGR/I'),
+      ),
     (objects) => ({
       success: true,
       function_group_name: functionGroupName,

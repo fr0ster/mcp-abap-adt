@@ -15,8 +15,10 @@
  * composite's own parameter names (`serviceDefinition`,
  * `serviceBindingVersion`) suggest it checked against a service-binding-
  * specific endpoint — have nowhere to go on this member, the same
- * "nowhere to go" `update()`'s own doc comment names for its own dropped
- * fields. No other member on `AdtServiceBinding` validates a name or a
+ * "nowhere to go" the `IServiceBindingPublicationConfig` type's own doc
+ * comment (`core/service/types.d.ts`, not `update()`'s own short one) names
+ * for that member's dropped fields. No other member on `AdtServiceBinding`
+ * validates a name or a
  * variant, so this is the only remaining single-call candidate, kept as a
  * one-call migration (Shape 1) with that narrowing documented rather than
  * silently accepted.

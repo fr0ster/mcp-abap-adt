@@ -39,7 +39,10 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  analyseValidation,
+} from '@mcp-abap-adt/adt-strategies';
 import { handleListFunctionGroupIncludes } from '../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
@@ -137,6 +140,21 @@ describe('SHAPE 1 — a rename, still one call', () => {
     expect(result.content[0].text).not.toContain('step');
   });
 
+  it('ValidateServiceBinding passes analyseValidation, not analyseException', async () => {
+    const seen: unknown[] = [];
+    fakeClient = fakeClientOf({
+      validate: async (_config: unknown, options: any) => {
+        seen.push(options?.analyse);
+        return okResponse(reading({}, '', 200));
+      },
+    });
+    await handleValidateServiceBinding(context as any, {
+      service_binding_name: 'ZSB',
+      service_definition_name: 'ZSD',
+    });
+    expect(seen).toEqual([analyseValidation]);
+  });
+
   it('packageResolver searches through the renamed member, with a strategy', async () => {
     const seen: unknown[] = [];
     fakeClient = fakeClientOf({
@@ -151,13 +169,95 @@ describe('SHAPE 1 — a rename, still one call', () => {
   });
 });
 
+describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child type', () => {
+  // The shared SHAPE 1 refusal test above proves the first (root)
+  // `fetchNodeStructure` call is reached; it never inspects which child
+  // type code either handler asks the root's `childNodes` for. Swapping
+  // `FUGR/FF` and `FUGR/I` between the two handler files would still pass
+  // every test above — this pins the outcome instead: two children on the
+  // root, one FUGR/FF, one FUGR/I, each with a distinct object one level
+  // down, and each handler must come back with the ONE that belongs to it.
+  function fakeFunctionGroupClient() {
+    return fakeClientOf({
+      fetchNodeStructure: async (
+        _parentType: unknown,
+        _parentName: unknown,
+        options?: any,
+      ) => {
+        // `fetchNodeStructure` through `ourUtils` (`node: nodeLevel`)
+        // answers a plain `NodeLevel` — `{ objects, childNodes }` — not an
+        // `AdtReading`-wrapped one; `nodeLevel` is a bare `IResultStrategy`,
+        // never passed through `reading.ts`'s `reading()` helper.
+        if (!options?.nodeId) {
+          return okResponse({
+            objects: [],
+            childNodes: [
+              { type: 'FUGR/FF', nodeId: '1' },
+              { type: 'FUGR/I', nodeId: '2' },
+            ],
+          });
+        }
+        if (options.nodeId === '1') {
+          return okResponse({
+            objects: [{ name: 'Z_FM_ONLY', type: 'FUGR/FF' }],
+            childNodes: [],
+          });
+        }
+        return okResponse({
+          objects: [{ name: 'LFGTOP', type: 'FUGR/I' }],
+          childNodes: [],
+        });
+      },
+    });
+  }
+
+  it('ListFunctionModules reads the FUGR/FF child, not FUGR/I', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const result: any = await handleListFunctionModules(context as any, {
+      function_group_name: 'ZFG',
+    });
+    expect(JSON.parse(result.content[0].text).function_modules).toEqual([
+      'Z_FM_ONLY',
+    ]);
+  });
+
+  it('ListFunctionGroupIncludes reads the FUGR/I child, not FUGR/FF', async () => {
+    fakeClient = fakeFunctionGroupClient();
+    const result: any = await handleListFunctionGroupIncludes(context as any, {
+      function_group_name: 'ZFG',
+    });
+    expect(JSON.parse(result.content[0].text).includes).toEqual(['LFGTOP']);
+  });
+
+  it.each([
+    ['ListFunctionModules', handleListFunctionModules],
+    ['ListFunctionGroupIncludes', handleListFunctionGroupIncludes],
+  ])('%s tells a nonexistent function group apart from an empty one — refuses on readMetadata, before the walk', async (_n, handler) => {
+    const walk = jest.fn();
+    fakeClient = fakeClientOf({
+      readMetadata: async () => refusedResponse('Function group ZFG not found'),
+      fetchNodeStructure: walk,
+    });
+    const result: any = await (handler as any)(context as any, {
+      function_group_name: 'ZFG',
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Function group ZFG not found',
+    );
+    expect(walk).not.toHaveBeenCalled();
+  });
+});
+
 describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () => {
   it('packageEnumerator walks rather than calling the removed member', async () => {
     const walked: string[] = [];
     fakeClient = fakeClientOf({
       fetchNodeStructure: async (_type: unknown, name: unknown) => {
         walked.push(String(name));
-        return okResponse(reading({ objects: [], childNodes: [] }));
+        // Plain `NodeLevel`, not `AdtReading`-wrapped — see the comment in
+        // the FUGR/FF-vs-FUGR/I describe block above for why.
+        return okResponse({ objects: [], childNodes: [] });
       },
       // If the handler still named `getPackageContentsList` this would be
       // reached instead of the walk above, and the assertion below would
@@ -236,26 +336,39 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     service_name: 'ZSRV',
   };
 
-  it('calls update with no analyse — the library default (publicationRefusal) is the tailored verdict', async () => {
+  it('locks before update and unlocks after, passing a timeout but no analyse — the library default (publicationRefusal) is the tailored verdict', async () => {
+    const order: string[] = [];
     const seen: Record<string, unknown> = {};
     fakeClient = fakeClientOf({
+      lock: async () => {
+        order.push('lock');
+        return okResponse('LOCK_HANDLE_1');
+      },
       update: async (config: any, options: any) => {
+        order.push('update');
         seen.config = config;
         seen.options = options;
         return okResponse(reading(undefined, '', 200));
       },
+      unlock: async () => {
+        order.push('unlock');
+        return okResponse(undefined);
+      },
     });
     const result: any = await handleUpdateServiceBinding(context as any, args);
     expect(result.isError).toBe(false);
+    expect(order).toEqual(['lock', 'update', 'unlock']);
     expect(seen.config).toEqual({
       bindingName: 'ZSB',
       desiredPublicationState: 'published',
       serviceType: 'odatav4',
     });
-    // No second argument at all — not even an empty `{}` — and no
-    // `classifyServiceBinding` call to check for: there was never a second
-    // member in the removed composite's replacement to call.
-    expect(seen.options).toBeUndefined();
+    // The lock handle and a timeout travel through options — but never a
+    // strategy. `classifyServiceBinding` is not called either: there was
+    // never a second member in the removed composite's replacement to call.
+    expect((seen.options as any).lockHandle).toBe('LOCK_HANDLE_1');
+    expect((seen.options as any).timeout).toBeGreaterThan(120_000);
+    expect('analyse' in (seen.options as any)).toBe(false);
   });
 
   it("refuses 'unchanged' before building any client", async () => {
@@ -269,6 +382,9 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
       desired_publication_state: 'unchanged',
     });
     expect(result.isError).toBe(true);
+    // `return_error` (not `answer()`'s failure path — this check runs
+    // before any client is built) answers plain text, not a JSON envelope.
+    expect(result.content[0].text).toContain("Cannot update to 'unchanged'");
   });
 });
 

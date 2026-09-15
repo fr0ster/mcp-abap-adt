@@ -1,8 +1,12 @@
 /**
  * One row per write in scope of task 20 (17 creates, 10 updates — minus
  * `CreateUnitTest`/`UpdateUnitTest`, deferred to whichever task takes
- * adt-clients 19's removed/renamed members): per handler, the endpoint the
- * write actually reaches and the field the caller's marker lands in.
+ * adt-clients 19's removed/renamed members), plus task 23's own writes,
+ * added when task 23 found this table had been left untouched despite
+ * being named by the brief as its home: `CreateServiceBinding`,
+ * `UpdateServiceBinding`, `CreateUnitTest`, `RunUnitTest`. Per handler, the
+ * endpoint the write actually reaches and the field the caller's marker
+ * lands in.
  *
  * **Driven through a real `AdtClient` against `recordingConnection`, not a
  * mocked member.** `highTierWriteChannel.test.ts` (the previous task's
@@ -18,6 +22,18 @@
  * captured: its URL (which endpoint — the family a mocked member's
  * "factory" name would otherwise prove) and its body (the channel the
  * marker travelled through).
+ *
+ * **Why this table matters for task 23 specifically.** `staticSequences.
+ * test.ts` (task 23's own new file) uses `fakeClientOf`, which — like
+ * `fakeClientOfWithFactory` above — replaces `createAdtClient` and ignores
+ * which factory (`getServiceBinding()`, `getUnitTest()`, …) was actually
+ * asked for. A handler pointed at the wrong family's factory, one that
+ * dropped its injected `resultsFor(serviceDocuments)`/`ourUnitTest` result
+ * set, one that emptied `run()`'s options, or one that dropped the caller's
+ * `transport_request` all compile, all pass a refusal-surfacing test, and
+ * none of them are visible without the real client actually building the
+ * request. These four rows are what catches that class of defect for this
+ * task's own writes.
  */
 
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
@@ -40,11 +56,15 @@ import { handleUpdateMessageClass } from '../../handlers/message_class/high/hand
 import { handleUpdateMessageClassMessage } from '../../handlers/message_class/high/handleUpdateMessageClassMessage';
 import { handleCreatePackage } from '../../handlers/package/high/handleCreatePackage';
 import { handleCreateProgram } from '../../handlers/program/high/handleCreateProgram';
+import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
+import { handleUpdateServiceBinding } from '../../handlers/service_binding/high/handleUpdateServiceBinding';
 import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleCreateStructure } from '../../handlers/structure/high/handleCreateStructure';
 import { handleCreateTable } from '../../handlers/table/high/handleCreateTable';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
+import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
+import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import {
   type RecordedRequest,
@@ -374,9 +394,74 @@ const cases: ChannelCase[] = [
         test_class_source: marker,
       }),
   },
+  // --- Task 23's own writes, deferred to this table by name, added here. ---
+  {
+    // `activate: false` keeps this to the ONE request `create()` itself
+    // issues — `staticSequences.test.ts`'s SHAPE 4b already proves the
+    // activate/generate order with mocked members; this row proves the
+    // create alone reaches the real endpoint the shipped `createRequest`
+    // sends it to, through the real `getServiceBinding()` factory (not a
+    // different family's), with the caller's `description` landing in the
+    // body `create()`'s own XML builder puts it in.
+    name: 'CreateServiceBinding',
+    method: 'POST',
+    urlContains: '/sap/bc/adt/businessservices/bindings',
+    run: (marker, connection) =>
+      handleCreateServiceBinding(ctx(connection) as any, {
+        service_binding_name: 'ZSB_X',
+        service_definition_name: 'ZSD_X',
+        package_name: 'ZP',
+        description: marker,
+        activate: false,
+      }),
+  },
+  {
+    // `publishByServiceType`'s body carries no free-text field at all — only
+    // the binding name, uppercased, in `adtcore:objectReference@name` — so
+    // the marker IS the binding name here, the one field this channel
+    // genuinely carries. `recordingConnection`'s default (a real lock handle
+    // for `_action=LOCK`, 200/empty otherwise) covers the lock this handler
+    // now takes and the unlock that releases it; no `seedAnswers` needed.
+    name: 'UpdateServiceBinding',
+    method: 'POST',
+    urlContains: '/businessservices/odatav4/publishjobs',
+    run: (marker, connection) =>
+      handleUpdateServiceBinding(ctx(connection) as any, {
+        service_binding_name: marker,
+        desired_publication_state: 'published',
+        binding_variant: 'ODATA_V4_UI',
+        service_name: 'ZSRV',
+      }),
+  },
+  {
+    // `startClassUnitTestRun`'s XML carries the caller's `title` verbatim.
+    // `runId` needs a run id in the answer to judge this a success at all
+    // (`startedRun`'s own verdict — no id, no success, regardless of HTTP
+    // status), so a `Location` header naming a run is seeded.
+    name: 'CreateUnitTest',
+    method: 'POST',
+    urlContains: '/sap/bc/adt/abapunit/runs',
+    seedAnswers: [{ headers: { location: '/sap/bc/adt/abapunit/runs/1' } }],
+    run: (marker, connection) =>
+      handleCreateUnitTest(ctx(connection) as any, {
+        tests: [{ container_class: 'ZCL_X', test_class: 'LTCL_X' }],
+        title: marker,
+      }),
+  },
+  {
+    name: 'RunUnitTest',
+    method: 'POST',
+    urlContains: '/sap/bc/adt/abapunit/runs',
+    seedAnswers: [{ headers: { location: '/sap/bc/adt/abapunit/runs/1' } }],
+    run: (marker, connection) =>
+      handleRunUnitTest(ctx(connection) as any, {
+        tests: [{ container_class: 'ZCL_X', test_class: 'LTCL_X' }],
+        title: marker,
+      }),
+  },
 ];
 
-describe('every write in task 20 lands where its shipped member sends it (real client)', () => {
+describe('every write in task 20 and task 23 lands where its shipped member sends it (real client)', () => {
   it.each(
     cases,
   )('$name reaches $urlContains and carries the marker', async (c) => {

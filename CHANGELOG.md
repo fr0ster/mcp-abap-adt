@@ -110,13 +110,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `max_trace_attempts`, `trace_retry_delay_ms`, `trace_lookup_uris` or a
   `trace_id` to begin with (program execution has always been
   fire-and-forget; a trace is located afterwards via
-  `RuntimeListProfilerTraceFiles`), so none of those were removed — an
-  earlier account of this task claimed otherwise and was wrong.
+  `RuntimeListProfilerTraceFiles`), so none of those were removed.
   `RuntimeRunProgramWithProfiling` is deprecated and, by the rule this
   repository otherwise follows (a deprecated tool gains no field — applied
   correctly to `RuntimeRunClassWithProfiling` above), should not have started
-  answering `output`; Task 23 added it inconsistently with that rule. Recorded
-  here rather than fixed by this entry.
+  answering `output`. Recorded here rather than fixed by this entry.
 
 ## [10.0.1] - 2026-09-11
 

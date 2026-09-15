@@ -1,25 +1,38 @@
 /**
  * UpdateDataElement Handler - Update Existing ABAP Data Element
  *
- * Uses AdtClient.getDataElement().{lock,readMetadata,updateMetadata,unlock,
- * activate} from @mcp-abap-adt/adt-clients 19, through `withLock` — the lock
- * is held for the read-modify-write in its body, released on every path out.
+ * Uses AdtClient.getDataElement().{lock,readMetadata,updateMetadata,check,
+ * unlock,activate} from @mcp-abap-adt/adt-clients 19, through `withLock` —
+ * the lock is held for the read-modify-write-check in its body, released on
+ * every path out.
  *
- * Workflow: lock -> (read, patch, write) -> unlock -> (activate). The
- * post-write syntax check the pre-migration handler ran (swallowed except
- * for a genuine, non-"already checked" refusal) is gone: it duplicated what
- * `updateMetadata`'s own `analyseException` already verdicts. The pre-write
- * "already exists" validation is also gone — it tolerated exactly one
- * refusal shape from an endpoint an update never needs to call.
+ * Workflow: lock -> (read, patch, write, check) -> unlock -> (wait for the
+ * write to be visible) -> (activate). `check` runs unconditionally, not
+ * gated by `activate` — the pre-migration handler ran it the same way (a
+ * refusal there stopped the answer), and it is now a step of the `sequence`
+ * below rather than a hand-rolled rethrow. The wait between `unlock` and
+ * `activate` is the pre-migration handler's long-polling
+ * `readMetadata({withLongPolling: true})`, discarded for its result but not
+ * for what it does — see `handleUpdateDomain.ts` (high) for the live
+ * incident this guards against, documented in `xmlPatch.ts`. The pre-write
+ * "already exists" validation is gone — it tolerated exactly one refusal
+ * shape from an endpoint an update never needs to call.
  *
  * **The patched document goes in `config.document`, not `options.xmlContent`.**
  * See `UpdateDataElementLow` — the shipped `AdtDataElement.updateMetadata()`
  * reads `config.document` only.
+ *
+ * **`config.packageName` never reaches the wire on an update.** The shipped
+ * `updateDataElement()` wire function (`core/dataElement/update.js`) builds
+ * its URL and PUT from `params.data_element_name`, `params.transport_request`
+ * and `document` only — `params.package_name` is passed in but never read.
+ * Not sent.
  */
 
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
+  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -34,6 +47,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
@@ -204,37 +218,50 @@ export async function handleUpdateDataElement(
 
       const written = await withLock(
         () => obj.lock({ dataElementName }),
-        async (
-          lockHandle,
-        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const current = await obj.readMetadata(
-            { dataElementName },
-            { analyse: analyseException },
-          );
-          if (!current.ok) {
-            return current as IAdtResponse<AdtReading<unknown>, IAdtError>;
-          }
-          return obj.updateMetadata(
-            {
-              dataElementName,
-              packageName: args.package_name,
-              transportRequest: args.transport_request,
-              document: patchDataElementXml(
-                extractXmlString(
-                  current.getResult().value.raw,
-                  `data element ${dataElementName}`,
-                ),
-                changes,
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+          sequence(
+            () =>
+              obj.readMetadata(
+                { dataElementName },
+                { analyse: analyseException },
               ),
-            },
-            { lockHandle, analyse: analyseException },
-          );
-        },
+            (current) =>
+              obj.updateMetadata(
+                {
+                  dataElementName,
+                  transportRequest: args.transport_request,
+                  document: patchDataElementXml(
+                    extractXmlString(
+                      current.raw,
+                      `data element ${dataElementName}`,
+                    ),
+                    changes,
+                  ),
+                },
+                { lockHandle, analyse: analyseException },
+              ),
+            () =>
+              obj.check({ dataElementName }, undefined, {
+                analyse: analyseCheck,
+              }),
+          ),
         (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
       );
 
-      if (!written.ok || !shouldActivate) {
+      if (!written.ok) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .readMetadata(
+          { dataElementName },
+          { withLongPolling: true, analyse: analyseException },
+        )
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
+        return written;
       }
 
       return obj.activate({ dataElementName }, { analyse: analyseActivation });

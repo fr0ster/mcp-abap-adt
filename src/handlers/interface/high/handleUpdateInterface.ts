@@ -1,23 +1,26 @@
 /**
  * UpdateInterface Handler - Update existing ABAP Interface source code
  *
- * Uses AdtClient.getInterface().{lock,update,unlock,activate} from
+ * Uses AdtClient.getInterface().{lock,check,update,unlock,activate} from
  * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
  * write, released on every path out.
  *
- * Workflow: lock -> update -> unlock -> (activate). The pre-write and
- * post-unlock syntax checks the pre-migration handler ran are gone: they
- * duplicated what `update`'s own `analyseException` already verdicts, and
- * dropping them matches this tool's documented contract ("Locks, updates,
- * unlocks, and optionally activates") and every low-tier sibling.
+ * Workflow: lock -> (check, iff activating) -> update -> unlock ->
+ * (activate). The pre-write check gates the write exactly as the
+ * pre-migration handler did — only when `activate` is true. The
+ * pre-migration handler's *post*-unlock check is gone: its own `catch`
+ * never rethrew, so it could never have changed the answer.
  *
- * **The source goes in `options`, not `config`.** See `UpdateInterfaceLow` —
- * the shipped `AdtInterface.update()` reads `options?.sourceCode` only.
+ * **The source goes in `options` for `update`, `config` for `check`.** See
+ * `UpdateInterfaceLow` for `update` — the shipped `AdtInterface.update()`
+ * reads `options?.sourceCode` only; `AdtInterface.check()` reads
+ * `config.sourceCode`.
  */
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
+  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -97,15 +100,28 @@ export async function handleUpdateInterface(
 
       const written = await withLock(
         () => obj.lock({ interfaceName }),
-        (lockHandle) =>
-          obj.update(
+        async (
+          lockHandle,
+        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          if (shouldActivate) {
+            const checked = await obj.check(
+              { interfaceName, sourceCode: args.source_code },
+              'inactive',
+              { analyse: analyseCheck },
+            );
+            if (!checked.ok) {
+              return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+            }
+          }
+          return obj.update(
             { interfaceName, transportRequest: args.transport_request },
             {
               sourceCode: args.source_code,
               lockHandle,
               analyse: analyseException,
             },
-          ),
+          );
+        },
         (lockHandle) => obj.unlock({ interfaceName }, lockHandle),
       );
 

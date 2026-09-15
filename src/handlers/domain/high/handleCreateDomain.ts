@@ -1,15 +1,26 @@
 /**
  * CreateDomain Handler - ABAP Domain Creation via ADT API
  *
- * Uses AdtClient.getDomain().{validate,create,lock,updateMetadata,unlock,
- * check,activate} from @mcp-abap-adt/adt-clients 19.
+ * Uses AdtClient.getDomain().{validate,create,lock,readMetadata,
+ * updateMetadata,unlock,check,activate} from @mcp-abap-adt/adt-clients 19.
  *
  * A lifecycle, not one call: validate the name, create the bare object, lock
- * it, write the properties the caller gave (through `withLock`, released on
- * every path out), check the inactive version, and optionally activate. The
- * lock wraps only the body write in the middle — `create` and `check` are
- * their own requests outside it, matching the order the pre-migration
- * handler ran them in.
+ * it, read-patch-write the properties the caller gave (through `withLock`,
+ * released on every path out), check the inactive version, wait for the
+ * write to be visible, and optionally activate. The lock wraps only the
+ * read-modify-write in the middle — `create` and `check` are their own
+ * requests outside it, matching the order the pre-migration handler ran
+ * them in. The wait before `activate` is the pre-migration handler's
+ * long-polling `read({withLongPolling: true})`, discarded for its result
+ * but not for what it does — this repository's own `xmlPatch.ts` documents
+ * the live incident behind it: a read of a not-yet-ready object answers 200
+ * with an empty body, never a 404.
+ *
+ * **`config.packageName` never reaches the wire on `updateMetadata`.** The
+ * shipped `updateDomain()` wire function (`core/domain/update.js`) builds
+ * its URL and PUT from `args.domain_name`, `args.transport_request` and
+ * `document` only — `args.package_name` is passed in but never read. Not
+ * sent (the create call above still carries it, where it is read).
  */
 
 import { domainDocuments } from '@mcp-abap-adt/adt-clients';
@@ -205,48 +216,56 @@ export async function handleCreateDomain(
         () =>
           withLock(
             () => obj.lock({ domainName }),
-            async (
+            (
               lockHandle,
-            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-              const current = await obj.readMetadata(
-                { domainName },
-                { analyse: analyseException },
-              );
-              if (!current.ok) {
-                return current as IAdtResponse<AdtReading<unknown>, IAdtError>;
-              }
-              return obj.updateMetadata(
-                {
-                  domainName,
-                  packageName: args.package_name,
-                  transportRequest: args.transport_request,
-                  document: patchDomainXml(
-                    extractXmlString(
-                      current.getResult().value.raw,
-                      `domain ${domainName}`,
-                    ),
-                    {
-                      description: args.description || domainName,
-                      datatype: args.datatype || 'CHAR',
-                      length: args.length || 100,
-                      decimals: args.decimals || 0,
-                      conversion_exit: args.conversion_exit,
-                      lowercase: args.lowercase || false,
-                      sign_exists: args.sign_exists || false,
-                      value_table: args.value_table,
-                      fixed_values: args.fixed_values,
-                    },
+            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+              sequence(
+                () =>
+                  obj.readMetadata(
+                    { domainName },
+                    { analyse: analyseException },
                   ),
-                },
-                { lockHandle, analyse: analyseException },
-              );
-            },
+                (current) =>
+                  obj.updateMetadata(
+                    {
+                      domainName,
+                      transportRequest: args.transport_request,
+                      document: patchDomainXml(
+                        extractXmlString(current.raw, `domain ${domainName}`),
+                        {
+                          description: args.description || domainName,
+                          datatype: args.datatype || 'CHAR',
+                          length: args.length || 100,
+                          decimals: args.decimals || 0,
+                          conversion_exit: args.conversion_exit,
+                          lowercase: args.lowercase || false,
+                          sign_exists: args.sign_exists || false,
+                          value_table: args.value_table,
+                          fixed_values: args.fixed_values,
+                        },
+                      ),
+                    },
+                    { lockHandle, analyse: analyseException },
+                  ),
+              ),
             (lockHandle) => obj.unlock({ domainName }, lockHandle),
           ),
         () => obj.check({ domainName }, undefined, { analyse: analyseCheck }),
       );
 
-      if (!checked.ok || !shouldActivate) {
+      if (!checked.ok) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .readMetadata(
+          { domainName },
+          { withLongPolling: true, analyse: analyseException },
+        )
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 

@@ -25,6 +25,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
   extractXmlString,
@@ -96,32 +97,30 @@ export async function handleUpdateFunctionGroup(
 
       return withLock(
         () => obj.lock({ functionGroupName }),
-        async (
-          lockHandle,
-        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-          const current = await obj.readMetadata(
-            { functionGroupName },
-            { analyse: analyseException },
-          );
-          if (!current.ok) {
-            return current as IAdtResponse<AdtReading<unknown>, IAdtError>;
-          }
-          return obj.updateMetadata(
-            {
-              functionGroupName,
-              transportRequest: args.transport_request,
-              document: patchXmlAttribute(
-                extractXmlString(
-                  current.getResult().value.raw,
-                  `function group ${functionGroupName}`,
-                ),
-                'adtcore:description',
-                description,
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+          sequence(
+            () =>
+              obj.readMetadata(
+                { functionGroupName },
+                { analyse: analyseException },
               ),
-            },
-            { lockHandle, analyse: analyseException },
-          );
-        },
+            (current) =>
+              obj.updateMetadata(
+                {
+                  functionGroupName,
+                  transportRequest: args.transport_request,
+                  document: patchXmlAttribute(
+                    extractXmlString(
+                      current.raw,
+                      `function group ${functionGroupName}`,
+                    ),
+                    'adtcore:description',
+                    description,
+                  ),
+                },
+                { lockHandle, analyse: analyseException },
+              ),
+          ),
         (lockHandle) => obj.unlock({ functionGroupName }, lockHandle),
       );
     },

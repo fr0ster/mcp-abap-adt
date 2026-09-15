@@ -1,15 +1,19 @@
 /**
  * UpdateFunctionModule Handler - Update Existing ABAP Function Module Source Code
  *
- * Uses AdtClient.getFunctionModule().{lock,update,unlock,activate} from
- * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
- * write, released on every path out.
+ * Uses AdtClient.getFunctionModule().{lock,update,check,unlock,activate}
+ * from @mcp-abap-adt/adt-clients 19, through `withLock` — held for the
+ * whole write, released on every path out.
  *
- * Workflow: lock -> update -> unlock -> (activate). The pre-migration
- * handler ran a `check` between `update` and `unlock` unconditionally
- * (outside any `safeCheckOperation` swallow); it is gone here for the same
- * reason the other families in this cluster dropped theirs: it duplicated
- * what `update`'s own `analyseException` already verdicts.
+ * Workflow: lock -> update -> check -> unlock -> (wait for the write to be
+ * visible) -> (activate). The pre-migration handler ran `check`
+ * unconditionally between `update` and `unlock` (outside any
+ * `safeCheckOperation` swallow — a refusal there stopped the answer); it is
+ * restored here as a step of the `sequence` below rather than a bare
+ * uncaught call. The wait between `unlock` and `activate` is the
+ * pre-migration handler's long-polling `read({withLongPolling: true})`,
+ * discarded for its result but not for what it does — see
+ * `handleUpdateDomain.ts` (high) for the live incident this guards against.
  *
  * **The source goes through `options.sourceCode`.** See
  * `UpdateFunctionModuleLow`.
@@ -18,6 +22,7 @@
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
+  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -28,6 +33,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -117,25 +123,44 @@ export async function handleUpdateFunctionModule(
 
       const written = await withLock(
         () => obj.lock({ functionModuleName, functionGroupName }),
-        (lockHandle) =>
-          obj.update(
-            {
-              functionModuleName,
-              functionGroupName,
-              transportRequest: args.transport_request,
-            },
-            {
-              sourceCode: args.source_code,
-              lockHandle,
-              analyse: analyseException,
-            },
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+          sequence(
+            () =>
+              obj.update(
+                {
+                  functionModuleName,
+                  functionGroupName,
+                  transportRequest: args.transport_request,
+                },
+                {
+                  sourceCode: args.source_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            () =>
+              obj.check({ functionModuleName, functionGroupName }, undefined, {
+                analyse: analyseCheck,
+              }),
           ),
         (lockHandle) =>
           obj.unlock({ functionModuleName, functionGroupName }, lockHandle),
       );
 
-      if (!written.ok || !shouldActivate) {
+      if (!written.ok) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .read({ functionModuleName, functionGroupName }, 'inactive', {
+          withLongPolling: true,
+          analyse: analyseException,
+        })
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
+        return written;
       }
 
       return obj.activate(

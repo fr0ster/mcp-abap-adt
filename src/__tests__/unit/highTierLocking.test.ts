@@ -1,6 +1,7 @@
 import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
+import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
 import {
   fakeClientOf,
   okResponse,
@@ -66,6 +67,69 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     expect(payload.operation).toBe('succeeded');
   });
 
+  it('gates the write on a pre-write check, but only when activating (fix round 1)', async () => {
+    const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
+    const unlock = jest.fn(async () => okResponse(undefined));
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check: async () => refusedResponse('Syntax error in new source'),
+      update,
+      unlock,
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'bad source',
+      activate: true,
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Syntax error in new source',
+    );
+    expect(update).not.toHaveBeenCalled();
+    expect(unlock).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the pre-write check on the default (non-activating) path', async () => {
+    const check = jest.fn(async () => refusedResponse('would have refused'));
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check,
+      update: async () => okResponse(reading(undefined, '', 200)),
+      unlock: async () => okResponse(undefined),
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+    });
+    expect(result.isError).toBe(false);
+    expect(check).not.toHaveBeenCalled();
+  });
+
+  it('runs the post-write check unconditionally on the default path (fix round 1)', async () => {
+    const check = jest.fn(async () => refusedResponse('Refused post-write'));
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      readMetadata: async () => okResponse(reading(DOMAIN_XML)),
+      updateMetadata: async () => okResponse(reading(undefined, '', 200)),
+      check,
+      unlock: async () => okResponse(undefined),
+    });
+    // domain_name/package_name only: activate defaults to true for
+    // UpdateDomain, but the check the four "unconditional" families ran was
+    // never gated by activate in the first place — it is a mandatory phase
+    // of the sequence, regardless of what activate is set to.
+    const result: any = await handleUpdateDomain(context as any, {
+      domain_name: 'ZD',
+      package_name: 'ZP',
+      activate: false,
+    });
+    expect(result.isError).toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Refused post-write',
+    );
+    expect(check).toHaveBeenCalledTimes(1);
+  });
+
   const lifecycleArgs = {
     domain_name: 'ZD',
     package_name: 'ZP',
@@ -121,7 +185,8 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     const result: any = await handleCreateDomain(context as any, lifecycleArgs);
     expect(result.isError).toBe(false);
     // The order the handler performs today: validate, create, then the
-    // read-modify-write held under one lock, then check, then activate.
+    // read-modify-write held under one lock, then check, then a best-effort
+    // wait (a second `readMetadata`, discarded) before activate.
     expect(order).toEqual([
       'validate',
       'create',
@@ -130,6 +195,7 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       'update',
       'unlock',
       'check',
+      'read',
       'activate',
     ]);
   });

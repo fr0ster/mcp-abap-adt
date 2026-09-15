@@ -5,7 +5,11 @@
  * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
  * write, released on every path out.
  *
- * Workflow: lock -> update -> unlock -> (activate).
+ * Workflow: lock -> update -> unlock -> (wait for the write to be visible)
+ * -> (activate). The wait is the pre-migration handler's long-polling
+ * `read({withLongPolling: true})`, discarded for its result but not for
+ * what it does — see `handleUpdateDomain.ts` (high) for the live incident
+ * this guards against, documented in `xmlPatch.ts`.
  *
  * **The source goes in `options`, not `config`.** See
  * `UpdateMetadataExtensionLow` — the shipped `AdtMetadataExtension.update()`
@@ -115,8 +119,20 @@ export async function handleUpdateMetadataExtension(
             (lockHandle) => obj.unlock({ name: ddlxName }, lockHandle),
           );
 
-      if (!written.ok || !shouldActivate) {
+      if (!written.ok) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .read({ name: ddlxName }, 'inactive', {
+          withLongPolling: true,
+          analyse: analyseException,
+        })
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
+        return written;
       }
 
       return obj.activate({ name: ddlxName }, { analyse: analyseActivation });

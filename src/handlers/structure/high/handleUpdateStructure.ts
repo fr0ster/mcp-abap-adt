@@ -1,23 +1,28 @@
 /**
  * UpdateStructure Handler - Update Existing ABAP Structure DDL Source
  *
- * Uses AdtClient.getStructure().{lock,update,unlock,activate} from
+ * Uses AdtClient.getStructure().{lock,check,update,unlock,activate} from
  * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
  * write, released on every path out.
  *
- * Workflow: lock -> update -> unlock -> (activate). The pre-write and
- * post-unlock syntax checks the pre-migration handler ran are gone: they
- * duplicated what `update`'s own `analyseException` already verdicts, and
- * dropping them matches this tool's documented contract ("Locks, updates,
- * unlocks, and optionally activates") and every low-tier sibling.
+ * Workflow: lock -> (check, iff activating) -> update -> unlock ->
+ * (activate). The pre-write check gates the write exactly as the
+ * pre-migration handler did — only when `activate` is true. Note:
+ * `AdtStructure.check()`'s shipped `runTableCheckRun`/`checkStructure` call
+ * does forward `config.ddlCode` to the wire request — unlike `AdtTable`'s,
+ * whose check hardcodes no source (see `UpdateTable`) — so this check does
+ * validate the unsaved source. The pre-migration handler's *post*-unlock
+ * check is gone: its own `catch` never rethrew, so it could never have
+ * changed the answer.
  *
- * **The source goes through `options.sourceCode`.** See
- * `UpdateStructureLow`.
+ * **The source goes through `options.sourceCode` for `update`,
+ * `config.ddlCode` for `check`.** See `UpdateStructureLow` for `update`.
  */
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
+  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -95,15 +100,28 @@ export async function handleUpdateStructure(
 
       const written = await withLock(
         () => obj.lock({ structureName }),
-        (lockHandle) =>
-          obj.update(
+        async (
+          lockHandle,
+        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          if (shouldActivate) {
+            const checked = await obj.check(
+              { structureName, ddlCode: args.ddl_code },
+              'inactive',
+              { analyse: analyseCheck },
+            );
+            if (!checked.ok) {
+              return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+            }
+          }
+          return obj.update(
             { structureName, transportRequest: args.transport_request },
             {
               sourceCode: args.ddl_code,
               lockHandle,
               analyse: analyseException,
             },
-          ),
+          );
+        },
         (lockHandle) => obj.unlock({ structureName }, lockHandle),
       );
 

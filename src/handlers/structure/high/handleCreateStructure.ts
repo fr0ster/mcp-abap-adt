@@ -1,21 +1,35 @@
 /**
  * CreateStructure Handler - ABAP Structure Creation via ADT API
  *
- * Uses AdtClient.getStructure().{validate,create,lock,unlock,check,activate}
- * from @mcp-abap-adt/adt-clients 19.
+ * Uses AdtClient.getStructure().{validate,create,check,activate} from
+ * @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: validate -> create -> lock+unlock (through `withLock`) -> check
- * -> (activate) — the order the pre-migration handler ran them in.
+ * Workflow: validate -> create -> check -> (activate) — the order the
+ * pre-migration handler ran them in, minus the lock/unlock pair it held
+ * around nothing.
  *
  * **`fields`/`includes` never reach the object.** They did not before this
  * migration either: the pre-migration handler's own comment said as much
  * ("skip update as structure creation already includes field definitions",
  * which it does not — `create()` posts a metadata document only, see
- * `CreateStructureLow`). Nothing between `lock` and `unlock` writes a body,
- * so `withLock`'s body here is the acquire/release pair itself — there is
- * nothing yet to compose it with. The parameters stay on this tool's surface
- * with their pre-migration descriptions; wiring DDL generation from
+ * `CreateStructureLow`). The parameters stay on this tool's surface with
+ * their pre-migration descriptions; wiring DDL generation from
  * `fields`/`includes` is a separate change, not part of this task.
+ *
+ * **No lock.** The pre-migration handler locked, wrote nothing, and
+ * unlocked — a `withLock` migrating that mechanically would cost two round
+ * trips for a body that never writes anything, and would let a refused
+ * unlock on that empty window sink an otherwise-good create. Since nothing
+ * here needs the object locked (there is no write between `create` and
+ * `check`), the lock/unlock pair is dropped rather than faithfully
+ * reproduced.
+ *
+ * **`check` now gates the answer; it did not before.** The pre-migration
+ * handler's own `catch` on a genuine (non-"already checked") check failure
+ * only `logger.warn`'d — the create still answered success and still went
+ * on to activate. `analyseCheck` makes a refusal here a refusal of the
+ * whole call, same as every other check in this migration. Deliberate, not
+ * an oversight: see CHANGELOG.md.
  */
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
@@ -34,7 +48,6 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -178,17 +191,6 @@ interface CreateStructureArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
-/** A synthetic success, for a lock whose body writes nothing. */
-function okOf<T>(value: T): IAdtResponse<T, IAdtError> {
-  return {
-    ok: true,
-    getResult: () => ({ value }),
-    getError: () => {
-      throw new Error('okOf: asked for the error of a success');
-    },
-  } as unknown as IAdtResponse<T, IAdtError>;
-}
-
 export async function handleCreateStructure(
   context: HandlerContext,
   args: CreateStructureArgs,
@@ -243,15 +245,6 @@ export async function handleCreateStructure(
               masterLanguage: args.master_language,
             },
             { analyse: analyseException },
-          ),
-        () =>
-          withLock<string, AdtReading<unknown>>(
-            () => obj.lock({ structureName }),
-            () =>
-              Promise.resolve(
-                okOf(undefined as unknown as AdtReading<unknown>),
-              ),
-            (lockHandle) => obj.unlock({ structureName }, lockHandle),
           ),
         () =>
           obj.check({ structureName }, 'inactive', { analyse: analyseCheck }),

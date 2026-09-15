@@ -17,9 +17,12 @@ const context = {
  * behavior_implementation: `AdtDomain.updateMetadata()`'s shipped body reads
  * `config.document` only and never `options.xmlContent` — verified against
  * `AdtDomain.js` and `core/domain/update.js`. This file pins that one
- * request shape, now through the `withLock`-held read-modify-write task 19
- * introduced (the pre-write/post-unlock syntax checks and the long-polling
- * read are gone from the handler as of that task).
+ * request shape, now through the `withLock`-held read-modify-write-check
+ * task 19 introduced.
+ *
+ * `config.packageName` is deliberately absent from the expectation below:
+ * the shipped `updateDomain()` wire function never reads it (see the
+ * handler's own doc comment), so it is not sent.
  */
 describe('UpdateDomain (high) — updateMetadata request shape', () => {
   it('passes the patched document via config.document, and no stray xmlContent survives in options', async () => {
@@ -34,6 +37,7 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
         updateCall = { config, options };
         return okResponse(reading(undefined, '', 200));
       },
+      check: async () => okResponse(reading({})),
       unlock: async () => okResponse(undefined),
     });
 
@@ -51,7 +55,6 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
 
     expect(updateCall?.config).toEqual({
       domainName: 'ZD',
-      packageName: 'ZP',
       transportRequest: undefined,
       document: expect.stringContaining('adtcore:description="after"'),
     });

@@ -4,10 +4,14 @@
  * Uses AdtClient.getBehaviorDefinition().{create,lock,check,unlock,activate}
  * from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: create -> lock+check+unlock (through `withLock`) -> (activate).
- * `create` takes every field this tool accepts (no separate body write), so
- * the lock's body is the syntax check the pre-migration handler ran while
- * holding it.
+ * Workflow: create -> lock+check+unlock (through `withLock`) -> (wait for
+ * the write to be visible) -> (activate). `create` takes every field this
+ * tool accepts (no separate body write), so the lock's body is the syntax
+ * check the pre-migration handler ran while holding it. The wait before
+ * `activate` is the pre-migration handler's long-polling
+ * `read({withLongPolling: true})`, discarded for its result but not for
+ * what it does — see `handleUpdateDomain.ts` (high) for the live incident
+ * this guards against, documented in `xmlPatch.ts`.
  */
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
@@ -145,7 +149,19 @@ export async function handleCreateBehaviorDefinition(
         () => obj.check({ name }, undefined, { analyse: analyseCheck }),
         (lockHandle) => obj.unlock({ name }, lockHandle),
       );
-      if (!checked.ok || !shouldActivate) {
+      if (!checked.ok) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .read({ name }, 'inactive', {
+          withLongPolling: true,
+          analyse: analyseException,
+        })
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 

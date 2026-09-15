@@ -1,11 +1,16 @@
 /**
  * UpdateBehaviorDefinition Handler - ABAP Behavior Definition Update via ADT API
  *
- * Uses AdtClient.getBehaviorDefinition().{lock,update,unlock,activate} from
- * @mcp-abap-adt/adt-clients 19, through `withLock` when this handler owns the
- * lock — held for the whole write, released on every path out. A caller who
- * passes `lock_handle` already holds it, so `withLock` is skipped and the
- * update runs as the one request it is.
+ * Uses AdtClient.getBehaviorDefinition().{lock,update,unlock,read,activate}
+ * from @mcp-abap-adt/adt-clients 19, through `withLock` when this handler
+ * owns the lock — held for the whole write, released on every path out. A
+ * caller who passes `lock_handle` already holds it, so `withLock` is
+ * skipped and the update runs as the one request it is.
+ *
+ * The wait between the write and `activate` is the pre-migration handler's
+ * long-polling `read({withLongPolling: true})`, discarded for its result
+ * but not for what it does — see `handleUpdateDomain.ts` (high) for the
+ * live incident this guards against, documented in `xmlPatch.ts`.
  *
  * **The source goes in `options`, not `config`.** See
  * `UpdateBehaviorDefinitionLow` — the shipped `AdtBehaviorDefinition.update()`
@@ -112,8 +117,20 @@ export async function handleUpdateBehaviorDefinition(
             (lockHandle) => obj.unlock({ name }, lockHandle),
           );
 
-      if (!written.ok || !shouldActivate) {
+      if (!written.ok) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .read({ name }, 'inactive', {
+          withLongPolling: true,
+          analyse: analyseException,
+        })
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
+        return written;
       }
 
       return obj.activate({ name }, { analyse: analyseActivation });

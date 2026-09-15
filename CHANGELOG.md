@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The eighteen high-tier writes that hold a lock now release it through one
+  shared `withLock`, and three genuine behaviour changes survive that
+  migration.**
+
+  `CreateStructure`'s syntax check now gates the answer; before, a genuine
+  check failure was `logger.warn`'d only — the create still answered success
+  and still went on to activate a structure with a known syntax problem. A
+  refused check now fails the call, the same as every other check in this
+  migration (`analyseCheck`, same as `CreateDomain`/`CreateDataElement`/
+  `CreateBehaviorDefinition`/`CreateMetadataExtension` already had).
+
+  `UpdateDdl`, `UpdateInterface`, `UpdateProgram`, `UpdateServiceDefinition`,
+  `UpdateStructure` and `UpdateTable` no longer carry an `activation_warnings`
+  array in their terse (default) answer — the `chkl:messages` parse that array
+  came from still happens, but only `detail: 'full'` or `detail: 'raw'` on the
+  activation reads it now. Terse writes answer the literal string `SUCCESS`
+  or a failure payload uniformly across every write tool in this migration;
+  keeping one family's warnings in the terse channel while every other write
+  tool's terse answer carries none would have been the inconsistency, not the
+  fix.
+
+  Everything else that changed shape during the underlying `withLock`
+  migration and still holds after review: the pre-write and post-unlock
+  syntax checks and the long-polling wait for write visibility are restored
+  to their pre-migration shape (checks now carry the check strategy, so a
+  refusal is reported the way every other refusal in this migration is), and
+  `config.packageName` is no longer sent on `UpdateDomain`/`CreateDomain`/
+  `UpdateDataElement`/`CreateDataElement`'s metadata write — the shipped wire
+  function never read it.
+
 - **`ActivateObjectLow` (multi-object activation) now answers acceptance, not
   a verdict.** Activating a single object still reads a real pass/fail
   straight from ADT. Activating more than one object at once — or one object

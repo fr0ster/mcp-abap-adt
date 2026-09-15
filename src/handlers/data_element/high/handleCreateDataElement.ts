@@ -6,11 +6,22 @@
  *
  * A lifecycle, not one call: validate the name, create the bare object, lock
  * it, read-patch-write the properties the caller gave (through `withLock`,
- * released on every path out), check the inactive version, and optionally
- * activate — the order the pre-migration handler ran them in. `create`
- * itself never reaches `type_kind`/`data_type`/`type_name`/`length`/
- * `decimals` (see `CreateDataElementLow`); they reach the object only
- * through the write inside the lock.
+ * released on every path out), check the inactive version, wait for the
+ * write to be visible, and optionally activate — the order the
+ * pre-migration handler ran them in. `create` itself never reaches
+ * `type_kind`/`data_type`/`type_name`/`length`/`decimals` (see
+ * `CreateDataElementLow`); they reach the object only through the write
+ * inside the lock. The wait before `activate` is the pre-migration
+ * handler's long-polling `read({withLongPolling: true})`, discarded for its
+ * result but not for what it does — this repository's own `xmlPatch.ts`
+ * documents the live incident behind it.
+ *
+ * **`config.packageName` never reaches the wire on `updateMetadata`.** The
+ * shipped `updateDataElement()` wire function
+ * (`core/dataElement/update.js`) builds its URL and PUT from
+ * `params.data_element_name`, `params.transport_request` and `document`
+ * only — `params.package_name` is passed in but never read. Not sent (the
+ * create call above still carries it, where it is read).
  */
 
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
@@ -220,46 +231,45 @@ export async function handleCreateDataElement(
         () =>
           withLock(
             () => obj.lock({ dataElementName }),
-            async (
+            (
               lockHandle,
-            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-              const current = await obj.readMetadata(
-                { dataElementName },
-                { analyse: analyseException },
-              );
-              if (!current.ok) {
-                return current as IAdtResponse<AdtReading<unknown>, IAdtError>;
-              }
-              return obj.updateMetadata(
-                {
-                  dataElementName,
-                  packageName: args.package_name,
-                  transportRequest: args.transport_request,
-                  document: patchDataElementXml(
-                    extractXmlString(
-                      current.getResult().value.raw,
-                      `data element ${dataElementName}`,
-                    ),
-                    {
-                      description: args.description || dataElementName,
-                      type_kind: typeKind,
-                      type_name: args.type_name,
-                      data_type: args.data_type || 'CHAR',
-                      length: args.length || 100,
-                      decimals: args.decimals || 0,
-                      short_label: args.short_label,
-                      medium_label: args.medium_label,
-                      long_label: args.long_label,
-                      heading_label: args.heading_label,
-                      search_help: args.search_help,
-                      search_help_parameter: args.search_help_parameter,
-                      set_get_parameter: args.set_get_parameter,
-                    },
+            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+              sequence(
+                () =>
+                  obj.readMetadata(
+                    { dataElementName },
+                    { analyse: analyseException },
                   ),
-                },
-                { lockHandle, analyse: analyseException },
-              );
-            },
+                (current) =>
+                  obj.updateMetadata(
+                    {
+                      dataElementName,
+                      transportRequest: args.transport_request,
+                      document: patchDataElementXml(
+                        extractXmlString(
+                          current.raw,
+                          `data element ${dataElementName}`,
+                        ),
+                        {
+                          description: args.description || dataElementName,
+                          type_kind: typeKind,
+                          type_name: args.type_name,
+                          data_type: args.data_type || 'CHAR',
+                          length: args.length || 100,
+                          decimals: args.decimals || 0,
+                          short_label: args.short_label,
+                          medium_label: args.medium_label,
+                          long_label: args.long_label,
+                          heading_label: args.heading_label,
+                          search_help: args.search_help,
+                          search_help_parameter: args.search_help_parameter,
+                          set_get_parameter: args.set_get_parameter,
+                        },
+                      ),
+                    },
+                    { lockHandle, analyse: analyseException },
+                  ),
+              ),
             (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
           ),
         () =>
@@ -268,7 +278,19 @@ export async function handleCreateDataElement(
           }),
       );
 
-      if (!checked.ok || !shouldActivate) {
+      if (!checked.ok) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .readMetadata(
+          { dataElementName },
+          { withLongPolling: true, analyse: analyseException },
+        )
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 

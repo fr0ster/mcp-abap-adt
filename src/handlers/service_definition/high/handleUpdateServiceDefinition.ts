@@ -1,14 +1,14 @@
 /**
  * UpdateServiceDefinition Handler - Update Existing ABAP Service Definition Source
  *
- * Uses AdtClient.getServiceDefinition().{lock,update,unlock,activate} from
- * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
- * write, released on every path out.
+ * Uses AdtClient.getServiceDefinition().{lock,update,check,unlock,activate}
+ * from @mcp-abap-adt/adt-clients 19, through `withLock` — held for the
+ * whole write, released on every path out.
  *
- * Workflow: lock -> update -> unlock -> (activate). The `check` the
- * pre-migration handler ran between `update` and `unlock` (swallowed except
- * for a genuine, non-"already checked" refusal) is gone: it duplicated what
- * `update`'s own `analyseException` already verdicts.
+ * Workflow: lock -> update -> check -> unlock -> (activate). `check` ran
+ * unconditionally between `update` and `unlock` in the pre-migration
+ * handler too (a genuine, non-"already checked" refusal there stopped the
+ * answer); it is restored here as a step of the `sequence` below.
  *
  * **The source goes in `options`, not `config`.** The shipped
  * `AdtServiceDefinition.update()` reads `options?.sourceCode` only and
@@ -19,6 +19,7 @@
 import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
+  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -29,6 +30,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
@@ -97,23 +99,42 @@ export async function handleUpdateServiceDefinition(
 
       const written = await withLock(
         () => obj.lock({ serviceDefinitionName }),
-        (lockHandle) =>
-          obj.update(
-            {
-              serviceDefinitionName,
-              transportRequest: args.transport_request,
-            },
-            {
-              sourceCode: args.source_code,
-              lockHandle,
-              analyse: analyseException,
-            },
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+          sequence(
+            () =>
+              obj.update(
+                {
+                  serviceDefinitionName,
+                  transportRequest: args.transport_request,
+                },
+                {
+                  sourceCode: args.source_code,
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            () =>
+              obj.check({ serviceDefinitionName }, undefined, {
+                analyse: analyseCheck,
+              }),
           ),
         (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),
       );
 
-      if (!written.ok || !shouldActivate) {
+      if (!written.ok) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .read({ serviceDefinitionName }, 'inactive', {
+          withLongPolling: true,
+          analyse: analyseException,
+        })
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
+        return written;
       }
 
       return obj.activate(

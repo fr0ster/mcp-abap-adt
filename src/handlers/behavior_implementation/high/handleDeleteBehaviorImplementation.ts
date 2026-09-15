@@ -1,23 +1,31 @@
 /**
- * DeleteBehaviorImplementation Handler - Delete ABAP BehaviorImplementation via AdtClient
+ * DeleteBehaviorImplementation Handler - Delete ABAP BehaviorImplementation
+ * via ADT deletion API
  *
- * Uses AdtClient.getBehaviorImplementation().delete() for high-level delete operation.
- * Includes deletion check before actual deletion.
+ * Uses AdtClient.getBehaviorImplementation().delete from
+ * @mcp-abap-adt/adt-clients 19. A behavior implementation is a class
+ * (`getBehaviorImplementation<R extends IClassResults>`), so its result set
+ * is `classDocuments`, not a set of its own. See `handleDeleteDomain.ts` for
+ * the shape and the masking this follows: a refusal answers 200,
+ * `analyseDeletion` reads it rather than the status, and no lock is taken
+ * because a held lock is what makes ADT refuse.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP behavior implementation from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -31,6 +39,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['behavior_implementation_name'],
   },
@@ -39,106 +48,32 @@ export const TOOL_DEFINITION = {
 interface DeleteBehaviorImplementationArgs {
   behavior_implementation_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteBehaviorImplementation MCP tool
- *
- * Uses AdtClient.getBehaviorImplementation().delete() - high-level delete operation with deletion check
- */
 export async function handleDeleteBehaviorImplementation(
   context: HandlerContext,
   args: DeleteBehaviorImplementationArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { behavior_implementation_name, transport_request } =
-      args as DeleteBehaviorImplementationArgs;
+  const { behavior_implementation_name, transport_request } = args;
 
-    // Validation
-    if (!behavior_implementation_name) {
-      return return_error(
-        new Error('behavior_implementation_name is required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    const behaviorImplementationName =
-      behavior_implementation_name.toUpperCase();
-
-    logger?.info(
-      `Starting behavior implementation deletion: ${behaviorImplementationName}`,
-    );
-
-    try {
-      // Delete behavior implementation using AdtClient (includes deletion check)
-      const behaviorImplementationObject = client.getBehaviorImplementation();
-      const deleteResult = await behaviorImplementationObject.delete({
-        className: behaviorImplementationName,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for behavior implementation ${behaviorImplementationName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteBehaviorImplementation completed successfully: ${behaviorImplementationName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            behavior_implementation_name: behaviorImplementationName,
-            transport_request: transport_request || null,
-            message: `BehaviorImplementation ${behaviorImplementationName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting behavior implementation ${behaviorImplementationName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete behavior implementation: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `BehaviorImplementation ${behaviorImplementationName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `BehaviorImplementation ${behaviorImplementationName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!behavior_implementation_name) {
+    return return_error(new Error('behavior_implementation_name is required'));
   }
+
+  const className = behavior_implementation_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteBehaviorImplementation', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorImplementation(resultsFor(classDocuments))
+        .delete(
+          { className, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

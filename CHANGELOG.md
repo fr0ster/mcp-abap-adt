@@ -7,6 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [10.1.0] - 2026-09-15
+
+### Added
+
+- **The responsible person and master system can be set per request.** Until
+  now only the master language was request-scoped (#110). `responsible` and
+  `masterSystem` lived in the process-wide system context, which is right for
+  one MCP session per process and wrong for a host that serves several SAP
+  users side by side: every concurrent create used whichever user wrote the
+  cache last.
+
+  `RequestContext` now carries both. Inside `runWithRequestContext`, a key the
+  scope carries — even as `undefined` — decides for that request; a key it does
+  not carry leaves the process value in charge. `createAdtClient`,
+  `ListTransports`' default user and `getSystemInformation()` all read through
+  the new `getEffectiveSystemContext()`, so they agree.
+
+  ```typescript
+  import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+
+  await runWithRequestContext({ responsible: 'JSMITH' }, () => handle());
+  ```
+
+  Not breaking: outside a scope nothing changes, and a scope that carries only
+  the language keeps the responsible resolved from the environment or the
+  system, exactly as before. `@mcp-abap-adt/core` is unchanged and stays at
+  10.0.1.
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

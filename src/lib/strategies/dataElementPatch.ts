@@ -41,6 +41,30 @@ export interface DataElementChanges {
  * named are touched; everything else in the document travels through unread,
  * which is the whole reason this patches text rather than building a document
  * from the caller's fields.
+ *
+ * **The description half is verified against a real captured document; the
+ * element-level fields below it are not, and I cannot prove them wrong.**
+ * `create-dataelement--01-ddic-dataelements.body.xml` is the one genuine
+ * data-element document in the corpus — a create response, not a metadata
+ * read, but `verbatim` per `resultSets.ts` either way. Its root element is
+ * `<blue:wbobj … xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel">` —
+ * SAP bound this document's `dtel` namespace to the alias `blue`, not to
+ * `dtel`. `adtcore:description` does not care (it is unprefixed, matched by
+ * `patchXmlAttribute` regardless of which alias the root uses), so
+ * `dataElementPatch.test.ts` can and does assert the description half
+ * against these real bytes. But every element-level patch below
+ * (`dtel:typeKind`, `dtel:typeName`, `dtel:dataType`, the labels, the search
+ * help fields) is hardcoded to the `dtel:` alias — and this particular
+ * document has no populated children of any kind to check them against: a
+ * fresh create answers only the wrapper, `packageRef` and a couple of
+ * `atom:link`s. If a real, populated data element document also binds
+ * `dtel`'s namespace to `blue` rather than `dtel`, every one of those
+ * patches would throw `XmlPatchError` rather than silently miswrite — which
+ * is the correct failure mode either way, just possibly the wrong one to
+ * fail with this often. I cannot prove that wrong from what is captured
+ * today. A `read-metadata-data-element` capture with populated fields —
+ * the one the brief for this task names as missing — is what would settle
+ * it.
  */
 export function patchDataElementXml(
   currentXml: string,

@@ -373,4 +373,53 @@ describe('UpdateDomainLow', () => {
       (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
     ).toBeUndefined();
   });
+
+  // Task 22, fix round 1: the ledger named this domain gap explicitly —
+  // `UpdateDataElementLow`'s sibling reads `transport_request` (and its
+  // camelCase alias) out of the same free-form `properties` bag and threads
+  // it into `config.transportRequest`; this handler read `properties` for
+  // every DDIC field the patch touches but never for the transport, so a
+  // transportable domain update went out with no transport at all.
+  it('threads transport_request out of the properties bag into config.transportRequest, the way UpdateDataElementLow does', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
+    let updateCall: { config: any; options: any } | undefined;
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (config: unknown, options: unknown) => {
+        updateCall = { config, options };
+        return okResponse(undefined);
+      },
+    });
+
+    const result: any = await handleUpdateDomain(context as any, {
+      domain_name: 'zd',
+      properties: { description: 'after', transport_request: 'E19K900123' },
+      lock_handle: 'h',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(updateCall?.config?.transportRequest).toBe('E19K900123');
+  });
+
+  it('accepts the camelCase alias too, the same fallback UpdateDataElementLow reads', async () => {
+    const currentXml =
+      '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
+    let updateCall: { config: any; options: any } | undefined;
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(currentXml),
+      updateMetadata: async (config: unknown, options: unknown) => {
+        updateCall = { config, options };
+        return okResponse(undefined);
+      },
+    });
+
+    await handleUpdateDomain(context as any, {
+      domain_name: 'zd',
+      properties: { description: 'after', transportRequest: 'E19K900456' },
+      lock_handle: 'h',
+    });
+
+    expect(updateCall?.config?.transportRequest).toBe('E19K900456');
+  });
 });

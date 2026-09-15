@@ -1,18 +1,37 @@
+import { corpusBody } from '../../lib/adtCorpus';
 import { patchDataElementXml } from '../../lib/strategies/dataElementPatch';
 
 /**
  * `patchDataElementXml`'s own test, standalone from any handler.
  *
- * Only the half that needs no document: the corpus has no data-element
- * metadata read (`read-metadata-data-element--*`), and a stand-in document
- * here would be this repository asserting against its own imagination
- * rather than a captured SAP response — the discipline `task-22-brief.md`
- * spells out. `lowTierStrategies.test.ts` and `highTierWriteChannel.test.ts`
- * separately prove `UpdateDataElementLow`/`UpdateDataElement` wire this
- * function's output into `config.document`, against hand-written documents
- * carrying the same `dtel:`-tagged shape this patcher expects.
+ * The description half runs against a real captured document —
+ * `create-dataelement--01-ddic-dataelements`, the one genuine data-element
+ * document in the corpus (a create response, but `verbatim` the same as a
+ * metadata read per `resultSets.ts`, and `adtcore:description` is unprefixed
+ * so the root element's namespace alias does not matter to it).
+ *
+ * The element-level fields (`type_kind`, `type_name`, the labels, …) stay
+ * unverified: that document has no populated children to patch, and its root
+ * binds the `dtel` namespace to the alias `blue`, not `dtel` — the alias
+ * `patchDataElementXml` hardcodes for every one of those fields. See
+ * `dataElementPatch.ts`'s own doc comment for what that would mean and why
+ * it cannot be proven wrong from what is captured today. A hand-written
+ * stand-in populated document would be this repository asserting against its
+ * own imagination rather than a captured SAP response — the discipline
+ * `task-22-brief.md` spells out — so the element-level half stays an
+ * `it.todo` instead.
  */
-describe('a read that came back empty is refused, not written back', () => {
+describe('patching a data element changes what was asked and nothing else', () => {
+  it('changes the description against the real captured document, and keeps everything else', () => {
+    const before = corpusBody('create-dataelement--01-ddic-dataelements');
+    const after = patchDataElementXml(before, { description: 'New text' });
+    expect(after).toContain('adtcore:description="New text"');
+    for (const attr of before.match(/\b[\w:]+="[^"]*"/g) ?? []) {
+      if (!attr.startsWith('adtcore:description='))
+        expect(after).toContain(attr);
+    }
+  });
+
   it('throws rather than writing a document it could not patch', () => {
     expect(() => patchDataElementXml('', { description: 'x' })).toThrow();
     expect(() =>
@@ -22,5 +41,8 @@ describe('a read that came back empty is refused, not written back', () => {
 });
 
 it.todo(
-  'keeps every unnamed field — unverified: no data-element metadata in the corpus',
+  'keeps every unnamed element-level field — unverified: the only real ' +
+    'data-element document in the corpus has no populated children, and its ' +
+    'root binds the dtel namespace to a different alias (blue) than the ' +
+    'hardcoded dtel: prefix these patches match against',
 );

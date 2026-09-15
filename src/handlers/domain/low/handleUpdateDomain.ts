@@ -122,6 +122,12 @@ export async function handleUpdateDomain(
       await restoreSessionInConnection(connection, session_id, session_state);
     }
 
+    // `properties` always took both spellings, the same fallback
+    // `UpdateDataElementLow`'s own `transportRequest` reads out of its
+    // `properties` bag.
+    const transportRequest =
+      properties.transport_request || properties.transportRequest;
+
     try {
       // The three steps, in the handler because 19 put them there. `analyse` on
       // each one: a refusal from the read and a refusal from the write are
@@ -136,6 +142,7 @@ export async function handleUpdateDomain(
           client.getDomain().updateMetadata(
             {
               domainName,
+              transportRequest,
               document: patchDomainXml(
                 extractXmlString(current, `domain ${domainName}`),
                 properties,

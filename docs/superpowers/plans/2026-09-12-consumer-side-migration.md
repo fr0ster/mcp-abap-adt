@@ -37,7 +37,8 @@ own tests pass and it is committed — not when it is described.
 | 16. `low` tier, cluster three | done | `9a2fad1` |
 | 17. `low` tier, cluster four | done | `d7e192e` |
 | 18. The `high` tier `Get*` handlers | done | `3c60dd2` |
-| 19 – 29 | not started | |
+| 19. High-tier writes under a lock | done | `33a1a99` |
+| 20 – 29 | not started | |
 
 Verify without reading anything above:
 
@@ -2318,7 +2319,7 @@ is a `sequence` with a `withLock` inside it. This is also why a `CreateX` taking
 
 **Files:** the eighteen the command above lists.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 ```typescript
 // src/__tests__/unit/highTierLocking.test.ts
@@ -2409,9 +2410,9 @@ it('a refused activation is answered as the strategy built it', async () => {
 });
 ```
 
-- [ ] **Step 2: Run them to verify they fail** — today the unlock failure is a `logger.warn` and the handler answers success.
+- [x] **Step 2: Run them to verify they fail** — today the unlock failure is a `logger.warn` and the handler answers success.
 
-- [ ] **Step 3: Implement**
+- [x] **Step 3: Implement**
 
 ```typescript
 // an update: the lock is the whole call
@@ -2464,8 +2465,8 @@ Confirm the order against the handler before editing; `handleCreateDomain` today
 runs validate, create, lock, update, unlock, check, activate, and a second
 unlock on its error path that `withLock` replaces.
 
-- [ ] **Step 4: Run the tests and measure**
-- [ ] **Step 5: Commit** — `refactor(high): the writes that hold a lock hold it through withLock`
+- [x] **Step 4: Run the tests and measure**
+- [x] **Step 5: Commit** — `refactor(high): the writes that hold a lock hold it through withLock`
 
 ---
 

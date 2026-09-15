@@ -16,7 +16,11 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import {
+  isCloudConnection,
+  restoreSessionInConnection,
+  return_error,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateProgramLow',
@@ -84,6 +88,14 @@ export async function handleValidateProgram(
   if (!program_name || !package_name || !description) {
     return return_error(
       new Error('program_name, package_name, and description are required'),
+    );
+  }
+
+  if (isCloudConnection()) {
+    return return_error(
+      new Error(
+        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
+      ),
     );
   }
 

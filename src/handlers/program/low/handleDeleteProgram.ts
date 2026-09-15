@@ -12,7 +12,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { return_error } from '../../../lib/utils';
+import { isCloudConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteProgramLow',
@@ -52,6 +52,14 @@ export async function handleDeleteProgram(
 
   if (!program_name) {
     return return_error(new Error('program_name is required'));
+  }
+
+  if (isCloudConnection()) {
+    return return_error(
+      new Error(
+        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
+      ),
+    );
   }
 
   const programName = program_name.toUpperCase();

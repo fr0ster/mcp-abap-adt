@@ -186,6 +186,7 @@ import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured } from '../../lib/strategies/reading';
+import { sessionContext } from '../../lib/utils';
 import { fakeClientOf, okResponse, recordAnalyse } from '../helpers/fakeClient';
 
 // The recorder IS the client, or it records nothing. Every test in this file
@@ -1550,6 +1551,38 @@ describe('program', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
+  it('DeleteProgramLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
+    await handleDeleteProgram(context as any, {
+      program_name: 'Z_X',
+      transport_request: 'E19K900001',
+    });
+    const call = callTo('delete');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.args[0]).toEqual({
+      programName: 'Z_X',
+      transportRequest: 'E19K900001',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseDeletion);
+  });
+
+  it('ValidateProgramLow passes the full first argument — packageName and description both reach validateProgramName', async () => {
+    await handleValidateProgram(context as any, {
+      program_name: 'Z_X',
+      package_name: 'zp',
+      description: 'x',
+    });
+    const call = callTo('validate');
+    expect(call?.factory).toBe('getProgram');
+    expect(call?.args[0]).toEqual({
+      programName: 'Z_X',
+      description: 'x',
+      packageName: 'ZP',
+    });
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseValidation);
+  });
+
   it('LockProgramLow passes no analyse and carries no detail parameter', async () => {
     await handleLockProgram(context as any, { program_name: 'Z_X' });
     const call = callTo('lock');
@@ -1637,6 +1670,86 @@ describe('program', () => {
     expect(JSON.parse(result.content[0].text)).toEqual({
       activated: true,
       generated: true,
+    });
+  });
+  // `ProgramLow` tools declare `available_in: ['onprem', 'legacy']` —
+  // cloud excluded. That field is a registration-time hint only:
+  // `BaseHandlerGroup.registerHandlers` (the path `LowLevelHandlersGroup`
+  // uses) forwards just the name, description and schema to
+  // `server.registerTool`, never `available_in` — so on that path every
+  // one of these tools stays registered and callable on a cloud system
+  // regardless of what it declares. The runtime refusal below is the only
+  // thing standing between a cloud caller and a real ADT request; drop it
+  // and nothing in the tool surface itself notices. Driven through
+  // `sessionContext` — the same store `isCloudConnection()` reads first —
+  // rather than stubbing the handler's own guard call, so that removing
+  // the guard makes the cloud row fail for the right reason.
+  describe('the cloud guard — declared in available_in, enforced here', () => {
+    const cloudStore = { sapConfig: { authType: 'jwt' } } as any;
+
+    const rows: Array<
+      [string, (...args: any[]) => unknown, string, Record<string, unknown>]
+    > = [
+      [
+        'ActivateProgramLow',
+        handleActivateProgram,
+        'activate',
+        { program_name: 'Z_X' },
+      ],
+      ['CheckProgramLow', handleCheckProgram, 'check', { program_name: 'Z_X' }],
+      [
+        'CreateProgramLow',
+        handleCreateProgram,
+        'create',
+        { program_name: 'Z_X', description: 'x', package_name: 'ZP' },
+      ],
+      [
+        'DeleteProgramLow',
+        handleDeleteProgram,
+        'delete',
+        { program_name: 'Z_X' },
+      ],
+      ['LockProgramLow', handleLockProgram, 'lock', { program_name: 'Z_X' }],
+      [
+        'UnlockProgramLow',
+        handleUnlockProgram,
+        'unlock',
+        { program_name: 'Z_X', lock_handle: 'h', session_id: 's' },
+      ],
+      [
+        'UpdateProgramLow',
+        handleUpdateProgram,
+        'update',
+        { program_name: 'Z_X', source_code: 'REPORT z_x.', lock_handle: 'h' },
+      ],
+      [
+        'ValidateProgramLow',
+        handleValidateProgram,
+        'validate',
+        { program_name: 'Z_X', package_name: 'ZP', description: 'x' },
+      ],
+    ];
+
+    it.each(
+      rows,
+    )('%s refuses on a cloud connection and never reaches the client', async (_name, handler, member, args) => {
+      const result: any = await sessionContext.run(cloudStore, () =>
+        handler(context as any, args),
+      );
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain(
+        'Programs are not available on cloud systems',
+      );
+      // The half that matters: a handler that explains and calls anyway
+      // is the same bug wearing a message.
+      expect(callTo(member)).toBeUndefined();
+    });
+
+    it.each(
+      rows,
+    )('%s proceeds on a non-cloud connection and reaches its member', async (_name, handler, member, args) => {
+      await handler(context as any, args);
+      expect(callTo(member)).toBeDefined();
     });
   });
 });

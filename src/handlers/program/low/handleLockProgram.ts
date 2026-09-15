@@ -12,7 +12,11 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import {
+  isCloudConnection,
+  restoreSessionInConnection,
+  return_error,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockProgramLow',
@@ -65,6 +69,14 @@ export async function handleLockProgram(
 
   if (!program_name) {
     return return_error(new Error('program_name is required'));
+  }
+
+  if (isCloudConnection()) {
+    return return_error(
+      new Error(
+        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
+      ),
+    );
   }
 
   if (session_id && session_state) {

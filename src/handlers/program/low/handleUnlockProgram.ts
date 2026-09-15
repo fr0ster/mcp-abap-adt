@@ -14,7 +14,11 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { terseWrite } from '../../../lib/strategies/projections';
-import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import {
+  isCloudConnection,
+  restoreSessionInConnection,
+  return_error,
+} from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockProgramLow',
@@ -73,6 +77,14 @@ export async function handleUnlockProgram(
   if (!program_name || !lock_handle || !session_id) {
     return return_error(
       new Error('program_name, lock_handle, and session_id are required'),
+    );
+  }
+
+  if (isCloudConnection()) {
+    return return_error(
+      new Error(
+        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
+      ),
     );
   }
 

@@ -40,84 +40,108 @@ interface RuntimeAnalyzeProfilerTraceArgs {
   with_system_events?: boolean;
 }
 
-function collectObjects(value: unknown, acc: Record<string, unknown>[]): void {
-  if (!value) {
-    return;
-  }
-
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      collectObjects(item, acc);
-    }
-    return;
-  }
-
-  if (typeof value === 'object') {
-    const record = value as Record<string, unknown>;
-    acc.push(record);
-    for (const nested of Object.values(record)) {
-      collectObjects(nested, acc);
-    }
-  }
-}
-
-function pickTopEntries(
-  payload: unknown,
-  top: number,
-): {
+interface RankedSummary {
   total_records: number;
   top_records: Array<Record<string, unknown>>;
-} {
-  const objects: Record<string, unknown>[] = [];
-  collectObjects(payload, objects);
+}
 
-  const candidateRows = objects.filter((obj) =>
-    Object.values(obj).some((val) => typeof val === 'number'),
-  );
-
-  const rankingKeys = [
-    'grossTime',
-    'gross_time',
-    'netTime',
-    'net_time',
-    'duration',
-    'runtime',
-    'calls',
-    'count',
-    'hits',
-  ];
-
-  const resolveRankValue = (obj: Record<string, unknown>): number => {
-    for (const key of rankingKeys) {
-      const value = obj[key];
-      if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
-      }
+/**
+ * Nested timing objects (`grossTime`/`traceEventNetTime`/`accessTime`) are
+ * the fields this summary ranks by. Flattening one level in keeps the value
+ * a row was ranked on visible in its own compact projection — `grossTime:
+ * {time, percentage}` becomes `grossTime_time`/`grossTime_percentage` —
+ * instead of being dropped as "not a primitive", which is what quietly
+ * turned every ranked row into `{}` before this fix (see `summarizeView`'s
+ * own doc).
+ */
+function flattenRow(row: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(row)) {
+    if (
+      typeof value === 'string' ||
+      typeof value === 'number' ||
+      typeof value === 'boolean'
+    ) {
+      out[key] = value;
+      continue;
     }
-    return 0;
-  };
-
-  const sorted = [...candidateRows]
-    .sort((a, b) => resolveRankValue(b) - resolveRankValue(a))
-    .slice(0, Math.max(1, top))
-    .map((item) => {
-      const compact: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(item)) {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const [nestedKey, nestedValue] of Object.entries(
+        value as Record<string, unknown>,
+      )) {
         if (
-          typeof value === 'string' ||
-          typeof value === 'number' ||
-          typeof value === 'boolean'
+          typeof nestedValue === 'string' ||
+          typeof nestedValue === 'number' ||
+          typeof nestedValue === 'boolean'
         ) {
-          compact[key] = value;
+          out[`${key}_${nestedKey}`] = nestedValue;
         }
       }
-      return compact;
-    });
+    }
+  }
+  return out;
+}
 
-  return {
-    total_records: candidateRows.length,
-    top_records: sorted,
-  };
+function rankBy(row: Record<string, unknown>, path: [string, string]): number {
+  const outer = row[path[0]];
+  if (!outer || typeof outer !== 'object') return 0;
+  const value = (outer as Record<string, unknown>)[path[1]];
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * `total_records`/`top_records`, read off the view's own named collection —
+ * `entries` (hitlist), `statements`, or `accesses` (db_accesses) — and
+ * ranked on that collection's own real numeric field
+ * (`grossTime.time`/`accessTime.total`), never by walking the whole document
+ * for any object that happens to carry a number.
+ *
+ * **Fix round 1, task 25.** The first pass here (`collectObjects`/
+ * `pickTopEntries`) walked every nested object in the typed reading looking
+ * for "anything with a number on it" — which counts each row's own
+ * `grossTime`/`accessTime` sub-object as a second, spurious row (it has
+ * numeric fields too), and ranked by a fixed list of guessed key names
+ * (`'runtime'`, `'calls'`, `'hits'`, …) that do not exist on any of
+ * `IAbapTraceHitListEntry`/`IAbapTraceStatement`/`IAbapTraceDbAccess` — so
+ * the sort collapsed to `Array.prototype.sort`'s stability (document order)
+ * with roughly half the slots taken by timing sub-objects rather than real
+ * entries. Measured against the shapes in `@mcp-abap-adt/adt-clients`'s
+ * `runtime/traces/types.d.ts`. `statements` ranks by `grossTime.time` too —
+ * the type carries `traceEventNetTime` beside it, but both are documented as
+ * present together on every row measured, and `grossTime` is the one metric
+ * every view here shares, so one real field beats guessing which of two is
+ * "the" one to prefer.
+ */
+function summarizeView(
+  view: 'hitlist' | 'statements' | 'db_accesses',
+  payload: unknown,
+  top: number,
+): RankedSummary {
+  const collectionKey =
+    view === 'hitlist'
+      ? 'entries'
+      : view === 'statements'
+        ? 'statements'
+        : 'accesses';
+  const rankPath: [string, string] =
+    view === 'db_accesses' ? ['accessTime', 'total'] : ['grossTime', 'time'];
+
+  const collection = (payload as Record<string, unknown> | undefined)?.[
+    collectionKey
+  ];
+  const rows: Record<string, unknown>[] = Array.isArray(collection)
+    ? collection.filter(
+        (row): row is Record<string, unknown> =>
+          !!row && typeof row === 'object',
+      )
+    : [];
+
+  const topRecords = [...rows]
+    .sort((a, b) => rankBy(b, rankPath) - rankBy(a, rankPath))
+    .slice(0, Math.max(1, top))
+    .map(flattenRow);
+
+  return { total_records: rows.length, top_records: topRecords };
 }
 
 export async function handleRuntimeAnalyzeProfilerTrace(
@@ -139,21 +163,19 @@ export async function handleRuntimeAnalyzeProfilerTrace(
   // that file's header): `read(traceId, view, options)` over the three named
   // views, already parsed, so `parseRuntimePayloadToJson` and the transport
   // fields (`status`/`statusText`/`headers`/`config`) are dropped here too.
-  // `pickTopEntries` still works unchanged — it walks whatever object graph
-  // it is given looking for numeric fields, and a typed `IAbapTraceHitList`/
-  // `IAbapTraceStatements`/`IAbapTraceDbAccesses` is exactly such a graph.
   //
   // Three separate `answer()` calls, not one `call()` with a branch per
   // view — same reason as `handleRuntimeGetProfilerTraceData.ts`: the three
   // instantiations of `read<K>` have no exported union name, and the
-  // projection below reads `payload` only through `pickTopEntries(payload:
-  // unknown, …)`, so nothing is lost keeping each view's own type to the
-  // point `answer()` erases it into the response.
+  // projection below reads `payload` only structurally (`summarizeView`
+  // narrows by `view`, not by `payload`'s static type), so nothing is lost
+  // keeping each view's own type to the point `answer()` erases it into the
+  // response.
   const project = (payload: unknown) => ({
     success: true,
     trace_id_or_uri: traceIdOrUri,
     view,
-    summary: pickTopEntries(payload, top),
+    summary: summarizeView(view, payload, top),
     payload,
   });
   const ctx = { tool: 'RuntimeAnalyzeProfilerTrace', detail: 'terse' as const };

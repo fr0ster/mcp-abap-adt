@@ -10,25 +10,28 @@
  * already exported from `resultSets.ts`) and its own `analyseUnitTest`
  * strategy — and it stays on `client.getUnitTest() as any` until the task
  * that wires the unit-test members and that shared result set migrates it
- * (it is one of the "twenty-three tools that reach a legacy contract").
+ * (it is one of the "twenty-three tools that reach a legacy contract"). The
+ * carve-out is still real: this file does not go through `resultsFor`/
+ * `ourUnitTest`, and the marker below exists so the compiler keeps naming it
+ * until that later task does.
  *
- * Task 25 fixed the one `tsc` error this file owed the build (`IAdtResponse`
- * requiring type arguments under adt-clients 19 — TS2707): `statusResponse`
- * is still the legacy transport-frame object `client.getUnitTest() as any`
- * always returned, so the cast is now `as AxiosResponse` (which still has
- * `.data`) instead of `as IAdtResponse` (which as of 19.0.0 no longer does).
- * No behaviour changed — this is the same object, read the same way; only
- * the name of the lie in the cast changed to a true one.
+ * **Fix round 1, task 25.** The first pass here cast `statusResponse as
+ * AxiosResponse`, on the wrong belief that `getUnitTest()`'s members still
+ * answered the pre-19 transport frame. They do not: `ITestRunInformation`
+ * (`@mcp-abap-adt/interfaces`) already declares `getResult`/`getStatus` as
+ * `Promise<IAdtResponse<T>>`, and `AdtUnitTest.d.ts` confirms the shipped
+ * class implements exactly that — `getUnitTest() as any` erases the type,
+ * not the runtime shape. `IAdtResponse` has no `.data` at all, so every call
+ * answered `{isError:false, content:[{text: undefined}]}` regardless of
+ * `.ok` — a refusal reported as success, the masking class this repository
+ * has removed three times elsewhere. Fixed by unwrapping through `answer()`
+ * instead of guessing at a shape.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetClassUnitTestStatusLow',
@@ -82,45 +85,29 @@ export async function handleGetClassUnitTestStatus(
   args: GetStatusArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      run_id,
-      with_long_polling = true,
-      session_id,
-      session_state,
-    } = args as GetStatusArgs;
+  const {
+    run_id,
+    with_long_polling = true,
+    session_id,
+    session_state,
+  } = args as GetStatusArgs;
 
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
-    const client = createAdtClient(connection, logger);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-    }
-
-    logger?.info(`Fetching ABAP Unit status for run ${run_id}`);
-
-    try {
-      const unitTest = client.getUnitTest() as any;
-      const statusResponse = await unitTest.getStatus(
-        run_id,
-        with_long_polling,
-      );
-
-      if (!statusResponse) {
-        throw new Error('SAP did not return ABAP Unit status response');
-      }
-
-      return return_response(statusResponse as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error retrieving ABAP Unit status for run ${run_id}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!run_id) {
+    return return_error(new Error('run_id is required'));
   }
+  const client = createAdtClient(connection, logger);
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  logger?.info(`Fetching ABAP Unit status for run ${run_id}`);
+
+  const unitTest = client.getUnitTest() as any;
+
+  return answer(
+    { tool: 'GetClassUnitTestStatusLow', detail: 'terse' },
+    () => unitTest.getStatus(run_id, with_long_polling),
+    (value: string) => value,
+  );
 }

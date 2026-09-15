@@ -100,16 +100,32 @@ export async function handleRuntimeListFeeds(
       // `ExceptionParameterNotFound`, measured; see `FeedRepository.
       // variants`'s own doc: "Everything that called this before
       // @mcp-abap-adt/interfaces@26.0.0 fixed the contract was getting that
-      // 400"). So this branch was already refused by SAP every time, before
-      // this migration and after it — the type just did not say so. The
-      // tool surface is frozen for this migration (only an optional
-      // `detail` parameter may be added), so there is nowhere to take a
-      // real category from, and every category tried on a real system
-      // answered 200 with an empty body anyway (same doc) — no value would
-      // make this branch useful. An empty string reaches the same SAP
-      // refusal this branch always reached, honestly, through `answer()`,
-      // rather than inventing a category that would only pretend to work.
-      return answer(ctx, () => feeds.variants(''), project);
+      // 400"). The tool surface is frozen for this migration (only an
+      // optional `detail` parameter may be added), so there is nowhere to
+      // take a real category from.
+      //
+      // **Fix round 1, task 25.** The first pass here called
+      // `feeds.variants('')`, reasoning that an empty category reaches "the
+      // same refusal" a categoryless call always did. That is a guess, not
+      // a measurement: the pre-19 wire sent no `category` query parameter
+      // at all, and the 19.0.0 wire always appends one — `category=` is a
+      // request nobody has measured, on a package whose own doc explicitly
+      // separates "no parameter" (measured: 400) from "a parameter with
+      // some value" (measured: 200, empty body) without ever measuring "a
+      // parameter with an empty value". If ADT reads an empty string as a
+      // present-but-blank category, this branch would silently start
+      // answering 200 with an empty list where a caller previously got an
+      // error — success fabricated from an answer nobody watched happen.
+      // Refused locally instead: honest about what this branch cannot do,
+      // never a guess dressed as a request.
+      return return_error(
+        new Error(
+          'RuntimeListFeeds cannot list variants: adt-clients 19 requires a ' +
+            'category argument for this endpoint, and the frozen tool surface ' +
+            'has no parameter to supply one from. Use feed_type "descriptors" ' +
+            'to list the feeds this system offers instead.',
+        ),
+      );
     case 'dumps':
       return answer(ctx, () => feeds.dumps(queryOptions), project);
     case 'system_messages':

@@ -127,7 +127,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   named fields (`id`, `recordedAt`, `user`, `objectName`, `state`,
   `expiresAt`, `system`, `client`, `host`, `size`, `runtime`/`runtimeABAP`/
   `runtimeSystem`/`runtimeDatabase`, `isAggregated`, `amdpFileSize`) — so the
-  tool now answers `{success, count, entries: IAbapTraceEntry[]}` instead.
+  tool now answers `{success, count, entries: IAbapTraceEntry[]}` instead,
+  and drops the `status` field along with it (see below — it is not only the
+  three tools originally named here). **What that costs a caller:** the old
+  hand-rolled parse of the raw Atom feed carried whatever the document had —
+  each entry's own `<atom:title>` and its `<atom:link>` navigation hrefs (to
+  the trace's hitlist/statements/dbAccesses views and its delete link), and
+  the feed's own metadata. `IAbapTraceEntry` is a curated, measured field
+  list and carries none of that; a consumer that read those fields off the
+  old freeform payload has nothing left to read them from.
 
   `RuntimeGetProfilerTraceData` and `RuntimeAnalyzeProfilerTrace` read the
   same view differently too: `Profiler.getHitList`/`getStatements`/
@@ -137,13 +145,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`IAbapTraceHitList`'s `entries`, `IAbapTraceStatements`'s `statements`,
   `IAbapTraceDbAccesses`'s `accesses`) rather than the free-form
   attribute-prefixed object the old hand-rolled XML parser produced. Both
-  tools' `payload` field now carries that typed shape.
+  tools' `payload` field now carries that typed shape. `RuntimeAnalyzeProfilerTrace`'s
+  `summary` (`total_records`/`top_records`) now reads the view's own named
+  collection and ranks by that collection's real numeric field
+  (`grossTime.time` for `hitlist`/`statements`, `accessTime.total` for
+  `db_accesses`) — a fix-round-1 correction: the first pass walked the whole
+  typed document for "anything with a number on it", which counted each
+  row's own timing sub-object as a second row and ranked against a fixed
+  list of key names (`'runtime'`, `'calls'`, `'hits'`, …) that do not exist
+  on any of the three typed shapes, so `top_records` was document order with
+  roughly half its slots taken by timing objects rather than real entries.
 
-  `RuntimeGetDumpById`, `RuntimeGetProfilerTraceData` and
-  `RuntimeAnalyzeProfilerTrace` all drop the `status` field they used to
-  answer (the HTTP status of the underlying request) — `IAdtResponse` carries
-  no transport envelope to read it from any more, the same reason the
-  class/program runners above lost `run_status`.
+  `RuntimeListProfilerTraceFiles`, `RuntimeGetDumpById`,
+  `RuntimeGetProfilerTraceData` and `RuntimeAnalyzeProfilerTrace` all drop
+  the `status` field they used to answer (the HTTP status of the underlying
+  request) — `IAdtResponse` carries no transport envelope to read it from
+  any more, the same reason the class/program runners above lost
+  `run_status`.
 
   `RuntimeCreateProfilerTraceParameters` changes mechanism, not contract:
   `Profiler.createParameters()` is gone (`IProfiler` no longer composes
@@ -163,6 +181,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   envelope that `IAdtResponse` didn't have. Fixed as part of this task's
   pass over the same file for its one genuine compile error
   (`errors.length`).
+
+  `RuntimeListFeeds`'s `variants` `feed_type` now refuses locally rather than
+  calling the library at all: `IFeedRepository.variants()` gained a required
+  `category` argument as of 19.0.0 (ADT's own endpoint always required one on
+  the wire; the type simply did not say so before), and the frozen tool
+  surface has no parameter this branch could take a real category from. A
+  fix-round-1 correction: the first pass sent `category=''`, reasoning that
+  an empty category reaches "the same refusal" a categoryless call always
+  did — but the pre-19 wire sent no `category` parameter at all, and the
+  19.0.0 wire always appends one, so `category=''` is a request nobody has
+  measured, not a preserved behaviour. This `feed_type` now answers a local
+  error explaining why, instead of guessing at what an unmeasured request
+  would do.
+
+  `GetPackageTree` (Task 25) wording: its pre-check for whether the target
+  package can be read now says "could not be read" rather than "not found"
+  for every refusal — a fix-round-1 correction. The pre-migration code
+  branched on the wire status (404 said "not found"; anything else rethrew
+  the original error unworded); `readMetadata`'s default error strategy
+  carries no status/code to branch on the same way, and the first pass here
+  said "not found" for every refusal regardless of cause (a lock, a
+  permission failure, a connection error), which is wrong for all but one of
+  them.
+
+  `handleGetClassUnitTestResult`/`handleGetClassUnitTestStatus` — a
+  fix-round-1 correction, not a shape change: the first pass at these two
+  Task-14-carve-out files cast the answer `as AxiosResponse`, believing
+  `getUnitTest()`'s members still answered the pre-19 transport frame. They
+  do not — `ITestRunInformation` already declares them `IAdtResponse<T>`, and
+  the shipped class implements exactly that. `IAdtResponse` has no `.data`,
+  so both tools answered success with empty content regardless of `.ok` —
+  a refusal reported as success. Both now unwrap through `answer()`; neither
+  tool's answer shape changes for a caller once the masking is removed.
 
 ## [10.0.1] - 2026-09-11
 

@@ -89,13 +89,23 @@ export async function handleGetPackageTree(
     // source of its own, so `readMetadata` is the one call (see
     // `handleReadPackage.ts`, migrated the same way). Without an `analyse`
     // strategy the default error contract still answers `ok: false` for a
-    // refusal (not-found included), which is all a plain existence check
-    // needs — no message enrichment is read here, only the boolean.
+    // refusal, which is all a plain existence check needs — no message
+    // enrichment is read here, only the boolean.
+    //
+    // **Fix round 1, task 25.** The pre-migration code branched on the wire
+    // status: a 404 said "not found", anything else rethrew the original
+    // error unworded. The first pass here collapsed every refusal — a lock,
+    // a permission failure, a connection error, an actual not-found — into
+    // one hardcoded "not found" message, which is wrong for every refusal
+    // that is not one. `readMetadata`'s default error strategy carries no
+    // status/code to branch on the way the old 404 check did, so rather than
+    // guess a code this has not measured, the message says only what is
+    // true of every case: the read did not produce a document.
     const readResult = await client.getPackage().readMetadata({ packageName });
     if (!readResult.ok) {
       return return_error(
         new Error(
-          `Package ${packageName} not found: ${readResult.getError().message}`,
+          `Package ${packageName} could not be read: ${readResult.getError().message}`,
         ),
       );
     }

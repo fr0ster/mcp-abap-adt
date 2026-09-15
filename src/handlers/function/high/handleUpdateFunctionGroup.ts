@@ -13,6 +13,10 @@
  * a hand-built URL and content type; `AdtFunctionGroup.updateMetadata()`
  * reads `config.document` and does that request itself now. Verified against
  * the compiled `AdtFunctionGroup.js`, not the declaration file.
+ *
+ * The patch itself is `patchFunctionGroupXml` (`functionGroupPatch.ts`),
+ * ported field-for-field from `v18.0.2`'s own patcher — description only, a
+ * function group being a container with nothing else `update` ever touched.
  */
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
@@ -22,15 +26,13 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { patchFunctionGroupXml } from '../../../lib/strategies/functionGroupPatch';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
-import {
-  extractXmlString,
-  patchXmlAttribute,
-} from '../../../lib/strategies/xmlPatch';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -81,11 +83,6 @@ export async function handleUpdateFunctionGroup(
   }
 
   const functionGroupName = args.function_group_name.toUpperCase();
-  // SAP requirement: `adtcore:description` is limited to 40 characters.
-  const description =
-    args.description.length > 40
-      ? args.description.substring(0, 40)
-      : args.description;
   const detail = detailOf(args);
 
   return answer(
@@ -109,13 +106,12 @@ export async function handleUpdateFunctionGroup(
                 {
                   functionGroupName,
                   transportRequest: args.transport_request,
-                  document: patchXmlAttribute(
+                  document: patchFunctionGroupXml(
                     extractXmlString(
                       current.raw,
                       `function group ${functionGroupName}`,
                     ),
-                    'adtcore:description',
-                    description,
+                    { description: args.description },
                   ),
                 },
                 { lockHandle, analyse: analyseException },

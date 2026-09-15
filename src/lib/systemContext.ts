@@ -1,6 +1,7 @@
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { registerConnectionResetHook } from './connectionEvents';
+import { getRequestContext } from './requestContext';
 
 export interface IAdtSystemContext {
   masterSystem?: string;
@@ -80,6 +81,32 @@ export async function resolveSystemContext(
 
 export function getSystemContext(): IAdtSystemContext {
   return cached || {};
+}
+
+/**
+ * The system context as the current request sees it.
+ *
+ * Outside a request scope (stdio) this is the process context. Inside one:
+ * - `masterLanguage` comes only from the scope (#110): a scope without it does
+ *   not inherit the process value.
+ * - `responsible` and `masterSystem` come from the scope when the scope carries
+ *   the key, an explicit `undefined` included. That lets a host serving several
+ *   SAP users from one process give each request its own, where the process
+ *   cache would hand every concurrent request whichever user wrote last. A scope
+ *   that does not carry the key keeps the process value, so a host that only
+ *   scopes the language keeps the responsible it resolved from its environment
+ *   or the system.
+ */
+export function getEffectiveSystemContext(): IAdtSystemContext {
+  const ctx = getSystemContext();
+  const req = getRequestContext();
+  if (!req) return ctx;
+  return {
+    ...ctx,
+    masterLanguage: req.masterLanguage,
+    responsible: 'responsible' in req ? req.responsible : ctx.responsible,
+    masterSystem: 'masterSystem' in req ? req.masterSystem : ctx.masterSystem,
+  };
 }
 
 /**

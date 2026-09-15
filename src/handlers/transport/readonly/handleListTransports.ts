@@ -8,7 +8,7 @@
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { getSystemContext } from '../../../lib/systemContext';
+import { getEffectiveSystemContext } from '../../../lib/systemContext';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -160,7 +160,7 @@ export async function handleListTransports(
     const modifiableOnly = args?.modifiable_only !== false;
     const user =
       args?.user ||
-      getSystemContext().responsible ||
+      getEffectiveSystemContext().responsible ||
       process.env.SAP_USERNAME ||
       '';
 

@@ -547,6 +547,33 @@ When creating or updating ABAP objects on on-premise systems, SAP ADT requires `
 
 **Cloud systems** (ABAP Cloud / BTP) resolve system context automatically via the `getSystemInformation()` API — no additional configuration is needed.
 
+#### Per-request responsible and master system (embedding hosts)
+
+**TL;DR:** a host that serves several SAP users from one process sets the responsible person per request, not in the process context.
+
+The values above live in one process-wide cache. That is right for one MCP session per process. It is wrong for a host that runs requests from different SAP users side by side: every concurrent create would use whichever user wrote the cache last.
+
+Wrap each request in a request scope instead:
+
+```typescript
+import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+
+await runWithRequestContext(
+  { responsible: 'JSMITH', masterSystem: 'DEV', masterLanguage: 'EN' },
+  () => handleTheRequest(),
+);
+```
+
+How the scope combines with the process context:
+
+| Key in the scope | Result for this request |
+|---|---|
+| `responsible` / `masterSystem` present (even `undefined`) | The scope's value |
+| `responsible` / `masterSystem` absent | The process value (env / `getSystemInformation()`) |
+| `masterLanguage` | Always the scope's value inside a scope, never the process value |
+
+Outside any scope (stdio) nothing changes.
+
 **Example `.env` for on-premise:**
 ```env
 SAP_URL=http://your-sap-system:8000

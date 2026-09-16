@@ -44,7 +44,8 @@ own tests pass and it is committed — not when it is described.
 | 23. Members 19 removed or renamed | done | `37c500d` |
 | 24. The class profiling handlers | done | `3bb6d2c` |
 | 25. The library files, and the last of the compiler's list | done | `16fdb3d` |
-| 26 – 29 | not started | |
+| 27. The twenty-three tools that reach a legacy contract | done | `027f94a` |
+| 26, 28, 29 | not started | |
 
 Verify without reading anything above:
 
@@ -4135,7 +4136,7 @@ here, with the task that creates them.
 
 The package tools, the unit-test tools, three listing tools and `handleActivateObject`.
 
-- [ ] **Step 1: Measure what the twenty-three call today**
+- [x] **Step 1: Measure what the twenty-three call today**
 
 Add a second function to the audit module — the AST walk is already there, and
 this needs the same receiver resolution:
@@ -4275,7 +4276,7 @@ After that the pinned set carries it: Step 4's first test compares
 `legacyEnabledHandlers()` against this file exactly, so a filter that later
 stops matching even one handler fails rather than shrinking the ledger.
 
-- [ ] **Step 2: Prove the walk sees every call form before trusting the list**
+- [x] **Step 2: Prove the walk sees every call form before trusting the list**
 
 Four fixtures, under `src/__tests__/fixtures/legacy/` — they exercise
 `legacyExposure` rather than `analyseOmissions`, so they live apart from Task
@@ -4350,9 +4351,9 @@ Adjust the path prefix in the expected pair to whatever `legacyExposure`
 actually produces; the assertion that matters is the length, because an empty
 array is what success looks like here and so is the wrong way to be wrong.
 
-- [ ] **Step 3: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate `tests/fixtures/legacy-exposure.json` **in the same commit as the change**, and read the diff: the pairs that left should be the ones you fixed, by name. A regeneration that drops pairs you never touched is the walk breaking, not the work landing.
+- [x] **Step 3: Walk the list and shrink it.** Where the handler can reach the same result through a member the `Legacy` class does parameterise, use it. Regenerate `tests/fixtures/legacy-exposure.json` **in the same commit as the change**, and read the diff: the pairs that left should be the ones you fixed, by name. A regeneration that drops pairs you never touched is the walk breaking, not the work landing.
 
-- [ ] **Step 4: Commit what remains as a ledger, and hold it**
+- [x] **Step 4: Commit what remains as a ledger, and hold it**
 
 ```typescript
 // src/__tests__/unit/legacyExposure.test.ts
@@ -4413,7 +4414,7 @@ it('lands on exactly the legacy members recorded, and no others', () => {
 });
 ```
 
-- [ ] **Step 5: Run it, and prove it fails on a new entry**
+- [x] **Step 5: Run it, and prove it fails on a new entry**
 
 ```bash
 npx jest src/__tests__/unit/legacyExposure.test.ts
@@ -4424,9 +4425,9 @@ again, and confirm the pair is named. Then the other direction: delete a pair
 from the fixture without touching any handler, and confirm that fails too. A
 ledger that has never refused in both directions is a file, not a check.
 
-- [ ] **Step 6: Put the remainder where people read it** — the PR description and the release notes, with the issue number. A limitation recorded only in a JSON fixture is a limitation nobody outside this repository learns about.
+- [x] **Step 6: Put the remainder where people read it** — the PR description and the release notes, with the issue number. A limitation recorded only in a JSON fixture is a limitation nobody outside this repository learns about.
 
-- [ ] **Step 7: Commit** — `refactor(legacy): prefer the members that take our strategy, and record what is left`
+- [x] **Step 7: Commit** — `refactor(legacy): prefer the members that take our strategy, and record what is left`
 
 ---
 

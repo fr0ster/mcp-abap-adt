@@ -257,20 +257,27 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
  * `.d.ts`.
  *
  * **Not all eighteen drop the same thing, and calling all of it "the
- * strategy" overstates ten of them.** About ten genuinely drop `analyse` — a
- * caller-supplied failure verdict modern accepts and legacy ignores. The rest
- * never accepted `analyse` on modern either; what legacy drops there is
- * something else — a positional argument, a run identifier, a table name —
- * which is a different failure mode, and in the unit-test trio's case a worse
- * one (see `AdtUnitTestLegacy.js` below and issue #208, which this ledger's
+ * strategy" overstates nine of them.** Nine genuinely drop `analyse` — a
+ * caller-supplied failure verdict modern accepts and legacy ignores. The
+ * other nine never accepted `analyse` on modern either; what legacy drops
+ * there is something else — a positional argument, a run identifier, a table
+ * name, an already-single-purpose options field — which is a different
+ * failure mode, and in the unit-test trio's case a worse one (see
+ * `AdtUnitTestLegacy.js` below and issue #208, which this ledger's
  * construction surfaced rather than caused).
  *
- * - `AdtPackageLegacy.js` (6, all genuinely drop `analyse`): `create`, `read`,
- *   `readMetadata`, `validate`, `updateMetadata`, `delete` are declared with
- *   an EMPTY parameter list and always answer `failed(UNSUPPORTED)` — modern
- *   `AdtPackage` accepts `IAdtOperationOptions<E>`/`IAdtCreateOptions<E>` on
- *   every one of these, so whatever a caller passes, including `analyse`, is
- *   discarded before it is ever bound to a name.
+ * - `AdtPackageLegacy.js` (6: 5 genuinely drop `analyse`, 1 never had one):
+ *   `create`, `readMetadata`, `validate`, `updateMetadata`, `delete` are
+ *   declared with an EMPTY parameter list and always answer
+ *   `failed(UNSUPPORTED)` — modern `AdtPackage` accepts
+ *   `IAdtOperationOptions<E>`/`IAdtCreateOptions<E>` on every one of these, so
+ *   whatever a caller passes, including `analyse`, is discarded before it is
+ *   ever bound to a name. `read()` is also declared and overridden with an
+ *   empty parameter list, but modern `AdtPackage` implements
+ *   `IAdtMetadataReadable`, not `IAdtReadable` — it has no public `read`
+ *   member at all, so no caller on either system could ever have handed this
+ *   one an `analyse` to begin with; the legacy override is dead code from the
+ *   type's perspective, not a dropped strategy.
  * - `AdtUnitTestLegacy.js` (3, none of which had a caller `analyse` to drop):
  *   `run(tests, options)` binds `options` but the wire call underneath is
  *   `startClassUnitTestRunLegacy(connection, tests, _options)` — renamed,
@@ -282,13 +289,16 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
  *   parameters at all — not even the run id modern's `getResult(runId,
  *   options)` takes, and modern's `getStatus`/`getResult` never accepted
  *   `analyse` either — and simply replay whatever `run()` already captured.
- * - `AdtRequestLegacy.js` (5, all genuinely drop `analyse`): `create`,
- *   `readMetadata`, `list`, `updateMetadata`, `delete` all either take no
+ * - `AdtRequestLegacy.js` (5: 4 genuinely drop `analyse`, 1 never had one):
+ *   `create`, `readMetadata`, `updateMetadata`, `delete` all either take no
  *   parameters (`create`/`updateMetadata`/`delete`, hardcoded refusal, same
  *   shape as `AdtPackageLegacy`) or bind `options`/`config` and never read
- *   `analyse` out of it (`readMetadata`, `list` — which reads only
- *   `options?.configUri`). Modern's `AdtRequest` accepts
- *   `IAdtOperationOptions<E>`/`IAdtCreateOptions<E>` on all five.
+ *   `analyse` out of it (`readMetadata`). Modern's `AdtRequest` accepts
+ *   `IAdtOperationOptions<E>`/`IAdtCreateOptions<E>` on all four. `list` is
+ *   declared and overridden too, and it does bind `options` and reads only
+ *   `options?.configUri` out of it — but modern's own `IListTransportsOptions`
+ *   is `{ configUri?: string }`, one field and never an `analyse`, so there
+ *   was nothing for either system's `list` to drop.
  * - `AdtUtilsLegacy.js` (4, none of which had a caller `analyse` to drop):
  *   `activateObjectsGroup(objects, preauditRequested)` has no third parameter
  *   on legacy OR modern — `AdtUtils.d.ts` declares none either — so this one
@@ -308,7 +318,7 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
  * whole factory's exposure is real but currently unreachable — the addition
  * changes no entry in `tests/fixtures/legacy-exposure.json`.
  */
-const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
+export const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
   getPackage: [
     'create',
     'read',
@@ -341,7 +351,7 @@ const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
  * `getServiceBinding` and throws the same way; classified as
  * `getServiceBinding` below since it is the same class either name reaches.
  */
-const LEGACY_THROWS = new Set([
+export const LEGACY_THROWS = new Set([
   'getCdsUnitTest',
   'getDomain',
   'getDataElement',

@@ -432,8 +432,10 @@ its strategies are injected, so its notes describe what it ships.
 - No handler reads an envelope property off `IAdtSuccess`.
 - No handler decides a refusal for itself, and **every call whose resolved
   signature accepts an `analyse` is given one** — resolved per (class, member)
-  by the compiler on the modern contract, and by a pinned list of seventeen
-  members on the `Legacy` one, which `createAdtClient`'s declared return type
+  by the compiler on the modern contract, and by a pinned list of eighteen
+  members on the `Legacy` one (nine of which never accepted an `analyse` on
+  the modern contract either — a different failure mode, not a dropped
+  strategy), which `createAdtClient`'s declared return type
   hides from the compiler. Neither the presence of an `options` parameter nor a
   `<E extends IAdtError>` type parameter is a reliable proxy. Where the
   library's default verdict is not enough — `activateObjectsGroup` alone, among

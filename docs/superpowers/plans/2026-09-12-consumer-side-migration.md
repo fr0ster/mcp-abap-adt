@@ -66,7 +66,7 @@ Every task's requirements implicitly include this section.
 - **Every test's arguments come from its tool's own schema — names, and values from any `enum` or documented set — and every negative test asserts what failed.** Values matter as much as names: `binding_variant` accepts four spellings and `ODATA_V4` is none of them; `object_type` is lowercased and matched against `class` or the ADT code `clas/oc`, so `CLAS` falls through to the default. A handler validates its input before it builds a client, so a call short of a required field never reaches the member under test — and still answers `isError: true`. Asserting only that flag passes such a test while proving nothing. Assert the message, or `origin: 'refusal'`, which a local validation error cannot produce.
 - **Nothing reaches a caller except by name.** `request` and `cleanup` are rebuilt field by field in `answer.ts`. The contract's types are not filters, and what sits on a transport config is headers, an Authorization bearer and cookies.
 - **A lock chain is `withLock()`, never `sequence()`**, and only where the handler owns the lock's whole lifetime. The fifteen `low`-tier `LockX` tools hand the handle back on purpose and are never wrapped.
-- **Legacy is in scope.** `SAP_SYSTEM_TYPE=legacy` selects `AdtClientLegacy`, which serves 144 of the 326 tools through these same handler files. Four `Legacy` classes drop the strategy on seventeen members; Task 18 pins them and Task 19 walks the twenty-three tools that reach them.
+- **Legacy is in scope.** `SAP_SYSTEM_TYPE=legacy` selects `AdtClientLegacy`, which serves 144 of the 326 tools through these same handler files. Four `Legacy` classes ignore what a caller passes on eighteen members — nine of them a genuine `analyse` dropped, the other nine never had one to drop on the modern contract either; Task 18 pins them and Task 19 walks the twenty-three tools that reach them.
 - **Never commit to `main`.** Work on `feat/answer-adapter`, PR and merge. Do not rewrite history.
 - **The agent never runs `npm publish`.** The user publishes.
 - **No live SAP calls.** Every test here runs offline against `tests/fixtures/adt/` — 48 cases, 61 exchanges, 27 endpoints. Integration runs are the user's call, after the compiler is clean.
@@ -130,7 +130,7 @@ sed -E 's/\(.*//' /tmp/errs.txt | sort | uniq -c | sort -rn | head -30
 | `src/__tests__/unit/analyseOmissions.test.ts` + twelve fixtures | every verdict the check can reach, held by a committed case |
 | `src/__tests__/unit/legacyExposure.test.ts` + `tests/fixtures/legacy-handlers.json` | exactly which handlers legacy is offered, pinned |
 | `tests/fixtures/legacy-exposure.json` | which of those still land on a member that decides alone |
-| `src/__tests__/unit/legacyContract.test.ts` | the seventeen legacy members that decide alone |
+| `src/__tests__/unit/legacyContract.test.ts` | the eighteen legacy members that decide alone |
 
 **Modified:** `src/lib/answer.ts`, `src/lib/strategies/sequence.ts`, 253 handler files, and six non-handler files carrying the same envelope reads (`src/lib/utils.ts`, `src/lib/checkRunParser.ts`, `src/lib/search-source/{sourceReader,packageResolver,packageEnumerator}.ts`, `src/embeddable/BaseMcpServer.ts`).
 
@@ -3885,7 +3885,7 @@ Three of the spec's success criteria are claims about 326 files. A reviewer cann
 - Create: `src/__tests__/unit/handlerInvariants.test.ts` — the three invariants
 - Create: `src/__tests__/unit/analyseOmissions.test.ts` — the controls, run against the fixtures
 - Create: `src/__tests__/fixtures/analyse/` — twelve modules, named for the verdict each must produce: `yes-inline.ts`, `yes-const.ts`, `yes-spread-then-analyse.ts`, `no-absent.ts`, `no-empty-literal.ts`, `no-typed-empty-const.ts`, `no-explicit-undefined.ts`, `no-shorthand-undefined.ts`, `unknown-analyse-then-spread.ts`, `unknown-maybe-undefined.ts`, `unknown-conditional.ts`, `unknown-reassigned-let.ts`
-- Create: `src/__tests__/unit/legacyContract.test.ts` — the seventeen legacy members that decide alone
+- Create: `src/__tests__/unit/legacyContract.test.ts` — the eighteen legacy members that decide alone
 - Consume: `src/lib/audit/analyseOmissions.ts` and `scripts/check-analyse.ts`, both written in Task 10. This task adds no implementation — it adds the fixtures that hold every verdict the module can reach, and the repo-wide run
 
 `tsconfig.json` already excludes `src/__tests__` from the build, so the fixtures typecheck under `tsconfig.test.json` and never reach `dist`. Run `npm run test:check` once they exist: a fixture that does not compile is one whose signature the checker cannot resolve, and the whole test would then pass while inspecting nothing.

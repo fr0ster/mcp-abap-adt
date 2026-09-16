@@ -19,12 +19,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes them, because the factory that returns them is typed as the modern
   class: the compiler cannot see the mismatch, so nothing before this caught
   it. Not all eighteen drop the same thing, and calling all of it "the
-  failure strategy" overstates about eight of them: roughly ten genuinely
-  drop `analyse`, the caller-supplied failure verdict modern accepts and
-  legacy ignores (all six `AdtPackageLegacy` members, all five
-  `AdtRequestLegacy` members); the rest never accepted `analyse` on modern
-  either — what legacy drops there is a positional argument, a run
-  identifier, or a table name, which is a different failure mode.
+  failure strategy" overstates nine of them: nine genuinely drop `analyse`,
+  the caller-supplied failure verdict modern accepts and legacy ignores
+  (five of `AdtPackageLegacy`'s six members — `create`/`readMetadata`/
+  `validate`/`updateMetadata`/`delete`; four of `AdtRequestLegacy`'s five —
+  `create`/`readMetadata`/`updateMetadata`/`delete`). The other nine never
+  accepted `analyse` on modern either: `AdtPackage` has no public `read`
+  member at all (it implements metadata-readable, not readable, so legacy's
+  `read` override is dead code from the type's perspective, not a dropped
+  strategy); `AdtRequest`'s `list` takes `IListTransportsOptions`, one
+  `configUri` field and never an `analyse`; `AdtUnitTest`'s `run`/
+  `getStatus`/`getResult` (three) and `AdtUtils`'s `activateObjectsGroup`/
+  `getTableColumns`/`getTableContents`/`getSqlQuery` (four) never declared
+  one either. What legacy drops on those nine is something else instead — a
+  positional argument, a run identifier, a table name — a different failure
+  mode.
   `legacyExposure()`/`legacyEnabledHandlers()` (`scripts/lib/analyseOmissions.ts`)
   resolve every handler legacy is offered (144 of 326) through the
   compiler's own type checker — not a syntax walk of specific call shapes,

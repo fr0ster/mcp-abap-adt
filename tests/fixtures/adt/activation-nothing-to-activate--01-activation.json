@@ -1,8 +1,8 @@
 {
-  "case": "activation-success-verdict",
+  "case": "activation-nothing-to-activate",
   "step": 1,
   "stepTag": "activation",
-  "capturedAt": "2026-09-16T14:01:02.663Z",
+  "capturedAt": "2026-09-16T14:01:04.192Z",
   "request": {
     "method": "POST",
     "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
@@ -20,16 +20,16 @@
     "statusText": "OK",
     "headers": {
       "content-type": "application/xml; charset=utf-8",
-      "content-length": "210",
+      "content-length": "212",
       "sap-authenticated": "true",
       "sap-adt-saplb": "appserver-sr97s",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
-      "x-sap-adt-profiling": "server-time=998685",
+      "x-sap-adt-profiling": "server-time=83826",
       "sap-server": "true",
-      "sap-perf-fesrec": "1000422.000000",
+      "sap-perf-fesrec": "86027.000000",
       "connection": "close"
     },
-    "bodyFile": "activation-success-verdict--01-activation.body.xml"
+    "bodyFile": "activation-nothing-to-activate--01-activation.body.xml"
   }
 }

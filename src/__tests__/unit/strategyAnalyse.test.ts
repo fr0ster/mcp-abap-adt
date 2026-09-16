@@ -60,6 +60,43 @@ describe('a success stays a success', () => {
     expect(analyse(ADT_NO_FAILURE, wire(name))).toBe(ADT_NO_FAILURE);
   });
 
+  /**
+   * `activationExecuted="false"` with no messages means SAP had nothing to
+   * activate, and `analyseActivation` reads it as a refusal.
+   *
+   * Measured on trial 2026-09-16, three ways, all answering the identical
+   * document — `checkExecuted="false" activationExecuted="false"
+   * generationExecuted="true"`, no `msg`:
+   *
+   * - activating a class a second time, right after an activation that
+   *   answered `activationExecuted="true"` — the fixture this test reads,
+   *   captured as `activation-nothing-to-activate`;
+   * - activating a function group straight after creating it — a function
+   *   group is created active, `adtcore:version="active"` on its metadata
+   *   before any activation is asked for;
+   * - the same through the tools, which is how it surfaces: the two function
+   *   integration suites fail on it.
+   *
+   * adt-clients `v18.0.2:src/utils/activationUtils.ts:45-75` carries the same
+   * finding from its own probe — "class already active | 200 | false | none"
+   * — and concludes that the attribute says whether ADT did work, not whether
+   * the work succeeded, so only an `E` message is a failure signal.
+   *
+   * The fix belongs to `@mcp-abap-adt/adt-strategies`
+   * (`packages/adt-strategies/src/refusals/read.ts`, `readActivationRefusal`),
+   * not here: the spec takes all seven strategies from that package, and a
+   * second opinion in the consumer is the thing this migration removed.
+   * `it.failing` is the honest holding shape — it passes while the defect is
+   * there and turns red the moment the upstream fix lands, which is when this
+   * becomes an ordinary assertion.
+   */
+  it.failing('an activation with nothing to activate is not a failure (pending the adt-strategies fix)', () => {
+    const name = 'activation-nothing-to-activate--01-activation';
+    expect(corpusSidecar(name).response.status).toBe(200);
+    expect(corpusBody(name)).not.toMatch(/<msg/);
+    expect(analyseActivation(ADT_NO_FAILURE, wire(name))).toBe(ADT_NO_FAILURE);
+  });
+
   it('a passing unit test run is not a failure', () => {
     const passing = corpusSidecar(
       'unittest-run-passing--03-results-fa53c505dd7b1fd1abb8599833a05d44',

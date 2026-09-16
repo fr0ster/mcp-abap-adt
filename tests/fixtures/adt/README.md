@@ -64,6 +64,7 @@ exchanges address the same endpoint and differ only in `params`.
 | `read-function-module-source-text` | read `Z_MCP_SHR_FM` in `ZMCP_SHR_FGRP` | 200, `text/plain`, ABAP source |
 | `check-success-verdict` | check the active `ZBP_MCP_SHR_I_ROOT` | 200, `chkrun:checkReport status="processed"`, no messages |
 | `activation-success-verdict` | activate the scratch class with valid source | 200, `chkl:properties activationExecuted="true"`, no `msg` children |
+| `activation-nothing-to-activate` | activate the same class again, with nothing left to do | 200, `activationExecuted="false"`, `generationExecuted="true"`, **no `msg` children** — the attribute alone is not a refusal |
 | `delete-success` | delete the scratch class, unlocked | 200 twice: `isDeletable="true"`, then `isDeleted="true"` |
 | `read-table-metadata-structure` | read metadata of `ZMCP_SHR_RTABL` | 200, `blueSource` document |
 | `read-package-contents-structure` | contents of `ZMCP_SHR_PKG` | 200, `asx:abap` with populated `OBJECT_TYPES` |
@@ -381,6 +382,19 @@ design exists to remove.
 Do not key on the presence of `del:message` here. A *successful* delete still
 carries one, with `del:type="S"` and an empty `del:text`. The attribute is the
 verdict; `del:type` only explains it.
+
+**Activation is the exception to its own rule, and the exception is
+measured.** `activationExecuted="false"` with **no `msg` children at all**
+does not mean SAP declined — it means SAP had nothing to activate. Activating
+an already-active class answers exactly that
+(`activation-nothing-to-activate`), and so does activating a function group
+straight after creating one, because a function group is created active:
+`adtcore:version="active"` stands on its metadata before any activation is
+asked for. Both measured on trial, 2026-09-16. When SAP does have work, it
+answers `activationExecuted="true"` in the same request — activation is not
+deferred behind a 200 here. So the verdict is: `false` **plus** a `msg` of
+type `E` is the refusal, and `false` alone is a no-op. Deletion's attribute
+carries no such exception.
 
 **3. Two attributes, then the messages.** `chkrun:checkReport` needs two
 decisions from one document. `chkrun:status="notProcessed"` means the check never

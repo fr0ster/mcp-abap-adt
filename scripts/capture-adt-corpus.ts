@@ -1185,6 +1185,20 @@ async function main(): Promise<void> {
       await withCase('activation-success-verdict', async () => {
         await client.getClass().activate({ className: SCRATCH_CLASS_NAME });
       });
+
+      // The same request a second time, with nothing left to activate. This
+      // is the case the corpus was missing and the one that decides how
+      // `activationExecuted="false"` may be read: the class is active as of
+      // the line above, so SAP has no work, and it says so with
+      // `activationExecuted="false"`, `generationExecuted="true"` and no
+      // `msg` at all — byte-identical to what a freshly created function
+      // group answers, and measured on trial 2026-09-16 for both. Without
+      // this case the two activation fixtures both carry a `msg` or a
+      // `true`, so a reading that treats the bare attribute as a refusal
+      // agrees with the corpus while contradicting the system.
+      await withCase('activation-nothing-to-activate', async () => {
+        await client.getClass().activate({ className: SCRATCH_CLASS_NAME });
+      });
     } else {
       console.log('\n(no write case selected — scratch class not created)');
     }

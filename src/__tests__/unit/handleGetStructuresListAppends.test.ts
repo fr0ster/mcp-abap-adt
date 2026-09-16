@@ -59,9 +59,13 @@ describe('GetStructuresList append handling (#128)', () => {
     mockGetWhereUsedScope.mockReset();
     mockModifyWhereUsedScope.mockReset();
     mockGetWhereUsed.mockReset();
-    // Root reads as a structure with no embedded includes.
-    mockStructRead.mockResolvedValue({ data: 'define structure zs { }' });
-    mockTableRead.mockResolvedValue(null);
+    // Root reads as a structure with no embedded includes. `getStructure()`
+    // is called bare (no `resultsFor`), so its default `source` reading is a
+    // plain string — the real `IAdtResponse<string>` shape, not the pre-19
+    // `{ data }` envelope this mock used to answer with, which only ever
+    // worked because `extractSource` had the matching pre-19 bug.
+    mockStructRead.mockResolvedValue(okResponse('define structure zs { }'));
+    mockTableRead.mockResolvedValue(refusedResponse('not a table'));
     mockModifyWhereUsedScope.mockReturnValue('<scope-modified/>');
   });
 

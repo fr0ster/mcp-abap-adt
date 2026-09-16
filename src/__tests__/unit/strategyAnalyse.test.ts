@@ -96,7 +96,7 @@ describe("the library's own verdict is enriched, never discarded", () => {
       message: 'Request failed with status code 423',
     };
     const out = analyseException(libraryVerdict, wire(name)) as IAdtError & {
-      messages: Array<{ t100?: { id: string; no: string } }>;
+      messages: ReadonlyArray<{ t100?: { id: string; no: string } }>;
     };
     expect(out.message).toBe('Request failed with status code 423');
   });
@@ -106,7 +106,7 @@ describe("the library's own verdict is enriched, never discarded", () => {
       { origin: 'refusal', message: 'Request failed with status code 423' },
       wire(name),
     ) as IAdtError & {
-      messages: Array<{ t100?: { id: string; no: string } }>;
+      messages: ReadonlyArray<{ t100?: { id: string; no: string } }>;
     };
     expect(out.adtType).toBe('ExceptionResourceInvalidLockHandle');
     expect(out.namespace).toBe('com.sap.adt');

@@ -177,40 +177,17 @@ export async function handleUpdateDomain(
         ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(
-        `Error updating domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Domain ${domainName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Domain ${domainName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
+      // `sequence()`'s two calls each carry their own `analyse` and never
+      // throw for a refusal — `written.ok`/`written.getError()` above is
+      // where that verdict is read. This catch is left for a genuine bug in
+      // this block, not for a wire refusal, so it no longer guesses an HTTP
+      // status or re-parses an `exc` namespace `exception` element out of a body no v19 call here
+      // can still produce — that read belongs to `analyseException`, not a
+      // second opinion here (found while writing the handler invariant that
+      // checks for exactly this).
+      const message = error?.message ?? String(error);
+      logger?.error(`Error updating domain ${domainName}: ${message}`);
+      return return_error(new Error(`Failed to update domain: ${message}`));
     }
   } catch (error: any) {
     return return_error(error);

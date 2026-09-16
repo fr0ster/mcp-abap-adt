@@ -64,7 +64,7 @@ export async function handleGetMessageClassMessage(
   // A read-fix-round finding: passing `{ analyse: analyseException }` here —
   // the original shape of this handler — REPLACES that check rather than
   // adding to it, since the member reads `options?.analyse ?? defaultCheck`.
-  // `analyseException` only inspects an `exc:exception` element, which a
+  // `analyseException` only inspects an `exc` namespace `exception` element, which a
   // missing-msgno answer never carries (ADT answers 200 with the whole class
   // document), so the replaced strategy let a request for a message that
   // does not exist answer `success: true` with the unrelated whole-class

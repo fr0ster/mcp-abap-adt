@@ -89,7 +89,7 @@ export async function handleReadMessageClassMessage(
   // when it is not. Passing `{ analyse: analyseException }` — this file's
   // original shape — REPLACED that check rather than composing with it,
   // since the member reads `options?.analyse ?? defaultCheck`.
-  // `analyseException` only inspects an `exc:exception` element, which a
+  // `analyseException` only inspects an `exc` namespace `exception` element, which a
   // missing-msgno answer never carries (ADT answers 200 with the whole class
   // document), so the replaced strategy let a request for a message that
   // does not exist answer `success: true` with the unrelated whole-class

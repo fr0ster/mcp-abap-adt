@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourUtils } from '../../../lib/strategies/resultSets';
@@ -124,16 +125,38 @@ export function parseEmbeddedStructures(source: string): EmbeddedRef[] {
   return refs;
 }
 
-function extractSource(readResult: any): string | null {
-  // Library may return { data } or { readResult: { data } }.
-  const data = readResult?.readResult?.data ?? readResult?.data;
-  if (data == null) return null;
-  if (typeof data === 'string') return data;
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
+/**
+ * Pull the source string out of an `IAdtResponse<string>` — `{ ok: true,
+ * getResult() }` on success, `{ ok: false, getError() }` on refusal, per the
+ * 19 contract `findExtensions` already reads a few lines below this. This
+ * used to read a bare `data` field, or a `data` field nested one level under
+ * a `readResult` key — the pre-19 wire-envelope shape — which answers
+ * `undefined` on either half of the real contract, which made
+ * `readDdl` fall through to the table endpoint for every structure — even
+ * ones that read back fine. `.ok`/`.getResult().value` never throws on a
+ * refusal, which is why `readDdl`'s fallback checks this function's result
+ * rather than relying on a caught exception for the ordinary "not this
+ * endpoint, try the other one" case.
+ */
+function extractSource(result: unknown): string | null {
+  if (
+    result !== null &&
+    typeof result === 'object' &&
+    'ok' in result &&
+    (result as { ok: unknown }).ok === true &&
+    'getResult' in result
+  ) {
+    const value = (result as { getResult(): { value: unknown } }).getResult()
+      .value;
+    if (value == null) return null;
+    if (typeof value === 'string') return value;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
   }
+  return null;
 }
 
 export async function handleGetStructuresList(
@@ -182,6 +205,7 @@ export async function handleGetStructuresList(
         const sr = await obj.read(
           { structureName: name },
           version as 'active' | 'inactive',
+          { analyse: analyseException },
         );
         const s = extractSource(sr);
         if (s != null) return s;
@@ -191,7 +215,9 @@ export async function handleGetStructuresList(
       try {
         const tr = await client
           .getTable()
-          .read({ tableName: name }, version as 'active' | 'inactive');
+          .read({ tableName: name }, version as 'active' | 'inactive', {
+            analyse: analyseException,
+          });
         return extractSource(tr);
       } catch {
         return null;

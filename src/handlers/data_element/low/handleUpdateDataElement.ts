@@ -220,39 +220,21 @@ export async function handleUpdateDataElement(
         ),
       } as AxiosResponse);
     } catch (error: any) {
+      // `sequence()`'s two calls each carry their own `analyse` and never
+      // throw for a refusal — `written.ok`/`written.getError()` above is
+      // where that verdict is read. This catch is left for a genuine bug in
+      // this block, not for a wire refusal, so it no longer guesses an HTTP
+      // status or re-parses an `exc` namespace `exception` element out of a body no v19 call here
+      // can still produce — that read belongs to `analyseException`, not a
+      // second opinion here (found while writing the handler invariant that
+      // checks for exactly this).
+      const message = error?.message ?? String(error);
       logger?.error(
-        `Error updating data element ${dataElementName}: ${error?.message || error}`,
+        `Error updating data element ${dataElementName}: ${message}`,
       );
-
-      let errorMessage = `Failed to update data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DataElement ${dataElementName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `DataElement ${dataElementName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
+      return return_error(
+        new Error(`Failed to update data element: ${message}`),
+      );
     }
   } catch (error: any) {
     return return_error(error);

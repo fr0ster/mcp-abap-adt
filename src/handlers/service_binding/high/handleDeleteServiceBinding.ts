@@ -8,8 +8,8 @@
  * and no lock is taken because a held lock is what makes ADT refuse.
  *
  * **`response_format` stays on the surface but no longer does anything.**
- * The pre-migration handler used it to pick how `state.deleteResult.data`
- * (the deletion service's raw XML) was rendered — xml/json/plain, through
+ * The pre-migration handler used it to pick how `deleteResult`'s `data`
+ * field, kept on `state` (the deletion service's raw XML), was rendered — xml/json/plain, through
  * `parseServiceBindingPayload`. `delete()` now answers a structured deletion
  * document (`del:deletionResult`/`del:checkResponse`) through the same
  * `analyseDeletion`/`terseDeletion` pair every other deletion in this task

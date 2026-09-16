@@ -3,8 +3,9 @@
  *
  * Uses AdtClient.getDomain().delete from @mcp-abap-adt/adt-clients 19.
  *
- * The deletion service answers a refusal inside a 200 (`del:isDeleted="false"`,
- * a `del:message` alongside it) — `analyseDeletion` reads that rather than the
+ * The deletion service answers a refusal inside a 200 (the `del` namespace's
+ * `isDeleted` attribute set to `"false"`, a `message` alongside it) —
+ * `analyseDeletion` reads that rather than the
  * HTTP status, which is why this handler never inspects `response.status`
  * itself. No lock is taken: a held lock is what makes ADT refuse a deletion,
  * so acquiring one here would be self-defeating, and adt-clients 19 removed

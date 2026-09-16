@@ -5,10 +5,11 @@
  *
  * `analyseDeletion` is passed explicitly rather than left to the shipped
  * default. `AdtPackage.delete()`'s own default is `packageDeletionRefusal`,
- * a package-specific reading of `del:deletionResult`/`del:isDeleted` — but
- * `analyseDeletion` (`readDeletionRefusal` in `@mcp-abap-adt/adt-strategies`)
- * reads that same attribute, on both `del:deletionResult` and
- * `del:checkResponse`, generically. Passing it explicitly is what every
+ * a package-specific reading of the `del` namespace's `deletionResult` and
+ * `isDeleted` — but `analyseDeletion` (`readDeletionRefusal` in
+ * `@mcp-abap-adt/adt-strategies`) reads that same attribute, on both the
+ * `del` namespace's `deletionResult` and `checkResponse`, generically.
+ * Passing it explicitly is what every
  * sibling family in this cluster does for delete, and package's own document
  * shape is not special enough to need its own strategy where the generic one
  * already reads the right attribute.

@@ -21,7 +21,7 @@
       "content-type": "application/xml",
       "content-length": "549",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-8q4vl",
+      "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
       "x-sap-adt-profiling": "server-time=65694",

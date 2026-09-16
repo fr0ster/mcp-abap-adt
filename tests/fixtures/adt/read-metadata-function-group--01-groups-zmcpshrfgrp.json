@@ -21,7 +21,7 @@
       "content-type": "application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8",
       "content-length": "746",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "etag": "2026091015255000189205",
       "last-modified": "Thu, 10 Sep 2026 15:25:50 GMT",
       "sap-cache-control": "+0",

@@ -22,7 +22,7 @@
       "content-type": "application/vnd.sap.adt.dataelements.v2+xml; charset=utf-8",
       "content-length": "518",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "etag": "20260911085937000application/vnd.sap.adt.dataelements.v2+xml4+r0hyZb55SWtCPTarK7f8g8Moc=",
       "location": "/sap/bc/adt/ddic/dataelements/zmcp_bld_crt_dtel",
       "sap-cache-control": "+0",

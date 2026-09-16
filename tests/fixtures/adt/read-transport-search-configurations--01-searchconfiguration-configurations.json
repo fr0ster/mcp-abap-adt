@@ -21,7 +21,7 @@
       "content-type": "application/vnd.sap.adt.configurations.v1+xml; charset=utf-8",
       "content-length": "700",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-vv728",
+      "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
       "x-sap-adt-profiling": "server-time=26556",

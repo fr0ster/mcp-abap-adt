@@ -22,7 +22,7 @@
       "content-type": "application/vnd.sap.adt.domains.v2+xml; charset=utf-8",
       "content-length": "653",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "etag": "20260911085716000application/vnd.sap.adt.domains.v2+xmlwAYD+HuGuob7NBf3sIW6Uo1YFcE=",
       "location": "/sap/bc/adt/ddic/domains/zmcp_bld_crt_dom",
       "sap-cache-control": "+0",

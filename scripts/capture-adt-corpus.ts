@@ -320,6 +320,13 @@ const SENSITIVE_HEADER_NAMES = new Set([
   'set-cookie',
   'x-csrf-token',
   'x-sap-security-session',
+  // Not a credential — the name of the application server that answered
+  // (`appserver-sr97s`). It identifies infrastructure rather than a request,
+  // and the corpus is committed to a public repository, so it is replaced the
+  // same way the credentials are. `mcp-abap-adt-clients`' copy of this corpus
+  // has always redacted it, and its `corpusCarriesNoIdentity` guard is what
+  // noticed that this collector did not.
+  'sap-adt-saplb',
 ]);
 
 /** [literal to find, what to write instead]. */

@@ -22,7 +22,7 @@
       "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result2",
       "content-length": "403",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
       "x-sap-adt-profiling": "server-time=86842",

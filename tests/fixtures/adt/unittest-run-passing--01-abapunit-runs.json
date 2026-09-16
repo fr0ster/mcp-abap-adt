@@ -20,7 +20,7 @@
     "headers": {
       "content-length": "0",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "location": "/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB8599833A05D44",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",

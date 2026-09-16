@@ -21,7 +21,7 @@
     "headers": {
       "content-length": "0",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "last-modified": "Sat, 00  0000 00:00:00 GMT",
       "etag": "202609110900310001",
       "sap-cache-control": "+0",

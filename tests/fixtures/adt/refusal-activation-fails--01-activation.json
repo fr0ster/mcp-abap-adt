@@ -22,7 +22,7 @@
       "content-type": "application/xml; charset=utf-8",
       "content-length": "621",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
       "x-sap-adt-profiling": "server-time=584321",

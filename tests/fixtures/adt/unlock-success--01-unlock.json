@@ -18,7 +18,7 @@
     "headers": {
       "content-length": "0",
       "sap-authenticated": "true",
-      "sap-adt-saplb": "appserver-dgm9s",
+      "sap-adt-saplb": "REDACTED",
       "sap-cache-control": "+0",
       "sap-isc-uagent": "0",
       "x-sap-adt-profiling": "server-time=7161",

@@ -1,6 +1,8 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -34,6 +36,7 @@ export const TOOL_DEFINITION = {
         description: 'Result format: abapunit or junit.',
         enum: ['abapunit', 'junit'],
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -43,6 +46,7 @@ interface GetUnitTestResultArgs {
   run_id: string;
   with_navigation_uris?: boolean;
   format?: 'abapunit' | 'junit';
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetUnitTestResult(
@@ -62,9 +66,10 @@ export async function handleGetUnitTestResult(
   // (`IUnitTestResultOptions`) carry no `analyse` field, confirmed against
   // the shipped `AdtUnitTest.d.ts`.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const detail = detailOf(args);
 
   return answer(
-    { tool: 'GetUnitTestResult', detail: 'terse' },
+    { tool: 'GetUnitTestResult', detail },
     () =>
       pollUntilFinished(
         (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
@@ -75,19 +80,27 @@ export async function handleGetUnitTestResult(
             format,
           }),
       ),
-    (outcome: RunOutcome<unknown>) =>
+    // Task 28 fix round 1: `getResult`'s slot (`result`) is `structured` in
+    // `READING_BY_SLOT`, so `outcome.result` is a real `AdtReading`, not a
+    // bare value — `detail` was owed and missing. `raw` answers the wire
+    // document; `terse`/`full` both answer the parse (no fixture proves a
+    // safe further reduction of a test-run result — see this tool's own
+    // description above), so `raw` is where the parameter genuinely differs.
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
       outcome.finished
         ? {
             success: true,
             run_id,
             finished: true,
-            run_result: outcome.result,
+            run_result:
+              detail === 'raw' ? outcome.result?.raw : outcome.result?.value,
           }
         : {
             success: true,
             run_id,
             finished: false,
-            run_status: outcome.status.value,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
           },
   );

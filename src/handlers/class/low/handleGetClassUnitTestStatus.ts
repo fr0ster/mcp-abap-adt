@@ -36,6 +36,17 @@
  * handler function itself rather than through the server) used to surface
  * as a rejected promise instead of an error result. `RunClassUnitTests.ts`,
  * the still-unmigrated sibling in this directory, keeps the same guard.
+ *
+ * **Task 28: why this tool carries no `detail`.** `GetUnitTestStatus`
+ * (`unit_test/high/`), the migrated, generic sibling this one predates, DOES
+ * have `detail` — its `getStatus` runs through `resultsFor(unitTestDocuments)`
+ * and answers a real `AdtReading` with `raw` genuinely distinct from `value`.
+ * This handler is still on the pre-migration `client.getUnitTest() as any`
+ * escape hatch named above: `(value: string) => value` treats the answer as
+ * an already-opaque string, not an `AdtReading`, because nothing here builds
+ * one. There are no layers to choose between until the carve-out itself is
+ * closed — adding `detail` to a tool with no reading behind it would be the
+ * lie this migration's one rule exists to prevent, not a fix.
  */
 
 import { answer } from '../../../lib/answer';

@@ -591,13 +591,31 @@ function factoryOf(
 /**
  * Handlers whose `detail` argument disagrees with their own tool schema.
  *
- * Both directions are defects. A tool that offers `detail` and hardcodes
- * `'terse'` advertises a parameter it ignores. A tool that offers none and
- * calls `detailOf(args)` reads a parameter no caller can set — harmless today,
- * and a lie in the schema the day someone reads the handler to learn the
- * contract.
+ * Both directions are defects, checked at TWO sites, not one. A tool that
+ * offers `detail` and hardcodes `'terse'` — in the `answer()` CONTEXT, or in
+ * its PROJECTION, the third argument — advertises a parameter it ignores. A
+ * tool that offers none and reads `detailOf(args)` anywhere reads a
+ * parameter no caller can set — harmless today, and a lie in the schema the
+ * day someone reads the handler to learn the contract. Checking only the
+ * context misses a real shape: a handler can carry `detail` correctly into
+ * `answer()`'s first argument and still hardcode the level in the
+ * projection beside it, so the tool advertises the parameter and silently
+ * ignores it. Fix round 1 proved this live on a real handler before the
+ * projection check existed here.
+ *
+ * `declares` is resolved against `declaresDetail` — the set of tool names
+ * the tool SURFACE (`scripts/list-tools.ts`'s rows) actually says declare
+ * `detail` — not against this file's own text. A regex over the whole file
+ * is satisfied by an unused `import { DETAIL_PROPERTY }` line alone: delete
+ * the schema spread and keep the import, and the regex still says
+ * `declares`. The tool's own registered name, read off its
+ * `TOOL_DEFINITION` object literal, is what the caller (the test that
+ * already loaded the surface rows) can check against real data instead.
  */
-export function detailWiring(handlers: string[]): string[] {
+export function detailWiring(
+  handlers: string[],
+  declaresDetail: ReadonlySet<string>,
+): string[] {
   const program = ts.createProgram(handlers, compilerOptions());
   // `.parent` on every node — `answerCallsIn`'s `node.expression.getText()`
   // and every other bare `.getText()` call below need it — is set by the
@@ -613,16 +631,9 @@ export function detailWiring(handlers: string[]): string[] {
   for (const file of handlers) {
     const source = program.getSourceFile(file);
     if (source === undefined) continue;
-    // `DETAIL_PROPERTY` spread into the schema, the property written out by
-    // hand (`ActivateObjectLow`, whose `detail` is a plain literal, not the
-    // shared constant), or a bare zod raw shape's own field (`CreatePackage`,
-    // `GetTableContents` write `detail: z.enum([...])` because a zod raw
-    // shape is not the `{type:'object', properties, required}` JSON Schema
-    // `DETAIL_PROPERTY` is written for — see those two files' own comments).
-    const declares =
-      /DETAIL_PROPERTY|\bdetail\s*:\s*\{|\bdetail\s*:\s*z\b/.test(
-        source.getFullText(),
-      );
+
+    const toolName = toolNameOf(source);
+    const declares = toolName !== undefined && declaresDetail.has(toolName);
 
     const calls = answerCallsIn(source);
     // No `answer()` at all is the emptiest way to pass: the loop below never
@@ -663,22 +674,32 @@ export function detailWiring(handlers: string[]): string[] {
       }
 
       // `{ tool: 'X', detail: <expr> }` names the value directly.
-      // `{ tool: 'X', detail }` — the shape all 158 already-migrated
-      // handlers actually write, sharing one `const detail = detailOf(args)`
-      // between this context and the `project(detail, terseX)` call below it
-      // — names the SAME identifier as the property, and has to be resolved
-      // to what that binding holds, the same way `carriesAnalyse` follows a
-      // `const` elsewhere in this file. Treating every shorthand as
-      // unreadable would flag that entire, already-reviewed corpus; the
+      // `{ tool: 'X', detail }` — the shape every already-migrated handler
+      // actually writes, sharing one `const detail = detailOf(args)`
+      // between this context and the `project(detail, terseX)` call below
+      // it — names the SAME identifier as the property, and has to be
+      // resolved to what that binding holds, the same way `carriesAnalyse`
+      // follows a `const` elsewhere in this file. Treating every shorthand
+      // as unreadable would flag that entire, already-reviewed corpus; the
       // actual hidden failure a shorthand can carry is a `const` bound to
       // something other than `detailOf(args)` — a hardcoded level routed
       // through a variable named to look wired. A spread is not resolved at
       // all and falls through to the same "unreadable" report below.
-      const value = ts.isPropertyAssignment(detailProp)
-        ? detailProp.initializer
-        : ts.isShorthandPropertyAssignment(detailProp)
-          ? resolveConstInitializer(detailProp, checker)
-          : undefined;
+      //
+      // `bindingSymbol`, when resolvable, is kept beyond this block: the
+      // PROJECTION check below asks whether it reaches the same variable,
+      // not just whether the context does.
+      let value: ts.Expression | undefined;
+      let bindingSymbol: ts.Symbol | undefined;
+      if (ts.isPropertyAssignment(detailProp)) {
+        value = detailProp.initializer;
+        if (ts.isIdentifier(value)) {
+          bindingSymbol = checker.getSymbolAtLocation(value);
+        }
+      } else if (ts.isShorthandPropertyAssignment(detailProp)) {
+        bindingSymbol = checker.getShorthandAssignmentValueSymbol(detailProp);
+        value = constInitializerOf(bindingSymbol);
+      }
 
       if (value === undefined) {
         offenders.push(
@@ -687,11 +708,35 @@ export function detailWiring(handlers: string[]): string[] {
         continue;
       }
 
-      const dynamic =
-        ts.isCallExpression(value) && value.expression.getText() === 'detailOf';
-      if (declares !== dynamic) {
+      const ctxDynamic = isDetailOfCall(value);
+      if (declares !== ctxDynamic) {
         offenders.push(
           `${file}:${lineOf(source, value)} — tool ${declares ? 'declares' : 'does not declare'} detail, handler passes ${value.getText()}`,
+        );
+      }
+
+      // The projection: `answer()`'s third argument. A tool can carry a
+      // correct, dynamic `detail` into the context above and still hand
+      // `answer()` a projection that ignores it — `project('terse', …)`
+      // hardcoded beside a perfectly wired context, or a hand-written
+      // projection that never reads the `detail` variable at all. Silence
+      // here is exactly the gap fix round 1 found live: the context check
+      // alone caught the one corpus defect this migration had only because
+      // BOTH of its sites happened to be hardcoded together.
+      const projection = call.arguments[2];
+      const projectionResult = classifyProjection(
+        projection,
+        bindingSymbol,
+        checker,
+      );
+      if (projectionResult === 'literal' && declares) {
+        offenders.push(
+          `${file}:${lineOf(source, projection ?? call)} — tool declares detail, the answer() projection does not vary with it`,
+        );
+      }
+      if (projectionResult === 'dynamic' && !declares) {
+        offenders.push(
+          `${file}:${lineOf(source, projection ?? call)} — tool does not declare detail, the answer() projection varies with it anyway`,
         );
       }
     }
@@ -700,31 +745,146 @@ export function detailWiring(handlers: string[]): string[] {
 }
 
 /**
- * What the outer variable a shorthand property (`{ detail }`) refers to was
- * initialised with, or `undefined` if it is not a `const` bound to a value
- * in this same file — a `let`, a destructured parameter, an import,
- * anything reassignable. `checker.getSymbolAtLocation` on a shorthand
- * assignment's name answers the PROPERTY symbol, not the variable it reads —
- * confirmed empirically, not assumed — so this needs the dedicated
- * `getShorthandAssignmentValueSymbol`, the one call that resolves to the
- * outer binding instead. Shares `isConstBinding`'s reasoning with
- * `carriesAnalyse` above: a `const` binding fixes the REFERENCE, not the
- * value behind it, but that is the convention this repository writes
- * `detail` to, and nothing short of a full mutation analysis would prove
- * more.
+ * The tool's own registered name, read off `export const TOOL_DEFINITION = {
+ * name: '...', ... }` (an `as const` wrapper, when present, is unwrapped).
+ * `undefined` when no such literal is found — a file this check should not
+ * silently treat as declaring anything.
  */
-function resolveConstInitializer(
-  shorthand: ts.ShorthandPropertyAssignment,
-  checker: ts.TypeChecker,
+function toolNameOf(source: ts.SourceFile): string | undefined {
+  let name: string | undefined;
+  const visit = (node: ts.Node): void => {
+    if (name !== undefined) return;
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === 'TOOL_DEFINITION' &&
+      node.initializer !== undefined
+    ) {
+      const initializer = ts.isAsExpression(node.initializer)
+        ? node.initializer.expression
+        : node.initializer;
+      if (ts.isObjectLiteralExpression(initializer)) {
+        const nameProperty = initializer.properties.find(
+          (p) => p.name?.getText() === 'name',
+        );
+        if (
+          nameProperty !== undefined &&
+          ts.isPropertyAssignment(nameProperty) &&
+          ts.isStringLiteralLike(nameProperty.initializer)
+        ) {
+          name = nameProperty.initializer.text;
+        }
+      }
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return name;
+}
+
+/** Is this expression a call to `detailOf(...)`? */
+function isDetailOfCall(expr: ts.Expression): boolean {
+  return ts.isCallExpression(expr) && expr.expression.getText() === 'detailOf';
+}
+
+/**
+ * What a symbol's `const` declaration was initialised with, or `undefined`
+ * if there is no such binding — a `let`, a destructured parameter, an
+ * import, anything reassignable, or no symbol at all. Shares
+ * `isConstBinding`'s reasoning with `carriesAnalyse` above: a `const`
+ * binding fixes the REFERENCE, not the value behind it, but that is the
+ * convention this repository writes `detail` to, and nothing short of a
+ * full mutation analysis would prove more.
+ */
+function constInitializerOf(
+  symbol: ts.Symbol | undefined,
 ): ts.Expression | undefined {
-  const declaration =
-    checker.getShorthandAssignmentValueSymbol(shorthand)?.declarations?.[0];
+  const declaration = symbol?.declarations?.[0];
   return declaration !== undefined &&
     ts.isVariableDeclaration(declaration) &&
     declaration.initializer !== undefined &&
     isConstBinding(declaration)
     ? declaration.initializer
     : undefined;
+}
+
+/**
+ * Does `answer()`'s third argument actually vary with the SAME `detail`
+ * binding the context resolved to?
+ *
+ *  'dynamic'  — yes: `project(detail, …)` (or `project(detailOf(args), …)`
+ *               directly) reading the identical variable, or a hand-written
+ *               projection function whose body references that same
+ *               variable somewhere.
+ *  'literal'  — no: `project('terse', …)`, or a hand-written projection
+ *               that never reaches the binding at all.
+ *  'unknown'  — not provable from here (no binding to compare against, an
+ *               identifier this walk cannot resolve, some other shape) —
+ *               reported only when reported some other way already, never
+ *               used on its own to accuse a tool of ignoring `detail`.
+ *
+ * **Symbol identity, not text.** A hand-written projection is scanned for
+ * any identifier resolving to the SAME symbol the context's `detail`
+ * resolved to — not for the literal substring `"detail"`, which a
+ * shadowing parameter of the same name would satisfy without actually
+ * reading the outer binding, and a renamed variable would fail to satisfy
+ * despite reading it correctly. `checker.getSymbolAtLocation` disambiguates
+ * both cases the way it already does for `carriesAnalyse`'s `const`-tracing
+ * above.
+ */
+function classifyProjection(
+  projection: ts.Expression | undefined,
+  bindingSymbol: ts.Symbol | undefined,
+  checker: ts.TypeChecker,
+): 'dynamic' | 'literal' | 'unknown' {
+  if (projection === undefined) return 'unknown';
+
+  if (
+    ts.isCallExpression(projection) &&
+    projection.expression.getText() === 'project'
+  ) {
+    const first = projection.arguments[0];
+    if (first === undefined) return 'unknown';
+    if (isDetailOfCall(first)) return 'dynamic';
+    if (ts.isIdentifier(first)) {
+      const symbol = checker.getSymbolAtLocation(first);
+      if (bindingSymbol !== undefined && symbol === bindingSymbol) {
+        return 'dynamic';
+      }
+      const initializer = constInitializerOf(symbol);
+      if (initializer !== undefined) {
+        return isDetailOfCall(initializer) ? 'dynamic' : 'literal';
+      }
+      return 'unknown';
+    }
+    if (ts.isStringLiteralLike(first)) return 'literal';
+    return 'unknown';
+  }
+
+  if (ts.isArrowFunction(projection) || ts.isFunctionExpression(projection)) {
+    // No binding to compare against — the context itself did not resolve to
+    // a named variable (it may have been a literal, or unreadable, both
+    // reported already at the context site). Nothing MORE this check can
+    // prove about the projection in that case.
+    if (bindingSymbol === undefined) return 'unknown';
+    let found = false;
+    const visit = (node: ts.Node): void => {
+      if (found) return;
+      if (
+        ts.isIdentifier(node) &&
+        checker.getSymbolAtLocation(node) === bindingSymbol
+      ) {
+        found = true;
+        return;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(projection.body);
+    return found ? 'dynamic' : 'literal';
+  }
+
+  return 'unknown';
 }
 
 /** Calls to `answer(...)` — the only place a detail reaches a caller. */

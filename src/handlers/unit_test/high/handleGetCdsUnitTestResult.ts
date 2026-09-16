@@ -1,6 +1,8 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { isLegacyConnection, return_error } from '../../../lib/utils';
 import {
@@ -32,6 +34,7 @@ export const TOOL_DEFINITION = {
         description: 'Result format: abapunit or junit.',
         enum: ['abapunit', 'junit'],
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -41,6 +44,7 @@ interface GetCdsUnitTestResultArgs {
   run_id: string;
   with_navigation_uris?: boolean;
   format?: 'abapunit' | 'junit';
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetCdsUnitTestResult(
@@ -70,9 +74,10 @@ export async function handleGetCdsUnitTestResult(
   const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
     ourUnitTest,
   );
+  const detail = detailOf(args);
 
   return answer(
-    { tool: 'GetCdsUnitTestResult', detail: 'terse' },
+    { tool: 'GetCdsUnitTestResult', detail },
     () =>
       pollUntilFinished(
         (id, withLongPolling) => cdsUnitTest.getStatus(id, withLongPolling),
@@ -83,19 +88,22 @@ export async function handleGetCdsUnitTestResult(
             format,
           }),
       ),
-    (outcome: RunOutcome<unknown>) =>
+    // Task 28 fix round 1 — same finding, same fix as `GetUnitTestResult`.
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
       outcome.finished
         ? {
             success: true,
             run_id,
             finished: true,
-            run_result: outcome.result,
+            run_result:
+              detail === 'raw' ? outcome.result?.raw : outcome.result?.value,
           }
         : {
             success: true,
             run_id,
             finished: false,
-            run_status: outcome.status.value,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; no result to fetch yet.`,
           },
   );

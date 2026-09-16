@@ -1,6 +1,8 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { isLegacyConnection, return_error } from '../../../lib/utils';
 import {
@@ -22,6 +24,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Run identifier returned by unit test run.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -29,6 +32,7 @@ export const TOOL_DEFINITION = {
 
 interface GetCdsUnitTestArgs {
   run_id: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetCdsUnitTest(
@@ -61,29 +65,35 @@ export async function handleGetCdsUnitTest(
   const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
     ourUnitTest,
   );
+  const detail = detailOf(args);
 
   return answer(
-    { tool: 'GetCdsUnitTest', detail: 'terse' },
+    { tool: 'GetCdsUnitTest', detail },
     () =>
       pollUntilFinished(
         (id, withLongPolling) => cdsUnitTest.getStatus(id, withLongPolling),
         run_id,
         () => cdsUnitTest.getResult(run_id),
       ),
-    (outcome: RunOutcome<unknown>) =>
+    // Task 28 fix round 1 — same finding, same fix as `GetUnitTest`: both
+    // readings behind this answer are `structured`, and `detail` was owed.
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
       outcome.finished
         ? {
             success: true,
             run_id,
             finished: true,
-            run_status: outcome.status.value,
-            run_result: outcome.result,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
+            run_result:
+              detail === 'raw' ? outcome.result?.raw : outcome.result?.value,
           }
         : {
             success: true,
             run_id,
             finished: false,
-            run_status: outcome.status.value,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; call GetCdsUnitTest again to keep polling.`,
           },
   );

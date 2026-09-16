@@ -1,10 +1,11 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, type Terse } from '../../../lib/strategies/projections';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
-import { runIsFinished } from '../shared/pollRun';
+import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
@@ -26,6 +27,7 @@ export const TOOL_DEFINITION = {
         description: 'Enable long polling while waiting for status.',
         default: true,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -34,6 +36,7 @@ export const TOOL_DEFINITION = {
 interface GetUnitTestStatusArgs {
   run_id: string;
   with_long_polling?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetUnitTestStatus(
@@ -52,15 +55,25 @@ export async function handleGetUnitTestStatus(
   // `AdtUnitTest.d.ts` — takes NO options object at all, so there is no
   // `analyse` to hand it, unlike `read`/`readMetadata` on this same class.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const detail = detailOf(args);
+
+  // Task 28 fix round 1: this member's result is `structured` in
+  // `READING_BY_SLOT` — a real `AdtReading`, with `raw` (the
+  // `aunit:run`/`aunit:progress` document ADT sent) genuinely distinct from
+  // `value` (its parse). `detail` was missing entirely: the schema offered
+  // no parameter and the projection always answered `status.value` — found
+  // by enumerating every `answer()` call's own projection rather than only
+  // calls to the shared `project()` helper, which this handler's own
+  // hand-written, `AdtReading`-typed projection does not use.
+  const terseRunStatus: Terse<unknown> = (value) => ({
+    run_id,
+    finished: runIsFinished(value),
+    run_status: runProgressStatus(value),
+  });
 
   return answer(
-    { tool: 'GetUnitTestStatus', detail: 'terse' },
+    { tool: 'GetUnitTestStatus', detail },
     () => unitTest.getStatus(run_id, with_long_polling),
-    (status: AdtReading<unknown>) => ({
-      success: true,
-      run_id,
-      finished: runIsFinished(status.value),
-      run_status: status.value,
-    }),
+    project(detail, terseRunStatus),
   );
 }

@@ -578,19 +578,19 @@
   {
     "group": "high",
     "name": "GetUnitTest",
-    "inputs": "run_id*",
+    "inputs": "run_id*, detail",
     "available_in": "cloud, legacy, onprem"
   },
   {
     "group": "high",
     "name": "GetUnitTestStatus",
-    "inputs": "run_id*, with_long_polling",
+    "inputs": "run_id*, with_long_polling, detail",
     "available_in": "cloud, legacy, onprem"
   },
   {
     "group": "high",
     "name": "GetUnitTestResult",
-    "inputs": "run_id*, with_navigation_uris, format",
+    "inputs": "run_id*, with_navigation_uris, format, detail",
     "available_in": "cloud, legacy, onprem"
   },
   {
@@ -614,19 +614,19 @@
   {
     "group": "high",
     "name": "GetCdsUnitTest",
-    "inputs": "run_id*",
+    "inputs": "run_id*, detail",
     "available_in": "cloud, legacy, onprem"
   },
   {
     "group": "high",
     "name": "GetCdsUnitTestStatus",
-    "inputs": "run_id*, with_long_polling",
+    "inputs": "run_id*, with_long_polling, detail",
     "available_in": "cloud, legacy, onprem"
   },
   {
     "group": "high",
     "name": "GetCdsUnitTestResult",
-    "inputs": "run_id*, with_navigation_uris, format",
+    "inputs": "run_id*, with_navigation_uris, format, detail",
     "available_in": "cloud, legacy, onprem"
   },
   {

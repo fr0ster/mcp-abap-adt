@@ -1,6 +1,8 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
@@ -24,6 +26,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Run identifier returned by RunUnitTest.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -31,6 +34,7 @@ export const TOOL_DEFINITION = {
 
 interface GetUnitTestArgs {
   run_id: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetUnitTest(
@@ -51,29 +55,42 @@ export async function handleGetUnitTest(
   // confirmed against the shipped `AdtUnitTest.d.ts` — so no `analyse` is
   // passed to either.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const detail = detailOf(args);
 
   return answer(
-    { tool: 'GetUnitTest', detail: 'terse' },
+    { tool: 'GetUnitTest', detail },
     () =>
       pollUntilFinished(
         (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
         run_id,
         () => unitTest.getResult(run_id),
       ),
-    (outcome: RunOutcome<unknown>) =>
+    // Task 28 fix round 1: `status` and, once finished, `result` are both
+    // `structured` `AdtReading`s (`getResult`'s slot is `structured` in
+    // `READING_BY_SLOT`, same as `getStatus`'s) — a real reading was behind
+    // this answer all along, and `detail` was owed. `raw` answers the wire
+    // documents; `terse` and `full` both answer the parse, because no
+    // fixture in the corpus proves a further reduction of a test-run result
+    // is safe (see `GetCdsUnitTestResult`'s own doc comment on the same
+    // point) — `detail` is still genuinely different at `raw`, which is
+    // what makes the parameter real rather than decorative.
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
       outcome.finished
         ? {
             success: true,
             run_id,
             finished: true,
-            run_status: outcome.status.value,
-            run_result: outcome.result,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
+            run_result:
+              detail === 'raw' ? outcome.result?.raw : outcome.result?.value,
           }
         : {
             success: true,
             run_id,
             finished: false,
-            run_status: outcome.status.value,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
             message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; call GetUnitTest again to keep polling.`,
           },
   );

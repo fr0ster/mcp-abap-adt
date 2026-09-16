@@ -1,10 +1,11 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { AdtReading } from '../../../lib/strategies/reading';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, type Terse } from '../../../lib/strategies/projections';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { isLegacyConnection, return_error } from '../../../lib/utils';
-import { runIsFinished } from '../shared/pollRun';
+import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
@@ -24,6 +25,7 @@ export const TOOL_DEFINITION = {
         description: 'Enable long polling while waiting for status.',
         default: true,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -32,6 +34,7 @@ export const TOOL_DEFINITION = {
 interface GetCdsUnitTestStatusArgs {
   run_id: string;
   with_long_polling?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetCdsUnitTestStatus(
@@ -61,15 +64,20 @@ export async function handleGetCdsUnitTestStatus(
   const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
     ourUnitTest,
   );
+  const detail = detailOf(args);
+
+  // Task 28 fix round 1 — same finding, same fix as `GetUnitTestStatus`:
+  // `getStatus`'s result is `structured` (a real `AdtReading`), and `detail`
+  // was missing while the projection always answered the whole parse.
+  const terseRunStatus: Terse<unknown> = (value) => ({
+    run_id,
+    finished: runIsFinished(value),
+    run_status: runProgressStatus(value),
+  });
 
   return answer(
-    { tool: 'GetCdsUnitTestStatus', detail: 'terse' },
+    { tool: 'GetCdsUnitTestStatus', detail },
     () => cdsUnitTest.getStatus(run_id, with_long_polling),
-    (status: AdtReading<unknown>) => ({
-      success: true,
-      run_id,
-      finished: runIsFinished(status.value),
-      run_status: status.value,
-    }),
+    project(detail, terseRunStatus),
   );
 }

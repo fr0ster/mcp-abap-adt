@@ -46,6 +46,18 @@ export async function handleListServiceBindingTypes(
   // `bindingTypes` is `structured` in `READING_BY_SLOT`, which still
   // carries `.raw` beside its parse, so the payload keeps parsing the raw
   // body exactly as before.
+  //
+  // **Task 28: why this tool carries no `detail`.** `reading` genuinely is
+  // an `AdtReading` with a `.raw` distinct from its parse, which would
+  // normally make `detail` owed. It is not owed HERE because
+  // `response_format` already spans the same axis: `'plain'` answers
+  // `reading.raw` verbatim (`parseServiceBindingPayload`'s own first
+  // branch, above) — exactly what `detail: 'raw'` would — while `'xml'`/
+  // `'json'` each answer a parse, just a caller-chosen ENCODING of one
+  // rather than a caller-chosen LEVEL of one. A second parameter
+  // controlling the same raw-vs-parsed choice `response_format` already
+  // makes would not add a capability, only a second, overlapping way to
+  // ask for the one this tool already has.
   return answer(
     { tool: 'ListServiceBindingTypes', detail: 'terse' },
     () => obj.getServiceBindingTypes(),

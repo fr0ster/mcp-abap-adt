@@ -10,7 +10,11 @@
  * what the shared `const` is bound to: here it is a hardcoded `'terse'`,
  * not `detailOf(args)` — a parameter the schema advertises and the handler
  * silently ignores, wearing a variable name that looks wired. Must produce
- * exactly one offender.
+ * exactly one offender: the context's own binding. The projection below
+ * reads the SAME `const detail` the context does — isolating the
+ * ctx-vs-schema disagreement this fixture models from the separate
+ * ctx-vs-projection disagreement `declares-hardcoded-projection.ts` models
+ * (a projection that ignores `detail` even though the context is wired).
  */
 declare const DETAIL_PROPERTY: Record<string, unknown>;
 declare function answer(
@@ -18,6 +22,11 @@ declare function answer(
   call: () => unknown,
   project: (value: unknown) => unknown,
 ): unknown;
+declare function project(
+  detail: unknown,
+  terse: unknown,
+): (value: unknown) => unknown;
+declare const terseWrite: unknown;
 
 export const TOOL_DEFINITION = {
   name: 'FixtureShorthand',
@@ -34,6 +43,6 @@ export function handleFixture() {
   return answer(
     { tool: 'FixtureShorthand', detail },
     () => undefined,
-    (value: unknown) => value,
+    project(detail, terseWrite),
   );
 }

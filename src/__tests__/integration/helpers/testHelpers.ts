@@ -39,6 +39,34 @@ export function parseHandlerResponse(response: {
 }
 
 /**
+ * Assert a write was accepted, for a handler whose terse projection answers
+ * the bare word rather than a document.
+ *
+ * `terseWrite` (`src/lib/strategies/projections.ts`) answers the string
+ * `SUCCESS` for any 2xx and `undefined` otherwise, so a create, an update or
+ * an unlock has no JSON body to parse at the default `detail`. Reaching for
+ * `parseHandlerResponse` on one of these throws
+ * `Unexpected token 'S', "SUCCESS" is not valid JSON` — which is a test
+ * reading the old envelope, not a handler defect.
+ *
+ * **An accepted write is not a completed one.** ADT is asynchronous: this
+ * says the parameters were valid and the task was taken, and nothing more.
+ * What the object looks like afterwards is a question for a read or an
+ * activation.
+ */
+export function expectWriteAccepted(response: {
+  isError: boolean;
+  content: Array<{ type: string; text: string }>;
+}): void {
+  if (response.isError) {
+    throw new Error(
+      `Handler returned error: ${response.content[0]?.text || 'Unknown error'}`,
+    );
+  }
+  expect(response.content[0]?.text).toBe('SUCCESS');
+}
+
+/**
  * Extract session state from handler response
  */
 export function extractSessionState(response: any): {

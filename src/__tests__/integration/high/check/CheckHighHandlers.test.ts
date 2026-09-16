@@ -31,14 +31,26 @@ import {
 } from '../../helpers/testHelpers';
 
 /**
- * Assert normalized check response contract.
- * Verifies: object_name present, session fields absent, core fields present.
+ * Assert the normalized check response contract.
+ *
+ * What a high-tier check answers is its low-tier sibling's terse projection
+ * (`terseCheck` in `src/lib/strategies/projections.ts`) with `object_name`
+ * added and the two session fields removed by `normalizeCheckResponse`. So
+ * the fields are the check run's own: whether it ran, SAP's own status
+ * sentence, and the messages when there are any.
+ *
+ * The three fields this used to require — `success`, `message`,
+ * `check_result` — were the pre-migration handler's own envelope, built by
+ * `parseCheckRunResponse` around a boolean this repository derived itself.
+ * The verdict now belongs to `analyseCheck`: a check run that reports
+ * errors is a refusal and never reaches here, which is why no `success`
+ * boolean survives on the success path. `check_result` is gone with the
+ * envelope; its content is `status_text` plus `messages`.
  */
 function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
   expect(data.object_name).toBe(expectedObjectName.toUpperCase());
-  expect(data.success).toBeDefined();
-  expect(data.message).toBeDefined();
-  expect(data.check_result).toBeDefined();
+  expect(data.ran).toBe(true);
+  expect(typeof data.status_text).toBe('string');
   expect(data).not.toHaveProperty('session_id');
   expect(data).not.toHaveProperty('session_state');
 }
@@ -94,11 +106,9 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.class_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -156,11 +166,9 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -220,9 +228,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.ddl_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -282,9 +289,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.domain_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -346,9 +352,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.data_element_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -406,11 +411,9 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.table_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -470,9 +473,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.structure_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -532,9 +534,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.interface_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -598,11 +599,9 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.package_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -662,9 +661,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.program_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -724,11 +722,9 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.function_group_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -796,9 +792,8 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.function_module_name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -856,11 +851,9 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.name).toBe(objectName.toUpperCase());
 
-          const cr = data.check_result;
           logger?.success(
-            `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },

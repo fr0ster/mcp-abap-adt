@@ -153,6 +153,10 @@ export class LowTester extends LambdaTester {
       return;
     }
 
+    if (this.skipsOnThisSystem()) {
+      return;
+    }
+
     if (!this.workflowFunctions) {
       throw new Error('Workflow functions not provided');
     }

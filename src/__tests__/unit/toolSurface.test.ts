@@ -98,13 +98,33 @@ describe('the MCP tool surface', () => {
    * `ValidatePackageLow` already said so; `UpdatePackageLow` and
    * `DeletePackageLow` still offered `legacy` and could only refuse there.
    *
-   * The reads keep `legacy` on purpose, even though `AdtPackageLegacy`
-   * currently blocks them too: that block is upstream and is wrong by the
-   * same rule — the commit that introduced it (`0c9ae6b9`, "block legacy
-   * packages") gives the reason as "the endpoint exists in discovery but does
-   * not return usable results **via RFC**", which is a statement about a
-   * connection type rather than about reading. Hiding the read tools here
-   * would bake that over-block into this repository's surface.
+   * **Why editing is the line, and why `available_in` cannot draw it
+   * exactly.** On a legacy system editing needs a lock, and lock/unlock there
+   * go over RFC — so editing works on legacy-over-RFC and not on
+   * legacy-over-HTTP, where only reading was ever allowed. `available_in`
+   * knows three values, `onprem | cloud | legacy`, and none of them is a
+   * transport: the connection type is a separate setting
+   * (`connectionType: 'rfc'`, `connectionFactory.ts`) that this vocabulary
+   * cannot reach. So the surface cannot say "legacy, but only over RFC".
+   *
+   * What makes the narrowing safe anyway is that it does not depend on the
+   * transport at all: `AdtPackageLegacy` refuses `updateMetadata` and
+   * `delete` unconditionally, RFC or HTTP alike. Those two tools could not
+   * work on legacy by any route, which is a stronger statement than the
+   * transport one and the one this list rests on.
+   *
+   * The reads keep `legacy` for the opposite reason: reading a package on
+   * legacy is precisely the thing that was always meant to work over HTTP.
+   * `AdtPackageLegacy` blocks `read`/`readMetadata` too, and that blanket
+   * block is upstream and contradicts the rule rather than expressing it —
+   * the commit that introduced it (`mcp-abap-adt-clients` `0c9ae6b9`) blocked
+   * every member at once over an RFC observation. Hiding the read tools here
+   * would bake that over-block into this repository's surface and make the
+   * upstream fix invisible when it comes.
+   *
+   * Lock and unlock keep `legacy` for the transport reason above: they are
+   * not overridden by the legacy class and they do work over RFC, which is
+   * the only way editing happens there at all.
    */
   const NARROWED_ON_PURPOSE: Record<string, string> = {
     'low/UpdatePackageLow': 'cloud, onprem',

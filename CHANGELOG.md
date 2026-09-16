@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Six unit-test tools gained the `detail` parameter, and their default answer
+  changed with it.** `GetUnitTest`, `GetUnitTestStatus`, `GetUnitTestResult`
+  and their three CDS siblings answer a JSON object built from a parsed
+  document, which is the shape `detail` exists for — but they had been left
+  without it, each hardcoding a level, so an audit keyed on the shared
+  projection helper could not see them.
+
+  What a caller sees at the default level is not what it was. The three status
+  and result tools used to answer the whole parse every time; the three that
+  poll a run used to answer the reading object itself, raw document included.
+  Now `terse` and `full` answer the parse and `raw` answers the wire text, the
+  same three levels every other JSON-answering tool has.
+
+  No test pinned the old shape, which is why this is recorded here rather than
+  discovered by one. A caller reading a named field off these answers is
+  unaffected; a caller that took the whole object and expected the document
+  inside it should ask for `raw`.
+
 - **A compiler-pinned ledger of the eighteen `adt-clients` legacy-class
   members that ignore what a caller passes them, and what it found (#207,
   #208).**

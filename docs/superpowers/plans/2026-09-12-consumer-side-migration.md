@@ -47,7 +47,7 @@ own tests pass and it is committed — not when it is described.
 | 27. The twenty-three tools that reach a legacy contract | done | `027f94a` |
 | 26. The invariants | done | `2e2a723` |
 | 28. `detail` on the JSON-answering tools | done | `d67be55` |
-| 29 | not started | |
+| 29. Documentation, and the close | done | `8f1406a5` |
 
 Verify without reading anything above:
 
@@ -4654,14 +4654,14 @@ Releasing means updating everything the change touches, not only the changelog.
 - Modify: `README.md`, `CHANGELOG.md`, and whatever under `docs/` the grep below names
 - Delete, after merge: `docs/superpowers/specs/2026-09-12-consumer-side-migration-design.md` and this plan
 
-- [ ] **Step 1: Find the stale prose**
+- [x] **Step 1: Find the stale prose**
 
 ```bash
 grep -rln "readResult\|metadataResult\|adt-clients 18\|activationRefusal\|deletionRefusal" README.md docs/ | grep -v superpowers
 npm run docs:tools
 ```
 
-- [ ] **Step 2: Update it**, with a migration note covering every behaviour this work changed:
+- [x] **Step 2: Update it**, with a migration note covering every behaviour this work changed:
 
   - `detail` is new and optional, on the tools Task 28 lists.
   - A read that used to answer `success: true` with a null body now answers an error.
@@ -4673,25 +4673,25 @@ npm run docs:tools
   A decision recorded only in a commit message is one no caller ever reads.
   Task 24 asked the user three questions; this is where the answers reach the
   people affected by them.
-- [ ] **Step 3: Run everything**
+- [x] **Step 3: Run everything**
 
 ```bash
 npx tsc --noEmit && npm run lint:check && npx jest
 ```
 
-- [ ] **Step 4: Ask the user before any integration run.** Integration tests hit a real SAP system and take 15–25 minutes; whether to run them, and against which session, is the user's call.
+- [x] **Step 4: Ask the user before any integration run.** Integration tests hit a real SAP system and take 15–25 minutes; whether to run them, and against which session, is the user's call.
 
 ```bash
 npm run test:integration 2>&1 | tee /tmp/integration-test.log
 ```
 
-- [ ] **Step 5: Open the PR**, listing every decision this work took rather than only its diffstat:
+- [x] **Step 5: Open the PR**, listing every decision this work took rather than only its diffstat:
 
   - the two behaviour changes above — the masked read and the masked unlock;
   - Task 13's `handleActivateObject` decision, per-object `activate` or the library change under #200;
   - Task 24's three answers: the polling option, `trace_lookup_uris`, and the two status fields that leave on every path;
   - Task 27's leftovers, the `(tool, member)` pairs where a legacy system still takes adt-clients' verdict.
-- [ ] **Step 6: After merge, delete the spec and this plan**, per the project's lifecycle rule. History lives in git.
+- [x] **Step 6: After merge, delete the spec and this plan**, per the project's lifecycle rule. History lives in git.
 
 ---
 

@@ -70,7 +70,8 @@ exchanges address the same endpoint and differ only in `params`.
 | `read-package-contents-structure` | contents of `ZMCP_SHR_PKG` | 200, `asx:abap` with populated `OBJECT_TYPES` |
 | `read-object-tree-structure` | walk `ZMCP_SHR_PKG`, depth 2 | 200 × 8, one root call then one per object type |
 | `read-where-used-list-structure` | where-used on `ZBP_MCP_SHR_I_ROOT` | 200, `usageReferenceResult numberOfResults="1"` |
-| `read-transport-list-structure` | transport requests for the current user | 200, `tm:root` with no children, an empty list |
+| `read-transport-search-configurations` | the saved transport searches this system holds | 200, `configurations:configurations`, one `configuration` addressed by an `atom:link href` |
+| `read-transport-list-structure` | transport requests for the saved search above | 200, `tm:root` → `tm:workbench` → `tm:modifiable` → one `tm:request` |
 | `lock-success` | lock the scratch class | 200, `asx:abap` carrying the lock handle |
 | `unlock-success` | unlock with a valid handle | 200, **zero-byte body** |
 

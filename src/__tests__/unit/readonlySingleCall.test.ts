@@ -84,7 +84,28 @@ import {
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
-const context = { connection: {} as any, logger: undefined };
+/**
+ * The connection answers one endpoint: the transport search configurations.
+ *
+ * `ListTransports` resolves which saved search to run before it lists (see
+ * `lib/strategies/transportSearch.ts`), and that request is a direct one —
+ * there is no client member behind it, so `fakeClient` cannot serve it. The
+ * document is the corpus's own, not a hand-built one.
+ */
+const context = {
+  connection: {
+    makeAdtRequest: async ({ url }: { url: string }) =>
+      url.includes('searchconfiguration')
+        ? {
+            status: 200,
+            data: corpusBody(
+              'read-transport-search-configurations--01-searchconfiguration-configurations',
+            ),
+          }
+        : { status: 200, data: '' },
+  } as any,
+  logger: undefined,
+};
 
 describe('readonlySingleCall handlers answer through the adapter and surface a refusal', () => {
   it.each([
@@ -291,12 +312,21 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     ]);
   });
 
-  it('ListTransports calls list() with no arguments', async () => {
+  it('ListTransports calls list() with the configUri it resolved itself', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleListTransports(context as any, {});
     const call = seen.calls.filter((c) => c.member === 'list').at(-1);
-    expect(call?.args).toEqual([]);
+    // The href out of the corpus's configurations document — resolved by this
+    // handler, not by `list()`. Passing it is what keeps the client from
+    // making that request a second time behind a member no strategy reaches,
+    // and what keeps a system holding several saved searches from throwing.
+    expect(call?.args).toEqual([
+      {
+        configUri:
+          '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/22D2111643541FE1A5AA03DC2D3DE702',
+      },
+    ]);
   });
 
   it('GetObjectVersionDiff calls getVersionSource once per content_uri, both uris', async () => {
@@ -621,25 +651,68 @@ describe('GetObjectInfo, mapped from a real matched pair of captured node-struct
   });
 });
 
-describe('ListTransports, mapped from a real captured (empty) transport list', () => {
+describe('ListTransports, mapped from a real captured transport list', () => {
   // `read-transport-list-structure--01-cts-transportrequests` is a real
-  // `tm:root` response with no requests at all (see
-  // `parseTransportListXml.test.ts`'s own note on it) — the honest-empty
-  // case, not a synthetic tree.
-  it('answers count: 0 for a real empty transport list', async () => {
-    const body = corpusBody(
-      'read-transport-list-structure--01-cts-transportrequests',
-    );
-    fakeClient = fakeClientOf({
+  // `tm:root` response, re-captured 2026-09-16 when the system had one
+  // modifiable request in it. It used to be the empty answer — a bare
+  // self-closing root — and the empty shape has not lost its coverage: the
+  // #168 regression guard (`parseTransportListXml.test.ts`) keeps a verbatim
+  // capture of it, beside the reconstructed tree, and asserts against both.
+  const body = corpusBody(
+    'read-transport-list-structure--01-cts-transportrequests',
+  );
+  const listing = () =>
+    fakeClientOf({
       list: async () => okResponse(reading(parseStructure(body), body)),
     });
+
+  it('finds the request the captured document actually holds', async () => {
+    fakeClient = listing();
 
     const result: any = await handleListTransports(context as any, {});
 
     expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
+    expect(payload.count).toBe(1);
+    expect(payload.transports[0]).toEqual({
+      number: 'TRLK900438',
+      description: 'adt-clients integration tests',
+      type: 'K',
+      status: 'D',
+      owner: 'SAPUSER01',
+      target: '',
+    });
+    // One configuration was searched, so nothing is said about which — the
+    // ordinary answer keeps the three fields it has always had.
+    expect(payload).not.toHaveProperty('searched_configurations');
+  });
+
+  it("applies the caller's user client-side, because the server does not", async () => {
+    fakeClient = listing();
+
+    const result: any = await handleListTransports(context as any, {
+      user: 'SOMEBODY_ELSE',
+    });
+
+    const payload = JSON.parse(result.content[0].text);
     expect(payload.count).toBe(0);
     expect(payload.transports).toEqual([]);
+  });
+
+  it('keeps a released request out unless the caller asks for one', async () => {
+    fakeClient = listing();
+
+    const all: any = await handleListTransports(context as any, {
+      modifiable_only: false,
+    });
+    const modifiable: any = await handleListTransports(context as any, {});
+
+    // The captured document holds one modifiable request and no released
+    // one, so both answers are the same here — what this pins is that the
+    // filter runs on the status the document carried (`D`), rather than on
+    // something the server was asked for and may not have honoured.
+    expect(JSON.parse(all.content[0].text).count).toBe(1);
+    expect(JSON.parse(modifiable.content[0].text).count).toBe(1);
   });
 });
 

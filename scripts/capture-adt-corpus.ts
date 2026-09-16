@@ -1459,8 +1459,38 @@ async function main(): Promise<void> {
       });
     });
 
+    // Both requests a transport listing takes, captured as the two they are.
+    //
+    // `list()` without a `configUri` resolves a saved search first and then
+    // lists — two requests inside one member, and only the second was ever
+    // captured here. The consumer makes both itself now
+    // (`src/lib/strategies/transportSearch.ts`), so the corpus carries both:
+    // the configurations document is what the choice is made from, and
+    // nothing could be tested against it while it was missing.
+    let transportConfigUri = '';
+    await withCase('read-transport-search-configurations', async () => {
+      const response = await connection.makeAdtRequest({
+        url: '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations',
+        method: 'GET',
+        // Without this exact type the endpoint answers 406, measured.
+        headers: { Accept: 'application/vnd.sap.adt.configurations.v1+xml' },
+      });
+      // Enough of the document to address the search in the next case. The
+      // real reading is `parseSearchConfigurations` in
+      // `src/lib/strategies/transportSearch.ts`, tested against this very
+      // fixture; a capture script only needs the href.
+      transportConfigUri =
+        /href="([^"]+)"/.exec(String(response?.data ?? ''))?.[1] ?? '';
+    });
+
     await withCase('read-transport-list-structure', async () => {
-      await client.getRequest().list({ user: ctx.responsible || '' });
+      // One exchange, because the configuration was resolved above. Called
+      // with no `configUri`, `list()` resolves one itself and the case
+      // records two requests — which is the very composite the consumer now
+      // makes explicitly.
+      await client.getRequest().list(
+        transportConfigUri ? { configUri: transportConfigUri } : undefined,
+      );
     });
 
     // -----------------------------------------------------------------

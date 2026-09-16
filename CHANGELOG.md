@@ -380,6 +380,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a direct caller — a soft-mode integration test, or an embedder) would
   reject the returned promise instead of answering an error result. Restored.
 
+- **`ListTransports` resolves its own saved search.** A transport listing is a
+  saved search: `list()` takes a `configUri`, and when it is not given one it
+  resolves a configuration itself — a second request, behind a `protected`
+  member, whose answer no strategy of ours reads. On a system holding several
+  saved searches that resolver refuses to guess and throws, telling the caller
+  to pass a `configUri` — which this tool has no parameter for and is not
+  getting one. Both requests are now made here
+  (`src/lib/strategies/transportSearch.ts`): the request count is unchanged
+  for the ordinary one-configuration system, the configurations document is
+  ours to read, and several searches are run and merged (capped at five,
+  reported as `searched_configurations` and `configurations_capped`) rather
+  than refused. A system with no saved search at all now gets a sentence
+  naming the endpoint that answered none, instead of a resolver's internal
+  error. The corpus gained the configurations document it never had.
+
 - **An activation with nothing to activate is a success, and says so.** SAP
   answers `POST /activation` with `activationExecuted="false"`,
   `generationExecuted="true"` and no `msg` at all when the object is already

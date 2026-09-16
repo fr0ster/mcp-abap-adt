@@ -6,13 +6,20 @@
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import {
+  fetchSearchConfigurations,
+  MAX_SEARCH_CONFIGURATIONS,
+} from '../../../lib/strategies/transportSearch';
 import { getEffectiveSystemContext } from '../../../lib/systemContext';
 
 export const TOOL_DEFINITION = {
@@ -187,34 +194,106 @@ export async function handleListTransports(
 
   const detail = detailOf(args);
 
+  // **Both requests a listing takes are made here.**
+  //
   // `IListTransportsOptions` carries `configUri` and NOTHING else since
   // adt-clients 19 — `user` and `status` (the old `{user, status}` this
-  // handler used to pass to `list()`) have nowhere to go any more.
-  // `list()` without a `configUri` resolves a saved server-side search
-  // configuration instead, and that configuration decides the scope, not the
-  // caller (see `AdtRequest.d.ts`'s doc on `list`/`resolveSearchConfiguration`).
-  // `user` and `modifiable_only` are therefore applied CLIENT-SIDE below, on
-  // whatever `list()` answers — the same backstop this handler already used
-  // for `modifiable_only` ("it is not established that the endpoint honours
-  // the status query param", #168), now load-bearing for `user` too.
+  // handler used to pass to `list()`) have nowhere to go any more, and the
+  // package's own note says why: "The five filter parameters this used to
+  // take were never read by the server; filtering is a property of the saved
+  // configuration." So `user` and `modifiable_only` are applied CLIENT-SIDE
+  // below, on whatever the searches answer — the same backstop this handler
+  // already used for `modifiable_only` ("it is not established that the
+  // endpoint honours the status query param", #168), now load-bearing for
+  // `user` too.
+  //
+  // Which saved search to run is resolved by `fetchSearchConfigurations`
+  // (`lib/strategies/transportSearch.ts`) rather than by `list()` itself.
+  // That file carries the reasoning; the short version is that `list()`
+  // without a `configUri` makes the same request internally behind a
+  // `protected` member no strategy of ours reaches, and throws outright on a
+  // system holding several saved searches — telling the caller to pass a
+  // `configUri` that this tool has no parameter for. Composed here, the
+  // request count is unchanged for the ordinary one-configuration system,
+  // both requests are ours to read, and several configurations are searched
+  // rather than refused.
   //
   // **This is an observable behaviour change, not merely an implementation
   // one.** Before, `user`/`status` were sent to the server and never proven
   // to be honoured — so the answer, in practice, was every owner's
-  // modifiable transports. `user` defaults to `getSystemContext().responsible`
-  // (or `SAP_USERNAME`) when the caller passes nothing, and the filter above
-  // is now always applied — so a caller who passes no `user` gets a
-  // NARROWER list than before: only the session user's transports, not
-  // everyone's. Believed to be what the tool should answer (its own
-  // description always said "for the current or specified user"), kept
-  // deliberately rather than reverted, and named here and in the tool's own
-  // description rather than left implicit.
+  // modifiable transports. `user` defaults to the request's own responsible
+  // (or `SAP_USERNAME`) when the caller passes nothing, and the filter below
+  // is now always applied — so a caller who passes no `user` gets a NARROWER
+  // list than before: only the session user's transports, not everyone's.
+  // Believed to be what the tool should answer (its own description always
+  // said "for the current or specified user"), kept deliberately rather than
+  // reverted, and named here and in the tool's own description rather than
+  // left implicit.
+
+  // Assigned by the call below and read by the projection: which searches
+  // actually ran. Only reported when there was more than one, so the ordinary
+  // answer keeps the shape it has always had.
+  let searched: string[] = [];
+  let capped = false;
+
   return answer(
     { tool: 'ListTransports', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
-        .list(),
+    async () => {
+      const configurations = await fetchSearchConfigurations(
+        connection,
+        logger,
+      );
+      if (configurations.length === 0) {
+        throw new Error(
+          `This system holds no saved transport search configuration, and a transport listing is a saved search: ${TRANSPORT_SEARCH_CONFIGURATIONS_URL} answered none. Create one in ADT's Transport Organizer and the tool will use it.`,
+        );
+      }
+
+      capped = configurations.length > MAX_SEARCH_CONFIGURATIONS;
+      const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
+      searched = running.map((configuration) => configuration.uri);
+
+      const request = createAdtClient(connection, logger).getRequest(
+        resultsFor(transportDocuments),
+      );
+
+      const readings: AdtReading<unknown>[] = [];
+      for (const configuration of running) {
+        const answered = await request.list({ configUri: configuration.uri });
+        // The failing search's own answer, untouched — the rule `sequence()`
+        // follows, for the same reason: a sentence composed here would stand
+        // beside the strategy's own account of the same refusal.
+        if (!answered.ok) {
+          return answered as unknown as IAdtResponse<
+            AdtReading<unknown>,
+            IAdtError
+          >;
+        }
+        readings.push(answered.getResult().value as AdtReading<unknown>);
+      }
+
+      // One search: its reading, unchanged. Several: the values as an array,
+      // which `parseTransportListValue` walks like any other node, and the
+      // documents joined for `detail: 'raw'` — there is no single document to
+      // answer when several were read, and dropping all but one would be a
+      // quieter lie than joining them.
+      const merged: AdtReading<unknown> =
+        readings.length === 1
+          ? readings[0]
+          : {
+              value: readings.map((r) => r.value),
+              raw: readings.map((r) => r.raw).join('\n'),
+              status: readings[0]?.status ?? 200,
+            };
+
+      return {
+        ok: true,
+        getResult: () => ({ value: merged }),
+        getError: () => {
+          throw new Error('ListTransports: asked for the error of a success');
+        },
+      } as unknown as IAdtResponse<AdtReading<unknown>, IAdtError>;
+    },
     project(detail, (value) => {
       const parsed = parseTransportListValue(value);
       const byUser = user
@@ -226,7 +305,13 @@ export async function handleListTransports(
 
       logger?.info(`ListTransports: found ${transports.length} transport(s)`);
 
-      return { success: true, count: transports.length, transports };
+      return {
+        success: true,
+        count: transports.length,
+        transports,
+        ...(searched.length > 1 ? { searched_configurations: searched } : {}),
+        ...(capped ? { configurations_capped: MAX_SEARCH_CONFIGURATIONS } : {}),
+      };
     }),
   );
 }

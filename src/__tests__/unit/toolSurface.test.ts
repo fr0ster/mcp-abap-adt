@@ -8,18 +8,36 @@ import { join } from 'node:path';
  * `detail` is the one addition the adt-clients 19 migration may make; anything
  * else moving is a regression, and this is where it is caught.
  *
- * `scripts/list-tools.ts` answers a FLAT ARRAY of `{ group, name, inputs }`,
- * where `inputs` is a formatted string — `"table_name*, max_rows"`, with `*`
- * marking required and the sentinel `"(none)"` for a tool that takes nothing.
- * Not an object keyed by group, and not a `params` array: a test written
- * against either would fail on an unchanged surface and the ratchet would be
- * useless from the first task onward.
+ * `scripts/list-tools.ts` answers a FLAT ARRAY of
+ * `{ group, name, inputs, available_in }`, where `inputs` is a formatted
+ * string — `"table_name*, max_rows"`, with `*` marking required and the
+ * sentinel `"(none)"` for a tool that takes nothing — and `available_in` is
+ * a sorted, comma-joined list of SAP environments, or the sentinel
+ * `"(everywhere)"` for a tool that declares none. Not an object keyed by
+ * group, and not a `params` array: a test written against either would fail
+ * on an unchanged surface and the ratchet would be useless from the first
+ * task onward.
+ *
+ * **`available_in` is checked here too, and was not always.** The parameter
+ * comparison below only ever read `inputs` — a tool that gained or lost an
+ * environment passed it silently, unless a `legacyExposure`/`legacyThrows`
+ * ledger elsewhere happened to name that exact tool. Two earlier tasks
+ * recorded the gap without closing it; this file is the ratchet, so this is
+ * where it closes: a changed `available_in`, in either direction, fails the
+ * same way an added or removed parameter does.
  */
 describe('the MCP tool surface', () => {
-  type Row = { group: string; name: string; inputs: string };
+  type Row = {
+    group: string;
+    name: string;
+    inputs: string;
+    available_in: string;
+  };
 
   const read = (rows: Row[]) =>
     new Map(rows.map((r) => [`${r.group}/${r.name}`, r.inputs]));
+  const availability = (rows: Row[]) =>
+    new Map(rows.map((r) => [`${r.group}/${r.name}`, r.available_in]));
   const parameters = (inputs: string) =>
     inputs === '(none)' ? [] : inputs.split(', ');
 
@@ -67,6 +85,16 @@ describe('the MCP tool surface', () => {
       expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
         tool,
         added: ['detail'],
+      });
+    }
+  });
+
+  it('changes no tool availability', () => {
+    const now = availability(current);
+    for (const [tool, before] of availability(frozen)) {
+      expect({ tool, available_in: now.get(tool) }).toEqual({
+        tool,
+        available_in: before,
       });
     }
   });

@@ -587,3 +587,155 @@ function factoryOf(
 ): string | undefined {
   return classify(receiver, checker);
 }
+
+/**
+ * Handlers whose `detail` argument disagrees with their own tool schema.
+ *
+ * Both directions are defects. A tool that offers `detail` and hardcodes
+ * `'terse'` advertises a parameter it ignores. A tool that offers none and
+ * calls `detailOf(args)` reads a parameter no caller can set — harmless today,
+ * and a lie in the schema the day someone reads the handler to learn the
+ * contract.
+ */
+export function detailWiring(handlers: string[]): string[] {
+  const program = ts.createProgram(handlers, compilerOptions());
+  // `.parent` on every node — `answerCallsIn`'s `node.expression.getText()`
+  // and every other bare `.getText()` call below need it — is set by the
+  // BINDER, not by parsing alone. `createProgram` parses lazily and does not
+  // bind until something asks for semantic information; every other walk in
+  // this file already forces that by calling `getResolvedSignature`/
+  // `getSymbolAtLocation` on the checker before it reads `.getText()`, so it
+  // never surfaced here. This walk asks the checker nothing, so without this
+  // line every node's `.parent` is `undefined` and `.getText()` throws
+  // reading `.text` off the `undefined` source file it can no longer find.
+  const checker = program.getTypeChecker();
+  const offenders: string[] = [];
+  for (const file of handlers) {
+    const source = program.getSourceFile(file);
+    if (source === undefined) continue;
+    // `DETAIL_PROPERTY` spread into the schema, the property written out by
+    // hand (`ActivateObjectLow`, whose `detail` is a plain literal, not the
+    // shared constant), or a bare zod raw shape's own field (`CreatePackage`,
+    // `GetTableContents` write `detail: z.enum([...])` because a zod raw
+    // shape is not the `{type:'object', properties, required}` JSON Schema
+    // `DETAIL_PROPERTY` is written for — see those two files' own comments).
+    const declares =
+      /DETAIL_PROPERTY|\bdetail\s*:\s*\{|\bdetail\s*:\s*z\b/.test(
+        source.getFullText(),
+      );
+
+    const calls = answerCallsIn(source);
+    // No `answer()` at all is the emptiest way to pass: the loop below never
+    // runs, so it can report nothing. A tool that declares `detail` and never
+    // reaches the adapter has not wired the parameter — it has nowhere to.
+    if (declares && calls.length === 0) {
+      offenders.push(
+        `${file} — tool declares detail and the handler never calls answer()`,
+      );
+    }
+
+    for (const call of calls) {
+      const ctx = call.arguments[0];
+
+      // A context this walk cannot read is not a pass. The failure being
+      // guarded against is a tool that declares `detail` and never passes it,
+      // and `continue` on an unreadable context is exactly how that escapes:
+      // no property, no offender, invariant green.
+      if (ctx === undefined || !ts.isObjectLiteralExpression(ctx)) {
+        if (declares) {
+          offenders.push(
+            `${file}:${lineOf(source, call)} — tool declares detail, answer() context is not a literal this check can read`,
+          );
+        }
+        continue;
+      }
+
+      const detailProp = ctx.properties.find(
+        (p) => p.name?.getText() === 'detail',
+      );
+      if (detailProp === undefined) {
+        if (declares) {
+          offenders.push(
+            `${file}:${lineOf(source, call)} — tool declares detail, answer() passes none`,
+          );
+        }
+        continue;
+      }
+
+      // `{ tool: 'X', detail: <expr> }` names the value directly.
+      // `{ tool: 'X', detail }` — the shape all 158 already-migrated
+      // handlers actually write, sharing one `const detail = detailOf(args)`
+      // between this context and the `project(detail, terseX)` call below it
+      // — names the SAME identifier as the property, and has to be resolved
+      // to what that binding holds, the same way `carriesAnalyse` follows a
+      // `const` elsewhere in this file. Treating every shorthand as
+      // unreadable would flag that entire, already-reviewed corpus; the
+      // actual hidden failure a shorthand can carry is a `const` bound to
+      // something other than `detailOf(args)` — a hardcoded level routed
+      // through a variable named to look wired. A spread is not resolved at
+      // all and falls through to the same "unreadable" report below.
+      const value = ts.isPropertyAssignment(detailProp)
+        ? detailProp.initializer
+        : ts.isShorthandPropertyAssignment(detailProp)
+          ? resolveConstInitializer(detailProp, checker)
+          : undefined;
+
+      if (value === undefined) {
+        offenders.push(
+          `${file}:${lineOf(source, detailProp)} — detail passed in a form this check cannot read; write detailOf(args) or a literal`,
+        );
+        continue;
+      }
+
+      const dynamic =
+        ts.isCallExpression(value) && value.expression.getText() === 'detailOf';
+      if (declares !== dynamic) {
+        offenders.push(
+          `${file}:${lineOf(source, value)} — tool ${declares ? 'declares' : 'does not declare'} detail, handler passes ${value.getText()}`,
+        );
+      }
+    }
+  }
+  return offenders;
+}
+
+/**
+ * What the outer variable a shorthand property (`{ detail }`) refers to was
+ * initialised with, or `undefined` if it is not a `const` bound to a value
+ * in this same file — a `let`, a destructured parameter, an import,
+ * anything reassignable. `checker.getSymbolAtLocation` on a shorthand
+ * assignment's name answers the PROPERTY symbol, not the variable it reads —
+ * confirmed empirically, not assumed — so this needs the dedicated
+ * `getShorthandAssignmentValueSymbol`, the one call that resolves to the
+ * outer binding instead. Shares `isConstBinding`'s reasoning with
+ * `carriesAnalyse` above: a `const` binding fixes the REFERENCE, not the
+ * value behind it, but that is the convention this repository writes
+ * `detail` to, and nothing short of a full mutation analysis would prove
+ * more.
+ */
+function resolveConstInitializer(
+  shorthand: ts.ShorthandPropertyAssignment,
+  checker: ts.TypeChecker,
+): ts.Expression | undefined {
+  const declaration =
+    checker.getShorthandAssignmentValueSymbol(shorthand)?.declarations?.[0];
+  return declaration !== undefined &&
+    ts.isVariableDeclaration(declaration) &&
+    declaration.initializer !== undefined &&
+    isConstBinding(declaration)
+    ? declaration.initializer
+    : undefined;
+}
+
+/** Calls to `answer(...)` — the only place a detail reaches a caller. */
+function answerCallsIn(source: ts.SourceFile): ts.CallExpression[] {
+  const calls: ts.CallExpression[] = [];
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && node.expression.getText() === 'answer') {
+      calls.push(node);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
+  return calls;
+}

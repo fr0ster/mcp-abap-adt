@@ -22,6 +22,14 @@
  * variant, so this is the only remaining single-call candidate, kept as a
  * one-call migration (Shape 1) with that narrowing documented rather than
  * silently accepted.
+ *
+ * **Task 28: `detail` was missing here.** `terseValidation` reads
+ * `asx:abap/asx:values/DATA` off a genuine parse — the same shape every
+ * other `Validate*` tool in this repository already exposes `detail` for —
+ * but this handler had `project('terse', terseValidation)` hardcoded and no
+ * `detail` in its schema, found by cross-checking every registered tool that
+ * calls the shared `project()` helper against the tools that declare
+ * `detail`. Wired the same way as its siblings.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -29,6 +37,7 @@ import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseValidation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -63,6 +72,7 @@ export const TOOL_DEFINITION = {
         description:
           'Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['service_binding_name', 'service_definition_name'],
   },
@@ -74,6 +84,7 @@ interface ValidateServiceBindingArgs {
   service_definition_name?: string;
   package_name?: string;
   service_binding_version?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleValidateServiceBinding(
@@ -90,9 +101,10 @@ export async function handleValidateServiceBinding(
   }
 
   const bindingName = args.service_binding_name.trim().toUpperCase();
+  const detail = detailOf(args);
 
   return answer(
-    { tool: 'ValidateServiceBinding', detail: 'terse' },
+    { tool: 'ValidateServiceBinding', detail },
     () =>
       createAdtClient(connection, logger)
         .getServiceBinding(resultsFor(serviceDocuments))
@@ -104,6 +116,6 @@ export async function handleValidateServiceBinding(
           },
           { analyse: analyseValidation },
         ),
-    project('terse', terseValidation),
+    project(detail, terseValidation),
   );
 }

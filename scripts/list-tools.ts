@@ -94,11 +94,24 @@ const formatInputs = (params: ParamInfo[]): string => {
     .join(', ');
 };
 
+// `(everywhere)` mirrors `(none)` above: an explicit sentinel for the same
+// implicit case (`available_in` omitted), not an empty string a diff would
+// render as "nothing changed" when a tool actually lost the field. Sorted so
+// declaring the same three environments in a different order — harmless to
+// `BaseMcpServer`'s `.includes()` check — does not read as a surface change.
+const formatAvailability = (
+  available_in: readonly string[] | undefined,
+): string =>
+  available_in === undefined || available_in.length === 0
+    ? '(everywhere)'
+    : [...available_in].sort().join(', ');
+
 const rows = Object.entries(groups).flatMap(([group, instance]) =>
   instance.getHandlers().map((entry) => ({
     group,
     name: entry.toolDefinition.name,
     inputs: formatInputs(describeInputs(entry.toolDefinition.inputSchema)),
+    available_in: formatAvailability(entry.toolDefinition.available_in),
   })),
 );
 

@@ -9,23 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Six unit-test tools gained the `detail` parameter, and their default answer
-  changed with it.** `GetUnitTest`, `GetUnitTestStatus`, `GetUnitTestResult`
-  and their three CDS siblings answer a JSON object built from a parsed
-  document, which is the shape `detail` exists for — but they had been left
-  without it, each hardcoding a level, so an audit keyed on the shared
-  projection helper could not see them.
+- **Six unit-test tools gained the `detail` parameter, and what they answer
+  changed with it.** `GetUnitTestStatus`, `GetCdsUnitTestStatus`, `GetUnitTest`,
+  `GetCdsUnitTest`, `GetUnitTestResult` and `GetCdsUnitTestResult` answer a JSON
+  object built from a parsed document, which is the shape `detail` exists for —
+  but they had been left without it, each hardcoding a level, so an audit keyed
+  on the shared projection helper could not see them.
 
-  What a caller sees at the default level is not what it was. The three status
-  and result tools used to answer the whole parse every time; the three that
-  poll a run used to answer the reading object itself, raw document included.
-  Now `terse` and `full` answer the parse and `raw` answers the wire text, the
-  same three levels every other JSON-answering tool has.
+  They split two ways, and the change is not the same for both.
 
-  No test pinned the old shape, which is why this is recorded here rather than
-  discovered by one. A caller reading a named field off these answers is
-  unaffected; a caller that took the whole object and expected the document
-  inside it should ask for `raw`.
+  The two **status** tools read the run's status directly. They used to answer
+  `success`, the run id, a finished flag, and the whole parse as `run_status`,
+  at every level. Now `terse` answers the run id, the finished flag and
+  `run_status` as the status string itself — `"FINISHED"` rather than the parsed
+  document; `full` answers the bare parse, without the surrounding envelope; and
+  `raw` answers the wire document.
+
+  The four **polling** tools go through the shared run poller. They used to
+  answer the parse as `run_status` and, as `run_result`, the reading object
+  itself with the wire document inside it. Now `terse` and `full` answer the
+  parse in both fields and `raw` answers the wire text.
+
+  **Named fields did move**, so a caller reading one is not automatically safe:
+  `success` is gone from both status tools at every level, `run_status` is a
+  string rather than an object at `terse`, and at `full` and `raw` the status
+  tools answer a document with no named fields at all.
+
+  No test pinned the old shapes, which is why this is recorded here rather than
+  discovered by one.
 
 - **A compiler-pinned ledger of the eighteen `adt-clients` legacy-class
   members that ignore what a caller passes them, and what it found (#207,

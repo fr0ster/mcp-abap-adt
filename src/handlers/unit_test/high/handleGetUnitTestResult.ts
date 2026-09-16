@@ -15,7 +15,8 @@ export const TOOL_DEFINITION = {
   description:
     'Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. ' +
     'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
-    'RunUnitTest/CreateUnitTest, and this tool is served by a fresh client with no memory of that run (issue #208).',
+    'RunUnitTest/CreateUnitTest, but AdtClientLegacy.getUnitTest() returns a new instance every time it is ' +
+    'called, even on the same client, so this tool always refuses (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {

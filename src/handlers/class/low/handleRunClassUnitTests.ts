@@ -47,8 +47,9 @@ export const TOOL_DEFINITION = {
   description:
     '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers. ' +
     'On legacy systems (BASIS < 7.50) the run finishes synchronously inside this call, but run_id is a fixed ' +
-    'placeholder, not a real identifier — a later GetClassUnitTestStatusLow/GetClassUnitTestResultLow call is ' +
-    'served by a fresh client with no memory of this run and always refuses, whatever the outcome was (issue #208).',
+    'placeholder, not a real identifier — AdtClientLegacy.getUnitTest() returns a new instance every time it is ' +
+    'called, even on the same client, so a later GetClassUnitTestStatusLow/GetClassUnitTestResultLow call always ' +
+    'refuses, whatever the outcome was (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -212,9 +213,24 @@ export async function handleRunClassUnitTests(
 
     try {
       const unitTest = client.getUnitTest() as any;
-      const runId = await unitTest.run(formattedTests, options);
+      // `run()` answers an `IAdtResponse`, not the run id directly — treating
+      // the envelope itself as the id (the pre-fix shape here) serialises an
+      // object with only an `ok` field (its methods are not JSON), and
+      // `!envelope` never fires because both a success and a refusal
+      // envelope are truthy objects. That is the false-success shape this
+      // migration exists to remove, on the tool that starts the run.
+      const runAnswer = await unitTest.run(formattedTests, options);
       const runResponse = unitTest.getStatusResponse?.();
 
+      if (!runAnswer?.ok) {
+        const failure = runAnswer?.getError?.();
+        throw new Error(
+          failure?.message ??
+            'Failed to obtain ABAP Unit run identifier from SAP response headers',
+        );
+      }
+
+      const runId = runAnswer.getResult().value;
       if (!runId) {
         throw new Error(
           'Failed to obtain ABAP Unit run identifier from SAP response headers',

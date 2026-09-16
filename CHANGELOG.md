@@ -9,24 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **A compiler-pinned ledger of the seventeen `adt-clients` legacy-class
-  members that drop the failure strategy, and what it found (#207, #208).**
+- **A compiler-pinned ledger of the eighteen `adt-clients` legacy-class
+  members that ignore what a caller passes them, and what it found (#207,
+  #208).**
 
   `AdtClientLegacy` (BASIS < 7.50) substitutes four classes —
   `AdtPackageLegacy`, `AdtUnitTestLegacy`, `AdtRequestLegacy`,
-  `AdtUtilsLegacy` — whose overridden members ignore the arguments a caller
-  passes, including any `analyse` strategy, because the factory that returns
-  them is typed as the modern class: the compiler cannot see the mismatch, so
-  nothing before this caught it. `legacyExposure()`/`legacyEnabledHandlers()`
-  (`scripts/lib/analyseOmissions.ts`) walk every handler legacy is offered
-  (144 of 326) and name the exact `(handler, factory, member)` pairs that
-  land on one, pinned by `tests/fixtures/legacy-handlers.json` and
+  `AdtUtilsLegacy` — whose overridden members ignore arguments a caller
+  passes them, because the factory that returns them is typed as the modern
+  class: the compiler cannot see the mismatch, so nothing before this caught
+  it. Not all eighteen drop the same thing, and calling all of it "the
+  failure strategy" overstates about eight of them: roughly ten genuinely
+  drop `analyse`, the caller-supplied failure verdict modern accepts and
+  legacy ignores (all six `AdtPackageLegacy` members, all five
+  `AdtRequestLegacy` members); the rest never accepted `analyse` on modern
+  either — what legacy drops there is a positional argument, a run
+  identifier, or a table name, which is a different failure mode.
+  `legacyExposure()`/`legacyEnabledHandlers()` (`scripts/lib/analyseOmissions.ts`)
+  resolve every handler legacy is offered (144 of 326) through the
+  compiler's own type checker — not a syntax walk of specific call shapes,
+  so a receiver reached through a shared helper, a destructured binding, or
+  an awaited factory is seen the same as a direct chain — and name the exact
+  `(handler, factory, member)` pairs that land on one, pinned by
+  `tests/fixtures/legacy-handlers.json` and
   `tests/fixtures/legacy-exposure.json` and asserted in
   `src/__tests__/unit/legacyExposure.test.ts`.
 
-  Sixteen pairs across eight files remain, and none can be moved to a sibling
-  member that does accept a strategy: `AdtPackageLegacy` refuses every
-  package operation (`create`/`read`/`readMetadata`/`validate`/
+  Sixteen pairs across thirteen files remain, and none can be moved to a
+  sibling member that does accept a strategy: `AdtPackageLegacy` refuses
+  every package operation (`create`/`read`/`readMetadata`/`validate`/
   `updateMetadata`/`delete`) unconditionally, before any request is made, so
   `GetPackage`, `ReadPackage`, `UpdatePackageLow` and `DeletePackageLow`
   always answer a clean `UNSUPPORTED_OPERATION` refusal on legacy — no
@@ -36,19 +47,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already in #200, now cross-referenced from #207. Each affected tool's
   description states the limitation and the tracking issue.
 
-  Building the ledger surfaced a second, more severe defect (#208, not fixed
+  A second, separate ledger — `legacyThrows()`, pinned by
+  `tests/fixtures/legacy-throws.json` — names every handler that reaches a
+  factory `AdtClientLegacy` declares *never available*
+  (`getDomain`/`getDataElement`/`getStructure`/`getTable`/`getCdsUnitTest`/…):
+  the no-arg overload throws synchronously there, rather than answering a
+  failure. Five tools declared `legacy` in `available_in` and reached one of
+  these with no disclosure and no guard — `CreateCdsUnitTest`,
+  `GetCdsUnitTest`, `GetCdsUnitTestResult`, `GetCdsUnitTestStatus`
+  (`getCdsUnitTest()`) and `GetStructuresList` (`getStructure()`/`getTable()`)
+  — and in three of the four CDS handlers the call sat before `answer()`'s
+  callback with nothing catching it, so the throw would have escaped as an
+  unhandled rejection rather than a tool error. All five now guard with a new
+  `isLegacyConnection()` (`src/lib/utils.ts`) and refuse with a message
+  before making any call, tested the way the program family's cloud guard
+  is (`src/__tests__/unit/legacyThrowingFactoryGuards.test.ts`): refuses and
+  never reaches the factory on legacy, reaches it on every other system.
+  `ActivateObjectLow`/`DeleteObjectLow` also reach several of these factories
+  for specific object types (`getDomain`/`getDataElement`/`getStructure`/
+  `getTable`/`getBehaviorDefinition`/`getMetadataExtension`), but only when a
+  caller names that type through the generic dispatcher; recorded in
+  `legacy-throws.json`, not guarded here.
+
+  Building the ledger surfaced a third, more severe defect (#208, not fixed
   here — out of this ledger's scope): on a legacy system, `RunUnitTest`,
   `CreateUnitTest` and `RunClassUnitTestsLow` answer their run's result
-  *synchronously*, but every handler in this repository builds a fresh
-  `AdtClient` per call, so the client that answers `GetUnitTest`,
-  `GetUnitTestStatus`, `GetUnitTestResult`, `GetClassUnitTestStatusLow` and
-  `GetClassUnitTestResultLow` afterwards has no memory of it and always
-  refuses — regardless of whether the run passed, failed, or errored.
-  Verified by construction against the installed `@mcp-abap-adt/adt-clients`
-  package with a stub connection, no live SAP system needed. All five tool
-  descriptions now disclose this; the fix itself needs a design decision
-  (embed the full result in the run tools' own answer on legacy, or give
-  unit-test handlers a connection-scoped client) tracked in #208.
+  *synchronously*, but `AdtClientLegacy.getUnitTest()` returns a **new
+  instance every time it is called — even on the same client** — and the
+  synchronous result is cached on that instance, not on the client or the
+  connection. So the client that answers `GetUnitTest`, `GetUnitTestStatus`,
+  `GetUnitTestResult`, `GetClassUnitTestStatusLow` and
+  `GetClassUnitTestResultLow` afterwards has no memory of the run and always
+  refuses, regardless of whether it passed, failed, or errored — reusing the
+  client across calls would not fix this; the factory call itself would
+  still need to be the same one. Verified by construction against the
+  installed `@mcp-abap-adt/adt-clients` package with a stub connection, no
+  live SAP system needed: the *same* `AdtClientLegacy` instance, asked for
+  `getUnitTest()` twice, answers the refusal from the second call even
+  though nothing about the client changed. All eight affected tool
+  descriptions (the five named above plus `RunUnitTest`, `CreateUnitTest`
+  and `RunClassUnitTestsLow` themselves) now disclose this; the fix itself
+  needs a design decision (embed the full result in the run tools' own
+  answer on legacy, or cache the factory's own returned instance rather than
+  the client) tracked in #208.
 
 - **The eighteen high-tier writes that hold a lock now release it through one
   shared `withLock`, and three genuine behaviour changes survive that

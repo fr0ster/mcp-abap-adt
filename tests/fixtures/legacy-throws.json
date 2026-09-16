@@ -1,0 +1,20 @@
+[
+  "common/low/handleActivateObject.ts → getBehaviorDefinition()",
+  "common/low/handleActivateObject.ts → getDataElement()",
+  "common/low/handleActivateObject.ts → getDomain()",
+  "common/low/handleActivateObject.ts → getMetadataExtension()",
+  "common/low/handleActivateObject.ts → getStructure()",
+  "common/low/handleActivateObject.ts → getTable()",
+  "common/low/handleDeleteObject.ts → getBehaviorDefinition()",
+  "common/low/handleDeleteObject.ts → getDataElement()",
+  "common/low/handleDeleteObject.ts → getDomain()",
+  "common/low/handleDeleteObject.ts → getMetadataExtension()",
+  "common/low/handleDeleteObject.ts → getStructure()",
+  "common/low/handleDeleteObject.ts → getTable()",
+  "structure/readonly/handleGetStructuresList.ts → getStructure()",
+  "structure/readonly/handleGetStructuresList.ts → getTable()",
+  "unit_test/high/handleCreateCdsUnitTest.ts → getCdsUnitTest()",
+  "unit_test/high/handleGetCdsUnitTest.ts → getCdsUnitTest()",
+  "unit_test/high/handleGetCdsUnitTestResult.ts → getCdsUnitTest()",
+  "unit_test/high/handleGetCdsUnitTestStatus.ts → getCdsUnitTest()"
+]

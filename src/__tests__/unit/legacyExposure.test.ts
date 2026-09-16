@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import {
   legacyEnabledHandlers,
   legacyExposure,
+  legacyThrows,
 } from '../../../scripts/lib/analyseOmissions';
 
 describe('legacyEnabledHandlers', () => {
@@ -10,9 +11,9 @@ describe('legacyEnabledHandlers', () => {
     expect(kept).not.toContain(
       'src/__tests__/fixtures/legacy/not-on-legacy.ts',
     );
-    // Three of the four fixtures declare (or omit) `legacy`; the fourth names
-    // two environments and neither of them is `legacy`.
-    expect(kept.length).toBe(3);
+    // Seven of the eight fixtures declare (or omit) `legacy`; the eighth
+    // (`not-on-legacy.ts`) names two environments and neither is `legacy`.
+    expect(kept.length).toBe(7);
   });
 
   /** Which handlers a legacy system is offered at all — the input to the ledger. */
@@ -43,6 +44,13 @@ describe('legacyExposure', () => {
     // 7 take this one, 3 of them among the twenty-three. An assertion hides
     // the factory from a walk that knows only calls and identifiers.
     ['asserted.ts', 'getUnitTest().getStatus'],
+    // These three are not shapes this repository's handlers happen to use
+    // today — the earlier syntax-directed walk missed all three, silently,
+    // which is exactly the failure mode type-based resolution exists to
+    // close before the next task turns this ledger into an invariant.
+    ['helper.ts', 'getPackage().readMetadata'],
+    ['destructured.ts', 'getPackage().readMetadata'],
+    ['awaited.ts', 'getPackage().readMetadata'],
   ])('sees the factory through %s', (fixture, pair) => {
     const found = legacyExposure([`src/__tests__/fixtures/legacy/${fixture}`]);
     // Every one of these must find exactly one, because [] is what a clean
@@ -97,6 +105,31 @@ describe('legacyExposure', () => {
     // A disappearance is either a fix worth recording or a walk that stopped
     // working, and those two are indistinguishable from here — which is
     // exactly why neither may pass in silence.
+    expect(actual.sort()).toEqual(recorded.sort());
+  });
+});
+
+describe('legacyThrows', () => {
+  it('sees a factory AdtClientLegacy declares never available', () => {
+    const found = legacyThrows(['src/__tests__/fixtures/legacy/throws.ts']);
+    expect(found).toHaveLength(1);
+    expect(found[0]).toContain('getStructure()');
+  });
+
+  /**
+   * Which handlers reach a factory `AdtClientLegacy` throws from
+   * unconditionally — `AdtPackageLegacy`/`AdtRequestLegacy`/`AdtUtilsLegacy`
+   * answer a failure instead, and are `legacyExposure`'s subject, not this
+   * one's. Pinned the same way and for the same reason: a disappearance here
+   * is either a fix (a guard that stopped the call from being reachable at
+   * all — which this static walk cannot tell from a call that simply moved)
+   * or a walk that stopped seeing real calls, and neither may pass quietly.
+   */
+  it('lands on exactly the throwing factories recorded, and no others', () => {
+    const recorded: string[] = JSON.parse(
+      readFileSync('tests/fixtures/legacy-throws.json', 'utf8'),
+    );
+    const actual = legacyThrows(legacyEnabledHandlers());
     expect(actual.sort()).toEqual(recorded.sort());
   });
 });

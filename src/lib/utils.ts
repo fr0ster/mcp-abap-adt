@@ -18,6 +18,7 @@ import {
 import { createAbapConnection } from './connectionFactory.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
+import { getSystemContext } from './systemContext';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -1003,6 +1004,25 @@ export function isCloudConnection(config?: SapConfig): boolean {
 
     // If no config available, cannot determine - return false for safety
     return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Is the current connection a legacy SAP system (BASIS < 7.50)?
+ *
+ * Same mechanism `createAdtClient` uses to pick `AdtClientLegacy` over
+ * `AdtClient` — `getSystemContext().isLegacy`, which reads `SAP_SYSTEM_TYPE`
+ * (or an explicit override) rather than probing the connection. A handler
+ * that reaches a factory `AdtClientLegacy` declares never available
+ * (`getDomain`, `getStructure`, `getCdsUnitTest`, …) throws synchronously if
+ * it calls that factory on legacy; this guard is what lets such a handler
+ * refuse with a message instead, before making any call at all.
+ */
+export function isLegacyConnection(): boolean {
+  try {
+    return getSystemContext().isLegacy ?? false;
   } catch {
     return false;
   }

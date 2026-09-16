@@ -4,6 +4,7 @@ import { ourUtils } from '../../../lib/strategies/resultSets';
 import { fetchWhereUsedReferences } from '../../../lib/strategies/whereUsedList';
 import {
   type AxiosResponse,
+  isLegacyConnection,
   return_error,
   return_response,
 } from '../../../lib/utils';
@@ -12,7 +13,9 @@ export const TOOL_DEFINITION = {
   name: 'GetStructuresList',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.',
+    '[read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. ' +
+    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the ' +
+    'DDIC structure/table endpoints this needs are not present there (issue #207).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -152,6 +155,17 @@ export async function handleGetStructuresList(
     let appendsUnavailable = false;
     if (!structure_name)
       return return_error(new Error('structure_name is required'));
+
+    // `AdtClientLegacy.getStructure()`/`getTable()` both throw synchronously
+    // — the DDIC structure/table endpoints this needs are absent from a
+    // legacy system's discovery catalog. Refuse before either call.
+    if (isLegacyConnection()) {
+      return return_error(
+        new Error(
+          'Structures and tables are not available on legacy SAP systems (BASIS < 7.50): the DDIC endpoints this needs are not present there.',
+        ),
+      );
+    }
 
     const client = createAdtClient(connection, logger);
     const obj = client.getStructure();

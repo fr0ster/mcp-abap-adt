@@ -12,7 +12,8 @@ export const TOOL_DEFINITION = {
   description:
     'Retrieve ABAP Unit test run status for a run_id. ' +
     'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
-    'RunUnitTest/CreateUnitTest, and this tool is served by a fresh client with no memory of that run (issue #208).',
+    'RunUnitTest/CreateUnitTest, but AdtClientLegacy.getUnitTest() returns a new instance every time it is ' +
+    'called, even on the same client, so this tool always refuses (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {

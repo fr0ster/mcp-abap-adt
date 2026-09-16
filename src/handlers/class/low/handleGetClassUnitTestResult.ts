@@ -48,7 +48,8 @@ export const TOOL_DEFINITION = {
   description:
     '[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id. ' +
     'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
-    'RunClassUnitTestsLow, and this tool is served by a fresh client with no memory of that run (issue #208).',
+    'RunClassUnitTestsLow, but AdtClientLegacy.getUnitTest() returns a new instance every time it is called, ' +
+    'even on the same client, so this tool always refuses (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {

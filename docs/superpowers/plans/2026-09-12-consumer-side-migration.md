@@ -46,7 +46,8 @@ own tests pass and it is committed — not when it is described.
 | 25. The library files, and the last of the compiler's list | done | `16fdb3d` |
 | 27. The twenty-three tools that reach a legacy contract | done | `027f94a` |
 | 26. The invariants | done | `2e2a723` |
-| 28, 29 | not started | |
+| 28. `detail` on the JSON-answering tools | done | `d67be55` |
+| 29 | not started | |
 
 Verify without reading anything above:
 
@@ -4443,7 +4444,7 @@ Last, deliberately: adding a parameter before the handlers honour it puts a lie 
 - Create: four fixtures under `src/__tests__/fixtures/detail/` — `declares-passes-none.ts`, `declares-indirect-context.ts`, `declares-shorthand.ts`, `declares-no-answer-call.ts`
 - Modify: `src/lib/audit/analyseOmissions.ts` — add `detailWiring()`
 
-- [ ] **Step 1: Enumerate the JSON-answering tools**
+- [x] **Step 1: Enumerate the JSON-answering tools**
 
 ```bash
 npx tsx scripts/list-tools.ts | node -e "
@@ -4471,7 +4472,7 @@ carries `detail: 'terse'`. That is not an exception granted to those two tools;
 it is this rule reaching the same answer as for a pass-through, by the same
 argument. A tool later given a reading gains `detail` with it.
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 A schema and a behaviour are two claims, and the second needs its own check.
 The rule is symmetrical, which makes it self-checking with no list to maintain:
@@ -4630,9 +4631,9 @@ it('answers raw as the document and terse as the summary', async () => {
 
 `JSON_ANSWERING` is the list from Step 1, written into the test as data. The list is a decision, and a decision belongs where a reviewer can see it.
 
-- [ ] **Step 3: Run it to verify it fails**
-- [ ] **Step 4: Implement** — spread `DETAIL_PROPERTY` into those tools' `properties`, and replace the hardcoded `detail: 'terse'` in those handlers with `detailOf(args)`.
-- [ ] **Step 5: Regenerate the snapshot and check the diff is only `detail`**
+- [x] **Step 3: Run it to verify it fails**
+- [x] **Step 4: Implement** — spread `DETAIL_PROPERTY` into those tools' `properties`, and replace the hardcoded `detail: 'terse'` in those handlers with `detailOf(args)`.
+- [x] **Step 5: Regenerate the snapshot and check the diff is only `detail`**
 
 ```bash
 npx tsx scripts/list-tools.ts > tests/fixtures/tools/surface.json
@@ -4641,7 +4642,7 @@ git diff tests/fixtures/tools/surface.json | grep '^[-+]' | grep -v detail | gre
 
 Expected: no output. Anything printed is a surface change this work was not allowed to make.
 
-- [ ] **Step 6: Commit** — `feat(tools): detail on the tools whose answer is JSON`
+- [x] **Step 6: Commit** — `feat(tools): detail on the tools whose answer is JSON`
 
 ---
 

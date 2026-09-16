@@ -17,9 +17,9 @@
  * posts the shell only, matching the general v19 rule ("one member, one
  * endpoint call") and this repository's own create/update split.
  *
- * The pre-migration composite's three captured results — `state`'s
- * `createResult`, `readResult` and `generatedInfoResult` fields — are
- * rebuilt as a sequence: `create()`, then, only when `activate` is
+ * The pre-migration composite's three captured results —
+ * `state.createResult`, `state.readResult`, `state.generatedInfoResult` —
+ * are rebuilt as a sequence: `create()`, then, only when `activate` is
  * requested (as `activateOnCreate` used to gate it), `activate()` and
  * `generateServiceBinding()`. `generateServiceBinding` accepts no
  * `options.analyse` at all (confirmed against its declared signature and its

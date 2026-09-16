@@ -76,7 +76,7 @@ export function analyseOmissions(handlers: string[]): {
  * every signature as unresolved — which this test would then read as "no call
  * accepts an analyse" and pass while checking nothing.
  */
-function compilerOptions(): ts.CompilerOptions {
+export function compilerOptions(): ts.CompilerOptions {
   // scripts/lib -> scripts -> repo root: two levels, not three. This module
   // used to live at src/lib/audit, one directory deeper, where '../../..' was
   // correct; moving it without updating this made every program resolve the

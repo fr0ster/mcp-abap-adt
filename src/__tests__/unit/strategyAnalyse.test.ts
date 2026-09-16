@@ -9,7 +9,6 @@ import {
 import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
-import { ourActivation } from '../../lib/strategies/ourActivation';
 
 /**
  * The error axis, injected, against real documents.
@@ -62,66 +61,50 @@ describe('a success stays a success', () => {
   });
 
   /**
-   * The one place this repository does not take the shipped strategy's word.
+   * The activation this repository once read for itself, now the package's.
    *
    * `activationExecuted="false"` with no messages means SAP had nothing to
-   * activate. Measured on trial 2026-09-16, three ways, all answering the
-   * identical document — `checkExecuted="false" activationExecuted="false"
-   * generationExecuted="true"`, no `msg`:
+   * activate. It was measured here first — on trial, three ways, all
+   * answering the identical document (`checkExecuted="false"
+   * activationExecuted="false" generationExecuted="true"`, no `msg`):
+   * activating a class a second time straight after an activation that
+   * answered `activationExecuted="true"`; activating a function group
+   * straight after creating one, because a function group is created active;
+   * and both of those through the tools, which is how it surfaced — two
+   * integration suites failing on objects that were never in trouble.
    *
-   * - activating a class a second time, right after an activation that
-   *   answered `activationExecuted="true"` — the fixture these tests read,
-   *   captured as `activation-nothing-to-activate`;
-   * - activating a function group straight after creating one — a function
-   *   group is created active, `adtcore:version="active"` stands on its
-   *   metadata before any activation is asked for;
-   * - both of those through the tools, which is how it surfaced: two function
-   *   integration suites failing on an object that was never in trouble.
+   * For a while this repository narrowed the shipped strategy itself, in
+   * `lib/strategies/ourActivation.ts` (deleted with this import), with a test beside these asserting that
+   * the package still disagreed — so that the day it stopped disagreeing would
+   * be a red test rather than a discovery. That day came:
+   * `@mcp-abap-adt/adt-strategies` 0.2.0 carries the reading, together with
+   * the corpus case that proves it, and the local module is gone.
    *
-   * adt-clients `v18.0.2:src/utils/activationUtils.ts:45-75` carries the same
-   * finding from its own probe — "class already active | 200 | false | none"
-   * — and concludes that the attribute says whether ADT did work, not whether
-   * the work succeeded, so only an `E` message is a failure signal.
-   *
-   * `ourActivation` (`src/lib/strategies/ourActivation.ts`) narrows the
-   * shipped strategy by exactly that case and delegates everything else.
+   * These stay. They are no longer about a disagreement — they are what this
+   * repository relies on from the package, checked against the corpus rather
+   * than assumed from a version number.
    */
-  it('ourActivation: nothing to activate is not a failure', () => {
+  it('nothing to activate is not a failure', () => {
     const name = 'activation-nothing-to-activate--01-activation';
     expect(corpusSidecar(name).response.status).toBe(200);
     expect(corpusBody(name)).not.toMatch(/<msg/);
-    expect(ourActivation(ADT_NO_FAILURE, wire(name))).toBe(ADT_NO_FAILURE);
+    expect(analyseActivation(ADT_NO_FAILURE, wire(name))).toBe(ADT_NO_FAILURE);
   });
 
-  it('ourActivation: an activation SAP refused with an E is still a failure', () => {
+  it('an activation SAP refused with an E is still a failure', () => {
     const name = 'refusal-activation-fails--01-activation';
-    const verdict = ourActivation(ADT_NO_FAILURE, wire(name));
+    const verdict = analyseActivation(ADT_NO_FAILURE, wire(name));
     expect(verdict).not.toBe(ADT_NO_FAILURE);
     expect((verdict as IAdtError).origin).toBe('refusal');
   });
 
-  it('ourActivation: a verdict the library already reached is never reversed', () => {
+  it('a verdict the library already reached is never reversed', () => {
     const library: IAdtError = {
       message: 'connection reset',
       origin: 'connection',
     } as IAdtError;
     const name = 'activation-nothing-to-activate--01-activation';
-    expect(ourActivation(library, wire(name))).not.toBe(ADT_NO_FAILURE);
-  });
-
-  /**
-   * Why `ourActivation` exists at all, pinned so it cannot quietly stop being
-   * true. The shipped strategy reads the same document as a refusal — that is
-   * the disagreement, stated as a test rather than as a comment. When
-   * `@mcp-abap-adt/adt-strategies` adopts the measured reading this goes red,
-   * and that is the signal to delete `ourActivation` and go back to the
-   * package's own.
-   */
-  it('the shipped analyseActivation still disagrees — which is what ourActivation is for', () => {
-    const name = 'activation-nothing-to-activate--01-activation';
-    expect(analyseActivation(ADT_NO_FAILURE, wire(name))).not.toBe(
-      ADT_NO_FAILURE,
-    );
+    expect(analyseActivation(library, wire(name))).not.toBe(ADT_NO_FAILURE);
   });
 
   it('a passing unit test run is not a failure', () => {

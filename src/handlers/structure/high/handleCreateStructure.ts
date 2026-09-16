@@ -34,6 +34,7 @@
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import {
+  analyseActivation,
   analyseCheck,
   analyseException,
   analyseValidation,
@@ -43,7 +44,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { ourActivation } from '../../../lib/strategies/ourActivation';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -254,7 +254,7 @@ export async function handleCreateStructure(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ structureName }, { analyse: ourActivation });
+      return obj.activate({ structureName }, { analyse: analyseActivation });
     },
     project(detail, terseWrite),
   );

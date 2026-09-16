@@ -1,7 +1,7 @@
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { handleUpdateClass } from '../../handlers/class/high/handleUpdateClass';
 import { handleCreateDomain } from '../../handlers/domain/high/handleCreateDomain';
 import { handleUpdateDomain } from '../../handlers/domain/high/handleUpdateDomain';
-import { ourActivation } from '../../lib/strategies/ourActivation';
 import {
   fakeClientOf,
   okResponse,
@@ -224,7 +224,7 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     const order: string[] = [];
     fakeClient = recordingLifecycle(order, {
       activate: async (_c: unknown, o: any) => {
-        expect(o.analyse).toBe(ourActivation);
+        expect(o.analyse).toBe(analyseActivation);
         return refusedResponse('Activation failed');
       },
     });

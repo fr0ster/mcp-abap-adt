@@ -1,4 +1,5 @@
 import {
+  analyseActivation,
   analyseCheck,
   analyseDeletion,
   analyseException,
@@ -13,7 +14,6 @@ import { handleUnlockDomain } from '../../handlers/domain/low/handleUnlockDomain
 import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
 import { handleValidateDomain } from '../../handlers/domain/low/handleValidateDomain';
 import { corpusBody } from '../../lib/adtCorpus';
-import { ourActivation } from '../../lib/strategies/ourActivation';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
@@ -157,11 +157,11 @@ describe('ActivateDomainLow', () => {
     });
   });
 
-  it('ActivateDomain takes ourActivation, and DeleteDomain takes analyseDeletion', async () => {
+  it('ActivateDomain takes analyseActivation, and DeleteDomain takes analyseDeletion', async () => {
     fakeClient = seen.client;
     await handleActivateDomain(context as any, { domain_name: 'ZD' });
     expect(seen.calls.at(-1)?.carriedAnalyse).toBe(true);
-    expect(seen.calls.at(-1)?.analyse).toBe(ourActivation);
+    expect(seen.calls.at(-1)?.analyse).toBe(analyseActivation);
 
     await handleDeleteDomain(context as any, { domain_name: 'ZD' });
     expect(seen.calls.at(-1)?.carriedAnalyse).toBe(true);

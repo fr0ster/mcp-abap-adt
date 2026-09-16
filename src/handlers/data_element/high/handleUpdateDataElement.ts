@@ -32,7 +32,11 @@
  */
 
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseCheck, analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -42,7 +46,6 @@ import {
   patchDataElementXml,
 } from '../../../lib/strategies/dataElementPatch';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { ourActivation } from '../../../lib/strategies/ourActivation';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -263,7 +266,7 @@ export async function handleUpdateDataElement(
         return written;
       }
 
-      return obj.activate({ dataElementName }, { analyse: ourActivation });
+      return obj.activate({ dataElementName }, { analyse: analyseActivation });
     },
     project(detail, terseWrite),
   );

@@ -400,17 +400,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `generationExecuted="true"` and no `msg` at all when the object is already
   active — activating a class twice, or a function group straight after
   creating one, since a function group is created active
-  (`adtcore:version="active"` before anything is activated). The shipped
-  `analyseActivation` treats the attribute as a refusal on its own, so every
-  such call answered an error. This repository now decides that verdict
-  itself, in `src/lib/strategies/ourActivation.ts`: it narrows the shipped
-  strategy by exactly that one measured case and delegates everything else,
-  so a `false` with an `E` beside it stays the refusal it is. The corpus
-  carries the case as `activation-nothing-to-activate`, and
-  `strategyAnalyse.test.ts` pins the disagreement, so if the strategies
-  package adopts the same reading, the test says so and this module can go.
-  A caller sees `activated: false` with `nothing_to_activate: true` beside
-  it, rather than a bare `false` under a success.
+  (`adtcore:version="active"` before anything is activated). Every such call
+  used to answer an error.
+
+  The verdict was wrong in `@mcp-abap-adt/adt-strategies`, and it was fixed
+  there: **0.2.0** carries the reading and the corpus case that proves it
+  (`activation-nothing-to-activate`). This repository ran its own narrowing
+  strategy in the meantime, with a test asserting that the package still
+  disagreed so the day it stopped would be a red test rather than a
+  discovery — that test went red on the upgrade, and the local module is
+  gone. All 46 handlers are back on the package's `analyseActivation`.
+
+  What stays here is the consumer's half: a caller sees `activated: false`
+  with `nothing_to_activate: true` beside it, rather than a bare `false`
+  under a success.
 
 - **`GetNodeStructureLow` no longer reports an error for a node that is
   simply empty.** The migration added a guard for the one ambiguity the

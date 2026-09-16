@@ -5,11 +5,11 @@
  */
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { ourActivation } from '../../../lib/strategies/ourActivation';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
@@ -82,7 +82,7 @@ export async function handleActivateBehaviorDefinition(
     () =>
       createAdtClient(connection, logger)
         .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-        .activate({ name: bdefName }, { analyse: ourActivation }),
+        .activate({ name: bdefName }, { analyse: analyseActivation }),
     project(detail, terseActivation),
   );
 }

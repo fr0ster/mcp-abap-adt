@@ -17,13 +17,15 @@
  */
 
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { ourActivation } from '../../../lib/strategies/ourActivation';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -133,7 +135,7 @@ export async function handleUpdateMetadataExtension(
         return written;
       }
 
-      return obj.activate({ name: ddlxName }, { analyse: ourActivation });
+      return obj.activate({ name: ddlxName }, { analyse: analyseActivation });
     },
     project(detail, terseWrite),
   );

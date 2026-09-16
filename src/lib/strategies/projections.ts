@@ -1,3 +1,4 @@
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import type { AdtReading } from './reading';
 
 /**
@@ -75,12 +76,16 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  * **`activated: false` on a successful answer needs a word beside it.**
  * `activationExecuted="false"` with no messages is SAP saying it had nothing
  * to activate — an object that was already active — which
- * `ourActivation` (`src/lib/strategies/ourActivation.ts`) reads as the
- * success it is, on evidence recorded there. Left at `activated: false`
- * alone, that answer reads to a caller as "it did not work" while the tool
- * reports no error. `nothing_to_activate` says which of the two it is, and
- * appears only in the case that was measured: the flag false, and not one
- * message of any severity to explain it.
+ * `analyseActivation` (`@mcp-abap-adt/adt-strategies` 0.2.0) reads as the
+ * success it is, against the corpus case `activation-nothing-to-activate`.
+ * Left at `activated: false` alone, that answer reads to a caller as "it did
+ * not work" while the tool reports no error. `nothing_to_activate` says which
+ * of the two it is, and appears only in the case that was measured: the flag
+ * false, and not one message of any severity to explain it.
+ *
+ * This field is the consumer's half and stays here: the strategy decides
+ * whether the answer is a failure, and this decides how a caller reads a
+ * success that says nothing was done.
  */
 export const terseActivation: Terse<any> = (value) => {
   const root = value?.['chkl:messages'];

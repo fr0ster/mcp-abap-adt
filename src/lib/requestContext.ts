@@ -4,14 +4,28 @@ import { AsyncLocalStorage } from 'node:async_hooks';
  * Request/session-scoped context for values that arrive per HTTP/SSE request
  * (e.g. the `x-sap-language` header) and must NOT live in a process-global
  * cache, otherwise they leak across requests, sessions, and connection modes
- * (direct-header vs broker/destination).
+ * (direct-header vs broker/destination). An embedding host that serves several
+ * SAP users from one process enters the same scope around each request.
  *
  * stdio mode never enters a request scope, so consumers fall back to the
- * process-level system context there.
+ * process-level system context there. See `getEffectiveSystemContext` for how
+ * the two combine.
  */
 export interface RequestContext {
   /** Master/original language for created objects (adtcore:masterLanguage), from x-sap-language. */
   masterLanguage?: string;
+  /**
+   * Responsible person for created objects (adtcore:responsible), e.g. from
+   * `x-sap-responsible` or the caller's own SAP user. When the key is present —
+   * even as `undefined` — it replaces the process value for this request. When
+   * it is absent, the process value stays.
+   */
+  responsible?: string;
+  /**
+   * Master system for created objects (adtcore:masterSystem), e.g. from
+   * `x-sap-master-system`. Same presence rule as `responsible`.
+   */
+  masterSystem?: string;
 }
 
 const storage = new AsyncLocalStorage<RequestContext>();
@@ -29,3 +43,15 @@ export function runWithRequestContext<T>(ctx: RequestContext, fn: () => T): T {
 export function getRequestContext(): RequestContext | undefined {
   return storage.getStore();
 }
+
+// Re-exported so embedding hosts reach it through the same
+// `@mcp-abap-adt/lib/request-context` entry point. It imports this module back;
+// the cycle is safe because neither side reads the other at load time — every
+// use is inside a function body. Kept at the bottom so this module's own
+// bindings exist before the other is loaded.
+export {
+  defaultSystemContextResolver,
+  type ResolvedSystemContext,
+  type SystemContextResolver,
+  withResolvedSystemContext,
+} from './requestSystemResolution';

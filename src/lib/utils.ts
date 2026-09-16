@@ -960,14 +960,15 @@ export async function makeAdtRequest(
 
 /**
  * Get system information from SAP ADT
- * Returns cached system context resolved during connection init
+ * Returns the system context resolved during connection init, as the current
+ * request sees it (see getEffectiveSystemContext)
  */
 export async function getSystemInformation(): Promise<{
   systemID?: string;
   userName?: string;
 } | null> {
-  const { getSystemContext } = await import('./systemContext.js');
-  const ctx = getSystemContext();
+  const { getEffectiveSystemContext } = await import('./systemContext.js');
+  const ctx = getEffectiveSystemContext();
   if (!ctx.masterSystem && !ctx.responsible) return null;
   return { systemID: ctx.masterSystem, userName: ctx.responsible };
 }

@@ -133,6 +133,23 @@ for (const entry of entries) {
 }
 ```
 
+### What `getHandlerEntries()` hands back
+
+Since 10.2.0 each entry's `handler` is wrapped, so that a call whose request
+carries no `responsible` or `masterSystem` can have them filled from an ABAP
+Cloud connection before the handler runs. Two things follow for an embedder:
+
+- The wrapper preserves the handler's arity, because embedders branch on it to
+  choose between `handler(context, args)` and `handler(args)`. A wrapped
+  handler reports the same `length` as the one it wraps.
+- The wrapper is built per call, so two calls to `getHandlerEntries()` return
+  functions that are not identity-equal. Compare tool names, not functions.
+
+Pass `systemContextResolver: null` in the options to switch the filling off, or
+your own resolver to decide it yourself. The option reaches
+`getHandlerEntries()`; `createRegistry()` returns the groups themselves, and a
+group registered that way uses the default resolver.
+
 ## Creating Registry for v2 Servers
 
 If you're using v2 server classes directly:

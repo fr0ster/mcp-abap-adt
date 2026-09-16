@@ -411,6 +411,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   live system, so outside the package case a blank body is an empty node and
   is answered as one.
 
+## [10.2.0] - 2026-09-15
+
+### Added
+
+- **On ABAP Cloud, a request without a responsible person or master system
+  gets them from the system.** 10.1.0 let a host scope both per request, but a
+  host that does not know them for a cloud destination had to look them up
+  itself — a second adt-clients import and a second connection type to keep in
+  step. The library now does it.
+
+  Every tool call — through `EmbeddableMcpServer`/`BaseMcpServer`, a handler
+  group registered on a server, or the handlers `HandlerExporter.getHandlerEntries()`
+  returns — runs inside the new `withResolvedSystemContext`. When the call's
+  effective context lacks `responsible` or `masterSystem` and the connection is
+  to ABAP Cloud, it asks the system (`systeminformation`) and fills only what
+  is missing: the user name as responsible, the system id as master system.
+  On-premise it does nothing. There is one lookup per connection, and only when
+  a request actually lacks a value; concurrent calls share it, and a lookup
+  that throws never fails the call.
+
+  "Lacks a value" means the key is absent. A request scope that carries
+  `responsible` as `undefined` has said this request has no responsible, and
+  that answer stands — the same rule 10.1.0 established.
+
+  A lookup that answers nothing is cached as nothing for that connection: the
+  system-information call swallows its own errors and answers null, so a
+  timeout and a system with nothing to give are indistinguishable from here.
+  Only a lookup that throws outright is retried.
+
+  Opt out with `systemContextResolver: null` on `EmbeddableMcpServer` or
+  `HandlerExporter`, or pass your own resolver. A handler group registering
+  itself directly uses the default resolver and has no opt-out yet. `withResolvedSystemContext`,
+  `defaultSystemContextResolver` and the `SystemContextResolver` type are
+  exported from `@mcp-abap-adt/lib/request-context`.
+
+  Not breaking: a value the request scope or the process context carries still
+  wins, and the wrapped handlers keep their arity, so an embedder that picks
+  `handler(context, args)` or `handler(args)` by `handler.length` is unaffected.
+  `@mcp-abap-adt/core` is unchanged and stays at 10.0.1.
+
+## [10.1.0] - 2026-09-15
+
+### Added
+
+- **The responsible person and master system can be set per request.** Until
+  now only the master language was request-scoped (#110). `responsible` and
+  `masterSystem` lived in the process-wide system context, which is right for
+  one MCP session per process and wrong for a host that serves several SAP
+  users side by side: every concurrent create used whichever user wrote the
+  cache last.
+
+  `RequestContext` now carries both. Inside `runWithRequestContext`, a key the
+  scope carries — even as `undefined` — decides for that request; a key it does
+  not carry leaves the process value in charge. `createAdtClient`,
+  `ListTransports`' default user and `getSystemInformation()` all read through
+  the new `getEffectiveSystemContext()`, so they agree.
+
+  ```typescript
+  import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+
+  await runWithRequestContext({ responsible: 'JSMITH' }, () => handle());
+  ```
+
+  Not breaking: outside a scope nothing changes, and a scope that carries only
+  the language keeps the responsible resolved from the environment or the
+  system, exactly as before. `@mcp-abap-adt/core` is unchanged and stays at
+  10.0.1.
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

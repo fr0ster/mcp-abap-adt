@@ -1,6 +1,11 @@
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../../handlers/interfaces.js';
 import { noopLogger } from '../handlerLogger.js';
+import {
+  defaultSystemContextResolver,
+  type SystemContextResolver,
+  withResolvedSystemContext,
+} from '../requestSystemResolution.js';
 import { CompactHandlersGroup } from './groups/CompactHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
@@ -11,6 +16,7 @@ import type {
   HandlerEntry,
   IHandlerGroup,
   IHandlersRegistry,
+  ToolHandler,
 } from './interfaces.js';
 import { CompositeHandlersRegistry } from './registry/CompositeHandlersRegistry.js';
 
@@ -59,6 +65,16 @@ export interface HandlerExporterOptions {
    * @default true
    */
   includeSearch?: boolean;
+
+  /**
+   * Fills the responsible person and master system a call lacks — neither in
+   * its request scope nor in the process context — from the connection's
+   * system. The default resolves them on ABAP Cloud (one lookup per
+   * connection) and does nothing on-premise. `null` disables it, and
+   * `getHandlerEntries()` then returns the groups' handlers unwrapped.
+   * @default defaultSystemContextResolver
+   */
+  systemContextResolver?: SystemContextResolver | null;
 }
 
 /**
@@ -88,9 +104,14 @@ export interface HandlerExporterOptions {
 export class HandlerExporter {
   private readonly logger: Logger;
   private readonly handlerGroups: IHandlerGroup[];
+  private readonly systemContextResolver: SystemContextResolver | null;
 
   constructor(options?: HandlerExporterOptions) {
     this.logger = options?.logger ?? noopLogger;
+    this.systemContextResolver =
+      options?.systemContextResolver === undefined
+        ? defaultSystemContextResolver
+        : options.systemContextResolver;
 
     // Create dummy context for group instantiation
     // Real context is provided by BaseMcpServer.registerHandlers() via getConnection()
@@ -125,13 +146,47 @@ export class HandlerExporter {
   /**
    * Get all handler entries
    * Useful for inspection or custom registration logic
+   *
+   * Embedders call these handlers themselves, so each one is wrapped to fill
+   * the responsible person and master system from the connection (see
+   * `systemContextResolver`). The wrapper keeps the original's `length`,
+   * because embedders choose between `handler(context, args)` and
+   * `handler(args)` by it.
    */
   getHandlerEntries(): HandlerEntry[] {
     const entries: HandlerEntry[] = [];
     for (const group of this.handlerGroups) {
-      entries.push(...group.getHandlers());
+      for (const entry of group.getHandlers()) {
+        entries.push(this.wrapEntry(group, entry));
+      }
     }
     return entries;
+  }
+
+  private wrapEntry(group: IHandlerGroup, entry: HandlerEntry): HandlerEntry {
+    const resolver = this.systemContextResolver;
+    if (!resolver) return entry;
+
+    const original = entry.handler as (...args: unknown[]) => Promise<unknown>;
+    const wrapped =
+      original.length >= 2
+        ? (context: HandlerContext, args: unknown) =>
+            withResolvedSystemContext(
+              context?.connection,
+              () => original(context, args),
+              resolver,
+            )
+        : // Args-only handlers close over their group's context, which the
+          // embedder swaps before calling — so read it at call time.
+          (...callArgs: unknown[]) =>
+            withResolvedSystemContext(
+              (group as Partial<{ context: HandlerContext }>).context
+                ?.connection,
+              () => original(...callArgs),
+              resolver,
+            );
+    Object.defineProperty(wrapped, 'length', { value: original.length });
+    return { ...entry, handler: wrapped as ToolHandler };
   }
 
   /**

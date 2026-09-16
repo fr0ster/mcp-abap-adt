@@ -44,13 +44,21 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      - name: Verify package can be created
+      # Both packages, because 10.0.0 split them: the repository root is
+      # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
+      # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
+      # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
+      # this job had never created and failed on every run since the split.
+      - name: Verify both packages can be created
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
-        run: npm pack
+        run: |
+          npm pack
+          npm pack ./server
 
       - name: Test package installation (Unix)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
+          ls mcp-abap-adt-lib-*.tgz
           PACKAGE_FILE=$(ls mcp-abap-adt-core-*.tgz)
           npm install -g "./$PACKAGE_FILE"
           mcp-abap-adt --help || true

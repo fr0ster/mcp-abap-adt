@@ -596,4 +596,4 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-09-16*

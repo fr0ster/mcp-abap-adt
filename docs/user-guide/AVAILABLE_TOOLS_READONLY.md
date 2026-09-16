@@ -388,7 +388,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclass-read-only-message-class"></a>
 #### ReadMessageClass (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) with all of its messages. Answers: "show message class X", "list messages of message class", "display message text 001 of class". Returns name, description, package, master language and the array of messages (msgno, msgtext, self-explanatory, description).
+**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
 
@@ -399,7 +399,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclassmessage-read-only-message-class"></a>
 #### ReadMessageClassMessage (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of class ZMY_MSGS", "get text of message". Returns msgno, msgtext, self-explanatory flag and description.
+**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of class ZMY_MSGS", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
 
@@ -440,7 +440,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description. 
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -475,7 +475,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
-- `format` (string, optional) - [read-only] Output format: 'raw' or 'parsed'
+- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.
 - `node_id` (string, required) - [read-only] Node ID
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_tech_name` (string, required) - [read-only] Parent technical name
@@ -545,7 +545,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. 
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
@@ -646,7 +646,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
-- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type)
+- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_type` (string, required) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)
 
@@ -862,7 +862,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimerunclass-read-only-system"></a>
 #### RuntimeRunClass (Read-Only / System)
-**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace (returns profilerId/traceId alongside output).
+**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
 
@@ -880,18 +880,18 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
 - `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and resolve the resulting traceId. Default false.
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
 - `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced, profile=true).
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000). Only used when profile=true.
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
 - `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
 <a id="runtimerunclasswithprofiling-read-only-system"></a>
 #### RuntimeRunClassWithProfiling (Read-Only / System)
-**Description:** [runtime][deprecated] Execute ABAP class with profiler enabled and return created profilerId + traceId. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
+**Description:** [runtime][deprecated] Execute ABAP class with profiler enabled: schedules a trace, runs the class under it, then searches the profiler feed for the trace id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). trace_id is absent if the trace has not appeared within that bound. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClassWithProfiling.ts`
 
@@ -909,10 +909,10 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
 - `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Increase for slow systems (e.g. SAP trial cloud).
 - `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced).
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000).
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000).
 - `with_rfc_tracing` (boolean, optional) - 
 
 ---
@@ -1023,14 +1023,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests.
+**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers — not sent to ADT as filters.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
 **Parameters:**
-- `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports. Default: true.
-- `user` (string, optional) - SAP user name. If not provided, returns transports for the current user.
+- `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
+- `user` (string, optional) - SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-09-16*

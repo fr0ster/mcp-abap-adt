@@ -238,7 +238,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Delete an ABAP behavior definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -280,12 +280,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state. Use UpdateBehaviorImplementation to set implementation code afterwards.
+**Description:** Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist.
+- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
 - `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions (typically starts with ZBP_ for behavior implementations).
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
@@ -295,7 +295,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Delete an ABAP behavior implementation from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -319,13 +319,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.
+**Description:** Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). Must match the behavior definition used when creating the class.
+- `behavior_definition` (string, required) - Referenced Behavior Definition name (e.g., ZI_MY_ENTITY). Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
 - `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
@@ -350,7 +350,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state.
+**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -369,7 +369,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -507,35 +507,35 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
+**Description:** Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `macros_code` (string, required) - Updated source code for local macros.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
+**Description:** Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -549,15 +549,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
+**Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `local_types_code` (string, required) - Updated source code for local types.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
@@ -1371,7 +1371,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Delete an ABAP data element from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -1453,7 +1453,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -1574,7 +1574,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
@@ -1648,7 +1648,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -1709,7 +1709,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -1750,7 +1750,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -1781,7 +1781,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -1836,7 +1836,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -1908,7 +1908,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system. Includes a deletion check before the actual deletion. Transport request required for transportable objects, optional for local ($TMP).
+**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
@@ -1933,7 +1933,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** Retrieve an ABAP message class (MSAG/T100) with its messages: name, description, package, master language and the message list (msgno, msgtext, self-explanatory).
+**Description:** Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -1944,7 +1944,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). Returns msgno, msgtext, self-explanatory flag and description.
+**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). There is no per-message resource: ADT answers the ENTIRE parent class document (XML) under the `message` field, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -1988,7 +1988,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Delete an ABAP metadata extension from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
@@ -2038,7 +2038,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
+**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version. 
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -2081,7 +2081,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -2127,12 +2127,12 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true)) - Activate service binding after create. Default: true.
+- `activate` (boolean, optional (default: true)) - Activate and generate the service binding after create. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI)) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - ABAP package name.
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name.
 - `service_definition_name` (string, required) - Referenced service definition name.
 - `service_name` (string, optional) - Published service name. Default: service_binding_name if omitted.
@@ -2143,12 +2143,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Delete ABAP service binding via ADT Business Services endpoint.
+**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
 - `transport_request` (string, optional) - Optional transport request for deletion transport flow.
 
@@ -2186,10 +2186,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI)) - Service binding variant. Determines OData version for publish/unpublish routing.
 - `desired_publication_state` (string, required) - Target publication state.
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name to update.
-- `service_name` (string, required) - Published service name.
-- `service_version` (string, optional) - Published service version. Optional.
+- `service_name` (string, required) - Published service name. Accepted for backward compatibility; the publication job no longer carries it.
+- `service_version` (string, optional) - Published service version. Accepted for backward compatibility; the publication job no longer carries it.
 
 ---
 
@@ -2203,8 +2203,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Optional description used during validation.
 - `package_name` (string, optional) - ABAP package for the binding.
 - `service_binding_name` (string, required) - Service binding name to validate.
-- `service_binding_version` (string, optional) - Service binding version (for example: 1.0).
-- `service_definition_name` (string, required) - Service definition linked to binding.
+- `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
+- `service_definition_name` (string, required) - Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.
 
 ---
 
@@ -2230,7 +2230,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Delete an ABAP service definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
@@ -2291,8 +2291,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
-- `fields` (array, required (default: 0)) - Array of structure fields
-- `includes` (array, optional) - Include other structures in this structure
+- `fields` (array, required (default: 0)) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
+- `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions.
@@ -2302,7 +2302,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Delete an ABAP structure from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
@@ -2379,7 +2379,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
 **Parameters:**
-- `description` (string, optional) - Table description for validation and creation.
+- `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
@@ -2389,7 +2389,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Delete an ABAP table from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
@@ -2447,14 +2447,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create a CDS unit test class with CDS validation. Creates the test class in initial state.
+**Description:** Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Parameters:**
-- `cds_view_name` (string, required) - CDS view name to validate for unit test doubles.
-- `class_name` (string, required) - Global test class name (e.g., ZCL_CDS_TEST).
-- `description` (string, optional) - Optional description for the global test class.
+- `cds_view_name` (string, required) - CDS view name to check for unit test doubles before creating the class.
+- `class_name` (string, required) - Container class name (e.g., ZCL_CDS_TEST).
+- `description` (string, optional) - Optional description for the container class.
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_PKG_01, $TMP).
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
@@ -2462,7 +2462,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -2501,7 +2501,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id.
+**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -2512,7 +2512,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id.
+**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -2525,7 +2525,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id.
+**Description:** Retrieve CDS unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 
@@ -2537,7 +2537,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id.
+**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
@@ -2548,7 +2548,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run result for a run_id.
+**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -2561,7 +2561,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunitteststatus-high-level-unit-test"></a>
 #### GetUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status for a run_id.
+**Description:** Retrieve ABAP Unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestStatus.ts`
 
@@ -2573,7 +2573,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. 
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -2589,7 +2589,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update a CDS unit test class local test class source code.
+**Description:** Update a CDS unit test class local test class source code. Manages lock, update, and unlock of the container class.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -2611,4 +2611,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-09-16*

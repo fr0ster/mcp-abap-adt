@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Two patterns run through the whole migration and are worth stating once,
+  in general, rather than only inside each task's own entry below.**
+
+  **A read that used to answer `success: true` with a null body now answers
+  an error.** Every migrated read-modify-write handler — a domain, a data
+  element, a package, a table's metadata, and the rest — goes through
+  `sequence()`, whose whole discipline is stopping at the first failed step
+  and handing back that step's own answer, untouched. A failed read used to
+  mean "nothing to patch, so write whatever came back" on more than one
+  pre-migration handler, which is the shape `null`/empty `success: true`
+  answers came from; a read step that fails now stops the chain before any
+  write is attempted, and the caller sees the read's own failure — origin,
+  message, and (where the strategy fills it in) the server's own T100 key —
+  instead of a write silently confirming nothing happened.
+
+  **A write that succeeded under a failed unlock now answers an error
+  carrying `operation: 'succeeded'`.** Every migrated high-tier write holds
+  its lock through the shared `withLock` (see the eighteen-writes entry
+  below): the body runs, and the release always runs after it, on every path
+  out — a refusal from the body, a throw from it, or neither. When the body
+  itself succeeded but the *unlock* is refused or throws, the object's
+  change is real and on the server, but the call now answers a failure
+  rather than the write's own success — with `operation: 'succeeded'` on the
+  error payload, and a `cleanup` field carrying what the release actually
+  said, so a caller does not read "failed" and conclude nothing happened.
+  This is the most arguable decision in the spec this migration implements:
+  a lock left behind on an object whose new content the caller can no longer
+  see as a success. Surfaces in integration runs as new failures that are
+  not regressions — see the pull request for a fuller account.
+
 - **Six unit-test tools gained the `detail` parameter, and what they answer
   changed with it.** `GetUnitTestStatus`, `GetCdsUnitTestStatus`, `GetUnitTest`,
   `GetCdsUnitTest`, `GetUnitTestResult` and `GetCdsUnitTestResult` answer a JSON

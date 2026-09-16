@@ -438,7 +438,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description. 
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -472,7 +472,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. 
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
@@ -525,7 +525,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state.
+**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -546,7 +546,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -706,39 +706,39 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
+**Description:** Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `macros_code` (string, required) - Updated source code for local macros.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
+**Description:** Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -754,17 +754,17 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
+**Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `local_types_code` (string, required) - Updated source code for local types.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
@@ -1186,7 +1186,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -1261,7 +1261,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -1330,7 +1330,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -1377,7 +1377,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -1412,7 +1412,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -1475,7 +1475,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -1536,7 +1536,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
+**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version. 
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -1585,7 +1585,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -1632,16 +1632,16 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create a CDS unit test class with CDS validation. Creates the test class in initial state.
+**Description:** Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `cds_view_name` (string, required) - CDS view name to validate for unit test doubles.
-- `class_name` (string, required) - Global test class name (e.g., ZCL_CDS_TEST).
-- `description` (string, optional) - Optional description for the global test class.
+- `cds_view_name` (string, required) - CDS view name to check for unit test doubles before creating the class.
+- `class_name` (string, required) - Container class name (e.g., ZCL_CDS_TEST).
+- `description` (string, optional) - Optional description for the container class.
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_PKG_01, $TMP).
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
@@ -1649,7 +1649,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -1694,7 +1694,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id.
+**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -1707,7 +1707,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id.
+**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -1722,7 +1722,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id.
+**Description:** Retrieve CDS unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 
@@ -1736,7 +1736,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id.
+**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
@@ -1749,7 +1749,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run result for a run_id.
+**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -1764,7 +1764,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getunitteststatus-high-level-unit-test"></a>
 #### GetUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status for a run_id.
+**Description:** Retrieve ABAP Unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestStatus.ts`
 
@@ -1778,7 +1778,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. 
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -1796,7 +1796,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update a CDS unit test class local test class source code.
+**Description:** Update a CDS unit test class local test class source code. Manages lock, update, and unlock of the container class.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -1855,7 +1855,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `test_class_name` (string, optional) - Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value.
+- `test_class_name` (string, optional) - Ignored. This activates the whole class, test classes included, without naming one — there is no per-test-class activation to target.
 
 ---
 
@@ -1914,7 +1914,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getclassunittestresultlow-low-level-class"></a>
 #### GetClassUnitTestResultLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
+**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id. 
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestResult.ts`
 
@@ -1931,7 +1931,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="getclassunitteststatuslow-low-level-class"></a>
 #### GetClassUnitTestStatusLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
+**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id. 
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestStatus.ts`
 
@@ -1975,7 +1975,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="runclassunittestslow-low-level-class"></a>
 #### RunClassUnitTestsLow (Low-Level / Class)
-**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
+**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers. 
 
 **Source:** `src/handlers/class/low/handleRunClassUnitTests.ts`
 
@@ -2085,8 +2085,9 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Honored only when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family) — the per-object activate() this tool prefers for a single object has no preaudit parameter at all.
 
 ---
 
@@ -2335,7 +2336,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `description` (string, required) - Function module description.
 - `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
 - `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Accepted for compatibility; not sent to the server. A function module lives inside its function group's package — the shipped create endpoint takes no package of its own.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -2463,7 +2464,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 **Available in:** `onprem`, `cloud`, `legacy`
 
 **Parameters:**
-- `description` (string, optional) - Optional description for validation
+- `description` (string, optional) - Optional description for validation. Defaults to the function group name when omitted — the endpoint requires a non-empty description.
 - `function_group_name` (string, required) - FunctionGroup name to validate (e.g., Z_MY_PROGRAM).
 - `package_name` (string, optional) - Package name for validation (optional but recommended).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -2623,7 +2624,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="checkpackagelow-low-level-package"></a>
 #### CheckPackageLow (Low-Level / Package)
-**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. super_package is required by this schema but not read by the check endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleCheckPackage.ts`
 
@@ -2633,13 +2634,13 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
+- `super_package` (string, required) - Does not reach the check endpoint — the shipped checkPackage() call takes only the package name. Kept for compatibility with ValidatePackage/CreatePackage, which do read it (LockPackage/UnlockPackage/UpdatePackage do not either).
 
 ---
 
 <a id="deletepackagelow-low-level-package"></a>
 #### DeletePackageLow (Low-Level / Package)
-**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. 
 
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
 
@@ -2655,7 +2656,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 <a id="lockpackagelow-low-level-package"></a>
 #### LockPackageLow (Low-Level / Package)
-**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Requires super_package.
+**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleLockPackage.ts`
 
@@ -2665,13 +2666,13 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
+- `super_package` (string, required) - Does not reach the lock endpoint — the shipped lockPackage() call takes only the package name. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
 
 ---
 
 <a id="unlockpackagelow-low-level-package"></a>
 #### UnlockPackageLow (Low-Level / Package)
-**Description:** [low-level] Unlock an ABAP package after modification. Requires lock handle from LockObject and superPackage. - must use the same session_id and lock_handle from LockObject.
+**Description:** [low-level] Unlock an ABAP package after modification. Requires lock_handle from LockPackage — must use the same session_id and lock_handle it returned. super_package is required by this schema but not read by the unlock endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleUnlockPackage.ts`
 
@@ -2682,13 +2683,13 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Package must already exist.
 - `session_id` (string, required) - Session ID from LockObject operation. Must be the same as used in LockObject.
 - `session_state` (object, optional) - Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name. Required for package operations.
+- `super_package` (string, required) - Does not reach the unlock endpoint — the shipped unlockPackage() call takes only the package name and lock handle. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
 
 ---
 
 <a id="updatepackagelow-low-level-package"></a>
 #### UpdatePackageLow (Low-Level / Package)
-**Description:** [low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.
+**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. 
 
 **Source:** `src/handlers/package/low/handleUpdatePackage.ts`
 
@@ -2699,7 +2700,7 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Package must already exist.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name. Required for package operations.
+- `super_package` (string, required) - Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
 - `updated_description` (string, required) - New description for the package.
 
 ---
@@ -2836,4 +2837,4 @@ Legacy systems support a subset of tools — primarily Class, Interface, View, P
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-09-16*

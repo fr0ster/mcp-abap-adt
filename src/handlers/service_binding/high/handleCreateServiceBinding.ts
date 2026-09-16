@@ -32,6 +32,25 @@
  * "activate before generate" follows ADT's general rule that only an active
  * object's OData service can be generated, not a recorded trace. Flagged
  * here for verification against a real system rather than asserted as fact.
+ *
+ * **No rollback, and the reason is the system, not a preference.** The
+ * pre-19 chain deleted the half-created binding when a later step failed,
+ * and whether to reproduce that was left open through this migration. It is
+ * settled: there is none, because in ABAP there is nothing here to roll back
+ * to. Rollback is an SQL and LUW concept — it undoes *data* changes inside a
+ * unit of work, and repository object operations over ADT are not one.
+ * Deleting an object that was created is not an undo: it is a second
+ * operation, with its own request, its own refusal and its own outcome, and
+ * calling it a rollback hides that.
+ *
+ * So each step answers for itself. A failed `create()` leaves nothing
+ * behind — the object was never made, and there is nothing to undo. A failed
+ * activate or generate leaves a binding that exists and is not yet usable,
+ * which is a fact the caller gets: the answer is the failing step's own,
+ * naming which step it was, so they can activate it, generate it, delete it,
+ * or leave it. Deleting it here would discard a created object on a verdict
+ * the caller never saw, and an activation ADT declined is not evidence that
+ * the binding is unwanted.
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';

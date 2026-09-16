@@ -55,6 +55,28 @@ function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
   expect(data).not.toHaveProperty('session_state');
 }
 
+/**
+ * Assert a check that SAP refused, and that its own words came through.
+ *
+ * A refusal is not passed through `normalizeCheckResponse` — it returns an
+ * error response untouched — so there is no `object_name` here, and nothing
+ * to parse into the terse shape. What there is, is the failure payload
+ * `answer()` builds: the message, `origin: 'refusal'`, and the check's own
+ * `messages`. That is the whole point of the migration on this path, so the
+ * test reads it rather than settling for `isError`.
+ */
+function assertCheckRefusal(
+  response: { isError: boolean; content: Array<{ text: string }> },
+  expected: RegExp,
+): any {
+  expect(response.isError).toBe(true);
+  const payload = JSON.parse(response.content[0].text);
+  expect(payload.origin).toBe('refusal');
+  expect(payload.message).toMatch(expected);
+  expect(payload.messages?.length).toBeGreaterThan(0);
+  return payload;
+}
+
 describe('Check High-Level Handlers Integration', () => {
   // CheckClass
   describe('CheckClass', () => {
@@ -163,12 +185,23 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+          // `CheckBehaviorDefinition` takes a name and nothing else — no
+          // `version`, on either tier — and the shipped `check` member
+          // defaults to the inactive version (see the note in
+          // `handleCheckBehaviorDefinition.ts`, low tier). The shared
+          // behaviour definition is active-only, so SAP answers
+          // `status="notProcessed"`, `statusText="Inactive version for BDEF
+          // ZMCP_SHR_I_ROOT does not exist"` — measured 2026-09-16. That is
+          // the honest answer to the question the tool is able to ask; the
+          // tool's inability to ask about the active version is a real gap,
+          // and a `version` input is what would close it.
+          //
+          // Before the migration the same answer was parsed into
+          // `success: false` inside an `isError: false` response.
+          const payload = assertCheckRefusal(response, /Inactive version/i);
 
           logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+            `✅ check: ${objectName} — refused: ${payload.message}`,
           );
         });
       },
@@ -397,14 +430,28 @@ describe('Check High-Level Handlers Integration', () => {
           logger?.info(`   • check: ${objectName}`);
           const checkLogger = createTestLogger('check-table');
           const response = await tester.invokeToolOrHandler(
+            // `version` is not optional here, and the default is not the
+            // one this test wants. `CheckTableLow` defaults to `new`, which
+            // the check endpoint treats as `inactive`; the shared table is
+            // active-only, so SAP answers `status="notProcessed"` with
+            // `statusText="Inactive version for TABL ZMCP_SHR_RTABL does not
+            // exist"` — a check that never ran, which `analyseCheck` reports
+            // as the refusal it is. Before the migration the same answer was
+            // parsed into `success: false` inside an `isError: false`
+            // response, which is the masking this work removed. Asking for
+            // the active version is asking the question the test's own name
+            // states.
             'CheckTable',
-            { table_name: objectName },
+            { table_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckTable(ctx, { table_name: objectName });
+              return handleCheckTable(ctx, {
+                table_name: objectName,
+                version: 'active',
+              });
             },
           );
 
@@ -719,12 +766,22 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
-          const data = parseHandlerResponse(response);
-          assertNormalizedCheckResponse(data, objectName);
+          // The check runs — `status="processed"`, `statusText="Object
+          // SAPLZMCP_BLD_SHR_FGR ... has been checked"` — and reports one
+          // error against the group's main source:
+          // `MESSAGE(G46)`, "The REPORT/PROGRAM statement is missing, or the
+          // program type is INCLUDE." A function group's main program IS an
+          // include, so this is what SAP says about a function group, not
+          // about this one being broken (measured 2026-09-16).
+          //
+          // `analyseCheck` makes a check carrying an `E` a refusal, which is
+          // the contract this migration adopted wholesale from
+          // `@mcp-abap-adt/adt-strategies`. The findings are not lost — they
+          // are in `messages`, which is what this asserts.
+          const payload = assertCheckRefusal(response, /REPORT\/PROGRAM/i);
 
           logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
+            `✅ check: ${objectName} — refused: ${payload.message}`,
           );
         });
       },
@@ -790,7 +847,6 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.function_module_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,

@@ -26,10 +26,19 @@
  * that is the one type this tool can check the same way `GetPackageTree`
  * does: `getPackage().readMetadata()`. So: a blank body for a `DEVC/K` parent
  * triggers that one extra request — success (empty listing) if the package
- * reads back, the package's own refusal if it does not. A blank body for any
- * other parent type still throws, undecided, because there is no fixture and
- * no existence check to decide it with; inventing one would be exactly the
- * mistake the corpus exists to prevent.
+ * reads back, the package's own refusal if it does not.
+ *
+ * **A blank body for any other parent type is an empty listing, measured.**
+ * An earlier pass threw there instead, on the grounds that no fixture settled
+ * it. One does now: `CL_ABAP_CHAR_UTILITIES` — a standard SAP class, which
+ * plainly exists — answers `CLAS/OC` node `0000` with HTTP 200 and zero
+ * bytes on the trial system (probed 2026-09-16 via
+ * `scripts/probe-migration-failures.ts`). So a blank body is not a
+ * not-found signal outside the package case: for a class it is simply what
+ * this endpoint says when the node holds nothing, and throwing made the tool
+ * answer `client_threw` for an ordinary, correct request. The ambiguity the
+ * two package fixtures capture is real and is still handled above; it is not
+ * a property of the blank body in general.
  *
  * **Where the throw lives, and why it agrees with `GetObjectStructureLow`'s.**
  * Both guards now run inside the `call()` passed to `answer()`, not inside a
@@ -183,9 +192,9 @@ export async function handleGetNodeStructure(
           }
 
           if (parent_type.toUpperCase() !== 'DEVC/K') {
-            throw new Error(
-              `ADT answered an empty node structure (HTTP 200, zero bytes) for ${parent_type}/${parent_name} — that answer means either the parent does not exist or it genuinely holds nothing, and this endpoint gives no way to tell the two apart for a non-package parent type. fetchNodeStructure carries no analyse, so nothing downstream of this reading can decide either.`,
-            );
+            // Nothing below this node. See the header: measured on a class
+            // that exists, so the blank body is the answer, not a refusal.
+            return succeededLevel({ objects: [], childNodes: [] });
           }
 
           // The one existence check this tool can pay: the same one

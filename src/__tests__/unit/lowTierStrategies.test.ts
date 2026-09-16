@@ -2778,7 +2778,14 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     expect(calls).toEqual(['fetchNodeStructure', 'readMetadata']);
   });
 
-  it('GetNodeStructureLow still throws, undecided, on a blank body for a non-package parent type — no fixture and no existence check exists to disambiguate one', async () => {
+  // Measured, where the earlier draft of this test reasoned from the absence
+  // of a fixture. `CL_ABAP_CHAR_UTILITIES` is a standard SAP class — it
+  // exists on every system — and `CLAS/OC` node `0000` answers HTTP 200 with
+  // zero bytes for it on the trial system (probed 2026-09-16,
+  // `scripts/probe-migration-failures.ts`). So a blank body outside the
+  // package case is an empty node, and the previous `client_threw` answered
+  // an ordinary correct request with a defect report.
+  it('GetNodeStructureLow answers an empty listing on a blank body for a non-package parent type, and pays no existence check for one', async () => {
     const calls: string[] = [];
     fakeClient = fakeClientOf({
       fetchNodeStructure: async () => {
@@ -2793,13 +2800,14 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
 
     const result: any = await handleGetNodeStructure(context as any, {
       parent_type: 'CLAS/OC',
-      parent_name: 'ZCL_NOPE',
+      parent_name: 'CL_ABAP_CHAR_UTILITIES',
     });
 
-    expect(result.isError).toBe(true);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('client_threw');
-    expect(payload.message).toMatch(/empty node structure/i);
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toEqual({
+      objects: [],
+      childNodes: [],
+    });
     // No existence check exists for a class, so none is attempted.
     expect(calls).toEqual(['fetchNodeStructure']);
   });

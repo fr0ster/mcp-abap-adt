@@ -380,6 +380,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a direct caller — a soft-mode integration test, or an embedder) would
   reject the returned promise instead of answering an error result. Restored.
 
+- **`GetNodeStructureLow` no longer reports an error for a node that is
+  simply empty.** The migration added a guard for the one ambiguity the
+  corpus captures: `/repository/nodestructure` answers HTTP 200 with zero
+  bytes both for a package that does not exist and for one that exists and
+  holds nothing, and the two fixtures are byte-for-byte identical. For a
+  `DEVC/K` parent the handler still pays one extra `readMetadata` round trip
+  to tell those apart, and still forwards the package's own refusal when the
+  package is gone. For every other parent type it used to throw, on the
+  grounds that no fixture settled the question — which made an ordinary
+  request answer `client_threw`. It is settled now: `CL_ABAP_CHAR_UTILITIES`,
+  a standard SAP class, answers `CLAS/OC` node `0000` with zero bytes on a
+  live system, so outside the package case a blank body is an empty node and
+  is answered as one.
+
 ## [10.0.1] - 2026-09-11
 
 ### Fixed

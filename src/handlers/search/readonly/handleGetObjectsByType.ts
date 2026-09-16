@@ -170,6 +170,13 @@ export async function handleGetObjectsByType(
   // `fetchNodeStructure(parentType, parentName, options?)` — no `analyse`:
   // not named by the brief for this member, and `IGetNodeContentsOptions`
   // carries no options field for one either.
+  //
+  // Task 28: why this tool carries no `detail`. The node-level family's
+  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
+  // `nodeLevel` parses `answer.data` and returns only the reduced
+  // `NodeLevel` it builds, never keeping the wire text beside it — there is
+  // no `.raw` for `detail: 'raw'` to answer without changing that shared
+  // strategy.
   return answer(
     { tool: 'GetObjectsByType', detail: 'terse' },
     () =>

@@ -169,6 +169,14 @@ export async function handleGetObjectsList(
   const parentName = parent_name.toUpperCase();
   const utils = utilsOf(context);
 
+  // Task 28: why this tool carries no `detail`. The node-level family's
+  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
+  // a real ADT document is fetched per node, but `nodeLevel` parses
+  // `answer.data` and returns only the reduced `NodeLevel` it builds —
+  // never keeping the wire text beside it. There is no `.raw` for
+  // `detail: 'raw'` to answer without changing that shared strategy, and
+  // this tool's own answer besides is a composite assembled from a
+  // recursive walk over many such calls, not one reading.
   return answer(
     { tool: 'GetObjectsList', detail: 'terse' },
     () =>

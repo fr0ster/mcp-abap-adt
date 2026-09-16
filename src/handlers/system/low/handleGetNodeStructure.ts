@@ -157,6 +157,14 @@ export async function handleGetNodeStructure(
     await restoreSessionInConnection(connection, session_id, session_state);
   }
 
+  // Task 28: why this tool carries no `detail`. The node-level family's
+  // shape: `nodeLevel` (`lib/strategies/packageWalk.ts`) parses
+  // `answer.data` and returns only the reduced `NodeLevel` it builds,
+  // never keeping the wire text beside it — there is no `.raw` for
+  // `detail: 'raw'` to answer without changing that shared strategy. The
+  // final projection below is the identity function for exactly that
+  // reason: there is nothing beyond the `NodeLevel` `nodeLevel` already
+  // produced to project three ways.
   return answer(
     { tool: 'GetNodeStructureLow', detail: 'terse' },
     () => {

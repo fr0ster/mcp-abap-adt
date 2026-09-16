@@ -267,6 +267,13 @@ export async function handleGetObjectInfo(
 
   const utils = createAdtClient(connection, logger).getUtils(ourUtils);
 
+  // Task 28: why this tool carries no `detail`. The node-level family's
+  // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
+  // `nodeLevel` parses `answer.data` and returns only the reduced
+  // `NodeLevel` it builds, never keeping the wire text beside it — there is
+  // no `.raw` for `detail: 'raw'` to answer without changing that shared
+  // strategy. This tool's own answer besides is a composite tree assembled
+  // from several such calls (`buildTree`, recursive), not one reading.
   return answer(
     { tool: 'GetObjectInfo', detail: 'terse' },
     () =>

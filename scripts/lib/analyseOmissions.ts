@@ -749,8 +749,19 @@ export function detailWiring(
  * name: '...', ... }` (an `as const` wrapper, when present, is unwrapped).
  * `undefined` when no such literal is found — a file this check should not
  * silently treat as declaring anything.
+ *
+ * Exported so a caller choosing WHICH files to hand `detailWiring` can
+ * resolve each one's tool name the same way this file does internally —
+ * from the syntax tree, keyed on the `TOOL_DEFINITION` declaration
+ * specifically. A caller that instead took "the first quoted `name:` in the
+ * file" would misidentify any file where an unrelated object carrying its
+ * own `name` property sits above the real `TOOL_DEFINITION` — silently
+ * dropping that file out of the audit rather than reading the tool it
+ * actually is. Needs only a parsed `ts.SourceFile`, not a full `ts.Program`
+ * — this walk is syntactic, no type information involved — so a caller can
+ * build one with a bare `ts.createSourceFile` per file.
  */
-function toolNameOf(source: ts.SourceFile): string | undefined {
+export function toolNameOf(source: ts.SourceFile): string | undefined {
   let name: string | undefined;
   const visit = (node: ts.Node): void => {
     if (name !== undefined) return;
@@ -839,6 +850,29 @@ function classifyProjection(
   checker: ts.TypeChecker,
 ): 'dynamic' | 'literal' | 'unknown' {
   if (projection === undefined) return 'unknown';
+
+  // A projection bound to a `const` and passed by name — `const project =
+  // (entries) => ({...}); return answer(ctx, call, project);`
+  // (`RuntimeListFeeds`, the two profiler readers, the two class-run
+  // handlers all write exactly this shape) — resolves the SAME way the
+  // context's own `detail` identifier does, via `constInitializerOf`, and
+  // is then classified as whatever that initializer turns out to be:
+  // another `project(...)` call, a hand-written function, or (an import,
+  // the shape every one of those five handlers' own `terseClassRun`/
+  // `terseProfilingRun` is) something this walk cannot see into, which
+  // stays 'unknown' the same way an unresolvable ctx value does. Skipping
+  // this resolution — the gap fix round 2 found — let a hardcoded
+  // projection hide behind a name: `project('terse', …)` written once,
+  // bound to a `const`, and handed to every `answer()` call by identifier
+  // reads as unreadable at every site rather than as the one hardcoded
+  // literal it is.
+  if (ts.isIdentifier(projection)) {
+    const symbol = checker.getSymbolAtLocation(projection);
+    const initializer = constInitializerOf(symbol);
+    return initializer === undefined
+      ? 'unknown'
+      : classifyProjection(initializer, bindingSymbol, checker);
+  }
 
   if (
     ts.isCallExpression(projection) &&

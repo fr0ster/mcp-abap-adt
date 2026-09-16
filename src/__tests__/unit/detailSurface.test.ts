@@ -25,6 +25,23 @@
  * it offers deliberately excludes `detail` (the same reduction it already
  * makes for other low-level knobs like `session_id`/`session_state`).
  *
+ * **A fifth shape, found in fix round 2: the node-level family.** A real
+ * ADT wire document is fetched here too, but the STRATEGY it goes through
+ * — `nodeLevel` (`lib/strategies/packageWalk.ts`), the reading every one of
+ * these tools shares — parses `answer.data` and returns only the reduced
+ * `NodeLevel` it builds, never keeping the wire text beside it. There is no
+ * `.raw` for `detail: 'raw'` to answer without changing `nodeLevel` itself
+ * to carry one, which none of these tools does on its own. Unlike the
+ * runtime-profiling tools (row three: no reading at all) a reading
+ * genuinely runs here; unlike the delegating wrapper (a real `AdtReading`
+ * reachable, just not forwarded) there is no `AdtReading` to reach — only
+ * the strategy's own already-reduced answer. `GetNodeStructureLow`
+ * (`system/low/handleGetNodeStructure.ts`), `GetObjectsList`,
+ * `GetObjectsByType` (`search/readonly/`) and `GetObjectInfo`
+ * (`system/readonly/`) are this shape, each documented at its own
+ * `answer()` call for why `(value) => value`/the tool's own composite is
+ * the whole answer, not a placeholder for a `detail` this task owes it.
+ *
  * Three things have to agree, and each gets its own test below:
  *
  *  1. **The schema.** `JSON_ANSWERING` names every tool whose surface
@@ -43,7 +60,11 @@
  */
 import { execFileSync } from 'node:child_process';
 import { globSync, readFileSync } from 'node:fs';
-import { detailWiring } from '../../../scripts/lib/analyseOmissions';
+import ts from 'typescript';
+import {
+  detailWiring,
+  toolNameOf,
+} from '../../../scripts/lib/analyseOmissions';
 import { handleCheckClass } from '../../handlers/class/low/handleCheckClass';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
 
@@ -313,27 +334,62 @@ it('declares detail on every JSON-answering tool and on no other', () => {
  * genuinely do read `detailOf(args)` — a real disagreement between "this
  * name is not a registered tool" and "this file behaves like a wired one",
  * but not the disagreement this test exists to catch.
+ *
+ * **Resolved from the syntax tree, via `toolNameOf` — the same function
+ * `detailWiring` uses internally — not a regex.** Fix round 2 proved why:
+ * a regex over the whole file text taking "the first quoted `name:` in the
+ * file" is fooled by an unrelated object carrying its own `name` property
+ * sitting above the real `TOOL_DEFINITION` — a file could then drop out of
+ * this filter (misread as some other, unregistered "tool") while a real,
+ * hardcoded-projection defect inside it went unaudited. `toolNameOf` reads
+ * the `TOOL_DEFINITION` declaration specifically, immune to what sits above
+ * it.
  */
 const registeredToolNames = new Set(surface.map((t) => t.name));
 const registeredHandlers = handlers.filter((file) => {
-  const match = /name:\s*'([^']+)'/.exec(readFileSync(file, 'utf8'));
-  return match !== null && registeredToolNames.has(match[1]);
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  const name = toolNameOf(source);
+  return name !== undefined && registeredToolNames.has(name);
 });
 
 /** The tool names the registered surface actually declares `detail` for. */
 const declaresDetail = new Set(toolsDeclaring('detail'));
 
+it('resolves the tool name past a decoy name property above TOOL_DEFINITION', () => {
+  const file =
+    'src/__tests__/fixtures/detail/decoy-name-above-tool-definition.ts';
+  const source = ts.createSourceFile(
+    file,
+    readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+  );
+  // "First quoted name: in the file" would answer 'NotTheToolName' — the
+  // decoy object's own property, textually first. The real tool name,
+  // `TOOL_DEFINITION`'s, comes second in the file.
+  expect(toolNameOf(source)).toBe('DecoyFixtureTool');
+});
+
 it.each([
-  // The absence hides five ways: no `detail` property at all, a context
+  // The absence hides six ways: no `detail` property at all, a context
   // assembled in a variable this walk cannot see into, the shorthand
   // `{ detail }` bound to something other than `detailOf(args)` (the exact
   // form the entire already-migrated corpus writes, so the hidden defect is
   // what the shared `const` holds, not the shorthand itself), a projection
-  // that ignores a correctly-wired context, and no `answer()` at all.
+  // that ignores a correctly-wired context (passed inline, or bound to a
+  // `const` and handed over by name — fix round 2's finding, live today in
+  // five handlers that happen not to declare `detail`), and no `answer()`
+  // at all.
   ['declares-passes-none', ['FixtureDeclaresPassesNone']],
   ['declares-indirect-context', ['FixtureIndirectContext']],
   ['declares-shorthand', ['FixtureShorthand']],
   ['declares-hardcoded-projection', ['FixtureHardcodedProjection']],
+  ['declares-aliased-projection', ['FixtureAliasedProjection']],
   // The emptiest case, and the last one a loop-based check can miss: no
   // `answer()` in the file, so there is nothing to iterate and nothing to
   // report — indistinguishable from correct.

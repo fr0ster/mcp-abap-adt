@@ -268,8 +268,16 @@ describe('Unit Test High-Level Handlers Integration', () => {
           );
         } else {
           const getStatusData = parseHandlerResponse(getStatusResponse);
-          expect(getStatusData.success).toBe(true);
+          // GetUnitTestStatus's terse projection no longer answers `success`
+          // — dropped from both status tools at every level (CHANGELOG
+          // Unreleased, "Six unit-test tools gained the `detail`
+          // parameter..."). `run_id`, `finished` and `run_status` (now the
+          // status string itself, e.g. "FINISHED") are what the projection
+          // actually carries — see handleGetUnitTestStatus.ts's
+          // `terseRunStatus`.
           expect(getStatusData.run_id).toBe(secondRunId);
+          expect(typeof getStatusData.finished).toBe('boolean');
+          expect(typeof getStatusData.run_status).toBe('string');
           testLogger?.success(
             `get unit test status: run_id ${secondRunId} completed successfully`,
           );

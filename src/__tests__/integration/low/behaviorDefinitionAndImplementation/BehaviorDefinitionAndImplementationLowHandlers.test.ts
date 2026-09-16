@@ -404,8 +404,12 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
           throw new Error(`Create class failed: ${errorMsg}`);
         }
 
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
+        // CreateClassLow's terse projection is `terseWrite`: on success it
+        // answers the literal text "SUCCESS", not a JSON object — `success`
+        // no longer exists to read (CHANGELOG Unreleased: "Terse writes
+        // answer the literal string `SUCCESS` ... uniformly across every
+        // write tool"; see projections.ts `terseWrite`).
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
         testLogger?.info?.(`   + class created`);
 
         await delay(context.getOperationDelay('create'));

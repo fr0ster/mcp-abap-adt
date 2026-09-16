@@ -197,9 +197,12 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
           throw new Error(`Create failed: ${errorMsg}`);
         }
 
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
-        expect(createData.name).toBe(ddlxName);
+        // CreateMetadataExtension's terse projection is `terseWrite`: on
+        // success it answers the literal text "SUCCESS", not a JSON object —
+        // `success`/`name` no longer exist to read (CHANGELOG Unreleased:
+        // "Terse writes answer the literal string `SUCCESS` ... uniformly
+        // across every write tool"; see projections.ts `terseWrite`).
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
         logger?.success(`✅ create: ${ddlxName} completed successfully`);
 
         // Wait after creation
@@ -248,9 +251,10 @@ annotate view ZI_TEST_ENTITY with {
           throw new Error(`Update failed: ${errorMsg}`);
         }
 
-        const updateData = parseHandlerResponse(updateResponse);
-        expect(updateData.success).toBe(true);
-        expect(updateData.name).toBe(ddlxName);
+        // UpdateMetadataExtension's terse projection is `terseWrite`, same as
+        // create: on success it answers the literal text "SUCCESS", not a
+        // JSON object with `success`/`name` (projections.ts `terseWrite`).
+        expect(updateResponse.content[0]?.text).toBe('SUCCESS');
         logger?.success(`✅ update: ${ddlxName} completed successfully`);
       });
     },

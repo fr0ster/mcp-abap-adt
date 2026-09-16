@@ -37,6 +37,22 @@ describe('activation', () => {
     });
   });
 
+  it('names the no-op, so a success that says activated:false is legible', () => {
+    const r = readingOf('activation-nothing-to-activate--01-activation');
+    expect(terseActivation(r.value as never, r.status)).toEqual({
+      activated: false,
+      generated: true,
+      nothing_to_activate: true,
+    });
+  });
+
+  it('never calls a refusal a no-op — the messages decide', () => {
+    const r = readingOf('refusal-activation-fails--01-activation');
+    expect(terseActivation(r.value as never, r.status)).not.toHaveProperty(
+      'nothing_to_activate',
+    );
+  });
+
   it('says it did not, and carries the reason, when it did not', () => {
     const r = readingOf('refusal-activation-fails--01-activation');
     const terse = terseActivation(r.value as never, r.status) as any;

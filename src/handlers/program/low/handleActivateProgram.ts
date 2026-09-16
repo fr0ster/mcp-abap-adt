@@ -5,11 +5,11 @@
  */
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { ourActivation } from '../../../lib/strategies/ourActivation';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import {
@@ -93,7 +93,7 @@ export async function handleActivateProgram(
     () =>
       createAdtClient(connection, logger)
         .getProgram(resultsFor(programDocuments))
-        .activate({ programName }, { analyse: analyseActivation }),
+        .activate({ programName }, { analyse: ourActivation }),
     project(detail, terseActivation),
   );
 }

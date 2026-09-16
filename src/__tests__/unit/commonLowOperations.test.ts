@@ -1,5 +1,4 @@
 import {
-  analyseActivation,
   analyseCheck,
   analyseDeletion,
   analyseValidation,
@@ -11,6 +10,7 @@ import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
+import { ourActivation } from '../../lib/strategies/ourActivation';
 import { structured } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
@@ -114,7 +114,7 @@ describe('the three masking cases (Task 13, Step 2)', () => {
     fakeClient = refusalFrom(
       'activate',
       'refusal-activation-fails--01-activation',
-      analyseActivation,
+      ourActivation,
     );
     // `objects`, an array of `{ name, type }` — one object, so the handler
     // reaches the per-object `activate()` (Step 1's decision), not
@@ -413,7 +413,7 @@ describe('ActivateObjectLow', () => {
     });
   });
 
-  it('one object reaches the per-object activate(), carrying analyseActivation', async () => {
+  it('one object reaches the per-object activate(), carrying ourActivation', async () => {
     fakeClient = seen.client;
     await handleActivateObject(context as any, {
       objects: [{ name: 'zcl_x', type: 'CLAS/OC' }],
@@ -422,7 +422,7 @@ describe('ActivateObjectLow', () => {
     const call = seen.calls[0];
     expect(call.member).toBe('activate');
     expect(call.carriedAnalyse).toBe(true);
-    expect(call.analyse).toBe(analyseActivation);
+    expect(call.analyse).toBe(ourActivation);
     expect(call.args[0]).toEqual({ className: 'ZCL_X' });
   });
 

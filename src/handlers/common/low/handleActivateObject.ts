@@ -20,7 +20,7 @@
  * call — the common case for this tool, matching what every other low-level
  * `ActivateXLow` handler already does one object at a time — is served by
  * mapping the object's ADT type code to that family and calling its
- * `activate()` directly, carrying `analyseActivation`. No masking on that
+ * `activate()` directly, carrying `ourActivation`. No masking on that
  * path: `answer()` reads the strategy's verdict, not the HTTP status.
  *
  * **What per-object activation does NOT serve, and why the group member
@@ -72,12 +72,12 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
 import type { IObjectReference } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { detailOf } from '../../../lib/strategies/detail';
+import { ourActivation } from '../../../lib/strategies/ourActivation';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -194,47 +194,47 @@ function activateFamily(
     case 'class':
       return client
         .getClass(resultsFor(classDocuments))
-        .activate({ className: name }, { analyse: analyseActivation });
+        .activate({ className: name }, { analyse: ourActivation });
     case 'program':
       return client
         .getProgram(resultsFor(programDocuments))
-        .activate({ programName: name }, { analyse: analyseActivation });
+        .activate({ programName: name }, { analyse: ourActivation });
     case 'interface':
       return client
         .getInterface(resultsFor(interfaceDocuments))
-        .activate({ interfaceName: name }, { analyse: analyseActivation });
+        .activate({ interfaceName: name }, { analyse: ourActivation });
     case 'function_group':
       return client
         .getFunctionGroup(resultsFor(functionGroupDocuments))
-        .activate({ functionGroupName: name }, { analyse: analyseActivation });
+        .activate({ functionGroupName: name }, { analyse: ourActivation });
     case 'table':
       return client
         .getTable(resultsFor(tableDocuments))
-        .activate({ tableName: name }, { analyse: analyseActivation });
+        .activate({ tableName: name }, { analyse: ourActivation });
     case 'structure':
       return client
         .getStructure(resultsFor(structureDocuments))
-        .activate({ structureName: name }, { analyse: analyseActivation });
+        .activate({ structureName: name }, { analyse: ourActivation });
     case 'ddl':
       return client
         .getDdl(resultsFor(ddlDocuments))
-        .activate({ ddlName: name }, { analyse: analyseActivation });
+        .activate({ ddlName: name }, { analyse: ourActivation });
     case 'domain':
       return client
         .getDomain(resultsFor(domainDocuments))
-        .activate({ domainName: name }, { analyse: analyseActivation });
+        .activate({ domainName: name }, { analyse: ourActivation });
     case 'data_element':
       return client
         .getDataElement(resultsFor(dataElementDocuments))
-        .activate({ dataElementName: name }, { analyse: analyseActivation });
+        .activate({ dataElementName: name }, { analyse: ourActivation });
     case 'behavior_definition':
       return client
         .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-        .activate({ name }, { analyse: analyseActivation });
+        .activate({ name }, { analyse: ourActivation });
     case 'metadata_extension':
       return client
         .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .activate({ name }, { analyse: analyseActivation });
+        .activate({ name }, { analyse: ourActivation });
   }
 }
 

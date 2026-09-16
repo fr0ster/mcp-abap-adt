@@ -9,7 +9,7 @@
  *
  * Task 10's per-operation table (Create/Update -> analyseException, statusOnly,
  * terseWrite; Check -> analyseCheck, structured, terseCheck; Activate ->
- * analyseActivation; Validate -> analyseValidation; Delete -> analyseDeletion;
+ * ourActivation; Validate -> analyseValidation; Delete -> analyseDeletion;
  * Lock/Unlock -> no strategy at all) applies unchanged across every family in
  * this cluster. What differs per family is the factory, the shipped result
  * set and the config key — this file pins the pairing per family rather than
@@ -33,7 +33,6 @@
  * to share a shape.
  */
 import {
-  analyseActivation,
   analyseCheck,
   analyseDeletion,
   analyseException,
@@ -219,6 +218,7 @@ import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
 import { corpusBody } from '../../lib/adtCorpus';
+import { ourActivation } from '../../lib/strategies/ourActivation';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
 import {
@@ -421,7 +421,7 @@ it.each([
   const activateCall = callTo('activate');
   expect(activateCall?.factory).toBe(factory);
   expect(activateCall?.carriedAnalyse).toBe(true);
-  expect(activateCall?.analyse).toBe(analyseActivation);
+  expect(activateCall?.analyse).toBe(ourActivation);
 
   // Delete -> analyseDeletion, except `ddlx (metadataExtension)`: its
   // `delete()` is a plain DELETE on the object's own URL, never a POST to
@@ -529,13 +529,13 @@ describe('class', () => {
   });
 
   describe('the test-classes trio shares getClass(), not a family of its own', () => {
-    it('ActivateClassTestClasses activates the parent class, taking analyseActivation like ActivateClass', async () => {
+    it('ActivateClassTestClasses activates the parent class, taking ourActivation like ActivateClass', async () => {
       await handleActivateClassTestClasses(context as any, {
         class_name: 'ZCL_X',
       });
       const call = callTo('activate');
       expect(call?.carriedAnalyse).toBe(true);
-      expect(call?.analyse).toBe(analyseActivation);
+      expect(call?.analyse).toBe(ourActivation);
       expect(call?.factory).toBe('getClass');
     });
 
@@ -2537,13 +2537,13 @@ describe('data_element', () => {
 });
 
 describe('service_binding — Activate only, over AdtServiceBinding', () => {
-  it('ActivateServiceBindingLow reaches getServiceBinding with analyseActivation', async () => {
+  it('ActivateServiceBindingLow reaches getServiceBinding with ourActivation', async () => {
     await handleActivateServiceBinding(context as any, { name: 'ZSB_X' });
     const call = callTo('activate');
     expect(call?.factory).toBe('getServiceBinding');
     expect(call?.args[0]).toEqual({ bindingName: 'ZSB_X' });
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseActivation);
+    expect(call?.analyse).toBe(ourActivation);
   });
 
   it('ActivateServiceBindingLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {
@@ -2567,7 +2567,7 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
   it('ActivateServiceBindingLow reports a refused activation as an error, on the real refusal-activation-fails fixture (200 with activationExecuted="false")', async () => {
     // The library's own verdict for a 200 is ADT_NO_FAILURE — this is the
     // HTTP-200-with-a-refusal-inside case the injection exists for, so
-    // `analyseActivation` has to read the document itself to find it.
+    // `ourActivation` has to read the document itself to find it.
     const document = corpusBody('refusal-activation-fails--01-activation');
     fakeClient = fakeClientOf({
       activate: async (_config: unknown, options: any) => {
@@ -2599,7 +2599,7 @@ describe('service_binding — Activate only, over AdtServiceBinding', () => {
 });
 
 describe('service_definition — Activate only', () => {
-  it('ActivateServiceDefinitionLow reaches getServiceDefinition with analyseActivation', async () => {
+  it('ActivateServiceDefinitionLow reaches getServiceDefinition with ourActivation', async () => {
     await handleActivateServiceDefinition(context as any, {
       name: 'ZI_X_SRVD',
     });
@@ -2607,7 +2607,7 @@ describe('service_definition — Activate only', () => {
     expect(call?.factory).toBe('getServiceDefinition');
     expect(call?.args[0]).toEqual({ serviceDefinitionName: 'ZI_X_SRVD' });
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseActivation);
+    expect(call?.analyse).toBe(ourActivation);
   });
 
   it('ActivateServiceDefinitionLow reads a real corpus document (generic activation-verdict fixture) through terseActivation', async () => {

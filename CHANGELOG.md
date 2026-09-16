@@ -380,6 +380,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from a direct caller — a soft-mode integration test, or an embedder) would
   reject the returned promise instead of answering an error result. Restored.
 
+- **An activation with nothing to activate is a success, and says so.** SAP
+  answers `POST /activation` with `activationExecuted="false"`,
+  `generationExecuted="true"` and no `msg` at all when the object is already
+  active — activating a class twice, or a function group straight after
+  creating one, since a function group is created active
+  (`adtcore:version="active"` before anything is activated). The shipped
+  `analyseActivation` treats the attribute as a refusal on its own, so every
+  such call answered an error. This repository now decides that verdict
+  itself, in `src/lib/strategies/ourActivation.ts`: it narrows the shipped
+  strategy by exactly that one measured case and delegates everything else,
+  so a `false` with an `E` beside it stays the refusal it is. The corpus
+  carries the case as `activation-nothing-to-activate`, and
+  `strategyAnalyse.test.ts` pins the disagreement, so if the strategies
+  package adopts the same reading, the test says so and this module can go.
+  A caller sees `activated: false` with `nothing_to_activate: true` beside
+  it, rather than a bare `false` under a success.
+
 - **`GetNodeStructureLow` no longer reports an error for a node that is
   simply empty.** The migration added a guard for the one ambiguity the
   corpus captures: `/repository/nodestructure` answers HTTP 200 with zero

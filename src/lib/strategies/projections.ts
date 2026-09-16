@@ -69,7 +69,19 @@ function text(node: unknown): string {
 export const terseWrite: Terse<unknown> = (_value, status) =>
   status >= 200 && status < 300 ? 'SUCCESS' : undefined;
 
-/** `chkl:messages` — did the activation happen, and what was said. */
+/**
+ * `chkl:messages` — did the activation happen, and what was said.
+ *
+ * **`activated: false` on a successful answer needs a word beside it.**
+ * `activationExecuted="false"` with no messages is SAP saying it had nothing
+ * to activate — an object that was already active — which
+ * `ourActivation` (`src/lib/strategies/ourActivation.ts`) reads as the
+ * success it is, on evidence recorded there. Left at `activated: false`
+ * alone, that answer reads to a caller as "it did not work" while the tool
+ * reports no error. `nothing_to_activate` says which of the two it is, and
+ * appears only in the case that was measured: the flag false, and not one
+ * message of any severity to explain it.
+ */
 export const terseActivation: Terse<any> = (value) => {
   const root = value?.['chkl:messages'];
   if (!root) return undefined;
@@ -77,9 +89,14 @@ export const terseActivation: Terse<any> = (value) => {
     type: attrs(m).type,
     text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
   }));
+  const activated =
+    attrs(root['chkl:properties']).activationExecuted === 'true';
   return {
-    activated: attrs(root['chkl:properties']).activationExecuted === 'true',
+    activated,
     generated: attrs(root['chkl:properties']).generationExecuted === 'true',
+    ...(!activated && messages.length === 0
+      ? { nothing_to_activate: true }
+      : {}),
     ...(messages.length ? { messages } : {}),
   };
 };

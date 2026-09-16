@@ -858,7 +858,15 @@ describe('Check High-Level Handlers Integration', () => {
           assertNormalizedCheckResponse(data, objectName);
           expect(data.name).toBe(objectName.toUpperCase());
 
+          // Regression: default check must target the ACTIVE version.
+          // An activated DDLX has no genuine inactive version; checking
+          // 'inactive' returns notProcessed / "Error while reading the object
+          // ... from the database". Default 'active' must come back processed.
+          expect(data.version).toBe('active');
           const cr = data.check_result;
+          expect(cr.status).not.toBe('notProcessed');
+          expect(cr.status).toBe('processed');
+
           logger?.success(
             `✅ check: ${objectName} — ${cr.errors.length} error(s), ${cr.warnings.length} warning(s)`,
           );

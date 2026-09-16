@@ -14,6 +14,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Metadata extension name (e.g., ZC_MY_DDLX).',
       },
+      version: {
+        type: 'string',
+        description:
+          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.",
+        enum: ['active', 'inactive'],
+      },
     },
     required: ['name'],
   },
@@ -21,7 +27,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckMetadataExtension(
   context: HandlerContext,
-  args: { name: string },
+  args: { name: string; version?: string },
 ) {
   const result = await handleCheckMetadataExtensionLow(context, args);
   return normalizeCheckResponse(result, args.name?.toUpperCase());

@@ -27,6 +27,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'MetadataExtension name (e.g., ZI_MY_DDLX).',
       },
+      version: {
+        type: 'string',
+        description:
+          "Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active. Note: checking 'inactive' on an activated DDLX with no genuine inactive version errors with 'Error while reading the object ... from the database'.",
+        enum: ['active', 'inactive'],
+      },
       session_id: {
         type: 'string',
         description:
@@ -49,6 +55,7 @@ export const TOOL_DEFINITION = {
 
 interface CheckMetadataExtensionArgs {
   name: string;
+  version?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -68,13 +75,23 @@ export async function handleCheckMetadataExtension(
 ) {
   const { connection, logger } = context;
   try {
-    const { name, session_id, session_state } =
+    const { name, version, session_id, session_state } =
       args as CheckMetadataExtensionArgs;
 
     // Validation
     if (!name) {
       return return_error(new Error('name is required'));
     }
+
+    // Version to check. Default 'active': an activated DDLX has no genuine
+    // inactive version, and the DDLX checkruns endpoint (unlike DDLS) does NOT
+    // fall back to active for version='inactive' — it returns notProcessed
+    // ("Error while reading the object ... from the database").
+    const validVersions = ['active', 'inactive'];
+    const checkVersion =
+      version && validVersions.includes(version.toLowerCase())
+        ? (version.toLowerCase() as 'active' | 'inactive')
+        : 'active';
 
     const client = createAdtClient(connection, logger);
 
@@ -87,13 +104,16 @@ export async function handleCheckMetadataExtension(
 
     const ddlxName = name.toUpperCase();
 
-    logger?.info(`Starting metadata extension check: ${ddlxName}`);
+    logger?.info(
+      `Starting metadata extension check: ${ddlxName} (version: ${checkVersion})`,
+    );
 
     try {
-      // Check metadata extension
+      // Check metadata extension. The second arg maps to chkrun:version inside
+      // the adt-clients check() method (status === 'active' ? 'active' : 'inactive').
       const checkState = await client
         .getMetadataExtension()
-        .check({ name: ddlxName });
+        .check({ name: ddlxName }, checkVersion);
       const response = checkState.checkResult;
 
       if (!response) {
@@ -117,6 +137,7 @@ export async function handleCheckMetadataExtension(
           {
             success: checkResult.success,
             name: ddlxName,
+            version: checkVersion,
             check_result: checkResult,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,

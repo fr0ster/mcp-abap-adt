@@ -28,7 +28,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeletePackageLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. ' +
     'On legacy systems (BASIS < 7.50) this is refused outright before any request is made — the client answers ' +

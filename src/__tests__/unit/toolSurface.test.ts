@@ -89,12 +89,44 @@ describe('the MCP tool surface', () => {
     }
   });
 
-  it('changes no tool availability', () => {
+  /**
+   * Two tools narrow deliberately, and they are named here so the narrowing
+   * cannot spread by accident.
+   *
+   * A package cannot be edited on a legacy system — reading its metadata and
+   * its contents is fine, changing it is not. `CreatePackage` and
+   * `ValidatePackageLow` already said so; `UpdatePackageLow` and
+   * `DeletePackageLow` still offered `legacy` and could only refuse there.
+   *
+   * The reads keep `legacy` on purpose, even though `AdtPackageLegacy`
+   * currently blocks them too: that block is upstream and is wrong by the
+   * same rule — the commit that introduced it (`0c9ae6b9`, "block legacy
+   * packages") gives the reason as "the endpoint exists in discovery but does
+   * not return usable results **via RFC**", which is a statement about a
+   * connection type rather than about reading. Hiding the read tools here
+   * would bake that over-block into this repository's surface.
+   */
+  const NARROWED_ON_PURPOSE: Record<string, string> = {
+    'low/UpdatePackageLow': 'cloud, onprem',
+    'low/DeletePackageLow': 'cloud, onprem',
+  };
+
+  it('changes no tool availability, except where this file says so', () => {
     const now = availability(current);
     for (const [tool, before] of availability(frozen)) {
       expect({ tool, available_in: now.get(tool) }).toEqual({
         tool,
-        available_in: before,
+        available_in: NARROWED_ON_PURPOSE[tool] ?? before,
+      });
+    }
+  });
+
+  it('every deliberate narrowing is still one — a stale entry hides nothing', () => {
+    const frozenAvailability = availability(frozen);
+    for (const [tool, narrowed] of Object.entries(NARROWED_ON_PURPOSE)) {
+      expect({ tool, was: frozenAvailability.get(tool) }).not.toEqual({
+        tool,
+        was: narrowed,
       });
     }
   });

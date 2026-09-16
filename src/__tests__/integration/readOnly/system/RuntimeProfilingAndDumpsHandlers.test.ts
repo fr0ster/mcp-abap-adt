@@ -16,6 +16,7 @@ import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system
 import { handleRuntimeRunClassWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
 import { createAdtClient } from '../../../../lib/clients';
+import { withLock } from '../../../../lib/strategies/withLock';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
@@ -187,14 +188,22 @@ async function createRunnableClass(
     transportRequest: context.transportRequest,
     description: `MCP runtime test ${className}`.slice(0, 60),
   });
-  await client.getClass().update(
-    {
-      className,
-      transportRequest: context.transportRequest,
-      sourceCode,
-    },
-    { activateOnUpdate: options?.activate === true },
+  // adt-clients 19 has no `activateOnUpdate` convenience — the source goes
+  // through `options.sourceCode` under a caller-held lock (see
+  // UpdateClassLow), and activation is its own call after unlock.
+  const obj = client.getClass();
+  const written = await withLock(
+    () => obj.lock({ className }),
+    (lockHandle) =>
+      obj.update(
+        { className, transportRequest: context.transportRequest },
+        { sourceCode, lockHandle },
+      ),
+    (lockHandle) => obj.unlock({ className }, lockHandle),
   );
+  if (written.ok && options?.activate === true) {
+    await obj.activate({ className });
+  }
 }
 
 async function deleteClassIfExists(
@@ -281,14 +290,21 @@ async function createRunnableProgram(
     transportRequest: context.transportRequest,
     description: `MCP runtime test ${programName}`.slice(0, 60),
   });
-  await client.getProgram().update(
-    {
-      programName,
-      transportRequest: context.transportRequest,
-      sourceCode,
-    },
-    { activateOnUpdate: true },
+  // adt-clients 19 has no `activateOnUpdate` convenience — see
+  // createRunnableClass above for the same shape.
+  const obj = client.getProgram();
+  const written = await withLock(
+    () => obj.lock({ programName }),
+    (lockHandle) =>
+      obj.update(
+        { programName, transportRequest: context.transportRequest },
+        { sourceCode, lockHandle },
+      ),
+    (lockHandle) => obj.unlock({ programName }, lockHandle),
   );
+  if (written.ok) {
+    await obj.activate({ programName });
+  }
 }
 
 async function deleteProgramIfExists(
@@ -429,58 +445,75 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(profiledRun.isError).toBe(false);
           const runData = parseTextPayload(profiledRun);
           expect(runData.success).toBe(true);
-          expect(runData.trace_id).toBeDefined();
-          const traceId = String(runData.trace_id).toUpperCase();
-          createdTraceIds.add(traceId);
 
-          const traceData = await invoke(
-            'RuntimeGetProfilerTraceData',
-            {
-              trace_id_or_uri: traceId,
-              view: 'hitlist',
-              with_system_events: false,
-            },
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection: context.connection,
-                logger,
-              });
-              return handleRuntimeGetProfilerTraceData(handlerContext, {
+          // adt-clients 19: a run only schedules and executes — finding the
+          // trace it produced is a feed search bounded by
+          // max_trace_attempts/trace_retry_delay_ms (newTrace.ts), and an
+          // exhausted search is `success: true` with no trace id, not a
+          // failure: "SAP writes it asynchronously and it may arrive a week
+          // later. Nothing refused anything, so there is nothing to report
+          // as a failure." (newTrace.ts). The old contract's guarantee that
+          // a run answers its own trace id is gone — recorded by Task 24 —
+          // so this no longer hard-asserts `trace_id`; it is tolerated
+          // missing the same way the program variant below already tolerates
+          // it via its own polling loop.
+          if (!runData.trace_id) {
+            logger?.warn(
+              'Class profiling trace not found within the polling budget — skipping trace read',
+            );
+          } else {
+            const traceId = String(runData.trace_id).toUpperCase();
+            createdTraceIds.add(traceId);
+
+            const traceData = await invoke(
+              'RuntimeGetProfilerTraceData',
+              {
                 trace_id_or_uri: traceId,
                 view: 'hitlist',
                 with_system_events: false,
-              });
-            },
-          );
-          expect(traceData.isError).toBe(false);
-          const tracePayload = parseTextPayload(traceData);
-          expect(tracePayload.success).toBe(true);
+              },
+              async () => {
+                const handlerContext = createHandlerContext({
+                  connection: context.connection,
+                  logger,
+                });
+                return handleRuntimeGetProfilerTraceData(handlerContext, {
+                  trace_id_or_uri: traceId,
+                  view: 'hitlist',
+                  with_system_events: false,
+                });
+              },
+            );
+            expect(traceData.isError).toBe(false);
+            const tracePayload = parseTextPayload(traceData);
+            expect(tracePayload.success).toBe(true);
 
-          const analyze = await invoke(
-            'RuntimeAnalyzeProfilerTrace',
-            {
-              trace_id_or_uri: traceId,
-              view: 'hitlist',
-              top: 5,
-              with_system_events: false,
-            },
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection: context.connection,
-                logger,
-              });
-              return handleRuntimeAnalyzeProfilerTrace(handlerContext, {
+            const analyze = await invoke(
+              'RuntimeAnalyzeProfilerTrace',
+              {
                 trace_id_or_uri: traceId,
                 view: 'hitlist',
                 top: 5,
                 with_system_events: false,
-              });
-            },
-          );
-          expect(analyze.isError).toBe(false);
-          const analyzePayload = parseTextPayload(analyze);
-          expect(analyzePayload.success).toBe(true);
-          expect(analyzePayload.summary).toBeDefined();
+              },
+              async () => {
+                const handlerContext = createHandlerContext({
+                  connection: context.connection,
+                  logger,
+                });
+                return handleRuntimeAnalyzeProfilerTrace(handlerContext, {
+                  trace_id_or_uri: traceId,
+                  view: 'hitlist',
+                  top: 5,
+                  with_system_events: false,
+                });
+              },
+            );
+            expect(analyze.isError).toBe(false);
+            const analyzePayload = parseTextPayload(analyze);
+            expect(analyzePayload.success).toBe(true);
+            expect(analyzePayload.summary).toBeDefined();
+          }
         } finally {
           await deleteClassIfExists(
             context,

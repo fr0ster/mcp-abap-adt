@@ -147,14 +147,19 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
 
         // Step 1: Create CDS unit test class
         testLogger?.info(`   • create cds unit test: ${className}`);
+        // `class_template` and `test_class_source` no longer reach
+        // CreateCdsUnitTest — the class shell is a bare `getClass().create`
+        // with no classTemplate (see handleCreateCdsUnitTest's own doc
+        // comment), and the test source is written afterward, under a lock,
+        // by UpdateCdsUnitTest (Step 3 below reads `update_test_class_source`
+        // for exactly that). `classTemplate`/`testClassSource` stay above as
+        // a test-config presence check; they are just not forwarded here.
         const createResponse = await tester.invokeToolOrHandler(
           'CreateCdsUnitTest',
           {
             class_name: className,
             package_name: packageName,
             cds_view_name: cdsViewName,
-            class_template: classTemplate,
-            test_class_source: testClassSource,
             description: params.description,
             transport_request: params.transport_request,
           },
@@ -167,8 +172,6 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
               class_name: className,
               package_name: packageName,
               cds_view_name: cdsViewName,
-              class_template: classTemplate,
-              test_class_source: testClassSource,
               description: params.description,
               transport_request: params.transport_request,
             });

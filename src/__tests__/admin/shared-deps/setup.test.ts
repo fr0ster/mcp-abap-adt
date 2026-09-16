@@ -15,7 +15,8 @@
  * Run:  npm run shared:setup
  */
 
-import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { asItCame } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
 import {
@@ -48,16 +49,28 @@ async function forceSaveViewSource(
   ddlSource: string,
   transportRequest?: string,
 ): Promise<void> {
-  const lockHandle = await client.getDdl().lock({ ddlName: viewName });
+  // adt-clients 19: `lock` answers `IAdtResponse<string>`, not a bare handle
+  // (IAdtCapabilities.ts), and `update` takes the source through
+  // `options.sourceCode`, not `config.ddlSource` (see UpdateDdlLow).
+  const lockResponse = await client.getDdl().lock({ ddlName: viewName });
+  if (!lockResponse.ok) {
+    throw new Error(lockResponse.getError().message);
+  }
+  const lockHandle = lockResponse.getResult().value;
   try {
-    await client
+    const updated = await client
       .getDdl()
       .update(
-        { ddlName: viewName, ddlSource, transportRequest },
-        { lockHandle },
+        { ddlName: viewName, transportRequest },
+        { sourceCode: ddlSource, lockHandle },
       );
+    if (!updated.ok) {
+      throw new Error(updated.getError().message);
+    }
   } finally {
     try {
+      // `unlock` no longer throws on a refusal — only a genuine
+      // connection-level throw reaches this catch now.
       await client.getDdl().unlock({ ddlName: viewName }, lockHandle);
     } catch {
       // ignore unlock errors
@@ -160,7 +173,7 @@ describe('Admin: Setup shared dependencies', () => {
               const readResult = await client
                 .getTable()
                 .read({ tableName: item.name });
-              exists = readResult?.readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -263,7 +276,7 @@ describe('Admin: Setup shared dependencies', () => {
               const readResult = await client
                 .getStructure()
                 .read({ structureName: item.name });
-              exists = readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -351,7 +364,7 @@ describe('Admin: Setup shared dependencies', () => {
               const readResult = await client
                 .getDdl()
                 .read({ ddlName: item.name });
-              exists = readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -459,7 +472,7 @@ describe('Admin: Setup shared dependencies', () => {
               const readResult = await client
                 .getBehaviorDefinition()
                 .read({ name: item.name });
-              exists = readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -558,7 +571,7 @@ describe('Admin: Setup shared dependencies', () => {
               const readResult = await client
                 .getClass()
                 .read({ className: item.name });
-              exists = readResult?.readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -638,10 +651,12 @@ describe('Admin: Setup shared dependencies', () => {
           try {
             let exists = false;
             try {
+              // A function group has no source of its own — only a document
+              // (IAdtMetadataReadable, not IAdtReadable): AdtFunctionGroup.d.ts.
               const readResult = await client
                 .getFunctionGroup()
-                .read({ functionGroupName: item.name });
-              exists = readResult?.readResult !== undefined;
+                .readMetadata({ functionGroupName: item.name });
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -718,18 +733,22 @@ describe('Admin: Setup shared dependencies', () => {
                 functionModuleName: item.name,
                 functionGroupName: item.group,
               });
-              exists = readResult?.readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
 
             if (!exists) {
+              // `create` posts a metadata document only — no create in
+              // adt-clients 19 carries source (IAdtCreatable.create's own
+              // comment) — so the empty `sourceCode` this used to send is
+              // dropped rather than ported; it never reached the wire either
+              // way, and the type now says so.
               await client.getFunctionModule().create({
                 functionModuleName: item.name,
                 functionGroupName: item.group,
                 description: item.description || 'Shared test function module',
                 packageName: '',
-                sourceCode: '',
                 transportRequest,
               });
               testsLogger?.info?.(`Created function module ${item.name}`);
@@ -738,25 +757,33 @@ describe('Admin: Setup shared dependencies', () => {
             // Update source code if provided
             if (item.source) {
               try {
-                const lockHandle = await client.getFunctionModule().lock({
+                const lockResponse = await client.getFunctionModule().lock({
                   functionModuleName: item.name,
                   functionGroupName: item.group,
                 });
+                if (!lockResponse.ok) {
+                  throw new Error(lockResponse.getError().message);
+                }
+                const lockHandle = lockResponse.getResult().value;
                 try {
-                  await client.getFunctionModule().update(
+                  const updated = await client.getFunctionModule().update(
                     {
                       functionModuleName: item.name,
                       functionGroupName: item.group,
-                      sourceCode: item.source,
                       transportRequest,
                     },
-                    { lockHandle },
+                    { sourceCode: item.source, lockHandle },
                   );
+                  if (!updated.ok) {
+                    throw new Error(updated.getError().message);
+                  }
                   testsLogger?.info?.(
                     `Updated function module ${item.name} source`,
                   );
                 } finally {
                   try {
+                    // `unlock` no longer throws on a refusal — only a
+                    // genuine connection-level throw reaches this catch.
                     await client.getFunctionModule().unlock(
                       {
                         functionModuleName: item.name,
@@ -836,7 +863,7 @@ describe('Admin: Setup shared dependencies', () => {
               const readResult = await client
                 .getServiceDefinition()
                 .read({ serviceDefinitionName: item.name });
-              exists = readResult !== undefined;
+              exists = readResult.ok;
             } catch {
               exists = false;
             }
@@ -937,10 +964,21 @@ describe('Admin: Setup shared dependencies', () => {
             `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
           );
           try {
+            // adt-clients 19's shipped default for the `activation` slot is
+            // the run id, not the document — acceptance, not completion (see
+            // handleActivateObject.ts). This script wants the messages a
+            // group-activate answers, so it asks for the raw document back
+            // explicitly (utilResultSet.d.ts: "rawDocument is one argument
+            // away") rather than the run id neither loop here follows up on.
             const response = await client
-              .getUtils()
+              .getUtils({ ...utilDocuments, activation: asItCame })
               .activateObjectsGroup(toActivate, true);
-            const activationResult = parseActivationResponse(response.data);
+            if (!response.ok) {
+              throw new Error(response.getError().message);
+            }
+            const activationResult = parseActivationResponse(
+              response.getResult().value,
+            );
 
             const errors = activationResult.messages.filter(
               (m) => m.type === 'error' || m.type === 'E',
@@ -1016,9 +1054,12 @@ describe('Admin: Setup shared dependencies', () => {
               };
               try {
                 const resp = await client
-                  .getUtils()
+                  .getUtils({ ...utilDocuments, activation: asItCame })
                   .activateObjectsGroup(chunk, true);
-                const r = parseActivationResponse(resp.data);
+                if (!resp.ok) {
+                  throw new Error(resp.getError().message);
+                }
+                const r = parseActivationResponse(resp.getResult().value);
                 const errs = r.messages.filter(
                   (m) => m.type === 'error' || m.type === 'E',
                 );

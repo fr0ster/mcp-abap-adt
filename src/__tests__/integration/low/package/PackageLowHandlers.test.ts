@@ -16,6 +16,10 @@ import { handleCreatePackage } from '../../../../handlers/package/low/handleCrea
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
 import { handleValidatePackage } from '../../../../handlers/package/low/handleValidatePackage';
 import { createAdtClient } from '../../../../lib/clients';
+import { patchPackageXml } from '../../../../lib/strategies/packagePatch';
+import { sequence } from '../../../../lib/strategies/sequence';
+import { withLock } from '../../../../lib/strategies/withLock';
+import { extractXmlString } from '../../../../lib/strategies/xmlPatch';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -232,21 +236,40 @@ describe('Package Low-Level Handlers Integration', () => {
         const createDelay = context.getOperationDelay('create');
         await delay(createDelay);
 
-        // Step 3: Update description (AdtPackage.update handles lock/update/unlock internally)
+        // Step 3: Update description. adt-clients 19: a package has no
+        // source, only its own document (`updateMetadata`, not `update` —
+        // IAdtCapabilities.ts), it takes the whole document rather than
+        // merging (handleUpdatePackage.ts's own doc comment), and the lock
+        // is the caller's — taken and released here since this test calls
+        // the client directly rather than through LockPackage/UpdatePackage.
         const updatedDescription =
           params.updated_description || `${description} (UPDATED)`;
         logger?.info(`   • update description: ${objectName}`);
         const adtClient = createAdtClient(connection);
-        await adtClient.getPackage().update({
-          packageName: objectName,
-          superPackage: superPackage,
-          description: description,
-          updatedDescription: updatedDescription,
-          packageType: params.package_type || 'development',
-          softwareComponent: params.software_component,
-          transportLayer: params.transport_layer,
-          transportRequest: transportRequest,
-        });
+        const packageObj = adtClient.getPackage();
+        const written = await withLock(
+          () => packageObj.lock({ packageName: objectName }),
+          (lockHandle) =>
+            sequence(
+              () => packageObj.readMetadata({ packageName: objectName }),
+              (current) =>
+                packageObj.updateMetadata(
+                  {
+                    packageName: objectName,
+                    document: patchPackageXml(
+                      extractXmlString(current, `package ${objectName}`),
+                      { description: updatedDescription },
+                    ),
+                  },
+                  { lockHandle },
+                ),
+            ),
+          (lockHandle) =>
+            packageObj.unlock({ packageName: objectName }, lockHandle),
+        );
+        if (!written.ok) {
+          throw new Error(`Update failed: ${written.getError().message}`);
+        }
         logger?.success(`✅ update description: ${objectName} completed`);
       });
     },

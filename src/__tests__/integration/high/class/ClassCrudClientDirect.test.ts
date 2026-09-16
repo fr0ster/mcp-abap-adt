@@ -14,11 +14,15 @@
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
-  type AbapConnection,
-  createAbapConnection,
-} from '@mcp-abap-adt/connection';
+  analyseCheck,
+  analyseException,
+  analyseValidation,
+  type IAdtMessageFailure,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { createAdtClient } from '../../../../lib/clients';
+import { createAbapConnection } from '../../../../lib/connectionFactory';
 import {
   getCleanupAfter,
   getEnabledTestCase,
@@ -74,7 +78,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
       const logLine = (msg: string) => process.stdout.write(`${msg}\n`);
 
       // Create a separate connection for this test (not using getManagedConnection)
-      let connection: AbapConnection | null = null;
+      let connection: IAbapConnection | null = null;
       let client: AdtClient | null = null;
       let diagnosticsTracker: ReturnType<
         typeof createDiagnosticsTracker
@@ -266,12 +270,19 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         },
       );
 
-      // Pre-cleanup: delete leftover object from previous test run if it exists
+      // Pre-cleanup: delete leftover object from previous test run if it
+      // exists. adt-clients 19: a refusal is `ok: false`, not a throw
+      // (IAdtCapabilities.ts) — "doesn't exist" is the expected refusal on a
+      // clean run, so it is silently not-ok rather than caught.
       try {
-        await client.getClass().delete({ className, transportRequest });
-        testLogger?.info(`🧹 Pre-cleanup: deleted leftover ${className}`);
+        const preCleanup = await client
+          .getClass()
+          .delete({ className, transportRequest });
+        if (preCleanup.ok) {
+          testLogger?.info(`🧹 Pre-cleanup: deleted leftover ${className}`);
+        }
       } catch {
-        // Object doesn't exist — expected on clean runs
+        // A genuine connection-level throw — still tolerated here.
       }
 
       // Track creation state for cleanup
@@ -303,23 +314,24 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         if (!client) {
           throw new Error('Client not initialized');
         }
+        // adt-clients 19: `validate` answers `{ ok }`, not a raw HTTP
+        // envelope. Nothing here throws, so a refusal is `!ok`, not a
+        // rejected promise (IAdtCapabilities.ts) — the HTTP status this test
+        // used to branch on now lives at `getError().response?.status`, only
+        // on the failure side, because a success carries no transport frame
+        // any more (IAdtResponse.ts: `IAdtResult<T>` is `{ value }`).
         const validateResponse = await client
           .getClass()
-          .validate(validateParams);
+          .validate(validateParams, { analyse: analyseValidation });
 
         debugLog('VALIDATE_RESPONSE', `Validation completed`, {
-          status: validateResponse?.validationResponse?.status,
-          statusText: validateResponse?.validationResponse?.statusText,
+          ok: validateResponse.ok,
         });
 
-        // Check validation status exactly as in adt-clients
-        const validateStatus = validateResponse?.validationResponse?.status;
-        if (validateStatus !== 200) {
-          const errorData =
-            typeof validateResponse?.validationResponse?.data === 'string'
-              ? validateResponse.validationResponse.data
-              : JSON.stringify(validateResponse?.validationResponse?.data);
-          const errorLower = String(errorData).toLowerCase();
+        if (!validateResponse.ok) {
+          const validateError = validateResponse.getError();
+          const validateStatus = validateError.response?.status;
+          const errorLower = validateError.message.toLowerCase();
           const isUnsupported =
             validateStatus === 400 ||
             validateStatus === 406 ||
@@ -328,31 +340,16 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
             errorLower.includes('not supported');
           if (isUnsupported) {
             testLogger?.warn(
-              `Validation not supported on this system (HTTP ${validateStatus}): ${errorData}`,
+              `Validation not supported on this system (HTTP ${validateStatus}): ${validateError.message}`,
             );
           } else {
             testLogger?.error(
-              `Validation failed (HTTP ${validateStatus}): ${errorData}`,
+              `Validation failed (HTTP ${validateStatus}): ${validateError.message}`,
             );
-          }
-        }
-        if (validateStatus !== 200) {
-          const errorData =
-            typeof validateResponse?.validationResponse?.data === 'string'
-              ? validateResponse.validationResponse.data
-              : JSON.stringify(validateResponse?.validationResponse?.data);
-          const errorLower = String(errorData).toLowerCase();
-          const isUnsupported =
-            validateStatus === 400 ||
-            validateStatus === 406 ||
-            errorLower.includes('unsupported') ||
-            errorLower.includes('not acceptable') ||
-            errorLower.includes('not supported');
-          if (!isUnsupported) {
-            expect(validateStatus).toBe(200);
+            expect(validateResponse.ok).toBe(true);
           }
         } else {
-          expect(validateStatus).toBe(200);
+          expect(validateResponse.ok).toBe(true);
         }
 
         // Step 2: Create (exactly as in adt-clients)
@@ -418,12 +415,14 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           );
         }
 
-        let createState: any | undefined;
+        let createResponse!: IAdtResponse<unknown, IAdtMessageFailure>;
         try {
           if (!client) {
             throw new Error('Client not initialized');
           }
-          createState = await client.getClass().create(createParams);
+          createResponse = await client
+            .getClass()
+            .create(createParams, { analyse: analyseException });
         } catch (createError: any) {
           // Log error details for debugging (only if DEBUG_TESTS is enabled)
           if (process.env.DEBUG_TESTS === 'true') {
@@ -444,15 +443,20 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         if (!client) {
           throw new Error('Client not initialized');
         }
-        const createResult = createState?.createResult;
         debugLog('CREATE_RESPONSE', `Creation completed`, {
-          status: createResult?.status,
-          statusText: createResult?.statusText,
+          ok: createResponse.ok,
         });
 
-        expect(createResult).toBeDefined();
-        // Accept both 201 (Created) and 200 (OK - object already exists)
-        expect([200, 201]).toContain(createResult?.status);
+        // adt-clients 19: a create answers `{ ok }` and carries no HTTP
+        // status on success — `IAdtResult<T>` is `{ value }`, nothing else
+        // (IAdtResponse.ts). The old "201 or 200" check is lost information
+        // on the success path; `ok` is what the member actually promises.
+        if (!createResponse.ok) {
+          testLogger?.error(
+            `Creation failed: ${createResponse.getError().message}`,
+          );
+        }
+        expect(createResponse.ok).toBe(true);
 
         // Mark class as created successfully
         classCreated = true;
@@ -474,12 +478,21 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         if (!client) {
           throw new Error('Client not initialized');
         }
-        const checkResponse = await client.getClass().check(checkParams);
+        const checkResponse = await client
+          .getClass()
+          .check(checkParams, undefined, { analyse: analyseCheck });
+        // The old assertion just confirmed a status field existed on the
+        // envelope — true of every response before this migration and true
+        // of none after it (`ok` is always a defined boolean; success carries
+        // no transport frame — IAdtResponse.ts). There is no field the same
+        // information moved to: this is a diagnostic log of the outcome, not
+        // a pass/fail gate the pre-migration assertion ever was either.
         debugLog('CHECK_RESPONSE', `Check completed`, {
-          status: checkResponse?.checkResult?.status,
-          statusText: checkResponse?.checkResult?.statusText,
+          ok: checkResponse.ok,
+          error: checkResponse.ok
+            ? undefined
+            : checkResponse.getError().message,
         });
-        expect(checkResponse?.checkResult?.status).toBeDefined();
 
         logLine(`🏁 AdtClient direct test finished for ${className}`);
       } catch (error: any) {

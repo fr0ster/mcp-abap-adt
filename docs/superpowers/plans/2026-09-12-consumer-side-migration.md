@@ -45,7 +45,8 @@ own tests pass and it is committed — not when it is described.
 | 24. The class profiling handlers | done | `3bb6d2c` |
 | 25. The library files, and the last of the compiler's list | done | `16fdb3d` |
 | 27. The twenty-three tools that reach a legacy contract | done | `027f94a` |
-| 26, 28, 29 | not started | |
+| 26. The invariants | done | `2e2a723` |
+| 28, 29 | not started | |
 
 Verify without reading anything above:
 
@@ -3891,7 +3892,7 @@ Three of the spec's success criteria are claims about 326 files. A reviewer cann
 
 `tsconfig.json` already excludes `src/__tests__` from the build, so the fixtures typecheck under `tsconfig.test.json` and never reach `dist`. Run `npm run test:check` once they exist: a fixture that does not compile is one whose signature the checker cannot resolve, and the whole test would then pass while inspecting nothing.
 
-- [ ] **Step 1: Write the invariants**
+- [x] **Step 1: Write the invariants**
 
 ```typescript
 // src/__tests__/unit/handlerInvariants.test.ts
@@ -3937,7 +3938,7 @@ it('every client call that accepts an analyse is given one', () => {
 
 Every failure names a file. Fix the file, never the regex. A genuine exception goes in the test with a sentence saying why, so a reviewer sees it.
 
-- [ ] **Step 2: Commit the controls as fixtures, not as a ritual**
+- [x] **Step 2: Commit the controls as fixtures, not as a ritual**
 
 Every verdict `carriesAnalyse` reaches has been wrong at least once: it read only
 inline literals, then only types, then left to right, then ignored `undefined`,
@@ -4027,7 +4028,7 @@ it.each(fixtures)('%s produces the verdict its name claims', (file) => {
 });
 ```
 
-- [ ] **Step 3: Run them, and make one fail on purpose**
+- [x] **Step 3: Run them, and make one fail on purpose**
 
 ```bash
 npx jest src/__tests__/unit/analyseOmissions.test.ts   # 14 assertions, all green
@@ -4039,7 +4040,7 @@ that `yes-spread-then-analyse` and `unknown-analyse-then-spread` both fail. They
 are the pair that catches it, and a suite where only one of them exists would
 have let that bug through with the offender count unchanged.
 
-- [ ] **Step 4: Check the whole tree, once**
+- [x] **Step 4: Check the whole tree, once**
 
 ```bash
 npx jest src/__tests__/unit/handlerInvariants.test.ts
@@ -4049,7 +4050,7 @@ The repo-wide run keeps the `inspected` bound, which guards against a program
 that resolved nothing. The fixtures guard the logic; the bound guards the setup.
 Neither substitutes for the other.
 
-- [ ] **Step 5: Pin what the legacy contract drops**
+- [x] **Step 5: Pin what the legacy contract drops**
 
 `SAP_SYSTEM_TYPE=legacy` is a supported deployment running a subset of the tools through **these same handler files**. `available_in` hides the tools that cannot run on legacy at all, not the 144 that can.
 
@@ -4092,7 +4093,7 @@ it('pins the legacy members that take no strategy', () => {
 });
 ```
 
-- [ ] **Step 6: Run everything this task added**
+- [x] **Step 6: Run everything this task added**
 
 ```bash
 npx jest src/__tests__/unit/analyseOmissions.test.ts \
@@ -4100,7 +4101,7 @@ npx jest src/__tests__/unit/analyseOmissions.test.ts \
          src/__tests__/unit/legacyContract.test.ts
 ```
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/__tests__/unit/handlerInvariants.test.ts \

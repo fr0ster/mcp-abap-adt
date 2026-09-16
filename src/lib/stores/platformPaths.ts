@@ -62,9 +62,13 @@ export function getPlatformPaths(
   // AUTH_BROKER_PATH is ALWAYS a base path - we add subfolder to it
   const envPath = process.env.AUTH_BROKER_PATH;
   if (envPath) {
-    // Support both colon (Unix) and semicolon (Windows) separators
+    // Only semicolon separates paths on Windows. Splitting on ':' as well
+    // tears an absolute path in two at its drive letter: "D:\tools\project"
+    // becomes "D" and "\tools\project", the second resolving against
+    // whatever drive the process is on — a bogus directory added beside the
+    // real one, or no match at all when run from another drive.
     const envPaths = envPath
-      .split(/[:;]/)
+      .split(isWindows ? /;/ : /[:;]/)
       .map((p) => p.trim())
       .filter((p) => p.length > 0);
     paths.push(

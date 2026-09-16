@@ -9,7 +9,10 @@ import { runIsFinished } from '../shared/pollRun';
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
-  description: 'Retrieve ABAP Unit test run status for a run_id.',
+  description:
+    'Retrieve ABAP Unit test run status for a run_id. ' +
+    'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
+    'RunUnitTest/CreateUnitTest, and this tool is served by a fresh client with no memory of that run (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {

@@ -317,7 +317,8 @@ export async function handleActivateObject(
             'still show an object as inactive that goes on to activate a moment ' +
             'later. Separately, a refusal embedded in this accept response is not ' +
             'read as a failure on this path (activateObjectsGroup takes no analyse ' +
-            'strategy; see issue #200).'
+            'strategy on modern or legacy systems; see issue #200, tracked for the ' +
+            'legacy contract specifically in issue #207).'
           : `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
             'object(s) — no run id came back, so this handler has no evidence a run ' +
             'was queued at all. Prefer calling this tool one object at a time when ' +

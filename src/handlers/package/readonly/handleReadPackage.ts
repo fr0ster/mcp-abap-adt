@@ -11,7 +11,9 @@ export const TOOL_DEFINITION = {
   name: 'ReadPackage',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.',
+    '[read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description. ' +
+    'On legacy systems (BASIS < 7.50) every package operation is refused outright before any request is made — ' +
+    'the client answers UNSUPPORTED_OPERATION without accepting a caller strategy (issue #207).',
   inputSchema: {
     type: 'object',
     properties: {

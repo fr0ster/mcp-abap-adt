@@ -37,7 +37,9 @@ export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.',
+    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. ' +
+    'On legacy systems (BASIS < 7.50) both the read and the write step are refused outright before any request is ' +
+    'made — the client answers UNSUPPORTED_OPERATION without accepting a caller strategy (issue #207).',
   inputSchema: {
     type: 'object',
     properties: {

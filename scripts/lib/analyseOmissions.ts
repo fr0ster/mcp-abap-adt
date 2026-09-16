@@ -1,3 +1,4 @@
+import { globSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import ts from 'typescript';
 
@@ -242,4 +243,174 @@ function memberCallsIn(source: ts.SourceFile): ts.CallExpression[] {
 /** 1-indexed, so the message matches what an editor shows. */
 function lineOf(source: ts.SourceFile, node: ts.Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
+}
+
+/**
+ * Which `(handler, Legacy class, member)` pairs land on a member the legacy
+ * contract does not parameterise.
+ *
+ * A handler reaches a member through `client.getPackage().readMetadata(...)`,
+ * so the factory name is the property access one level in. That factory decides
+ * which class serves the call on a legacy system, and only four of the ten
+ * overridden classes drop the strategy — seventeen members across them,
+ * measured against the shipped `.js`, not the `.d.ts`:
+ *
+ * - `AdtPackageLegacy.js`: all six members ignore every argument and always
+ *   answer `failed(UNSUPPORTED)` — `create`, `read`, `readMetadata`,
+ *   `validate`, `updateMetadata`, `delete` are declared with an EMPTY
+ *   parameter list, so whatever a caller passes, including an `analyse`, is
+ *   discarded before it is ever bound to a name.
+ * - `AdtUnitTestLegacy.js`: `run(tests, options)` binds `options` but the wire
+ *   call underneath is `startClassUnitTestRunLegacy(connection, tests,
+ *   _options)` — the parameter is renamed with a leading underscore and never
+ *   read. It also calls `answering(runFn, () => LEGACY_SYNC_RUN_ID)` with only
+ *   two arguments, dropping the shipped `startedRun` analyse modern `run` adds
+ *   as its third. `getStatus()` and `getResult()` are declared and called with
+ *   NO parameters at all — not even the run id modern's `getResult(runId,
+ *   options)` takes — and simply replay whatever `run()` already captured.
+ * - `AdtRequestLegacy.js`: `readMetadata(config, options)` and `list(options)`
+ *   both bind `options` and never read it (`list` reads only
+ *   `options?.configUri`); `create`, `updateMetadata` and `delete` take no
+ *   parameters and always answer a hardcoded refusal, the same shape as
+ *   `AdtPackageLegacy`.
+ * - `AdtUtilsLegacy.js`: `activateObjectsGroup(objects, preauditRequested)`
+ *   has no third parameter at all, where modern's declares none either but
+ *   the call site (`answering(request, this.results.activation)`) is the same
+ *   two-argument shape that drops any caller-supplied `analyse` for the whole
+ *   family; `getTableColumns`, `getTableContents` and `getSqlQuery` all take
+ *   their single positional argument renamed with a leading underscore and
+ *   answer a hardcoded connection failure instead of making the call.
+ *
+ * **`getRequest.readMetadata` is in this list although no shipped ledger entry
+ * for it exists yet.** The four-factory table drafted for this task omitted
+ * it — 6 + 3 + 3 + 4 counts sixteen, one short of the seventeen this task's own
+ * brief states — and the `.js` above shows it drops `options` exactly like
+ * `list` does, on the same class, in the same file. Restored rather than left
+ * at sixteen. It changes nothing in the ledger below: no handler this
+ * repository ships reaches `getRequest()` on a system declaring `'legacy'` in
+ * `available_in` (checked against every handler under `src/handlers`, not only
+ * the twenty-three named for this task), so the member is real and unreachable
+ * at once.
+ */
+const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
+  getPackage: [
+    'create',
+    'read',
+    'readMetadata',
+    'updateMetadata',
+    'delete',
+    'validate',
+  ],
+  getUnitTest: ['run', 'getStatus', 'getResult'],
+  getRequest: ['delete', 'updateMetadata', 'list', 'readMetadata'],
+  getUtils: [
+    'activateObjectsGroup',
+    'getTableContents',
+    'getTableColumns',
+    'getSqlQuery',
+  ],
+};
+
+/**
+ * The handlers a legacy system can actually reach.
+ *
+ * **The ledger is meaningless without this filter.** A handful of handlers
+ * call the four factories whose `Legacy` class drops the strategy, and most of
+ * them are not offered on legacy at all — the package creates, the searches,
+ * the transport tools. Recorded unfiltered, the ledger would carry more false
+ * entries than real ones and read as a much worse problem than exists.
+ *
+ * A file with no `available_in` is available everywhere, legacy included. No
+ * handler is in that state today; the branch is here because the field is
+ * optional by contract, not because something needs it.
+ */
+export function legacyEnabledHandlers(
+  pattern = 'src/handlers/**/handle*.ts',
+): string[] {
+  const AVAILABLE_IN = /available_in\s*:\s*\[([^\]]*)\]/;
+  // Either quote style. The repository writes single quotes today, and a
+  // formatter switching them would otherwise empty this list without a word.
+  const LEGACY = /['"`]legacy['"`]/;
+  return globSync(pattern).filter((file) => {
+    const declared = AVAILABLE_IN.exec(readFileSync(file, 'utf8'));
+    return declared === null || LEGACY.test(declared[1]);
+  });
+}
+
+export function legacyExposure(handlers: string[]): string[] {
+  const program = ts.createProgram(handlers, compilerOptions());
+  const checker = program.getTypeChecker();
+  const found = new Set<string>();
+  for (const file of handlers) {
+    const source = program.getSourceFile(file);
+    if (source === undefined) continue;
+    for (const call of memberCallsIn(source)) {
+      const access = call.expression as ts.PropertyAccessExpression;
+      const member = access.name.getText();
+      const factory = factoryOf(access.expression, checker);
+      if (
+        factory !== undefined &&
+        LEGACY_NO_STRATEGY[factory]?.includes(member)
+      ) {
+        found.add(
+          `${file.replace('src/handlers/', '')} → ${factory}().${member}`,
+        );
+      }
+    }
+  }
+  return [...found].sort();
+}
+
+/**
+ * Which factory produced this receiver?
+ *
+ * **Both forms, because handlers use both.** Most call sites are the direct
+ * chain `client.getPackage().read(...)`; others hold the object in a local
+ * first — `const utils = client.getUtils(); utils.getSqlQuery(...)` — and
+ * `handleGetPackageContents` is one of them, which is to say one of the
+ * twenty-three this ledger exists for. A walk that recognised only the chain
+ * would miss the majority of what it is meant to record, and would do it
+ * quietly: a shorter ledger reads like progress.
+ *
+ * Only a `const` is followed, for the reason `carriesAnalyse` follows only a
+ * `const`: a rebound `let` no longer describes what the initializer says.
+ */
+function factoryOf(
+  receiver: ts.Expression,
+  checker: ts.TypeChecker,
+): string | undefined {
+  if (
+    ts.isCallExpression(receiver) &&
+    ts.isPropertyAccessExpression(receiver.expression)
+  ) {
+    return receiver.expression.name.getText();
+  }
+  if (ts.isIdentifier(receiver)) {
+    const declaration =
+      checker.getSymbolAtLocation(receiver)?.declarations?.[0];
+    if (
+      declaration !== undefined &&
+      ts.isVariableDeclaration(declaration) &&
+      declaration.initializer !== undefined &&
+      isConstBinding(declaration)
+    ) {
+      return factoryOf(declaration.initializer, checker);
+    }
+  }
+  // Everything that wraps an expression without changing which factory made
+  // it. `as any` is the one that matters: several handlers write
+  // `const unitTest = client.getUnitTest() as any`, three of them among the
+  // twenty-three this ledger is for, and an assertion is invisible to a walk
+  // that only knows about calls and identifiers.
+  if (
+    ts.isAwaitExpression(receiver) ||
+    ts.isParenthesizedExpression(receiver) ||
+    ts.isAsExpression(receiver) ||
+    ts.isTypeAssertionExpression(receiver) ||
+    ts.isNonNullExpression(receiver) ||
+    ts.isSatisfiesExpression(receiver)
+  ) {
+    return factoryOf(receiver.expression, checker);
+  }
+  return undefined;
 }

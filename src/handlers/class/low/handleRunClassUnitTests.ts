@@ -45,7 +45,10 @@ export const TOOL_DEFINITION = {
   name: 'RunClassUnitTestsLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.',
+    '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers. ' +
+    'On legacy systems (BASIS < 7.50) the run finishes synchronously inside this call, but run_id is a fixed ' +
+    'placeholder, not a real identifier — a later GetClassUnitTestStatusLow/GetClassUnitTestResultLow call is ' +
+    'served by a fresh client with no memory of this run and always refuses, whatever the outcome was (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {

@@ -47,7 +47,9 @@ export const TOOL_DEFINITION = {
   name: 'GetClassUnitTestStatusLow',
   available_in: ['onprem', 'cloud', 'legacy'] as const,
   description:
-    '[low-level] Retrieve ABAP Unit run status XML for a previously started run_id.',
+    '[low-level] Retrieve ABAP Unit run status XML for a previously started run_id. ' +
+    'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
+    'RunClassUnitTestsLow, and this tool is served by a fresh client with no memory of that run (issue #208).',
   inputSchema: {
     type: 'object',
     properties: {

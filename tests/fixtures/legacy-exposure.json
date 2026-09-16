@@ -1,0 +1,18 @@
+[
+  "class/low/handleGetClassUnitTestResult.ts → getUnitTest().getResult",
+  "class/low/handleGetClassUnitTestStatus.ts → getUnitTest().getStatus",
+  "class/low/handleRunClassUnitTests.ts → getUnitTest().run",
+  "common/low/handleActivateObject.ts → getUtils().activateObjectsGroup",
+  "package/high/handleGetPackage.ts → getPackage().readMetadata",
+  "package/low/handleDeletePackage.ts → getPackage().delete",
+  "package/low/handleUpdatePackage.ts → getPackage().readMetadata",
+  "package/low/handleUpdatePackage.ts → getPackage().updateMetadata",
+  "package/readonly/handleReadPackage.ts → getPackage().readMetadata",
+  "unit_test/high/handleCreateUnitTest.ts → getUnitTest().run",
+  "unit_test/high/handleGetUnitTest.ts → getUnitTest().getResult",
+  "unit_test/high/handleGetUnitTest.ts → getUnitTest().getStatus",
+  "unit_test/high/handleGetUnitTestResult.ts → getUnitTest().getResult",
+  "unit_test/high/handleGetUnitTestResult.ts → getUnitTest().getStatus",
+  "unit_test/high/handleGetUnitTestStatus.ts → getUnitTest().getStatus",
+  "unit_test/high/handleRunUnitTest.ts → getUnitTest().run"
+]

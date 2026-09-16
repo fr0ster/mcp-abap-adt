@@ -84,27 +84,18 @@ import {
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
+const context = { connection: {} as any, logger: undefined };
+
 /**
- * The connection answers one endpoint: the transport search configurations.
+ * The saved search `ListTransports` asks for before it lists.
  *
- * `ListTransports` resolves which saved search to run before it lists (see
- * `lib/strategies/transportSearch.ts`), and that request is a direct one —
- * there is no client member behind it, so `fakeClient` cannot serve it. The
- * document is the corpus's own, not a hand-built one.
+ * It used to be a direct request this repository made itself, which is why
+ * this file once stubbed `connection.makeAdtRequest`. adt-clients 19.1.0
+ * answers it as a member, so the fake client serves it like any other.
  */
-const context = {
-  connection: {
-    makeAdtRequest: async ({ url }: { url: string }) =>
-      url.includes('searchconfiguration')
-        ? {
-            status: 200,
-            data: corpusBody(
-              'read-transport-search-configurations--01-searchconfiguration-configurations',
-            ),
-          }
-        : { status: 200, data: '' },
-  } as any,
-  logger: undefined,
+const SEARCH_CONFIGURATION = {
+  uri: '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/22D2111643541FE1A5AA03DC2D3DE702',
+  attributes: { client: '100' },
 };
 
 describe('readonlySingleCall handlers answer through the adapter and surface a refusal', () => {
@@ -312,20 +303,23 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     ]);
   });
 
-  it('ListTransports calls list() with the configUri it resolved itself', async () => {
-    const seen = recordAnalyse();
+  it('ListTransports asks for the saved search, then lists with its uri', async () => {
+    const seen = recordAnalyse({
+      searchConfigurations: () => [SEARCH_CONFIGURATION],
+    });
     fakeClient = seen.client;
     await handleListTransports(context as any, {});
-    const call = seen.calls.filter((c) => c.member === 'list').at(-1);
-    // The href out of the corpus's configurations document — resolved by this
-    // handler, not by `list()`. Passing it is what keeps the client from
-    // making that request a second time behind a member no strategy reaches,
-    // and what keeps a system holding several saved searches from throwing.
-    expect(call?.args).toEqual([
-      {
-        configUri:
-          '/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations/22D2111643541FE1A5AA03DC2D3DE702',
-      },
+
+    // Both requests, in order, and the second carries what the first
+    // answered — which is what keeps `list()` from resolving a search again
+    // behind a member no strategy of ours reaches, and what keeps a system
+    // holding several from throwing.
+    expect(seen.calls.map((c) => c.member)).toEqual([
+      'searchConfigurations',
+      'list',
+    ]);
+    expect(seen.calls.at(-1)?.args).toEqual([
+      { configUri: SEARCH_CONFIGURATION.uri },
     ]);
   });
 
@@ -663,6 +657,7 @@ describe('ListTransports, mapped from a real captured transport list', () => {
   );
   const listing = () =>
     fakeClientOf({
+      searchConfigurations: async () => okResponse([SEARCH_CONFIGURATION]),
       list: async () => okResponse(reading(parseStructure(body), body)),
     });
 

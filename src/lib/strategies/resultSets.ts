@@ -77,6 +77,15 @@ export const READING_BY_SLOT = {
   odata: structured,
   bindingTypes: structured,
   list: structured,
+  // Arrived with adt-clients 19.1.0, on `AdtRequest.searchConfigurations()`.
+  // `structured` is the default any call site gets: the document parsed into
+  // named structure, like its neighbour `list`. `ListTransports` is the one
+  // caller that wants something else and keeps the shipped reading instead
+  // (`resultsFor(transportDocuments, ['searchConfigurations'])`), because
+  // what it needs is the addressable list — `uri`, `etag`, attributes — that
+  // the package already parses, and a `configUri` is not something to dig
+  // back out of a generic parse.
+  searchConfigurations: structured,
   search: structured,
   whereUsed: structured,
   whereUsedScope: structured,

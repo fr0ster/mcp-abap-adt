@@ -6,6 +6,7 @@
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
@@ -16,10 +17,7 @@ import { project } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { parseStructure } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import {
-  fetchSearchConfigurations,
-  MAX_SEARCH_CONFIGURATIONS,
-} from '../../../lib/strategies/transportSearch';
+import { MAX_SEARCH_CONFIGURATIONS } from '../../../lib/strategies/transportSearch';
 import { getEffectiveSystemContext } from '../../../lib/systemContext';
 
 export const TOOL_DEFINITION = {
@@ -207,16 +205,15 @@ export async function handleListTransports(
   // endpoint honours the status query param", #168), now load-bearing for
   // `user` too.
   //
-  // Which saved search to run is resolved by `fetchSearchConfigurations`
-  // (`lib/strategies/transportSearch.ts`) rather than by `list()` itself.
-  // That file carries the reasoning; the short version is that `list()`
-  // without a `configUri` makes the same request internally behind a
-  // `protected` member no strategy of ours reaches, and throws outright on a
-  // system holding several saved searches — telling the caller to pass a
-  // `configUri` that this tool has no parameter for. Composed here, the
-  // request count is unchanged for the ordinary one-configuration system,
-  // both requests are ours to read, and several configurations are searched
-  // rather than refused.
+  // Which saved search to run is asked for rather than left to `list()`.
+  // `searchConfigurations()` arrived in adt-clients 19.1.0 for this: before
+  // it, `list()` without a `configUri` made the same request internally,
+  // behind a `protected` member no strategy of ours reached, and threw
+  // outright on a system holding several saved searches — telling the caller
+  // to pass a `configUri` this tool has no parameter for. The request count
+  // is unchanged for the ordinary one-configuration system; what changed is
+  // that both requests carry our `analyse`, and that several configurations
+  // are searched rather than refused (see `MAX_SEARCH_CONFIGURATIONS`).
   //
   // **This is an observable behaviour change, not merely an implementation
   // one.** Before, `user`/`status` were sent to the server and never proven
@@ -239,10 +236,32 @@ export async function handleListTransports(
   return answer(
     { tool: 'ListTransports', detail },
     async () => {
-      const configurations = await fetchSearchConfigurations(
-        connection,
-        logger,
+      // `searchConfigurations` is kept at the shipped reading rather than
+      // given one of ours. The three readings this repository injects —
+      // verbatim, structured, statusOnly — all answer a document or a status,
+      // and what this member is for is the addressable list the package
+      // already parses: `uri`, `etag`, and the configuration's own
+      // attributes. Keeping it is what `ourUtils` and `ourUnitTest` do for
+      // the same reason. It is also not optional: the slot arrived with
+      // 19.1.0, and `resultsFor` refuses a slot it has no reading for rather
+      // than guessing one.
+      const request = createAdtClient(connection, logger).getRequest(
+        resultsFor(transportDocuments, ['searchConfigurations']),
       );
+
+      const answered = await request.searchConfigurations({
+        analyse: analyseException,
+      });
+      // The endpoint's own refusal, forwarded — not a sentence composed here
+      // about a call this handler made on the caller's behalf.
+      if (!answered.ok) {
+        return answered as unknown as IAdtResponse<
+          AdtReading<unknown>,
+          IAdtError
+        >;
+      }
+
+      const configurations = answered.getResult().value;
       if (configurations.length === 0) {
         throw new Error(
           `This system holds no saved transport search configuration, and a transport listing is a saved search: ${TRANSPORT_SEARCH_CONFIGURATIONS_URL} answered none. Create one in ADT's Transport Organizer and the tool will use it.`,
@@ -253,23 +272,19 @@ export async function handleListTransports(
       const running = configurations.slice(0, MAX_SEARCH_CONFIGURATIONS);
       searched = running.map((configuration) => configuration.uri);
 
-      const request = createAdtClient(connection, logger).getRequest(
-        resultsFor(transportDocuments),
-      );
-
       const readings: AdtReading<unknown>[] = [];
       for (const configuration of running) {
-        const answered = await request.list({ configUri: configuration.uri });
+        const listed = await request.list({ configUri: configuration.uri });
         // The failing search's own answer, untouched — the rule `sequence()`
         // follows, for the same reason: a sentence composed here would stand
         // beside the strategy's own account of the same refusal.
-        if (!answered.ok) {
-          return answered as unknown as IAdtResponse<
+        if (!listed.ok) {
+          return listed as unknown as IAdtResponse<
             AdtReading<unknown>,
             IAdtError
           >;
         }
-        readings.push(answered.getResult().value as AdtReading<unknown>);
+        readings.push(listed.getResult().value as AdtReading<unknown>);
       }
 
       // One search: its reading, unchanged. Several: the values as an array,

@@ -143,7 +143,13 @@ export function throwingClient(message: string) {
  * through a factory this double was never told about still shows up as
  * whatever string the handler used.
  */
-export function recordAnalyse() {
+/**
+ * `answers` supplies what a named member resolves to, for the handlers that
+ * read one call's value to make the next. Everything else keeps the default
+ * empty reading: a recorder exists to record, and a member whose value nobody
+ * reads should not need one stated.
+ */
+export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
   const calls: Array<{
     member: string;
     factory: string;
@@ -169,7 +175,10 @@ export function recordAnalyse() {
               carriedAnalyse,
               args,
             });
-            return okResponse(reading(undefined, '', 200));
+            const supplied = answers[member];
+            return okResponse(
+              supplied ? supplied() : reading(undefined, '', 200),
+            );
           },
       }),
   });

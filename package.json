@@ -150,7 +150,7 @@
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^19.0.0",
+    "@mcp-abap-adt/adt-clients": "^19.1.0",
     "@mcp-abap-adt/adt-strategies": "^0.2.0",
     "@mcp-abap-adt/auth-broker": "^2.0.0",
     "@mcp-abap-adt/auth-providers": "^2.0.0",

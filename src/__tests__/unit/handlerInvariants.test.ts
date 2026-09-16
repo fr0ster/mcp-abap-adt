@@ -90,11 +90,19 @@ it('no handler reads an envelope property', () => {
  * The verdict belongs to `analyse`. A handler reading the document to decide
  * is a second opinion beside the strategy's, and the two will disagree.
  *
- * Both the namespaced spelling a wire document carries (`exc:exception`,
- * `del:isDeleted`) and the unprefixed one an XML parser configured to strip
- * namespaces would hand a caller instead are covered — the same handler
- * deciding for itself either way, and a parser option is not a defence
- * against this invariant.
+ * Two spellings reach a handler for the same attribute: the namespaced one a
+ * wire document carries, and the bare one an XML parser configured to strip
+ * namespaces hands back instead. Both are listed for `exc:exception` and
+ * `del:isDeleted`, because a parser option is not a defence against this
+ * invariant.
+ *
+ * `chkrun:status` is listed in one spelling only, and deliberately. Its bare
+ * twin is `status`, which every HTTP-shaped object in this tree also carries —
+ * listing it would fail on `answer.status` and `reading.status`, which are not
+ * verdicts and are read legitimately all over. So a handler that decides a
+ * check's outcome from a namespace-stripped parse passes this invariant. That
+ * is a known hole, not a claim of coverage; the omission audit and the two
+ * strategy tests are what stand behind that case.
  */
 it('no handler decides a refusal for itself', () => {
   expect(handlers.length).toBeGreaterThan(200);

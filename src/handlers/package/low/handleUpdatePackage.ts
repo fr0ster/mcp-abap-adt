@@ -1,12 +1,31 @@
 /**
  * UpdatePackage Handler - Update ABAP Package Description
  *
- * Uses AdtClient.updatePackage from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Read, patch, write. adt-clients 19 removed the merge that used to happen
+ * inside `updatePackage`: the member takes the whole document now and
+ * replaces with it, so anything not sent is gone. The sequence is the
+ * handler's, and every step of it carries its own `analyse` — the verdict on
+ * each answer stays the strategy's.
+ *
+ * **The patched document goes in `config.document`, not `options.xmlContent`.**
+ * `AdtPackage.updateMetadata()`'s shipped body reads `config.document` only
+ * and passes it straight to `updatePackage(connection, {...}, config.document,
+ * options?.lockHandle)` as the PUT body — every other field it builds into
+ * that `fields` object (`superPackage`, `softwareComponent`,
+ * `transportLayer`, `description`, `packageType`, `responsible`,
+ * `recordChanges`) describes a create and is never read to build or merge a
+ * body on an update; only `package_name` (for the URL path) and
+ * `transport_request` (the write-query string) reach the wire function at
+ * all. Verified against the compiled `AdtPackage.js` and
+ * `core/package/update.js`, not the declaration file.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { patchPackageXml } from '../../../lib/strategies/packagePatch';
+import { sequence } from '../../../lib/strategies/sequence';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
   restoreSessionInConnection,
@@ -16,9 +35,9 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.',
+    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,7 +49,7 @@ export const TOOL_DEFINITION = {
       super_package: {
         type: 'string',
         description:
-          'Super package (parent package) name. Required for package operations.',
+          'Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.',
       },
       updated_description: {
         type: 'string',
@@ -79,11 +98,6 @@ interface UpdatePackageArgs {
   };
 }
 
-/**
- * Main handler for UpdatePackage MCP tool
- *
- * Uses AdtClient.updatePackage - low-level single method call
- */
 export async function handleUpdatePackage(
   context: HandlerContext,
   args: UpdatePackageArgs,
@@ -99,7 +113,6 @@ export async function handleUpdatePackage(
       session_state,
     } = args as UpdatePackageArgs;
 
-    // Validation
     if (
       !package_name ||
       !super_package ||
@@ -114,40 +127,45 @@ export async function handleUpdatePackage(
     }
 
     const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      // CRITICAL: Use restoreSessionInConnection to properly restore session
-      // This will set sessionId in connection and enable stateful session mode
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
     const packageName = package_name.toUpperCase();
-    const superPackage = super_package.toUpperCase();
 
     logger?.info(`Starting package update: ${packageName}`);
 
+    if (session_id && session_state) {
+      await restoreSessionInConnection(connection, session_id, session_state);
+    }
+
     try {
-      // Update package description
-      const updateState = await client.getPackage().update(
-        {
-          packageName,
-          superPackage,
-          updatedDescription: updated_description,
-        },
-        { lockHandle: lock_handle },
+      // The three steps, in the handler because 19 put them there. `analyse`
+      // on each one: a refusal from the read and a refusal from the write are
+      // different failures, and whichever comes back is the one the caller
+      // sees, built by the strategy rather than summarised here.
+      const written = await sequence(
+        () =>
+          client
+            .getPackage()
+            .readMetadata({ packageName }, { analyse: analyseException }),
+        (current) =>
+          client.getPackage().updateMetadata(
+            {
+              packageName,
+              document: patchPackageXml(
+                extractXmlString(current, `package ${packageName}`),
+                { description: updated_description },
+              ),
+            },
+            {
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
       );
-      const updateResult = updateState.updateResult;
 
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for package ${packageName}`,
-        );
+      if (!written.ok) {
+        const failure = written.getError();
+        logger?.error(`UpdatePackage refused: ${failure.message}`);
+        return return_error(new Error(failure.message));
       }
-
-      // Get updated session state after update
 
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);
 
@@ -156,7 +174,7 @@ export async function handleUpdatePackage(
           {
             success: true,
             package_name: packageName,
-            super_package: superPackage,
+            super_package: super_package.toUpperCase(),
             updated_description,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
@@ -167,40 +185,18 @@ export async function handleUpdatePackage(
         ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(
-        `Error updating package ${packageName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update package: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Package ${packageName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Package ${packageName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
+      // `sequence()`'s two calls each carry their own `analyse` and never
+      // throw for a refusal — `written.ok`/`written.getError()` above is
+      // where that verdict is read, per this file's own top comment. This
+      // catch is left for a genuine bug in this block (`patchPackageXml`,
+      // say), not for a wire refusal, so it no longer guesses an HTTP
+      // status or re-parses an `exc` namespace `exception` element out of a body no v19 call here
+      // can still produce — that read belongs to `analyseException`, not a
+      // second opinion here (issue #200-adjacent; found while writing the
+      // handler invariant that checks for exactly this).
+      const message = error?.message ?? String(error);
+      logger?.error(`Error updating package ${packageName}: ${message}`);
+      return return_error(new Error(`Failed to update package: ${message}`));
     }
   } catch (error: any) {
     return return_error(error);

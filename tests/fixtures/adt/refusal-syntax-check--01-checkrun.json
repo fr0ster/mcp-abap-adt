@@ -1,0 +1,35 @@
+{
+  "case": "refusal-syntax-check",
+  "step": 1,
+  "stepTag": "checkrun",
+  "capturedAt": "2026-09-11T09:07:42.538Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.checkmessages+xml",
+      "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/oo/classes/zmcp_bld_ansch01\" chkrun:version=\"inactive\">\n    <chkrun:artifacts>\n      <chkrun:artifact chkrun:contentType=\"text/plain; charset=utf-8\" chkrun:uri=\"/sap/bc/adt/oo/classes/zmcp_bld_ansch01/source/main\">\n        <chkrun:content>Q0xBU1MgWk1DUF9CTERfQU5TQ0gwMSBERUZJTklUSU9OCiAgUFVCTElDCiAgRklOQUwKICBDUkVBVEUgUFVCTElDIC4KCiAgUFVCTElDIFNFQ1RJT04uCiAgICBNRVRIT0RTIHNheV9oZWxsbwogICAgICBSRVRVUk5JTkcgVkFMVUUocnZfdGV4dCkgVFlQRSBzdHJpbmcuCiAgUFJPVEVDVEVEIFNFQ1RJT04uCiAgUFJJVkFURSBTRUNUSU9OLgpFTkRDTEFTUy4KCkNMQVNTIFpNQ1BfQkxEX0FOU0NIMDEgSU1QTEVNRU5UQVRJT04uCiAgTUVUSE9EIHNheV9oZWxsby4KICAgIERBVEEgbHZfYnJva2VuIFRZUEUgc3Ryb25nX2J1dF9ub3RfYV9yZWFsX3R5cGUuCiAgICBydl90ZXh0ID0gbHZfYnJva2VuICsrKyAxIH5+fiBzeW50YXggZXJyb3Igb24gcHVycG9zZS4KICBFTkRNRVRIT0QuCkVORENMQVNTLg==</chkrun:content>\n      </chkrun:artifact>\n    </chkrun:artifacts>\n  </chkrun:checkObject>\n</chkrun:checkObjectList>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.checkmessages+xml; charset=utf-8",
+      "content-length": "781",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=95399",
+      "sap-server": "true",
+      "sap-perf-fesrec": "96989.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-syntax-check--01-checkrun.body.xml"
+  }
+}

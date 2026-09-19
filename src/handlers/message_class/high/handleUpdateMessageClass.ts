@@ -1,18 +1,37 @@
 /**
- * UpdateMessageClass Handler - Update an ABAP Message Class (MSAG) via AdtClient.
+ * UpdateMessageClass Handler - Write a Message Class's own metadata
  *
- * Uses AdtClient.getMessageClass().update() — currently updates the class
- * description. Individual messages are managed with the *MessageClassMessage tools.
- * Lock/unlock is handled internally by the client.
+ * Uses AdtClient.getMessageClass().{lock,updateMetadata,unlock} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`.
+ *
+ * **This handler acquires its own lock.** `IMessageClassContract` composes
+ * `IAdtLockable` — `lock({name})`/`unlock({name}, lockHandle)` are on the
+ * same accessor `updateMetadata()` is called through, verified against
+ * `AdtMessageClass.js` (`lock()`/`unlock()` call `lockMessageClass`/
+ * `unlockMessageClass` directly). Fix round 1: a caller-supplied
+ * `lock_handle` param was tried here first and reverted — adt-clients 19
+ * moving a lock out of a member does not move it onto the caller, it moves
+ * it onto this handler.
+ *
+ * **The member is `updateMetadata`, not `update`.** `IMessageClassContract`
+ * declares `IAdtMetadataUpdatable`, whose method is `updateMetadata`; there
+ * is no plain `update` on this factory.
+ *
+ * **`description` goes in `config`, not `options`.** Verified against
+ * `AdtMessageClass.js`'s `updateMetadata()`: `updateMessageClass(connection,
+ * name, options?.lockHandle, config.description, config.transportRequest)`.
  */
 
+import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
@@ -35,6 +54,7 @@ export const TOOL_DEFINITION = {
         description:
           '(optional) Transport request number. Required for transportable objects.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['message_class_name', 'description'],
   },
@@ -44,6 +64,7 @@ interface UpdateMessageClassArgs {
   message_class_name: string;
   description: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateMessageClass(
@@ -51,39 +72,38 @@ export async function handleUpdateMessageClass(
   args: UpdateMessageClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { message_class_name, description, transport_request } = args;
-    if (!message_class_name) {
-      return return_error(new Error('message_class_name is required'));
-    }
-    if (!description) {
-      return return_error(new Error('description is required'));
-    }
 
-    const client = createAdtClient(connection, logger);
-    const name = message_class_name.toUpperCase();
-
-    logger?.info(`Updating message class ${name}`);
-
-    const state = await client.getMessageClass().update({
-      name,
-      description,
-      transportRequest: transport_request,
-    });
-
-    logger?.info(`✅ UpdateMessageClass completed: ${name}`);
-
-    return return_response({
-      data: JSON.stringify({
-        success: true,
-        message_class_name: name,
-        description,
-        transport_request,
-        status: state.updateResult?.status,
-        message: `Message class ${name} updated successfully`,
-      }),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+  if (!args?.description) {
+    return return_error(new Error('description is required'));
+  }
+
+  const name = args.message_class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateMessageClass', detail },
+    () => {
+      const obj = createAdtClient(connection, logger).getMessageClass(
+        resultsFor(messageClassDocuments),
+      );
+
+      return withLock(
+        () => obj.lock({ name }),
+        (lockHandle) =>
+          obj.updateMetadata(
+            {
+              name,
+              description: args.description,
+              transportRequest: args.transport_request,
+            },
+            { lockHandle, analyse: analyseException },
+          ),
+        (lockHandle) => obj.unlock({ name }, lockHandle),
+      );
+    },
+    project(detail, terseWrite),
+  );
 }

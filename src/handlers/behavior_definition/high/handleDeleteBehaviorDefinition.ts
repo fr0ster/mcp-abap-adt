@@ -1,23 +1,29 @@
 /**
- * DeleteBehaviorDefinition Handler - Delete ABAP BehaviorDefinition via AdtClient
+ * DeleteBehaviorDefinition Handler - Delete ABAP BehaviorDefinition via ADT
+ * deletion API
  *
- * Uses AdtClient.getBehaviorDefinition().delete() for high-level delete operation.
- * Includes deletion check before actual deletion.
+ * Uses AdtClient.getBehaviorDefinition().delete from
+ * @mcp-abap-adt/adt-clients 19. See `handleDeleteDomain.ts` for the shape and
+ * the masking this follows: a refusal answers 200, `analyseDeletion` reads
+ * it rather than the status, and no lock is taken because a held lock is
+ * what makes ADT refuse.
  */
 
+import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP behavior definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +36,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['behavior_definition_name'],
   },
@@ -38,103 +45,32 @@ export const TOOL_DEFINITION = {
 interface DeleteBehaviorDefinitionArgs {
   behavior_definition_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteBehaviorDefinition MCP tool
- *
- * Uses AdtClient.getBehaviorDefinition().delete() - high-level delete operation with deletion check
- */
 export async function handleDeleteBehaviorDefinition(
   context: HandlerContext,
   args: DeleteBehaviorDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { behavior_definition_name, transport_request } =
-      args as DeleteBehaviorDefinitionArgs;
+  const { behavior_definition_name, transport_request } = args;
 
-    // Validation
-    if (!behavior_definition_name) {
-      return return_error(new Error('behavior_definition_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const behaviorDefinitionName = behavior_definition_name.toUpperCase();
-
-    logger?.info(
-      `Starting behavior definition deletion: ${behaviorDefinitionName}`,
-    );
-
-    try {
-      // Delete behavior definition using AdtClient (includes deletion check)
-      const behaviorDefinitionObject = client.getBehaviorDefinition();
-      const deleteResult = await behaviorDefinitionObject.delete({
-        name: behaviorDefinitionName,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for behavior definition ${behaviorDefinitionName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteBehaviorDefinition completed successfully: ${behaviorDefinitionName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            behavior_definition_name: behaviorDefinitionName,
-            transport_request: transport_request || null,
-            message: `BehaviorDefinition ${behaviorDefinitionName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting behavior definition ${behaviorDefinitionName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete behavior definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `BehaviorDefinition ${behaviorDefinitionName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `BehaviorDefinition ${behaviorDefinitionName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!behavior_definition_name) {
+    return return_error(new Error('behavior_definition_name is required'));
   }
+
+  const name = behavior_definition_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteBehaviorDefinition', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+        .delete(
+          { name, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

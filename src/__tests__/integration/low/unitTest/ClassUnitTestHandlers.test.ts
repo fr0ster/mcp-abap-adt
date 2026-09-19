@@ -239,8 +239,12 @@ ENDCLASS.`;
             throw new Error(`Update test classes failed: ${errorMsg}`);
           }
 
-          const updateData = parseHandlerResponse(updateResponse);
-          expect(updateData.success).toBe(true);
+          // UpdateClassTestClassesLow's terse projection is `terseWrite`: on
+          // success it answers the literal text "SUCCESS", not a JSON object —
+          // `success` no longer exists to read (CHANGELOG Unreleased: "Terse
+          // writes answer the literal string `SUCCESS` ... uniformly across
+          // every write tool"; see projections.ts `terseWrite`).
+          expect(updateResponse.content[0]?.text).toBe('SUCCESS');
           testLogger?.success(
             `✅ update test classes: ${containerClassName} completed`,
           );
@@ -309,7 +313,10 @@ ENDCLASS.`;
           }
 
           const activateData = parseHandlerResponse(activateResponse);
-          expect(activateData.success).toBe(true);
+          // ActivateClassTestClassesLow's terse projection is `terseActivation`,
+          // which answers `activated`/`generated` from `chkl:properties` — it
+          // never had a `success` field (see projections.ts `terseActivation`).
+          expect(activateData.activated).toBe(true);
           testLogger?.success(
             `✅ activate test classes: ${containerClassName} completed`,
           );

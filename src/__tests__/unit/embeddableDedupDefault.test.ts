@@ -33,7 +33,7 @@ describe('EmbeddableMcpServer default Read/Get dedup', () => {
   const ORIGINAL_SAP_SYSTEM_TYPE = process.env.SAP_SYSTEM_TYPE;
 
   beforeAll(() => {
-    // Program tools are onprem/legacy-only; force onprem so Get/ReadProgram register.
+    // Program tools are onprem-only; force onprem so Get/ReadProgram register.
     process.env.SAP_SYSTEM_TYPE = 'onprem';
   });
 

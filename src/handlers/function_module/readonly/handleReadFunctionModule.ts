@@ -1,15 +1,17 @@
+import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 import { assertFunctionGroupMatches } from '../shared/parseContainerGroup';
 
 export const TOOL_DEFINITION = {
   name: 'ReadFunctionModule',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.',
   inputSchema: {
@@ -44,78 +46,65 @@ export async function handleReadFunctionModule(
   },
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      function_module_name,
-      function_group_name,
-      version = 'active',
-    } = args;
-    if (!function_module_name || !function_group_name)
-      return return_error(
-        new Error('function_module_name and function_group_name are required'),
-      );
-
-    const client = createAdtClient(connection, logger);
-    const functionModuleName = function_module_name.toUpperCase();
-    const functionGroupName = function_group_name.toUpperCase();
-    const obj = client.getFunctionModule();
-
-    // Read metadata FIRST — the ADT backend resolves FM by name regardless of
-    // the group segment in the URL, so we must verify ownership from metadata
-    // (<adtcore:containerRef/>) before trusting any source payload.
-    let metadata: string | null = null;
-    const metaResult = await obj.readMetadata({
-      functionModuleName,
-      functionGroupName,
-    });
-    if (metaResult?.metadataResult?.data) {
-      metadata =
-        typeof metaResult.metadataResult.data === 'string'
-          ? metaResult.metadataResult.data
-          : safeStringify(metaResult.metadataResult.data);
-    }
-
-    const realGroup = assertFunctionGroupMatches(
-      metadata,
-      functionGroupName,
-      functionModuleName,
+  const {
+    function_module_name,
+    function_group_name,
+    version = 'active',
+  } = args;
+  if (!function_module_name || !function_group_name)
+    return return_error(
+      new Error('function_module_name and function_group_name are required'),
     );
 
-    let source_code: string | null = null;
-    const readResult = await obj.read(
-      { functionModuleName, functionGroupName: realGroup },
-      version as 'active' | 'inactive',
-    );
-    if (readResult?.readResult?.data) {
-      source_code =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : safeStringify(readResult.readResult.data);
-    }
+  const functionModuleName = function_module_name.toUpperCase();
+  const functionGroupName = function_group_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getFunctionModule(
+    resultsFor(functionModuleDocuments),
+  );
 
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          function_module_name: functionModuleName,
-          function_group_name: realGroup,
-          version,
-          source_code,
-          metadata,
+  // Metadata first, not source-then-metadata like every sibling in this
+  // family: the ADT backend resolves a function module by name alone
+  // regardless of the group segment in the URL, so the caller-supplied group
+  // must be verified from metadata's own <adtcore:containerRef/> before any
+  // source read can be trusted. `pair`'s second step is handed the first
+  // step's own reading for exactly this reason — `assertFunctionGroupMatches`
+  // throws when the groups disagree, which `answer()` catches and reports as
+  // `client_threw`, the same verdict the pre-19 handler gave for a mismatch.
+  //
+  // `realGroup` is assigned once, inside the pair step that already parsed
+  // `containerRef` to get it, and carried out through this closure so the
+  // projection below can answer it without a second parse of the same
+  // document.
+  let realGroup = functionGroupName;
+  return answer(
+    { tool: 'ReadFunctionModule', detail: 'terse' },
+    () =>
+      pair(
+        () =>
+          obj.readMetadata(
+            { functionModuleName, functionGroupName },
+            { analyse: analyseException },
+          ),
+        (metadata: AdtReading<string>) => {
+          realGroup = assertFunctionGroupMatches(
+            metadata.raw,
+            functionGroupName,
+            functionModuleName,
+          );
+          return obj.read(
+            { functionModuleName, functionGroupName: realGroup },
+            version,
+            { analyse: analyseException },
+          );
         },
-        null,
-        2,
       ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
-  }
-}
-
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
+    ([metadata, source]: [AdtReading<string>, AdtReading<string>]) => ({
+      success: true,
+      function_module_name: functionModuleName,
+      function_group_name: realGroup,
+      version,
+      source_code: source.raw,
+      metadata: metadata.raw,
+    }),
+  );
 }

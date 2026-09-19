@@ -10,7 +10,7 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtObject } from '@mcp-abap-adt/interfaces';
+import type { IAdtVersionable } from '@mcp-abap-adt/interfaces';
 
 /** object_type values supported for version history (same set as LockObject). */
 // Only object types whose adt-clients handler actually implements version
@@ -32,8 +32,16 @@ export const VERSIONED_OBJECT_TYPES = [
 ] as const;
 
 export interface ResolvedVersionedObject {
-  /** The IAdtObject instance to call getVersions/getVersionSource on. */
-  obj: IAdtObject<any, any>;
+  /**
+   * The versions atom to call getVersions/getVersionSource on.
+   *
+   * `IAdtObject` — a per-type bundle interface — is gone from adt-clients 19
+   * (decision 19: member by member). `IAdtVersionable` is the one atom every
+   * caller here actually uses, and `getVersionSource`'s source is hardcoded to
+   * `string` by `VersionsCapability` regardless of which result set the
+   * factory below was given — see `VersionsCapability.d.ts`.
+   */
+  obj: IAdtVersionable<any, any, string>;
   /** Identity config to pass to getVersions(config). */
   config: Record<string, unknown>;
 }

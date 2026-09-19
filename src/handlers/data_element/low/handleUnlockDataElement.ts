@@ -1,18 +1,20 @@
 /**
- * UnlockDataElement Handler - Unlock ABAP DataElement
+ * UnlockDataElement Handler - Unlock ABAP Data Element
  *
- * Uses AdtClient.unlockDataElement from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDataElement().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockDataElementLow',
@@ -61,111 +63,31 @@ interface UnlockDataElementArgs {
   };
 }
 
-/**
- * Main handler for UnlockDataElement MCP tool
- *
- * Uses AdtClient.unlockDataElement - low-level single method call
- */
 export async function handleUnlockDataElement(
   context: HandlerContext,
   args: UnlockDataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { data_element_name, lock_handle, session_id, session_state } =
-      args as UnlockDataElementArgs;
+  const { data_element_name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!data_element_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error(
-          'data_element_name, lock_handle, and session_id are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const dataElementName = data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element unlock: ${dataElementName}`);
-
-    try {
-      // Unlock data element
-      const unlockState = await client
-        .getDataElement()
-        .unlock({ dataElementName: dataElementName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        logger?.error(
-          `Unlock did not return a response for data element ${dataElementName}`,
-        );
-        throw new Error(
-          `Unlock did not return a response for data element ${dataElementName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockDataElement completed: ${dataElementName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `DataElement ${dataElementName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DataElement ${dataElementName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockDataElement.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!data_element_name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('data_element_name, lock_handle, and session_id are required'),
+    );
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const dataElementName = data_element_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockDataElementLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getDataElement()
+        .unlock({ dataElementName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

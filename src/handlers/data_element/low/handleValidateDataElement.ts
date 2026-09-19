@@ -1,19 +1,18 @@
 /**
- * ValidateDataElement Handler - Validate ABAP DataElement Name
+ * ValidateDataElement Handler - Validate ABAP Data Element Name
  *
- * Uses AdtClient.validateDataElement from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDataElement().validate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateDataElementLow',
@@ -51,6 +50,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['data_element_name', 'package_name', 'description'],
   },
@@ -58,168 +58,58 @@ export const TOOL_DEFINITION = {
 
 interface ValidateDataElementArgs {
   data_element_name: string;
-  package_name: string;
   description: string;
+  package_name: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateDataElement MCP tool
- *
- * Uses AdtClient.validateDataElement - low-level single method call
- */
 export async function handleValidateDataElement(
   context: HandlerContext,
   args: ValidateDataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      data_element_name,
-      description,
-      package_name,
-      session_id,
-      session_state,
-    } = args as ValidateDataElementArgs;
+  const {
+    data_element_name,
+    description,
+    package_name,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!data_element_name || !package_name || !description) {
-      return return_error(
-        new Error(
-          'data_element_name, package_name, and description are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const dataElementName = data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element validation: ${dataElementName}`);
-
-    try {
-      // Validate data element
-      let validationResponse: unknown;
-      try {
-        const validationState = await client.getDataElement().validate({
-          dataElementName: dataElementName,
-          packageName: package_name.toUpperCase(),
-          description: description,
-        });
-        validationResponse = validationState.validationResponse;
-      } catch (validateError: any) {
-        // If validation throws an error with response, use it
-        if (validateError.response) {
-          validationResponse = validateError.response;
-        } else {
-          throw validateError;
-        }
-      }
-
-      if (!validationResponse) {
-        logger?.error(
-          `Validation did not return a result for data element ${dataElementName}`,
-        );
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(
-        `✅ ValidateDataElement completed: ${dataElementName} (valid=${result.valid})`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            data_element_name: dataElementName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `DataElement name ${dataElementName} is valid and available`
-              : `DataElement name ${dataElementName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // If validation endpoint returns 400, try to parse it as validation response
-      if (error.response?.status === 400) {
-        try {
-          const result = parseValidationResponse(error.response);
-
-          return return_response({
-            data: JSON.stringify(
-              {
-                success: result.valid,
-                data_element_name: dataElementName,
-                validation_result: result,
-                session_id: session_id || null,
-                session_state: null, // Session state management is now handled by auth-broker,
-                message: result.valid
-                  ? `DataElement name ${dataElementName} is valid and available`
-                  : `DataElement name ${dataElementName} validation failed: ${result.message}`,
-              },
-              null,
-              2,
-            ),
-          } as AxiosResponse);
-        } catch (_parseError) {
-          // If parsing fails, continue with error handling
-        }
-      }
-
-      // Parse error message
-      let errorMessage = `Failed to validate data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DataElement ${dataElementName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!data_element_name || !package_name || !description) {
+    return return_error(
+      new Error(
+        'data_element_name, package_name, and description are required',
+      ),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const dataElementName = data_element_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateDataElementLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDataElement(resultsFor(dataElementDocuments))
+        .validate(
+          {
+            dataElementName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

@@ -1,18 +1,24 @@
 /**
  * LockBehaviorImplementation Handler - Lock ABAP Behavior Implementation Class
  *
- * Uses AdtClient.lockClass from @mcp-abap-adt/adt-clients (BehaviorImplementation extends ClassBuilder).
- * Low-level handler: single method call.
+ * Uses AdtClient.getBehaviorImplementation().lock from
+ * @mcp-abap-adt/adt-clients 19. A behavior implementation *is* a class, and
+ * `AdtBehaviorImplementation.lock()` delegates to the class's own lock — but
+ * it is reached through `getBehaviorImplementation`, not `getClass`, so a
+ * swap between the two families stays visible (see the low-tier strategy
+ * test: both answer through `classDocuments` and are otherwise
+ * indistinguishable to the compiler).
+ *
+ * `lock()` accepts no options at all — not even `analyse` — so there is no
+ * strategy to inject here. Its answer is the lock handle itself, and the
+ * projection is the envelope the tool already returned: nothing about `lock`
+ * varies with `detail`, so the parameter is not added to this tool's surface.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockBehaviorImplementationLow',
@@ -57,97 +63,36 @@ interface LockBehaviorImplementationArgs {
   };
 }
 
-/**
- * Main handler for LockBehaviorImplementation MCP tool
- *
- * Uses AdtClient.lockClass - BehaviorImplementation extends ClassBuilder
- */
 export async function handleLockBehaviorImplementation(
   context: HandlerContext,
   args: LockBehaviorImplementationArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { class_name, session_id, session_state } =
-      args as LockBehaviorImplementationArgs;
+  const { class_name, session_id, session_state } = args;
 
-    // Validation
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Starting behavior implementation lock: ${className}`);
-
-    try {
-      // Lock class (BehaviorImplementation extends ClassBuilder)
-      const lockHandle = await client.getClass().lock({ className });
-
-      if (!lockHandle) {
-        throw new Error(
-          `Lock did not return a lock handle for behavior implementation ${className}`,
-        );
-      }
-
-      // Get updated session state after lock
-
-      logger?.info(`✅ LockBehaviorImplementation completed: ${className}`);
-      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            lock_handle: lockHandle,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Behavior Implementation ${className} locked successfully. Use lock_handle in subsequent update/unlock operations.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error locking behavior implementation ${className}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to lock behavior implementation: ${error.message || String(error)}`;
-
-      if (error.response?.data && typeof error.response.data === 'string') {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!class_name) {
+    return return_error(new Error('class_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const className = class_name.toUpperCase();
+
+  return answer(
+    { tool: 'LockBehaviorImplementationLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorImplementation()
+        .lock({ className }),
+    (lockHandle: string) => ({
+      success: true,
+      class_name: className,
+      lock_handle: lockHandle,
+      session_id: connection.getSessionId() || session_id || null,
+      session_state: null, // Session state management is now handled by auth-broker
+      message: `Behavior Implementation ${className} locked successfully. Use lock_handle in subsequent update/unlock operations.`,
+    }),
+  );
 }

@@ -171,30 +171,20 @@ describe('Class High-Level Handlers Integration', () => {
           throw new Error(`Create failed: ${detailedError}`);
         }
 
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
-        expect(createData.data).toBeDefined();
-
-        // Check for errors from state.errors (warnings/errors that occurred during creation)
-        if (
-          createData.errors &&
-          Array.isArray(createData.errors) &&
-          createData.errors.length > 0
-        ) {
-          logger?.warn(
-            `⚠️ Create completed with ${createData.errors.length} error(s)/warning(s):`,
-          );
-          createData.errors.forEach((err: any) => {
-            logger?.warn(
-              `  - [${err.method || 'unknown'}]: ${err.error || String(err)}`,
-            );
-          });
-          // Log errors but don't fail test - these are warnings from state.errors
-          // They indicate non-critical issues (e.g., warnings during check)
-        }
+        // CreateClass's terse projection is `terseWrite`: on success it
+        // answers the literal text "SUCCESS", not a JSON object — there is no
+        // `data`/`errors` field left to inspect (CHANGELOG Unreleased: "Terse
+        // writes answer the literal string `SUCCESS` ... uniformly across
+        // every write tool"; see src/lib/strategies/projections.ts
+        // `terseWrite`/`project()`). `JSON.parse('SUCCESS')` throws, so this
+        // no longer goes through `parseHandlerResponse`.
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
 
         logger?.success(`✅ create: ${objectName} completed successfully`);
-        updateSessionFromResponse(session, createData);
+        // terseWrite carries no session fields either way — this was always
+        // a fallback to the current session, kept for parity with the other
+        // handler-test files that call it after a write.
+        updateSessionFromResponse(session, {});
 
         // Wait a bit after creation before update to ensure object is ready
         // Use delay from YAML config (operation_delays.create or default) via context
@@ -257,27 +247,10 @@ describe('Class High-Level Handlers Integration', () => {
           throw new Error(`Update failed: ${detailedError}`);
         }
 
-        const updateData = parseHandlerResponse(updateResponse);
-        expect(updateData.success).toBe(true);
-        // handleUpdateClass returns data at root level, not in data field
-        expect(updateData.class_name).toBeDefined();
-
-        // Check for errors from state.errors (warnings/errors that occurred during update)
-        if (
-          updateData.errors &&
-          Array.isArray(updateData.errors) &&
-          updateData.errors.length > 0
-        ) {
-          logger?.warn(
-            `⚠️ Update completed with ${updateData.errors.length} error(s)/warning(s):`,
-          );
-          updateData.errors.forEach((err: any) => {
-            logger?.warn(
-              `  - [${err.method || 'unknown'}]: ${err.error || String(err)}`,
-            );
-          });
-          // Log errors but don't fail test - these are warnings from state.errors
-        }
+        // UpdateClass's terse projection is `terseWrite` too — same literal
+        // "SUCCESS" text on success, no `class_name`/`data`/`errors` fields
+        // (projections.ts `terseWrite`).
+        expect(updateResponse.content[0]?.text).toBe('SUCCESS');
 
         logger?.success(`✅ update: ${objectName} completed successfully`);
 
@@ -344,8 +317,12 @@ describe('Class High-Level Handlers Integration', () => {
           // Don't fail test - object might already be deleted or cleanup will handle it
         } else {
           const deleteData = parseHandlerResponse(deleteResponse);
-          expect(deleteData.success).toBe(true);
-          expect(deleteData.class_name).toBe(objectName);
+          // DeleteClass's terse projection is `terseDeletion`, which answers
+          // `deleted`/`object` from ADT's own `del:deletionResult` document —
+          // it never had `success`/`class_name` fields (projections.ts
+          // `terseDeletion`).
+          expect(deleteData.deleted).toBe(true);
+          expect(deleteData.object).toBe(objectName);
           logger?.success(
             `✅ delete (high): ${objectName} completed successfully`,
           );

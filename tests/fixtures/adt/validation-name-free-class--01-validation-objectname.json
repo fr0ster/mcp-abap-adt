@@ -1,0 +1,34 @@
+{
+  "case": "validation-name-free-class",
+  "step": 1,
+  "stepTag": "validation-objectname",
+  "capturedAt": "2026-09-11T08:31:45.022Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/validation/objectname?objname=ZMCP_BLD_FREE_X1&objtype=CLAS%2FOC&packagename=ZADT_BLD_PKG03",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/validation/objectname?objname=ZMCP_BLD_FREE_X1&objtype=CLAS%2FOC&packagename=ZADT_BLD_PKG03",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.oo.clifname.check",
+      "content-length": "180",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=21798",
+      "sap-server": "true",
+      "sap-perf-fesrec": "28160.000000",
+      "connection": "close"
+    },
+    "bodyFile": "validation-name-free-class--01-validation-objectname.body.xml"
+  }
+}

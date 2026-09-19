@@ -161,10 +161,17 @@ export function createSourceReaderDeps(
 ): ReadSourceUnitsDeps {
   const client = createAdtClient(ctx.connection, ctx.logger);
   return {
+    // `read()`/`getObjectStructure()` now answer `IAdtResponse<string>` (the
+    // 19.0.0 envelope) instead of the old transport frame with `.readResult`/
+    // `.data` on it — both defaulted to `rawDocument`, the document as it
+    // arrived, exactly what `.readResult.data`/`.data` used to hand back. No
+    // `analyse` strategy is passed: a refusal (missing object, no access) now
+    // answers `ok: false` instead of throwing, and is read that way below
+    // rather than relying on the outer `try/catch` — `safe()` still catches a
+    // genuine throw (a connection failure), but a refusal is no longer one.
     async readProgram(programName, version) {
       const r = await client.getProgram().read({ programName }, version);
-      const data = r?.readResult?.data;
-      return typeof data === 'string' ? data : null;
+      return r.ok ? r.getResult().value : null;
     },
     async readInclude(includeName) {
       const r = await makeAdtRequestWithTimeout(
@@ -177,14 +184,11 @@ export function createSourceReaderDeps(
     },
     async readClassMain(className, version) {
       const r = await client.getClass().read({ className }, version);
-      const data = r?.readResult?.data;
-      return typeof data === 'string' ? data : null;
+      return r.ok ? r.getResult().value : null;
     },
     async fetchFugrStructure(fugrName) {
       const r = await client.getUtils().getObjectStructure('FUGR/F', fugrName);
-      return typeof r?.data === 'string'
-        ? parseFugrChildrenFromXml(r.data)
-        : [];
+      return r.ok ? parseFugrChildrenFromXml(r.getResult().value) : [];
     },
     async readFugrFm(fugrName, fmName) {
       const r = await makeAdtRequestWithTimeout(

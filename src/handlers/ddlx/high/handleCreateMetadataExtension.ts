@@ -1,11 +1,38 @@
 /**
  * CreateMetadataExtension Handler - ABAP Metadata Extension Creation via ADT API
+ *
+ * Uses AdtClient.getMetadataExtension().{create,lock,check,unlock,activate}
+ * from @mcp-abap-adt/adt-clients 19.
+ *
+ * Workflow: create -> lock+check+unlock (through `withLock`) -> (wait for
+ * the write to be visible) -> (activate). `create` never takes a source
+ * (the endpoint posts a metadata document only — see
+ * `CreateMetadataExtensionLow`), so there is nothing to write inside the
+ * lock; the lock's body is the syntax check the pre-migration handler ran
+ * while holding it. The wait before `activate` is the pre-migration
+ * handler's long-polling `read({withLongPolling: true})`, discarded for its
+ * result but not for what it does — see `handleUpdateDomain.ts` (high) for
+ * the live incident this guards against, documented in `xmlPatch.ts`.
  */
 
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
+
 export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
@@ -39,6 +66,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name', 'package_name'],
   },
@@ -51,14 +79,15 @@ interface CreateMetadataExtensionArgs {
   transport_request?: string;
   activate?: boolean;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateMetadataExtension(
   context: HandlerContext,
-  params: any,
+  args: CreateMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  const args: CreateMetadataExtensionArgs = params;
+
   if (!args.name || !args.package_name) {
     return return_error(new Error('Missing required parameters'));
   }
@@ -70,77 +99,51 @@ export async function handleCreateMetadataExtension(
   }
 
   const name = args.name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
 
-  logger?.info(`Starting DDLX creation: ${name}`);
+  return answer(
+    { tool: 'CreateMetadataExtension', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getMetadataExtension(
+        resultsFor(metadataExtensionDocuments),
+      );
 
-  try {
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = args.activate !== false;
+      const created = await obj.create(
+        {
+          name,
+          description: args.description || name,
+          packageName: args.package_name,
+          transportRequest: args.transport_request,
+          masterLanguage: args.master_language,
+        },
+        { analyse: analyseException },
+      );
+      if (!created.ok) return created;
 
-    // Create
-    await client.getMetadataExtension().create({
-      name,
-      description: args.description || name,
-      packageName: args.package_name,
-      transportRequest: args.transport_request || '',
-      masterLanguage: args.master_language,
-    });
-
-    // Lock
-    const lockHandle = await client.getMetadataExtension().lock({ name: name });
-
-    try {
-      // Check
-      await client.getMetadataExtension().check({ name: name });
-
-      // Unlock
-      await client.getMetadataExtension().unlock({ name: name }, lockHandle);
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getMetadataExtension()
-          .read({ name }, 'inactive', { withLongPolling: true });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
+      const checked = await withLock(
+        () => obj.lock({ name }),
+        () => obj.check({ name }, undefined, { analyse: analyseCheck }),
+        (lockHandle) => obj.unlock({ name }, lockHandle),
+      );
+      if (!checked.ok) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      // Activate if requested
-      if (shouldActivate) {
-        await client.getMetadataExtension().activate({ name: name });
-      }
-    } catch (error) {
-      // Unlock on error (principle 1: if lock was done, unlock is mandatory)
-      try {
-        await client.getMetadataExtension().unlock({ name: name }, lockHandle);
-      } catch (unlockError) {
-        logger?.error(
-          `Failed to unlock metadata extension after error: ${unlockError instanceof Error ? unlockError.message : String(unlockError)}`,
-        );
-      }
-      // Principle 2: first error and exit
-      throw error;
-    }
+      // Best-effort: wait for the write to be visible before activating.
+      await obj
+        .read({ name }, 'inactive', {
+          withLongPolling: true,
+          analyse: analyseException,
+        })
+        .catch(() => undefined);
 
-    const result = {
-      success: true,
-      name: name,
-      package_name: args.package_name,
-      type: 'DDLX',
-      message: shouldActivate
-        ? `Metadata Extension ${name} created and activated successfully`
-        : `Metadata Extension ${name} created successfully`,
-    };
+      if (!shouldActivate) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
 
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    });
-  } catch (error: any) {
-    logger?.error(`Error creating DDLX ${name}: ${error?.message || error}`);
-    return return_error(error);
-  }
+      return obj.activate({ name }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

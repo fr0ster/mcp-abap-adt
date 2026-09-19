@@ -1,17 +1,11 @@
-/**
- * GetDomain Handler - Read ABAP Domain via AdtClient
- *
- * Uses AdtClient.getDomain().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetDomain',
@@ -42,80 +36,37 @@ interface GetDomainArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetDomain MCP tool
- *
- * Uses AdtClient.getDomain().read() - high-level read operation
- */
 export async function handleGetDomain(
   context: HandlerContext,
   args: GetDomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { domain_name, version = 'active' } = args as GetDomainArgs;
+  const { domain_name, version = 'active' } = args;
+  if (!domain_name) return return_error(new Error('domain_name is required'));
 
-    // Validation
-    if (!domain_name) {
-      return return_error(new Error('domain_name is required'));
-    }
+  const domainName = domain_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getDomain(
+    resultsFor(domainDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const domainName = domain_name.toUpperCase();
-
-    logger?.info(`Reading domain ${domainName}, version: ${version}`);
-
-    try {
-      // Read domain using AdtClient
-      const domainObject = client.getDomain();
-      const readResult = await domainObject.read(
-        { domainName },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`Domain ${domainName} not found`);
-      }
-
-      // Extract data from read result
-      const domainData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(`✅ GetDomain completed successfully: ${domainName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            domain_name: domainName,
-            version,
-            domain_data: domainData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Domain ${domainName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Domain ${domainName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  // A domain has no source of its own — `IDomainContract` composes
+  // `IAdtMetadataReadable` and nothing else, so unlike its siblings there
+  // is no `.read()` to call at all: `read` and `readMetadata` fetched the
+  // identical document even before 19 (same defect/fix as `ReadDomain`).
+  // `version` is not forwarded to the call — `AdtDomain` ignores it at
+  // every level — matching `ReadDomain`'s own, deliberately unfixed, echo
+  // (task 11 fix round 1: "the library ignores `version` at every level
+  // and the pre-existing echo is inert ... deferred to the documentation
+  // task"). One call, used for the one field this tool has always
+  // answered.
+  return answer(
+    { tool: 'GetDomain', detail: 'terse' },
+    () => obj.readMetadata({ domainName }, { analyse: analyseException }),
+    (metadata: AdtReading<string>) => ({
+      success: true,
+      domain_name: domainName,
+      version,
+      domain_data: metadata.raw,
+    }),
+  );
 }

@@ -31,7 +31,11 @@ import { handleUpdateLocalMacros } from '../../../../handlers/class/high/handleU
 import { handleUpdateLocalTestClass } from '../../../../handlers/class/high/handleUpdateLocalTestClass';
 import { handleUpdateLocalTypes } from '../../../../handlers/class/high/handleUpdateLocalTypes';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
-import { getTimeout } from '../../helpers/configHelpers';
+import {
+  getSystemType,
+  getTimeout,
+  isTestAvailableForSystem,
+} from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -293,48 +297,63 @@ ENDCLASS.`;
 
         logger?.success(`✅ LocalDefinitions set completed`);
 
-        // Step 5: Test LocalMacros handlers (may not be supported on all systems)
-        logger?.info(`   • testing LocalMacros handlers`);
-        const localMacrosCode = `DEFINE test_macro.
+        // Step 5: Test LocalMacros handlers.
+        //
+        // Macros are classic ABAP. On a cloud system `DEFINE` and
+        // `END-OF-DEFINITION` are not part of the language version at all,
+        // and the refusal does not arrive at the write: the macros include
+        // is written happily, and activation then refuses the whole class —
+        // `"DEFINE" is not allowed in the current ABAP language version.`
+        // So tolerating a failed write, which the code below already does,
+        // cannot cover this case. On such a system the write must not
+        // happen at all.
+        if (!isTestAvailableForSystem(['onprem', 'legacy'])) {
+          logger?.info(
+            `   • skipping LocalMacros handlers: macros are not part of the ${getSystemType()} ABAP language version`,
+          );
+        } else {
+          logger?.info(`   • testing LocalMacros handlers`);
+          const localMacrosCode = `DEFINE test_macro.
   " Test macro
 END-OF-DEFINITION.`;
 
-        try {
-          // Update LocalMacros (set content via Update)
-          const setLocalMacrosLogger = createTestLogger('local-macros-set');
-          const setLocalMacrosResponse = await invoke(
-            'UpdateLocalMacros',
-            {
-              class_name: className,
-              macros_code: localMacrosCode,
-              activate_on_update: false,
-            },
-            async () => {
-              const setLocalMacrosCtx = createHandlerContext({
-                connection,
-                logger: setLocalMacrosLogger,
-              });
-              return handleUpdateLocalMacros(setLocalMacrosCtx, {
+          try {
+            // Update LocalMacros (set content via Update)
+            const setLocalMacrosLogger = createTestLogger('local-macros-set');
+            const setLocalMacrosResponse = await invoke(
+              'UpdateLocalMacros',
+              {
                 class_name: className,
                 macros_code: localMacrosCode,
                 activate_on_update: false,
-              });
-            },
-          );
+              },
+              async () => {
+                const setLocalMacrosCtx = createHandlerContext({
+                  connection,
+                  logger: setLocalMacrosLogger,
+                });
+                return handleUpdateLocalMacros(setLocalMacrosCtx, {
+                  class_name: className,
+                  macros_code: localMacrosCode,
+                  activate_on_update: false,
+                });
+              },
+            );
 
-          if (!setLocalMacrosResponse.isError) {
-            // Wait after update
-            await new Promise((resolve) => setTimeout(resolve, createDelay));
-            logger?.success(`✅ LocalMacros set completed`);
-          } else {
+            if (!setLocalMacrosResponse.isError) {
+              // Wait after update
+              await new Promise((resolve) => setTimeout(resolve, createDelay));
+              logger?.success(`✅ LocalMacros set completed`);
+            } else {
+              logger?.warn(
+                `⚠️ LocalMacros not supported on this system (expected for newer ABAP versions)`,
+              );
+            }
+          } catch (error: any) {
             logger?.warn(
-              `⚠️ LocalMacros not supported on this system (expected for newer ABAP versions)`,
+              `⚠️ LocalMacros test skipped: ${error.message || String(error)}`,
             );
           }
-        } catch (error: any) {
-          logger?.warn(
-            `⚠️ LocalMacros test skipped: ${error.message || String(error)}`,
-          );
         }
 
         // Step 6: Test Update operations

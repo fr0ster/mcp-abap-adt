@@ -736,7 +736,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclass-read-only-message-class"></a>
 #### ReadMessageClass (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) with all of its messages. Answers: "show message class X", "list messages of message class", "display message text 001 of class". Returns name, description, package, master language and the array of messages (msgno, msgtext, self-explanatory, description).
+**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
 
@@ -747,7 +747,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclassmessage-read-only-message-class"></a>
 #### ReadMessageClassMessage (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of class ZMY_MSGS", "get text of message". Returns msgno, msgtext, self-explanatory flag and description.
+**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of class ZMY_MSGS", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
 
@@ -823,7 +823,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/search/readonly/handleGetObjectsByType.ts`
 
 **Parameters:**
-- `format` (string, optional) - [read-only] Output format: 'raw' or 'parsed'
+- `format` (string, optional) - [read-only] Output format: 'parsed' (default). 'raw' is accepted for backward compatibility but answers the same parsed text — see the note on `nodeLevel` below.
 - `node_id` (string, required) - [read-only] Node ID
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_tech_name` (string, required) - [read-only] Parent technical name
@@ -893,7 +893,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree.
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. 
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
@@ -994,7 +994,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `enrich` (boolean, optional (default: true)) - [read-only] Whether to add description and package via SearchObject (default true)
-- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type)
+- `maxDepth` (integer, optional (default: 1)) - [read-only] Maximum tree depth (default depends on type). Every object's own type folders and their contents are always shown (one tier); a higher value only descends further for PACKAGES, expanding nested subpackages that many tiers deep — no captured node-structure document shows a non-package object usefully recursable beyond its own type folders, so other object types are capped at one tier regardless of a higher value here.
 - `parent_name` (string, required) - [read-only] Parent object name
 - `parent_type` (string, required) - [read-only] Parent object type (e.g. DEVC/K, CLAS/OC, PROG/P)
 
@@ -1102,7 +1102,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimecreateprofilertraceparameters-read-only-system"></a>
 #### RuntimeCreateProfilerTraceParameters (Read-Only / System)
-**Description:** [runtime] Create ABAP profiler trace parameters and return profilerId (URI) for profiled execution.
+**Description:** [runtime] Schedule ABAP profiler trace parameters and return profilerId (the request id) for profiled execution.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters.ts`
 
@@ -1185,7 +1185,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistprofilertracefiles-read-only-system"></a>
 #### RuntimeListProfilerTraceFiles (Read-Only / System)
-**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns parsed JSON payload.
+**Description:** [runtime] List ABAP profiler trace files available in ADT runtime. Returns structured entries with id, recordedAt, user, objectName, state, expiresAt, and sizing/timing fields.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListProfilerTraceFiles.ts`
 
@@ -1210,7 +1210,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimerunclass-read-only-system"></a>
 #### RuntimeRunClass (Read-Only / System)
-**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace (returns profilerId/traceId alongside output).
+**Description:** [runtime] Execute an ABAP class implementing if_oo_adt_classrun and return its output. Set profile=true to also capture a profiler trace: schedules the trace, runs the class under it, then searches the profiler feed for the id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). If the trace has not appeared within that bound, the run still answers success with output and profiler_id but no trace_id — poll RuntimeListProfilerTraceFiles or RuntimeAnalyzeProfilerTrace afterwards. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClass.ts`
 
@@ -1228,18 +1228,18 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
 - `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Only used when profile=true.
-- `profile` (boolean, optional) - When true, run with the profiler and resolve the resulting traceId. Default false.
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Only used when profile=true.
+- `profile` (boolean, optional) - When true, run with the profiler and search the profiler feed for the resulting traceId. Default false.
 - `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced, profile=true).
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000). Only used when profile=true.
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000). Only used when profile=true.
 - `with_rfc_tracing` (boolean, optional) - 
 
 ---
 
 <a id="runtimerunclasswithprofiling-read-only-system"></a>
 #### RuntimeRunClassWithProfiling (Read-Only / System)
-**Description:** [runtime][deprecated] Execute ABAP class with profiler enabled and return created profilerId + traceId. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
+**Description:** [runtime][deprecated] Execute ABAP class with profiler enabled: schedules a trace, runs the class under it, then searches the profiler feed for the trace id this run produced (bounded by max_trace_attempts/trace_retry_delay_ms). trace_id is absent if the trace has not appeared within that bound. No run_status or trace_requests_status field is returned — the client exposes no transport status for a run. Prefer RuntimeRunClass with profile=true; this tool is kept for backward compatibility and will be removed in a future major release.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeRunClassWithProfiling.ts`
 
@@ -1257,10 +1257,10 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - 
 - `max_size_for_trace_file` (number, optional) - 
 - `max_time_for_tracing` (number, optional) - 
-- `max_trace_attempts` (integer, optional) - Max polling attempts to resolve traceId after execution (default 5). Increase for slow systems (e.g. SAP trial cloud).
+- `max_trace_attempts` (integer, optional) - Max attempts to poll the profiler feed for the trace this run produced (default 5). Increase for slow systems (e.g. SAP trial cloud).
 - `sql_trace` (boolean, optional) - 
-- `trace_lookup_uris` (array, optional) - Additional URIs to consult when resolving the trace (advanced).
-- `trace_retry_delay_ms` (integer, optional) - Delay in ms between trace polling attempts (default 2000).
+- `trace_lookup_uris` (array, optional) - Accepted for backward compatibility; no longer affects trace lookup. adt-clients 19 lists the profiler feed as one endpoint, optionally filtered by user — there is nowhere to put a URI.
+- `trace_retry_delay_ms` (integer, optional) - Delay in ms between profiler-feed polling attempts (default 2000).
 - `with_rfc_tracing` (boolean, optional) - 
 
 ---
@@ -1371,13 +1371,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="listtransports-read-only-transport"></a>
 #### ListTransports (Read-Only / Transport)
-**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests.
+**Description:** [read-only] List transport requests for the current or specified user. Returns modifiable and/or released workbench and customizing requests. `user` and modifiable-only are both applied client-side, over every request the server's default search configuration answers — not sent to ADT as filters.
 
 **Source:** `src/handlers/transport/readonly/handleListTransports.ts`
 
 **Parameters:**
-- `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports. Default: true.
-- `user` (string, optional) - SAP user name. If not provided, returns transports for the current user.
+- `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
+- `user` (string, optional) - SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
 
 ---
 
@@ -1418,7 +1418,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Delete an ABAP behavior definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -1460,12 +1460,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state. Use UpdateBehaviorImplementation to set implementation code afterwards.
+**Description:** Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist.
+- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
 - `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions (typically starts with ZBP_ for behavior implementations).
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
@@ -1475,7 +1475,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Delete an ABAP behavior implementation from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -1499,13 +1499,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatebehaviorimplementation-high-level-behavior-implementation"></a>
 #### UpdateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Update source code of an existing ABAP behavior implementation class. Updates both main source (with FOR BEHAVIOR OF clause) and implementations include. Uses stateful session with proper lock/unlock mechanism.
+**Description:** Update source code of an existing ABAP behavior implementation class. Updates the implementations include. Manages lock, update, unlock, and optional activation.
 
 **Source:** `src/handlers/behavior_implementation/high/handleUpdateBehaviorImplementation.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). Must match the behavior definition used when creating the class.
+- `behavior_definition` (string, required) - Referenced Behavior Definition name (e.g., ZI_MY_ENTITY). Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
 - `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
@@ -1530,7 +1530,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state.
+**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -1549,7 +1549,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -1687,35 +1687,35 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaldefinitions-high-level-class"></a>
 #### UpdateLocalDefinitions (High-Level / Class)
-**Description:** Update local definitions in an ABAP class (definitions include). Manages lock, check, update, unlock, and optional activation.
+**Description:** Update local definitions (class-local types/constants) in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalDefinitions.ts`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
 <a id="updatelocalmacros-high-level-class"></a>
 #### UpdateLocalMacros (High-Level / Class)
-**Description:** Update local macros in an ABAP class (macros include). Manages lock, check, update, unlock, and optional activation. Note: Macros are supported in older ABAP versions but not in newer ones.
+**Description:** Update local macros in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalMacros.ts`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `macros_code` (string, required) - Updated source code for local macros.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.
+**Description:** Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -1729,15 +1729,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaltypes-high-level-class"></a>
 #### UpdateLocalTypes (High-Level / Class)
-**Description:** Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.
+**Description:** Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTypes.ts`
 
 **Parameters:**
-- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating. Default: false
+- `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
 - `local_types_code` (string, required) - Updated source code for local types.
-- `transport_request` (string, optional) - Transport request number.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects).
 
 ---
 
@@ -2150,7 +2150,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
@@ -2194,7 +2194,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerdelete-high-level-compact"></a>
 #### HandlerDelete (High-Level / Compact)
-**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
+**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
@@ -2248,7 +2248,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
-**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerGet.ts`
 
@@ -2439,7 +2439,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerupdate-high-level-compact"></a>
 #### HandlerUpdate (High-Level / Compact)
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
@@ -2551,7 +2551,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Delete an ABAP data element from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -2633,7 +2633,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -2754,7 +2754,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Delete an ABAP domain from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
@@ -2828,7 +2828,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctiongroup-high-level-function"></a>
 #### CreateFunctionGroup (High-Level / Function)
-**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules. Uses stateful session for proper lock management.
+**Description:** Create a new ABAP function group in SAP system. Function groups serve as containers for function modules.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionGroup.ts`
 
@@ -2889,7 +2889,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -2930,7 +2930,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -2961,7 +2961,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -3016,7 +3016,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -3088,7 +3088,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system. Includes a deletion check before the actual deletion. Transport request required for transportable objects, optional for local ($TMP).
+**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
@@ -3113,7 +3113,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclass-high-level-message-class"></a>
 #### GetMessageClass (High-Level / Message Class)
-**Description:** Retrieve an ABAP message class (MSAG/T100) with its messages: name, description, package, master language and the message list (msgno, msgtext, self-explanatory).
+**Description:** Retrieve an ABAP message class (MSAG/T100) as its ADT metadata document (XML), under the `message_class` field. adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
@@ -3124,7 +3124,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getmessageclassmessage-high-level-message-class"></a>
 #### GetMessageClassMessage (High-Level / Message Class)
-**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). Returns msgno, msgtext, self-explanatory flag and description.
+**Description:** Retrieve a single message (by number) from an ABAP message class (MSAG/T100). There is no per-message resource: ADT answers the ENTIRE parent class document (XML) under the `message` field, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
@@ -3168,7 +3168,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Delete an ABAP metadata extension from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
@@ -3261,7 +3261,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -3307,12 +3307,12 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
 **Parameters:**
-- `activate` (boolean, optional (default: true)) - Activate service binding after create. Default: true.
+- `activate` (boolean, optional (default: true)) - Activate and generate the service binding after create. Default: true.
 - `binding_variant` (string, optional (default: ODATA_V4_UI)) - Service binding variant. ODATA_V4_UI = OData V4 for Fiori Elements, ODATA_V4_WEB_API = OData V4 Web API, ODATA_V2_UI = OData V2 for Fiori Elements, ODATA_V2_WEB_API = OData V2 Web API.
 - `description` (string, optional) - Optional description. Defaults to service_binding_name when omitted.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - ABAP package name.
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name.
 - `service_definition_name` (string, required) - Referenced service definition name.
 - `service_name` (string, optional) - Published service name. Default: service_binding_name if omitted.
@@ -3323,12 +3323,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Delete ABAP service binding via ADT Business Services endpoint.
+**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
 - `transport_request` (string, optional) - Optional transport request for deletion transport flow.
 
@@ -3366,10 +3366,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `binding_variant` (string, required (default: ODATA_V4_UI)) - Service binding variant. Determines OData version for publish/unpublish routing.
 - `desired_publication_state` (string, required) - Target publication state.
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name to update.
-- `service_name` (string, required) - Published service name.
-- `service_version` (string, optional) - Published service version. Optional.
+- `service_name` (string, required) - Published service name. Accepted for backward compatibility; the publication job no longer carries it.
+- `service_version` (string, optional) - Published service version. Accepted for backward compatibility; the publication job no longer carries it.
 
 ---
 
@@ -3383,8 +3383,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Optional description used during validation.
 - `package_name` (string, optional) - ABAP package for the binding.
 - `service_binding_name` (string, required) - Service binding name to validate.
-- `service_binding_version` (string, optional) - Service binding version (for example: 1.0).
-- `service_definition_name` (string, required) - Service definition linked to binding.
+- `service_binding_version` (string, optional) - Service binding version (for example: 1.0). Accepted for backward compatibility; the transport check this now runs does not read it.
+- `service_definition_name` (string, required) - Service definition linked to binding. Accepted for backward compatibility; the transport check this now runs does not read it.
 
 ---
 
@@ -3410,7 +3410,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Delete an ABAP service definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
@@ -3471,8 +3471,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after creation. Default: true. Set to false for batch operations (activate multiple objects later).
 - `description` (string, optional) - Structure description. If not provided, structure_name will be used.
-- `fields` (array, required (default: 0)) - Array of structure fields
-- `includes` (array, optional) - Include other structures in this structure
+- `fields` (array, required (default: 0)) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
+- `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions.
@@ -3482,7 +3482,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Delete an ABAP structure from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
@@ -3559,7 +3559,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
 **Parameters:**
-- `description` (string, optional) - Table description for validation and creation.
+- `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
 - `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
@@ -3569,7 +3569,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Delete an ABAP table from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
@@ -3627,14 +3627,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create a CDS unit test class with CDS validation. Creates the test class in initial state.
+**Description:** Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Parameters:**
-- `cds_view_name` (string, required) - CDS view name to validate for unit test doubles.
-- `class_name` (string, required) - Global test class name (e.g., ZCL_CDS_TEST).
-- `description` (string, optional) - Optional description for the global test class.
+- `cds_view_name` (string, required) - CDS view name to check for unit test doubles before creating the class.
+- `class_name` (string, required) - Container class name (e.g., ZCL_CDS_TEST).
+- `description` (string, optional) - Optional description for the container class.
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_PKG_01, $TMP).
 - `transport_request` (string, optional) - Transport request number (required for transportable packages).
 
@@ -3681,7 +3681,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id.
+**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -3692,7 +3692,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id.
+**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -3705,7 +3705,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id.
+**Description:** Retrieve CDS unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 
@@ -3717,7 +3717,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id.
+**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
@@ -3728,7 +3728,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run result for a run_id.
+**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3769,7 +3769,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update a CDS unit test class local test class source code.
+**Description:** Update a CDS unit test class local test class source code. Manages lock, update, and unlock of the container class.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -3918,7 +3918,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementationlow-low-level-behavior-implementation"></a>
 #### CreateBehaviorImplementationLow (Low-Level / Behavior Implementation)
-**Description:** [low-level] Create a new ABAP behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate). - use CreateBehaviorImplementation (high-level) for additional validation.
+**Description:** [low-level] Create a new ABAP behavior implementation class. With implementation_code, also locks, writes it to the implementations include, and unlocks. This does NOT write the FOR BEHAVIOR OF main source — the class will not be bound to behavior_definition until a caller writes that separately (e.g. via UpdateClass). - use CreateBehaviorImplementation (high-level) for additional validation.
 
 **Source:** `src/handlers/behavior_implementation/low/handleCreateBehaviorImplementation.ts`
 
@@ -3926,7 +3926,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). Required.
 - `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions.
 - `description` (string, required) - Class description.
-- `implementation_code` (string, optional) - Implementation code for the implementations include (optional).
+- `implementation_code` (string, optional) - Implementation code for the implementations include (optional). When given, the class is locked, the code is written to the implementations include, and unlocked, right after creation. Does NOT write the FOR BEHAVIOR OF main source — the class is not bound to behavior_definition by this alone.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -3989,7 +3989,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `test_class_name` (string, optional) - Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value.
+- `test_class_name` (string, optional) - Ignored. This activates the whole class, test classes included, without naming one — there is no per-test-class activation to target.
 
 ---
 
@@ -4191,8 +4191,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/common/low/handleActivateObject.ts`
 
 **Parameters:**
+- `detail` (string, optional (default: terse)) - How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it). Ignored on the group-activation fallback (more than one object, or a type this tool cannot map to a single family): that path answers a bare run id with no document behind it, so there is nothing for "full" or "raw" to add.
 - `objects` (array, required) - Array of objects to activate. Each object must have 'name' and 'type'. URI is optional.
-- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true
+- `preaudit` (boolean, optional) - Request pre-audit before activation. Default: true. Honored only when the call falls back to group activation (more than one object, or a type this tool cannot map to a single family) — the per-object activate() this tool prefers for a single object has no preaudit parameter at all.
 
 ---
 
@@ -4213,14 +4214,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem/legacy only — calling it on ABAP Cloud will fail.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
+- `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
 
 ---
@@ -4311,16 +4312,16 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - DataElement name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `data_type` (string, optional) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'E' or 'domain'.
-- `decimals` (number, optional) - Decimal places (for predefinedAbapType or refToPredefinedAbapType)
+- `data_type` (string, optional) - Does not reach creation — the shipped create endpoint never reads it (only sends name/description/package/transport). Use UpdateDataElementLow (with lock_handle) after creating to set the data type or domain name.
+- `decimals` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the decimal places.
 - `description` (string, required) - DataElement description.
-- `length` (number, optional) - Data type length (for predefinedAbapType or refToPredefinedAbapType)
+- `length` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the data type length.
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
-- `type_kind` (string, optional) - Type kind: 'E' for domain-based, 'P' for predefined type, etc.
-- `type_name` (string, optional) - Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')
+- `type_kind` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type kind ('E'/'domain', 'P'/'predefinedAbapType', etc.).
+- `type_name` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type name (domain, data element, or class name depending on type_kind).
 
 ---
 
@@ -4515,12 +4516,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatemetadataextensionlow-low-level-ddlx"></a>
 #### ActivateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** Operation: Activate, Create, Update. Subject: MetadataExtension. Will be useful for activating, creating, or updating metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: Metadata Extension. Will be useful for activating, creating, or updating a metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - Metadata extension name (e.g., ZC_MY_EXTENSION).
+- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -4558,7 +4559,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemetadataextensionlow-low-level-ddlx"></a>
 #### DeleteMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Delete an ABAP metadata extension from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/ddlx/low/handleDeleteMetadataExtension.ts`
 
@@ -4575,7 +4576,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleLockMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
+- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -4583,15 +4584,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="unlockmetadataextensionlow-low-level-ddlx"></a>
 #### UnlockMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.
+**Description:** [low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtensionLow operation.
 
 **Source:** `src/handlers/ddlx/low/handleUnlockMetadataExtension.ts`
 
 **Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockMetadataExtension operation.
-- `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
-- `session_id` (string, required) - Session ID from LockMetadataExtension operation. Must be the same as used in LockMetadataExtension.
-- `session_state` (object, optional) - Session state from LockMetadataExtension (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `lock_handle` (string, required) - Lock handle from LockMetadataExtensionLow operation.
+- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
+- `session_id` (string, required) - Session ID from LockMetadataExtensionLow operation. Must be the same as used in LockMetadataExtensionLow.
+- `session_state` (object, optional) - Session state from LockMetadataExtensionLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
 ---
 
@@ -4617,9 +4618,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleValidateMetadataExtension.ts`
 
 **Parameters:**
-- `description` (string, required) - MetadataExtension description.
-- `name` (string, required) - MetadataExtension name to validate (e.g., ZI_MY_DDLX).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `description` (string, required) - Metadata Extension description. Required for validation.
+- `name` (string, required) - Metadata Extension name to validate (e.g., ZI_MY_DDLX).
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -4823,7 +4824,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, required) - Function module description.
 - `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
 - `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Accepted for compatibility; not sent to the server. A function module lives inside its function group's package — the shipped create endpoint takes no package of its own.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
@@ -4935,7 +4936,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleValidateFunctionGroup.ts`
 
 **Parameters:**
-- `description` (string, optional) - Optional description for validation
+- `description` (string, optional) - Optional description for validation. Defaults to the function group name when omitted — the endpoint requires a non-empty description.
 - `function_group_name` (string, required) - FunctionGroup name to validate (e.g., Z_MY_PROGRAM).
 - `package_name` (string, optional) - Package name for validation (optional but recommended).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -5077,7 +5078,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkpackagelow-low-level-package"></a>
 #### CheckPackageLow (Low-Level / Package)
-**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. super_package is required by this schema but not read by the check endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleCheckPackage.ts`
 
@@ -5085,7 +5086,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
+- `super_package` (string, required) - Does not reach the check endpoint — the shipped checkPackage() call takes only the package name. Kept for compatibility with ValidatePackage/CreatePackage, which do read it (LockPackage/UnlockPackage/UpdatePackage do not either).
 
 ---
 
@@ -5126,7 +5127,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="lockpackagelow-low-level-package"></a>
 #### LockPackageLow (Low-Level / Package)
-**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. Requires super_package.
+**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleLockPackage.ts`
 
@@ -5134,13 +5135,13 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
+- `super_package` (string, required) - Does not reach the lock endpoint — the shipped lockPackage() call takes only the package name. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
 
 ---
 
 <a id="unlockpackagelow-low-level-package"></a>
 #### UnlockPackageLow (Low-Level / Package)
-**Description:** [low-level] Unlock an ABAP package after modification. Requires lock handle from LockObject and superPackage. - must use the same session_id and lock_handle from LockObject.
+**Description:** [low-level] Unlock an ABAP package after modification. Requires lock_handle from LockPackage — must use the same session_id and lock_handle it returned. super_package is required by this schema but not read by the unlock endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleUnlockPackage.ts`
 
@@ -5149,13 +5150,13 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Package must already exist.
 - `session_id` (string, required) - Session ID from LockObject operation. Must be the same as used in LockObject.
 - `session_state` (object, optional) - Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name. Required for package operations.
+- `super_package` (string, required) - Does not reach the unlock endpoint — the shipped unlockPackage() call takes only the package name and lock handle. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
 
 ---
 
 <a id="updatepackagelow-low-level-package"></a>
 #### UpdatePackageLow (Low-Level / Package)
-**Description:** [low-level] Update description of an existing ABAP package. Requires lock handle from LockObject and superPackage. - use UpdatePackageSource for full workflow with lock/unlock.
+**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleUpdatePackage.ts`
 
@@ -5164,7 +5165,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Package must already exist.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Super package (parent package) name. Required for package operations.
+- `super_package` (string, required) - Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
 - `updated_description` (string, required) - New description for the package.
 
 ---
@@ -5336,14 +5337,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatestructurelow-low-level-structure"></a>
 #### ActivateStructureLow (Low-Level / Structure)
-**Description:** Operation: Activate, Create, Update. Subject: Structure. Will be useful for activating, creating, or updating structure. [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: Structure. Will be useful for activating, creating, or updating a structure. [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., ZST_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name (e.g., ZST_MY_STRUCT).
 
 ---
 
@@ -5375,14 +5376,14 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `structure_type` (string, optional) - Structure type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
+- `structure_type` (string, optional) - Accepted for compatibility; not forwarded to the create request. (These values name ABAP program subtypes — a DDIC structure has no structure-type concept of its own.)
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
 
 ---
 
 <a id="deletestructurelow-low-level-structure"></a>
 #### DeleteStructureLow (Low-Level / Structure)
-**Description:** [low-level] Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/structure/low/handleDeleteStructure.ts`
 
@@ -5394,7 +5395,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="lockstructurelow-low-level-structure"></a>
 #### LockStructureLow (Low-Level / Structure)
-**Description:** [low-level] Lock an ABAP structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+**Description:** [low-level] Lock a structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/structure/low/handleLockStructure.ts`
 
@@ -5407,14 +5408,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="unlockstructurelow-low-level-structure"></a>
 #### UnlockStructureLow (Low-Level / Structure)
-**Description:** [low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructure operation.
+**Description:** [low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructureLow operation.
 
 **Source:** `src/handlers/structure/low/handleUnlockStructure.ts`
 
 **Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockStructure operation.
-- `session_id` (string, required) - Session ID from LockStructure operation. Must be the same as used in LockStructure.
-- `session_state` (object, optional) - Session state from LockStructure (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `lock_handle` (string, required) - Lock handle from LockStructureLow operation.
+- `session_id` (string, required) - Session ID from LockStructureLow operation. Must be the same as used in LockStructureLow.
+- `session_state` (object, optional) - Session state from LockStructureLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
 
 ---
@@ -5436,13 +5437,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="validatestructurelow-low-level-structure"></a>
 #### ValidateStructureLow (Low-Level / Structure)
-**Description:** [low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/structure/low/handleValidateStructure.ts`
 
 **Parameters:**
 - `description` (string, required) - Structure description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name to validate (e.g., Z_MY_PROGRAM).
@@ -5502,30 +5503,30 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatetablelow-low-level-table"></a>
 #### ActivateTableLow (Low-Level / Table)
-**Description:** Operation: Activate, Create, Update. Subject: Table. Will be useful for activating, creating, or updating table. [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** Operation: Activate, Create, Update. Subject: Table. Will be useful for activating, creating, or updating a table. [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., ZTB_MY_TABLE).
+- `table_name` (string, required) - Table name (e.g., ZT_MY_TABLE).
 
 ---
 
 <a id="checktablelow-low-level-table"></a>
 #### CheckTableLow (Low-Level / Table)
-**Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Requires session_id for stateful operations. Can use session_id and session_state from GetSession to maintain the same session. If ddl_code is provided, validates new/unsaved code (will be base64 encoded in request).
+**Description:** [low-level] Perform syntax check on an ABAP table. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/table/low/handleCheckTable.ts`
 
 **Parameters:**
-- `ddl_code` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
-- `reporter` (string, optional) - Check reporter: 'tableStatusCheck' or 'abapCheckRun'. Default: abapCheckRun
+- `ddl_code` (string, optional) - Accepted for compatibility; not sent to the server. The shipped check endpoint takes no source of its own — it checks whatever is already saved.
+- `reporter` (string, optional) - Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `table_name` (string, required) - Table name (e.g., Z_MY_TABLE)
-- `version` (string, optional) - Version to check: 'active' (last activated), 'inactive' (current unsaved), or 'new' (for new code validation). Default: new
+- `version` (string, optional) - Version to check: 'active' selects the last activated version. 'inactive' and 'new' are accepted for compatibility but indistinguishable — the shipped check endpoint treats anything other than 'active' as 'inactive'. Default: new.
 
 ---
 
@@ -5546,40 +5547,40 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletetablelow-low-level-table"></a>
 #### DeleteTableLow (Low-Level / Table)
-**Description:** [low-level] Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/table/low/handleDeleteTable.ts`
 
 **Parameters:**
-- `table_name` (string, required) - Table name (e.g., Z_MY_PROGRAM).
+- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
 - `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
 
 ---
 
 <a id="locktablelow-low-level-table"></a>
 #### LockTableLow (Low-Level / Table)
-**Description:** [low-level] Lock an ABAP table for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
+**Description:** [low-level] Lock a table for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.
 
 **Source:** `src/handlers/table/low/handleLockTable.ts`
 
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., Z_MY_PROGRAM).
+- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
 
 ---
 
 <a id="unlocktablelow-low-level-table"></a>
 #### UnlockTableLow (Low-Level / Table)
-**Description:** [low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTable operation.
+**Description:** [low-level] Unlock an ABAP table after modification. Must use the same session_id and lock_handle from LockTableLow operation.
 
 **Source:** `src/handlers/table/low/handleUnlockTable.ts`
 
 **Parameters:**
-- `lock_handle` (string, required) - Lock handle from LockTable operation.
-- `session_id` (string, required) - Session ID from LockTable operation. Must be the same as used in LockTable.
-- `session_state` (object, optional) - Session state from LockTable (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., Z_MY_PROGRAM).
+- `lock_handle` (string, required) - Lock handle from LockTableLow operation.
+- `session_id` (string, required) - Session ID from LockTableLow operation. Must be the same as used in LockTableLow.
+- `session_state` (object, optional) - Session state from LockTableLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
 
 ---
 
@@ -5607,7 +5608,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Table description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `table_name` (string, required) - Table name to validate (e.g., Z_MY_TABLE)
@@ -5629,4 +5630,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-07-22*
+*Last updated: 2026-09-17*

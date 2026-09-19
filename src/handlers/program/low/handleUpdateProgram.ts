@@ -1,23 +1,36 @@
 /**
- * UpdateProgram Handler - Update ABAP Program Source Code
+ * UpdateProgramLow Handler - Update ABAP Program Source Code
  *
- * Uses AdtClient.updateProgram from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getProgram().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes through `options.sourceCode`.** `AdtProgram.update()`'s
+ * shipped body reads `const source = options?.sourceCode;` only — the
+ * `config.sourceCode` fallback other members used to have is gone, and
+ * `config.sourceCode` is `check()`'s alone now (an unsaved source to check,
+ * not one to write). This handler writes through `options` only, the one
+ * channel every sibling family in this cluster shares. No `transport_request`
+ * parameter existed on this tool before this migration, so none is forwarded
+ * to `config.transportRequest` either. Verified against `AdtProgram.js`, not
+ * the declaration file.
  */
 
+import { programDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import {
-  type AxiosResponse,
   isCloudConnection,
   restoreSessionInConnection,
   return_error,
-  return_response,
 } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgramLow',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     '[low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
@@ -52,6 +65,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['program_name', 'source_code', 'lock_handle'],
   },
@@ -67,124 +81,51 @@ interface UpdateProgramArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateProgram MCP tool
- *
- * Uses AdtClient.updateProgram - low-level single method call
- */
 export async function handleUpdateProgram(
   context: HandlerContext,
   args: UpdateProgramArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      program_name,
-      source_code,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UpdateProgramArgs;
+  const { program_name, source_code, lock_handle, session_id, session_state } =
+    args;
 
-    // Validation
-    if (!program_name || !source_code || !lock_handle) {
-      return return_error(
-        new Error('program_name, source_code, and lock_handle are required'),
-      );
-    }
-
-    // Check if cloud - programs are not available on cloud systems
-    if (isCloudConnection()) {
-      return return_error(
-        new Error(
-          'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const programName = program_name.toUpperCase();
-
-    logger?.info(`Starting program update: ${programName}`);
-
-    try {
-      // Update program with source code
-      const updateState = await client
-        .getProgram()
-        .update(
-          { programName: programName, sourceCode: source_code },
-          { lockHandle: lock_handle },
-        );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for program ${programName}`,
-        );
-      }
-
-      // Get updated session state after update
-
-      logger?.info(`✅ UpdateProgram completed: ${programName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            program_name: programName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Program ${programName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating program ${programName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update program: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Program ${programName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Program ${programName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!program_name || !source_code || !lock_handle) {
+    return return_error(
+      new Error('program_name, source_code, and lock_handle are required'),
+    );
   }
+
+  if (isCloudConnection()) {
+    return return_error(
+      new Error(
+        'Programs are not available on cloud systems (ABAP Cloud). This operation is only supported on on-premise systems.',
+      ),
+    );
+  }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const programName = program_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateProgramLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getProgram(resultsFor(programDocuments))
+        .update(
+          { programName },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

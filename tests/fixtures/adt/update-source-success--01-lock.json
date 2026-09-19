@@ -1,0 +1,35 @@
+{
+  "case": "update-source-success",
+  "step": 1,
+  "stepTag": "lock",
+  "capturedAt": "2026-09-11T09:00:29.215Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/classes/zmcp_bld_crt_cl2?_action=LOCK&accessMode=MODIFY",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/zmcp_bld_crt_cl2?_action=LOCK&accessMode=MODIFY",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "set-cookie": "REDACTED",
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.lock.Result2",
+      "content-length": "403",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=70616",
+      "sap-server": "true",
+      "sap-perf-fesrec": "76529.000000",
+      "connection": "close"
+    },
+    "bodyFile": "update-source-success--01-lock.body.xml"
+  }
+}

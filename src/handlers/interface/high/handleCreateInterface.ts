@@ -1,22 +1,28 @@
 /**
- * CreateInterface Handler - ABAP Interface Creation via ADT API
+ * CreateInterface Handler - Create ABAP Interface
  *
- * Workflow: create (object in initial state)
- * Source code is set via UpdateInterface handler.
+ * Uses AdtClient.getInterface().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it. Source is `UpdateInterface`'s job.
  */
 
+import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
   name: 'CreateInterface',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.',
   inputSchema: {
@@ -46,6 +52,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['interface_name', 'package_name'],
   },
@@ -57,6 +64,7 @@ interface CreateInterfaceArgs {
   package_name: string;
   transport_request?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateInterface(
@@ -64,71 +72,34 @@ export async function handleCreateInterface(
   args: CreateInterfaceArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.interface_name) {
-      return return_error(new Error('interface_name is required'));
-    }
-    if (!args?.package_name) {
-      return return_error(new Error('package_name is required'));
-    }
 
-    // Validate transport_request: required for non-$TMP packages
-    try {
-      validateTransportRequest(args.package_name, args.transport_request);
-    } catch (error) {
-      return return_error(error as Error);
-    }
-
-    const interfaceName = args.interface_name.toUpperCase();
-    const description = args.description || interfaceName;
-    const packageName = args.package_name;
-    const transportRequest = args.transport_request || '';
-
-    logger?.info(`Starting interface creation: ${interfaceName}`);
-
-    try {
-      const client = createAdtClient(connection, logger);
-
-      // Create
-      await client.getInterface().create({
-        interfaceName,
-        description,
-        packageName,
-        transportRequest,
-        masterLanguage: args.master_language,
-      });
-
-      logger?.info(`Interface created: ${interfaceName}`);
-
-      const result = {
-        success: true,
-        interface_name: interfaceName,
-        package_name: packageName,
-        transport_request: transportRequest || null,
-        type: 'INTF/OI',
-        message: `Interface ${interfaceName} created successfully. Use UpdateInterface to set source code.`,
-        uri: `/sap/bc/adt/oo/interfaces/${encodeSapObjectName(interfaceName).toLowerCase()}`,
-        steps_completed: ['create'],
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(
-        `Interface creation failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      return return_error(error);
-    }
-  } catch (error: any) {
-    logger?.error(
-      `CreateInterface handler error: ${error instanceof Error ? error.message : String(error)}`,
-    );
-    return return_error(error);
+  if (!args?.interface_name) {
+    return return_error(new Error('interface_name is required'));
   }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const interfaceName = args.interface_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateInterface', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getInterface(resultsFor(interfaceDocuments))
+        .create(
+          {
+            interfaceName,
+            description: args.description || interfaceName,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

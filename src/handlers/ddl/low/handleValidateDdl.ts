@@ -1,23 +1,22 @@
 /**
  * ValidateDdlLow Handler - Validate ABAP DDL Source Name
  *
- * Uses AdtClient.getDdl().validate from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().validate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateDdlLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Validate an ABAP DDL source name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
@@ -51,6 +50,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name', 'package_name', 'description'],
   },
@@ -66,113 +66,43 @@ interface ValidateDdlArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateDdl MCP tool
- *
- * Uses AdtClient.getDdl().validate - low-level single method call
- */
 export async function handleValidateDdl(
   context: HandlerContext,
   args: ValidateDdlArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { ddl_name, description, package_name, session_id, session_state } =
-      args as ValidateDdlArgs;
+  const { ddl_name, description, package_name, session_id, session_state } =
+    args;
 
-    // Validation
-    if (!ddl_name || !package_name || !description) {
-      return return_error(
-        new Error('ddl_name, package_name, and description are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlName = ddl_name.toUpperCase();
-
-    logger?.info(`Starting DDL source validation: ${ddlName}`);
-
-    try {
-      // Validate DDL source
-      const validationState = await client.getDdl().validate({
-        ddlName: ddlName,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(`✅ ValidateDdlLow completed: ${ddlName}`);
-      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            ddl_name: ddlName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `DDL source ${ddlName} is valid and available`
-              : `DDL source ${ddlName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to validate DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DDL source ${ddlName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!ddl_name || !package_name || !description) {
+    return return_error(
+      new Error('ddl_name, package_name, and description are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlName = ddl_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateDdlLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl(resultsFor(ddlDocuments))
+        .validate(
+          {
+            ddlName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

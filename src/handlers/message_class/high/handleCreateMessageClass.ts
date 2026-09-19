@@ -1,17 +1,21 @@
 /**
- * CreateMessageClass Handler - Create an ABAP Message Class (MSAG) via AdtClient.
+ * CreateMessageClass Handler - Create an ABAP Message Class (MSAG) shell
  *
- * Uses AdtClient.getMessageClass().create(). Message classes are not activated —
- * create() registers the object in its final (usable) state.
+ * Uses AdtClient.getMessageClass().create from @mcp-abap-adt/adt-clients 19.
+ * Message classes are not activated — create() registers the object in its
+ * final (usable) state. Individual messages are added afterwards with
+ * CreateMessageClassMessage.
  */
 
+import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 
 export const TOOL_DEFINITION = {
@@ -46,6 +50,7 @@ export const TOOL_DEFINITION = {
         description:
           '(optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['message_class_name', 'package_name'],
   },
@@ -57,6 +62,7 @@ interface CreateMessageClassArgs {
   package_name: string;
   transport_request?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateMessageClass(
@@ -64,69 +70,34 @@ export async function handleCreateMessageClass(
   args: CreateMessageClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    if (!args?.message_class_name) {
-      return return_error('message_class_name is required');
-    }
-    if (!args?.package_name) {
-      return return_error('package_name is required');
-    }
 
-    // Transport required for transportable (non-$TMP/non-local) packages
-    validateTransportRequest(args.package_name, args.transport_request);
-
-    const name = args.message_class_name.toUpperCase();
-    const description = args.description || name;
-
-    logger?.info(`Starting message class creation: ${name}`);
-
-    const client = createAdtClient(connection, logger);
-
-    try {
-      await client.getMessageClass().create({
-        name,
-        description,
-        packageName: args.package_name,
-        transportRequest: args.transport_request,
-        masterLanguage: args.master_language,
-      });
-
-      logger?.info(`✅ CreateMessageClass completed: ${name}`);
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          message_class_name: name,
-          package: args.package_name,
-          transport_request: args.transport_request,
-          message: `Message class ${name} created successfully`,
-        }),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating message class ${name}: ${error?.message || error}`,
-      );
-
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.data?.includes?.('ExceptionResourceAlreadyExists')
-      ) {
-        return return_error(
-          `Message class ${name} already exists. Delete it first or use a different name.`,
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : String(error.response.data).substring(0, 500)
-        : error.message || String(error);
-
-      return return_error(
-        `Failed to create message class ${name}: ${errorMessage}`,
-      );
-    }
-  } catch (error) {
-    return return_error(error);
+  if (!args?.message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const name = args.message_class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateMessageClass', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMessageClass(resultsFor(messageClassDocuments))
+        .create(
+          {
+            name,
+            description: args.description || name,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

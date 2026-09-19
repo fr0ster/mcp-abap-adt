@@ -1,12 +1,31 @@
 /**
  * WhereUsed handler using AdtClient utilities
  * Endpoint: /sap/bc/adt/repository/informationsystem/usageReferences
- * Uses getWhereUsedList for parsed results
+ *
+ * Uses AdtClient.getUtils(ourUtils).{getWhereUsedScope,modifyWhereUsedScope,
+ * getWhereUsed} from @mcp-abap-adt/adt-clients 19 — `getWhereUsedList`'s
+ * replacement, composed in `src/lib/strategies/whereUsedList.ts` per the
+ * guide's own "Sequences are yours" table entry. See that file for why the
+ * scope round trip is skipped unless a filter needs it, why a refused scope
+ * fetch is surfaced rather than silently retried unscoped, and why neither
+ * member takes an `analyse`.
+ *
+ * `client.getUtils(ourUtils)`, never `client.getUtils()`: `ourUtils` is this
+ * repository's own `node` reading (keeps the descriptions the shipped one
+ * drops) — irrelevant to where-used itself, but every consumer of the
+ * information-system utilities shares the one injected result set, the same
+ * way `handleGetObjectsByType.ts` does for its own unrelated member.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import {
+  fetchWhereUsedReferences,
+  type WhereUsedListResult,
+} from '../../../lib/strategies/whereUsedList';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -60,107 +79,85 @@ interface WhereUsedArgs {
 
 /**
  * Returns where-used references for ABAP objects using AdtClient utilities.
- * Uses getWhereUsedList for parsed structured results.
  */
 export async function handleGetWhereUsed(
   context: HandlerContext,
   args: WhereUsedArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.object_name) {
-      return return_error('Object name is required');
-    }
 
-    if (!args?.object_type) {
-      return return_error('Object type is required');
-    }
+  if (!args?.object_name) {
+    return return_error('Object name is required');
+  }
+  if (!args?.object_type) {
+    return return_error('Object type is required');
+  }
 
-    const typedArgs = args as WhereUsedArgs;
-    logger?.info(
-      `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
-    );
+  const typedArgs = args as WhereUsedArgs;
+  logger?.info(
+    `Resolving where-used list for ${typedArgs.object_type}/${typedArgs.object_name}`,
+  );
 
-    // Create AdtClient and get utilities
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+  const utils = createAdtClient(connection, logger).getUtils(ourUtils);
 
-    // Validate enable_only_types against the object's where-used scope. The
-    // scope lists exactly which object types are searchable for THIS object;
-    // selecting a type that is absent would otherwise leave an all-deselected
-    // scope, which SAP silently treats as "default" and returns the full,
-    // unfiltered result set. We refuse that: only valid scope types are
-    // searched, anything else is an explicit error — so we return only what
-    // was asked for, never extra.
-    if (typedArgs.enable_only_types && typedArgs.enable_only_types.length > 0) {
-      const scopeResponse = await utils.getWhereUsedScope({
-        object_name: typedArgs.object_name,
-        object_type: typedArgs.object_type,
-      });
-      const available = new Set<string>(
-        [
-          ...String(scopeResponse.data).matchAll(
-            /<usagereferences:type\b[^>]*\bname="([^"]+)"/g,
-          ),
-        ].map((m) => m[1]),
-      );
-      const unknown = typedArgs.enable_only_types.filter(
-        (t) => !available.has(t),
-      );
-      if (unknown.length > 0) {
-        return return_error(
-          `enable_only_types contains object type(s) not searchable in the where-used scope of ${typedArgs.object_type}/${typedArgs.object_name}: ${unknown.join(', ')}. ` +
-            `Supported types for this object: ${[...available].sort().join(', ')}.`,
-        );
-      }
-    }
-
-    // Use getWhereUsedList for parsed results
-    const result = await utils.getWhereUsedList({
+  // Validate enable_only_types against the object's where-used scope. The
+  // scope lists exactly which object types are searchable for THIS object;
+  // selecting a type that is absent would otherwise leave an all-deselected
+  // scope, which SAP silently treats as "default" and returns the full,
+  // unfiltered result set. We refuse that: only valid scope types are
+  // searched, anything else is an explicit error — so we return only what
+  // was asked for, never extra.
+  if (typedArgs.enable_only_types && typedArgs.enable_only_types.length > 0) {
+    const scopeResponse = await utils.getWhereUsedScope({
       object_name: typedArgs.object_name,
       object_type: typedArgs.object_type,
-      enableAllTypes: typedArgs.enable_all_types,
-      enableOnlyTypes: typedArgs.enable_only_types,
-      disableTypes: typedArgs.disable_types,
     });
-
-    logger?.debug(
-      `Where-used search completed for ${typedArgs.object_type}/${typedArgs.object_name}: ${result.totalReferences} references`,
+    if (!scopeResponse.ok) {
+      return return_error(scopeResponse.getError().message);
+    }
+    const scopeXml = scopeResponse.getResult().value?.raw ?? '';
+    const available = new Set<string>(
+      [
+        ...scopeXml.matchAll(/<usagereferences:type\b[^>]*\bname="([^"]+)"/g),
+      ].map((m) => m[1]),
     );
-
-    // Format response with parsed data
-    const formattedResponse = {
-      object_name: result.objectName,
-      object_type: result.objectType,
-      enable_all_types: typedArgs.enable_all_types || false,
-      enable_only_types: typedArgs.enable_only_types,
-      disable_types: typedArgs.disable_types,
-      total_references: result.totalReferences,
-      result_description: result.resultDescription,
-      references: result.references.map((ref) => ({
-        name: ref.name,
-        type: ref.type,
-        uri: ref.uri,
-        package_name: ref.packageName,
-        responsible: ref.responsible,
-        usage_information: ref.usageInformation,
-      })),
-    };
-
-    const mcpResult = {
-      isError: false,
-      content: [
-        {
-          type: 'json',
-          json: formattedResponse,
-        },
-      ],
-    };
-    objectsListCache.setCache(mcpResult);
-    return mcpResult;
-  } catch (error) {
-    logger?.error('Failed to resolve where-used references', error as any);
-    return return_error(error);
+    const unknown = typedArgs.enable_only_types.filter(
+      (t) => !available.has(t),
+    );
+    if (unknown.length > 0) {
+      return return_error(
+        `enable_only_types contains object type(s) not searchable in the where-used scope of ${typedArgs.object_type}/${typedArgs.object_name}: ${unknown.join(', ')}. ` +
+          `Supported types for this object: ${[...available].sort().join(', ')}.`,
+      );
+    }
   }
+
+  return answer(
+    { tool: 'GetWhereUsed', detail: 'terse' },
+    () =>
+      fetchWhereUsedReferences(utils, {
+        object_name: typedArgs.object_name,
+        object_type: typedArgs.object_type,
+        enableAllTypes: typedArgs.enable_all_types,
+        enableOnlyTypes: typedArgs.enable_only_types,
+        disableTypes: typedArgs.disable_types,
+      }),
+    (result: WhereUsedListResult) => {
+      const formattedResponse = {
+        object_name: typedArgs.object_name,
+        object_type: typedArgs.object_type,
+        enable_all_types: typedArgs.enable_all_types || false,
+        enable_only_types: typedArgs.enable_only_types,
+        disable_types: typedArgs.disable_types,
+        total_references: result.totalReferences,
+        result_description: result.resultDescription,
+        references: result.references,
+      };
+      objectsListCache.setCache({
+        isError: false,
+        content: [{ type: 'json', json: formattedResponse }],
+      });
+      return formattedResponse;
+    },
+  );
 }

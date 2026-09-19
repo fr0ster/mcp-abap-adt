@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 
@@ -48,31 +49,41 @@ export async function resolvePackagePatterns(
   return out;
 }
 
+/**
+ * `searchObjects`'s replacement: `search`. `searchObjects` sat beside
+ * `search` doing the identical request until adt-clients 31.0.0, per
+ * `search()`'s own doc comment (not `AdtUtils`'s class-level one, which says
+ * nothing about the rename) — this is the rename the guide's `search`
+ * migration is, everywhere but `handleSearchObject.ts`.
+ *
+ * **`analyse` is passed here, unlike `handleSearchObject.ts`.** That file's
+ * own comment establishes the asymmetry with `tsc`: `getUtils(ourUtils)`
+ * (a result set injected) resolves `search` through the narrower
+ * `IAdtObjectSearch<TSearch>` contract, one parameter only — TS2554 for a
+ * second argument. This resolver calls `client.getUtils()` with **no**
+ * result set, exactly as it did before migration, so `search` resolves
+ * through `AdtUtils`'s own class method instead: `search<E>(criteria,
+ * options?: IAdtOperationOptions<E>)`, confirmed against
+ * `AdtClient.d.ts`'s two `getUtils` overloads (`getUtils(): AdtUtils` vs.
+ * `getUtils<R>(results: R): IAdtInformationSystem<...> & …`). The bare
+ * overload also keeps the shipped `utilDocuments.search` reading —
+ * `IResultStrategy<ISearchResult[]>`, already parsed hits with a `name` —
+ * so the regex walk over `response.data` this resolver used to do by hand
+ * is no longer needed at all.
+ */
 export function createPackagePatternResolver(
   ctx: HandlerContext,
 ): SearchObjectsFn {
   const client = createAdtClient(ctx.connection, ctx.logger);
   const utils = client.getUtils();
   return async ({ query, objectType, maxResults }) => {
-    const response = await utils.searchObjects({
-      query,
-      objectType,
-      maxResults,
-    });
-    const status = response?.status;
-    if (status && status !== 200) {
-      throw new Error(`ADT request failed (status ${status})`);
+    const response = await utils.search(
+      { query, objectType, maxResults },
+      { analyse: analyseException },
+    );
+    if (!response.ok) {
+      throw new Error(response.getError().message);
     }
-    const xml: string =
-      typeof response?.data === 'string'
-        ? response.data
-        : String(response?.data ?? '');
-    const names: string[] = [];
-    for (const m of xml.matchAll(/<adtcore:objectReference\s+([^>]*)\/>/g)) {
-      const attrs = m[1];
-      const name = attrs.match(/adtcore:name="([^"]*)"/)?.[1];
-      if (name) names.push(name);
-    }
-    return names;
+    return response.getResult().value.map((hit) => hit.name);
   };
 }

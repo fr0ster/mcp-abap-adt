@@ -2,11 +2,12 @@
  * GetPackageTree Handler - High-level handler for package tree structure
  *
  * Builds a complete tree of package contents (subpackages + objects)
- * using AdtClient.getPackageHierarchy() from @mcp-abap-adt/adt-clients.
+ * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -83,25 +84,47 @@ export async function handleGetPackageTree(
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
-    // Verify package exists before building tree (fixes #38)
-    try {
-      const readResult = await client.getPackage().read({ packageName });
-      if (!readResult || !readResult.readResult) {
-        return return_error(new Error(`Package ${packageName} not found`));
-      }
-    } catch (readError: any) {
-      if (readError.response?.status === 404) {
-        return return_error(new Error(`Package ${packageName} not found`));
-      }
-      throw readError;
+    // Verify package exists before building tree (fixes #38).
+    // `IPackageContract` has no `.read()` — a package is a container with no
+    // source of its own, so `readMetadata` is the one call (see
+    // `handleReadPackage.ts`, migrated the same way). Without an `analyse`
+    // strategy the default error contract still answers `ok: false` for a
+    // refusal, which is all a plain existence check needs — no message
+    // enrichment is read here, only the boolean.
+    //
+    // **Fix round 1, task 25.** The pre-migration code branched on the wire
+    // status: a 404 said "not found", anything else rethrew the original
+    // error unworded. The first pass here collapsed every refusal — a lock,
+    // a permission failure, a connection error, an actual not-found — into
+    // one hardcoded "not found" message, which is wrong for every refusal
+    // that is not one. `readMetadata`'s default error strategy carries no
+    // status/code to branch on the way the old 404 check did, so rather than
+    // guess a code this has not measured, the message says only what is
+    // true of every case: the read did not produce a document.
+    const readResult = await client.getPackage().readMetadata({ packageName });
+    if (!readResult.ok) {
+      return return_error(
+        new Error(
+          `Package ${packageName} could not be read: ${readResult.getError().message}`,
+        ),
+      );
     }
 
-    // Use the optimized and fixed hierarchy builder from adt-clients
-    const packageTree = await utils.getPackageHierarchy(packageName, {
-      includeSubpackages,
-      maxDepth,
-      includeDescriptions,
-    });
+    // Walked here, not in the client. `getPackageHierarchy` makes one request
+    // per object type plus a walk into subpackages, so `IResultStrategy`, which
+    // reads ONE answer, cannot be given to it — and between it and
+    // `getPackageContentsList` the library had already chosen the shape for us.
+    // `fetchNodeStructure` is one request and takes our reading, so the walk is
+    // composed of steps we can read and the assembly is ours.
+    // See mcp-abap-adt-clients#141.
+    const packageTree = assembleTree(
+      packageName,
+      await walkPackage(utils as never, packageName, {
+        includeSubpackages,
+        maxDepth,
+        includeDescriptions,
+      }),
+    );
 
     if (!packageTree) {
       return return_error(

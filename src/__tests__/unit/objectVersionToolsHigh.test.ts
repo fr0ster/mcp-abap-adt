@@ -5,7 +5,7 @@
  *  - Get<Display>VersionSource forwards content_uri to getVersionSource;
  *  - the factory registers all 27 expected tool names (9 versioned types ×
  *    {Versions, VersionSource, VersionDiff}) with the per-type available_in
- *    copied from each high-level Get<X> (program is onprem/legacy);
+ *    copied from each high-level Get<X> (program is onprem);
  *  - non-versioned types (function_group, domain, data_element, package) get
  *    no version tools.
  * SAP-free via a mocked AdtClient.
@@ -170,25 +170,21 @@ describe('per-object high-level version tools (#30)', () => {
     }
     // no duplicate tool names in the whole HighLevel group
     expect(new Set(registered).size).toBe(registered.length);
-    // program version tools are onprem/legacy-gated in the registered set
+    // program version tools are onprem-gated in the registered set
     const prog = group
       .getHandlers()
       .find((e) => e.toolDefinition.name === 'GetProgramVersions');
-    expect(prog?.toolDefinition.available_in).toEqual(['onprem', 'legacy']);
+    expect(prog?.toolDefinition.available_in).toEqual(['onprem']);
   });
 
-  it('program version tools are onprem/legacy-gated (mirrors GetProgram)', () => {
+  it('program version tools are onprem-gated (mirrors GetProgram)', () => {
     for (const name of ['GetProgramVersions', 'GetProgramVersionSource']) {
-      expect(tool(name).toolDefinition.available_in).toEqual([
-        'onprem',
-        'legacy',
-      ]);
+      expect(tool(name).toolDefinition.available_in).toEqual(['onprem']);
     }
-    // class is all three (mirrors GetClass)
+    // class is both modern environments (mirrors GetClass)
     expect(tool('GetClassVersions').toolDefinition.available_in).toEqual([
       'onprem',
       'cloud',
-      'legacy',
     ]);
     // table omits legacy (mirrors GetTable)
     expect(tool('GetTableVersions').toolDefinition.available_in).toEqual([

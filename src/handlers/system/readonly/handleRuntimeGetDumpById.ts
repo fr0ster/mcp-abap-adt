@@ -1,6 +1,7 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { parseRuntimePayloadToJson } from './runtimePayloadParser';
 
 export const TOOL_DEFINITION = {
@@ -104,48 +105,50 @@ export async function handleRuntimeGetDumpById(
   args: RuntimeGetDumpByIdArgs,
 ) {
   const { connection, logger } = context;
+  const dumpId = args?.dump_id?.trim();
 
-  try {
-    const dumpId = args?.dump_id?.trim();
-
-    if (!dumpId) {
-      throw new Error(
+  if (!dumpId) {
+    return return_error(
+      new Error(
         'dump_id is required. Use RuntimeListFeeds to find dump IDs first.',
-      );
-    }
-
-    const view = args.view ?? 'default';
-    const responseMode = args.response_mode ?? 'both';
-    const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const response = await runtimeClient.getDumps().getById(dumpId, { view });
-    const parsedPayload = parseRuntimePayloadToJson(response.data);
-
-    const result: Record<string, unknown> = {
-      success: true,
-      dump_id: dumpId,
-      view,
-      status: response.status,
-    };
-
-    if (responseMode === 'summary' || responseMode === 'both') {
-      const summary: Record<string, unknown> = {};
-      collectKeyFacts(parsedPayload, summary);
-      result.summary = summary;
-    }
-
-    if (responseMode === 'payload' || responseMode === 'both') {
-      result.payload = parsedPayload;
-    }
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error reading runtime dump by ID:', error);
-    return return_error(error);
+      ),
+    );
   }
+
+  const view = args.view ?? 'default';
+  const responseMode = args.response_mode ?? 'both';
+  const dumps = new AdtRuntimeClient(connection, logger).getDumps();
+
+  // `getById` still answers the raw document (`IAdtResponse<string>`,
+  // defaulted to `rawDocument` — the same transport-frame `.data` this
+  // handler used to read, just reached through `.getResult().value` now).
+  // `parseRuntimePayloadToJson` stays: there is still XML/JSON text here to
+  // turn into an object, unlike the profiler's own views (see
+  // `handleRuntimeGetProfilerTraceData.ts`), which the library now parses
+  // itself. `status`/`statusText`/`headers`/`config` are dropped — the
+  // envelope carries no transport state to read them from any more.
+  return answer(
+    { tool: 'RuntimeGetDumpById', detail: 'terse' },
+    () => dumps.getById(dumpId, { view }),
+    (raw) => {
+      const parsedPayload = parseRuntimePayloadToJson(raw);
+      const result: Record<string, unknown> = {
+        success: true,
+        dump_id: dumpId,
+        view,
+      };
+
+      if (responseMode === 'summary' || responseMode === 'both') {
+        const summary: Record<string, unknown> = {};
+        collectKeyFacts(parsedPayload, summary);
+        result.summary = summary;
+      }
+
+      if (responseMode === 'payload' || responseMode === 'both') {
+        result.payload = parsedPayload;
+      }
+
+      return result;
+    },
+  );
 }

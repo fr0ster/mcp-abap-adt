@@ -9,7 +9,8 @@
 
 **Why teams use it:**
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
-- Works with **On-Premise (ECC/S/4HANA)**, **ABAP Cloud (BTP)**, and **Legacy** systems (BASIS < 7.50)
+- Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
+- Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
 - **JWT/XSUAA**, **service key** (destination-based), and **RFC** authorization
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Rich tool surface for ABAP objects, metadata, transports, and search
@@ -127,7 +128,6 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
    - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
    - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
    - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
-   - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ## Use Cases
 
@@ -203,7 +203,6 @@ Published in the official MCP Registry and listed on Glama.ai.
   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
-  - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ### For Administrators
 - **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes
@@ -303,7 +302,7 @@ SAP_JWT_TOKEN=your-jwt-token
 
 For RFC connection:
 ```bash
-SAP_URL=https://your-legacy-system.com
+SAP_URL=https://your-onprem-system.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username

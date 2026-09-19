@@ -1,19 +1,37 @@
 /**
  * LockObject Handler - Lock ABAP object for modification via ADT API
  *
- * Uses AdtClient lock methods for specific object types.
- * Returns lock handle that must be reused with the same session.
+ * A dispatcher: one branch runs per call, over the same family clients every
+ * low-level LockX handler in this migration uses.
+ *
+ * `lock()` accepts no options at all — not even `analyse` — so there is no
+ * strategy to inject in any branch below, the same as every single-family
+ * LockXLow handler. Its answer is the lock handle itself, and the projection
+ * is the envelope the tool already returned: nothing about `lock` varies with
+ * `detail`, so the parameter is not added to this tool's surface.
  */
 
+import {
+  behaviorDefinitionDocuments,
+  classDocuments,
+  dataElementDocuments,
+  ddlDocuments,
+  domainDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  interfaceDocuments,
+  metadataExtensionDocuments,
+  packageDocuments,
+  programDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockObjectLow',
@@ -83,205 +101,145 @@ interface LockObjectArgs {
   };
 }
 
+const VALID_TYPES = [
+  'class',
+  'program',
+  'interface',
+  'function_group',
+  'function_module',
+  'table',
+  'structure',
+  'ddl',
+  'domain',
+  'data_element',
+  'package',
+  'behavior_definition',
+  'metadata_extension',
+];
+
 export async function handleLockObject(
   context: HandlerContext,
   args: LockObjectArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      object_name,
-      object_type,
-      super_package,
-      session_id,
-      session_state,
-    } = args as LockObjectArgs;
+  const { object_name, object_type, super_package, session_id, session_state } =
+    args as LockObjectArgs;
 
-    if (!object_name || !object_type) {
-      return return_error(
-        new Error('object_name and object_type are required'),
-      );
-    }
+  if (!object_name || !object_type) {
+    return return_error(new Error('object_name and object_type are required'));
+  }
 
-    const validTypes = [
-      'class',
-      'program',
-      'interface',
-      'function_group',
-      'function_module',
-      'table',
-      'structure',
-      'ddl',
-      'domain',
-      'data_element',
-      'package',
-      'behavior_definition',
-      'metadata_extension',
-    ];
-    const objectType = object_type.toLowerCase();
-    if (!validTypes.includes(objectType)) {
-      return return_error(
-        new Error(
-          `Invalid object_type. Must be one of: ${validTypes.join(', ')}`,
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-    }
-
-    const desiredSessionId = session_id || generateSessionId();
-    const objectName = object_name.toUpperCase();
-
-    logger?.info(
-      `Starting object lock: ${objectName} (type: ${objectType}, session: ${desiredSessionId.substring(0, 8)}...)`,
+  const objectType = object_type.toLowerCase();
+  if (!VALID_TYPES.includes(objectType)) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
+      ),
     );
+  }
 
-    try {
-      let lockHandle: string | undefined;
+  // Two request-shape checks that stay ahead of the client call, exactly
+  // where they lived before this migration: `lock()`'s config does not
+  // itself enforce either.
+  let functionGroupName: string | undefined;
+  let functionModuleName: string | undefined;
+  if (objectType === 'function_module') {
+    if (!object_name.toUpperCase().includes('|')) {
+      return return_error(
+        new Error('Function module name must be in format GROUP|FM_NAME'),
+      );
+    }
+    [functionGroupName, functionModuleName] = object_name
+      .toUpperCase()
+      .split('|');
+  }
+  if (objectType === 'package' && !super_package) {
+    return return_error(
+      new Error('super_package is required for package locking.'),
+    );
+  }
 
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const desiredSessionId = session_id || generateSessionId();
+  const objectName = object_name.toUpperCase();
+  const client = createAdtClient(connection, logger);
+
+  return answer(
+    { tool: 'LockObjectLow', detail: 'terse' },
+    () => {
       switch (objectType) {
         case 'class':
-          lockHandle = await client.getClass().lock({ className: objectName });
-          break;
+          return client
+            .getClass(resultsFor(classDocuments))
+            .lock({ className: objectName });
         case 'program':
-          lockHandle = await client
-            .getProgram()
+          return client
+            .getProgram(resultsFor(programDocuments))
             .lock({ programName: objectName });
-          break;
         case 'interface':
-          lockHandle = await client
-            .getInterface()
+          return client
+            .getInterface(resultsFor(interfaceDocuments))
             .lock({ interfaceName: objectName });
-          break;
         case 'function_group':
-          lockHandle = await client
-            .getFunctionGroup()
+          return client
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
             .lock({ functionGroupName: objectName });
-          break;
-        case 'function_module': {
-          if (!objectName.includes('|')) {
-            return return_error(
-              new Error('Function module name must be in format GROUP|FM_NAME'),
-            );
-          }
-          const [groupName, fmName] = objectName.split('|');
-          lockHandle = await client.getFunctionModule().lock({
-            functionGroupName: groupName,
-            functionModuleName: fmName,
-          });
-          break;
-        }
+        case 'function_module':
+          return client
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .lock({
+              functionGroupName: functionGroupName as string,
+              functionModuleName: functionModuleName as string,
+            });
         case 'table':
-          lockHandle = await client.getTable().lock({ tableName: objectName });
-          break;
+          return client
+            .getTable(resultsFor(tableDocuments))
+            .lock({ tableName: objectName });
         case 'structure':
-          lockHandle = await client
-            .getStructure()
+          return client
+            .getStructure(resultsFor(structureDocuments))
             .lock({ structureName: objectName });
-          break;
         case 'ddl':
-          lockHandle = await client.getDdl().lock({ ddlName: objectName });
-          break;
+          return client
+            .getDdl(resultsFor(ddlDocuments))
+            .lock({ ddlName: objectName });
         case 'domain':
-          lockHandle = await client
-            .getDomain()
+          return client
+            .getDomain(resultsFor(domainDocuments))
             .lock({ domainName: objectName });
-          break;
         case 'data_element':
-          lockHandle = await client
-            .getDataElement()
+          return client
+            .getDataElement(resultsFor(dataElementDocuments))
             .lock({ dataElementName: objectName });
-          break;
         case 'behavior_definition':
-          lockHandle = await client
-            .getBehaviorDefinition()
+          return client
+            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
             .lock({ name: objectName });
-          break;
         case 'metadata_extension':
-          lockHandle = await client
-            .getMetadataExtension()
+          return client
+            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .lock({ name: objectName });
-          break;
         case 'package':
-          if (!super_package) {
-            return return_error(
-              new Error('super_package is required for package locking.'),
-            );
-          }
-          lockHandle = await client.getPackage().lock({
+          return client.getPackage(resultsFor(packageDocuments)).lock({
             packageName: objectName,
-            superPackage: super_package.toUpperCase(),
+            superPackage: (super_package as string).toUpperCase(),
           });
-          break;
         default:
-          return return_error(
-            new Error(`Unsupported object_type: ${object_type}`),
-          );
+          // Unreachable: objectType was already checked against VALID_TYPES.
+          throw new Error(`Unsupported object_type: ${object_type}`);
       }
-
-      if (!lockHandle) {
-        throw new Error(
-          `Lock did not return a lock handle for object ${objectName}`,
-        );
-      }
-
-      logger?.info(`✅ LockObject completed: ${objectName}`);
-      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            object_name: objectName,
-            object_type: objectType,
-            session_id: desiredSessionId,
-            lock_handle: lockHandle,
-            session_state: null, // Session state management is now handled by auth-broker
-            message: `Object ${objectName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error locking object ${objectName}:`, error);
-
-      let errorMessage = `Failed to lock object: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Object ${objectName} not found.`;
-      } else if (error.response?.status === 409) {
-        errorMessage = `Object ${objectName} is already locked by another user.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch {
-          // ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    },
+    (lockHandle: string) => ({
+      success: true,
+      object_name: objectName,
+      object_type: objectType,
+      session_id: desiredSessionId,
+      lock_handle: lockHandle,
+      session_state: null, // Session state management is now handled by auth-broker
+      message: `Object ${objectName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+    }),
+  );
 }

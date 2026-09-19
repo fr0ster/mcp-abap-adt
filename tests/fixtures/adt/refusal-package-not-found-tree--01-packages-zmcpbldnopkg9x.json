@@ -1,0 +1,32 @@
+{
+  "case": "refusal-package-not-found-tree",
+  "step": 1,
+  "stepTag": "packages-zmcpbldnopkg9x",
+  "capturedAt": "2026-09-11T06:12:23.549Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/packages/ZMCP_BLD_NOPKG9X?version=active",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/packages/ZMCP_BLD_NOPKG9X?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "Not Found",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "554",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "51179.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-package-not-found-tree--01-packages-zmcpbldnopkg9x.body.xml"
+  }
+}

@@ -508,9 +508,11 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 |-------|-------------|---------|
 | `cloud` | ABAP Cloud / BTP systems | **Yes** (default) |
 | `onprem` | On-premise systems (BASIS ≥ 7.50) | No |
-| `legacy` | Legacy on-premise systems (BASIS < 7.50) | No |
+| `legacy` | Legacy on-premise systems (BASIS < 7.50) — **not supported at present**, see below | No |
 
-**Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` and `legacy` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
+**Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
+
+**On `legacy`:** no tool declares that environment, so a server started with `SAP_SYSTEM_TYPE=legacy` offers none. Support for legacy systems is parked on the `parked/legacy-support` branch until it can be tried against a live one — it was declared on 142 tools and had never been run against such a system, which is a claim rather than a fact.
 
 **Default is `cloud`** — this covers most modern scenarios. On-premise users must set `SAP_SYSTEM_TYPE=onprem` to access on-premise-only tools (e.g., Programs).
 
@@ -524,7 +526,7 @@ When embedding the server via `EmbeddableMcpServer`, pass `systemType` in the co
 new EmbeddableMcpServer({
   connection,
   exposition: ['readonly', 'high'],
-  systemType: 'onprem', // or 'cloud' / 'legacy'
+  systemType: 'onprem', // or 'cloud'
 });
 ```
 

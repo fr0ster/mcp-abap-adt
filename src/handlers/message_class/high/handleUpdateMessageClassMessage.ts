@@ -1,18 +1,40 @@
 /**
  * UpdateMessageClassMessage Handler - Update (upsert) a single message in a
- * Message Class (MSAG) via AdtClient.
+ * Message Class (MSAG)
  *
- * Uses AdtClient.getMessageClassMessage().update(). Lock/unlock is handled
- * internally by the client.
+ * Uses AdtClient.getMessageClassMessage().update from
+ * @mcp-abap-adt/adt-clients 19. `create` and `update` are the same write —
+ * ADT upserts.
+ *
+ * **No lock handle — this one genuinely has none to take.**
+ * `AdtMessageClassMessage` is not `IAdtLockable` at all: `update()` manages
+ * its own message-level and class-level locks internally, through direct
+ * module calls (`lockMessageIfGranted`/`lockClassForMessageOrPlain`/
+ * `unlockMessageClass`), never through a `lock()`/`unlock()` on this
+ * accessor — which does not exist on `IMessageClassMessageContract`. Fix
+ * round 1: an optional `lock_handle` param was tried here (forwarded into
+ * `options.lockHandle`, which the shipped member never reads) and reverted
+ * — unlike its eight siblings, there is no lock this handler could acquire
+ * even if it wanted to, so nothing was moved and no parameter was added.
+ *
+ * **No `resultsFor(messageDocuments)`, and no `detail`.**
+ * `IMessageClassMessageResults<TRead, TWritten, TDeleted>` fixes its three
+ * type parameters to literal `string` at the factory's own generic bound
+ * (`R extends IMessageClassMessageResults`, which — no explicit type
+ * arguments at that bound — means `IMessageClassMessageResults<string,
+ * string, string>`), so passing `resultsFor(...)`'s `AdtReading`-producing
+ * functions does not type-check against it; `GetMessageClassMessage` found
+ * the same disagreement on the read side. The default `messageDocuments`
+ * answers the raw PUT response body as a plain string, with no `status`
+ * alongside it to build `AdtReading`/`project(detail, terseWrite)` from —
+ * matching why this tool carries no `detail` parameter.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateMessageClassMessage',
@@ -67,54 +89,38 @@ export async function handleUpdateMessageClassMessage(
   args: UpdateMessageClassMessageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      message_class_name,
-      msgno,
-      msgtext,
-      self_explanatory,
-      description,
-      transport_request,
-    } = args;
-    if (!message_class_name) {
-      return return_error(new Error('message_class_name is required'));
-    }
-    if (!msgno) {
-      return return_error(new Error('msgno is required'));
-    }
-    if (msgtext === undefined || msgtext === null) {
-      return return_error(new Error('msgtext is required'));
-    }
 
-    const client = createAdtClient(connection, logger);
-    const className = message_class_name.toUpperCase();
-
-    logger?.info(`Updating message ${msgno} in class ${className}`);
-
-    const state = await client.getMessageClassMessage().update({
-      className,
-      msgno,
-      msgtext,
-      selfExplanatory: self_explanatory,
-      description,
-      transportRequest: transport_request,
-    });
-
-    logger?.info(
-      `✅ UpdateMessageClassMessage completed: ${className}/${msgno}`,
-    );
-
-    return return_response({
-      data: JSON.stringify({
-        success: true,
-        message_class_name: className,
-        msgno,
-        transport_request,
-        status: state.updateResult?.status,
-        message: `Message ${msgno} updated in message class ${className}`,
-      }),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+  if (!args?.msgno) {
+    return return_error(new Error('msgno is required'));
+  }
+  if (args?.msgtext === undefined || args?.msgtext === null) {
+    return return_error(new Error('msgtext is required'));
+  }
+
+  const className = args.message_class_name.toUpperCase();
+
+  return answer(
+    { tool: 'UpdateMessageClassMessage', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger).getMessageClassMessage().update(
+        {
+          className,
+          msgno: args.msgno,
+          msgtext: args.msgtext,
+          selfExplanatory: args.self_explanatory,
+          description: args.description,
+          transportRequest: args.transport_request,
+        },
+        { analyse: analyseException },
+      ),
+    () => ({
+      success: true,
+      message_class_name: className,
+      msgno: args.msgno,
+      message: `Message ${args.msgno} updated in message class ${className}`,
+    }),
+  );
 }

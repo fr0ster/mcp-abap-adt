@@ -1,0 +1,38 @@
+{
+  "case": "read-package-contents-structure",
+  "step": 1,
+  "stepTag": "nodestructure",
+  "capturedAt": "2026-09-11T06:12:25.991Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/repository/nodestructure",
+    "params": {
+      "parent_type": "DEVC/K",
+      "parent_name": "ZMCP_SHR_PKG",
+      "parent_tech_name": "ZMCP_SHR_PKG",
+      "withShortDescriptions": "true"
+    },
+    "effectiveUrl": "/sap/bc/adt/repository/nodestructure?parent_type=DEVC%2FK&parent_name=ZMCP_SHR_PKG&parent_tech_name=ZMCP_SHR_PKG&withShortDescriptions=true",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml;dataname=com.sap.adt.RepositoryObjectTreeContent, application/vnd.sap.adt.repository.nodestructure.v1+xml, application/xml",
+      "Content-Type": "application/vnd.sap.as+xml; charset=UTF-8; dataname=null"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><asx:abap xmlns:asx=\"http://www.sap.com/abapxml\" version=\"1.0\"><asx:values><DATA><TV_NODEKEY>000000</TV_NODEKEY></DATA></asx:values></asx:abap>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.RepositoryObjectTreeContent",
+      "content-length": "448",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "82467.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-package-contents-structure--01-nodestructure.body.xml"
+  }
+}

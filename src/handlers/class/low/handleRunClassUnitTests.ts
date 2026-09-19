@@ -3,6 +3,15 @@
  *
  * Uses AdtClient.runClassUnitTests from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
+ *
+ * **Deliberately excluded from Task 14's `class/low` migration.** This
+ * reaches `getUnitTest()`, not `getClass()` — a different family with its
+ * own result set (`ourUnitTest`, already exported from `resultSets.ts`) and
+ * its own `analyseUnitTest` strategy — and stays on `client.getUnitTest() as
+ * any` until the task that wires the unit-test members migrates it. It has
+ * no `tsc` error today only because nothing here resolves a signature that
+ * names `IAdtResponse`'s type parameters explicitly, not because it is
+ * migrated.
  */
 
 import { createAdtClient } from '../../../lib/clients';
@@ -34,7 +43,7 @@ type DurationOptions = {
 
 export const TOOL_DEFINITION = {
   name: 'RunClassUnitTestsLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.',
   inputSchema: {
@@ -200,9 +209,24 @@ export async function handleRunClassUnitTests(
 
     try {
       const unitTest = client.getUnitTest() as any;
-      const runId = await unitTest.run(formattedTests, options);
+      // `run()` answers an `IAdtResponse`, not the run id directly — treating
+      // the envelope itself as the id (the pre-fix shape here) serialises an
+      // object with only an `ok` field (its methods are not JSON), and
+      // `!envelope` never fires because both a success and a refusal
+      // envelope are truthy objects. That is the false-success shape this
+      // migration exists to remove, on the tool that starts the run.
+      const runAnswer = await unitTest.run(formattedTests, options);
       const runResponse = unitTest.getStatusResponse?.();
 
+      if (!runAnswer?.ok) {
+        const failure = runAnswer?.getError?.();
+        throw new Error(
+          failure?.message ??
+            'Failed to obtain ABAP Unit run identifier from SAP response headers',
+        );
+      }
+
+      const runId = runAnswer.getResult().value;
       if (!runId) {
         throw new Error(
           'Failed to obtain ABAP Unit run identifier from SAP response headers',

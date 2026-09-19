@@ -1,0 +1,34 @@
+{
+  "case": "refusal-validation-name-taken-domain",
+  "step": 1,
+  "stepTag": "domains-validation",
+  "capturedAt": "2026-09-11T08:31:46.133Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/domains/validation?objname=MANDT&packagename=ZADT_BLD_PKG03&description=x",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/domains/validation?objname=MANDT&packagename=ZADT_BLD_PKG03&description=x",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "statusText": "Bad Request",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "549",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=65694",
+      "sap-server": "true",
+      "sap-perf-fesrec": "72575.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-validation-name-taken-domain--01-domains-validation.body.xml"
+  }
+}

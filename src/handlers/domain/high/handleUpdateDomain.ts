@@ -1,21 +1,57 @@
 /**
  * UpdateDomain Handler - Update Existing ABAP Domain
  *
- * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getDomain().{lock,readMetadata,updateMetadata,check,unlock,
+ * activate} from @mcp-abap-adt/adt-clients 19, through `withLock` — the lock
+ * is held for the read-modify-write-check in its body, and released on
+ * every path out (a refused read, a refused write, a refused check, a
+ * thrown patch all still unlock).
  *
- * Workflow: lock -> update -> check -> unlock -> (activate)
- * Note: No validation step - lock will fail if domain doesn't exist
+ * Workflow: lock -> (read, patch, write, check) -> unlock -> (wait for the
+ * write to be visible) -> (activate). `check` runs unconditionally, not
+ * gated by `activate` — the pre-migration handler ran it the same way, and
+ * a refusal there stops the answer exactly as a refused write would (both
+ * are steps of the `sequence` below; `sequence` hands back whichever one
+ * refused, untouched). The wait between `unlock` and `activate` is the
+ * pre-migration handler's long-polling `readMetadata({withLongPolling:
+ * true})`, discarded for its result but not for what it does: this
+ * repository's own `xmlPatch.ts` documents the live incident behind it — a
+ * read of a not-yet-ready object answers 200 with an empty body, never a
+ * 404, so a slow read can otherwise patch nothing and PUT a document
+ * missing a field that was in fact set all along.
+ *
+ * **The patched document goes in `config.document`, not `options.xmlContent`.**
+ * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only and
+ * passes it straight to the PUT body; `options.xmlContent` is declared on the
+ * options type but never read by this member. Verified against the compiled
+ * `AdtDomain.js` and `core/domain/update.js`, not the declaration file. See
+ * `handleUpdateDomain.ts` (low) for the same fix.
+ *
+ * **`config.packageName` never reaches the wire on an update.** The shipped
+ * `updateDomain()` wire function (`core/domain/update.js`) builds its URL
+ * and PUT from `args.domain_name`, `args.transport_request` and `document`
+ * only — `args.package_name` is passed in but never read. Not sent.
  */
 
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { withLock } from '../../../lib/strategies/withLock';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
@@ -96,6 +132,7 @@ export const TOOL_DEFINITION = {
           required: ['low', 'text'],
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['domain_name', 'package_name'],
   },
@@ -115,165 +152,89 @@ interface DomainArgs {
   value_table?: string;
   activate?: boolean;
   fixed_values?: Array<{ low: string; text: string }>;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateDomain tool
- *
- * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleUpdateDomain(
   context: HandlerContext,
   args: DomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    if (!args?.domain_name) {
-      return return_error('Domain name is required');
-    }
-    if (!args?.package_name) {
-      return return_error('Package name is required');
-    }
 
-    // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(args.package_name, args.transport_request);
-
-    const typedArgs = args as DomainArgs;
-    const domainName = typedArgs.domain_name.toUpperCase();
-
-    logger?.info(`Starting domain update: ${domainName}`);
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
-
-      // Lock domain (will fail if domain doesn't exist)
-      // Pass packageName to lockDomain so builder is created with correct config from the start
-      let lockHandle: string | undefined;
-      let updateState: any;
-
-      try {
-        lockHandle = await client.getDomain().lock({
-          domainName,
-          packageName: typedArgs.package_name,
-        } as any);
-
-        // Update with properties (packageName and description are required)
-        const properties = {
-          domainName: domainName,
-          packageName: typedArgs.package_name,
-          description: typedArgs.description || domainName,
-          datatype: typedArgs.datatype,
-          length: typedArgs.length,
-          decimals: typedArgs.decimals,
-          conversionExit: typedArgs.conversion_exit,
-          lowercase: typedArgs.lowercase,
-          signExists: typedArgs.sign_exists,
-          valueTable: typedArgs.value_table,
-          fixedValues: typedArgs.fixed_values,
-          transportRequest: typedArgs.transport_request,
-        };
-        updateState = await client
-          .getDomain()
-          .update(properties, { lockHandle: lockHandle });
-
-        // Check
-        try {
-          await safeCheckOperation(
-            () => client.getDomain().check({ domainName }),
-            domainName,
-            {
-              debug: (message: string) => logger?.debug(message),
-            },
-          );
-        } catch (checkError: any) {
-          // If error was marked as "already checked", continue silently
-          if (!(checkError as any).isAlreadyChecked) {
-            // Real check error - rethrow
-            throw checkError;
-          }
-        }
-      } finally {
-        if (lockHandle) {
-          try {
-            await client.getDomain().unlock({ domainName }, lockHandle);
-            logger?.info(`Domain unlocked: ${domainName}`);
-          } catch (unlockError: any) {
-            logger?.warn(
-              `Failed to unlock domain ${domainName}: ${unlockError?.message || unlockError}`,
-            );
-          }
-        }
-      }
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getDomain()
-          .read({ domainName }, 'inactive', { withLongPolling: true });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        await client.getDomain().activate({ domainName });
-      }
-
-      // Get domain details from update result
-      const updateResult = updateState.updateResult;
-      let domainDetails = null;
-      if (
-        updateResult?.data &&
-        typeof updateResult.data === 'object' &&
-        'domain_details' in updateResult.data
-      ) {
-        domainDetails = (updateResult.data as any).domain_details;
-      }
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          domain_name: domainName,
-          package: typedArgs.package_name,
-          transport_request: typedArgs.transport_request,
-          status: shouldActivate ? 'active' : 'inactive',
-          message: `Domain ${domainName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-          domain_details: domainDetails,
-        }),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Handle specific error cases
-      if (
-        error.message?.includes('not found') ||
-        error.response?.status === 404
-      ) {
-        return return_error(`Domain ${domainName} not found.`);
-      }
-
-      if (error.message?.includes('locked') || error.response?.status === 403) {
-        return return_error(
-          `Domain ${domainName} is locked by another user or session. Please try again later.`,
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        `Failed to update domain ${domainName}: ${errorMessage}`,
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.domain_name) {
+    return return_error('Domain name is required');
   }
+  if (!args?.package_name) {
+    return return_error('Package name is required');
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const domainName = args.domain_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateDomain', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getDomain(
+        resultsFor(domainDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ domainName }),
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+          sequence(
+            () =>
+              obj.readMetadata({ domainName }, { analyse: analyseException }),
+            (current) =>
+              obj.updateMetadata(
+                {
+                  domainName,
+                  transportRequest: args.transport_request,
+                  document: patchDomainXml(
+                    extractXmlString(current.raw, `domain ${domainName}`),
+                    {
+                      description: args.description,
+                      datatype: args.datatype,
+                      length: args.length,
+                      decimals: args.decimals,
+                      conversion_exit: args.conversion_exit,
+                      lowercase: args.lowercase,
+                      sign_exists: args.sign_exists,
+                      value_table: args.value_table,
+                      fixed_values: args.fixed_values,
+                    },
+                  ),
+                },
+                { lockHandle, analyse: analyseException },
+              ),
+            () =>
+              obj.check({ domainName }, undefined, { analyse: analyseCheck }),
+          ),
+        (lockHandle) => obj.unlock({ domainName }, lockHandle),
+      );
+
+      if (!written.ok) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // Best-effort: wait for the write to be visible before activating.
+      // Every outcome is discarded — activation answers explicitly if the
+      // object still is not ready.
+      await obj
+        .readMetadata(
+          { domainName },
+          { withLongPolling: true, analyse: analyseException },
+        )
+        .catch(() => undefined);
+
+      if (!shouldActivate) {
+        return written;
+      }
+
+      return obj.activate({ domainName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

@@ -147,14 +147,19 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
 
         // Step 1: Create CDS unit test class
         testLogger?.info(`   • create cds unit test: ${className}`);
+        // `class_template` and `test_class_source` no longer reach
+        // CreateCdsUnitTest — the class shell is a bare `getClass().create`
+        // with no classTemplate (see handleCreateCdsUnitTest's own doc
+        // comment), and the test source is written afterward, under a lock,
+        // by UpdateCdsUnitTest (Step 3 below reads `update_test_class_source`
+        // for exactly that). `classTemplate`/`testClassSource` stay above as
+        // a test-config presence check; they are just not forwarded here.
         const createResponse = await tester.invokeToolOrHandler(
           'CreateCdsUnitTest',
           {
             class_name: className,
             package_name: packageName,
             cds_view_name: cdsViewName,
-            class_template: classTemplate,
-            test_class_source: testClassSource,
             description: params.description,
             transport_request: params.transport_request,
           },
@@ -167,8 +172,6 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
               class_name: className,
               package_name: packageName,
               cds_view_name: cdsViewName,
-              class_template: classTemplate,
-              test_class_source: testClassSource,
               description: params.description,
               transport_request: params.transport_request,
             });
@@ -180,9 +183,12 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
           throw new Error(`CreateCdsUnitTest failed: ${errorMsg}`);
         }
 
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
-        expect(createData.class_name).toBe(className.toUpperCase());
+        // CreateCdsUnitTest's terse projection is `terseWrite`: on success it
+        // answers the literal text "SUCCESS", not a JSON object — `success`/
+        // `class_name` no longer exist to read (CHANGELOG Unreleased: "Terse
+        // writes answer the literal string `SUCCESS` ... uniformly across
+        // every write tool"; see projections.ts `terseWrite`).
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
 
         testLogger?.success(`create cds unit test: ${className} done`);
 
@@ -243,8 +249,10 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
             throw new Error(`UpdateCdsUnitTest failed: ${errorMsg}`);
           }
 
-          const updateData = parseHandlerResponse(updateResponse);
-          expect(updateData.success).toBe(true);
+          // UpdateCdsUnitTest's terse projection is `terseWrite` too — same
+          // literal "SUCCESS" text, no `success` field (projections.ts
+          // `terseWrite`).
+          expect(updateResponse.content[0]?.text).toBe('SUCCESS');
           testLogger?.success(`update cds unit test: ${className} done`);
         } else {
           testLogger?.warn(
@@ -326,8 +334,16 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
           );
         } else {
           const getStatusData = parseHandlerResponse(getStatusResponse);
-          expect(getStatusData.success).toBe(true);
+          // GetCdsUnitTestStatus's terse projection no longer answers
+          // `success` — dropped from both status tools at every level
+          // (CHANGELOG Unreleased, "Six unit-test tools gained the `detail`
+          // parameter..."). `run_id`, `finished` and `run_status` (now the
+          // status string itself, e.g. "FINISHED") are what the projection
+          // actually carries — see handleGetCdsUnitTestStatus.ts's
+          // `terseRunStatus`.
           expect(getStatusData.run_id).toBe(runId);
+          expect(typeof getStatusData.finished).toBe('boolean');
+          expect(typeof getStatusData.run_status).toBe('string');
           testLogger?.success(`get cds unit test status: run_id ${runId}`);
         }
 
@@ -390,7 +406,11 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         }
 
         const deleteData = parseHandlerResponse(deleteResponse);
-        expect(deleteData.success).toBe(true);
+        // DeleteCdsUnitTest's terse projection is `terseDeletion`, which
+        // answers `deleted`/`object` from ADT's own `del:deletionResult`
+        // document — it never had a `success` field (projections.ts
+        // `terseDeletion`).
+        expect(deleteData.deleted).toBe(true);
         deletedInTest = true;
         testLogger?.success(`delete cds unit test: ${className} done`);
       });

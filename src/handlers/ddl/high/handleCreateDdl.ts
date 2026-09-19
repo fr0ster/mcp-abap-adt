@@ -1,22 +1,34 @@
 /**
  * CreateDdl Handler - CDS/Classic View Creation via ADT API
  *
- * Workflow: validate -> create (object in initial state)
- * DDL source is set via UpdateDdl handler.
+ * Uses AdtClient.getDdl().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
+ *
+ * **No source here.** `createDdl` never reads `ddl_source`: a create posts
+ * metadata, and the source is a PUT to `.../source/main` under a lock, which
+ * is `UpdateDdl`'s job. The pre-migration handler's own `validate()` call is
+ * dropped — this is a bare create, matching `CreateDdlLow`. Verified against
+ * `AdtDdl.js`.
  */
 
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
   name: 'CreateDdl',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
   inputSchema: {
@@ -44,6 +56,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name', 'package_name'],
   },
@@ -55,11 +68,14 @@ interface CreateDdlArgs {
   transport_request?: string;
   description?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-export async function handleCreateDdl(context: HandlerContext, params: any) {
+export async function handleCreateDdl(
+  context: HandlerContext,
+  args: CreateDdlArgs,
+) {
   const { connection, logger } = context;
-  const args: CreateDdlArgs = params;
 
   if (!args.ddl_name || !args.package_name) {
     return return_error(
@@ -67,60 +83,26 @@ export async function handleCreateDdl(context: HandlerContext, params: any) {
     );
   }
 
-  try {
-    validateTransportRequest(args.package_name, args.transport_request);
-  } catch (error) {
-    return return_error(error as Error);
-  }
+  validateTransportRequest(args.package_name, args.transport_request);
 
   const ddlName = args.ddl_name.toUpperCase();
-  logger?.info(`Starting DDL source creation: ${ddlName}`);
+  const detail = detailOf(args);
 
-  try {
-    const client = createAdtClient(connection, logger);
-
-    // Validate
-    logger?.debug(`Validating DDL source: ${ddlName}`);
-    await client.getDdl().validate({
-      ddlName: ddlName,
-      packageName: args.package_name,
-      description: args.description || ddlName,
-    });
-    logger?.debug(`DDL source validation passed: ${ddlName}`);
-
-    // Create
-    logger?.debug(`Creating DDL source: ${ddlName}`);
-    await client.getDdl().create({
-      ddlName: ddlName,
-      description: args.description || ddlName,
-      packageName: args.package_name,
-      ddlSource: '',
-      transportRequest: args.transport_request,
-      masterLanguage: args.master_language,
-    });
-    logger?.info(`DDL source created: ${ddlName}`);
-
-    const result = {
-      success: true,
-      ddl_name: ddlName,
-      package_name: args.package_name,
-      transport_request: args.transport_request || null,
-      type: 'DDLS',
-      message: `DDL source ${ddlName} created successfully. Use UpdateDdl to set DDL source code.`,
-      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`,
-      steps_completed: ['validate', 'create'],
-    };
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    });
-  } catch (error: any) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger?.error(`Error creating DDL source ${ddlName}: ${errorMessage}`);
-    return return_error(new Error(errorMessage));
-  }
+  return answer(
+    { tool: 'CreateDdl', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl(resultsFor(ddlDocuments))
+        .create(
+          {
+            ddlName,
+            description: args.description || ddlName,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

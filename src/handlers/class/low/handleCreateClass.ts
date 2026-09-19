@@ -1,21 +1,27 @@
 /**
  * CreateClass Handler - Create ABAP Class
  *
- * Uses AdtClient.createClass from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getClass().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateClassLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP class. - use CreateClass (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {
@@ -70,6 +76,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'description', 'package_name'],
   },
@@ -90,130 +97,58 @@ interface CreateClassArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateClass MCP tool
- *
- * Uses AdtClient.createClass - low-level single method call
- */
 export async function handleCreateClass(
   context: HandlerContext,
   args: CreateClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      description,
-      package_name,
-      transport_request,
-      superclass,
-      final,
-      abstract,
-      create_protected,
-      session_id,
-      session_state,
-    } = args;
+  const {
+    class_name,
+    description,
+    package_name,
+    transport_request,
+    superclass,
+    final,
+    abstract,
+    create_protected,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!class_name || !description || !package_name) {
-      return return_error(
-        new Error('class_name, description, and package_name are required'),
-      );
-    }
-
-    // Check if connection can refresh token (for debugging)
-    const connectionWithRefresh = connection as any;
-    if (
-      process.env.DEBUG_HANDLERS === 'true' &&
-      connectionWithRefresh.canRefreshToken
-    ) {
-      const canRefresh = connectionWithRefresh.canRefreshToken();
-      logger?.debug(`Connection can refresh token: ${canRefresh}`);
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Starting class creation: ${className}`);
-
-    try {
-      // Create class
-      const createState = await client.getClass().create({
-        className,
-        description,
-        packageName: package_name,
-        transportRequest: transport_request,
-        superclass,
-        final,
-        abstract,
-        createProtected: create_protected,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for class ${className}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateClass completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Class ${className} created successfully. Use LockObject and UpdateClass to add source code, then UnlockObject and ActivateObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating class ${className}: ${error.message || String(error)}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to create class: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Class ${className} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!class_name || !description || !package_name) {
+    return return_error(
+      new Error('class_name, description, and package_name are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const className = class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateClassLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getClass(resultsFor(classDocuments))
+        .create(
+          {
+            className,
+            description,
+            packageName: package_name,
+            transportRequest: transport_request,
+            superclass,
+            final,
+            abstract,
+            createProtected: create_protected,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

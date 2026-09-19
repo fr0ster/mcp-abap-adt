@@ -537,6 +537,41 @@ export class LambdaTester {
    * Note: Jest's afterEach hook will run cleanup even if test fails, so we don't need try-finally here.
    * The cleanup is handled by afterEach() which is called by Jest regardless of test outcome.
    */
+  /**
+   * Does this test case's declared scope exclude the system we are pointed at?
+   *
+   * A test case may name the systems it applies to (`available_in` in
+   * `tests/test-config.yaml`) — programs, for one, do not exist on ABAP
+   * Cloud, so both program cases declare `["onprem"]`.
+   *
+   * The check lives on the base class because it belongs to every tester,
+   * and because keeping a copy per tester is what let it go missing:
+   * `LowTester` overrides `run()` wholesale and carried no copy, so
+   * `create_program_low` ran its workflow against a cloud system while
+   * `create_program` was correctly skipped. SAP answered the lock with
+   * `ExceptionResourceNotFound` — "ZMCP_BLD_PROG_L1 does not exist"
+   * (T100KEY `SEDI_ADT`/005) — a real answer to a request that should
+   * never have been sent.
+   *
+   * Logs the skip itself, so a caller only has to decide whether to return.
+   */
+  protected skipsOnThisSystem(): boolean {
+    const availableIn = this.context?.testCase?.available_in as
+      | string[]
+      | undefined;
+    if (!availableIn || availableIn.length === 0) {
+      return false;
+    }
+    const systemType = getSystemType();
+    if (availableIn.includes(systemType)) {
+      return false;
+    }
+    this.context?.logger?.testSkip(
+      `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
+    );
+    return true;
+  }
+
   async run(testFunc: TLambda): Promise<void> {
     if (!this.context) {
       throw new Error('Tester not initialized. Call beforeAll() first.');
@@ -547,18 +582,8 @@ export class LambdaTester {
       return;
     }
 
-    // Check available_in constraint from test case config
-    const availableIn = this.context.testCase?.available_in as
-      | string[]
-      | undefined;
-    if (availableIn && availableIn.length > 0) {
-      const systemType = getSystemType();
-      if (!availableIn.includes(systemType)) {
-        this.context.logger?.testSkip(
-          `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
-        );
-        return;
-      }
+    if (this.skipsOnThisSystem()) {
+      return;
     }
 
     if (!this.context.connection || !this.context.session) {

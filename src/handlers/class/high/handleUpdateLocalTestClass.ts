@@ -1,24 +1,56 @@
 /**
- * UpdateLocalTestClass Handler - Update Local Test Class via AdtClient
+ * UpdateLocalTestClass Handler - Write a class's testclasses include
  *
- * Uses AdtClient.getLocalTestClass().update() for high-level update operation.
- * Includes lock, check, update, unlock, and optional activation.
+ * Uses AdtClient.getLocalTestClass().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — the lock is held for
+ * the write and released on every path out.
+ *
+ * **This handler acquires its own lock.** `AdtLocalTestClass.update()`
+ * itself "never takes a lock and never releases one" (its own doc comment)
+ * — but the SAME accessor (`getLocalTestClass()`) also composes
+ * `IAdtLockable`, delegating to the class's own lock
+ * (`AdtClassMemberBase.lock()`: "This is the lock an include is written
+ * under too: ADT locks `/oo/classes/{name}`... and the PUT that writes the
+ * include carries the class's handle"). So this handler locks the class
+ * itself, writes under that handle, and unlocks — the same shape every
+ * already-migrated high-tier locked write in this repository uses — rather
+ * than asking the caller for a lock handle it has no other way to obtain.
+ * Fix round 1: a caller-supplied `lock_handle` param was tried here first
+ * and reverted; adt-clients 19 moving a lock out of a member does not move
+ * it onto the caller, it moves it onto this handler.
+ *
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode ?? config.testClassCode`. Verified against
+ * `AdtLocalTestClass.js`.
+ *
+ * Activation is restored: `activate()` is on the same accessor (delegating
+ * to the class's own activate — "An include has no activation of its own —
+ * activating the class publishes whatever its includes now contain"), run
+ * after the lock is released, exactly as the pre-migration handler's
+ * `activate_on_update` did.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  extractAdtErrorMessage,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update a local test class in an ABAP class. Manages lock, check, update, unlock, and optional activation of parent class.',
+    'Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -41,6 +73,7 @@ export const TOOL_DEFINITION = {
           'Activate parent class after updating test class. Default: false',
         default: false,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'test_class_code'],
   },
@@ -51,96 +84,53 @@ interface UpdateLocalTestClassArgs {
   test_class_code: string;
   transport_request?: string;
   activate_on_update?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateLocalTestClass MCP tool
- *
- * Uses AdtClient.getLocalTestClass().update() - high-level update operation
- */
 export async function handleUpdateLocalTestClass(
   context: HandlerContext,
   args: UpdateLocalTestClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      test_class_code,
-      transport_request,
-      activate_on_update = false,
-    } = args as UpdateLocalTestClassArgs;
 
-    // Validation
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-    if (!test_class_code) {
-      return return_error(new Error('test_class_code is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Updating local test class for ${className}`);
-
-    try {
-      // Update local test class using AdtClient
-      const localTestClass = client.getLocalTestClass();
-      const updateResult = await localTestClass.update(
-        {
-          className,
-          testClassCode: test_class_code,
-          transportRequest: transport_request,
-        },
-        { activateOnUpdate: activate_on_update },
-      );
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a result for local test class in ${className}`,
-        );
-      }
-
-      logger?.info(
-        `✅ UpdateLocalTestClass completed successfully: ${className}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            transport_request: transport_request || null,
-            activated: activate_on_update,
-            message: `Local test class updated successfully in ${className}.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating local test class for ${className}: ${error?.message || error}`,
-      );
-
-      const detailedError = extractAdtErrorMessage(
-        error,
-        `Failed to update local test class in ${className}`,
-      );
-      let errorMessage = `Failed to update local test class: ${detailedError}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Local test class for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. ${detailedError}`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+  if (!args?.test_class_code) {
+    return return_error(new Error('test_class_code is required'));
+  }
+
+  const className = args.class_name.toUpperCase();
+  const shouldActivate = args.activate_on_update === true;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateLocalTestClass', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getLocalTestClass(
+        resultsFor(classDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            { className, transportRequest: args.transport_request },
+            {
+              sourceCode: args.test_class_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ className }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

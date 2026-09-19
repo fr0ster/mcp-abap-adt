@@ -1,0 +1,36 @@
+{
+  "case": "read-metadata-class",
+  "step": 1,
+  "stepTag": "classes-zbpmcpshriroot",
+  "capturedAt": "2026-09-11T08:42:10.602Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/classes/ZBP_MCP_SHR_I_ROOT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/ZBP_MCP_SHR_I_ROOT",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.oo.classes.v4+xml, application/vnd.sap.adt.oo.classes.v3+xml, application/vnd.sap.adt.oo.classes.v2+xml, application/vnd.sap.adt.oo.classes.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.oo.classes.v4+xml; charset=utf-8",
+      "content-length": "1111",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "2026091015104300172026091015251200119205",
+      "last-modified": "Thu, 10 Sep 2026 15:10:43 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=113172",
+      "sap-server": "true",
+      "sap-perf-fesrec": "119411.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-metadata-class--01-classes-zbpmcpshriroot.body.xml"
+  }
+}

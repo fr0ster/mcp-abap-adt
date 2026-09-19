@@ -1,23 +1,41 @@
 /**
  * UpdateProgram Handler - Update Existing ABAP Program Source Code
  *
- * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
+ * Uses AdtClient.getProgram().{lock,check,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
+ * write, released on every path out.
+ *
+ * Workflow: lock -> (check, iff activating) -> update -> unlock ->
+ * (activate). The pre-write check gates the write exactly as the
+ * pre-migration handler did — only when `activate` is true. The
+ * pre-migration handler's *post*-unlock check is gone: its own `catch`
+ * never rethrew, so it could never have changed the answer.
+ *
+ * **The source goes through `options.sourceCode` for `update`,
+ * `config.sourceCode` for `check`.** See `UpdateProgramLow` for `update`.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { programDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  isCloudConnection,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { withLock } from '../../../lib/strategies/withLock';
+import { isCloudConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     'Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
@@ -42,6 +60,7 @@ export const TOOL_DEFINITION = {
         description:
           'Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['program_name', 'source_code'],
   },
@@ -52,23 +71,21 @@ interface UpdateProgramArgs {
   source_code: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateProgram(
   context: HandlerContext,
-  params: any,
+  args: UpdateProgramArgs,
 ) {
   const { connection, logger } = context;
-  const args: UpdateProgramArgs = params;
 
-  // Validate required parameters
   if (!args.program_name || !args.source_code) {
     return return_error(
       new Error('Missing required parameters: program_name and source_code'),
     );
   }
 
-  // Check if cloud - programs are not available on cloud systems
   if (isCloudConnection()) {
     return return_error(
       new Error(
@@ -78,230 +95,51 @@ export async function handleUpdateProgram(
   }
 
   const programName = args.program_name.toUpperCase();
-  logger?.info(
-    `Starting program source update: ${programName} (activate=${args.activate === true})`,
-  );
+  const shouldActivate = args.activate === true;
+  const detail = detailOf(args);
 
-  // Connection setup
-  try {
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger?.debug(
-      `Created separate connection for handler call: ${programName}`,
-    );
-  } catch (connectionError: any) {
-    const errorMessage =
-      connectionError instanceof Error
-        ? connectionError.message
-        : String(connectionError);
-    logger?.error(`Failed to create connection: ${errorMessage}`);
-    return return_error(
-      new Error(`Failed to create connection: ${errorMessage}`),
-    );
-  }
-
-  try {
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = args.activate === true; // Default to false if not specified
-    let lockHandle: string | undefined;
-    let activateResponse: any | undefined;
-
-    try {
-      // Lock
-      logger?.debug(`Locking program: ${programName}`);
-      lockHandle = await client.getProgram().lock({ programName });
-      logger?.debug(
-        `Program locked: ${programName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+  return answer(
+    { tool: 'UpdateProgram', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getProgram(
+        resultsFor(programDocuments),
       );
 
-      // Check new code BEFORE update (only when activating)
-      if (shouldActivate) {
-        logger?.debug(`Checking new source code before update: ${programName}`);
-        try {
-          await safeCheckOperation(
-            () =>
-              client
-                .getProgram()
-                .check(
-                  { programName, sourceCode: args.source_code },
-                  'inactive',
-                ),
-            programName,
-            {
-              debug: (message: string) => logger?.debug(message),
-            },
-          );
-          logger?.debug(`New code check passed: ${programName}`);
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(
-              `Program ${programName} was already checked - continuing`,
+      const written = await withLock(
+        () => obj.lock({ programName }),
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          const update = () =>
+            obj.update(
+              { programName, transportRequest: args.transport_request },
+              {
+                sourceCode: args.source_code,
+                lockHandle,
+                analyse: analyseException,
+              },
             );
-          } else {
-            logger?.error(
-              `New code check failed: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-            throw new Error(
-              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-          }
-        }
-      } else {
-        logger?.debug(`Skipping syntax check (activate=false): ${programName}`);
-      }
-
-      // Update
-      logger?.debug(`Updating program source code: ${programName}`);
-      await client.getProgram().update(
-        {
-          programName,
-          sourceCode: args.source_code,
-          transportRequest: args.transport_request,
+          // A conditional phase of the sequence, not a hand-rolled
+          // short-circuit: see UpdateClass for the reasoning.
+          return shouldActivate
+            ? sequence(
+                () =>
+                  obj.check(
+                    { programName, sourceCode: args.source_code },
+                    'inactive',
+                    { analyse: analyseCheck },
+                  ),
+                update,
+              )
+            : update();
         },
-        { lockHandle },
+        (lockHandle) => obj.unlock({ programName }, lockHandle),
       );
-      logger?.info(`Program source code updated: ${programName}`);
-    } finally {
-      if (lockHandle) {
-        try {
-          logger?.debug(`Unlocking program: ${programName}`);
-          await client.getProgram().unlock({ programName }, lockHandle);
-          logger?.info(`Program unlocked: ${programName}`);
-        } catch (unlockError: any) {
-          logger?.warn(
-            `Failed to unlock program ${programName}: ${unlockError?.message || unlockError}`,
-          );
-        }
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
-    }
 
-    // Check inactive version (after unlock, only when activating)
-    if (shouldActivate) {
-      logger?.debug(`Checking inactive version: ${programName}`);
-      try {
-        await safeCheckOperation(
-          () => client.getProgram().check({ programName }, 'inactive'),
-          programName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-        logger?.debug(`Inactive version check completed: ${programName}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(
-            `Program ${programName} was already checked - continuing`,
-          );
-        } else {
-          logger?.warn(
-            `Inactive version check had issues: ${programName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
-        }
-      }
-    }
-
-    // Activate if requested
-    if (shouldActivate) {
-      logger?.debug(`Activating program: ${programName}`);
-      try {
-        const activateState = await client.getProgram().activate({
-          programName,
-        });
-        activateResponse = activateState.activateResult;
-        logger?.info(`Program activated: ${programName}`);
-      } catch (activationError: any) {
-        logger?.error(
-          `Activation failed: ${programName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-        );
-        throw new Error(
-          `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-        );
-      }
-    } else {
-      logger?.debug(`Skipping activation for: ${programName}`);
-    }
-
-    // Parse activation warnings if activation was performed
-    let activationWarnings: string[] = [];
-    if (
-      shouldActivate &&
-      activateResponse &&
-      typeof activateResponse.data === 'string' &&
-      activateResponse.data.includes('<chkl:messages')
-    ) {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_',
-      });
-      const result = parser.parse(activateResponse.data);
-      const messages = result?.['chkl:messages']?.msg;
-      if (messages) {
-        const msgArray = Array.isArray(messages) ? messages : [messages];
-        activationWarnings = msgArray.map(
-          (msg: any) => `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-        );
-      }
-    }
-
-    logger?.info(`UpdateProgram completed successfully: ${programName}`);
-
-    const result = {
-      success: true,
-      program_name: programName,
-      type: 'PROG/P',
-      activated: shouldActivate,
-      message: shouldActivate
-        ? `Program ${programName} source updated and activated successfully`
-        : `Program ${programName} source updated successfully (not activated)`,
-      uri: `/sap/bc/adt/programs/programs/${encodeSapObjectName(programName).toLowerCase()}`,
-      steps_completed: [
-        'lock',
-        'check_new_code',
-        'update',
-        'unlock',
-        'check_inactive',
-        ...(shouldActivate ? ['activate'] : []),
-      ],
-      activation_warnings:
-        activationWarnings.length > 0 ? activationWarnings : undefined,
-      source_size_bytes: args.source_code.length,
-    };
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    });
-  } catch (error: any) {
-    // Parse error message
-    let errorMessage = error instanceof Error ? error.message : String(error);
-
-    // Attempt to parse ADT XML error
-    try {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_',
-      });
-      const errorData = error?.response?.data
-        ? parser.parse(error.response.data)
-        : null;
-      const errorMsg =
-        errorData?.['exc:exception']?.message?.['#text'] ||
-        errorData?.['exc:exception']?.message;
-      if (errorMsg) {
-        errorMessage = `SAP Error: ${errorMsg}`;
-      }
-    } catch {
-      // ignore parse errors
-    }
-
-    logger?.error(
-      `Error updating program source ${programName}: ${errorMessage}`,
-    );
-    return return_error(
-      new Error(`Failed to update program ${programName}: ${errorMessage}`),
-    );
-  }
+      return obj.activate({ programName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

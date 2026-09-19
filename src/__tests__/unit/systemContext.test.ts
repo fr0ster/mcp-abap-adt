@@ -136,42 +136,12 @@ describe('resolveSystemContext', () => {
     expect(result.masterSystem).toBe('OVERRIDE');
   });
 
-  it('should detect cloud system as not legacy (default)', async () => {
-    process.env.SAP_MASTER_SYSTEM = 'SYS';
-
-    const result = await resolveSystemContext(mockConnection);
-
-    expect(result.isLegacy).toBe(false);
-  });
-
-  it('should detect legacy system when SAP_SYSTEM_TYPE=legacy', async () => {
-    process.env.SAP_SYSTEM_TYPE = 'legacy';
-    process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
-
-    const result = await resolveSystemContext(mockConnection);
-
-    expect(result.isLegacy).toBe(true);
-  });
-
-  it('should preserve isLegacy when overrides are applied', async () => {
-    process.env.SAP_SYSTEM_TYPE = 'legacy';
-    process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
-    await resolveSystemContext(mockConnection);
-
-    // Now apply overrides — isLegacy should be preserved from cache
-    const result = await resolveSystemContext(mockConnection, {
-      masterSystem: 'OVERRIDE',
-    });
-
-    expect(result.masterSystem).toBe('OVERRIDE');
-    expect(result.isLegacy).toBe(true);
-  });
-
-  it('should expose isLegacy via getSystemContext()', async () => {
-    process.env.SAP_SYSTEM_TYPE = 'legacy';
-    process.env.SAP_MASTER_SYSTEM = 'SYS';
-    await resolveSystemContext(mockConnection);
-
-    expect(getSystemContext().isLegacy).toBe(true);
-  });
+  /**
+   * Four tests lived here pinning `isLegacy` — that a legacy system is
+   * detected from `SAP_SYSTEM_TYPE`, that the flag survives an override, and
+   * that `getSystemContext()` exposes it. The flag is gone: legacy support is
+   * parked on `parked/legacy-support` until it can be tried against a live
+   * system, and no tool declares that environment any more. The tests went
+   * with it rather than being weakened into asserting `undefined`.
+   */
 });

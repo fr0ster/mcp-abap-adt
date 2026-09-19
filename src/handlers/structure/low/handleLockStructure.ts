@@ -1,24 +1,24 @@
 /**
- * LockStructure Handler - Lock ABAP Structure
+ * LockStructureLow Handler - Lock ABAP Structure
  *
- * Uses AdtClient.lockStructure from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getStructure().lock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `lock()` accepts no options at all — not even `analyse` — so there is no
+ * strategy to inject here. Its answer is the lock handle itself, and the
+ * projection is the envelope the tool already returned: nothing about `lock`
+ * varies with `detail`, so the parameter is not added to this tool's surface.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'LockStructureLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Lock an ABAP structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
+    '[low-level] Lock a structure for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -56,104 +56,36 @@ interface LockStructureArgs {
   };
 }
 
-/**
- * Main handler for LockStructure MCP tool
- *
- * Uses AdtClient.lockStructure - low-level single method call
- */
 export async function handleLockStructure(
   context: HandlerContext,
   args: LockStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { structure_name, session_id, session_state } =
-      args as LockStructureArgs;
+  const { structure_name, session_id, session_state } = args;
 
-    // Validation
-    if (!structure_name) {
-      return return_error(new Error('structure_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(`Starting structure lock: ${structureName}`);
-
-    try {
-      // Lock structure
-      const lockHandle = await client
-        .getStructure()
-        .lock({ structureName: structureName });
-
-      if (!lockHandle) {
-        throw new Error(
-          `Lock did not return a lock handle for structure ${structureName}`,
-        );
-      }
-
-      // Get updated session state after lock
-
-      logger?.info(`✅ LockStructure completed: ${structureName}`);
-      logger?.info(`   Lock handle: ${lockHandle.substring(0, 20)}...`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            structure_name: structureName,
-            session_id: session_id || null,
-            lock_handle: lockHandle,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Structure ${structureName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error locking structure ${structureName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to lock structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Structure ${structureName} not found.`;
-      } else if (error.response?.status === 409) {
-        errorMessage = `Structure ${structureName} is already locked by another user.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!structure_name) {
+    return return_error(new Error('structure_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const structureName = structure_name.toUpperCase();
+
+  return answer(
+    { tool: 'LockStructureLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getStructure()
+        .lock({ structureName }),
+    (lockHandle: string) => ({
+      success: true,
+      structure_name: structureName,
+      session_id: connection.getSessionId() || session_id || null,
+      lock_handle: lockHandle,
+      session_state: null, // Session state management is now handled by auth-broker
+      message: `Structure ${structureName} locked successfully. Use this lock_handle and session_id for subsequent update/unlock operations.`,
+    }),
+  );
 }

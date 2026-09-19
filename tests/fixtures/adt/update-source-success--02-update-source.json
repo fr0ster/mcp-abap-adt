@@ -1,0 +1,36 @@
+{
+  "case": "update-source-success",
+  "step": 2,
+  "stepTag": "update-source",
+  "capturedAt": "2026-09-11T09:00:29.821Z",
+  "request": {
+    "method": "PUT",
+    "url": "/sap/bc/adt/oo/classes/zmcp_bld_crt_cl2/source/main?lockHandle=03244DD5957796C90869B37C814C63E409671564",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/zmcp_bld_crt_cl2/source/main?lockHandle=03244DD5957796C90869B37C814C63E409671564",
+    "headers": {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Accept": "text/plain"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "CLASS ZMCP_BLD_CRT_CL2 DEFINITION\n  PUBLIC\n  FINAL\n  CREATE PUBLIC .\n\n  PUBLIC SECTION.\n    METHODS say_hello\n      RETURNING VALUE(rv_text) TYPE string.\n  PROTECTED SECTION.\n  PRIVATE SECTION.\nENDCLASS.\n\nCLASS ZMCP_BLD_CRT_CL2 IMPLEMENTATION.\n  METHOD say_hello.\n    rv_text = |Hello from the answer-adapter corpus scratch class|.\n  ENDMETHOD.\nENDCLASS."
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "last-modified": "Sat, 00  0000 00:00:00 GMT",
+      "etag": "202609110900310001",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=1788636",
+      "sap-server": "true",
+      "sap-perf-fesrec": "1790347.000000",
+      "connection": "close"
+    },
+    "bodyFile": "update-source-success--02-update-source.body.txt"
+  }
+}

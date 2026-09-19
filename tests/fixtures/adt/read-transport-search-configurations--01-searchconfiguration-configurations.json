@@ -1,0 +1,34 @@
+{
+  "case": "read-transport-search-configurations",
+  "step": 1,
+  "stepTag": "searchconfiguration-configurations",
+  "capturedAt": "2026-09-16T14:34:57.668Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/cts/transportrequests/searchconfiguration/configurations",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.configurations.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.configurations.v1+xml; charset=utf-8",
+      "content-length": "700",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=26556",
+      "sap-server": "true",
+      "sap-perf-fesrec": "32138.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-transport-search-configurations--01-searchconfiguration-configurations.body.xml"
+  }
+}

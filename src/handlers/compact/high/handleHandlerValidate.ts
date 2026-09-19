@@ -1,3 +1,24 @@
+/**
+ * Task 28: why this compact facade carries no `detail` of its own.
+ *
+ * Both handlers this facade delegates to genuinely reach a `detail`-bearing
+ * projection: `handleValidateObject` (`common/low/handleValidateObject.ts`)
+ * answers through `project(detail, terseValidation)`, and so does the
+ * `SERVICE_BINDING` branch's `handleValidateServiceBinding` (fixed in this
+ * same task). Neither call below forwards a `detail` argument, so both
+ * siblings always answer at their default, terse — a fourth shape the
+ * brief's three rows do not name: a tool with a real reading behind it,
+ * reached only through another handler it delegates to.
+ *
+ * `handleValidateObject`'s own `TOOL_DEFINITION` (`ValidateObjectLow`) is
+ * not even a registered tool — `LowLevelHandlersGroup.ts` comments its
+ * registration out — so for every `object_type` except `SERVICE_BINDING`
+ * this compact facade is the ONLY way a caller reaches that function's
+ * logic at all. Deliberately kept off this facade's own reduced,
+ * `compactValidateSchema` surface (the same simplification `compact/` tools
+ * make everywhere: no `detail`, no low-level session knobs) rather than
+ * exposed here for the first time.
+ */
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleValidateObject } from '../../common/low/handleValidateObject';
 import { handleValidateServiceBinding } from '../../service_binding/high/handleValidateServiceBinding';

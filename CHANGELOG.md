@@ -7,6 +7,435 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Two patterns run through the whole migration and are worth stating once,
+  in general, rather than only inside each task's own entry below.**
+
+  **A read that used to answer `success: true` with a null body now answers
+  an error.** Every migrated read-modify-write handler — a domain, a data
+  element, a package, a table's metadata, and the rest — goes through
+  `sequence()`, whose whole discipline is stopping at the first failed step
+  and handing back that step's own answer, untouched. A failed read used to
+  mean "nothing to patch, so write whatever came back" on more than one
+  pre-migration handler, which is the shape `null`/empty `success: true`
+  answers came from; a read step that fails now stops the chain before any
+  write is attempted, and the caller sees the read's own failure — origin,
+  message, and (where the strategy fills it in) the server's own T100 key —
+  instead of a write silently confirming nothing happened.
+
+  **A write that succeeded under a failed unlock now answers an error
+  carrying `operation: 'succeeded'`.** Every migrated high-tier write holds
+  its lock through the shared `withLock` (see the eighteen-writes entry
+  below): the body runs, and the release always runs after it, on every path
+  out — a refusal from the body, a throw from it, or neither. When the body
+  itself succeeded but the *unlock* is refused or throws, the object's
+  change is real and on the server, but the call now answers a failure
+  rather than the write's own success — with `operation: 'succeeded'` on the
+  error payload, and a `cleanup` field carrying what the release actually
+  said, so a caller does not read "failed" and conclude nothing happened.
+  This is the most arguable decision in the spec this migration implements:
+  a lock left behind on an object whose new content the caller can no longer
+  see as a success. Surfaces in integration runs as new failures that are
+  not regressions — see the pull request for a fuller account.
+
+- **Six unit-test tools gained the `detail` parameter, and what they answer
+  changed with it.** `GetUnitTestStatus`, `GetCdsUnitTestStatus`, `GetUnitTest`,
+  `GetCdsUnitTest`, `GetUnitTestResult` and `GetCdsUnitTestResult` answer a JSON
+  object built from a parsed document, which is the shape `detail` exists for —
+  but they had been left without it, each hardcoding a level, so an audit keyed
+  on the shared projection helper could not see them.
+
+  They split two ways, and the change is not the same for both.
+
+  The two **status** tools read the run's status directly. They used to answer
+  `success`, the run id, a finished flag, and the whole parse as `run_status`,
+  at every level. Now `terse` answers the run id, the finished flag and
+  `run_status` as the status string itself — `"FINISHED"` rather than the parsed
+  document; `full` answers the bare parse, without the surrounding envelope; and
+  `raw` answers the wire document.
+
+  The four **polling** tools go through the shared run poller. They used to
+  answer the parse as `run_status` and, as `run_result`, the reading object
+  itself with the wire document inside it. Now `terse` and `full` answer the
+  parse in both fields and `raw` answers the wire text.
+
+  **Named fields did move**, so a caller reading one is not automatically safe:
+  `success` is gone from both status tools at every level, `run_status` is a
+  string rather than an object at `terse`, and at `full` and `raw` the status
+  tools answer a document with no named fields at all.
+
+  No test pinned the old shapes, which is why this is recorded here rather than
+  discovered by one.
+
+- **A compiler-pinned ledger of the eighteen `adt-clients` legacy-class
+  members that ignore what a caller passes them, and what it found (#207,
+  #208).**
+
+  `AdtClientLegacy` (BASIS < 7.50) substitutes four classes —
+  `AdtPackageLegacy`, `AdtUnitTestLegacy`, `AdtRequestLegacy`,
+  `AdtUtilsLegacy` — whose overridden members ignore arguments a caller
+  passes them, because the factory that returns them is typed as the modern
+  class: the compiler cannot see the mismatch, so nothing before this caught
+  it. Not all eighteen drop the same thing, and calling all of it "the
+  failure strategy" overstates nine of them: nine genuinely drop `analyse`,
+  the caller-supplied failure verdict modern accepts and legacy ignores
+  (five of `AdtPackageLegacy`'s six members — `create`/`readMetadata`/
+  `validate`/`updateMetadata`/`delete`; four of `AdtRequestLegacy`'s five —
+  `create`/`readMetadata`/`updateMetadata`/`delete`). The other nine never
+  accepted `analyse` on modern either: `AdtPackage` has no public `read`
+  member at all (it implements metadata-readable, not readable, so legacy's
+  `read` override is dead code from the type's perspective, not a dropped
+  strategy); `AdtRequest`'s `list` takes `IListTransportsOptions`, one
+  `configUri` field and never an `analyse`; `AdtUnitTest`'s `run`/
+  `getStatus`/`getResult` (three) and `AdtUtils`'s `activateObjectsGroup`/
+  `getTableColumns`/`getTableContents`/`getSqlQuery` (four) never declared
+  one either. What legacy drops on those nine is something else instead — a
+  positional argument, a run identifier, a table name — a different failure
+  mode.
+  `legacyExposure()`/`legacyEnabledHandlers()` (`scripts/lib/analyseOmissions.ts`)
+  resolve every handler legacy is offered (144 of 326) through the
+  compiler's own type checker — not a syntax walk of specific call shapes,
+  so a receiver reached through a shared helper, a destructured binding, or
+  an awaited factory is seen the same as a direct chain — and name the exact
+  `(handler, factory, member)` pairs that land on one, pinned by
+  `tests/fixtures/legacy-handlers.json` and
+  `tests/fixtures/legacy-exposure.json` and asserted in
+  `src/__tests__/unit/legacyExposure.test.ts`.
+
+  Sixteen pairs across thirteen files remain, and none can be moved to a
+  sibling member that does accept a strategy: `AdtPackageLegacy` refuses
+  every package operation (`create`/`read`/`readMetadata`/`validate`/
+  `updateMetadata`/`delete`) unconditionally, before any request is made, so
+  `GetPackage`, `ReadPackage`, `UpdatePackageLow` and `DeletePackageLow`
+  always answer a clean `UNSUPPORTED_OPERATION` refusal on legacy — no
+  masking risk, but the operation reaches nothing, and their descriptions now
+  say so. `getUtils().activateObjectsGroup` (`ActivateObjectLow`'s
+  multi-object path) never accepted a strategy on modern either — tracked
+  already in #200, now cross-referenced from #207. Each affected tool's
+  description states the limitation and the tracking issue.
+
+  A second, separate ledger — `legacyThrows()`, pinned by
+  `tests/fixtures/legacy-throws.json` — names every handler that reaches a
+  factory `AdtClientLegacy` declares *never available*
+  (`getDomain`/`getDataElement`/`getStructure`/`getTable`/`getCdsUnitTest`/…):
+  the no-arg overload throws synchronously there, rather than answering a
+  failure. Five tools declared `legacy` in `available_in` and reached one of
+  these with no disclosure and no guard — `CreateCdsUnitTest`,
+  `GetCdsUnitTest`, `GetCdsUnitTestResult`, `GetCdsUnitTestStatus`
+  (`getCdsUnitTest()`) and `GetStructuresList` (`getStructure()`/`getTable()`)
+  — and in three of the four CDS handlers the call sat before `answer()`'s
+  callback with nothing catching it, so the throw would have escaped as an
+  unhandled rejection rather than a tool error. All five now guard with a new
+  `isLegacyConnection()` (`src/lib/utils.ts`) and refuse with a message
+  before making any call, tested the way the program family's cloud guard
+  is (`src/__tests__/unit/legacyThrowingFactoryGuards.test.ts`): refuses and
+  never reaches the factory on legacy, reaches it on every other system.
+  `ActivateObjectLow`/`DeleteObjectLow` also reach several of these factories
+  for specific object types (`getDomain`/`getDataElement`/`getStructure`/
+  `getTable`/`getBehaviorDefinition`/`getMetadataExtension`), but only when a
+  caller names that type through the generic dispatcher; recorded in
+  `legacy-throws.json`, not guarded here.
+
+  Building the ledger surfaced a third, more severe defect (#208, not fixed
+  here — out of this ledger's scope): on a legacy system, `RunUnitTest`,
+  `CreateUnitTest` and `RunClassUnitTestsLow` answer their run's result
+  *synchronously*, but `AdtClientLegacy.getUnitTest()` returns a **new
+  instance every time it is called — even on the same client** — and the
+  synchronous result is cached on that instance, not on the client or the
+  connection. So the client that answers `GetUnitTest`, `GetUnitTestStatus`,
+  `GetUnitTestResult`, `GetClassUnitTestStatusLow` and
+  `GetClassUnitTestResultLow` afterwards has no memory of the run and always
+  refuses, regardless of whether it passed, failed, or errored — reusing the
+  client across calls would not fix this; the factory call itself would
+  still need to be the same one. Verified by construction against the
+  installed `@mcp-abap-adt/adt-clients` package with a stub connection, no
+  live SAP system needed: the *same* `AdtClientLegacy` instance, asked for
+  `getUnitTest()` twice, answers the refusal from the second call even
+  though nothing about the client changed. All eight affected tool
+  descriptions (the five named above plus `RunUnitTest`, `CreateUnitTest`
+  and `RunClassUnitTestsLow` themselves) now disclose this; the fix itself
+  needs a design decision (embed the full result in the run tools' own
+  answer on legacy, or cache the factory's own returned instance rather than
+  the client) tracked in #208.
+
+- **The eighteen high-tier writes that hold a lock now release it through one
+  shared `withLock`, and three genuine behaviour changes survive that
+  migration.**
+
+  `CreateStructure`'s syntax check now gates the answer; before, a genuine
+  check failure was `logger.warn`'d only — the create still answered success
+  and still went on to activate a structure with a known syntax problem. A
+  refused check now fails the call, the same as every other check in this
+  migration (`analyseCheck`, same as `CreateDomain`/`CreateDataElement`/
+  `CreateBehaviorDefinition`/`CreateMetadataExtension` already had).
+
+  `UpdateDdl`, `UpdateInterface`, `UpdateProgram`, `UpdateServiceDefinition`,
+  `UpdateStructure` and `UpdateTable` no longer carry an `activation_warnings`
+  array in their terse (default) answer — the `chkl:messages` parse that array
+  came from still happens, but only `detail: 'full'` or `detail: 'raw'` on the
+  activation reads it now. Terse writes answer the literal string `SUCCESS`
+  or a failure payload uniformly across every write tool in this migration;
+  keeping one family's warnings in the terse channel while every other write
+  tool's terse answer carries none would have been the inconsistency, not the
+  fix.
+
+  Everything else that changed shape during the underlying `withLock`
+  migration and still holds after review: the long-polling wait for write
+  visibility is restored, in its pre-migration position, on every handler
+  that had one. The pre-write syntax check on `UpdateClass`, `UpdateDdl`,
+  `UpdateInterface`, `UpdateProgram`, `UpdateStructure` and `UpdateTable` is
+  restored too, gated by `activate` exactly as before — it runs only when
+  `activate` is set, and a refusal there stops the write. No handler
+  restores a *post*-unlock check: the pre-migration one existed only on
+  these same six, its own `catch` never rethrew, and it is dropped rather
+  than restored — every check in this migration now carries the check
+  strategy, so a refusal is reported the way every other refusal is, and a
+  check that could never have changed the answer is not worth the round
+  trip. `config.packageName` is no longer sent on `UpdateDomain`/
+  `CreateDomain`/`UpdateDataElement`/`CreateDataElement`'s metadata write —
+  the shipped wire function never read it. `CreateStructure` no longer
+  holds a lock while it creates — nothing between `create` and `check` ever
+  wrote through it.
+
+- **`ActivateObjectLow` (multi-object activation) now answers acceptance, not
+  a verdict.** Activating a single object still reads a real pass/fail
+  straight from ADT. Activating more than one object at once — or one object
+  of a type this tool has no dedicated family for — goes through group
+  activation, and ADT's answer there has always meant "the request was
+  accepted and a run was queued," not "activation finished." The tool now
+  says so explicitly: `accepted` (from whether a run id came back), `run_id`,
+  and `activated: null` (there is no verdict on this path — acceptance is
+  not completion). It does not wait for the run. To learn what actually
+  happened, call `GetInactiveObjects` afterwards — an object still listed
+  there did not activate — keeping in mind that a check made immediately
+  after acceptance can still show an object as inactive that goes on to
+  activate a moment later, since the run has not necessarily finished yet.
+
+  Separately, and left open: group activation cannot judge a refusal the way
+  every other write path in this migration now does — `activateObjectsGroup`
+  accepts no error strategy at all, so a refusal ADT embeds in its answer is
+  not caught on this path. Tracked as issue #200 in
+  `@mcp-abap-adt/adt-clients` (giving the member the `<E extends IAdtError>`
+  shape every sibling member already has); not fixed by this change.
+
+- **`RuntimeRunClass` and `RuntimeRunClassWithProfiling` now find a profiled
+  run's trace themselves, and two fields they used to answer are gone.**
+  adt-clients 19 split the old composite `runWithProfiling` into
+  `scheduleTrace` + `runWithProfiler`, neither of which waits for a trace or
+  answers a `traceId` — a run only schedules and executes, and reading a
+  trace is `IProfiler.list()`/`read()`, whenever the caller is ready. Both
+  tools still advertise `trace_id`, `max_trace_attempts` and
+  `trace_retry_delay_ms`, so this repository now composes what the library
+  no longer does: it snapshots the profiler feed before scheduling, runs,
+  then polls the feed for an id that was not in the snapshot — by set
+  difference, ordered by the library's own `compareRecordedAt` (never by
+  feed position, and never by sorting `recordedAt` as a string, both of
+  which pick the wrong trace on a real feed). `max_trace_attempts` and
+  `trace_retry_delay_ms` keep bounding that search exactly as before. A run
+  that finishes before its trace is written still answers success, with
+  `trace_id` absent rather than fabricated — poll `RuntimeListProfilerTraceFiles`
+  or `RuntimeAnalyzeProfilerTrace` afterwards in that case.
+
+  `trace_lookup_uris` is now accepted and ignored: adt-clients 19's
+  `IProfilerListOptions` is `{ user?: string }`, the whole interface, so
+  there is nowhere left to put a URI — the profiler feed is one endpoint,
+  not one per lookup URI.
+
+  `run_status` and `trace_requests_status` are gone from both tools' answers
+  and cannot come back under any of the three options considered: `run` and
+  `runWithProfiler` answer `IAdtResponse<string>` and `ClassExecutor` takes
+  no result strategy in its constructor, so there is no transport envelope
+  left to read a status from.
+
+- **`RuntimeRunProgram` and `RuntimeRunProgramWithProfiling` (Task 23) no
+  longer answer `run_status`, and `RuntimeRunProgramWithProfiling` gained an
+  `output` field it never had before — neither was documented at the time.**
+  `ProgramExecutor.run()`/`runWithProfiler()` answer `IAdtResponse<string>`
+  with no transport envelope to read a status from, the same reason the class
+  tools above lost it; `run_status` is gone from `RuntimeRunProgram`'s
+  non-profiled answer, its profiled answer, and
+  `RuntimeRunProgramWithProfiling`'s answer — three answers across the two
+  tools. Unlike the class tools, the program tools never had
+  `max_trace_attempts`, `trace_retry_delay_ms`, `trace_lookup_uris` or a
+  `trace_id` to begin with (program execution has always been
+  fire-and-forget; a trace is located afterwards via
+  `RuntimeListProfilerTraceFiles`), so none of those were removed.
+  `RuntimeRunProgramWithProfiling` is deprecated and, by the rule this
+  repository otherwise follows (a deprecated tool gains no field — applied
+  correctly to `RuntimeRunClassWithProfiling` above), should not have started
+  answering `output`. Recorded here rather than fixed by this entry.
+
+- **The rest of the profiler/dump/feed readers (Task 25) lose the same
+  transport fields the class/program runners above lost, and two of them
+  answer a genuinely different shape.**
+
+  `RuntimeListProfilerTraceFiles` used to hand `response.data` — the raw feed
+  XML — to a hand-rolled parser and answer `{success, status, payload:
+  <whatever that parse produced>}`. `IProfiler.list()` answers
+  `IAdtResponse<IAbapTraceEntry[]>` now — already the parsed entries, with
+  named fields (`id`, `recordedAt`, `user`, `objectName`, `state`,
+  `expiresAt`, `system`, `client`, `host`, `size`, `runtime`/`runtimeABAP`/
+  `runtimeSystem`/`runtimeDatabase`, `isAggregated`, `amdpFileSize`) — so the
+  tool now answers `{success, count, entries: IAbapTraceEntry[]}` instead,
+  and drops the `status` field along with it (see below — it is not only the
+  three tools originally named here). **What that costs a caller:** the old
+  hand-rolled parse of the raw Atom feed carried whatever the document had —
+  each entry's own `<atom:title>` and its `<atom:link>` navigation hrefs (to
+  the trace's hitlist/statements/dbAccesses views and its delete link), and
+  the feed's own metadata. `IAbapTraceEntry` is a curated, measured field
+  list and carries none of that; a consumer that read those fields off the
+  old freeform payload has nothing left to read them from.
+
+  `RuntimeGetProfilerTraceData` and `RuntimeAnalyzeProfilerTrace` read the
+  same view differently too: `Profiler.getHitList`/`getStatements`/
+  `getDbAccesses` are gone (`IProfiler` composes `ITraceReading` since
+  31.0.0 — one `read(traceId, view, options)` over three named views
+  instead), and each view already answers its own typed, parsed shape
+  (`IAbapTraceHitList`'s `entries`, `IAbapTraceStatements`'s `statements`,
+  `IAbapTraceDbAccesses`'s `accesses`) rather than the free-form
+  attribute-prefixed object the old hand-rolled XML parser produced. Both
+  tools' `payload` field now carries that typed shape. **What that costs a
+  caller, same as `RuntimeListProfilerTraceFiles` above:** the old
+  hand-rolled parse turned every attribute and element the raw XML document
+  carried into JSON; `IAbapTraceHitList`/`IAbapTraceStatements`/
+  `IAbapTraceDbAccesses` are curated, measured field lists too (each one
+  says so in its own doc in `adt-clients`' `runtime/traces/types.d.ts`), not
+  the whole document — a consumer reading a field the old freeform payload
+  had that one of these three types does not name has nothing left to read
+  it from. `RuntimeAnalyzeProfilerTrace`'s `summary` (`total_records`/
+  `top_records`) now reads the view's own named collection and ranks by
+  that collection's real numeric field (`grossTime.time` for
+  `hitlist`/`statements`, `accessTime.total` for `db_accesses`) — a
+  fix-round-1 correction: the first pass walked the whole typed document for
+  "anything with a number on it", which counted each row's own timing
+  sub-object as a second row and ranked against a fixed list of key names
+  (`'runtime'`, `'calls'`, `'hits'`, …) that do not exist on any of the
+  three typed shapes, so `top_records` was document order with roughly half
+  its slots taken by timing objects rather than real entries.
+
+  `RuntimeListProfilerTraceFiles`, `RuntimeGetDumpById`,
+  `RuntimeGetProfilerTraceData`, `RuntimeAnalyzeProfilerTrace` and
+  `RuntimeCreateProfilerTraceParameters` all drop the `status` field they
+  used to answer (the HTTP status of the underlying request) —
+  `IAdtResponse` carries no transport envelope to read it from any more, the
+  same reason the class/program runners above lost `run_status`.
+
+  `RuntimeCreateProfilerTraceParameters` also changes mechanism:
+  `Profiler.createParameters()` is gone (`IProfiler` no longer composes
+  `ITraceScheduling` as of 19.0.0 — scheduling a measurement moved onto
+  `IClassExecutor`/`IProgramExecutor`, the same `scheduleTrace` member
+  `RuntimeRunClassWithProfiling` already calls), now reached through
+  `AdtExecutor.getClassExecutor().scheduleTrace(...)`. `profiler_id` is
+  still answered; `status` is not (see the paragraph above — this is one of
+  the five, not an exception to it).
+
+  `RuntimeGetGatewayErrorLog`'s `error_url` branch was silently wrong before
+  this task touched it: the pre-19 code handed the whole envelope object to
+  `error:` with nothing unwrapping it, which — once `gatewayErrorDetail()`
+  started answering `IAdtResponse<T>` instead of `T` directly — would have
+  serialised as `{"ok":true}` (its `getResult`/`getError` methods dropped by
+  `JSON.stringify`) rather than the actual detail document. No `tsc` error
+  ever named this, because nothing in the old code read a field off the
+  envelope that `IAdtResponse` didn't have. Fixed as part of this task's
+  pass over the same file for its one genuine compile error
+  (`errors.length`).
+
+  `RuntimeListFeeds`'s `variants` `feed_type` now refuses locally rather than
+  calling the library at all: `IFeedRepository.variants()` gained a required
+  `category` argument as of 19.0.0 (ADT's own endpoint always required one on
+  the wire; the type simply did not say so before), and the frozen tool
+  surface has no parameter this branch could take a real category from. A
+  fix-round-1 correction: the first pass sent `category=''`, reasoning that
+  an empty category reaches "the same refusal" a categoryless call always
+  did — but the pre-19 wire sent no `category` parameter at all, and the
+  19.0.0 wire always appends one, so `category=''` is a request nobody has
+  measured, not a preserved behaviour. This `feed_type` now answers a local
+  error explaining why, instead of guessing at what an unmeasured request
+  would do.
+
+  `GetPackageTree` (Task 25) wording: its pre-check for whether the target
+  package can be read now says "could not be read" rather than "not found"
+  for every refusal — a fix-round-1 correction. The pre-migration code
+  branched on the wire status (404 said "not found"; anything else rethrew
+  the original error unworded); `readMetadata`'s default error strategy
+  carries no status/code to branch on the same way, and the first pass here
+  said "not found" for every refusal regardless of cause (a lock, a
+  permission failure, a connection error), which is wrong for all but one of
+  them.
+
+  `handleGetClassUnitTestResult`/`handleGetClassUnitTestStatus` — a
+  fix-round-1 correction, not a shape change: the first pass at these two
+  Task-14-carve-out files cast the answer `as AxiosResponse`, believing
+  `getUnitTest()`'s members still answered the pre-19 transport frame. They
+  do not — `ITestRunInformation` already declares them `IAdtResponse<T>`, and
+  the shipped class implements exactly that. `IAdtResponse` has no `.data`,
+  so both tools answered success with empty content regardless of `.ok` —
+  a refusal reported as success. Both now unwrap through `answer()`; neither
+  tool's answer shape changes for a caller once the masking is removed. A
+  fix-round-2 correction on top of that: fix round 1 dropped the outer
+  `try`/`catch` both handlers had before it, so a thrown error from
+  `createAdtClient`/`restoreSessionInConnection` (unreachable through the
+  server, which always calls a handler inside its own guard, but reachable
+  from a direct caller — a soft-mode integration test, or an embedder) would
+  reject the returned promise instead of answering an error result. Restored.
+
+- **`ListTransports` asks which saved search to run.** A transport listing is
+  a saved search: `list()` takes a `configUri`, and when it is not given one
+  it resolves a configuration itself — a second request, behind a `protected`
+  member, whose answer no strategy of ours could read. On a system holding
+  several saved searches that resolver throws, telling the caller to pass a
+  `configUri` — which this tool has no parameter for and is not getting one.
+
+  Fixed where it belonged: `adt-clients` **19.1.0** answers
+  `getRequest().searchConfigurations(options)`, one request with the caller's
+  `analyse` over it. This handler asks, then lists with what it was given. The
+  request count is unchanged for the ordinary one-configuration system; what
+  changed is that both requests carry a strategy, and that a system with
+  several is **searched rather than refused** — each of them, merged, capped
+  at five, reported as `searched_configurations` and `configurations_capped`.
+  A system with no saved search at all gets a sentence naming the endpoint
+  that answered none, instead of a resolver's internal error.
+
+  A new `searchConfigurations` slot came with that release, and
+  `READING_BY_SLOT` declares a reading for it — the ratchet that exists so a
+  slot adt-clients adds arrives in the table rather than unshaped at a call
+  site is what caught it.
+
+- **An activation with nothing to activate is a success, and says so.** SAP
+  answers `POST /activation` with `activationExecuted="false"`,
+  `generationExecuted="true"` and no `msg` at all when the object is already
+  active — activating a class twice, or a function group straight after
+  creating one, since a function group is created active
+  (`adtcore:version="active"` before anything is activated). Every such call
+  used to answer an error.
+
+  The verdict was wrong in `@mcp-abap-adt/adt-strategies`, and it was fixed
+  there: **0.2.0** carries the reading and the corpus case that proves it
+  (`activation-nothing-to-activate`). This repository ran its own narrowing
+  strategy in the meantime, with a test asserting that the package still
+  disagreed so the day it stopped would be a red test rather than a
+  discovery — that test went red on the upgrade, and the local module is
+  gone. All 46 handlers are back on the package's `analyseActivation`.
+
+  What stays here is the consumer's half: a caller sees `activated: false`
+  with `nothing_to_activate: true` beside it, rather than a bare `false`
+  under a success.
+
+- **`GetNodeStructureLow` no longer reports an error for a node that is
+  simply empty.** The migration added a guard for the one ambiguity the
+  corpus captures: `/repository/nodestructure` answers HTTP 200 with zero
+  bytes both for a package that does not exist and for one that exists and
+  holds nothing, and the two fixtures are byte-for-byte identical. For a
+  `DEVC/K` parent the handler still pays one extra `readMetadata` round trip
+  to tell those apart, and still forwards the package's own refusal when the
+  package is gone. For every other parent type it used to throw, on the
+  grounds that no fixture settled the question — which made an ordinary
+  request answer `client_threw`. It is settled now: `CL_ABAP_CHAR_UTILITIES`,
+  a standard SAP class, answers `CLAS/OC` node `0000` with zero bytes on a
+  live system, so outside the package case a blank body is an empty node and
+  is answered as one.
+
 ## [10.2.0] - 2026-09-15
 
 ### Added

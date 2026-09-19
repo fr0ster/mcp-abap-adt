@@ -1,0 +1,34 @@
+{
+  "case": "refusal-lock-held-by-other",
+  "step": 1,
+  "stepTag": "lock",
+  "capturedAt": "2026-09-11T09:07:40.843Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/classes/zmcp_bld_ansch01?_action=LOCK&accessMode=MODIFY",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/zmcp_bld_ansch01?_action=LOCK&accessMode=MODIFY",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result;q=0.8, application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.lock.result2;q=0.9"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 403,
+    "statusText": "Forbidden",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "632",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=65626",
+      "sap-server": "true",
+      "sap-perf-fesrec": "67335.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-lock-held-by-other--01-lock.body.xml"
+  }
+}

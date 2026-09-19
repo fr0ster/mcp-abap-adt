@@ -1,17 +1,32 @@
 /**
  * CheckObject Handler - Syntax check for ABAP objects via ADT API.
- * Uses AdtClient check methods per object type.
+ *
+ * A dispatcher: one branch runs per call, over the same family clients every
+ * low-level CheckX handler in this migration uses. Each branch carries its
+ * own `resultsFor(xDocuments)` and `analyseCheck`.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import {
+  behaviorDefinitionDocuments,
+  classDocuments,
+  dataElementDocuments,
+  ddlDocuments,
+  domainDocuments,
+  functionGroupDocuments,
+  interfaceDocuments,
+  metadataExtensionDocuments,
+  programDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckObjectLow',
@@ -63,6 +78,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['object_name', 'object_type'],
   },
@@ -78,194 +94,136 @@ interface CheckObjectArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
+
+const VALID_TYPES = [
+  'class',
+  'program',
+  'interface',
+  'function_group',
+  'table',
+  'structure',
+  'ddl',
+  'domain',
+  'data_element',
+  'behavior_definition',
+  'metadata_extension',
+];
 
 export async function handleCheckObject(
   context: HandlerContext,
   args: CheckObjectArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      object_name,
-      object_type,
-      version = 'active',
-      session_id,
-      session_state,
-    } = args as CheckObjectArgs;
+  const {
+    object_name,
+    object_type,
+    version = 'active',
+    session_id,
+    session_state,
+  } = args as CheckObjectArgs;
 
-    if (!object_name || !object_type) {
-      return return_error(
-        new Error('object_name and object_type are required'),
-      );
-    }
+  if (!object_name || !object_type) {
+    return return_error(new Error('object_name and object_type are required'));
+  }
 
-    const validTypes = [
-      'class',
-      'program',
-      'interface',
-      'function_group',
-      'table',
-      'structure',
-      'ddl',
-      'domain',
-      'data_element',
-      'behavior_definition',
-      'metadata_extension',
-    ];
-    const objectType = object_type.toLowerCase();
-    if (!validTypes.includes(objectType)) {
-      return return_error(
-        new Error(
-          `Invalid object_type. Must be one of: ${validTypes.join(', ')}`,
-        ),
-      );
-    }
-
-    const validVersions = ['active', 'inactive'];
-    const checkVersion = validVersions.includes(version.toLowerCase())
-      ? (version.toLowerCase() as 'active' | 'inactive')
-      : 'active';
-
-    const client = createAdtClient(connection, logger);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-    }
-
-    const objectName = object_name.toUpperCase();
-    logger?.info(
-      `Starting object check: ${objectName} (type: ${objectType}, version: ${checkVersion})`,
+  const objectType = object_type.toLowerCase();
+  if (!VALID_TYPES.includes(objectType)) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
+      ),
     );
+  }
 
-    try {
-      let checkState: any | undefined;
+  const checkVersion = ['active', 'inactive'].includes(version.toLowerCase())
+    ? (version.toLowerCase() as 'active' | 'inactive')
+    : 'active';
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const objectName = object_name.toUpperCase();
+  const detail = detailOf(args);
+  const client = createAdtClient(connection, logger);
+
+  return answer(
+    { tool: 'CheckObjectLow', detail },
+    () => {
       switch (objectType) {
         case 'class':
-          checkState = await client
-            .getClass()
-            .check({ className: objectName }, checkVersion);
-          break;
+          return client
+            .getClass(resultsFor(classDocuments))
+            .check({ className: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'program':
-          checkState = await client
-            .getProgram()
-            .check({ programName: objectName }, checkVersion);
-          break;
+          return client
+            .getProgram(resultsFor(programDocuments))
+            .check({ programName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'interface':
-          checkState = await client
-            .getInterface()
-            .check({ interfaceName: objectName }, checkVersion);
-          break;
+          return client
+            .getInterface(resultsFor(interfaceDocuments))
+            .check({ interfaceName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'function_group':
-          checkState = await client
-            .getFunctionGroup()
-            .check({ functionGroupName: objectName });
-          break;
+          return client
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
+            .check({ functionGroupName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'table':
-          checkState = await client
-            .getTable()
-            .check({ tableName: objectName }, checkVersion);
-          break;
+          return client
+            .getTable(resultsFor(tableDocuments))
+            .check({ tableName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'structure':
-          checkState = await client
-            .getStructure()
-            .check({ structureName: objectName }, checkVersion);
-          break;
+          return client
+            .getStructure(resultsFor(structureDocuments))
+            .check({ structureName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'ddl':
-          checkState = await client
-            .getDdl()
-            .check({ ddlName: objectName }, checkVersion);
-          break;
+          return client
+            .getDdl(resultsFor(ddlDocuments))
+            .check({ ddlName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'domain':
-          checkState = await client
-            .getDomain()
-            .check({ domainName: objectName }, checkVersion);
-          break;
+          return client
+            .getDomain(resultsFor(domainDocuments))
+            .check({ domainName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'data_element':
-          checkState = await client
-            .getDataElement()
-            .check({ dataElementName: objectName }, checkVersion);
-          break;
+          return client
+            .getDataElement(resultsFor(dataElementDocuments))
+            .check({ dataElementName: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'behavior_definition':
-          checkState = await client
-            .getBehaviorDefinition()
-            .check({ name: objectName });
-          break;
+          return client
+            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+            .check({ name: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         case 'metadata_extension':
-          checkState = await client
-            .getMetadataExtension()
-            .check({ name: objectName }, checkVersion);
-          break;
+          return client
+            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+            .check({ name: objectName }, checkVersion, {
+              analyse: analyseCheck,
+            });
         default:
-          return return_error(
-            new Error(`Unsupported object_type: ${object_type}`),
-          );
+          // Unreachable: objectType was already checked against VALID_TYPES.
+          throw new Error(`Unsupported object_type: ${object_type}`);
       }
-
-      const response = checkState?.checkResult;
-      if (!response) {
-        throw new Error('Check did not return a response');
-      }
-
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      logger?.info(`✅ CheckObject completed: ${objectName}`);
-      logger?.info(`   Status: ${checkResult.status}`);
-      logger?.info(
-        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            object_name: objectName,
-            object_type: objectType,
-            version: checkVersion,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `Object ${objectName} has no syntax errors`
-              : `Object ${objectName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error checking object ${objectName}:`, error);
-
-      let errorMessage = `Failed to check object: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Object ${objectName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch {
-          // ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    },
+    project(detail, terseCheck),
+  );
 }

@@ -33,7 +33,6 @@ describe('masterLanguage does not leak across requests/modes (#110)', () => {
     (AdtClient as jest.Mock).mockClear();
     // Process-global context: a stale masterLanguage 'EN' plus a system id.
     setSystemContext({
-      isLegacy: false,
       masterSystem: 'SYS',
       masterLanguage: 'EN',
     });

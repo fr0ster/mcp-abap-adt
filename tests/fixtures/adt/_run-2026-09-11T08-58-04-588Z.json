@@ -1,0 +1,199 @@
+{
+  "startedAt": "2026-09-11T08:58:04.587Z",
+  "finishedAt": "2026-09-11T08:58:07.787Z",
+  "substitutions": [
+    "REDACTED",
+    "REDACTED",
+    "SAPUSER01"
+  ],
+  "cases": [
+    {
+      "case": "refusal-object-not-found",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-check-nonexistent-object",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-tree",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-contents-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-objectslist-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-hierarchy-direct",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-class-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-function-module-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "check-success-verdict",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-table-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-package-contents-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "create-class",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:58:06.588Z",
+      "endedAt": "2026-09-11T08:58:07.171Z"
+    },
+    {
+      "case": "update-source-success",
+      "outcome": "threw",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:58:07.171Z",
+      "endedAt": "2026-09-11T08:58:07.783Z",
+      "error": "Source code is required for update"
+    },
+    {
+      "case": "create-domain",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "create-dataelement",
+      "outcome": "threw",
+      "exchanges": 0,
+      "startedAt": "2026-09-11T08:58:07.785Z",
+      "endedAt": "2026-09-11T08:58:07.785Z",
+      "error": "Type kind is required"
+    },
+    {
+      "case": "read-metadata-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-function-group",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-function-module",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-behavior-definition",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-service-definition",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-package",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-domain",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-table",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-table",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-functiongroup",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-empty-package-contents",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-object-tree-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-where-used-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-transport-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "delete-success",
+      "outcome": "skipped",
+      "exchanges": 0
+    }
+  ]
+}

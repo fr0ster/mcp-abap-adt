@@ -1,21 +1,55 @@
 /**
  * CreateDataElement Handler - ABAP Data Element Creation via ADT API
  *
- * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getDataElement().{validate,create,lock,readMetadata,
+ * updateMetadata,unlock,check,activate} from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: create -> activate -> verify
+ * A lifecycle, not one call: validate the name, create the bare object, lock
+ * it, read-patch-write the properties the caller gave (through `withLock`,
+ * released on every path out), wait for the write to be visible, check the
+ * inactive version, and optionally activate — the order the pre-migration
+ * handler ran them in: `unlock` then the wait then `check`, because `check`
+ * is the first call after the write that reads it back and so the one the
+ * wait has to sit ahead of. `create` itself never reaches
+ * `type_kind`/`data_type`/`type_name`/`length`/`decimals` (see
+ * `CreateDataElementLow`); they reach the object only through the write
+ * inside the lock. The pre-migration handler's own wait was
+ * `read({withLongPolling: true})`; data element exposes no plain `read` in
+ * adt-clients 19 (only `readMetadata`), so the wait here is
+ * `readMetadata({withLongPolling: true})`, discarded for its result but not
+ * for what it does — this repository's own `xmlPatch.ts` documents the live
+ * incident behind it.
+ *
+ * **`config.packageName` never reaches the wire on `updateMetadata`.** The
+ * shipped `updateDataElement()` wire function
+ * (`core/dataElement/update.js`) builds its URL and PUT from
+ * `params.data_element_name`, `params.transport_request` and `document`
+ * only — `params.package_name` is passed in but never read. Not sent (the
+ * create call above still carries it, where it is read).
  */
 
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+  analyseValidation,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { patchDataElementXml } from '../../../lib/strategies/dataElementPatch';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { withLock } from '../../../lib/strategies/withLock';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
+
 export const TOOL_DEFINITION = {
   name: 'CreateDataElement',
   available_in: ['onprem', 'cloud'] as const,
@@ -117,6 +151,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['data_element_name', 'package_name'],
   },
@@ -146,173 +181,123 @@ interface DataElementArgs {
   set_get_parameter?: string;
   activate?: boolean;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateDataElement MCP tool
- *
- * Uses DataElementBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleCreateDataElement(
   context: HandlerContext,
   args: DataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.data_element_name) {
-      return return_error('Data element name is required');
-    }
-    if (!args?.package_name) {
-      return return_error('Package name is required');
-    }
 
-    // Validate transport_request: required for non-$TMP packages
-    validateTransportRequest(args.package_name, args.transport_request);
-
-    const typedArgs = args as DataElementArgs;
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const dataElementName = typedArgs.data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element creation: ${dataElementName}`);
-
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = typedArgs.activate !== false;
-    const typeKind = typedArgs.type_kind || 'domain';
-    let lockHandle: string | undefined;
-    try {
-      // Validate
-      await client.getDataElement().validate({
-        dataElementName,
-        packageName: typedArgs.package_name,
-        description: typedArgs.description || dataElementName,
-      });
-
-      // Create (registers bare object in SAP)
-      await client.getDataElement().create({
-        dataElementName,
-        description: typedArgs.description || dataElementName,
-        packageName: typedArgs.package_name,
-        typeKind: typeKind,
-        dataType: typedArgs.data_type,
-        typeName: typedArgs.type_name,
-        length: typedArgs.length,
-        decimals: typedArgs.decimals,
-        transportRequest: typedArgs.transport_request,
-        masterLanguage: typedArgs.master_language,
-      });
-
-      // Lock
-      lockHandle = await client.getDataElement().lock({ dataElementName });
-
-      // Update with read-modify-write: reads current XML from SAP, patches with properties, PUTs back
-      await client.getDataElement().update(
-        {
-          dataElementName,
-          packageName: typedArgs.package_name,
-          description: typedArgs.description || dataElementName,
-          dataType: typedArgs.data_type || 'CHAR',
-          length: typedArgs.length || 100,
-          decimals: typedArgs.decimals || 0,
-          shortLabel: typedArgs.short_label,
-          mediumLabel: typedArgs.medium_label,
-          longLabel: typedArgs.long_label,
-          headingLabel: typedArgs.heading_label,
-          typeKind: typeKind,
-          typeName: typedArgs.type_name,
-          searchHelp: typedArgs.search_help,
-          searchHelpParameter: typedArgs.search_help_parameter,
-          setGetParameter: typedArgs.set_get_parameter,
-          transportRequest: typedArgs.transport_request,
-        },
-        { lockHandle },
-      );
-
-      // Unlock
-      await client.getDataElement().unlock({ dataElementName }, lockHandle);
-      lockHandle = undefined;
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getDataElement()
-          .read({ dataElementName }, 'inactive', { withLongPolling: true });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
-      }
-
-      // Check
-      try {
-        await safeCheckOperation(
-          () => client.getDataElement().check({ dataElementName }),
-          dataElementName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-      } catch (checkError: any) {
-        if (!(checkError as any).isAlreadyChecked) {
-          throw checkError;
-        }
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        await client.getDataElement().activate({ dataElementName });
-      }
-
-      logger?.info(`✅ CreateDataElement completed: ${dataElementName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            package: typedArgs.package_name,
-            transport_request: typedArgs.transport_request,
-            data_type: typedArgs.data_type || null,
-            status: shouldActivate ? 'active' : 'inactive',
-            message: `Data element ${dataElementName} created${shouldActivate ? ' and activated' : ''} successfully`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      if (lockHandle) {
-        try {
-          await client.getDataElement().unlock({ dataElementName }, lockHandle);
-        } catch (_unlockError) {
-          // Ignore unlock errors during cleanup
-        }
-      }
-
-      logger?.error(
-        `Error creating data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.data?.includes('ExceptionResourceAlreadyExists')
-      ) {
-        return return_error(
-          `Data element ${dataElementName} already exists. Please delete it first or use a different name.`,
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : String(error.response.data).substring(0, 500)
-        : error.message || String(error);
-
-      return return_error(
-        `Failed to create data element ${dataElementName}: ${errorMessage}`,
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.data_element_name) {
+    return return_error('Data element name is required');
   }
+  if (!args?.package_name) {
+    return return_error('Package name is required');
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const dataElementName = args.data_element_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const typeKind = args.type_kind || 'domain';
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateDataElement', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getDataElement(
+        resultsFor(dataElementDocuments),
+      );
+
+      const checked = await sequence(
+        () =>
+          obj.validate(
+            {
+              dataElementName,
+              description: args.description || dataElementName,
+              packageName: args.package_name,
+            },
+            { analyse: analyseValidation },
+          ),
+        () =>
+          obj.create(
+            {
+              dataElementName,
+              description: args.description || dataElementName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { analyse: analyseException },
+          ),
+        () =>
+          withLock(
+            () => obj.lock({ dataElementName }),
+            (
+              lockHandle,
+            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+              sequence(
+                () =>
+                  obj.readMetadata(
+                    { dataElementName },
+                    { analyse: analyseException },
+                  ),
+                (current) =>
+                  obj.updateMetadata(
+                    {
+                      dataElementName,
+                      transportRequest: args.transport_request,
+                      document: patchDataElementXml(
+                        extractXmlString(
+                          current.raw,
+                          `data element ${dataElementName}`,
+                        ),
+                        {
+                          description: args.description || dataElementName,
+                          type_kind: typeKind,
+                          type_name: args.type_name,
+                          data_type: args.data_type || 'CHAR',
+                          length: args.length || 100,
+                          decimals: args.decimals || 0,
+                          short_label: args.short_label,
+                          medium_label: args.medium_label,
+                          long_label: args.long_label,
+                          heading_label: args.heading_label,
+                          search_help: args.search_help,
+                          search_help_parameter: args.search_help_parameter,
+                          set_get_parameter: args.set_get_parameter,
+                        },
+                      ),
+                    },
+                    { lockHandle, analyse: analyseException },
+                  ),
+              ),
+            (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
+          ),
+        // Best-effort: wait for the write to be visible, right before the
+        // first call that reads it back — see `handleCreateDomain.ts` for
+        // why the wait sits here rather than after `check`.
+        async () => {
+          await obj
+            .readMetadata(
+              { dataElementName },
+              { withLongPolling: true, analyse: analyseException },
+            )
+            .catch(() => undefined);
+          return obj.check({ dataElementName }, undefined, {
+            analyse: analyseCheck,
+          });
+        },
+      );
+
+      if (!checked.ok || !shouldActivate) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ dataElementName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

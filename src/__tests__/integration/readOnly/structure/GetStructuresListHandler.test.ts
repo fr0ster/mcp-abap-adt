@@ -191,6 +191,18 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
       // Append (extension) child — config-driven; only asserted when the test
       // case provides `expected_append` (the extension is created out-of-band,
       // since adt-clients cannot create `extend type` objects).
+      //
+      // **Out-of-band means it may not be here.** The config names an
+      // extension somebody created by hand on one system, and nothing in
+      // this repository creates it on another — on trial, `ZOK_S_APPEND`
+      // answers 404 and SAP reports zero where-used references for the base
+      // structure, scoped or unscoped (measured 2026-09-16,
+      // `scripts/probe-migration-failures.ts`). Asserting the child anyway
+      // turned a missing test fixture into a failure that reads like a
+      // defect in the walk. So: when the named extension is absent from the
+      // tree, say which of the two it is — an extension that is not on this
+      // system, or a walk that lost one it should have found — by asking
+      // whether the tool can see the object at all.
       const expectedAppend = testCase.params.expected_append
         ? String(testCase.params.expected_append).toUpperCase()
         : null;
@@ -198,6 +210,21 @@ describe('GetStructuresList ReadOnly Handler Integration', () => {
         const appendChild = (tree.children ?? []).find(
           (node) => node.structure === expectedAppend,
         );
+        if (!appendChild) {
+          const probe = await handleGetStructuresList(
+            createHandlerContext({
+              connection: connection!,
+              logger: testLogger,
+            }),
+            { structure_name: expectedAppend },
+          );
+          if (probe.isError) {
+            testLogger?.info(
+              `⏭️  Skipping the append assertion: ${expectedAppend} does not exist on this system — ${probe.content[0]?.text?.slice(0, 200)}`,
+            );
+            return;
+          }
+        }
         expect(appendChild).toBeDefined();
         expect(appendChild?.kind).toBe('append');
       }

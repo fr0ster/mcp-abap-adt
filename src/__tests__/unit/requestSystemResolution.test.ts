@@ -71,7 +71,7 @@ function seen() {
 
 beforeEach(() => {
   resetSystemContextCache();
-  setSystemContext({ isLegacy: false });
+  setSystemContext({});
   (AdtClient as jest.Mock).mockClear();
   lookup.mockReset();
   lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });

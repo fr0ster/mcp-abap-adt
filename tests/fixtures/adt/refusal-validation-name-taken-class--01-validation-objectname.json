@@ -1,0 +1,34 @@
+{
+  "case": "refusal-validation-name-taken-class",
+  "step": 1,
+  "stepTag": "validation-objectname",
+  "capturedAt": "2026-09-11T08:31:45.557Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/validation/objectname?objname=ZBP_MCP_SHR_I_ROOT&objtype=CLAS%2FOC&packagename=ZMCP_SHR_PKG",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/validation/objectname?objname=ZBP_MCP_SHR_I_ROOT&objtype=CLAS%2FOC&packagename=ZMCP_SHR_PKG",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml;charset=UTF-8;dataname=com.sap.adt.oo.clifname.check"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "statusText": "Bad Request",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "552",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=24175",
+      "sap-server": "true",
+      "sap-perf-fesrec": "31146.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-validation-name-taken-class--01-validation-objectname.body.xml"
+  }
+}

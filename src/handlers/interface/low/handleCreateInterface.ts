@@ -1,22 +1,27 @@
 /**
  * CreateInterface Handler - Create ABAP Interface
  *
- * Uses AdtClient.createInterface from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getInterface().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
  */
 
+import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateInterfaceLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Create a new ABAP interface. - use CreateInterface (high-level) for full workflow with validation, lock, update, check, unlock, and activate.',
   inputSchema: {
@@ -55,6 +60,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['interface_name', 'description', 'package_name'],
   },
@@ -71,117 +77,50 @@ interface CreateInterfaceArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateInterface MCP tool
- *
- * Uses AdtClient.createInterface - low-level single method call
- */
 export async function handleCreateInterface(
   context: HandlerContext,
   args: CreateInterfaceArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      interface_name,
-      description,
-      package_name,
-      transport_request,
-      session_id,
-      session_state,
-    } = args as CreateInterfaceArgs;
+  const {
+    interface_name,
+    description,
+    package_name,
+    transport_request,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!interface_name || !description || !package_name) {
-      return return_error(
-        new Error('interface_name, description, and package_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const interfaceName = interface_name.toUpperCase();
-
-    logger?.info(`Starting interface creation: ${interfaceName}`);
-
-    try {
-      // Create interface
-      const createState = await client.getInterface().create({
-        interfaceName,
-        description,
-        packageName: package_name,
-        transportRequest: transport_request,
-      });
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for interface ${interfaceName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateInterface completed: ${interfaceName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            interface_name: interfaceName,
-            description,
-            package_name: package_name,
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Interface ${interfaceName} created successfully. Use LockInterface and UpdateInterface to add source code, then UnlockInterface and ActivateObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating interface ${interfaceName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to create interface: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Interface ${interfaceName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!interface_name || !description || !package_name) {
+    return return_error(
+      new Error('interface_name, description, and package_name are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const interfaceName = interface_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateInterfaceLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getInterface(resultsFor(interfaceDocuments))
+        .create(
+          {
+            interfaceName,
+            description,
+            packageName: package_name,
+            transportRequest: transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

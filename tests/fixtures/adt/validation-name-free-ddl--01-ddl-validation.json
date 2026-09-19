@@ -1,0 +1,34 @@
+{
+  "case": "validation-name-free-ddl",
+  "step": 1,
+  "stepTag": "ddl-validation",
+  "capturedAt": "2026-09-11T08:31:49.205Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/ddl/validation?objname=ZMCP_BLD_FREE_V1&packagename=ZADT_BLD_PKG03&description=x",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/ddl/validation?objname=ZMCP_BLD_FREE_V1&packagename=ZADT_BLD_PKG03&description=x",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.as+xml; charset=utf-8; dataname=com.sap.adt.StatusMessage",
+      "content-length": "198",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=22186",
+      "sap-server": "true",
+      "sap-perf-fesrec": "28657.000000",
+      "connection": "close"
+    },
+    "bodyFile": "validation-name-free-ddl--01-ddl-validation.body.xml"
+  }
+}

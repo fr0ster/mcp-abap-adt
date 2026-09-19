@@ -1,0 +1,31 @@
+{
+  "case": "refusal-deletion-check-refuses",
+  "step": 1,
+  "stepTag": "deletion-check",
+  "capturedAt": "2026-09-11T05:40:46.531Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/deletion/check",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.deletion.check.response.v1+xml",
+      "Content-Type": "application/vnd.sap.adt.deletion.check.request.v1+xml"
+    },
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:checkRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/oo/classes/ZMCP_BLD_ANSCH01\"/>\n</del:checkRequest>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.deletion.check.response.v1+xml; charset=utf-8",
+      "content-length": "749",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=96475",
+      "sap-server": "true",
+      "sap-perf-fesrec": "111689.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-deletion-check-refuses--01-deletion-check.body.xml"
+  }
+}

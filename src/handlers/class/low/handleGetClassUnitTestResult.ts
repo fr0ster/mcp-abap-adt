@@ -3,20 +3,56 @@
  *
  * Uses AdtClient.getUnitTest().getResult from @mcp-abap-adt/adt-clients.
  * Low-level handler: single method call.
+ *
+ * **Deliberately excluded from Task 14's `class/low` migration and its
+ * `tsc`/`check-analyse` gates.** This reaches `getUnitTest()`, not
+ * `getClass()` — a different family with its own result set (`ourUnitTest`,
+ * already exported from `resultSets.ts`) and its own `analyseUnitTest`
+ * strategy — and it stays on `client.getUnitTest() as any` until the task
+ * that wires the unit-test members and that shared result set migrates it.
+ * The carve-out is real, but nothing holds it in place any more: `client.
+ * getUnitTest() as any` silences the compiler rather than naming an error
+ * for it to keep finding, and the build reports zero errors with this file
+ * exactly as it is. Nothing but this comment marks the carve-out until the
+ * task that wires the unit-test members reads it.
+ *
+ * **Fix round 1, task 25.** The first pass here cast `resultResponse as
+ * AxiosResponse`, on the wrong belief that `getUnitTest()`'s members still
+ * answered the pre-19 transport frame. They do not: `ITestRunInformation`
+ * (`@mcp-abap-adt/interfaces`) already declares `getResult`/`getStatus` as
+ * `Promise<IAdtResponse<T>>`, and `AdtUnitTest.d.ts` confirms the shipped
+ * class implements exactly that — `getUnitTest() as any` erases the type,
+ * not the runtime shape. `IAdtResponse` has no `.data` at all, so every call
+ * answered `{isError:false, content:[{text: undefined}]}` regardless of
+ * `.ok` — a refusal reported as success, the masking class this repository
+ * has removed three times elsewhere. Fixed by unwrapping through `answer()`
+ * instead of guessing at a shape.
+ *
+ * **Fix round 2, task 25.** The outer `try`/`catch` this handler had before
+ * fix round 1 is restored: `createAdtClient`/`restoreSessionInConnection`
+ * run before `answer()` is reached and are not inside it, so a throw there
+ * (a direct caller, e.g. a soft-mode integration test that calls the
+ * handler function itself rather than through the server) used to surface
+ * as a rejected promise instead of an error result. `RunClassUnitTests.ts`,
+ * the still-unmigrated sibling in this directory, keeps the same guard.
+ *
+ * **Task 28: why this tool carries no `detail`.** Same reasoning as
+ * `GetClassUnitTestStatus.ts` in this directory: the migrated, generic
+ * `GetUnitTestResult` (`unit_test/high/`) DOES have `detail`, because its
+ * `getResult` answers a real `AdtReading`. This handler is still on the
+ * pre-migration `client.getUnitTest() as any` escape hatch, treating the
+ * answer as an already-opaque value with no reading behind it — nothing to
+ * choose a level of until the carve-out above is closed.
  */
 
-import type { IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetClassUnitTestResultLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.',
   inputSchema: {
@@ -85,29 +121,21 @@ export async function handleGetClassUnitTestResult(
 
     if (session_id && session_state) {
       await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
     }
 
     logger?.info(`Fetching ABAP Unit result for run ${run_id}`);
 
-    try {
-      const unitTest = client.getUnitTest() as any;
-      const resultResponse = await unitTest.getResult(run_id, {
-        withNavigationUris: with_navigation_uris,
-        format,
-      });
+    const unitTest = client.getUnitTest() as any;
 
-      if (!resultResponse) {
-        throw new Error('SAP did not return ABAP Unit result response');
-      }
-
-      return return_response(resultResponse as IAdtResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error retrieving ABAP Unit result for run ${run_id}: ${error?.message || error}`,
-      );
-      return return_error(new Error(error?.message || String(error)));
-    }
+    return await answer(
+      { tool: 'GetClassUnitTestResultLow', detail: 'terse' },
+      () =>
+        unitTest.getResult(run_id, {
+          withNavigationUris: with_navigation_uris,
+          format,
+        }),
+      (value: string) => value,
+    );
   } catch (error: any) {
     return return_error(error);
   }

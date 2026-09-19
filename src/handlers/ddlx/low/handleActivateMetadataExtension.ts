@@ -1,31 +1,30 @@
 /**
- * ActivateMetadataExtension Handler - Activate ABAP Metadata Extension
+ * ActivateMetadataExtensionLow Handler - Activate ABAP Metadata Extension
  *
- * Uses AdtClient.activateMetadataExtension from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getMetadataExtension().activate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseActivationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseActivation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateMetadataExtensionLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: MetadataExtension. Will be useful for activating, creating, or updating metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    'Operation: Activate, Create, Update. Subject: Metadata Extension. Will be useful for activating, creating, or updating a metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
       name: {
         type: 'string',
-        description: 'Metadata extension name (e.g., ZC_MY_EXTENSION).',
+        description: 'Metadata Extension name (e.g., ZI_MY_DDLX).',
       },
       session_id: {
         type: 'string',
@@ -42,6 +41,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name'],
   },
@@ -55,130 +55,33 @@ interface ActivateMetadataExtensionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ActivateMetadataExtension MCP tool
- *
- * Uses AdtClient.activateMetadataExtension - low-level single method call
- */
 export async function handleActivateMetadataExtension(
   context: HandlerContext,
   args: ActivateMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, session_id, session_state } =
-      args as ActivateMetadataExtensionArgs;
+  const { name, session_id, session_state } = args;
 
-    // Validation
-    if (!name) {
-      return return_error(new Error('name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const metadataExtensionName = name.toUpperCase();
-
-    logger?.info(
-      `Starting metadata extension activation: ${metadataExtensionName}`,
-    );
-
-    try {
-      // Activate metadata extension
-      const activateState = await client
-        .getMetadataExtension()
-        .activate({ name: metadataExtensionName });
-      const response = activateState.activateResult;
-
-      if (!response) {
-        throw new Error(
-          `Activation did not return a response for metadata extension ${metadataExtensionName}`,
-        );
-      }
-
-      // Parse activation response
-      const activationResult = parseActivationResponse(response.data);
-      const success = activationResult.activated && activationResult.checked;
-
-      // Get updated session state after activation
-
-      logger?.info(
-        `✅ ActivateMetadataExtension completed: ${metadataExtensionName}`,
-      );
-      logger?.debug(
-        `Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success,
-            name: metadataExtensionName,
-            activation: {
-              activated: activationResult.activated,
-              checked: activationResult.checked,
-              generated: activationResult.generated,
-            },
-            messages: activationResult.messages,
-            warnings: activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
-            ),
-            errors: activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            ),
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: success
-              ? `Metadata extension ${metadataExtensionName} activated successfully`
-              : `Metadata extension ${metadataExtensionName} activation completed with ${activationResult.messages.length} message(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error activating metadata extension ${metadataExtensionName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to activate metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Metadata extension ${metadataExtensionName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!name) {
+    return return_error(new Error('name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlxName = name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ActivateMetadataExtensionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+        .activate({ name: ddlxName }, { analyse: analyseActivation }),
+    project(detail, terseActivation),
+  );
 }

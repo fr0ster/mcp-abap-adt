@@ -1,19 +1,27 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "types": [
-      "node",
-      "jest"
-    ]
+    "types": ["node", "jest"],
+    // The emitting tsconfig.json pins `rootDir` to `./src`, which is correct
+    // for `dist/` but refuses any file under `scripts/` the moment this
+    // config's `include` reaches there (TS6059). This config never emits —
+    // ts-jest transpiles per-file and `tsc --noEmit -p` here is a checker
+    // run, not a build — so widening `rootDir` to the repo root costs
+    // nothing and lets the audit tooling under `scripts/` type-check with
+    // the tests.
+    //
+    // Only the audit tooling, not all of `scripts/`. The other scripts carry
+    // eighteen errors of their own that predate this migration, and adopting
+    // them here would make "errors naming the files this task touched" — the
+    // measure every remaining task reports against — noisier for no gain.
+    "rootDir": "."
   },
   "include": [
     "src/**/*",
     "src/__tests__/**/*",
-    "src/lib/servers/v2/__tests__/**/*"
+    "src/lib/servers/v2/__tests__/**/*",
+    "scripts/lib/**/*",
+    "scripts/check-analyse.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ]
+  "exclude": ["node_modules", "dist"]
 }
-

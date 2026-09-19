@@ -1,6 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
@@ -43,35 +43,24 @@ export async function handleRuntimeListSystemMessages(
   args: RuntimeListSystemMessagesArgs,
 ) {
   const { connection, logger } = context;
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds();
 
-  try {
-    const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const feeds = runtimeClient.getFeeds();
-
-    const messages = await feeds.systemMessages({
-      user: args?.user,
-      maxResults: args?.max_results,
-      from: args?.from,
-      to: args?.to,
-    });
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          count: messages.length,
-          messages,
-        },
-        null,
-        2,
-      ),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {},
-    });
-  } catch (error: unknown) {
-    logger?.error('Error listing system messages:', error);
-    return return_error(error);
-  }
+  // `systemMessages()` answers `IAdtResponse<ISystemMessageEntry[]>` as of
+  // adt-clients 19, not a bare array — the same parsed entries as before,
+  // reached through `.getResult().value` now instead of directly.
+  return answer(
+    { tool: 'RuntimeListSystemMessages', detail: 'terse' },
+    () =>
+      feeds.systemMessages({
+        user: args?.user,
+        maxResults: args?.max_results,
+        from: args?.from,
+        to: args?.to,
+      }),
+    (messages) => ({
+      success: true,
+      count: messages.length,
+      messages,
+    }),
+  );
 }

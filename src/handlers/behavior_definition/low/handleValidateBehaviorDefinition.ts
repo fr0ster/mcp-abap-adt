@@ -1,23 +1,24 @@
 /**
- * ValidateBehaviorDefinition Handler - Validate ABAP BehaviorDefinition Name
+ * ValidateBehaviorDefinition Handler - Validate ABAP Behavior Definition Name
  *
- * Uses AdtClient.validateBehaviorDefinition from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getBehaviorDefinition().validate from @mcp-abap-adt/adt-clients 19.
+ *
+ * ADT's validation endpoint requires `name` and `rootEntity` to carry the same
+ * value — the root entity CDS view name — not the behavior definition's own
+ * `name` argument. That quirk predates this migration; kept as-is.
  */
 
-import type {
-  BehaviorDefinitionImplementationType,
-  IBehaviorDefinitionValidationParams,
-} from '@mcp-abap-adt/interfaces';
+import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import type { BehaviorDefinitionImplementationType } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+
 export const TOOL_DEFINITION = {
   name: 'ValidateBehaviorDefinitionLow',
   available_in: ['onprem', 'cloud'] as const,
@@ -65,6 +66,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: [
       'name',
@@ -88,144 +90,61 @@ interface ValidateBehaviorDefinitionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateBehaviorDefinition MCP tool
- *
- * Uses AdtClient.validateBehaviorDefinition - low-level single method call
- */
 export async function handleValidateBehaviorDefinition(
   context: HandlerContext,
   args: ValidateBehaviorDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      name,
-      root_entity,
-      implementation_type,
-      package_name,
-      description,
-      session_id,
-      session_state,
-    } = args as ValidateBehaviorDefinitionArgs;
+  const {
+    root_entity,
+    implementation_type,
+    package_name,
+    description,
+    session_id,
+    session_state,
+  } = args;
+  const name = args.name;
 
-    // Validation
-    if (
-      !name ||
-      !root_entity ||
-      !implementation_type ||
-      !package_name ||
-      !description
-    ) {
-      return return_error(
-        new Error(
-          'name, root_entity, implementation_type, package_name, and description are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const bdefName = name.toUpperCase();
-
-    logger?.info(`Starting behavior definition validation: ${bdefName}`);
-
-    try {
-      // Validate behavior definition - using IBehaviorDefinitionValidationParams from adt-clients
-      // Note: In SAP ADT validation API, objname and rootEntity are both required parameters
-      // but they must have the same value (one value in two parameters)
-      // We use root_entity for both since it's the actual CDS view name
-      const validateParams: IBehaviorDefinitionValidationParams = {
-        objname: root_entity, // objname - same as rootEntity
-        rootEntity: root_entity, // rootEntity - CDS view name
-        description: description,
-        package: package_name.toUpperCase(),
-        implementationType: implementation_type,
-      };
-
-      // AdtClient.validateBehaviorDefinition expects IBehaviorDefinitionConfig,
-      // but we use IBehaviorDefinitionValidationParams structure for clarity
-      // Convert to the format expected by AdtClient
-      const validationState = await client.getBehaviorDefinition().validate({
-        name: validateParams.objname,
-        rootEntity: validateParams.rootEntity,
-        description: validateParams.description,
-        packageName: validateParams.package,
-        implementationType: validateParams.implementationType,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(`✅ ValidateBehaviorDefinition completed: ${bdefName}`);
-      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            name: bdefName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `BehaviorDefinition ${bdefName} is valid and available`
-              : `BehaviorDefinition ${bdefName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating behavior definition ${bdefName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to validate behavior definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `BehaviorDefinition ${bdefName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (
+    !name ||
+    !root_entity ||
+    !implementation_type ||
+    !package_name ||
+    !description
+  ) {
+    return return_error(
+      new Error(
+        'name, root_entity, implementation_type, package_name, and description are required',
+      ),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateBehaviorDefinitionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+        .validate(
+          {
+            // objname and rootEntity must carry the same value — the root
+            // entity CDS view name — not the behavior definition's own name.
+            name: root_entity,
+            rootEntity: root_entity,
+            description,
+            packageName: package_name.toUpperCase(),
+            implementationType: implementation_type,
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

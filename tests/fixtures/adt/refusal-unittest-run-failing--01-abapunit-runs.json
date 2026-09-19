@@ -1,0 +1,34 @@
+{
+  "case": "refusal-unittest-run-failing",
+  "step": 1,
+  "stepTag": "abapunit-runs",
+  "capturedAt": "2026-09-11T09:26:04.496Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/abapunit/runs",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/abapunit/runs",
+    "headers": {
+      "Content-Type": "application/vnd.sap.adt.api.abapunit.run.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><aunit:run xmlns:aunit=\"http://www.sap.com/adt/api/aunit\" title=\"LTC_PROBE\" context=\"MCP ABAP ADT Client\">\n  <aunit:options>\n    <aunit:scope ownTests=\"true\" foreignTests=\"false\" addForeignTestsAsPreview=\"true\"/>\n    <aunit:riskLevel harmless=\"true\" dangerous=\"true\" critical=\"true\"/>\n    <aunit:duration short=\"true\" medium=\"true\" long=\"true\"/>\n  </aunit:options>\n  <aunit:tests>\n    <aunit:test containerClass=\"ZMCP_BLD_UT01\" class=\"LTC_PROBE\"/>\n  </aunit:tests>\n</aunit:run>"
+  },
+  "response": {
+    "status": 201,
+    "statusText": "Created",
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "location": "/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB859F1193D5D44",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=320388",
+      "sap-server": "true",
+      "sap-perf-fesrec": "322192.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-unittest-run-failing--01-abapunit-runs.body.txt"
+  }
+}

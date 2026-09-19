@@ -1,23 +1,22 @@
 /**
  * ValidateInterface Handler - Validate ABAP Interface Name
  *
- * Uses AdtClient.validateInterface from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getInterface().validate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateInterfaceLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Validate an ABAP interface name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
@@ -51,6 +50,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['interface_name', 'package_name', 'description'],
   },
@@ -66,117 +66,48 @@ interface ValidateInterfaceArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateInterface MCP tool
- *
- * Uses AdtClient.validateInterface - low-level single method call
- */
 export async function handleValidateInterface(
   context: HandlerContext,
   args: ValidateInterfaceArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      interface_name,
-      package_name,
-      description,
-      session_id,
-      session_state,
-    } = args as ValidateInterfaceArgs;
+  const {
+    interface_name,
+    package_name,
+    description,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!interface_name || !package_name || !description) {
-      return return_error(
-        new Error('interface_name, package_name, and description are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const interfaceName = interface_name.toUpperCase();
-
-    logger?.info(`Starting interface validation: ${interfaceName}`);
-
-    try {
-      // Validate interface
-      const validationState = await client.getInterface().validate({
-        interfaceName: interfaceName,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(
-        `✅ ValidateInterface completed: ${interfaceName} (valid=${result.valid})`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            interface_name: interfaceName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `Interface name ${interfaceName} is valid and available`
-              : `Interface name ${interfaceName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating interface ${interfaceName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to validate interface: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Interface ${interfaceName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!interface_name || !package_name || !description) {
+    return return_error(
+      new Error('interface_name, package_name, and description are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const interfaceName = interface_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateInterfaceLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getInterface(resultsFor(interfaceDocuments))
+        .validate(
+          {
+            interfaceName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

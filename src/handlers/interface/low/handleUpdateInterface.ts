@@ -1,22 +1,31 @@
 /**
  * UpdateInterface Handler - Update ABAP Interface Source Code
  *
- * Uses AdtClient.updateInterface from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getInterface().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes in `options`, not `config`.** `IInterfaceConfig` still
+ * declares a `sourceCode` field, so `update({ interfaceName, sourceCode },
+ * ...)` compiles either way — but the shipped `AdtInterface.update()` reads
+ * `options?.sourceCode` only (its own comment: "This used to fall back to
+ * `config.sourceCode` — two channels for one value, where the contract
+ * documents one"). A `.d.ts` comment is not evidence for where a value
+ * lands; the compiled JavaScript is. Verified against `AdtInterface.js`, not
+ * the declaration file.
  */
 
+import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateInterfaceLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update source code of an existing ABAP interface. Requires lock handle from LockObject. - use UpdateInterface (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
@@ -51,6 +60,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['interface_name', 'source_code', 'lock_handle'],
   },
@@ -66,112 +76,48 @@ interface UpdateInterfaceArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateInterface MCP tool
- *
- * Uses AdtClient.updateInterface - low-level single method call
- */
 export async function handleUpdateInterface(
   context: HandlerContext,
   args: UpdateInterfaceArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      interface_name,
-      source_code,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UpdateInterfaceArgs;
+  const {
+    interface_name,
+    source_code,
+    lock_handle,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!interface_name || !source_code || !lock_handle) {
-      return return_error(
-        new Error('interface_name, source_code, and lock_handle are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const interfaceName = interface_name.toUpperCase();
-
-    logger?.info(`Starting interface update: ${interfaceName}`);
-
-    try {
-      // Update interface with source code
-      const updateState = await client
-        .getInterface()
-        .update(
-          { interfaceName: interfaceName, sourceCode: source_code },
-          { lockHandle: lock_handle },
-        );
-      // updateResult may be null for successful updates (interface PUT returns 204 No Content)
-      const updateResult = updateState.updateResult;
-
-      // Get updated session state after update
-
-      logger?.info(`✅ UpdateInterface completed: ${interfaceName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            interface_name: interfaceName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Interface ${interfaceName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating interface ${interfaceName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update interface: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Interface ${interfaceName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Interface ${interfaceName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!interface_name || !source_code || !lock_handle) {
+    return return_error(
+      new Error('interface_name, source_code, and lock_handle are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const interfaceName = interface_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateInterfaceLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getInterface(resultsFor(interfaceDocuments))
+        .update(
+          { interfaceName },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

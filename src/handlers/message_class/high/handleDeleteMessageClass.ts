@@ -1,23 +1,29 @@
 /**
- * DeleteMessageClass Handler - Delete an ABAP Message Class (MSAG) via AdtClient.
+ * DeleteMessageClass Handler - Delete an ABAP Message Class (MSAG) via ADT
+ * deletion API
  *
- * Uses AdtClient.getMessageClass().delete(), which runs the ADT deletion
- * check + delete service. Deletes the class and all of its messages.
+ * Uses AdtClient.getMessageClass().delete from @mcp-abap-adt/adt-clients 19.
+ * Deletes the class and all of its messages. See `handleDeleteDomain.ts` for
+ * the shape and the masking this follows: a refusal answers 200,
+ * `analyseDeletion` reads it rather than the status, and no lock is taken
+ * because a held lock is what makes ADT refuse.
  */
 
+import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP message class (MSAG) and all of its messages from the SAP system. Includes a deletion check before the actual deletion. Transport request required for transportable objects, optional for local ($TMP).',
+    'Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +36,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects, optional for local ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['message_class_name'],
   },
@@ -38,6 +45,7 @@ export const TOOL_DEFINITION = {
 interface DeleteMessageClassArgs {
   message_class_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleDeleteMessageClass(
@@ -45,34 +53,24 @@ export async function handleDeleteMessageClass(
   args: DeleteMessageClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { message_class_name, transport_request } = args;
-    if (!message_class_name) {
-      return return_error(new Error('message_class_name is required'));
-    }
+  const { message_class_name, transport_request } = args;
 
-    const client = createAdtClient(connection, logger);
-    const name = message_class_name.toUpperCase();
-
-    logger?.info(`Starting message class deletion: ${name}`);
-
-    const state = await client.getMessageClass().delete({
-      name,
-      transportRequest: transport_request,
-    });
-
-    logger?.info(`✅ DeleteMessageClass completed: ${name}`);
-
-    return return_response({
-      data: JSON.stringify({
-        success: true,
-        message_class_name: name,
-        transport_request,
-        status: state.deleteResult?.status,
-        message: `Message class ${name} deleted successfully`,
-      }),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
+  if (!message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+
+  const name = message_class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteMessageClass', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMessageClass(resultsFor(messageClassDocuments))
+        .delete(
+          { name, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

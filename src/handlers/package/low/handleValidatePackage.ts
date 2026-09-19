@@ -1,19 +1,18 @@
 /**
  * ValidatePackage Handler - Validate ABAP Package Name
  *
- * Uses AdtClient.validatePackage from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getPackage().validate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidatePackageLow',
@@ -47,6 +46,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['package_name', 'super_package'],
   },
@@ -61,118 +61,39 @@ interface ValidatePackageArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidatePackage MCP tool
- *
- * Uses AdtClient.validatePackage - low-level single method call
- */
 export async function handleValidatePackage(
   context: HandlerContext,
   args: ValidatePackageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { package_name, super_package, session_id, session_state } =
-      args as ValidatePackageArgs;
+  const { package_name, super_package, session_id, session_state } = args;
 
-    // Validation
-    if (!package_name || !super_package) {
-      return return_error(
-        new Error('package_name and super_package are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const packageName = package_name.toUpperCase();
-    const superPackage = super_package.toUpperCase();
-
-    logger?.info(
-      `Starting package validation: ${packageName} in ${superPackage}`,
+  if (!package_name || !super_package) {
+    return return_error(
+      new Error('package_name and super_package are required'),
     );
-
-    try {
-      // Validate package
-      const validationState = await client.getPackage().validate({
-        packageName: packageName,
-        superPackage: superPackage,
-        description: undefined,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(
-        `✅ ValidatePackage completed: ${packageName} (valid=${result.valid})`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            package_name: packageName,
-            super_package: superPackage,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `Package name ${packageName} is valid and available`
-              : `Package name ${packageName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating package ${packageName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to validate package: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Package ${packageName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const packageName = package_name.toUpperCase();
+  const superPackage = super_package.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidatePackageLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getPackage(resultsFor(packageDocuments))
+        .validate(
+          { packageName, superPackage },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

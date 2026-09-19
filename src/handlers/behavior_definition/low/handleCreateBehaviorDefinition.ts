@@ -1,22 +1,24 @@
 /**
  * CreateBehaviorDefinition Handler - Create ABAP Behavior Definition
  *
- * Uses AdtClient.createBehaviorDefinition from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getBehaviorDefinition().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
  */
 
-import type {
-  BehaviorDefinitionImplementationType,
-  IBehaviorDefinitionConfig,
-} from '@mcp-abap-adt/interfaces';
+import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { BehaviorDefinitionImplementationType } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinitionLow',
@@ -67,6 +69,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: [
       'name',
@@ -82,7 +85,7 @@ interface CreateBehaviorDefinitionArgs {
   name: string;
   description: string;
   package_name: string;
-  transport_request?: string; // Optional for local packages ($TMP)
+  transport_request?: string;
   root_entity: string;
   implementation_type: BehaviorDefinitionImplementationType;
   session_id?: string;
@@ -91,150 +94,62 @@ interface CreateBehaviorDefinitionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateBehaviorDefinition MCP tool
- *
- * Uses AdtClient.createBehaviorDefinition - low-level single method call
- */
 export async function handleCreateBehaviorDefinition(
   context: HandlerContext,
   args: CreateBehaviorDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      name,
-      description,
-      package_name,
-      transport_request,
-      root_entity,
-      implementation_type,
-      session_id,
-      session_state,
-    } = args as CreateBehaviorDefinitionArgs;
+  const {
+    name,
+    description,
+    package_name,
+    transport_request,
+    root_entity,
+    implementation_type,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    // Note: transport_request is optional (can be empty for local objects)
-    if (
-      !name ||
-      !description ||
-      !package_name ||
-      !root_entity ||
-      !implementation_type
-    ) {
-      return return_error(
-        new Error(
-          'name, description, package_name, root_entity, and implementation_type are required',
-        ),
-      );
-    }
+  if (
+    !name ||
+    !description ||
+    !package_name ||
+    !root_entity ||
+    !implementation_type
+  ) {
+    return return_error(
+      new Error(
+        'name, description, package_name, root_entity, and implementation_type are required',
+      ),
+    );
+  }
 
-    const client = createAdtClient(connection, logger);
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
 
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
+  const bdefName = name.toUpperCase();
+  const detail = detailOf(args);
 
-    const bdefName = name.toUpperCase();
-
-    logger?.info(`Starting behavior definition creation: ${bdefName}`);
-
-    try {
-      // Create behavior definition - using types from adt-clients
-      const createConfig: Pick<
-        IBehaviorDefinitionConfig,
-        | 'name'
-        | 'description'
-        | 'packageName'
-        | 'transportRequest'
-        | 'rootEntity'
-        | 'implementationType'
-      > = {
-        name: bdefName,
-        description,
-        packageName: package_name,
-        transportRequest: transport_request,
-        rootEntity: root_entity,
-        implementationType: implementation_type,
-      };
-      const createState = await client
-        .getBehaviorDefinition()
-        .create(createConfig);
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for behavior definition ${bdefName}`,
-        );
-      }
-
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateBehaviorDefinition completed: ${bdefName}`);
-
-      return return_response({
-        data: JSON.stringify(
+  return answer(
+    { tool: 'CreateBehaviorDefinitionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
+        .create(
           {
-            success: true,
             name: bdefName,
             description,
-            package_name: package_name,
-            transport_request: transport_request,
-            root_entity: root_entity,
-            implementation_type: implementation_type,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Behavior Definition ${bdefName} created successfully. Use LockBehaviorDefinition and UpdateBehaviorDefinition to add source code, then UnlockBehaviorDefinition and ActivateObject.`,
+            packageName: package_name,
+            transportRequest: transport_request,
+            rootEntity: root_entity,
+            implementationType: implementation_type,
           },
-          null,
-          2,
+          { analyse: analyseException },
         ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating behavior definition ${bdefName}: ${error?.message || error}`,
-      );
-      if (error.response?.data) {
-        logger?.error(
-          `Response body: ${typeof error.response.data === 'string' ? error.response.data.substring(0, 500) : JSON.stringify(error.response.data).substring(0, 500)}`,
-        );
-      }
-
-      // Parse error message
-      let errorMessage = `Failed to create behavior definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Behavior Definition ${bdefName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    project(detail, terseWrite),
+  );
 }

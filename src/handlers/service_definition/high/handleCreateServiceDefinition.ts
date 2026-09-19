@@ -1,22 +1,44 @@
 /**
  * CreateServiceDefinition Handler - ABAP Service Definition Creation via ADT API
  *
- * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by client.
+ * Uses AdtClient.getServiceDefinition().{create,lock,update,unlock,activate}
+ * from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: validate -> create -> (activate)
+ * Workflow: create -> (write the body, under a lock, iff source_code is
+ * given) -> (activate). `create` posts a metadata document only —
+ * `AdtServiceDefinition.js`'s `create()` never reads `sourceCode` — so a
+ * caller who passed `source_code` and got only the shell back would have an
+ * object created and activated empty. This repository has fixed that exact
+ * bug once already (`project_create_shell_update_writes_body`: "create()=
+ * shell/initial-state only, update() writes body; a CreateX handler taking
+ * `source_code` MUST call update() after create()"); the fix round 1 excuse
+ * for dropping the write here — that a lock lifecycle was out of this
+ * task's scope — is contradicted by this very file's siblings
+ * (`UpdateLocalTestClass` and seven others), which take exactly that
+ * lifecycle through the same accessor's own `lock`/`unlock`.
+ *
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode` — `config.sourceCode` belongs to `check`
+ * alone. Verified against `AdtServiceDefinition.js`.
  */
 
-import type { IServiceDefinitionConfig } from '@mcp-abap-adt/interfaces';
-import { XMLParser } from 'fast-xml-parser';
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
+
 export const TOOL_DEFINITION = {
   name: 'CreateServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
@@ -59,6 +81,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['service_definition_name', 'package_name'],
   },
@@ -72,189 +95,82 @@ interface CreateServiceDefinitionArgs {
   source_code?: string;
   activate?: boolean;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateServiceDefinition MCP tool
- *
- * Uses AdtClient.createServiceDefinition
- */
 export async function handleCreateServiceDefinition(
   context: HandlerContext,
   args: CreateServiceDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.service_definition_name) {
-      return return_error(new Error('service_definition_name is required'));
-    }
-    if (!args?.package_name) {
-      return return_error(new Error('package_name is required'));
-    }
 
-    // Validate transport_request: required for non-$TMP packages
-    try {
-      validateTransportRequest(args.package_name, args.transport_request);
-    } catch (error) {
-      return return_error(error as Error);
-    }
-
-    const typedArgs = args as CreateServiceDefinitionArgs;
-
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const serviceDefinitionName =
-      typedArgs.service_definition_name.toUpperCase();
-
-    logger?.info(
-      `Starting service definition creation: ${serviceDefinitionName}`,
-    );
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-      const shouldActivate = typedArgs.activate !== false; // Default to true if not specified
-      let activateResponse: any | undefined;
-
-      // Validate
-      await client.getServiceDefinition().validate({
-        serviceDefinitionName,
-        description: typedArgs.description || serviceDefinitionName,
-      });
-
-      // Create
-      const createConfig: Partial<IServiceDefinitionConfig> &
-        Pick<
-          IServiceDefinitionConfig,
-          'serviceDefinitionName' | 'packageName' | 'description'
-        > = {
-        serviceDefinitionName,
-        description: typedArgs.description || serviceDefinitionName,
-        packageName: typedArgs.package_name.toUpperCase(),
-        transportRequest: typedArgs.transport_request,
-        masterLanguage: typedArgs.master_language,
-        // NB: source is NOT passed to create() — create() only makes the shell
-        // (adt-clients 7.4.3 dropped the no-op create source pass-through). The
-        // body is written by the update() call below when source_code is given.
-      };
-
-      const createState = await client
-        .getServiceDefinition()
-        .create(createConfig);
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for service definition ${serviceDefinitionName}`,
-        );
-      }
-
-      // Write the source body. The create() POST only registers the shell
-      // (metadata) and does NOT persist the `define service … { … }` source,
-      // so without this the object is created with an empty body. Run a full
-      // lock → update → unlock via the high-level update() to write it.
-      if (typedArgs.source_code) {
-        await client.getServiceDefinition().update({
-          serviceDefinitionName,
-          sourceCode: typedArgs.source_code,
-          transportRequest: typedArgs.transport_request,
-        });
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        const activateState = await client
-          .getServiceDefinition()
-          .activate({ serviceDefinitionName });
-        activateResponse = activateState.activateResult;
-      }
-
-      // Parse activation warnings if activation was performed
-      let activationWarnings: string[] = [];
-      if (
-        shouldActivate &&
-        activateResponse &&
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-
-      logger?.info(
-        `✅ CreateServiceDefinition completed successfully: ${serviceDefinitionName}`,
-      );
-
-      // Return success result
-      const stepsCompleted = ['validate', 'create'];
-      if (shouldActivate) {
-        stepsCompleted.push('activate');
-      }
-
-      const result = {
-        success: true,
-        service_definition_name: serviceDefinitionName,
-        package_name: typedArgs.package_name.toUpperCase(),
-        transport_request: typedArgs.transport_request || null,
-        type: 'SRVD/SRV',
-        message: shouldActivate
-          ? `Service Definition ${serviceDefinitionName} created and activated successfully`
-          : `Service Definition ${serviceDefinitionName} created successfully (not activated)`,
-        uri: `/sap/bc/adt/ddic/srvd/sources/${encodeSapObjectName(serviceDefinitionName)}`,
-        steps_completed: stepsCompleted,
-        activation_warnings:
-          activationWarnings.length > 0 ? activationWarnings : undefined,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(
-        `Error creating service definition ${serviceDefinitionName}:`,
-        error,
-      );
-
-      // Check if service definition already exists
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.status === 409
-      ) {
-        return return_error(
-          new Error(
-            `Service Definition ${serviceDefinitionName} already exists. Please delete it first or use a different name.`,
-          ),
-        );
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      return return_error(
-        new Error(`Failed to create service definition: ${errorMessage}`),
-      );
-    }
-  } catch (error: any) {
-    logger?.error('CreateServiceDefinition handler error:', error);
-    return return_error(error);
+  if (!args?.service_definition_name) {
+    return return_error(new Error('service_definition_name is required'));
   }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const serviceDefinitionName = args.service_definition_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateServiceDefinition', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getServiceDefinition(
+        resultsFor(serviceDefinitionDocuments),
+      );
+
+      const created = await obj.create(
+        {
+          serviceDefinitionName,
+          description: args.description || serviceDefinitionName,
+          packageName: args.package_name.toUpperCase(),
+          transportRequest: args.transport_request,
+          masterLanguage: args.master_language,
+        },
+        { analyse: analyseException },
+      );
+
+      if (!created.ok) {
+        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      // The shell was created empty. Write the body, under a lock this call
+      // also releases, before any activation — an activated empty object is
+      // the bug this write exists to avoid.
+      let written = created as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      if (args.source_code) {
+        written = await withLock(
+          () => obj.lock({ serviceDefinitionName }),
+          (lockHandle) =>
+            obj.update(
+              {
+                serviceDefinitionName,
+                transportRequest: args.transport_request,
+              },
+              {
+                sourceCode: args.source_code,
+                lockHandle,
+                analyse: analyseException,
+              },
+            ),
+          (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),
+        );
+      }
+
+      if (!written.ok || !shouldActivate) {
+        return written;
+      }
+
+      return obj.activate(
+        { serviceDefinitionName },
+        { analyse: analyseActivation },
+      );
+    },
+    project(detail, terseWrite),
+  );
 }

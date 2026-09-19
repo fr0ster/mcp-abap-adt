@@ -1,22 +1,28 @@
 /**
- * UpdateFunctionModule Handler - Update ABAP Function Module Source Code
+ * UpdateFunctionModuleLow Handler - Update ABAP Function Module Source Code
  *
- * Uses AdtClient.updateFunctionModule from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getFunctionModule().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes through `options.sourceCode`.** `AdtFunctionModule.update()`'s
+ * shipped body reads `const source = options?.sourceCode;` only, and passes
+ * `config.transportRequest` straight through. This handler writes through
+ * `options` only, the one channel every sibling family in this cluster
+ * shares. Verified against `AdtFunctionModule.js`.
  */
 
+import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionModuleLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Update source code of an existing ABAP function module. Requires lock handle from LockObject and function group name. - use UpdateFunctionModule (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {
@@ -61,6 +67,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: [
       'function_module_name',
@@ -83,136 +90,62 @@ interface UpdateFunctionModuleArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateFunctionModule MCP tool
- *
- * Uses AdtClient.updateFunctionModule - low-level single method call
- */
 export async function handleUpdateFunctionModule(
   context: HandlerContext,
   args: UpdateFunctionModuleArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      function_module_name,
-      function_group_name,
-      source_code,
-      transport_request,
-      lock_handle,
-      session_id,
-      session_state,
-    } = args as UpdateFunctionModuleArgs;
+  const {
+    function_module_name,
+    function_group_name,
+    source_code,
+    transport_request,
+    lock_handle,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (
-      !function_module_name ||
-      !function_group_name ||
-      !source_code ||
-      !lock_handle
-    ) {
-      return return_error(
-        new Error(
-          'function_module_name, function_group_name, source_code, and lock_handle are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const functionModuleName = function_module_name.toUpperCase();
-    const functionGroupName = function_group_name.toUpperCase();
-
-    logger?.info(
-      `Starting function module update: ${functionModuleName} in ${functionGroupName}`,
+  if (
+    !function_module_name ||
+    !function_group_name ||
+    !source_code ||
+    !lock_handle
+  ) {
+    return return_error(
+      new Error(
+        'function_module_name, function_group_name, source_code, and lock_handle are required',
+      ),
     );
-
-    try {
-      // Update function module with source code
-      const updateState = await client.getFunctionModule().update(
-        {
-          functionModuleName: functionModuleName,
-          functionGroupName: functionGroupName,
-          sourceCode: source_code,
-          transportRequest: transport_request,
-        },
-        { lockHandle: lock_handle },
-      );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for function module ${functionModuleName}`,
-        );
-      }
-
-      // Get updated session state after update
-
-      logger?.info(`✅ UpdateFunctionModule completed: ${functionModuleName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            function_module_name: functionModuleName,
-            function_group_name: functionGroupName,
-            transport_request: transport_request || null,
-            lock_handle: lock_handle,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Function module ${functionModuleName} updated successfully. Remember to unlock using UnlockFunctionModule.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating function module ${functionModuleName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update function module: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Function module ${functionModuleName} not found.`;
-      } else if (error.response?.status === 400 && !transport_request) {
-        errorMessage = `Update failed for ${functionModuleName}. The object may be assigned to a transport request. Pass transport_request explicitly.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Function module ${functionModuleName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const functionModuleName = function_module_name.toUpperCase();
+  const functionGroupName = function_group_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateFunctionModuleLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionModule(resultsFor(functionModuleDocuments))
+        .update(
+          {
+            functionModuleName,
+            functionGroupName,
+            transportRequest: transport_request,
+          },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

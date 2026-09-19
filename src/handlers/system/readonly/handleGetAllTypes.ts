@@ -1,11 +1,14 @@
 /**
- * Handler for retrieving all valid ADT object types and validating a type.
+ * Handler for retrieving all valid ADT object types.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+
 export const TOOL_DEFINITION = {
   name: 'GetAdtTypes',
   available_in: ['onprem', 'cloud'] as const,
@@ -18,85 +21,57 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Type name to validate (optional)',
       },
+      ...DETAIL_PROPERTY,
     },
     required: [],
   },
 } as const;
 
-function _parseObjectTypesXml(xml: string) {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-    trimValues: true,
-  });
-  const result = parser.parse(xml);
-  const types: { name: string; description: string; provider: string }[] = [];
-  const objects = result['opr:objectTypes']?.['opr:objectType'];
-  if (Array.isArray(objects)) {
-    for (const obj of objects) {
-      types.push({
-        name: obj.name,
-        description: obj.text,
-        provider: obj.provider,
-      });
-    }
-  } else if (objects) {
-    types.push({
-      name: objects.name,
-      description: objects.text,
-      provider: objects.provider,
-    });
-  }
-  return types;
+interface NamedItem {
+  name: string;
+  description: string;
 }
 
-function extractNamedItems(xml: string) {
-  const parser = new XMLParser({
-    ignoreAttributes: false,
-    attributeNamePrefix: '',
-    parseAttributeValue: true,
-    trimValues: true,
-  });
-  const result = parser.parse(xml);
-  const items: Array<{ name: string; description: string }> = [];
-  const namedItems = result['nameditem:namedItemList']?.['nameditem:namedItem'];
-  if (Array.isArray(namedItems)) {
-    for (const item of namedItems) {
-      items.push({
-        name: item['nameditem:name'],
-        description: item['nameditem:description'],
-      });
-    }
-  } else if (namedItems) {
-    items.push({
-      name: namedItems['nameditem:name'],
-      description: namedItems['nameditem:description'],
-    });
-  }
-  return items;
+/**
+ * `nameditem:namedItemList/nameditem:namedItem` — the same document
+ * `@mcp-abap-adt/adt-clients`' own (shipped, but overridden here by the
+ * generic `structured` reading — see `resultSets.ts`) `namedItems` strategy
+ * reads; field names verified against `core/shared/allTypes.js`'s
+ * `parseNamedItems`. Not forced into an array by the shared `structured`
+ * reading's `REPEATABLE` set — `namedItem` isn't a member of it — so a system
+ * with exactly one type would hand back a bare object; normalised here the
+ * same way the pre-migration handler already did.
+ */
+function extractNamedItems(value: unknown): NamedItem[] {
+  const list = (value as any)?.['nameditem:namedItemList'];
+  const raw = list?.['nameditem:namedItem'];
+  const items = raw ? (Array.isArray(raw) ? raw : [raw]) : [];
+  return items
+    .map((item: any) => ({
+      name: item?.['nameditem:name'],
+      description: item?.['nameditem:description'],
+    }))
+    .filter(
+      (item: NamedItem) =>
+        item.name !== undefined && item.name !== null && item.name !== '',
+    );
 }
 
-export async function handleGetAdtTypes(context: HandlerContext, _args: any) {
+export async function handleGetAdtTypes(
+  context: HandlerContext,
+  args: { detail?: 'terse' | 'full' | 'raw' },
+) {
   const { connection, logger } = context;
-  try {
-    const client = createAdtClient(connection, logger);
-    const response = await client
-      .getUtils()
-      .getAllTypes(999, '*', 'usedByProvider');
-    logger?.info('Fetched ADT object types list');
-    const items = extractNamedItems(response.data);
-    return {
-      isError: false,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(items),
-        },
-      ],
-    };
-  } catch (error) {
-    logger?.error('Failed to fetch ADT object types', error as any);
-    return return_error(error);
-  }
+  const detail = detailOf(args);
+
+  // `getAllTypes(maxItemCount?, name?, data?)` takes no options object at
+  // all — no `analyse` to pass, matching the brief.
+  return answer(
+    { tool: 'GetAdtTypes', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getAllTypes(999, '*', 'usedByProvider'),
+    project(detail, (value) => extractNamedItems(value)),
+  );
 }

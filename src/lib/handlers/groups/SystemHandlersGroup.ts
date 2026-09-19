@@ -237,7 +237,10 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: GetAdtTypes_Tool,
         handler: (args: any) => {
-          return handleGetAdtTypes(this.context, args as { type_name: string });
+          return handleGetAdtTypes(
+            this.context,
+            args as { detail?: 'terse' | 'full' | 'raw' },
+          );
         },
       },
       {

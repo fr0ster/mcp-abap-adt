@@ -1,21 +1,39 @@
 /**
- * CreatePackage Handler - Create ABAP Package via ADT API
+ * CreatePackage Handler - Create ABAP Package
  *
- * Uses PackageBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getPackage().create from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: validate -> create -> check
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it. The pre-migration handler's `validate()` and
+ * `check()` calls are dropped — this is a bare create, matching
+ * `CreatePackageLow`. Unlike every other family in this cluster,
+ * `AdtPackage.create()` has no `packageName` guard: for a package the name
+ * being created IS the object this create is about, and `superPackage` is
+ * genuinely optional — a top-level package has none by design.
+ *
+ * **The `inputSchema` stays a bare zod raw shape.** Fix round 1: this was
+ * converted to plain JSON Schema, reasoning the two are read identically by
+ * `scripts/list-tools.ts`. True for the tool's own surface (only `detail`
+ * moved), but the conversion also changed what
+ * `compactSchemaCompleteness.test.ts` could see: a zod-shaped handler's
+ * `required[]` is unreadable to that test's `requiredOf()` helper, which is
+ * why it had never flagged `compactCreateSchema` missing `super_package` in
+ * the first place. Reverted to zod, `detail` added as a proper zod field
+ * (not a plain object mixed into a zod raw shape) alongside its siblings.
  */
 
-import type { IPackageConfig } from '@mcp-abap-adt/interfaces';
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreatePackage',
@@ -77,6 +95,13 @@ export const TOOL_DEFINITION = {
       .describe(
         'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       ),
+    detail: z
+      .enum(['terse', 'full', 'raw'])
+      .optional()
+      .default('terse')
+      .describe(
+        'How much of the answer to return: "terse" (default, the fields you need to act), "full" (the whole parse), "raw" (the document as ADT sent it).',
+      ),
   },
 } as const;
 
@@ -91,224 +116,45 @@ interface CreatePackageArgs {
   record_changes?: boolean;
   application_component?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreatePackage MCP tool
- *
- * Uses PackageBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleCreatePackage(
   context: HandlerContext,
   args: CreatePackageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.package_name) {
-      return return_error('Package name is required');
-    }
-    if (!args?.super_package) {
-      return return_error('Super package (parent package) is required');
-    }
 
-    const typedArgs = args;
-
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    const packageName = typedArgs.package_name.toUpperCase();
-
-    logger?.info(`Starting package creation: ${packageName}`);
-
-    const client = createAdtClient(connection, logger);
-
-    try {
-      // Validate
-      await client.getPackage().validate({
-        packageName: packageName,
-        superPackage: typedArgs.super_package,
-        description: typedArgs.description || packageName,
-        softwareComponent: typedArgs.software_component,
-        transportLayer: typedArgs.transport_layer,
-        transportRequest: typedArgs.transport_request,
-        applicationComponent: typedArgs.application_component,
-      });
-
-      // Create - build config object with proper typing
-      const createConfig: Partial<IPackageConfig> &
-        Pick<
-          IPackageConfig,
-          'packageName' | 'superPackage' | 'description' | 'softwareComponent'
-        > = {
-        packageName,
-        superPackage: typedArgs.super_package,
-        description: typedArgs.description || packageName,
-        packageType: typedArgs.package_type,
-        softwareComponent: typedArgs.software_component,
-      };
-
-      // Only add optional params if explicitly provided
-      if (typedArgs.transport_layer) {
-        createConfig.transportLayer = typedArgs.transport_layer;
-      }
-      if (typedArgs.transport_request) {
-        createConfig.transportRequest = typedArgs.transport_request;
-      }
-      if (typedArgs.record_changes !== undefined) {
-        createConfig.recordChanges = typedArgs.record_changes;
-      }
-      if (typedArgs.application_component) {
-        createConfig.applicationComponent = typedArgs.application_component;
-      }
-      if (typedArgs.master_language) {
-        createConfig.masterLanguage = typedArgs.master_language;
-      }
-
-      // DEBUG: Log softwareComponent at each step
-      logger?.debug(
-        `[CreatePackage] software_component in args: ${typedArgs.software_component || 'undefined'}`,
-      );
-      logger?.debug(
-        `[CreatePackage] softwareComponent in config: ${createConfig.softwareComponent || 'undefined'}`,
-      );
-
-      await client.getPackage().create(createConfig);
-
-      // Check
-      await client.getPackage().check({
-        packageName: packageName,
-        superPackage: typedArgs.super_package,
-      });
-
-      logger?.info(`✅ CreatePackage completed successfully: ${packageName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            package_name: packageName,
-            description: typedArgs.description || packageName,
-            super_package: typedArgs.super_package,
-            package_type: typedArgs.package_type || 'development',
-            software_component: typedArgs.software_component || null,
-            transport_layer: typedArgs.transport_layer || null,
-            transport_request: typedArgs.transport_request || null,
-            uri: `/sap/bc/adt/packages/${packageName.toLowerCase()}`,
-            message: `Package ${packageName} created successfully`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`CreatePackage ${packageName}`, error);
-      const responseData =
-        typeof error.response?.data === 'string'
-          ? error.response.data
-          : error.response?.data
-            ? JSON.stringify(error.response.data)
-            : '';
-      const responseSnippet = responseData
-        ? responseData.slice(0, 1000)
-        : undefined;
-      if (responseSnippet) {
-        logger?.warn(
-          `CreatePackage returned HTTP ${error.response?.status} for ${packageName}. Response: ${responseSnippet}`,
-        );
-      }
-
-      // Check for authentication errors (expired tokens)
-      if (
-        error.message?.includes('Refresh token has expired') ||
-        error.message?.includes('JWT token has expired') ||
-        error.message?.includes('Please re-authenticate')
-      ) {
-        return return_error(
-          `Authentication failed: ${error.message}. Please re-authenticate using the authentication tool or update your credentials.`,
-        );
-      }
-
-      // Check if package already exists
-      const errorMessageLower = error.message?.toLowerCase() || '';
-      const errorDataLower =
-        typeof error.response?.data === 'string'
-          ? error.response.data.toLowerCase()
-          : '';
-      if (
-        errorMessageLower.includes('already exists') ||
-        errorMessageLower.includes('does already exist') ||
-        errorDataLower.includes('already exists') ||
-        errorDataLower.includes('does already exist') ||
-        errorDataLower.includes('exceptionresourcealreadyexists') ||
-        error.response?.status === 409
-      ) {
-        return return_error(
-          `Package ${packageName} already exists. Please delete it first or use a different name.`,
-        );
-      }
-
-      // Check for 401/403 authentication errors
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        const authError =
-          error.response?.status === 401
-            ? 'Unauthorized: Authentication failed. Please check your credentials and re-authenticate.'
-            : 'Forbidden: Access denied. Please check your permissions.';
-        return return_error(authError);
-      }
-
-      const errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      if (
-        error.response?.status === 404 &&
-        typeof errorMessage === 'string' &&
-        errorMessage.includes('Error while importing object')
-      ) {
-        try {
-          const readState = await client
-            .getPackage()
-            .read({ packageName: packageName }, 'active', {
-              withLongPolling: true,
-            });
-          if (readState?.readResult) {
-            logger?.warn(
-              `CreatePackage returned import error, but ${packageName} is readable; continuing as success`,
-            );
-            return return_response({
-              data: JSON.stringify(
-                {
-                  success: true,
-                  package_name: packageName,
-                  description: typedArgs.description || packageName,
-                  super_package: typedArgs.super_package,
-                  package_type: typedArgs.package_type || 'development',
-                  software_component: typedArgs.software_component || null,
-                  transport_layer: typedArgs.transport_layer || null,
-                  transport_request: typedArgs.transport_request || null,
-                  uri: `/sap/bc/adt/packages/${packageName.toLowerCase()}`,
-                  warning:
-                    'Import warning during create (404). Object verified by read.',
-                  message: `Package ${packageName} created successfully (import warning ignored).`,
-                },
-                null,
-                2,
-              ),
-            } as AxiosResponse);
-          }
-        } catch (_readError) {
-          // Fall through to standard error handling below.
-        }
-      }
-
-      return return_error(
-        `Failed to create package ${packageName}: ${errorMessage}`,
-      );
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
   }
+  if (!args?.super_package) {
+    return return_error(new Error('super_package is required'));
+  }
+
+  const packageName = args.package_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreatePackage', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getPackage(resultsFor(packageDocuments))
+        .create(
+          {
+            packageName,
+            superPackage: args.super_package.toUpperCase(),
+            description: args.description || packageName,
+            packageType: args.package_type,
+            softwareComponent: args.software_component,
+            transportLayer: args.transport_layer,
+            transportRequest: args.transport_request,
+            recordChanges: args.record_changes,
+            applicationComponent: args.application_component,
+            masterLanguage: args.master_language,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

@@ -49,7 +49,7 @@ Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
   docs/user-guide/AVAILABLE_TOOLS_LOW.md
   docs/user-guide/AVAILABLE_TOOLS_COMPACT.md
-  docs/user-guide/AVAILABLE_TOOLS_LEGACY.md
+  docs/user-guide/AVAILABLE_TOOLS_LEGACY.md   (only when a tool declares legacy)
 
 Output hierarchy:
   1) Group (level)
@@ -983,22 +983,41 @@ function main() {
     generateCompactMarkdown(tools),
     'utf8',
   );
-  fs.writeFileSync(
-    OUTPUT_PATHS.legacy,
-    generateEnvironmentMarkdown(
-      tools,
-      'legacy',
-      'Legacy System',
-      'Tools available on legacy SAP systems (BASIS < 7.50).\nLegacy systems support a subset of tools — primarily Class, Interface, View, Program, Function Group/Module, Package (read/update/delete), Include, Unit Test, and common utilities.',
-    ),
-    'utf8',
+  // The legacy page writes itself back when there is something to put on it.
+  //
+  // Support for legacy systems (BASIS < 7.50) is parked on
+  // `parked/legacy-support` until it can be tried against a live system, and
+  // no tool declares that environment today — so this would otherwise
+  // generate a page listing nothing. Deleting the branch instead would mean
+  // the page had to be reconstructed by hand when legacy comes back, which
+  // is the one cost worth avoiding here: the text is generated, the code that
+  // generates it is what would have been lost.
+  const declaresLegacy = tools.some((tool) =>
+    (tool.availableIn || []).includes('legacy'),
   );
+  if (declaresLegacy) {
+    fs.writeFileSync(
+      OUTPUT_PATHS.legacy,
+      generateEnvironmentMarkdown(
+        tools,
+        'legacy',
+        'Legacy System',
+        'Tools available on legacy SAP systems (BASIS < 7.50).',
+      ),
+      'utf8',
+    );
+  }
+
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.all}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.compact}`);
-  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.legacy}`);
+  console.log(
+    declaresLegacy
+      ? `✅ Documentation generated: ${OUTPUT_PATHS.legacy}`
+      : 'ℹ️  Skipped AVAILABLE_TOOLS_LEGACY.md — no tool declares legacy',
+  );
 }
 
 if (require.main === module) {

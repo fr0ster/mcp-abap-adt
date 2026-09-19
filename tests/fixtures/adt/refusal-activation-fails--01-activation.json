@@ -1,0 +1,35 @@
+{
+  "case": "refusal-activation-fails",
+  "step": 1,
+  "stepTag": "activation",
+  "capturedAt": "2026-09-11T09:07:46.038Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+    "headers": {
+      "Content-Type": "application/vnd.sap.adt.activation+xml",
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/oo/classes/zmcp_bld_ansch01\" adtcore:name=\"ZMCP_BLD_ANSCH01\"/>\n</adtcore:objectReferences>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "content-length": "621",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=584321",
+      "sap-server": "true",
+      "sap-perf-fesrec": "586035.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-activation-fails--01-activation.body.xml"
+  }
+}

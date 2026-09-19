@@ -1,11 +1,12 @@
 import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { assembleList, walkPackage } from '../../../lib/strategies/packageWalk';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackageContents',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.',
   inputSchema: {
@@ -47,14 +48,19 @@ export async function handleGetPackageContents(
     const client = createAdtClient(connection, logger);
     const utils = client.getUtils();
 
-    // Use the optimized list method from adt-clients 0.3.13
-    const items = await utils.getPackageContentsList(
-      args.package_name.toUpperCase(),
-      {
+    // Walked here rather than in the client, for the reason given in
+    // handleGetPackageTree and in mcp-abap-adt-clients#141: a member that makes
+    // many requests cannot take an IResultStrategy, and a flat list and a tree
+    // are two conveniences over one walk. This is the same walk that handler
+    // uses, assembled the other way.
+    const packageName = args.package_name.toUpperCase();
+    const items = assembleList(
+      packageName,
+      await walkPackage(utils as never, packageName, {
         includeSubpackages: args.include_subpackages,
         maxDepth: args.max_depth,
         includeDescriptions: args.include_descriptions,
-      },
+      }),
     );
 
     const finalResult = {

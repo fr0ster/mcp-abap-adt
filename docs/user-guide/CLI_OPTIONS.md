@@ -434,7 +434,7 @@ These are typically set in `.env` file:
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: `basic` or `jwt` (default: basic)
-- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default), `onprem`, or `legacy`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.**
+- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default) or `onprem`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc`

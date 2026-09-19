@@ -181,9 +181,12 @@ describe('Package High-Level Handlers Integration', () => {
           throw new Error(`Create failed: ${errorMsg}`);
         }
 
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
-        expect(createData.package_name).toBe(objectName);
+        // CreatePackage's terse projection is `terseWrite`: on success it answers
+        // the literal text "SUCCESS", not a JSON object — `success`/`package_name`
+        // no longer exist to read (CHANGELOG Unreleased: "Terse writes answer the
+        // literal string `SUCCESS` ... uniformly across every write tool";
+        // see src/lib/strategies/projections.ts `terseWrite`/`project()`).
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
         logger?.success(`✅ create: ${objectName} completed successfully`);
       });
     },

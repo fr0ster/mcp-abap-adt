@@ -141,18 +141,8 @@ export class HighTester extends LambdaTester {
       return;
     }
 
-    // Check available_in constraint from test case config
-    const availableIn = this.context.testCase?.available_in as
-      | string[]
-      | undefined;
-    if (availableIn && availableIn.length > 0) {
-      const systemType = getSystemType();
-      if (!availableIn.includes(systemType)) {
-        this.context.logger?.testSkip(
-          `Skipping test: not available on ${systemType} (available_in: ${availableIn.join(', ')})`,
-        );
-        return;
-      }
+    if (this.skipsOnThisSystem()) {
+      return;
     }
 
     if (!this.workflowFunctions) {

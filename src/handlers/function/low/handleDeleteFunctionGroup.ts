@@ -1,21 +1,22 @@
 /**
- * DeleteFunctionGroup Handler - Delete ABAP FunctionGroup
+ * DeleteFunctionGroupLow Handler - Delete ABAP Function Group
  *
- * Uses AdtClient.deleteFunctionGroup from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getFunctionGroup().delete from @mcp-abap-adt/adt-clients 19.
  */
 
+import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteFunctionGroupLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
@@ -30,6 +31,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['function_group_name'],
   },
@@ -38,100 +40,32 @@ export const TOOL_DEFINITION = {
 interface DeleteFunctionGroupArgs {
   function_group_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteFunctionGroup MCP tool
- *
- * Uses AdtClient.deleteFunctionGroup - low-level single method call
- */
 export async function handleDeleteFunctionGroup(
   context: HandlerContext,
   args: DeleteFunctionGroupArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { function_group_name, transport_request } =
-      args as DeleteFunctionGroupArgs;
+  const { function_group_name, transport_request } = args;
 
-    // Validation
-    if (!function_group_name) {
-      return return_error(new Error('function_group_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const functionGroupName = function_group_name.toUpperCase();
-    logger?.info(`Starting function group deletion: ${functionGroupName}`);
-
-    try {
-      // Delete function group
-      const deleteState = await client.getFunctionGroup().delete({
-        functionGroupName: functionGroupName,
-        transportRequest: transport_request,
-      });
-      const deleteResult = deleteState.deleteResult;
-
-      if (!deleteResult) {
-        throw new Error(
-          `Delete did not return a response for function group ${functionGroupName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteFunctionGroup completed successfully: ${functionGroupName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            function_group_name: functionGroupName,
-            transport_request: transport_request || null,
-            message: `FunctionGroup ${functionGroupName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting function group ${functionGroupName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete function group: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `FunctionGroup ${functionGroupName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `FunctionGroup ${functionGroupName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!function_group_name) {
+    return return_error(new Error('function_group_name is required'));
   }
+
+  const functionGroupName = function_group_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteFunctionGroupLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionGroup(resultsFor(functionGroupDocuments))
+        .delete(
+          { functionGroupName, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

@@ -1,23 +1,27 @@
 /**
- * DeleteDataElement Handler - Delete ABAP Data Element via AdtClient
+ * DeleteDataElement Handler - Delete ABAP Data Element via ADT deletion API
  *
- * Uses AdtClient.getDataElement().delete() for high-level delete operation.
- * Includes deletion check before actual deletion.
+ * Uses AdtClient.getDataElement().delete from @mcp-abap-adt/adt-clients 19.
+ * See `handleDeleteDomain.ts` for the shape and the masking this follows: a
+ * refusal answers 200, `analyseDeletion` reads it rather than the status,
+ * and no lock is taken because a held lock is what makes ADT refuse.
  */
 
+import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP data element from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +34,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['data_element_name'],
   },
@@ -38,101 +43,32 @@ export const TOOL_DEFINITION = {
 interface DeleteDataElementArgs {
   data_element_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteDataElement MCP tool
- *
- * Uses AdtClient.getDataElement().delete() - high-level delete operation with deletion check
- */
 export async function handleDeleteDataElement(
   context: HandlerContext,
   args: DeleteDataElementArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { data_element_name, transport_request } =
-      args as DeleteDataElementArgs;
+  const { data_element_name, transport_request } = args;
 
-    // Validation
-    if (!data_element_name) {
-      return return_error(new Error('data_element_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const dataElementName = data_element_name.toUpperCase();
-
-    logger?.info(`Starting data element deletion: ${dataElementName}`);
-
-    try {
-      // Delete data element using AdtClient (includes deletion check)
-      const dataElementObject = client.getDataElement();
-      const deleteResult = await dataElementObject.delete({
-        dataElementName,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for data element ${dataElementName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteDataElement completed successfully: ${dataElementName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            data_element_name: dataElementName,
-            transport_request: transport_request || null,
-            message: `Data element ${dataElementName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting data element ${dataElementName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete data element: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Data element ${dataElementName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Data element ${dataElementName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!data_element_name) {
+    return return_error(new Error('data_element_name is required'));
   }
+
+  const dataElementName = data_element_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteDataElement', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDataElement(resultsFor(dataElementDocuments))
+        .delete(
+          { dataElementName, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

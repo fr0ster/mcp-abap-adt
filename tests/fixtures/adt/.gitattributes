@@ -1,0 +1,6 @@
+# This corpus is the wire, byte for byte. SAP sends ABAP source with CRLF; git's
+# line-ending normalisation would silently rewrite it and the fixture would stop
+# being what the endpoint actually sent.
+*.body.xml -text
+*.body.txt -text
+*.body.json -text

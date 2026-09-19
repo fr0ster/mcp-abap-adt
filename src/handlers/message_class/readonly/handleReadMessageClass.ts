@@ -1,16 +1,17 @@
+import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) with all of its messages. Answers: "show message class X", "list messages of message class", "display message text 001 of class". Returns name, description, package, master language and the array of messages (msgno, msgtext, self-explanatory, description).',
+    'Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -28,32 +29,25 @@ export async function handleReadMessageClass(
   args: { message_class_name: string },
 ) {
   const { connection, logger } = context;
-  try {
-    const { message_class_name } = args;
-    if (!message_class_name) {
-      return return_error(new Error('message_class_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const name = message_class_name.toUpperCase();
-
-    const state = await client.getMessageClass().read({ name });
-    if (!state) {
-      return return_error(new Error(`Message class ${name} not found.`));
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          message_class_name: name,
-          message_class: state.messageClass ?? null,
-        },
-        null,
-        2,
-      ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
+  const { message_class_name } = args;
+  if (!message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+
+  const name = message_class_name.toUpperCase();
+
+  // A message class has no source resource of its own — `readMetadata` fetches
+  // the same document `read` used to. One call.
+  return answer(
+    { tool: 'ReadMessageClass', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getMessageClass(resultsFor(messageClassDocuments))
+        .readMetadata({ name }, { analyse: analyseException }),
+    (metadata: AdtReading<string>) => ({
+      success: true,
+      message_class_name: name,
+      metadata: metadata.raw,
+    }),
+  );
 }

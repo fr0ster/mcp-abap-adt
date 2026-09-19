@@ -1,20 +1,52 @@
 /**
  * CreateDomain Handler - ABAP Domain Creation via ADT API
  *
- * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by builder.
+ * Uses AdtClient.getDomain().{validate,create,lock,readMetadata,
+ * updateMetadata,unlock,check,activate} from @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: create -> check -> unlock -> (activate)
+ * A lifecycle, not one call: validate the name, create the bare object, lock
+ * it, read-patch-write the properties the caller gave (through `withLock`,
+ * released on every path out), wait for the write to be visible, check the
+ * inactive version, and optionally activate. The lock wraps only the
+ * read-modify-write in the middle — `create` and `check` are their own
+ * requests outside it, matching the order the pre-migration handler ran
+ * them in: `unlock` then the wait then `check`, not the other way round —
+ * `check` is the first call after the write that reads it back, so it is
+ * the one the wait has to sit ahead of. The pre-migration handler's own
+ * wait was `read({withLongPolling: true})`; domain exposes no plain `read`
+ * in adt-clients 19 (only `readMetadata`), so the wait here is
+ * `readMetadata({withLongPolling: true})`, discarded for its result but not
+ * for what it does — this repository's own `xmlPatch.ts` documents the live
+ * incident behind it: a read of a not-yet-ready object answers 200 with an
+ * empty body, never a 404.
+ *
+ * **`config.packageName` never reaches the wire on `updateMetadata`.** The
+ * shipped `updateDomain()` wire function (`core/domain/update.js`) builds
+ * its URL and PUT from `args.domain_name`, `args.transport_request` and
+ * `document` only — `args.package_name` is passed in but never read. Not
+ * sent (the create call above still carries it, where it is read).
  */
 
+import { domainDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+  analyseValidation,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { withLock } from '../../../lib/strategies/withLock';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation';
 
 export const TOOL_DEFINITION = {
@@ -109,6 +141,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['domain_name'],
   },
@@ -130,164 +163,121 @@ interface DomainArgs {
   fixed_values?: Array<{ low: string; text: string }>;
   super_package?: string;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateDomain MCP tool
- *
- * Uses DomainBuilder from @mcp-abap-adt/adt-clients for all operations
- * Session and lock management handled internally by builder
- */
 export async function handleCreateDomain(
   context: HandlerContext,
   args: DomainArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.domain_name) {
-      return return_error('Domain name is required');
-    }
-    if (!args?.package_name) {
-      return return_error('Package name is required');
-    }
 
-    // Validate transport_request: required for non-$TMP, non-ZLOCAL packages
-    validateTransportRequest(
-      args.package_name,
-      args.transport_request,
-      args.super_package,
-    );
-
-    const typedArgs = args as DomainArgs;
-    const domainName = typedArgs.domain_name.toUpperCase();
-
-    logger?.info(`Starting domain creation: ${domainName}`);
-
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = typedArgs.activate !== false;
-    let lockHandle: string | undefined;
-    try {
-      // Validate
-      await client.getDomain().validate({
-        domainName,
-        packageName: typedArgs.package_name,
-        description: typedArgs.description || domainName,
-      });
-
-      // Create (registers bare object in SAP)
-      await client.getDomain().create({
-        domainName,
-        description: typedArgs.description || domainName,
-        packageName: typedArgs.package_name,
-        transportRequest: typedArgs.transport_request,
-        masterLanguage: typedArgs.master_language,
-      });
-
-      // Lock
-      lockHandle = await client.getDomain().lock({ domainName });
-
-      // Update with read-modify-write: reads current XML from SAP, patches with properties, PUTs back
-      await client.getDomain().update(
-        {
-          domainName,
-          packageName: typedArgs.package_name,
-          description: typedArgs.description || domainName,
-          datatype: typedArgs.datatype || 'CHAR',
-          length: typedArgs.length || 100,
-          decimals: typedArgs.decimals || 0,
-          conversion_exit: typedArgs.conversion_exit,
-          lowercase: typedArgs.lowercase || false,
-          sign_exists: typedArgs.sign_exists || false,
-          value_table: typedArgs.value_table,
-          fixed_values: typedArgs.fixed_values,
-          transportRequest: typedArgs.transport_request,
-        },
-        { lockHandle },
-      );
-
-      // Unlock
-      await client.getDomain().unlock({ domainName }, lockHandle);
-      lockHandle = undefined;
-
-      // Wait for object to be ready after update (long polling)
-      try {
-        await client
-          .getDomain()
-          .read({ domainName }, 'inactive', { withLongPolling: true });
-      } catch {
-        // Continue anyway — activation will fail explicitly if object isn't ready
-      }
-
-      // Check
-      try {
-        await safeCheckOperation(
-          () => client.getDomain().check({ domainName }),
-          domainName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-      } catch (checkError: any) {
-        if (!(checkError as any).isAlreadyChecked) {
-          throw checkError;
-        }
-      }
-
-      // Activate if requested
-      if (shouldActivate) {
-        await client.getDomain().activate({ domainName });
-      }
-
-      logger?.info(`✅ CreateDomain completed: ${domainName}`);
-
-      return return_response({
-        data: JSON.stringify({
-          success: true,
-          domain_name: domainName,
-          package: typedArgs.package_name,
-          transport_request: typedArgs.transport_request,
-          status: shouldActivate ? 'active' : 'inactive',
-          message: `Domain ${domainName} created${shouldActivate ? ' and activated' : ''} successfully`,
-        }),
-      } as AxiosResponse);
-    } catch (error: any) {
-      if (lockHandle) {
-        try {
-          await client.getDomain().unlock({ domainName }, lockHandle);
-        } catch (_unlockError) {
-          // Ignore unlock errors during cleanup
-        }
-      }
-
-      logger?.error(
-        `Error creating domain ${domainName}: ${error?.message || error}`,
-      );
-
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.data?.includes('ExceptionResourceAlreadyExists')
-      ) {
-        return return_error(
-          `Domain ${domainName} already exists. Please delete it first or use a different name.`,
-        );
-      }
-
-      let errorMessage: string;
-      if (error.response?.data) {
-        errorMessage =
-          typeof error.response.data === 'string'
-            ? error.response.data
-            : String(error.response.data).substring(0, 500);
-      } else {
-        errorMessage = error.message || String(error);
-      }
-
-      return return_error(
-        `Failed to create domain ${domainName}: ${errorMessage}`,
-      );
-    }
-  } catch (error) {
-    return return_error(error);
+  if (!args?.domain_name) {
+    return return_error('Domain name is required');
   }
+  if (!args?.package_name) {
+    return return_error('Package name is required');
+  }
+
+  validateTransportRequest(
+    args.package_name,
+    args.transport_request,
+    args.super_package,
+  );
+
+  const domainName = args.domain_name.toUpperCase();
+  const shouldActivate = args.activate !== false;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateDomain', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getDomain(
+        resultsFor(domainDocuments),
+      );
+
+      const checked = await sequence(
+        () =>
+          obj.validate(
+            {
+              domainName,
+              description: args.description || domainName,
+              packageName: args.package_name,
+            },
+            { analyse: analyseValidation },
+          ),
+        () =>
+          obj.create(
+            {
+              domainName,
+              description: args.description || domainName,
+              packageName: args.package_name,
+              transportRequest: args.transport_request,
+              masterLanguage: args.master_language,
+            },
+            { analyse: analyseException },
+          ),
+        () =>
+          withLock(
+            () => obj.lock({ domainName }),
+            (
+              lockHandle,
+            ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
+              sequence(
+                () =>
+                  obj.readMetadata(
+                    { domainName },
+                    { analyse: analyseException },
+                  ),
+                (current) =>
+                  obj.updateMetadata(
+                    {
+                      domainName,
+                      transportRequest: args.transport_request,
+                      document: patchDomainXml(
+                        extractXmlString(current.raw, `domain ${domainName}`),
+                        {
+                          description: args.description || domainName,
+                          datatype: args.datatype || 'CHAR',
+                          length: args.length || 100,
+                          decimals: args.decimals || 0,
+                          conversion_exit: args.conversion_exit,
+                          lowercase: args.lowercase || false,
+                          sign_exists: args.sign_exists || false,
+                          value_table: args.value_table,
+                          fixed_values: args.fixed_values,
+                        },
+                      ),
+                    },
+                    { lockHandle, analyse: analyseException },
+                  ),
+              ),
+            (lockHandle) => obj.unlock({ domainName }, lockHandle),
+          ),
+        // Best-effort: wait for the write to be visible, right before the
+        // first call that reads it back — this is the call most likely to
+        // meet a not-yet-ready object (see `xmlPatch.ts`), so the wait sits
+        // immediately ahead of it, exactly where the pre-migration handler
+        // put it (between `unlock` and `check`).
+        async () => {
+          await obj
+            .readMetadata(
+              { domainName },
+              { withLongPolling: true, analyse: analyseException },
+            )
+            .catch(() => undefined);
+          return obj.check({ domainName }, undefined, {
+            analyse: analyseCheck,
+          });
+        },
+      );
+
+      if (!checked.ok || !shouldActivate) {
+        return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ domainName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

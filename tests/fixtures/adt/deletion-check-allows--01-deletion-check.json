@@ -1,0 +1,33 @@
+{
+  "case": "deletion-check-allows",
+  "step": 1,
+  "stepTag": "deletion-check",
+  "capturedAt": "2026-09-11T06:12:35.432Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/deletion/check",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/deletion/check",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.deletion.check.response.v1+xml",
+      "Content-Type": "application/vnd.sap.adt.deletion.check.request.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<del:checkRequest xmlns:del=\"http://www.sap.com/adt/deletion\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <del:object adtcore:uri=\"/sap/bc/adt/oo/classes/ZMCP_BLD_ANSCH01\"/>\n</del:checkRequest>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.deletion.check.response.v1+xml; charset=utf-8",
+      "content-length": "694",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "1034397.000000",
+      "connection": "close"
+    },
+    "bodyFile": "deletion-check-allows--01-deletion-check.body.xml"
+  }
+}

@@ -1,12 +1,33 @@
 /**
  * UpdateDomain Handler - Update ABAP Domain Properties
  *
- * Uses AdtClient.updateDomain from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Read, patch, write. adt-clients 19 removed the merge that used to happen
+ * inside `updateDomain`: the member takes the whole document now and replaces
+ * with it, so anything not sent is gone. The sequence is the handler's, and
+ * every step of it carries its own `analyse` — the verdict on each answer stays
+ * the strategy's.
+ *
+ * **The patched document goes in `config.document`, not `options.xmlContent`.**
+ * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only
+ * ("`config.document` is what gets written. The fields beside it describe a
+ * create; on an update nothing here merges them into a document, because
+ * nothing is read to merge them into.") and passes it straight to
+ * `updateDomain(connection, {...}, config.document, options?.lockHandle)` as
+ * the PUT body. `options` declares an `xmlContent` field
+ * (`IAdtOperationOptions.xmlContent`) that this member never reads — nothing
+ * in the low-level `updateDomain()` call reaches into `options` for a body.
+ * With the patched document in `options.xmlContent`, this issued a PUT with
+ * `data: undefined` against a replace-semantics endpoint and answered
+ * whatever status came back as success. Verified against the compiled
+ * `AdtDomain.js` and `core/domain/update.js`, not the declaration file.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { sequence } from '../../../lib/strategies/sequence';
+import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import {
   type AxiosResponse,
   restoreSessionInConnection,
@@ -101,25 +122,44 @@ export async function handleUpdateDomain(
       await restoreSessionInConnection(connection, session_id, session_state);
     }
 
+    // `properties` always took both spellings, the same fallback
+    // `UpdateDataElementLow`'s own `transportRequest` reads out of its
+    // `properties` bag.
+    const transportRequest =
+      properties.transport_request || properties.transportRequest;
+
     try {
-      // Update domain with properties
-      const updateState = await client.getDomain().update(
-        {
-          domainName,
-          packageName: properties.package_name || properties.packageName,
-          description: properties.description || '',
-        },
-        { lockHandle: lock_handle },
+      // The three steps, in the handler because 19 put them there. `analyse` on
+      // each one: a refusal from the read and a refusal from the write are
+      // different failures, and whichever comes back is the one the caller
+      // sees, built by the strategy rather than summarised here.
+      const written = await sequence(
+        () =>
+          client
+            .getDomain()
+            .readMetadata({ domainName }, { analyse: analyseException }),
+        (current) =>
+          client.getDomain().updateMetadata(
+            {
+              domainName,
+              transportRequest,
+              document: patchDomainXml(
+                extractXmlString(current, `domain ${domainName}`),
+                properties,
+              ),
+            },
+            {
+              lockHandle: lock_handle,
+              analyse: analyseException,
+            },
+          ),
       );
-      const updateResult = updateState.updateResult;
 
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for domain ${domainName}`,
-        );
+      if (!written.ok) {
+        const failure = written.getError();
+        logger?.error(`UpdateDomain refused: ${failure.message}`);
+        return return_error(new Error(failure.message));
       }
-
-      // Get updated session state after update
 
       logger?.info(`✅ UpdateDomain completed: ${domainName}`);
 
@@ -137,40 +177,17 @@ export async function handleUpdateDomain(
         ),
       } as AxiosResponse);
     } catch (error: any) {
-      logger?.error(
-        `Error updating domain ${domainName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update domain: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Domain ${domainName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Domain ${domainName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
+      // `sequence()`'s two calls each carry their own `analyse` and never
+      // throw for a refusal — `written.ok`/`written.getError()` above is
+      // where that verdict is read. This catch is left for a genuine bug in
+      // this block, not for a wire refusal, so it no longer guesses an HTTP
+      // status or re-parses an `exc` namespace `exception` element out of a body no v19 call here
+      // can still produce — that read belongs to `analyseException`, not a
+      // second opinion here (found while writing the handler invariant that
+      // checks for exactly this).
+      const message = error?.message ?? String(error);
+      logger?.error(`Error updating domain ${domainName}: ${message}`);
+      return return_error(new Error(`Failed to update domain: ${message}`));
     }
   } catch (error: any) {
     return return_error(error);

@@ -1,17 +1,47 @@
 /**
- * UpdateFunctionInclude Handler - Update Existing ABAP Function Group Include Source Code
+ * UpdateFunctionInclude Handler - Write a function group include's source
  *
- * Uses AdtClient.getFunctionInclude().update() for the high-level update operation.
- * Session and lock management handled internally by the builder.
+ * Uses AdtClient.getFunctionInclude().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`.
+ *
+ * **This handler acquires its own lock.** `IFunctionIncludeContract`
+ * composes `IAdtLockable`, so `lock({functionGroupName, includeName})` and
+ * `unlock(config, lockHandle)` are on the same accessor `update()` is
+ * called through — verified against `AdtFunctionInclude.js`
+ * (`lock()`/`unlock()` call `lockFunctionInclude`/`unlockFunctionInclude`
+ * directly). Fix round 1: a caller-supplied `lock_handle` param was tried
+ * here first and reverted — adt-clients 19 moving a lock out of a member
+ * does not move it onto the caller, it moves it onto this handler.
+ *
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode` — `config.sourceCode` belongs to `check`
+ * alone.
+ *
+ * Activation is restored: `activate()` is on the same accessor and
+ * activates the include itself (a resource of its own, unlike the class
+ * Local* writes), run after the lock is released, exactly as the
+ * pre-migration handler's `activate` did.
  */
 
+import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionInclude',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.',
   inputSchema: {
@@ -42,6 +72,7 @@ export const TOOL_DEFINITION = {
           'Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.',
         default: false,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['function_group_name', 'include_name', 'source_code'],
   },
@@ -53,116 +84,69 @@ interface UpdateFunctionIncludeArgs {
   source_code: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateFunctionInclude MCP tool
- */
 export async function handleUpdateFunctionInclude(
   context: HandlerContext,
   args: UpdateFunctionIncludeArgs,
-): Promise<any> {
+) {
   const { connection, logger } = context;
-  try {
-    if (!args.function_group_name || args.function_group_name.length > 30) {
-      return return_error(
-        new Error(
-          'Function group name is required and must not exceed 30 characters',
-        ),
-      );
-    }
-    if (!args.include_name) {
-      return return_error(new Error('include_name is required'));
-    }
-    if (!args.source_code) {
-      return return_error(new Error('Source code is required'));
-    }
 
-    const functionGroupName = args.function_group_name.toUpperCase();
-    const includeName = args.include_name.toUpperCase();
-
-    logger?.info(
-      `Starting function include source update: ${includeName} in ${functionGroupName}`,
+  if (!args.function_group_name || args.function_group_name.length > 30) {
+    return return_error(
+      new Error(
+        'Function group name is required and must not exceed 30 characters',
+      ),
     );
+  }
+  if (!args.include_name) {
+    return return_error(new Error('include_name is required'));
+  }
+  if (!args.source_code) {
+    return return_error(new Error('source_code is required'));
+  }
 
-    try {
-      const client = createAdtClient(connection, logger);
-      const shouldActivate = args.activate === true;
+  const functionGroupName = args.function_group_name.toUpperCase();
+  const includeName = args.include_name.toUpperCase();
+  const shouldActivate = args.activate === true;
+  const detail = detailOf(args);
 
-      await client.getFunctionInclude().update(
-        {
-          functionGroupName,
-          includeName,
-          sourceCode: args.source_code,
-          transportRequest: args.transport_request,
-        },
-        { activateOnUpdate: shouldActivate },
+  return answer(
+    { tool: 'UpdateFunctionInclude', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getFunctionInclude(
+        resultsFor(functionIncludeDocuments),
       );
 
-      logger?.info(
-        `✅ UpdateFunctionInclude completed successfully: ${includeName}`,
+      const written = await withLock(
+        () => obj.lock({ functionGroupName, includeName }),
+        (lockHandle) =>
+          obj.update(
+            {
+              functionGroupName,
+              includeName,
+              transportRequest: args.transport_request,
+            },
+            {
+              sourceCode: args.source_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) =>
+          obj.unlock({ functionGroupName, includeName }, lockHandle),
       );
 
-      const result = {
-        success: true,
-        function_group_name: functionGroupName,
-        include_name: includeName,
-        transport_request: args.transport_request || null,
-        activated: shouldActivate,
-        message: `Function include ${includeName} source code updated successfully${shouldActivate ? ' and activated' : ''}`,
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(
-        `Error updating function include source ${includeName}: ${error?.message || error}`,
-      );
-
-      let errorMessage = error.response?.data
-        ? typeof error.response.data === 'string'
-          ? error.response.data
-          : JSON.stringify(error.response.data)
-        : error.message || String(error);
-
-      if (error.response?.status === 404) {
-        errorMessage = `Function include ${includeName} not found in group ${functionGroupName}.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Function include ${includeName} is locked by another user or lock handle is invalid.`;
-      } else if (error.response?.status === 400 && !args.transport_request) {
-        errorMessage = `Update failed for ${includeName}. The object may be assigned to a transport request. Pass transport_request explicitly.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Keep original error message if XML parsing fails
-        }
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return return_error(
-        new Error(`Failed to update function include source: ${errorMessage}`),
+      return obj.activate(
+        { functionGroupName, includeName },
+        { analyse: analyseActivation },
       );
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    },
+    project(detail, terseWrite),
+  );
 }

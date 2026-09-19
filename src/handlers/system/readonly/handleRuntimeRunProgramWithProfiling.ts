@@ -1,6 +1,19 @@
+/**
+ * RuntimeRunProgramWithProfiling Handler - Execute ABAP program with
+ * profiler enabled [deprecated, kept for backward compatibility]
+ *
+ * Uses `new AdtExecutor(connection, logger).getProgramExecutor()` from
+ * @mcp-abap-adt/adt-clients 19. Same `scheduleTrace` → `runWithProfiler`
+ * split as `handleRuntimeRunProgram.ts` (see that file's header for the
+ * full reasoning and the citation from `ProgramExecutor`'s own doc
+ * comment) — this tool always takes the profiled branch.
+ */
+
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeRunProgramWithProfiling',
@@ -60,57 +73,45 @@ export async function handleRuntimeRunProgramWithProfiling(
 ) {
   const { connection, logger } = context;
 
-  try {
-    if (!args?.program_name) {
-      throw new Error('Parameter "program_name" is required');
-    }
-
-    const programName = args.program_name.trim().toUpperCase();
-    const executor = new AdtExecutor(connection, logger);
-    const programExecutor = executor.getProgramExecutor();
-
-    const result = await programExecutor.runWithProfiling(
-      { programName },
-      {
-        profilerParameters: {
-          description: args.description,
-          allProceduralUnits: args.all_procedural_units,
-          allMiscAbapStatements: args.all_misc_abap_statements,
-          allInternalTableEvents: args.all_internal_table_events,
-          allDynproEvents: args.all_dynpro_events,
-          aggregate: args.aggregate,
-          explicitOnOff: args.explicit_on_off,
-          withRfcTracing: args.with_rfc_tracing,
-          allSystemKernelEvents: args.all_system_kernel_events,
-          sqlTrace: args.sql_trace,
-          allDbEvents: args.all_db_events,
-          maxSizeForTraceFile: args.max_size_for_trace_file,
-          amdpTrace: args.amdp_trace,
-          maxTimeForTracing: args.max_time_for_tracing,
-        },
-      },
-    );
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          program_name: programName,
-          profiler_id: result.profilerId,
-          run_status: result.response?.status,
-          // trace_id is not returned — program execution is fire-and-forget.
-          // Use RuntimeListProfilerTraceFiles to find the trace after execution.
-        },
-        null,
-        2,
-      ),
-      status: result.response?.status,
-      statusText: result.response?.statusText,
-      headers: result.response?.headers,
-      config: result.response?.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error running program with profiling:', error);
-    return return_error(error);
+  if (!args?.program_name) {
+    return return_error(new Error('Parameter "program_name" is required'));
   }
+
+  const programName = args.program_name.trim().toUpperCase();
+  const executor = new AdtExecutor(connection, logger);
+  const programExecutor = executor.getProgramExecutor();
+
+  return answer(
+    { tool: 'RuntimeRunProgramWithProfiling', detail: 'terse' },
+    () =>
+      pair(
+        () =>
+          programExecutor.scheduleTrace({
+            description: args.description,
+            allProceduralUnits: args.all_procedural_units,
+            allMiscAbapStatements: args.all_misc_abap_statements,
+            allInternalTableEvents: args.all_internal_table_events,
+            allDynproEvents: args.all_dynpro_events,
+            aggregate: args.aggregate,
+            explicitOnOff: args.explicit_on_off,
+            withRfcTracing: args.with_rfc_tracing,
+            allSystemKernelEvents: args.all_system_kernel_events,
+            sqlTrace: args.sql_trace,
+            allDbEvents: args.all_db_events,
+            maxSizeForTraceFile: args.max_size_for_trace_file,
+            amdpTrace: args.amdp_trace,
+            maxTimeForTracing: args.max_time_for_tracing,
+          }),
+        (profilerId: string) =>
+          programExecutor.runWithProfiler({ programName }, { profilerId }),
+      ),
+    ([profilerId, output]: [string, string]) => ({
+      success: true,
+      program_name: programName,
+      profiler_id: profilerId,
+      output: output ?? '',
+      // trace_id is not returned — program execution is fire-and-forget.
+      // Use RuntimeListProfilerTraceFiles to find the trace after execution.
+    }),
+  );
 }

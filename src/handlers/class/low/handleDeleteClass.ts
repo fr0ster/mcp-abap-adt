@@ -1,20 +1,22 @@
 /**
  * DeleteClass Handler - Delete ABAP Class
  *
- * Uses AdtClient.deleteClass from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getClass().delete from @mcp-abap-adt/adt-clients 19.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
+
 export const TOOL_DEFINITION = {
   name: 'DeleteClassLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
@@ -29,6 +31,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name'],
   },
@@ -37,98 +40,32 @@ export const TOOL_DEFINITION = {
 interface DeleteClassArgs {
   class_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteClass MCP tool
- *
- * Uses AdtClient.deleteClass - low-level single method call
- */
 export async function handleDeleteClass(
   context: HandlerContext,
   args: DeleteClassArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { class_name, transport_request } = args as DeleteClassArgs;
+  const { class_name, transport_request } = args;
 
-    // Validation
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Starting class deletion: ${className}`);
-
-    try {
-      // Delete class
-      const deleteState = await client.getClass().delete({
-        className,
-        transportRequest: transport_request,
-      });
-      const deleteResult = deleteState.deleteResult;
-
-      if (!deleteResult) {
-        throw new Error(
-          `Delete did not return a response for class ${className}`,
-        );
-      }
-
-      logger?.info(`✅ DeleteClass completed successfully: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            transport_request: transport_request || null,
-            message: `Class ${className} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting class ${className}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete class: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Class ${className} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!class_name) {
+    return return_error(new Error('class_name is required'));
   }
+
+  const className = class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteClassLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getClass(resultsFor(classDocuments))
+        .delete(
+          { className, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

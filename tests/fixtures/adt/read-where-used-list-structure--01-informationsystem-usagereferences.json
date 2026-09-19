@@ -1,0 +1,33 @@
+{
+  "case": "read-where-used-list-structure",
+  "step": 1,
+  "stepTag": "informationsystem-usagereferences",
+  "capturedAt": "2026-09-11T06:12:32.761Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2FZBP_MCP_SHR_I_ROOT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/repository/informationsystem/usageReferences?uri=%2Fsap%2Fbc%2Fadt%2Foo%2Fclasses%2FZBP_MCP_SHR_I_ROOT",
+    "headers": {
+      "Content-Type": "application/vnd.sap.adt.repository.usagereferences.request.v1+xml",
+      "Accept": "application/vnd.sap.adt.repository.usagereferences.result.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><usagereferences:usageReferenceRequest xmlns:usagereferences=\"http://www.sap.com/adt/ris/usageReferences\"><usagereferences:affectedObjects/></usagereferences:usageReferenceRequest>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.repository.usagereferences.result.v1+xml; charset=utf-8",
+      "content-length": "557",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "1441189.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-where-used-list-structure--01-informationsystem-usagereferences.body.xml"
+  }
+}

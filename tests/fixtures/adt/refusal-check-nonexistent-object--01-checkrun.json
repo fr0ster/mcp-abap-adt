@@ -1,0 +1,30 @@
+{
+  "case": "refusal-check-nonexistent-object",
+  "step": 1,
+  "stepTag": "checkrun",
+  "capturedAt": "2026-09-11T05:40:31.023Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.checkmessages+xml",
+      "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+    },
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/oo/classes/zmcp_bld_nope_cls99\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.checkmessages+xml; charset=utf-8",
+      "content-length": "352",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "30811.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-check-nonexistent-object--01-checkrun.body.xml"
+  }
+}

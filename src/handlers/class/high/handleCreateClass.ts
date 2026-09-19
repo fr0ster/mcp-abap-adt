@@ -1,24 +1,33 @@
 /**
- * CreateClass Handler - ABAP Class Creation via ADT API
+ * CreateClass Handler - Create ABAP Class
  *
- * Workflow: validate -> create -> lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
+ * Uses AdtClient.getClass().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it. `create()` makes the class shell only — no
+ * source — matching `CreateClassLow`; the pre-migration handler's
+ * validate/check/lock/update/unlock/check/activate chain was
+ * `AdtClass.create()`'s own internal workflow in adt-clients 18, which v19
+ * removed (a member is one request now). Source is `UpdateClass`'s job.
  */
 
-import type { IClassState } from '@mcp-abap-adt/interfaces';
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateClass',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state.',
+    'Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -57,6 +66,7 @@ export const TOOL_DEFINITION = {
         description:
           'Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'package_name'],
   },
@@ -72,13 +82,13 @@ interface CreateClassArgs {
   abstract?: boolean;
   create_protected?: boolean;
   master_language?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleCreateClass(
   context: HandlerContext,
-  params: CreateClassArgs,
+  args: CreateClassArgs,
 ) {
-  const args = params;
   const { connection, logger } = context;
 
   if (!args.class_name || !args.package_name) {
@@ -88,157 +98,27 @@ export async function handleCreateClass(
   }
 
   const className = args.class_name.toUpperCase();
-  logger?.info(`Starting class creation: ${className}`);
+  const detail = detailOf(args);
 
-  try {
-    const client = createAdtClient(connection, logger);
-    const adtClass = client.getClass();
-
-    // Use AdtClass.create() which handles the full workflow automatically:
-    // validate → create → check → lock → check(inactive) → update → unlock → check → activate
-    // AdtClass.create() handles cleanup (unlock) in its catch block, so we should let errors propagate
-    logger?.info(`Creating class with AdtClass: ${className}`);
-
-    let state: IClassState;
-    try {
-      state = await adtClass.create(
-        {
-          className,
-          packageName: args.package_name,
-          transportRequest: args.transport_request,
-          description: args.description || className,
-          superclass: args.superclass,
-          final: args.final || false,
-          abstract: args.abstract || false,
-          createProtected: args.create_protected || false,
-          sourceCode: undefined,
-          masterLanguage: args.master_language,
-        },
-        {
-          activateOnCreate: false,
-        },
-      );
-    } catch (createError: any) {
-      // AdtClass.create() already handles cleanup (unlock) in its catch block before throwing
-      // Check if validation failed with 400 (object might already exist)
-      if (
-        createError.code === AdtObjectErrorCodes.VALIDATION_FAILED &&
-        createError.status === 400
-      ) {
-        const errorText = createError.message?.toLowerCase() || '';
-        const isAlreadyExists =
-          errorText.includes('already exists') ||
-          errorText.includes('exceptionresourcealreadyexists') ||
-          errorText.includes('resourcealreadyexists');
-
-        if (isAlreadyExists) {
-          logger?.warn(
-            `Class ${className} already exists - validation returned 400, checking if object exists`,
-          );
-          // Try to read existing class to confirm it exists
-          // Note: No cleanup needed here since validation failed before object creation
-          try {
-            const existingState = await adtClass.read({ className }, 'active');
-            if (existingState) {
-              logger?.info(`Class ${className} already exists and is active`);
-              return return_response({
-                data: JSON.stringify(
-                  {
-                    success: true,
-                    data: {
-                      class_name: className,
-                      package_name: args.package_name,
-                      transport_request: args.transport_request || null,
-                      activated: true,
-                    },
-                    class_name: className,
-                    package_name: args.package_name,
-                    transport_request: args.transport_request || null,
-                    activated: true,
-                    already_exists: true,
-                    message: `Class ${className} already exists`,
-                  },
-                  null,
-                  2,
-                ),
-              } as AxiosResponse);
-            }
-          } catch (_readError: any) {
-            // Class doesn't exist or can't be read - validation error might be something else
-            logger?.warn(
-              `Class ${className} validation failed with 400 but object doesn't exist - treating as validation error`,
-            );
-            // Continue to throw original createError below
-          }
-        }
-      }
-
-      // Re-throw error - AdtClass.create() already handled cleanup (unlock) before throwing
-      // Log error with code if available (from AdtClass error handling)
-      if (createError.code) {
-        logger?.error(
-          `Class creation failed with code ${createError.code}: ${className} - ${createError.message || String(createError)}`,
-        );
-      } else {
-        logger?.error(
-          `Class creation failed: ${className} - ${createError.message || String(createError)}`,
-        );
-      }
-
-      const errorMessage =
-        createError instanceof Error
-          ? createError.message
-          : String(createError);
-      return return_error(new Error(errorMessage));
-    }
-
-    const errorCount = state.errors?.length || 0;
-    const errors =
-      state.errors?.map((err) => ({
-        method: err.method,
-        error: err.error.message || String(err.error),
-        timestamp: err.timestamp?.toISOString() || new Date().toISOString(),
-      })) || [];
-
-    if (errorCount > 0) {
-      logger?.warn(
-        `CreateClass completed with ${errorCount} error(s): ${className}`,
-      );
-      errors.forEach((err) => {
-        logger?.warn(`  - [${err.method}]: ${err.error}`);
-      });
-    } else {
-      logger?.info(`CreateClass completed successfully: ${className}`);
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          data: {
-            class_name: className,
-            package_name: args.package_name,
-            transport_request: args.transport_request || null,
-            activated: false,
-            errors: errors,
+  return answer(
+    { tool: 'CreateClass', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getClass(resultsFor(classDocuments))
+        .create(
+          {
+            className,
+            packageName: args.package_name,
+            transportRequest: args.transport_request,
+            description: args.description || className,
+            superclass: args.superclass,
+            final: args.final || false,
+            abstract: args.abstract || false,
+            createProtected: args.create_protected || false,
+            masterLanguage: args.master_language,
           },
-          class_name: className,
-          package_name: args.package_name,
-          transport_request: args.transport_request || null,
-          activated: false,
-          errors: errors,
-          message: `Class ${className} created successfully${errorCount > 0 ? ` (with ${errorCount} error(s))` : ''}. Use UpdateClass to set source code.`,
-        },
-        null,
-        2,
-      ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    // Generic outer catch for unexpected errors (e.g., connection issues)
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    logger?.error(
-      `Unexpected error in CreateClass handler: ${className} - ${errorMessage}`,
-    );
-    return return_error(new Error(errorMessage));
-  }
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

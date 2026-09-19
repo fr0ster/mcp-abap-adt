@@ -1,6 +1,9 @@
+import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
 import {
   parseServiceBindingPayload,
   type ServiceBindingResponseFormat,
@@ -32,30 +35,36 @@ export async function handleListServiceBindingTypes(
   args: ListServiceBindingTypesArgs = {},
 ) {
   const { connection, logger } = context;
+  const responseFormat = args.response_format ?? 'xml';
+  const obj = createAdtClient(connection, logger).getServiceBinding(
+    resultsFor(serviceDocuments),
+  );
 
-  try {
-    const responseFormat = args.response_format ?? 'xml';
-    const client = createAdtClient(connection, logger);
-    const response = await client.getServiceBinding().getServiceBindingTypes();
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          response_format: responseFormat,
-          status: response.status,
-          payload: parseServiceBindingPayload(response.data, responseFormat),
-        },
-        null,
-        2,
-      ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error listing service binding types:', error);
-    return return_error(error);
-  }
+  // `getServiceBindingTypes()` takes no arguments at all — no `analyse` to
+  // hand it, confirmed against the shipped `AdtServiceBinding.d.ts`
+  // signature (`getServiceBindingTypes(): Promise<IAdtResponse<...>>`).
+  // `bindingTypes` is `structured` in `READING_BY_SLOT`, which still
+  // carries `.raw` beside its parse, so the payload keeps parsing the raw
+  // body exactly as before.
+  //
+  // **Task 28: why this tool carries no `detail`.** `reading` genuinely is
+  // an `AdtReading` with a `.raw` distinct from its parse, which would
+  // normally make `detail` owed. It is not owed HERE because
+  // `response_format` already spans the same axis: `'plain'` answers
+  // `reading.raw` verbatim (`parseServiceBindingPayload`'s own first
+  // branch, above) — exactly what `detail: 'raw'` would — while `'xml'`/
+  // `'json'` each answer a parse, just a caller-chosen ENCODING of one
+  // rather than a caller-chosen LEVEL of one. A second parameter
+  // controlling the same raw-vs-parsed choice `response_format` already
+  // makes would not add a capability, only a second, overlapping way to
+  // ask for the one this tool already has.
+  return answer(
+    { tool: 'ListServiceBindingTypes', detail: 'terse' },
+    () => obj.getServiceBindingTypes(),
+    (reading: AdtReading<unknown>) => ({
+      success: true,
+      response_format: responseFormat,
+      payload: parseServiceBindingPayload(reading.raw, responseFormat),
+    }),
+  );
 }

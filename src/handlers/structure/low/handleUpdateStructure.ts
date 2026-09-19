@@ -1,18 +1,25 @@
 /**
- * UpdateStructure Handler - Update ABAP Structure DDL Source
+ * UpdateStructureLow Handler - Update ABAP Structure DDL Source
  *
- * Uses AdtClient.updateStructure from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getStructure().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes through `options.sourceCode`.** `AdtStructure.update()`'s
+ * shipped body does keep a fallback — `const source = options?.sourceCode ||
+ * config.ddlCode` — but this handler writes through `options` only, the one
+ * channel every sibling family in this cluster shares, and never puts a
+ * source string on `config`. Verified against `AdtStructure.js`, not the
+ * declaration file.
  */
 
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateStructureLow',
@@ -51,6 +58,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['structure_name', 'ddl_code', 'lock_handle'],
   },
@@ -66,110 +74,43 @@ interface UpdateStructureArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateStructure MCP tool
- *
- * Uses AdtClient.updateStructure - low-level single method call
- */
 export async function handleUpdateStructure(
   context: HandlerContext,
   args: UpdateStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { structure_name, ddl_code, lock_handle, session_id, session_state } =
-      args as UpdateStructureArgs;
+  const { structure_name, ddl_code, lock_handle, session_id, session_state } =
+    args;
 
-    // Validation
-    if (!structure_name || !ddl_code || !lock_handle) {
-      return return_error(
-        new Error('structure_name, ddl_code, and lock_handle are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(`Starting structure update: ${structureName}`);
-
-    try {
-      // Update structure with DDL code
-      const updateState = await client
-        .getStructure()
-        .update(
-          { structureName: structureName, ddlCode: ddl_code },
-          { lockHandle: lock_handle },
-        );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for structure ${structureName}`,
-        );
-      }
-
-      // Get updated session state after update
-
-      logger?.info(`✅ UpdateStructure completed: ${structureName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            structure_name: structureName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Structure ${structureName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error updating structure ${structureName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to update structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Structure ${structureName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Structure ${structureName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!structure_name || !ddl_code || !lock_handle) {
+    return return_error(
+      new Error('structure_name, ddl_code, and lock_handle are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const structureName = structure_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateStructureLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getStructure(resultsFor(structureDocuments))
+        .update(
+          { structureName },
+          {
+            sourceCode: ddl_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

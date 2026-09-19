@@ -1,25 +1,31 @@
 /**
- * ValidateStructure Handler - Validate ABAP Structure Name
+ * ValidateStructureLow Handler - Validate ABAP Structure Name
  *
- * Uses AdtClient.validateStructure from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getStructure().validate from @mcp-abap-adt/adt-clients 19.
+ *
+ * `packageName` reaches `config` here, but the shipped
+ * `validateStructureName(connection, name, config.description)` never reads
+ * a third argument — the wire request carries no package. Kept in `config`
+ * anyway because the field compiles and the tool schema still requires it
+ * (removing an existing parameter is not this migration's job). Verified
+ * against `AdtStructure.js`, not the declaration file.
  */
 
+import { structureDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateStructureLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Returns validation result with success status and message. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Validate an ABAP structure name before creation. Checks if the name is valid and available. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,7 +36,7 @@ export const TOOL_DEFINITION = {
       package_name: {
         type: 'string',
         description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.',
       },
       description: {
         type: 'string',
@@ -51,6 +57,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['structure_name', 'package_name', 'description'],
   },
@@ -66,116 +73,48 @@ interface ValidateStructureArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateStructure MCP tool
- *
- * Uses AdtClient.validateStructure - low-level single method call
- */
 export async function handleValidateStructure(
   context: HandlerContext,
   args: ValidateStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      structure_name,
-      package_name,
-      description,
-      session_id,
-      session_state,
-    } = args as ValidateStructureArgs;
+  const {
+    structure_name,
+    package_name,
+    description,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!structure_name || !package_name || !description) {
-      return return_error(
-        new Error('structure_name, package_name, and description are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(`Starting structure validation: ${structureName}`);
-
-    try {
-      // Validate structure
-      const validationState = await client.getStructure().validate({
-        structureName: structureName,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(`✅ ValidateStructure completed: ${structureName}`);
-      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            structure_name: structureName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `Structure name ${structureName} is valid and available`
-              : `Structure name ${structureName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error validating structure ${structureName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to validate structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Structure ${structureName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!structure_name || !package_name || !description) {
+    return return_error(
+      new Error('structure_name, package_name, and description are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const structureName = structure_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateStructureLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getStructure(resultsFor(structureDocuments))
+        .validate(
+          {
+            structureName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

@@ -128,8 +128,12 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       });
 
       expect(createResponse.isError).toBe(false);
-      const createData = parseHandlerResponse(createResponse);
-      expect(createData.success).toBe(true);
+      // CreateClass's terse projection is `terseWrite`: on success it answers
+      // the literal text "SUCCESS", not a JSON object — `success` no longer
+      // exists to read (CHANGELOG Unreleased: "Terse writes answer the
+      // literal string `SUCCESS` ... uniformly across every write tool"; see
+      // projections.ts `terseWrite`).
+      expect(createResponse.content[0]?.text).toBe('SUCCESS');
       logger?.success(`Step 1: Class ${className} created`);
 
       await delay(getOperationDelay('create'));
@@ -181,8 +185,9 @@ ENDCLASS.`;
       });
 
       expect(updateResponse.isError).toBe(false);
-      const updateData = parseHandlerResponse(updateResponse);
-      expect(updateData.success).toBe(true);
+      // UpdateClass's terse projection is `terseWrite` too — same literal
+      // "SUCCESS" text, no `success` field (projections.ts `terseWrite`).
+      expect(updateResponse.content[0]?.text).toBe('SUCCESS');
       logger?.success('Step 4: UpdateClass in transport succeeded');
 
       // Step 5: Delete the class

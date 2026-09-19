@@ -1,23 +1,22 @@
 /**
  * ActivateDdlLow Handler - Activate ABAP DDL Source (CDS View)
  *
- * Uses AdtClient.getDdl().activate from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().activate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseActivationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseActivation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateDdlLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
@@ -42,6 +41,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name'],
   },
@@ -55,126 +55,33 @@ interface ActivateDdlArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ActivateDdl MCP tool
- *
- * Uses AdtClient.getDdl().activate - low-level single method call
- */
 export async function handleActivateDdl(
   context: HandlerContext,
   args: ActivateDdlArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { ddl_name, session_id, session_state } = args as ActivateDdlArgs;
+  const { ddl_name, session_id, session_state } = args;
 
-    // Validation
-    if (!ddl_name) {
-      return return_error(new Error('ddl_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlName = ddl_name.toUpperCase();
-
-    logger?.info(`Starting DDL source activation: ${ddlName}`);
-
-    try {
-      // Activate DDL source
-      const activateState = await client
-        .getDdl()
-        .activate({ ddlName: ddlName });
-      const response = activateState.activateResult;
-
-      if (!response) {
-        throw new Error(
-          `Activation did not return a response for DDL source ${ddlName}`,
-        );
-      }
-
-      // Parse activation response
-      const activationResult = parseActivationResponse(response.data);
-      const success = activationResult.activated && activationResult.checked;
-
-      // Get updated session state after activation
-
-      logger?.info(`✅ ActivateDdlLow completed: ${ddlName}`);
-      logger?.info(
-        `   Activated: ${activationResult.activated}, Checked: ${activationResult.checked}`,
-      );
-      logger?.info(`   Messages: ${activationResult.messages.length}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success,
-            ddl_name: ddlName,
-            activation: {
-              activated: activationResult.activated,
-              checked: activationResult.checked,
-              generated: activationResult.generated,
-            },
-            messages: activationResult.messages,
-            warnings: activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
-            ),
-            errors: activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            ),
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: success
-              ? `DDL source ${ddlName} activated successfully`
-              : `DDL source ${ddlName} activation completed with ${activationResult.messages.length} message(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error activating DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to activate DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DDL source ${ddlName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!ddl_name) {
+    return return_error(new Error('ddl_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlName = ddl_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ActivateDdlLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl(resultsFor(ddlDocuments))
+        .activate({ ddlName }, { analyse: analyseActivation }),
+    project(detail, terseActivation),
+  );
 }

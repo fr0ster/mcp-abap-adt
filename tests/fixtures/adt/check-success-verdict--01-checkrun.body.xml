@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"><chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/sap/bc/adt/oo/classes/zbp_mcp_shr_i_root" chkrun:status="processed" chkrun:statusText="Object ZBP_MCP_SHR_I_ROOT has been checked"/></chkrun:checkRunReports>

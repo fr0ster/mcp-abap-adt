@@ -97,7 +97,10 @@ export async function createHardModeClient(): Promise<{
     );
   } else {
     // stdio: launch server process with connection parameters
-    const launcherPath = path.resolve(process.cwd(), 'dist/server/launcher.js');
+    // The standalone server is its own package now (@mcp-abap-adt/core,
+    // AGPL-3.0-only) and builds into server/dist. Hard mode spawns that binary,
+    // so it needs the server package built, not just this one.
+    const launcherPath = path.resolve(process.cwd(), 'server/dist/launcher.js');
     const cfg = loadTestConfig();
     const useUnsafe =
       process.env.MCP_UNSAFE === 'true' ||

@@ -1,6 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetGatewayErrorLog',
@@ -49,55 +49,41 @@ export async function handleRuntimeGetGatewayErrorLog(
   args: RuntimeGetGatewayErrorLogArgs,
 ) {
   const { connection, logger } = context;
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds();
+  const errorUrl = args?.error_url;
 
-  try {
-    const runtimeClient = new AdtRuntimeClient(connection, logger);
-    const feeds = runtimeClient.getFeeds();
+  // `gatewayErrorDetail()`/`gatewayErrors()` both answer `IAdtResponse<T>`
+  // now — the detail branch used to hand the whole envelope object straight
+  // to `error:` with no compile error at all (`IAdtResponse` unwrapped
+  // nowhere, `.data`/`.length` never read on it), which would have
+  // serialised as `{"ok":true}` (its own methods dropped by
+  // `JSON.stringify`) rather than the actual detail document. Fixed here
+  // alongside the list branch's genuine `errors.length` compile error,
+  // since both come from the same `feeds` accessor this file already reads.
+  //
+  // Two separate `answer()` calls, not one `call()` with a branch per mode:
+  // `IGatewayErrorEntry[]` and `IGatewayErrorDetail` are two different `T`s
+  // for the same generic `answer<T>`, and `IGatewayErrorDetail` is not
+  // exported by name from `@mcp-abap-adt/adt-clients` to write a union with.
+  const ctx = { tool: 'RuntimeGetGatewayErrorLog', detail: 'terse' as const };
 
-    if (args?.error_url) {
-      const detail = await feeds.gatewayErrorDetail(args.error_url);
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            mode: 'detail',
-            error: detail,
-          },
-          null,
-          2,
-        ),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {},
-      });
-    }
-
-    const errors = await feeds.gatewayErrors({
-      user: args?.user,
-      maxResults: args?.max_results,
-      from: args?.from,
-      to: args?.to,
-    });
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          mode: 'list',
-          count: errors.length,
-          errors,
-        },
-        null,
-        2,
-      ),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {},
-    });
-  } catch (error: unknown) {
-    logger?.error('Error reading gateway error log:', error);
-    return return_error(error);
+  if (errorUrl) {
+    return answer(
+      ctx,
+      () => feeds.gatewayErrorDetail(errorUrl),
+      (error) => ({ success: true, mode: 'detail', error }),
+    );
   }
+
+  return answer(
+    ctx,
+    () =>
+      feeds.gatewayErrors({
+        user: args?.user,
+        maxResults: args?.max_results,
+        from: args?.from,
+        to: args?.to,
+      }),
+    (errors) => ({ success: true, mode: 'list', count: errors.length, errors }),
+  );
 }

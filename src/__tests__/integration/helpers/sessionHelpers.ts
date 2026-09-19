@@ -12,12 +12,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
-import {
-  type AbapConnection,
-  createAbapConnection,
-  type SapConfig,
-} from '@mcp-abap-adt/connection';
-import type { IServiceKeyStore, ISessionStore } from '@mcp-abap-adt/interfaces';
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import type {
+  IAbapConnection,
+  IServiceKeyStore,
+  ISessionStore,
+} from '@mcp-abap-adt/interfaces';
+import { createAbapConnection } from '../../../lib/connectionFactory';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getPlatformStoresAsync } from '../../../lib/stores';
 import { resolveSystemContext } from '../../../lib/systemContext';
@@ -92,7 +93,7 @@ export interface SessionInfo {
 async function createConnectionViaBroker(
   destination?: string,
   envFilePath?: string,
-): Promise<AbapConnection | null> {
+): Promise<IAbapConnection | null> {
   try {
     const config = loadTestConfig();
     const useUnsafe =
@@ -193,16 +194,22 @@ async function createConnectionViaBroker(
       const providerLogger = createProviderLogger();
       const brokerLogger = createBrokerLogger();
 
+      // `browser` is not part of AuthorizationCodeProviderConfig any more (the
+      // package now takes an `authorization` strategy instead) — carried as a
+      // typed variable rather than an inline literal, same as brokerFactory.ts's
+      // own providerConfig, so this still documents the intent without tripping
+      // the excess-property check on a fresh object literal.
+      const providerConfig = {
+        uaaUrl: authConfig.uaaUrl,
+        clientId: authConfig.uaaClientId,
+        clientSecret: authConfig.uaaClientSecret,
+        refreshToken: authConfig.refreshToken,
+        accessToken: sessionConnConfig?.authorizationToken,
+        browser: 'system',
+        logger: providerLogger,
+      };
       const tokenProvider = wrapLegacyTokenProvider(
-        new AuthorizationCodeProvider({
-          uaaUrl: authConfig.uaaUrl,
-          clientId: authConfig.uaaClientId,
-          clientSecret: authConfig.uaaClientSecret,
-          refreshToken: authConfig.refreshToken,
-          accessToken: sessionConnConfig?.authorizationToken,
-          browser: 'system',
-          logger: providerLogger,
-        }),
+        new AuthorizationCodeProvider(providerConfig),
       );
       authBroker = new AuthBroker(
         {
@@ -266,7 +273,7 @@ async function createConnectionViaBroker(
  * Uses AuthBroker (from destination or .env file directory) or falls back to getSapConfigFromEnv()
  */
 export async function createTestConnectionAndSession(): Promise<{
-  connection: AbapConnection;
+  connection: IAbapConnection;
   session: SessionInfo;
   authType?: string;
   connectionSource?: 'auth_broker' | 'env' | 'unknown';
@@ -284,7 +291,7 @@ export async function createTestConnectionAndSession(): Promise<{
     // Check if environment.env is explicitly configured — skip auth broker
     const hasExplicitEnv = !!loadTestConfig()?.environment?.env;
 
-    let connection: AbapConnection | null = null;
+    let connection: IAbapConnection | null = null;
     let connectionSource: 'auth_broker' | 'env' | 'unknown' = 'unknown';
 
     // Try AuthBroker only when no explicit env file is configured

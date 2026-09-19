@@ -1,18 +1,37 @@
 /**
  * UnlockObject Handler - Unlock ABAP object after modification via ADT API
  *
- * Uses AdtClient unlock methods for specific object types.
- * Must reuse session_id and lock_handle from LockObject.
+ * A dispatcher: one branch runs per call, over the same family clients every
+ * low-level UnlockX handler in this migration uses.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not
+ * go through the result-set strategies at all), so the synthetic 200 below is
+ * a stand-in for "the call answered ok" rather than a status read off the
+ * wire — `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import {
+  behaviorDefinitionDocuments,
+  classDocuments,
+  dataElementDocuments,
+  ddlDocuments,
+  domainDocuments,
+  functionGroupDocuments,
+  functionModuleDocuments,
+  interfaceDocuments,
+  metadataExtensionDocuments,
+  packageDocuments,
+  programDocuments,
+  structureDocuments,
+  tableDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockObjectLow',
@@ -82,192 +101,137 @@ interface UnlockObjectArgs {
   };
 }
 
+const VALID_TYPES = [
+  'class',
+  'program',
+  'interface',
+  'function_group',
+  'function_module',
+  'table',
+  'structure',
+  'ddl',
+  'domain',
+  'data_element',
+  'package',
+  'behavior_definition',
+  'metadata_extension',
+];
+
 export async function handleUnlockObject(
   context: HandlerContext,
   args: UnlockObjectArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { object_name, object_type, lock_handle, session_id, session_state } =
-      args as UnlockObjectArgs;
+  const { object_name, object_type, lock_handle, session_id, session_state } =
+    args as UnlockObjectArgs;
 
-    if (!object_name || !object_type || !lock_handle || !session_id) {
-      return return_error(
-        new Error(
-          'object_name, object_type, lock_handle, and session_id are required',
-        ),
-      );
-    }
-
-    const validTypes = [
-      'class',
-      'program',
-      'interface',
-      'function_group',
-      'function_module',
-      'table',
-      'structure',
-      'ddl',
-      'domain',
-      'data_element',
-      'package',
-      'behavior_definition',
-      'metadata_extension',
-    ];
-    const objectType = object_type.toLowerCase();
-    if (!validTypes.includes(objectType)) {
-      return return_error(
-        new Error(
-          `Invalid object_type. Must be one of: ${validTypes.join(', ')}`,
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-    }
-
-    const objectName = object_name.toUpperCase();
-
-    logger?.info(
-      `Starting object unlock: ${objectName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!object_name || !object_type || !lock_handle || !session_id) {
+    return return_error(
+      new Error(
+        'object_name, object_type, lock_handle, and session_id are required',
+      ),
     );
+  }
 
-    try {
+  const objectType = object_type.toLowerCase();
+  if (!VALID_TYPES.includes(objectType)) {
+    return return_error(
+      new Error(
+        `Invalid object_type. Must be one of: ${VALID_TYPES.join(', ')}`,
+      ),
+    );
+  }
+
+  // Request-shape check that stays ahead of the client call, exactly where it
+  // lived before this migration: `unlock()`'s config does not itself enforce
+  // it.
+  let functionGroupName: string | undefined;
+  let functionModuleName: string | undefined;
+  if (objectType === 'function_module') {
+    if (!object_name.toUpperCase().includes('|')) {
+      return return_error(
+        new Error('Function module name must be in format GROUP|FM_NAME'),
+      );
+    }
+    [functionGroupName, functionModuleName] = object_name
+      .toUpperCase()
+      .split('|');
+  }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const objectName = object_name.toUpperCase();
+  const client = createAdtClient(connection, logger);
+
+  return answer(
+    { tool: 'UnlockObjectLow', detail: 'terse' },
+    () => {
       switch (objectType) {
         case 'class':
-          await client
-            .getClass()
+          return client
+            .getClass(resultsFor(classDocuments))
             .unlock({ className: objectName }, lock_handle);
-          break;
         case 'program':
-          await client
-            .getProgram()
+          return client
+            .getProgram(resultsFor(programDocuments))
             .unlock({ programName: objectName }, lock_handle);
-          break;
         case 'interface':
-          await client
-            .getInterface()
+          return client
+            .getInterface(resultsFor(interfaceDocuments))
             .unlock({ interfaceName: objectName }, lock_handle);
-          break;
         case 'function_group':
-          await client
-            .getFunctionGroup()
+          return client
+            .getFunctionGroup(resultsFor(functionGroupDocuments))
             .unlock({ functionGroupName: objectName }, lock_handle);
-          break;
-        case 'function_module': {
-          if (!objectName.includes('|')) {
-            return return_error(
-              new Error('Function module name must be in format GROUP|FM_NAME'),
+        case 'function_module':
+          return client
+            .getFunctionModule(resultsFor(functionModuleDocuments))
+            .unlock(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: functionModuleName as string,
+              },
+              lock_handle,
             );
-          }
-          const [groupName, fmName] = objectName.split('|');
-          await client.getFunctionModule().unlock(
-            {
-              functionGroupName: groupName,
-              functionModuleName: fmName,
-            },
-            lock_handle,
-          );
-          break;
-        }
         case 'table':
-          await client
-            .getTable()
+          return client
+            .getTable(resultsFor(tableDocuments))
             .unlock({ tableName: objectName }, lock_handle);
-          break;
         case 'structure':
-          await client
-            .getStructure()
+          return client
+            .getStructure(resultsFor(structureDocuments))
             .unlock({ structureName: objectName }, lock_handle);
-          break;
         case 'ddl':
-          await client.getDdl().unlock({ ddlName: objectName }, lock_handle);
-          break;
+          return client
+            .getDdl(resultsFor(ddlDocuments))
+            .unlock({ ddlName: objectName }, lock_handle);
         case 'domain':
-          await client
-            .getDomain()
+          return client
+            .getDomain(resultsFor(domainDocuments))
             .unlock({ domainName: objectName }, lock_handle);
-          break;
         case 'data_element':
-          await client
-            .getDataElement()
+          return client
+            .getDataElement(resultsFor(dataElementDocuments))
             .unlock({ dataElementName: objectName }, lock_handle);
-          break;
         case 'package':
-          await client
-            .getPackage()
+          return client
+            .getPackage(resultsFor(packageDocuments))
             .unlock({ packageName: objectName }, lock_handle);
-          break;
         case 'behavior_definition':
-          await client
-            .getBehaviorDefinition()
+          return client
+            .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
             .unlock({ name: objectName }, lock_handle);
-          break;
         case 'metadata_extension':
-          await client
-            .getMetadataExtension()
+          return client
+            .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .unlock({ name: objectName }, lock_handle);
-          break;
         default:
-          return return_error(
-            new Error(`Unsupported object_type: ${object_type}`),
-          );
+          // Unreachable: objectType was already checked against VALID_TYPES.
+          throw new Error(`Unsupported object_type: ${object_type}`);
       }
-
-      logger?.info(`✅ UnlockObject completed: ${objectName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            object_name: objectName,
-            object_type: objectType,
-            session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Object ${objectName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error unlocking object ${objectName}:`, error);
-
-      let errorMessage = `Failed to unlock object: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Object ${objectName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Use the same session_id and lock_handle from LockObject.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch {
-          // ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+    },
+    (value) => terseWrite(value, 200),
+  );
 }

@@ -21,7 +21,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionSource',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Fetch the source code of a specific object version. Pass the opaque content_uri from a GetObjectVersions entry.',
   inputSchema: {

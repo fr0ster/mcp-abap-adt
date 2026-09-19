@@ -1,0 +1,34 @@
+{
+  "case": "read-transport-list-structure",
+  "step": 1,
+  "stepTag": "cts-transportrequests",
+  "capturedAt": "2026-09-16T14:34:58.261Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/cts/transportrequests?configUri=%2Fsap%2Fbc%2Fadt%2Fcts%2Ftransportrequests%2Fsearchconfiguration%2Fconfigurations%2F22D2111643541FE1A5AA03DC2D3DE702",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/cts/transportrequests?configUri=%2Fsap%2Fbc%2Fadt%2Fcts%2Ftransportrequests%2Fsearchconfiguration%2Fconfigurations%2F22D2111643541FE1A5AA03DC2D3DE702",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.transportorganizertree.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.transportorganizertree.v1+xml; charset=utf-8",
+      "content-length": "933",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=78134",
+      "sap-server": "true",
+      "sap-perf-fesrec": "83517.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-transport-list-structure--01-cts-transportrequests.body.xml"
+  }
+}

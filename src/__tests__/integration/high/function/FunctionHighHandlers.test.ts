@@ -49,7 +49,7 @@ import {
 import {
   debugLog,
   delay,
-  parseHandlerResponse,
+  expectWriteAccepted,
 } from '../../helpers/testHelpers';
 
 // Load environment variables
@@ -213,7 +213,7 @@ describe('Function High-Level Handlers Integration', () => {
           );
         }
 
-        const createFGData = parseHandlerResponse(createFGResponse);
+        expectWriteAccepted(createFGResponse);
         testLogger?.info(
           `✅ High Create: Created function group ${functionGroupName} successfully`,
         );
@@ -249,7 +249,7 @@ describe('Function High-Level Handlers Integration', () => {
             );
           }
 
-          const updateFGData = parseHandlerResponse(updateFGResponse);
+          expectWriteAccepted(updateFGResponse);
           testLogger?.info(
             `✅ High Update: Updated function group ${functionGroupName} successfully`,
           );
@@ -297,7 +297,7 @@ describe('Function High-Level Handlers Integration', () => {
           throw new Error(`CreateFunctionModule failed: ${errorMsg}`);
         }
 
-        const createFMData = parseHandlerResponse(createFMResponse);
+        expectWriteAccepted(createFMResponse);
         testLogger?.info(
           `✅ High Create: Created function module ${functionModuleName} successfully`,
         );
@@ -336,7 +336,7 @@ describe('Function High-Level Handlers Integration', () => {
           );
         }
 
-        const updateFMData = parseHandlerResponse(updateFMResponse);
+        expectWriteAccepted(updateFMResponse);
         testLogger?.info(
           `✅ High Update: Updated function module ${functionModuleName} successfully`,
         );

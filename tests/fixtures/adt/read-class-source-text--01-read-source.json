@@ -1,0 +1,31 @@
+{
+  "case": "read-class-source-text",
+  "step": 1,
+  "stepTag": "read-source",
+  "capturedAt": "2026-09-11T05:40:52.829Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/classes/ZBP_MCP_SHR_I_ROOT/source/main",
+    "headers": {
+      "Accept": "text/plain"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "text/plain; charset=utf-8",
+      "content-length": "197",
+      "sap-authenticated": "true",
+      "last-modified": "Thu, 10 Sep 2026 15:10:43 GMT",
+      "etag": "202609101525120011",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "87953.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-class-source-text--01-read-source.body.txt"
+  }
+}

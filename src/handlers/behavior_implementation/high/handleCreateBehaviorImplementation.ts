@@ -1,27 +1,40 @@
 /**
- * CreateBehaviorImplementation Handler - ABAP Behavior Implementation Creation via ADT API
+ * CreateBehaviorImplementation Handler - Create ABAP Behavior Implementation Class
  *
- * Uses AdtClient from @mcp-abap-adt/adt-clients for all operations.
- * Session and lock management handled internally by client.
+ * Uses AdtClient.getBehaviorImplementation().create from
+ * @mcp-abap-adt/adt-clients 19.
  *
- * Workflow: create -> lock -> update main source -> update implementations -> unlock -> activate
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` still reads
+ * the status for `terse` while `full`/`raw` answer the document ADT sent
+ * instead of discarding it.
+ *
+ * A behavior implementation *is* a class — every request `AdtBehaviorImplementation`
+ * makes composes `AdtClass` and is declared over `classDocuments`, not a result
+ * set of its own (see `AdtBehaviorImplementation`'s own doc comment). This
+ * handler holds no lock: `create()` makes the class shell only, and does not
+ * write the `FOR BEHAVIOR OF` main source or the implementations include —
+ * that is `UpdateClass` (main source) and `UpdateBehaviorImplementation`
+ * (implementations include, taking a lock handle the caller already holds)
+ * after it.
  */
 
-import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  encodeSapObjectName,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state. Use UpdateBehaviorImplementation to set implementation code afterwards.',
+    'Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -33,7 +46,7 @@ export const TOOL_DEFINITION = {
       behavior_definition: {
         type: 'string',
         description:
-          'Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist.',
+          'Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.',
       },
       description: {
         type: 'string',
@@ -49,6 +62,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable packages.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'behavior_definition', 'package_name'],
   },
@@ -60,139 +74,45 @@ interface CreateBehaviorImplementationArgs {
   description?: string;
   package_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateBehaviorImplementation MCP tool
- *
- * Uses AdtClient.createBehaviorImplementation - full workflow
- */
 export async function handleCreateBehaviorImplementation(
   context: HandlerContext,
   args: CreateBehaviorImplementationArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-    if (!args?.behavior_definition) {
-      return return_error(new Error('behavior_definition is required'));
-    }
-    if (!args?.package_name) {
-      return return_error(new Error('package_name is required'));
-    }
 
-    // Validate transport_request: required for non-$TMP packages
-    try {
-      validateTransportRequest(args.package_name, args.transport_request);
-    } catch (error) {
-      return return_error(error as Error);
-    }
-
-    const className = args.class_name.toUpperCase();
-    const behaviorDefinition = args.behavior_definition.toUpperCase();
-
-    logger?.info(
-      `Starting behavior implementation creation: ${className} for ${behaviorDefinition}`,
-    );
-
-    try {
-      // Create client
-      const client = createAdtClient(connection, logger);
-      // Create behavior implementation (full workflow)
-      const createConfig: Partial<IBehaviorImplementationConfig> &
-        Pick<
-          IBehaviorImplementationConfig,
-          'className' | 'packageName' | 'behaviorDefinition'
-        > = {
-        className: className,
-        behaviorDefinition: behaviorDefinition,
-        description: args.description || className,
-        packageName: args.package_name.toUpperCase(),
-        transportRequest: args.transport_request,
-      };
-
-      const createState = await client
-        .getBehaviorImplementation()
-        .create(createConfig);
-      const createResult = createState.createResult;
-
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for behavior implementation ${className}`,
-        );
-      }
-
-      logger?.info(
-        `CreateBehaviorImplementation completed successfully: ${className}`,
-      );
-
-      const result = {
-        success: true,
-        class_name: className,
-        behavior_definition: behaviorDefinition,
-        package_name: args.package_name.toUpperCase(),
-        transport_request: args.transport_request || null,
-        type: 'CLAS/OC',
-        message: `Behavior Implementation ${className} created successfully. Use UpdateBehaviorImplementation to set implementation code.`,
-        uri: `/sap/bc/adt/oo/classes/${encodeSapObjectName(className).toLowerCase()}`,
-        steps_completed: ['create'],
-      };
-
-      return return_response({
-        data: JSON.stringify(result, null, 2),
-        status: 200,
-        statusText: 'OK',
-        headers: {},
-        config: {} as any,
-      });
-    } catch (error: any) {
-      logger?.error(
-        `Error creating behavior implementation ${className}: ${error?.message || error}`,
-      );
-
-      // Check if behavior implementation already exists
-      if (
-        error.message?.includes('already exists') ||
-        error.response?.status === 409
-      ) {
-        return return_error(
-          new Error(
-            `Behavior Implementation ${className} already exists. Please delete it first or use a different name.`,
-          ),
-        );
-      }
-
-      // Parse error message
-      let errorMessage = `Failed to create behavior implementation: ${error.message || String(error)}`;
-
-      if (error.response?.data && typeof error.response.data === 'string') {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    logger?.error(
-      `CreateBehaviorImplementation handler error: ${error?.message || error}`,
-    );
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+  if (!args?.behavior_definition) {
+    return return_error(new Error('behavior_definition is required'));
+  }
+  if (!args?.package_name) {
+    return return_error(new Error('package_name is required'));
+  }
+
+  validateTransportRequest(args.package_name, args.transport_request);
+
+  const className = args.class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreateBehaviorImplementation', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorImplementation(resultsFor(classDocuments))
+        .create(
+          {
+            className,
+            behaviorDefinition: args.behavior_definition.toUpperCase(),
+            packageName: args.package_name.toUpperCase(),
+            description: args.description || className,
+            transportRequest: args.transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

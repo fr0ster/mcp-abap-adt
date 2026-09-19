@@ -1,0 +1,34 @@
+{
+  "case": "refusal-validation-name-taken-table",
+  "step": 1,
+  "stepTag": "tables-validation",
+  "capturedAt": "2026-09-11T08:31:47.515Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/ddic/tables/validation?objname=ZMCP_SHR_RTABL&packagename=ZMCP_SHR_PKG&description=x",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/tables/validation?objname=ZMCP_SHR_RTABL&packagename=ZMCP_SHR_PKG&description=x",
+    "headers": {
+      "Accept": "application/vnd.sap.as+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 400,
+    "statusText": "Bad Request",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "600",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=44799",
+      "sap-server": "true",
+      "sap-perf-fesrec": "51188.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-validation-name-taken-table--01-tables-validation.body.xml"
+  }
+}

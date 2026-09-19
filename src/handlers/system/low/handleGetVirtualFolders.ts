@@ -1,13 +1,28 @@
 /**
  * GetVirtualFolders Handler - Low-level handler for virtual folders
  *
- * Uses getVirtualFoldersContents from @mcp-abap-adt/adt-clients AdtUtils.
- * Retrieves hierarchical virtual folder contents from ADT information system.
+ * Uses AdtClient.getUtils().getVirtualFoldersContents from
+ * @mcp-abap-adt/adt-clients 19. `getVirtualFoldersContents(params)` takes no
+ * `options` at all — no `analyse` — so there is nothing to inject beyond the
+ * result set.
+ *
+ * `folders` is one of the 300-odd slots `resultSets.ts` maps to `structured`
+ * (unlike `node`, which `ourUtils` overrides with the tree-flattening
+ * `nodeLevel` reading), so this answers an `AdtReading` the same shape every
+ * write handler in this cluster does — `detail: 'raw'` and `'full'` both
+ * work. No corpus fixture for this endpoint exists yet (the README's
+ * endpoint table has no `/virtualfolders/contents` row at all), so `terse`
+ * here answers the same whole parse `full` does rather than picking fields
+ * nobody has measured — inventing a compact shape without a captured
+ * document would be exactly the mistake the corpus exists to prevent.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'GetVirtualFoldersLow',
@@ -60,6 +75,7 @@ export const TOOL_DEFINITION = {
         description: 'Ignore short descriptions in response',
         default: false,
       },
+      ...DETAIL_PROPERTY,
     },
     required: [],
   },
@@ -71,40 +87,28 @@ interface GetVirtualFoldersArgs {
   facet_order?: string[];
   with_versions?: boolean;
   ignore_short_descriptions?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for GetVirtualFoldersLow MCP tool
- *
- * Uses getVirtualFoldersContents from AdtUtils
- */
 export async function handleGetVirtualFolders(
   context: HandlerContext,
   args: GetVirtualFoldersArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Create AdtClient and get utilities
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+  const detail = detailOf(args);
 
-    logger?.info('Fetching virtual folders contents');
-
-    const params = {
-      objectSearchPattern: args.object_search_pattern || '*',
-      preselection: args.preselection,
-      facetOrder: args.facet_order || ['package', 'group', 'type'],
-      withVersions: args.with_versions,
-      ignoreShortDescriptions: args.ignore_short_descriptions,
-    };
-
-    const result = await utils.getVirtualFoldersContents(params);
-
-    logger?.debug('Virtual folders contents fetched successfully');
-
-    return return_response(result);
-  } catch (error: any) {
-    logger?.error('Failed to fetch virtual folders contents', error);
-    return return_error(error);
-  }
+  return answer(
+    { tool: 'GetVirtualFoldersLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getVirtualFoldersContents({
+          objectSearchPattern: args.object_search_pattern || '*',
+          preselection: args.preselection,
+          facetOrder: args.facet_order || ['package', 'group', 'type'],
+          withVersions: args.with_versions,
+          ignoreShortDescriptions: args.ignore_short_descriptions,
+        }),
+    project(detail, (value) => value),
+  );
 }

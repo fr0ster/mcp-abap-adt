@@ -1,21 +1,40 @@
 /**
- * UpdateLocalTypes Handler - Update Local Types via AdtClient
+ * UpdateLocalTypes Handler - Write a class's local types include
+ *
+ * Uses AdtClient.getLocalTypes().{lock,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock`. Same shape as
+ * `UpdateLocalTestClass` — see its own doc comment for the full reasoning:
+ * `AdtLocalTypes.update()` never locks itself, but the same accessor
+ * composes `IAdtLockable`, delegating to the class's own lock, so this
+ * handler acquires it rather than asking the caller for a handle it has no
+ * other way to obtain.
+ *
+ * **The source goes in `options`, not `config`.** The shipped `update()`
+ * reads `options?.sourceCode ?? config.localTypesCode`. Verified against
+ * `AdtLocalTypes.js`.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  extractAdtErrorMessage,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTypes',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update local types in an ABAP class (implementations include). Manages lock, check, update, unlock, and optional activation.',
+    'Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -29,13 +48,16 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description: 'Transport request number.',
+        description:
+          'Transport request number (required for transportable objects).',
       },
       activate_on_update: {
         type: 'boolean',
-        description: 'Activate parent class after updating. Default: false',
+        description:
+          'Activate parent class after updating local types. Default: false',
         default: false,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'local_types_code'],
   },
@@ -46,6 +68,7 @@ interface UpdateLocalTypesArgs {
   local_types_code: string;
   transport_request?: string;
   activate_on_update?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleUpdateLocalTypes(
@@ -53,75 +76,45 @@ export async function handleUpdateLocalTypes(
   args: UpdateLocalTypesArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      local_types_code,
-      transport_request,
-      activate_on_update = false,
-    } = args as UpdateLocalTypesArgs;
 
-    if (!class_name || !local_types_code) {
-      return return_error(
-        new Error('class_name and local_types_code are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-    const className = class_name.toUpperCase();
-
-    logger?.info(`Updating local types for ${className}`);
-
-    try {
-      const localTypes = client.getLocalTypes();
-      const updateResult = await localTypes.update(
-        {
-          className,
-          localTypesCode: local_types_code,
-          transportRequest: transport_request,
-        },
-        { activateOnUpdate: activate_on_update },
-      );
-
-      if (!updateResult) {
-        throw new Error(`Update did not return a result for ${className}`);
-      }
-
-      logger?.info(`✅ UpdateLocalTypes completed successfully: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            transport_request: transport_request || null,
-            activated: activate_on_update,
-            message: `Local types updated successfully in ${className}.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating local types for ${className}: ${error?.message || error}`,
-      );
-
-      const detailedError = extractAdtErrorMessage(
-        error,
-        `Failed to update local types in ${className}`,
-      );
-      let errorMessage = `Failed to update local types: ${detailedError}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Local types for ${className} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Class ${className} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
+  if (!args?.local_types_code) {
+    return return_error(new Error('local_types_code is required'));
+  }
+
+  const className = args.class_name.toUpperCase();
+  const shouldActivate = args.activate_on_update === true;
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateLocalTypes', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getLocalTypes(
+        resultsFor(classDocuments),
+      );
+
+      const written = await withLock(
+        () => obj.lock({ className }),
+        (lockHandle) =>
+          obj.update(
+            { className, transportRequest: args.transport_request },
+            {
+              sourceCode: args.local_types_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => obj.unlock({ className }, lockHandle),
+      );
+
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
+      }
+
+      return obj.activate({ className }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

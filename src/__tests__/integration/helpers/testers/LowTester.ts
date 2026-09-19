@@ -13,6 +13,7 @@ import type { LoggerWithExtras } from '../loggerHelpers';
 import {
   createHandlerContext,
   delay,
+  extractErrorMessage,
   extractLockHandle,
   parseHandlerResponse,
 } from '../testHelpers';
@@ -152,6 +153,10 @@ export class LowTester extends LambdaTester {
       return;
     }
 
+    if (this.skipsOnThisSystem()) {
+      return;
+    }
+
     if (!this.workflowFunctions) {
       throw new Error('Workflow functions not provided');
     }
@@ -187,14 +192,26 @@ export class LowTester extends LambdaTester {
           handlerContext,
           args,
         );
-        // Extract and store lock handle for subsequent operations
+        // Extract the lock handle only when the lock actually answered one —
+        // a refused lock, or a success answer that carries no handle, means
+        // there is nothing to update under. Failing here, with the lock's
+        // own refusal as the reason, is what keeps a reader from seeing
+        // "update refused" for what was really a lock refusal; entering the
+        // try/finally below on a lock that never yielded a handle would also
+        // run `update` (and `guaranteedUnlock`) against an object nothing
+        // here actually locked.
+        let lockHandle: string | undefined;
         if (lockResponse && !lockResponse.isError) {
           const lockData = parseHandlerResponse(lockResponse);
-          const lockHandle = extractLockHandle(lockData);
-          if (this.context) {
-            this.context.lockHandle = lockHandle;
-          }
+          lockHandle = extractLockHandle(lockData);
         }
+        if (!lockHandle) {
+          const reason = lockResponse?.isError
+            ? extractErrorMessage(lockResponse)
+            : 'lock response carried no lock handle';
+          throw new Error(`Lock ${this.context.objectName} failed: ${reason}`);
+        }
+        this.context.lockHandle = lockHandle;
         logger?.info(`🔒 Locked ${this.context.objectName}`);
 
         // Guarantee unlock even if update fails

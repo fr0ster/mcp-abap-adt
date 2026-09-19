@@ -1,23 +1,41 @@
 /**
  * UpdateDdl Handler - Update existing CDS/Classic view DDL source
  *
- * Workflow: lock -> check (new code) -> update (if check OK) -> unlock -> check (inactive) -> (activate)
+ * Uses AdtClient.getDdl().{lock,check,update,unlock,activate} from
+ * @mcp-abap-adt/adt-clients 19, through `withLock` — held for the whole
+ * write, released on every path out.
+ *
+ * Workflow: lock -> (check, iff activating) -> update -> unlock ->
+ * (activate). The pre-write check gates the write exactly as the
+ * pre-migration handler did — only when `activate` is true. The
+ * pre-migration handler's *post*-unlock check is gone: its own `catch`
+ * never rethrew, so it could never have changed the answer.
+ *
+ * **The source goes through `options.sourceCode` for `update`,
+ * `config.ddlSource` for `check`.** See `UpdateDdlLow` for `update`.
  */
 
-import { XMLParser } from 'fast-xml-parser';
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseCheck,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  encodeSapObjectName,
-  return_error,
-  return_response,
-  safeCheckOperation,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
+import { withLock } from '../../../lib/strategies/withLock';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
   inputSchema: {
@@ -37,6 +55,7 @@ export const TOOL_DEFINITION = {
         type: 'boolean',
         description: 'Activate after update. Default: false.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name', 'ddl_source'],
   },
@@ -47,11 +66,14 @@ interface UpdateDdlArgs {
   ddl_source: string;
   transport_request?: string;
   activate?: boolean;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-export async function handleUpdateDdl(context: HandlerContext, params: any) {
+export async function handleUpdateDdl(
+  context: HandlerContext,
+  args: UpdateDdlArgs,
+) {
   const { connection, logger } = context;
-  const args: UpdateDdlArgs = params;
 
   if (!args.ddl_name || !args.ddl_source) {
     return return_error(
@@ -60,228 +82,50 @@ export async function handleUpdateDdl(context: HandlerContext, params: any) {
   }
 
   const ddlName = args.ddl_name.toUpperCase();
-  logger?.info(
-    `Starting DDL source update: ${ddlName} (activate=${args.activate === true})`,
-  );
+  const shouldActivate = args.activate === true;
+  const detail = detailOf(args);
 
-  // Connection setup
-  try {
-    // Get connection from session context (set by ProtocolHandler)
-    // Connection is managed and cached per session, with proper token refresh via AuthBroker
-    logger?.debug(`Created separate connection for handler call: ${ddlName}`);
-  } catch (connectionError: any) {
-    const errorMessage =
-      connectionError instanceof Error
-        ? connectionError.message
-        : String(connectionError);
-    logger?.error(`Failed to create connection: ${errorMessage}`);
-    return return_error(
-      new Error(`Failed to create connection: ${errorMessage}`),
-    );
-  }
-
-  try {
-    const client = createAdtClient(connection, logger);
-    const shouldActivate = args.activate === true;
-    let lockHandle: string | undefined;
-
-    try {
-      // Lock
-      logger?.debug(`Locking DDL source: ${ddlName}`);
-      lockHandle = await client.getDdl().lock({ ddlName: ddlName });
-      logger?.debug(
-        `DDL source locked: ${ddlName} (handle=${lockHandle ? `${lockHandle.substring(0, 8)}...` : 'none'})`,
+  return answer(
+    { tool: 'UpdateDdl', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const obj = createAdtClient(connection, logger).getDdl(
+        resultsFor(ddlDocuments),
       );
 
-      // Check new code BEFORE update (only when activating)
-      if (shouldActivate) {
-        logger?.debug(`Checking new DDL code before update: ${ddlName}`);
-        try {
-          await safeCheckOperation(
-            () =>
-              client
-                .getDdl()
-                .check(
-                  { ddlName: ddlName, ddlSource: args.ddl_source },
-                  'inactive',
-                ),
-            ddlName,
-            {
-              debug: (message: string) => logger?.debug(message),
-            },
-          );
-          logger?.debug(`New code check passed: ${ddlName}`);
-        } catch (checkError: any) {
-          if ((checkError as any).isAlreadyChecked) {
-            logger?.debug(
-              `DDL source ${ddlName} was already checked - continuing`,
+      const written = await withLock(
+        () => obj.lock({ ddlName }),
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+          const update = () =>
+            obj.update(
+              { ddlName, transportRequest: args.transport_request },
+              {
+                sourceCode: args.ddl_source,
+                lockHandle,
+                analyse: analyseException,
+              },
             );
-          } else {
-            logger?.error(
-              `New code check failed: ${ddlName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-            throw new Error(
-              `New code check failed: ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-            );
-          }
-        }
-      } else {
-        logger?.debug(`Skipping syntax check (activate=false): ${ddlName}`);
-      }
-
-      // Update
-      logger?.debug(`Updating DDL source: ${ddlName}`);
-      await client.getDdl().update(
-        {
-          ddlName: ddlName,
-          ddlSource: args.ddl_source,
-          transportRequest: args.transport_request,
+          // A conditional phase of the sequence, not a hand-rolled
+          // short-circuit: see UpdateClass for the reasoning.
+          return shouldActivate
+            ? sequence(
+                () =>
+                  obj.check(
+                    { ddlName, ddlSource: args.ddl_source },
+                    'inactive',
+                    { analyse: analyseCheck },
+                  ),
+                update,
+              )
+            : update();
         },
-        { lockHandle },
+        (lockHandle) => obj.unlock({ ddlName }, lockHandle),
       );
-      logger?.info(`DDL source updated: ${ddlName}`);
-    } finally {
-      if (lockHandle) {
-        try {
-          logger?.debug(`Unlocking DDL source: ${ddlName}`);
-          await client.getDdl().unlock({ ddlName: ddlName }, lockHandle);
-          logger?.info(`DDL source unlocked: ${ddlName}`);
-        } catch (unlockError: any) {
-          logger?.warn(
-            `Failed to unlock DDL source ${ddlName}: ${unlockError?.message || unlockError}`,
-          );
-        }
+      if (!written.ok || !shouldActivate) {
+        return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
-    }
 
-    // Check inactive version (after unlock, only when activating)
-    if (shouldActivate) {
-      logger?.debug(`Checking inactive version: ${ddlName}`);
-      try {
-        await safeCheckOperation(
-          () =>
-            client
-              .getDdl()
-              .check(
-                { ddlName: ddlName, ddlSource: args.ddl_source },
-                'inactive',
-              ),
-          ddlName,
-          {
-            debug: (message: string) => logger?.debug(message),
-          },
-        );
-        logger?.debug(`Inactive version check completed: ${ddlName}`);
-      } catch (checkError: any) {
-        if ((checkError as any).isAlreadyChecked) {
-          logger?.debug(
-            `DDL source ${ddlName} was already checked - continuing`,
-          );
-        } else {
-          logger?.warn(
-            `Inactive version check had issues: ${ddlName} - ${checkError instanceof Error ? checkError.message : String(checkError)}`,
-          );
-        }
-      }
-    }
-
-    // Activate if requested
-    let activateResponse: any | undefined;
-    if (shouldActivate) {
-      logger?.debug(`Activating DDL source: ${ddlName}`);
-      try {
-        const activateState = await client
-          .getDdl()
-          .activate({ ddlName: ddlName });
-        activateResponse = activateState.activateResult;
-        logger?.info(`DDL source activated: ${ddlName}`);
-      } catch (activationError: any) {
-        logger?.error(
-          `Activation failed: ${ddlName} - ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-        );
-        throw new Error(
-          `Activation failed: ${activationError instanceof Error ? activationError.message : String(activationError)}`,
-        );
-      }
-    } else {
-      logger?.debug(`Skipping activation for: ${ddlName}`);
-    }
-
-    // Parse activation warnings if activation was performed
-    let activationWarnings: string[] = [];
-    if (shouldActivate && activateResponse) {
-      if (
-        typeof activateResponse.data === 'string' &&
-        activateResponse.data.includes('<chkl:messages')
-      ) {
-        const parser = new XMLParser({
-          ignoreAttributes: false,
-          attributeNamePrefix: '@_',
-        });
-        const result = parser.parse(activateResponse.data);
-        const messages = result?.['chkl:messages']?.msg;
-        if (messages) {
-          const msgArray = Array.isArray(messages) ? messages : [messages];
-          activationWarnings = msgArray.map(
-            (msg: any) =>
-              `${msg['@_type']}: ${msg.shortText?.txt || 'Unknown'}`,
-          );
-        }
-      }
-    }
-
-    logger?.info(`UpdateDdl completed successfully: ${ddlName}`);
-
-    const result = {
-      success: true,
-      ddl_name: ddlName,
-      type: 'DDLS',
-      activated: shouldActivate,
-      message: `DDL source ${ddlName} updated${shouldActivate ? ' and activated' : ''} successfully`,
-      uri: `/sap/bc/adt/ddic/ddl/sources/${encodeSapObjectName(ddlName).toLowerCase()}`,
-      steps_completed: [
-        'lock',
-        'check_new_code',
-        'update',
-        'unlock',
-        'check_inactive',
-        ...(shouldActivate ? ['activate'] : []),
-      ],
-      activation_warnings:
-        activationWarnings.length > 0 ? activationWarnings : undefined,
-    };
-
-    return return_response({
-      data: JSON.stringify(result, null, 2),
-      status: 200,
-      statusText: 'OK',
-      headers: {},
-      config: {} as any,
-    } as AxiosResponse);
-  } catch (error: any) {
-    // Parse error message
-    let errorMessage = error instanceof Error ? error.message : String(error);
-
-    // Attempt to parse ADT XML error
-    try {
-      const parser = new XMLParser({
-        ignoreAttributes: false,
-        attributeNamePrefix: '@_',
-      });
-      const errorData = error?.response?.data
-        ? parser.parse(error.response.data)
-        : null;
-      const errorMsg =
-        errorData?.['exc:exception']?.message?.['#text'] ||
-        errorData?.['exc:exception']?.message;
-      if (errorMsg) {
-        errorMessage = `SAP Error: ${errorMsg}`;
-      }
-    } catch {
-      // ignore parse errors
-    }
-
-    logger?.error(`Error updating DDL source ${ddlName}: ${errorMessage}`);
-    return return_error(new Error(errorMessage));
-  }
+      return obj.activate({ ddlName }, { analyse: analyseActivation });
+    },
+    project(detail, terseWrite),
+  );
 }

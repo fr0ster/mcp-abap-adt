@@ -10,7 +10,7 @@ import { handleActivateObject } from '../low/handleActivateObject';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateObjects',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Activate one or multiple ABAP repository objects. Use after Create/Update when objects remain inactive, or for group activation of related objects (e.g., domains + data elements + tables together). Works with any object type.',
   inputSchema: {

@@ -1,0 +1,36 @@
+{
+  "case": "read-metadata-function-group",
+  "step": 1,
+  "stepTag": "groups-zmcpshrfgrp",
+  "capturedAt": "2026-09-11T08:42:52.825Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP",
+    "headers": {
+      "Accept": "*/*"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.functions.groups.v3+xml; charset=utf-8",
+      "content-length": "746",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "2026091015255000189205",
+      "last-modified": "Thu, 10 Sep 2026 15:25:50 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=85530",
+      "sap-server": "true",
+      "sap-perf-fesrec": "91512.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-metadata-function-group--01-groups-zmcpshrfgrp.body.xml"
+  }
+}

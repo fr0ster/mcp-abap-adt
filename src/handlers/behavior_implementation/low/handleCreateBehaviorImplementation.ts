@@ -1,25 +1,76 @@
 /**
  * CreateBehaviorImplementation Handler - Create ABAP Behavior Implementation Class
  *
- * Uses AdtClient.createBehaviorImplementation from @mcp-abap-adt/adt-clients.
- * Low-level handler: full workflow (create, lock, update main source, update implementations, unlock, activate).
+ * Uses AdtClient.getBehaviorImplementation().create from
+ * @mcp-abap-adt/adt-clients 19.
+ *
+ * A behavior implementation *is* a class — its every request composes
+ * `AdtClass` and is declared over the class document set (`classDocuments`,
+ * not a set of its own; see `AdtBehaviorImplementation`'s own doc comment).
+ * `getBehaviorImplementation` is still the factory to call, not `getClass`:
+ * both answer identically-shaped readings, and only the factory name tells
+ * the two families apart on the wire (see the low-tier strategy test).
+ *
+ * **`implementation_code` cannot reach `create()` itself.** v19's `create()`
+ * is typed `Omit<IBehaviorImplementationConfig, 'sourceCode'> & {sourceCode?:
+ * never}` — the class is created plain, because the implementations
+ * include's `FOR BEHAVIOR OF` clause cannot be written until the class shell
+ * exists. But this repository's own invariant (`create()` = shell, `update()`
+ * writes the body — see `project_create_shell_update_writes_body`, the fix for
+ * the ServiceDefinition empty-body bug) still applies: a caller who passed a
+ * body expects it written, not silently discarded. So when `implementation_code`
+ * is given, this locks the class it just created, writes it, and unlocks on
+ * every path out via `withLock` — never a bare `sequence`, because a refused
+ * or throwing `update()` must not leave the object locked.
+ *
+ * **The source goes in `options`, not `config`.**
+ * `IBehaviorImplementationConfig` still declares a `sourceCode` field, so
+ * `update({ className, sourceCode }, ...)` compiles either way and answers
+ * `SUCCESS` — but the shipped `AdtBehaviorImplementation.update()` reads
+ * `options?.sourceCode` only (`const source = options?.sourceCode;` in
+ * `AdtBehaviorImplementation.js`). With the source in `config`, the request
+ * this issues has no body at all, and the implementations include endpoint
+ * *replaces* rather than merges: an empty write against a locked class is
+ * the empty-body bug this repository has already fixed once
+ * (`project_create_shell_update_writes_body`), recreated here on a
+ * destructive write. Verified against the compiled JavaScript, not the
+ * declaration file's comment — a `.d.ts` comment is not evidence for where a
+ * value lands.
+ *
+ * **`update()` writes the implementations include only — one request, not
+ * two.** The declaration file's own doc comment ("Two writes under one
+ * lock: the main source with the FOR BEHAVIOR OF clause, then the handler
+ * code into the implementations include") does not match the shipped
+ * member: `AdtBehaviorImplementation.js`'s `update()` makes exactly one
+ * `updateBehaviorImplementation()` call, against the implementations
+ * include endpoint. `mainSourceFor()` — the helper that would compose the
+ * `FOR BEHAVIOR OF` main source — is exported from the same module and
+ * never called from `update()`. **A class created and written through this
+ * handler does not get its `FOR BEHAVIOR OF` clause from this call.**
+ * Writing the main source is a separate `getClass().update({ className },
+ * { sourceCode: mainSourceFor(className, behaviorDefinition) })`, which this
+ * handler does not invent on its own — under-promising here beats claiming
+ * a second write nobody has observed happening.
  */
 
-import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { withLock } from '../../../lib/strategies/withLock';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementationLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Create a new ABAP behavior implementation class with full workflow (create, lock, update main source, update implementations, unlock, activate). - use CreateBehaviorImplementation (high-level) for additional validation.',
+    '[low-level] Create a new ABAP behavior implementation class. With implementation_code, also locks, writes it to the implementations include, and unlocks. This does NOT write the FOR BEHAVIOR OF main source — the class will not be bound to behavior_definition until a caller writes that separately (e.g. via UpdateClass). - use CreateBehaviorImplementation (high-level) for additional validation.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -48,7 +99,7 @@ export const TOOL_DEFINITION = {
       implementation_code: {
         type: 'string',
         description:
-          'Implementation code for the implementations include (optional).',
+          'Implementation code for the implementations include (optional). When given, the class is locked, the code is written to the implementations include, and unlocked, right after creation. Does NOT write the FOR BEHAVIOR OF main source — the class is not bound to behavior_definition by this alone.',
       },
       session_id: {
         type: 'string',
@@ -65,6 +116,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: [
       'class_name',
@@ -88,137 +140,85 @@ interface CreateBehaviorImplementationArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreateBehaviorImplementation MCP tool
- *
- * Uses AdtClient.createBehaviorImplementation - full workflow
- */
 export async function handleCreateBehaviorImplementation(
   context: HandlerContext,
   args: CreateBehaviorImplementationArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      behavior_definition,
-      description,
-      package_name,
-      transport_request,
-      implementation_code,
-      session_id,
-      session_state,
-    } = args as CreateBehaviorImplementationArgs;
+  const {
+    class_name,
+    behavior_definition,
+    description,
+    package_name,
+    transport_request,
+    implementation_code,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!class_name || !behavior_definition || !description || !package_name) {
-      return return_error(
-        new Error(
-          'class_name, behavior_definition, description, and package_name are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const className = class_name.toUpperCase();
-    const behaviorDefinition = behavior_definition.toUpperCase();
-
-    logger?.info(
-      `Starting behavior implementation creation: ${className} for ${behaviorDefinition}`,
+  if (!class_name || !behavior_definition || !description || !package_name) {
+    return return_error(
+      new Error(
+        'class_name, behavior_definition, description, and package_name are required',
+      ),
     );
+  }
 
-    try {
-      // Create behavior implementation (full workflow)
-      const createConfig: Partial<IBehaviorImplementationConfig> &
-        Pick<
-          IBehaviorImplementationConfig,
-          'className' | 'packageName' | 'behaviorDefinition'
-        > = {
-        className: className,
-        behaviorDefinition: behaviorDefinition,
-        description: description,
-        packageName: package_name.toUpperCase(),
-        transportRequest: transport_request,
-        ...(implementation_code && { sourceCode: implementation_code }),
-      };
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
 
-      const createState = await client
-        .getBehaviorImplementation()
-        .create(createConfig);
-      const createResult = createState.createResult;
+  const className = class_name.toUpperCase();
+  const behaviorDefinition = behavior_definition.toUpperCase();
+  const detail = detailOf(args);
 
-      if (!createResult) {
-        throw new Error(
-          `Create did not return a response for behavior implementation ${className}`,
-        );
-      }
+  return answer(
+    { tool: 'CreateBehaviorImplementationLow', detail },
+    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      const client = createAdtClient(
+        connection,
+        logger,
+      ).getBehaviorImplementation(resultsFor(classDocuments));
 
-      // Get updated session state after create
-
-      logger?.info(`✅ CreateBehaviorImplementation completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            behavior_definition: behaviorDefinition,
-            description,
-            package_name: package_name.toUpperCase(),
-            transport_request: transport_request || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Behavior Implementation ${className} created and activated successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error creating behavior implementation ${className}: ${error?.message || error}`,
+      const created = await client.create(
+        {
+          className,
+          behaviorDefinition,
+          description,
+          packageName: package_name.toUpperCase(),
+          transportRequest: transport_request,
+        },
+        { analyse: analyseException },
       );
 
-      // Parse error message
-      let errorMessage = `Failed to create behavior implementation: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Behavior Implementation ${className} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
+      if (!created.ok || !implementation_code) {
+        return created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+      // The body was passed; write it under a lock this call also releases.
+      // sourceCode belongs in options, not config — AdtBehaviorImplementation
+      // .update() reads options?.sourceCode only (see the module doc comment).
+      return withLock(
+        () => client.lock({ className }),
+        (lockHandle) =>
+          client.update(
+            {
+              className,
+              behaviorDefinition,
+              transportRequest: transport_request,
+            },
+            {
+              sourceCode: implementation_code,
+              lockHandle,
+              analyse: analyseException,
+            },
+          ),
+        (lockHandle) => client.unlock({ className }, lockHandle),
+      ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+    },
+    project(detail, terseWrite),
+  );
 }

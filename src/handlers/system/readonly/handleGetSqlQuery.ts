@@ -1,7 +1,12 @@
 import type { ILogger } from '@mcp-abap-adt/interfaces';
 import { XMLParser } from 'fast-xml-parser';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AnswerDetail } from '../../../lib/strategies/projections';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -25,10 +30,36 @@ export const TOOL_DEFINITION = {
         description: '[read-only] Maximum number of rows to return',
         default: 100,
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['sql_query'],
   },
 } as const;
+
+/**
+ * `project(detail, terse)` from `projections.ts` hands `terse` only
+ * `reading.value` (the generic `structured` parse of `query`/`contents` — see
+ * `resultSets.ts`'s `READING_BY_SLOT`; both slots default to `rawDocument`
+ * unparsed in `@mcp-abap-adt/adt-clients` itself, so there is no shipped
+ * reading to read real `dataPreview:*` tag names off of, and no fixture under
+ * `tests/fixtures/adt/` captures one either). `parseSqlQueryXml` below parses
+ * the raw payload with its own `XMLParser` configuration, tuned for the data
+ * preview shape: `columns` and `data` forced to arrays, tag values kept as
+ * strings, and a self-closing `<data/>` kept as an empty cell. The generic
+ * parse tree's `REPEATABLE` list was never tuned for that nesting
+ * (`dataPreview:columns` and `dataPreview:data` are not in it), and there is no
+ * corpus to tune it against. So this projects `reading.raw` rather than
+ * `reading.value`.
+ */
+export function projectRaw(
+  detail: AnswerDetail,
+  reading: AdtReading<unknown>,
+  terseRaw: (raw: string, status: number) => unknown,
+): unknown {
+  if (detail === 'raw') return reading.raw;
+  if (detail === 'full') return reading.value ?? reading.raw;
+  return terseRaw(reading.raw, reading.status);
+}
 
 /**
  * Interface for SQL query execution response
@@ -233,123 +264,43 @@ export function parseSqlQueryXml(
 }
 
 /**
- * Pull the human-readable reason out of an ADT `<exc:exception>` body.
- *
- * The Data Preview endpoint answers a rejected statement with a precise
- * diagnosis — `"UP" is invalid here (due to grammar).` — and losing it leaves
- * the caller staring at a bare HTTP status with no way to tell a typo from an
- * unsupported construct.
- */
-function extractSapErrorMessage(error: any): string | undefined {
-  const data = error?.response?.data;
-  if (!data) return undefined;
-
-  const raw = typeof data === 'string' ? data : String(data);
-  if (!raw.includes('exception')) return undefined;
-
-  try {
-    const parsed = xmlParser.parse(raw);
-    const exception = parsed?.exception ?? parsed?.['exc:exception'];
-    const message = exception?.message ?? exception?.localizedMessage;
-    const text =
-      typeof message === 'object' ? message?.['#text'] : (message as string);
-    return typeof text === 'string' && text.trim() ? text.trim() : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-/**
- * SAP rewrites the submitted statement, appending its own INTO and UP TO
- * clauses. A caller-supplied clause of either kind therefore arrives as a
- * duplicate, and SAP reports it as a grammar error that says nothing about the
- * real cause. Recognise that shape and explain it.
- */
-function hintForSapError(
-  message: string,
-  sqlQuery: string,
-): string | undefined {
-  if (!/invalid here|due to grammar/i.test(message)) return undefined;
-
-  if (/\bINTO\b/i.test(sqlQuery)) {
-    return 'Your query contains an INTO clause. SAP appends "INTO TABLE @DATA(LT_RESULT)" itself — remove yours.';
-  }
-  if (/\bUP\s+TO\b/i.test(sqlQuery)) {
-    return 'Your query contains an UP TO ... ROWS clause. SAP appends "UP TO <row_number> ROWS" itself — remove yours and use the row_number parameter.';
-  }
-  return 'SAP appends "INTO TABLE @DATA(LT_RESULT) UP TO <row_number> ROWS ." to the statement. Note that ABAP SQL requires alias~column and spaces inside function parentheses, e.g. SUBSTRING( col, 1, 4 ).';
-}
-
-/**
  * Handler to execute freestyle SQL queries via SAP ADT Data Preview API
  *
  * @param args - Tool arguments containing sql_query and optional row_number parameter
  * @returns Response with parsed SQL query results or error
  */
-export async function handleGetSqlQuery(context: HandlerContext, args: any) {
+export async function handleGetSqlQuery(
+  context: HandlerContext,
+  args: { sql_query: string; row_number?: number; detail?: AnswerDetail },
+) {
   const { connection, logger } = context;
-  try {
-    logger?.info('handleGetSqlQuery called');
+  logger?.info('handleGetSqlQuery called');
 
-    if (!args?.sql_query) {
-      return return_error('SQL query is required');
-    }
-
-    const sqlQuery = args.sql_query;
-    const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
-
-    logger?.info(`Executing SQL query (rows=${rowNumber})`);
-
-    const client = createAdtClient(connection, logger);
-
-    let response: any;
-    try {
-      response = await client
-        .getUtils()
-        .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber });
-    } catch (requestError: any) {
-      // SAP's own diagnosis is far more useful than the transport-level
-      // failure wrapping it, so surface that instead of discarding the body.
-      const sapMessage = extractSapErrorMessage(requestError);
-      if (!sapMessage) throw requestError;
-
-      const hint = hintForSapError(sapMessage, sqlQuery);
-      logger?.error(`SQL query rejected by SAP: ${sapMessage}`);
-      return return_error(hint ? `${sapMessage} ${hint}` : sapMessage);
-    }
-
-    if (response.status === 200 && response.data) {
-      logger?.info('SQL query request completed successfully');
-
-      // Parse the XML response
-      const parsedData = parseSqlQueryXml(
-        response.data,
-        sqlQuery,
-        rowNumber,
-        logger,
-      );
-
-      logger?.debug(
-        `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
-      );
-
-      const result = {
-        isError: false,
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(parsedData, null, 2),
-          },
-        ],
-      };
-      return result;
-    } else {
-      return return_error(
-        `Failed to execute SQL query. Status: ${response.status}`,
-      );
-    }
-  } catch (error) {
-    logger?.error('Failed to execute SQL query', error as any);
-    return return_error(error);
+  if (!args?.sql_query) {
+    return return_error('SQL query is required');
   }
+
+  const sqlQuery = args.sql_query;
+  const rowNumber = args.row_number || 100; // Default to 100 rows if not specified
+  const detail = detailOf(args);
+
+  logger?.info(`Executing SQL query (rows=${rowNumber})`);
+
+  // `getSqlQuery(params)` takes no options object at all — no `analyse` to
+  // pass, matching the brief.
+  return answer(
+    { tool: 'GetSqlQuery', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber }),
+    (reading: AdtReading<unknown>) =>
+      projectRaw(detail, reading, (raw) => {
+        const parsedData = parseSqlQueryXml(raw, sqlQuery, rowNumber, logger);
+        logger?.debug(
+          `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
+        );
+        return parsedData;
+      }),
+  );
 }

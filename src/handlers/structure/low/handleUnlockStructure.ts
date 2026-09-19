@@ -1,24 +1,26 @@
 /**
- * UnlockStructure Handler - Unlock ABAP Structure
+ * UnlockStructureLow Handler - Unlock ABAP Structure
  *
- * Uses AdtClient.unlockStructure from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getStructure().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockStructureLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructure operation.',
+    '[low-level] Unlock an ABAP structure after modification. Must use the same session_id and lock_handle from LockStructureLow operation.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -28,17 +30,17 @@ export const TOOL_DEFINITION = {
       },
       lock_handle: {
         type: 'string',
-        description: 'Lock handle from LockStructure operation.',
+        description: 'Lock handle from LockStructureLow operation.',
       },
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockStructure operation. Must be the same as used in LockStructure.',
+          'Session ID from LockStructureLow operation. Must be the same as used in LockStructureLow.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockStructure (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          'Session state from LockStructureLow (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },
@@ -61,107 +63,31 @@ interface UnlockStructureArgs {
   };
 }
 
-/**
- * Main handler for UnlockStructure MCP tool
- *
- * Uses AdtClient.unlockStructure - low-level single method call
- */
 export async function handleUnlockStructure(
   context: HandlerContext,
   args: UnlockStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { structure_name, lock_handle, session_id, session_state } =
-      args as UnlockStructureArgs;
+  const { structure_name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!structure_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('structure_name, lock_handle, and session_id are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const structureName = structure_name.toUpperCase();
-
-    logger?.info(
-      `Starting structure unlock: ${structureName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!structure_name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('structure_name, lock_handle, and session_id are required'),
     );
-
-    try {
-      // Unlock structure
-      const unlockState = await client
-        .getStructure()
-        .unlock({ structureName: structureName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for structure ${structureName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockStructure completed: ${structureName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            structure_name: structureName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Structure ${structureName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error unlocking structure ${structureName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to unlock structure: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Structure ${structureName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockStructure.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const structureName = structure_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockStructureLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getStructure()
+        .unlock({ structureName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

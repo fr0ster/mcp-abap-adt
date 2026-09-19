@@ -1,0 +1,36 @@
+{
+  "case": "read-metadata-package",
+  "step": 1,
+  "stepTag": "packages-zmcpshrpkg",
+  "capturedAt": "2026-09-11T08:42:16.626Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/packages/ZMCP_SHR_PKG?version=active",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/packages/ZMCP_SHR_PKG?version=active",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.packages.v2+xml, application/vnd.sap.adt.packages.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.packages.v2+xml; charset=utf-8",
+      "content-length": "966",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "20260910000000001application/vnd.sap.adt.packages.v2+xmlN9bKZ6V6ZQIbM8cI/PRUigX1m04=",
+      "last-modified": "Thu, 10 Sep 2026 00:00:00 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=80723",
+      "sap-server": "true",
+      "sap-perf-fesrec": "86877.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-metadata-package--01-packages-zmcpshrpkg.body.xml"
+  }
+}

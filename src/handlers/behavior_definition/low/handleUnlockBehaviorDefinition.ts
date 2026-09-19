@@ -1,19 +1,20 @@
 /**
  * UnlockBehaviorDefinition Handler - Unlock ABAP Behavior Definition
  *
- * Uses AdtClient.unlockBehaviorDefinition from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getBehaviorDefinition().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
-import type { IBehaviorDefinitionConfig } from '@mcp-abap-adt/interfaces';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockBehaviorDefinitionLow',
@@ -62,112 +63,31 @@ interface UnlockBehaviorDefinitionArgs {
   };
 }
 
-/**
- * Main handler for UnlockBehaviorDefinition MCP tool
- *
- * Uses AdtClient.unlockBehaviorDefinition - low-level single method call
- */
 export async function handleUnlockBehaviorDefinition(
   context: HandlerContext,
   args: UnlockBehaviorDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, lock_handle, session_id, session_state } =
-      args as UnlockBehaviorDefinitionArgs;
+  const { name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('name, lock_handle, and session_id are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const bdefName = name.toUpperCase();
-
-    logger?.info(
-      `Starting behavior definition unlock: ${bdefName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('name, lock_handle, and session_id are required'),
     );
-
-    try {
-      // Unlock behavior definition - using types from adt-clients
-      const unlockConfig: Pick<IBehaviorDefinitionConfig, 'name'> = {
-        name: bdefName,
-      };
-      const unlockState = await client
-        .getBehaviorDefinition()
-        .unlock(unlockConfig, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for behavior definition ${bdefName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockBehaviorDefinition completed: ${bdefName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            name: bdefName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `BehaviorDefinition ${bdefName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking behavior definition ${bdefName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock behavior definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `BehaviorDefinition ${bdefName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockBehaviorDefinition.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const bdefName = name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockBehaviorDefinitionLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorDefinition()
+        .unlock({ name: bdefName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

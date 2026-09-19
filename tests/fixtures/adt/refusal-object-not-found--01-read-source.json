@@ -1,0 +1,29 @@
+{
+  "case": "refusal-object-not-found",
+  "step": 1,
+  "stepTag": "read-source",
+  "capturedAt": "2026-09-11T05:40:30.413Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/oo/classes/ZMCP_BLD_NOPE_CLS99/source/main",
+    "headers": {
+      "Accept": "text/plain"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 404,
+    "statusText": "Not Found",
+    "headers": {
+      "content-type": "application/xml",
+      "content-length": "573",
+      "sap-authenticated": "true",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "70662.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-object-not-found--01-read-source.body.xml"
+  }
+}

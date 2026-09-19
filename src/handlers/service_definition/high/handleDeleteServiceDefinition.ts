@@ -1,23 +1,29 @@
 /**
- * DeleteServiceDefinition Handler - Delete ABAP ServiceDefinition via AdtClient
+ * DeleteServiceDefinition Handler - Delete ABAP ServiceDefinition via ADT
+ * deletion API
  *
- * Uses AdtClient.getServiceDefinition().delete() for high-level delete operation.
- * Includes deletion check before actual deletion.
+ * Uses AdtClient.getServiceDefinition().delete from
+ * @mcp-abap-adt/adt-clients 19. See `handleDeleteDomain.ts` for the shape and
+ * the masking this follows: a refusal answers 200, `analyseDeletion` reads
+ * it rather than the status, and no lock is taken because a held lock is
+ * what makes ADT refuse.
  */
 
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP service definition from the SAP system. Includes deletion check before actual deletion. Transport request optional for $TMP objects.',
+    'Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -30,6 +36,7 @@ export const TOOL_DEFINITION = {
         description:
           'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['service_definition_name'],
   },
@@ -38,103 +45,32 @@ export const TOOL_DEFINITION = {
 interface DeleteServiceDefinitionArgs {
   service_definition_name: string;
   transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteServiceDefinition MCP tool
- *
- * Uses AdtClient.getServiceDefinition().delete() - high-level delete operation with deletion check
- */
 export async function handleDeleteServiceDefinition(
   context: HandlerContext,
   args: DeleteServiceDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { service_definition_name, transport_request } =
-      args as DeleteServiceDefinitionArgs;
+  const { service_definition_name, transport_request } = args;
 
-    // Validation
-    if (!service_definition_name) {
-      return return_error(new Error('service_definition_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    const serviceDefinitionName = service_definition_name.toUpperCase();
-
-    logger?.info(
-      `Starting service definition deletion: ${serviceDefinitionName}`,
-    );
-
-    try {
-      // Delete service definition using AdtClient (includes deletion check)
-      const serviceDefinitionObject = client.getServiceDefinition();
-      const deleteResult = await serviceDefinitionObject.delete({
-        serviceDefinitionName,
-        transportRequest: transport_request,
-      });
-
-      if (!deleteResult || !deleteResult.deleteResult) {
-        throw new Error(
-          `Delete did not return a response for service definition ${serviceDefinitionName}`,
-        );
-      }
-
-      logger?.info(
-        `✅ DeleteServiceDefinition completed successfully: ${serviceDefinitionName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            service_definition_name: serviceDefinitionName,
-            transport_request: transport_request || null,
-            message: `ServiceDefinition ${serviceDefinitionName} deleted successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error deleting service definition ${serviceDefinitionName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to delete service definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `ServiceDefinition ${serviceDefinitionName} not found. It may already be deleted.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `ServiceDefinition ${serviceDefinitionName} is locked by another user. Cannot delete.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Bad request. Check if transport request is required and valid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!service_definition_name) {
+    return return_error(new Error('service_definition_name is required'));
   }
+
+  const serviceDefinitionName = service_definition_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteServiceDefinition', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+        .delete(
+          { serviceDefinitionName, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

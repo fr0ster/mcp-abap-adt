@@ -1,0 +1,36 @@
+{
+  "case": "read-metadata-ddl",
+  "step": 1,
+  "stepTag": "sources-zmcpshriroot",
+  "capturedAt": "2026-09-11T08:42:11.252Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/ddl/sources/ZMCP_SHR_I_ROOT",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/ddl/sources/ZMCP_SHR_I_ROOT",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.ddlSource.v2+xml, application/vnd.sap.adt.ddlSource+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.ddlSource+xml; charset=utf-8",
+      "content-length": "588",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "202609101518490013yUFotE4kCsVsL3+c+kcOAFHxhR8=",
+      "last-modified": "Thu, 10 Sep 2026 15:18:49 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=251961",
+      "sap-server": "true",
+      "sap-perf-fesrec": "258976.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-metadata-ddl--01-sources-zmcpshriroot.body.xml"
+  }
+}

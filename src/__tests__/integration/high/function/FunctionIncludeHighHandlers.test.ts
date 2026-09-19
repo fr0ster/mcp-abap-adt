@@ -189,8 +189,12 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
         }
 
         created = true;
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
+        // CreateFunctionInclude's terse projection is `terseWrite`: on success
+        // it answers the literal text "SUCCESS", not a JSON object — `success`
+        // no longer exists to read (CHANGELOG Unreleased: "Terse writes answer
+        // the literal string `SUCCESS` ... uniformly across every write tool";
+        // see projections.ts `terseWrite`).
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
         testLogger?.info(`✅ High Create: Created include ${includeName}`);
 
         await delay(getOperationDelay('create', testCase));
@@ -224,8 +228,10 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
             `UpdateFunctionInclude failed: ${updateResponse.content[0]?.text || 'Unknown error'}`,
           );
         }
-        const updateData = parseHandlerResponse(updateResponse);
-        expect(updateData.success).toBe(true);
+        // UpdateFunctionInclude's terse projection is `terseWrite` too — same
+        // literal "SUCCESS" text, no `success` field (projections.ts
+        // `terseWrite`).
+        expect(updateResponse.content[0]?.text).toBe('SUCCESS');
         testLogger?.info(`✅ High Update: Updated include ${includeName}`);
 
         await delay(getOperationDelay('update', testCase));

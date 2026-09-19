@@ -1,0 +1,31 @@
+{
+  "case": "update-source-success",
+  "step": 3,
+  "stepTag": "unlock",
+  "capturedAt": "2026-09-11T09:00:32.115Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/oo/classes/zmcp_bld_crt_cl2?_action=UNLOCK&lockHandle=03244DD5957796C90869B37C814C63E409671564",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/oo/classes/zmcp_bld_crt_cl2?_action=UNLOCK&lockHandle=03244DD5957796C90869B37C814C63E409671564",
+    "headers": {},
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-length": "0",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=6032",
+      "sap-server": "true",
+      "sap-perf-fesrec": "7773.000000",
+      "connection": "close"
+    },
+    "bodyFile": "update-source-success--03-unlock.body.txt"
+  }
+}

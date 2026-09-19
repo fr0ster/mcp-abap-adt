@@ -1,14 +1,16 @@
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { pair } from '../../../lib/strategies/sequence';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadDdl',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.',
   inputSchema: {
@@ -34,57 +36,31 @@ export async function handleReadDdl(
   args: { ddl_name: string; version?: 'active' | 'inactive' },
 ) {
   const { connection, logger } = context;
-  try {
-    const { ddl_name, version = 'active' } = args;
-    if (!ddl_name) return return_error(new Error('ddl_name is required'));
+  const { ddl_name, version = 'active' } = args;
+  if (!ddl_name) return return_error(new Error('ddl_name is required'));
 
-    const client = createAdtClient(connection, logger);
-    const ddlName = ddl_name.toUpperCase();
-    const obj = client.getDdl();
+  const ddlName = ddl_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getDdl(
+    resultsFor(ddlDocuments),
+  );
 
-    let source_code: string | null = null;
-    const readResult = await obj.read(
-      { ddlName: ddlName },
-      version as 'active' | 'inactive',
-    );
-    if (readResult?.readResult?.data) {
-      source_code =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : safeStringify(readResult.readResult.data);
-    }
-
-    let metadata: string | null = null;
-    const metaResult = await obj.readMetadata({ ddlName: ddlName });
-    if (metaResult?.metadataResult?.data) {
-      metadata =
-        typeof metaResult.metadataResult.data === 'string'
-          ? metaResult.metadataResult.data
-          : safeStringify(metaResult.metadataResult.data);
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          ddl_name: ddlName,
-          version,
-          source_code,
-          metadata,
-        },
-        null,
-        2,
+  // Two calls, so the order is ours — 19 removed the members that made several.
+  // Each carries its own `analyse`: a refused read and a refused metadata read
+  // are different failures, and whichever comes back is the one the caller
+  // sees, built by the strategy rather than summarised here.
+  return answer(
+    { tool: 'ReadDdl', detail: 'terse' },
+    () =>
+      pair(
+        () => obj.read({ ddlName }, version, { analyse: analyseException }),
+        () => obj.readMetadata({ ddlName }, { analyse: analyseException }),
       ),
-    } as AxiosResponse);
-  } catch (error: any) {
-    return return_error(error);
-  }
-}
-
-function safeStringify(data: unknown): string {
-  try {
-    return JSON.stringify(data);
-  } catch {
-    return String(data);
-  }
+    ([source, metadata]: [AdtReading<string>, AdtReading<string>]) => ({
+      success: true,
+      ddl_name: ddlName,
+      version,
+      source_code: source.raw,
+      metadata: metadata.raw,
+    }),
+  );
 }

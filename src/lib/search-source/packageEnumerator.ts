@@ -1,15 +1,24 @@
-import type { IPackageContentItem } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
+import {
+  assembleList,
+  type PackageItem,
+  walkPackage,
+} from '../strategies/packageWalk';
 
 export type ScanObjectType = 'PROG' | 'FUGR' | 'CLAS';
 
 /**
- * The contents item as the ADT client hands it over. Kept as a local alias so
- * call sites read in this module's vocabulary; the shape itself is owned by
- * `@mcp-abap-adt/interfaces` (adt-clients 9.0.0 renamed `adtType` to `type`).
+ * The contents item as the walk hands it over.
+ *
+ * `IPackageContentItem` — the type this alias used to point at — no longer
+ * exists in `@mcp-abap-adt/interfaces` at all (`getPackageContentsList`'s own
+ * type went with the member). `PackageItem` from `packageWalk.ts` carries the
+ * same fields this module reads (`isPackage`, `type`, `name`, `packageName`)
+ * — the flat-list assembly `handleGetPackageContents.ts` already produces
+ * from the same walk.
  */
-export type PackageContentItem = IPackageContentItem;
+export type PackageContentItem = PackageItem;
 
 export interface EnumeratedObject {
   devclass: string;
@@ -86,13 +95,22 @@ export async function enumerateScanTargets(
   return out;
 }
 
+/**
+ * `getPackageContentsList`'s replacement: the same walk
+ * `handleGetPackageContents.ts` already assembles into a flat list, per the
+ * guide's "Walks are yours" table and mcp-abap-adt-clients#141 (`walkPackage`
+ * itself is filed against that issue — see its own doc comment).
+ */
 export function createPackageContentsFetcher(
   ctx: HandlerContext,
 ): PackageContentsFetcher {
   const client = createAdtClient(ctx.connection, ctx.logger);
   const utils = client.getUtils();
-  return (packageName, options) =>
-    utils.getPackageContentsList(packageName, {
-      includeSubpackages: options.includeSubpackages,
-    });
+  return async (packageName, options) =>
+    assembleList(
+      packageName,
+      await walkPackage(utils as never, packageName, {
+        includeSubpackages: options.includeSubpackages,
+      }),
+    );
 }

@@ -1,19 +1,25 @@
 /**
- * ValidateTable Handler - Validate ABAP table name via ADT API
+ * ValidateTableLow Handler - Validate ABAP Table Name
  *
- * Uses validateTableName from @mcp-abap-adt/adt-clients/core/table for table-specific validation.
+ * Uses AdtClient.getTable().validate from @mcp-abap-adt/adt-clients 19.
+ *
+ * `packageName` reaches `config` here, but the shipped
+ * `validateTableName(connection, name, config.description)` never reads a
+ * third argument — the wire request carries no package. Kept in `config`
+ * anyway because the field compiles and the tool schema still requires it
+ * (removing an existing parameter is not this migration's job). Verified
+ * against `AdtTable.js`, not the declaration file.
  */
 
-import type { ITableConfig } from '@mcp-abap-adt/interfaces';
+import { tableDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateTableLow',
@@ -30,7 +36,7 @@ export const TOOL_DEFINITION = {
       package_name: {
         type: 'string',
         description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.',
       },
       description: {
         type: 'string',
@@ -51,13 +57,13 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['table_name', 'package_name', 'description'],
   },
 } as const;
 
-interface ValidateTableArgs
-  extends Pick<ITableConfig, 'tableName' | 'packageName' | 'description'> {
+interface ValidateTableArgs {
   table_name: string;
   package_name: string;
   description: string;
@@ -67,107 +73,43 @@ interface ValidateTableArgs
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateTable MCP tool
- */
 export async function handleValidateTable(
   context: HandlerContext,
   args: ValidateTableArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { table_name, package_name, description, session_id, session_state } =
-      args as ValidateTableArgs;
+  const { table_name, package_name, description, session_id, session_state } =
+    args;
 
-    if (!table_name || !package_name || !description) {
-      return return_error(
-        new Error('table_name, package_name, and description are required'),
-      );
-    }
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const tableName = table_name.toUpperCase();
-
-    logger?.info(`Starting table validation: ${tableName}`);
-
-    try {
-      const client = createAdtClient(connection, logger);
-
-      const validationState = await client.getTable().validate({
-        tableName: tableName,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(`✅ ValidateTable completed: ${tableName}`);
-      logger?.info(
-        `   Valid: ${result.valid}, Message: ${result.message || 'N/A'}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            table_name: tableName,
-            description: description || null,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `Table name ${tableName} is valid and available`
-              : `Table name ${tableName} validation failed: ${result.message || 'Unknown error'}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error validating table ${tableName}:`, error);
-
-      let errorMessage = `Failed to validate table: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Table ${tableName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!table_name || !package_name || !description) {
+    return return_error(
+      new Error('table_name, package_name, and description are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const tableName = table_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateTableLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getTable(resultsFor(tableDocuments))
+        .validate(
+          {
+            tableName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

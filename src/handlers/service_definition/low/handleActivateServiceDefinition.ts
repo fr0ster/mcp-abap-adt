@@ -1,19 +1,18 @@
 /**
  * ActivateServiceDefinition Handler - Activate ABAP Service Definition
  *
- * Uses AdtClient.getServiceDefinition().activate() from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getServiceDefinition().activate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseActivationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseActivation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateServiceDefinitionLow',
@@ -42,6 +41,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name'],
   },
@@ -55,125 +55,33 @@ interface ActivateServiceDefinitionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ActivateServiceDefinition MCP tool
- *
- * Uses AdtClient.getServiceDefinition().activate() - low-level single method call
- */
 export async function handleActivateServiceDefinition(
   context: HandlerContext,
   args: ActivateServiceDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, session_id, session_state } =
-      args as ActivateServiceDefinitionArgs;
+  const { name, session_id, session_state } = args;
 
-    // Validation
-    if (!name) {
-      return return_error(new Error('name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const serviceDefinitionName = name.toUpperCase();
-
-    logger?.info(
-      `Starting service definition activation: ${serviceDefinitionName}`,
-    );
-
-    try {
-      // Activate service definition
-      const activateState = await client
-        .getServiceDefinition()
-        .activate({ serviceDefinitionName });
-      const response = activateState.activateResult;
-
-      if (!response) {
-        throw new Error(
-          `Activation did not return a response for service definition ${serviceDefinitionName}`,
-        );
-      }
-
-      // Parse activation response
-      const activationResult = parseActivationResponse(response.data);
-      const success = activationResult.activated && activationResult.checked;
-
-      logger?.info(
-        `ActivateServiceDefinition completed: ${serviceDefinitionName}`,
-      );
-      logger?.debug(
-        `Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success,
-            name: serviceDefinitionName,
-            activation: {
-              activated: activationResult.activated,
-              checked: activationResult.checked,
-              generated: activationResult.generated,
-            },
-            messages: activationResult.messages,
-            warnings: activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
-            ),
-            errors: activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            ),
-            session_id: session_id || null,
-            session_state: null,
-            message: success
-              ? `Service definition ${serviceDefinitionName} activated successfully`
-              : `Service definition ${serviceDefinitionName} activation completed with ${activationResult.messages.length} message(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error activating service definition ${serviceDefinitionName}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to activate service definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Service definition ${serviceDefinitionName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!name) {
+    return return_error(new Error('name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const serviceDefinitionName = name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ActivateServiceDefinitionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getServiceDefinition(resultsFor(serviceDefinitionDocuments))
+        .activate({ serviceDefinitionName }, { analyse: analyseActivation }),
+    project(detail, terseActivation),
+  );
 }

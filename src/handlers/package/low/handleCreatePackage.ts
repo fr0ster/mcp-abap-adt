@@ -1,26 +1,34 @@
 /**
  * CreatePackage Handler - Create ABAP Package
  *
- * Uses AdtClient.createPackage from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getPackage().create from @mcp-abap-adt/adt-clients 19.
+ *
+ * A create is one request, and its own answer: `resultSets.ts` maps the
+ * `created` slot to `verbatim`, so `project(detail, terseWrite)` reads the
+ * status for `terse` while `full`/`raw` answer the document ADT sent instead
+ * of discarding it. No corpus fixture for `create-package` exists yet — the
+ * corpus README names `/oo/classes create`, `/ddic/domains create` and
+ * `/ddic/dataelements create` as the only DDIC-create states captured so
+ * far — so this is proven only against the generic `terseWrite`/`verbatim`
+ * shape every sibling DDIC create shares, not against a package-specific
+ * document.
+ *
+ * Unlike every other family in this cluster, `AdtPackage.create()` has no
+ * `packageName` guard: for a package the name being created IS the object
+ * this create is about, and what would strand an un-deletable object
+ * elsewhere (`superPackage`) is genuinely optional here — a top-level
+ * package has none by design.
  */
 
-import type { IPackageConfig } from '@mcp-abap-adt/interfaces';
+import { packageDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
-
-// Type matching AdtClient.createPackage signature
-type CreatePackageConfig = Partial<IPackageConfig> &
-  Pick<
-    IPackageConfig,
-    'packageName' | 'superPackage' | 'description' | 'softwareComponent'
-  >;
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreatePackageLow',
@@ -88,6 +96,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['package_name', 'super_package', 'description'],
   },
@@ -109,155 +118,61 @@ interface CreatePackageArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CreatePackage MCP tool
- *
- * Uses AdtClient.createPackage - low-level single method call
- */
 export async function handleCreatePackage(
   context: HandlerContext,
   args: CreatePackageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      package_name,
-      super_package,
-      description,
-      package_type,
-      software_component,
-      transport_layer,
-      transport_request,
-      record_changes,
-      application_component,
-      session_id,
-      session_state,
-    } = args as CreatePackageArgs;
+  const {
+    package_name,
+    super_package,
+    description,
+    package_type,
+    software_component,
+    transport_layer,
+    transport_request,
+    record_changes,
+    application_component,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!package_name || !super_package || !description) {
-      return return_error(
-        new Error('package_name, super_package, and description are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const packageName = package_name.toUpperCase();
-    const superPackage = super_package.toUpperCase();
-
-    logger?.info(
-      `Starting package creation: ${packageName} in ${superPackage}`,
+  if (!package_name || !super_package || !description) {
+    return return_error(
+      new Error('package_name, super_package, and description are required'),
     );
-
-    try {
-      // Create package - build config object with proper typing
-      const createConfig: CreatePackageConfig = {
-        packageName,
-        superPackage,
-        description,
-        packageType: package_type,
-        softwareComponent: software_component,
-      };
-      // Only add optional params if explicitly provided
-      if (transport_layer) {
-        createConfig.transportLayer = transport_layer;
-      }
-      if (transport_request) {
-        createConfig.transportRequest = transport_request;
-      }
-      if (record_changes !== undefined) {
-        createConfig.recordChanges = record_changes;
-      }
-      if (application_component) {
-        createConfig.applicationComponent = application_component;
-      }
-      await client.getPackage().create(createConfig);
-
-      logger?.info(`✅ CreatePackage completed: ${packageName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            package_name: packageName,
-            super_package: superPackage,
-            description,
-            package_type: package_type || 'development',
-            software_component: software_component || null,
-            transport_layer: transport_layer || null,
-            transport_request: transport_request || null,
-            application_component: application_component || null,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Package ${packageName} created successfully. Use LockPackage and UpdatePackage to modify, then UnlockPackage.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`CreatePackage ${packageName}`, error);
-
-      // Check for authentication errors (expired tokens)
-      if (
-        error.message?.includes('Refresh token has expired') ||
-        error.message?.includes('JWT token has expired') ||
-        error.message?.includes('Please re-authenticate')
-      ) {
-        return return_error(
-          new Error(
-            `Authentication failed: ${error.message}. Please re-authenticate using the authentication tool or update your credentials.`,
-          ),
-        );
-      }
-
-      // Check for 401/403 authentication errors
-      if (error.response?.status === 401 || error.response?.status === 403) {
-        const authError =
-          error.response?.status === 401
-            ? 'Unauthorized: Authentication failed. Please check your credentials and re-authenticate.'
-            : 'Forbidden: Access denied. Please check your permissions.';
-        return return_error(new Error(authError));
-      }
-
-      // Parse error message
-      let errorMessage = `Failed to create package: ${error.message || String(error)}`;
-
-      if (error.response?.status === 409) {
-        errorMessage = `Package ${packageName} already exists.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const packageName = package_name.toUpperCase();
+  const superPackage = super_package.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CreatePackageLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getPackage(resultsFor(packageDocuments))
+        .create(
+          {
+            packageName,
+            superPackage,
+            description,
+            packageType: package_type,
+            softwareComponent: software_component,
+            transportLayer: transport_layer,
+            transportRequest: transport_request,
+            recordChanges: record_changes,
+            applicationComponent: application_component,
+          },
+          { analyse: analyseException },
+        ),
+    project(detail, terseWrite),
+  );
 }

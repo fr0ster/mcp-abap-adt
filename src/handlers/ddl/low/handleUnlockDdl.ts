@@ -1,22 +1,24 @@
 /**
  * UnlockDdlLow Handler - Unlock ABAP DDL Source
  *
- * Uses AdtClient.getDdl().unlock from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockDdlLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Unlock an ABAP DDL source after modification. Must use the same session_id and lock_handle from LockDdlLow operation.',
   inputSchema: {
@@ -61,109 +63,31 @@ interface UnlockDdlArgs {
   };
 }
 
-/**
- * Main handler for UnlockDdl MCP tool
- *
- * Uses AdtClient.getDdl().unlock - low-level single method call
- */
 export async function handleUnlockDdl(
   context: HandlerContext,
   args: UnlockDdlArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { ddl_name, lock_handle, session_id, session_state } =
-      args as UnlockDdlArgs;
+  const { ddl_name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!ddl_name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('ddl_name, lock_handle, and session_id are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlName = ddl_name.toUpperCase();
-
-    logger?.info(
-      `Starting DDL source unlock: ${ddlName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!ddl_name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('ddl_name, lock_handle, and session_id are required'),
     );
-
-    try {
-      // Unlock DDL source
-      const unlockState = await client
-        .getDdl()
-        .unlock({ ddlName: ddlName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for DDL source ${ddlName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockDdlLow completed: ${ddlName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            ddl_name: ddlName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `DDL source ${ddlName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DDL source ${ddlName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockDdlLow.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlName = ddl_name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockDdlLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl()
+        .unlock({ ddlName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

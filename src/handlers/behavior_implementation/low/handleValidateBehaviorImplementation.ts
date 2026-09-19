@@ -1,20 +1,20 @@
 /**
  * ValidateBehaviorImplementation Handler - Validate ABAP Behavior Implementation Class Name
  *
- * Uses AdtClient.validateBehaviorImplementation from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getBehaviorImplementation().validate from
+ * @mcp-abap-adt/adt-clients 19. Declared over the class document set — see
+ * `handleCreateBehaviorImplementation`'s doc comment.
  */
 
-import type { IBehaviorImplementationConfig } from '@mcp-abap-adt/interfaces';
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateBehaviorImplementationLow',
@@ -58,6 +58,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: [
       'class_name',
@@ -79,133 +80,53 @@ interface ValidateBehaviorImplementationArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateBehaviorImplementation MCP tool
- *
- * Uses AdtClient.validateBehaviorImplementation - low-level single method call
- */
 export async function handleValidateBehaviorImplementation(
   context: HandlerContext,
   args: ValidateBehaviorImplementationArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      class_name,
-      behavior_definition,
-      package_name,
-      description,
-      session_id,
-      session_state,
-    } = args as ValidateBehaviorImplementationArgs;
+  const {
+    class_name,
+    behavior_definition,
+    package_name,
+    description,
+    session_id,
+    session_state,
+  } = args;
 
-    // Validation
-    if (!class_name || !behavior_definition || !package_name || !description) {
-      return return_error(
-        new Error(
-          'class_name, behavior_definition, package_name, and description are required',
-        ),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const className = class_name.toUpperCase();
-    const behaviorDefinition = behavior_definition.toUpperCase();
-
-    logger?.info(
-      `Starting behavior implementation validation: ${className} for ${behaviorDefinition}`,
+  if (!class_name || !behavior_definition || !package_name || !description) {
+    return return_error(
+      new Error(
+        'class_name, behavior_definition, package_name, and description are required',
+      ),
     );
-
-    try {
-      // Validate behavior implementation
-      const validateConfig: Partial<IBehaviorImplementationConfig> &
-        Pick<
-          IBehaviorImplementationConfig,
-          'className' | 'packageName' | 'behaviorDefinition'
-        > = {
-        className: className,
-        behaviorDefinition: behaviorDefinition,
-        packageName: package_name.toUpperCase(),
-        description: description,
-      };
-      const validationState = await client
-        .getBehaviorImplementation()
-        .validate(validateConfig);
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(`✅ ValidateBehaviorImplementation completed: ${className}`);
-      logger?.info(`   Valid: ${result.valid}, Message: ${result.message}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            class_name: className,
-            behavior_definition: behaviorDefinition,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `Behavior Implementation ${className} is valid and available`
-              : `Behavior Implementation ${className} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error validating behavior implementation ${className}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to validate behavior implementation: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Behavior Implementation ${className} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const className = class_name.toUpperCase();
+  const behaviorDefinition = behavior_definition.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateBehaviorImplementationLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getBehaviorImplementation(resultsFor(classDocuments))
+        .validate(
+          {
+            className,
+            behaviorDefinition,
+            packageName: package_name.toUpperCase(),
+            description,
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

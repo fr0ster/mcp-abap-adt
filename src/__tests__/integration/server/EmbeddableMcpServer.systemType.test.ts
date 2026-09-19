@@ -12,7 +12,7 @@
  * Run: npm test -- --testPathPattern=integration/server
  */
 
-import { EmbeddableMcpServer } from '../../../server/EmbeddableMcpServer';
+import { EmbeddableMcpServer } from '../../../embeddable/EmbeddableMcpServer';
 import { getTimeout } from '../helpers/configHelpers';
 import { createTestConnectionAndSession } from '../helpers/sessionHelpers';
 

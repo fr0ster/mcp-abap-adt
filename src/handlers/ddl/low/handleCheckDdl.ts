@@ -1,23 +1,28 @@
 /**
  * CheckDdlLow Handler - Syntax check for ABAP DDL Source
  *
- * Uses AdtClient.getDdl().check from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getDdl().check from @mcp-abap-adt/adt-clients 19.
+ *
+ * `ddl_source`, unlike most families in this migration, is not a dead
+ * parameter: the shipped `AdtDdl.check()` passes `config.ddlSource` straight
+ * into `checkDdl(connection, name, version, config.ddlSource)`, so a caller
+ * validating unsaved code still reaches the server with it. Verified against
+ * `AdtDdl.js`, not the declaration file.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CheckDdlLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP DDL source. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. If ddl_source is provided, validates new/unsaved code (will be base64 encoded in request).',
   inputSchema: {
@@ -53,6 +58,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['ddl_name'],
   },
@@ -68,130 +74,37 @@ interface CheckDdlArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckDdl MCP tool
- *
- * Uses AdtClient.getDdl().check - low-level single method call
- */
 export async function handleCheckDdl(
   context: HandlerContext,
   args: CheckDdlArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const {
-      ddl_name,
-      ddl_source,
-      version = 'inactive',
-      session_id,
-      session_state,
-    } = args as CheckDdlArgs;
+  const { ddl_name, ddl_source, version, session_id, session_state } = args;
 
-    // Validation
-    if (!ddl_name) {
-      return return_error(new Error('ddl_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlName = ddl_name.toUpperCase();
-
-    const validVersions = ['active', 'inactive'];
-    const checkVersion =
-      version && validVersions.includes(version.toLowerCase())
-        ? (version.toLowerCase() as 'active' | 'inactive')
-        : 'inactive';
-
-    logger?.info(
-      `Starting DDL source check: ${ddlName} (version: ${checkVersion}) ${ddl_source ? '(with new code)' : '(saved version)'}`,
-    );
-
-    try {
-      // Check DDL source with optional source code (for validating new/unsaved code)
-      // If ddl_source is provided, it will be base64 encoded in the request body
-      const checkState = await client
-        .getDdl()
-        .check({ ddlName: ddlName, ddlSource: ddl_source }, checkVersion);
-      const response = checkState.checkResult;
-
-      if (!response) {
-        throw new Error(
-          `Check did not return a response for DDL source ${ddlName}`,
-        );
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckDdlLow completed: ${ddlName}`);
-      logger?.info(`   Status: ${checkResult.status}`);
-      logger?.info(
-        `   Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            ddl_name: ddlName,
-            version: checkVersion,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `DDL source ${ddlName} has no syntax errors`
-              : `DDL source ${ddlName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to check DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DDL source ${ddlName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!ddl_name) {
+    return return_error(new Error('ddl_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlName = ddl_name.toUpperCase();
+  const checkVersion =
+    version && version.toLowerCase() === 'active' ? 'active' : 'inactive';
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckDdlLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl(resultsFor(ddlDocuments))
+        .check({ ddlName, ddlSource: ddl_source }, checkVersion, {
+          analyse: analyseCheck,
+        }),
+    project(detail, terseCheck),
+  );
 }

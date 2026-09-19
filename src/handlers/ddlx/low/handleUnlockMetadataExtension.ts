@@ -1,44 +1,46 @@
 /**
- * UnlockMetadataExtension Handler - Unlock ABAP MetadataExtension
+ * UnlockMetadataExtensionLow Handler - Unlock ABAP Metadata Extension
  *
- * Uses AdtClient.unlockMetadataExtension from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getMetadataExtension().unlock from @mcp-abap-adt/adt-clients 19.
+ *
+ * `unlock()` accepts no options either — no `analyse`, and its success value
+ * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * through the result-set strategies at all), so the synthetic 200 below is a
+ * stand-in for "the call answered ok" rather than a status read off the wire —
+ * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { terseWrite } from '../../../lib/strategies/projections';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UnlockMetadataExtensionLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtension operation.',
+    '[low-level] Unlock an ABAP metadata extension after modification. Must use the same session_id and lock_handle from LockMetadataExtensionLow operation.',
   inputSchema: {
     type: 'object',
     properties: {
       name: {
         type: 'string',
-        description: 'MetadataExtension name (e.g., ZI_MY_DDLX).',
+        description: 'Metadata Extension name (e.g., ZI_MY_DDLX).',
       },
       lock_handle: {
         type: 'string',
-        description: 'Lock handle from LockMetadataExtension operation.',
+        description: 'Lock handle from LockMetadataExtensionLow operation.',
       },
       session_id: {
         type: 'string',
         description:
-          'Session ID from LockMetadataExtension operation. Must be the same as used in LockMetadataExtension.',
+          'Session ID from LockMetadataExtensionLow operation. Must be the same as used in LockMetadataExtensionLow.',
       },
       session_state: {
         type: 'object',
         description:
-          'Session state from LockMetadataExtension (cookies, csrf_token, cookie_store). Required if session_id is provided.',
+          'Session state from LockMetadataExtensionLow (cookies, csrf_token, cookie_store). Required if session_id is provided.',
         properties: {
           cookies: { type: 'string' },
           csrf_token: { type: 'string' },
@@ -61,107 +63,31 @@ interface UnlockMetadataExtensionArgs {
   };
 }
 
-/**
- * Main handler for UnlockMetadataExtension MCP tool
- *
- * Uses AdtClient.unlockMetadataExtension - low-level single method call
- */
 export async function handleUnlockMetadataExtension(
   context: HandlerContext,
   args: UnlockMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, lock_handle, session_id, session_state } =
-      args as UnlockMetadataExtensionArgs;
+  const { name, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!name || !lock_handle || !session_id) {
-      return return_error(
-        new Error('name, lock_handle, and session_id are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const ddlxName = name.toUpperCase();
-
-    logger?.info(
-      `Starting metadata extension unlock: ${ddlxName} (session: ${session_id.substring(0, 8)}...)`,
+  if (!name || !lock_handle || !session_id) {
+    return return_error(
+      new Error('name, lock_handle, and session_id are required'),
     );
-
-    try {
-      // Unlock metadata extension
-      const unlockState = await client
-        .getMetadataExtension()
-        .unlock({ name: ddlxName }, lock_handle);
-      const unlockResult = unlockState.unlockResult;
-
-      if (!unlockResult) {
-        throw new Error(
-          `Unlock did not return a response for metadata extension ${ddlxName}`,
-        );
-      }
-
-      // Get updated session state after unlock
-
-      logger?.info(`✅ UnlockMetadataExtension completed: ${ddlxName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            name: ddlxName,
-            session_id: session_id,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `MetadataExtension ${ddlxName} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking metadata extension ${ddlxName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to unlock metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `MetadataExtension ${ddlxName} not found.`;
-      } else if (error.response?.status === 400) {
-        errorMessage = `Invalid lock handle or session. Make sure you're using the same session_id and lock_handle from LockMetadataExtension.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlxName = name.toUpperCase();
+
+  return answer(
+    { tool: 'UnlockMetadataExtensionLow', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension()
+        .unlock({ name: ddlxName }, lock_handle),
+    (value) => terseWrite(value, 200),
+  );
 }

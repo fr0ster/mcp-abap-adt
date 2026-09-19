@@ -1,17 +1,11 @@
-/**
- * GetServiceDefinition Handler - Read ABAP ServiceDefinition via AdtClient
- *
- * Uses AdtClient.getServiceDefinition().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
+import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetServiceDefinition',
@@ -42,85 +36,33 @@ interface GetServiceDefinitionArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetServiceDefinition MCP tool
- *
- * Uses AdtClient.getServiceDefinition().read() - high-level read operation
- */
 export async function handleGetServiceDefinition(
   context: HandlerContext,
   args: GetServiceDefinitionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { service_definition_name, version = 'active' } =
-      args as GetServiceDefinitionArgs;
+  const { service_definition_name, version = 'active' } = args;
+  if (!service_definition_name)
+    return return_error(new Error('service_definition_name is required'));
 
-    // Validation
-    if (!service_definition_name) {
-      return return_error(new Error('service_definition_name is required'));
-    }
+  const serviceDefinitionName = service_definition_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getServiceDefinition(
+    resultsFor(serviceDefinitionDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const serviceDefinitionName = service_definition_name.toUpperCase();
-
-    logger?.info(
-      `Reading service definition ${serviceDefinitionName}, version: ${version}`,
-    );
-
-    try {
-      // Read service definition using AdtClient
-      const serviceDefinitionObject = client.getServiceDefinition();
-      const readResult = await serviceDefinitionObject.read(
-        { serviceDefinitionName },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`ServiceDefinition ${serviceDefinitionName} not found`);
-      }
-
-      // Extract data from read result
-      const serviceDefinitionData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(
-        `✅ GetServiceDefinition completed successfully: ${serviceDefinitionName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            service_definition_name: serviceDefinitionName,
-            version,
-            service_definition_data: serviceDefinitionData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading service definition ${serviceDefinitionName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read service definition: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `ServiceDefinition ${serviceDefinitionName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `ServiceDefinition ${serviceDefinitionName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  // GetServiceDefinition has only ever answered the source, not the
+  // metadata — one call, unlike ReadServiceDefinition's pair.
+  return answer(
+    { tool: 'GetServiceDefinition', detail: 'terse' },
+    () =>
+      obj.read({ serviceDefinitionName }, version, {
+        analyse: analyseException,
+      }),
+    (source: AdtReading<string>) => ({
+      success: true,
+      service_definition_name: serviceDefinitionName,
+      version,
+      service_definition_data: source.raw,
+    }),
+  );
 }

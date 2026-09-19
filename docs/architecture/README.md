@@ -15,7 +15,7 @@ The default `mcp-abap-adt` command runs the v2 server with full transport suppor
 ### Handler Exporter (v1)
 For embedding into existing servers (e.g., CAP/CDS applications):
 ```typescript
-import { HandlerExporter } from '@mcp-abap-adt/core/handlers';
+import { HandlerExporter } from '@mcp-abap-adt/lib/handlers';
 
 const exporter = new HandlerExporter({
   includeReadOnly: true,

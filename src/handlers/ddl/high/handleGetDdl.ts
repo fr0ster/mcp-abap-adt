@@ -1,21 +1,15 @@
-/**
- * GetDdl Handler - Read ABAP DDL Source via AdtClient
- *
- * Uses AdtClient.getDdl().read() for high-level read operation.
- * Supports both active and inactive versions.
- */
-
+import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetDdl',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP DDL source definition. Supports reading active or inactive version.',
   inputSchema: {
@@ -42,77 +36,26 @@ interface GetDdlArgs {
   version?: 'active' | 'inactive';
 }
 
-/**
- * Main handler for GetDdl MCP tool
- *
- * Uses AdtClient.getDdl().read() - high-level read operation
- */
 export async function handleGetDdl(context: HandlerContext, args: GetDdlArgs) {
   const { connection, logger } = context;
-  try {
-    const { ddl_name, version = 'active' } = args as GetDdlArgs;
+  const { ddl_name, version = 'active' } = args;
+  if (!ddl_name) return return_error(new Error('ddl_name is required'));
 
-    // Validation
-    if (!ddl_name) {
-      return return_error(new Error('ddl_name is required'));
-    }
+  const ddlName = ddl_name.toUpperCase();
+  const obj = createAdtClient(connection, logger).getDdl(
+    resultsFor(ddlDocuments),
+  );
 
-    const client = createAdtClient(connection, logger);
-    const ddlName = ddl_name.toUpperCase();
-
-    logger?.info(`Reading DDL source ${ddlName}, version: ${version}`);
-
-    try {
-      // Read DDL source using AdtClient
-      const ddlObject = client.getDdl();
-      const readResult = await ddlObject.read(
-        { ddlName: ddlName },
-        version as 'active' | 'inactive',
-      );
-
-      if (!readResult || !readResult.readResult) {
-        throw new Error(`DDL source ${ddlName} not found`);
-      }
-
-      // Extract data from read result
-      const ddlData =
-        typeof readResult.readResult.data === 'string'
-          ? readResult.readResult.data
-          : JSON.stringify(readResult.readResult.data);
-
-      logger?.info(`✅ GetDdl completed successfully: ${ddlName}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            ddl_name: ddlName,
-            version,
-            ddl_data: ddlData,
-            status: readResult.readResult.status,
-            status_text: readResult.readResult.statusText,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading DDL source ${ddlName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read DDL source: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `DDL source ${ddlName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `DDL source ${ddlName} is locked by another user.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  // GetDdl has only ever answered the source, not the metadata — one call,
+  // unlike ReadDdl's pair.
+  return answer(
+    { tool: 'GetDdl', detail: 'terse' },
+    () => obj.read({ ddlName }, version, { analyse: analyseException }),
+    (source: AdtReading<string>) => ({
+      success: true,
+      ddl_name: ddlName,
+      version,
+      ddl_data: source.raw,
+    }),
+  );
 }

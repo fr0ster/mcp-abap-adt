@@ -1,0 +1,31 @@
+{
+  "case": "read-function-module-source-text",
+  "step": 1,
+  "stepTag": "read-source",
+  "capturedAt": "2026-09-11T05:40:53.420Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP/fmodules/Z_MCP_SHR_FM/source/main",
+    "headers": {
+      "Accept": "text/plain"
+    },
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "text/plain; charset=utf-8",
+      "content-length": "174",
+      "sap-authenticated": "true",
+      "etag": "202609101525510011",
+      "last-modified": "Thu, 10 Sep 2026 15:25:51 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "sap-server": "true",
+      "sap-perf-fesrec": "620679.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-function-module-source-text--01-read-source.body.txt"
+  }
+}

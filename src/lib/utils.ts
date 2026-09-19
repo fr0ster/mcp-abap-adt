@@ -2,13 +2,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import * as crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import {
-  createAbapConnection,
   getTimeout,
   getTimeoutConfig,
   type SapConfig,
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -16,8 +15,10 @@ import {
   notifyConnectionResetListeners,
   registerConnectionResetHook,
 } from './connectionEvents';
+import { createAbapConnection } from './connectionFactory.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
+import { getSystemContext } from './systemContext';
 
 // Initialize connection variables before exports to avoid circular dependency issues
 // Variables are initialized immediately to avoid TDZ (Temporal Dead Zone) issues
@@ -80,7 +81,7 @@ export function getAuthBroker(destination: string): any | undefined {
   return authBrokerRegistry.get(destination);
 }
 
-// Compatibility re-export: `@mcp-abap-adt/core/utils` exposed the SDK's McpError /
+// Compatibility re-export: `@mcp-abap-adt/lib/utils` exposes the SDK's McpError /
 // ErrorCode before #155. Internal code no longer throws McpError (enforced by
 // noMcpErrorInSrc.test.ts, which permits the identifier only in this one export
 // declaration and forbids every import or use elsewhere in src), but the public
@@ -98,7 +99,7 @@ export function encodeSapObjectName(objectName: string): string {
   return encodeURIComponent(objectName);
 }
 
-export function return_response(response: IAdtResponse | AxiosResponse) {
+export function return_response(response: AxiosResponse) {
   return {
     isError: false,
     content: [
@@ -959,14 +960,15 @@ export async function makeAdtRequest(
 
 /**
  * Get system information from SAP ADT
- * Returns cached system context resolved during connection init
+ * Returns the system context resolved during connection init, as the current
+ * request sees it (see getEffectiveSystemContext)
  */
 export async function getSystemInformation(): Promise<{
   systemID?: string;
   userName?: string;
 } | null> {
-  const { getSystemContext } = await import('./systemContext.js');
-  const ctx = getSystemContext();
+  const { getEffectiveSystemContext } = await import('./systemContext.js');
+  const ctx = getEffectiveSystemContext();
   if (!ctx.masterSystem && !ctx.responsible) return null;
   return { systemID: ctx.masterSystem, userName: ctx.responsible };
 }
@@ -1011,12 +1013,10 @@ export function isCloudConnection(config?: SapConfig): boolean {
 /**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
- * @param response - IAdtResponse or AxiosResponse from validation endpoint
+ * @param response - AxiosResponse from validation endpoint
  * @returns Parsed validation result with valid, severity, message, exists fields
  */
-export function parseValidationResponse(
-  response: IAdtResponse | AxiosResponse,
-): {
+export function parseValidationResponse(response: AxiosResponse): {
   valid: boolean;
   severity?: string;
   message?: string;

@@ -9,7 +9,8 @@
 
 **Why teams use it:**
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
-- Works with **On-Premise (ECC/S/4HANA)**, **ABAP Cloud (BTP)**, and **Legacy** systems (BASIS < 7.50)
+- Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
+- Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
 - **JWT/XSUAA**, **service key** (destination-based), and **RFC** authorization
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Rich tool surface for ABAP objects, metadata, transports, and search
@@ -73,7 +74,17 @@ For full details (paths, `.env`, direct headers), see [Authentication & Destinat
 
 ## Architecture
 
-The project provides two main usage patterns:
+The project ships as **two packages**, because the two usage patterns want
+different licences. Embedding the tools in a network service should not drag in
+the obligations of a server that service never runs.
+
+| Package | Licence | What it is |
+|---|---|---|
+| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib) | Apache-2.0 | The ADT tool handlers and the embeddable MCP server. No transport: the host supplies one. |
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone server — stdio, SSE and streamable HTTP, the launcher and the `mcp-abap-adt` CLI. Depends on the library. |
+
+Install `@mcp-abap-adt/core` to run a server. Install `@mcp-abap-adt/lib` to
+embed the tools in your own application.
 
 ### 1. Standalone MCP Server (Default)
 Run as a standalone MCP server with stdio, HTTP, or SSE transport:
@@ -84,12 +95,16 @@ mcp-abap-adt --transport=sse           # SSE mode
 ```
 
 ### 2. Embeddable Server (For Integration)
-Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express):
+Embed MCP server into existing applications (e.g., SAP CAP/CDS, Express).
+This needs `@mcp-abap-adt/lib` only — not the AGPL server:
+```bash
+npm install @mcp-abap-adt/lib
+```
 ```typescript
 import {
   EmbeddableMcpServer,
   NoDedupStrategy, // optional: expose both Read<X> and Get<X>
-} from '@mcp-abap-adt/core/server';
+} from '@mcp-abap-adt/lib/embeddable';
 
 const server = new EmbeddableMcpServer({
   connection,              // Your AbapConnection instance
@@ -113,7 +128,6 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
    - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
    - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
    - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
-   - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ## Use Cases
 
@@ -189,7 +203,6 @@ Published in the official MCP Registry and listed on Glama.ai.
   - [Read-Only Tools](docs/user-guide/AVAILABLE_TOOLS_READONLY.md)
   - [High-Level Tools](docs/user-guide/AVAILABLE_TOOLS_HIGH.md)
   - [Low-Level Tools](docs/user-guide/AVAILABLE_TOOLS_LOW.md)
-  - [Legacy System Tools](docs/user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ### For Administrators
 - **[Deployment Docs](docs/deployment/README.md)** - MCP Registry, Docker, release notes
@@ -289,7 +302,7 @@ SAP_JWT_TOKEN=your-jwt-token
 
 For RFC connection:
 ```bash
-SAP_URL=https://your-legacy-system.com
+SAP_URL=https://your-onprem-system.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -419,3 +432,64 @@ Thank you to all contributors! See [CONTRIBUTORS.md](CONTRIBUTORS.md) for the co
 ---
 
 **Acknowledgment**: This project was originally inspired by [mario-andreschak/mcp-abap-adt](https://github.com/mario-andreschak/mcp-abap-adt). We started with the core concept and then evolved it into an independent project with our own architecture and features.
+
+## License
+
+**Two packages, two licences.** Which one applies depends on which you install.
+
+| Package | Licence | |
+|---|---|---|
+| `@mcp-abap-adt/lib` | Apache-2.0 | [`LICENSE`](LICENSE), [`NOTICE`](NOTICE) |
+| `@mcp-abap-adt/core` | AGPL-3.0-only | [`server/LICENSE`](server/LICENSE) |
+
+Both are published from this repository with one command, in the order the
+dependency requires:
+
+```bash
+npm run release:dry        # rehearses both, touches nothing
+npm run release:publish    # @mcp-abap-adt/lib, then @mcp-abap-adt/core
+```
+
+`release:publish` skips a version already on the registry, so re-running after
+a failure resumes rather than starting over. It aborts on the first failure
+instead of publishing the server on top of a library that is not there.
+
+Note that `npm publish` and `npm run` are different commands. `npm publish
+release` asks npm to publish a package *named* `release`, which is somebody
+else's package on the registry.
+
+Copyright © 2025–2026 Oleksii Kyslytsia
+
+Both are distributed in the hope that they will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE.
+
+**What this means.** Running either, on your own data, carries no conditions.
+
+Embedding the library in your own application carries no obligation to open your
+application: Apache-2.0 asks for the notice and the licence text to travel with
+it, and nothing more.
+
+Distributing the standalone server, or running a modified version of it as a
+network service, means passing on the same freedoms under AGPL section 13 —
+including the source. That is why the two are separate packages: installing the
+library never puts the server in your dependency tree.
+
+**The libraries underneath are LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
+`connection`, `interfaces` and `logger` — and the library links them at runtime.
+LGPL does not reach your own code, but its terms do travel with those four
+packages whatever this project is licensed as. Plan for that, not for the
+notice on this repository.
+
+**Other terms are possible.** Apache-2.0 is what the library is offered under
+publicly, not the only way it can be offered. The copyright holder may license
+the same code separately to a party who needs different terms; that takes
+nothing away from anyone who received it under Apache-2.0, which is permanent.
+[`CONTRIBUTORS.md`](CONTRIBUTORS.md#licensing) records what keeps that option
+open, including the rule that no LGPL code from the packages underneath is ever
+copied into this tree.
+
+**History.** Releases through 8.13.0 were MIT and stay MIT; 9.x was
+`GPL-3.0-only`. A licence change is not retroactive — anyone may still take an
+earlier release under the licence it carried. See [`CONTRIBUTORS.md`](CONTRIBUTORS.md#licensing)
+for the full account of how the relicensing was lawful.

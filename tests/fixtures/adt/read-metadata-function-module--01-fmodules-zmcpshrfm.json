@@ -1,0 +1,36 @@
+{
+  "case": "read-metadata-function-module",
+  "step": 1,
+  "stepTag": "fmodules-zmcpshrfm",
+  "capturedAt": "2026-09-11T08:42:13.576Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP/fmodules/Z_MCP_SHR_FM",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/functions/groups/ZMCP_SHR_FGRP/fmodules/Z_MCP_SHR_FM",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.functions.fmodules+xml, application/vnd.sap.adt.functions.fmodules.v2+xml, application/vnd.sap.adt.functions.fmodules.v3+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.functions.fmodules.v3+xml; charset=utf-8",
+      "content-length": "580",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "etag": "202609101525510016",
+      "last-modified": "Thu, 10 Sep 2026 15:25:51 GMT",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=502125",
+      "sap-server": "true",
+      "sap-perf-fesrec": "507993.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-metadata-function-module--01-fmodules-zmcpshrfm.body.xml"
+  }
+}

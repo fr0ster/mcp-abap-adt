@@ -45,7 +45,12 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => {
           return handleGetObjectsList(
             this.context,
-            args as { object_type: string },
+            args as {
+              parent_name?: string;
+              parent_tech_name?: string;
+              parent_type?: string;
+              with_short_descriptions?: boolean;
+            },
           );
         },
       },
@@ -54,7 +59,14 @@ export class SearchHandlersGroup extends BaseHandlerGroup {
         handler: (args: any) => {
           return handleGetObjectsByType(
             this.context,
-            args as { object_type: string },
+            args as {
+              parent_name?: string;
+              parent_tech_name?: string;
+              parent_type?: string;
+              node_id?: string;
+              format?: string;
+              with_short_descriptions?: boolean;
+            },
           );
         },
       },

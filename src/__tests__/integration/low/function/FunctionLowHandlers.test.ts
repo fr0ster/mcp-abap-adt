@@ -54,6 +54,7 @@ import {
 import {
   debugLog,
   delay,
+  expectWriteAccepted,
   extractLockHandle,
   parseHandlerResponse,
 } from '../../helpers/testHelpers';
@@ -362,8 +363,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             throw new Error(`FUGR create failed: ${errorMsg}`);
           }
 
-          const createFGData = parseHandlerResponse(createFGResponse);
-          session = updateSessionFromResponse(session, createFGData);
+          expectWriteAccepted(createFGResponse);
           await delay(getOperationDelay('create', testCase));
 
           // Step 1.3: Lock FUGR
@@ -435,8 +435,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             throw new Error(`FUGR unlock failed: ${errorMsg}`);
           }
 
-          const unlockFGData = parseHandlerResponse(unlockFGResponse);
-          session = updateSessionFromResponse(session, unlockFGData);
+          expectWriteAccepted(unlockFGResponse);
           fgLockHandle = null; // Clear lock handle after unlock
           await delay(getOperationDelay('unlock', testCase));
 
@@ -567,8 +566,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             throw new Error(`FM create failed: ${errorMsg}`);
           }
 
-          const createFMData = parseHandlerResponse(createFMResponse);
-          session = updateSessionFromResponse(session, createFMData);
+          expectWriteAccepted(createFMResponse);
           await delay(getOperationDelay('create', testCase));
 
           // Step 2.3: Lock FM
@@ -651,8 +649,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             throw new Error(`FM update failed: ${errorMsg}`);
           }
 
-          const updateFMData = parseHandlerResponse(updateFMResponse);
-          session = updateSessionFromResponse(session, updateFMData);
+          expectWriteAccepted(updateFMResponse);
           await delay(getOperationDelay('update', testCase));
 
           // Step 2.5: Unlock FM
@@ -686,8 +683,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             throw new Error(`FM unlock failed: ${errorMsg}`);
           }
 
-          const unlockFMData = parseHandlerResponse(unlockFMResponse);
-          session = updateSessionFromResponse(session, unlockFMData);
+          expectWriteAccepted(unlockFMResponse);
           fmLockHandle = null; // Clear lock handle after unlock
           await delay(getOperationDelay('unlock', testCase));
 

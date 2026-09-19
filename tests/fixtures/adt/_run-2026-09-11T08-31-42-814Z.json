@@ -1,0 +1,150 @@
+{
+  "startedAt": "2026-09-11T08:31:42.814Z",
+  "finishedAt": "2026-09-11T08:31:49.771Z",
+  "substitutions": [
+    "REDACTED",
+    "REDACTED",
+    "SAPUSER01"
+  ],
+  "cases": [
+    {
+      "case": "refusal-object-not-found",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-check-nonexistent-object",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-tree",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-contents-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-objectslist-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-hierarchy-direct",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-class-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-function-module-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "check-success-verdict",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-table-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-package-contents-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-class",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:45.021Z",
+      "endedAt": "2026-09-11T08:31:45.557Z"
+    },
+    {
+      "case": "refusal-validation-name-taken-class",
+      "outcome": "threw",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:45.557Z",
+      "endedAt": "2026-09-11T08:31:46.133Z",
+      "error": "SAP refused the request: Class ZBP_MCP_SHR_I_ROOT already exists"
+    },
+    {
+      "case": "refusal-validation-name-taken-domain",
+      "outcome": "threw",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:46.133Z",
+      "endedAt": "2026-09-11T08:31:46.735Z",
+      "error": "SAP refused the request: Domain with the name MANDT already exists"
+    },
+    {
+      "case": "validation-name-free-table",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:46.735Z",
+      "endedAt": "2026-09-11T08:31:47.515Z"
+    },
+    {
+      "case": "refusal-validation-name-taken-table",
+      "outcome": "threw",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:47.515Z",
+      "endedAt": "2026-09-11T08:31:48.066Z",
+      "error": "SAP refused the request: Database Table with the name ZMCP_SHR_RTABL already exists"
+    },
+    {
+      "case": "refusal-validation-name-taken-ddl",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:48.066Z",
+      "endedAt": "2026-09-11T08:31:48.629Z"
+    },
+    {
+      "case": "refusal-validation-name-taken-functiongroup",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:48.629Z",
+      "endedAt": "2026-09-11T08:31:49.205Z"
+    },
+    {
+      "case": "validation-name-free-ddl",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-11T08:31:49.205Z",
+      "endedAt": "2026-09-11T08:31:49.768Z"
+    },
+    {
+      "case": "read-empty-package-contents",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-object-tree-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-where-used-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-transport-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "delete-success",
+      "outcome": "skipped",
+      "exchanges": 0
+    }
+  ]
+}

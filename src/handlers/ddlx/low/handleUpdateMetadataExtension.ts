@@ -1,18 +1,30 @@
 /**
- * UpdateMetadataExtension Handler - Update ABAP Metadata Extension Source Code
+ * UpdateMetadataExtensionLow Handler - Update ABAP Metadata Extension Source Code
  *
- * Uses AdtClient.updateMetadataExtension from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getMetadataExtension().update from @mcp-abap-adt/adt-clients 19.
+ *
+ * **The source goes in `options`, not `config`.** The pre-migration (v18)
+ * handler put `sourceCode` inside the config object passed as the first
+ * argument — `update({ name, sourceCode }, { lockHandle })`. The shipped
+ * `AdtMetadataExtension.update()` reads `options?.sourceCode` only, and says
+ * so in its own comment: "This used to fall back to `config.sourceCode` —
+ * two channels for one value, where the contract documents one.
+ * `config.sourceCode` is `check`'s alone now". `IMetadataExtensionConfig`
+ * still declares a `sourceCode` field, so the old shape still compiled —
+ * this is the exact empty-write shape cluster 14 found in four handlers,
+ * and it recurs here in the family that removed the fallback outright.
+ * Verified against `AdtMetadataExtension.js`, not the declaration file.
  */
 
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateMetadataExtensionLow',
@@ -51,6 +63,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name', 'source_code', 'lock_handle'],
   },
@@ -66,117 +79,42 @@ interface UpdateMetadataExtensionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for UpdateMetadataExtension MCP tool
- *
- * Uses AdtClient.updateMetadataExtension - low-level single method call
- */
 export async function handleUpdateMetadataExtension(
   context: HandlerContext,
   args: UpdateMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, source_code, lock_handle, session_id, session_state } =
-      args as UpdateMetadataExtensionArgs;
+  const { name, source_code, lock_handle, session_id, session_state } = args;
 
-    // Validation
-    if (!name || !source_code || !lock_handle) {
-      return return_error(
-        new Error('name, source_code, and lock_handle are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const metadataExtensionName = name.toUpperCase();
-
-    logger?.info(
-      `Starting metadata extension update: ${metadataExtensionName}`,
+  if (!name || !source_code || !lock_handle) {
+    return return_error(
+      new Error('name, source_code, and lock_handle are required'),
     );
-
-    try {
-      // Update metadata extension with source code
-      const updateState = await client.getMetadataExtension().update(
-        {
-          name: metadataExtensionName,
-          sourceCode: source_code,
-        },
-        { lockHandle: lock_handle },
-      );
-      const updateResult = updateState.updateResult;
-
-      if (!updateResult) {
-        throw new Error(
-          `Update did not return a response for metadata extension ${metadataExtensionName}`,
-        );
-      }
-
-      // Get updated session state after update
-
-      logger?.info(
-        `✅ UpdateMetadataExtension completed: ${metadataExtensionName}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            name: metadataExtensionName,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Metadata extension ${metadataExtensionName} updated successfully. Remember to unlock using UnlockObject.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error updating metadata extension ${metadataExtensionName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to update metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Metadata extension ${metadataExtensionName} not found.`;
-      } else if (error.response?.status === 423) {
-        errorMessage = `Metadata extension ${metadataExtensionName} is locked by another user or lock handle is invalid.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlxName = name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'UpdateMetadataExtensionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+        .update(
+          { name: ddlxName },
+          {
+            sourceCode: source_code,
+            lockHandle: lock_handle,
+            analyse: analyseException,
+          },
+        ),
+    project(detail, terseWrite),
+  );
 }

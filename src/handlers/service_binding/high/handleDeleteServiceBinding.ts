@@ -1,16 +1,39 @@
+/**
+ * DeleteServiceBinding Handler - Delete ABAP service binding via ADT
+ * deletion API
+ *
+ * Uses AdtClient.getServiceBinding().delete from @mcp-abap-adt/adt-clients 19.
+ * See `handleDeleteDomain.ts` for the shape and the masking this follows: a
+ * refusal answers 200, `analyseDeletion` reads it rather than the status,
+ * and no lock is taken because a held lock is what makes ADT refuse.
+ *
+ * **`response_format` stays on the surface but no longer does anything.**
+ * The pre-migration handler used it to pick how `state.deleteResult.data`
+ * (the deletion service's raw XML) was rendered — xml/json/plain, through
+ * `parseServiceBindingPayload`. `delete()` now answers a structured deletion
+ * document (`del:deletionResult`/`del:checkResponse`) through the same
+ * `analyseDeletion`/`terseDeletion` pair every other deletion in this task
+ * uses, and every caller gets that one shape regardless of what it asks
+ * for — removing the parameter would be a surface change this task is not
+ * allowed to make, so it is accepted and ignored rather than dropped.
+ */
+
+import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
-import {
-  parseServiceBindingPayload,
-  type ServiceBindingResponseFormat,
-} from './serviceBindingPayloadUtils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseDeletion } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
+import type { ServiceBindingResponseFormat } from './serviceBindingPayloadUtils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete ABAP service binding via ADT Business Services endpoint.',
+    'Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -26,7 +49,10 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['xml', 'json', 'plain'],
         default: 'xml',
+        description:
+          'Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['service_binding_name'],
   },
@@ -36,6 +62,7 @@ interface DeleteServiceBindingArgs {
   service_binding_name: string;
   transport_request?: string;
   response_format?: ServiceBindingResponseFormat;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleDeleteServiceBinding(
@@ -43,45 +70,24 @@ export async function handleDeleteServiceBinding(
   args: DeleteServiceBindingArgs,
 ) {
   const { connection, logger } = context;
+  const { service_binding_name, transport_request } = args;
 
-  try {
-    if (!args?.service_binding_name) {
-      throw new Error('service_binding_name is required');
-    }
-
-    const serviceBindingName = args.service_binding_name.trim().toUpperCase();
-    const responseFormat = args.response_format ?? 'xml';
-    const client = createAdtClient(connection, logger);
-    const state = await client.getServiceBinding().delete({
-      bindingName: serviceBindingName,
-      transportRequest: args.transport_request,
-    });
-    const response = state?.deleteResult;
-    if (!response) {
-      throw new Error(
-        `Delete did not return a response for service binding ${serviceBindingName}`,
-      );
-    }
-
-    return return_response({
-      data: JSON.stringify(
-        {
-          success: true,
-          service_binding_name: serviceBindingName,
-          response_format: responseFormat,
-          status: response.status,
-          payload: parseServiceBindingPayload(response.data, responseFormat),
-        },
-        null,
-        2,
-      ),
-      status: response.status,
-      statusText: response.statusText,
-      headers: response.headers,
-      config: response.config,
-    });
-  } catch (error: any) {
-    logger?.error('Error deleting service binding:', error);
-    return return_error(error);
+  if (!service_binding_name) {
+    return return_error(new Error('service_binding_name is required'));
   }
+
+  const bindingName = service_binding_name.trim().toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'DeleteServiceBinding', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getServiceBinding(resultsFor(serviceDocuments))
+        .delete(
+          { bindingName, transportRequest: transport_request },
+          { analyse: analyseDeletion },
+        ),
+    project(detail, terseDeletion),
+  );
 }

@@ -1,3 +1,22 @@
+/**
+ * Task 28: why this compact facade carries no `detail` of its own.
+ *
+ * `handleCheckObject` (`common/low/handleCheckObject.ts`) — what this
+ * facade delegates every call to — genuinely reaches a `detail`-bearing
+ * projection: `project(detail, terseCheck)` over a real `AdtReading`, same
+ * shape as every other `Check*Low` tool. This facade never forwards a
+ * `detail` argument, so that sibling always answers at its default, terse.
+ * A fourth shape the brief's three rows do not name: a tool with a real
+ * reading behind it, reached only through another handler it delegates to.
+ *
+ * `handleCheckObject`'s own `TOOL_DEFINITION` (`CheckObjectLow`) is not
+ * even a registered tool — `LowLevelHandlersGroup.ts` comments its
+ * registration out — so this compact facade is the ONLY way a caller
+ * reaches that function's logic at all. Deliberately kept off this facade's
+ * own reduced, `compactCheckRunSchema` surface (the same simplification
+ * `compact/` tools make everywhere: no `detail`, no low-level session
+ * knobs) rather than exposed here for the first time.
+ */
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleCheckObject } from '../../common/low/handleCheckObject';
 import { toLowObjectType } from './compactLifecycleUtils';

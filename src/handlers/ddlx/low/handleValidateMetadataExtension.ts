@@ -1,19 +1,18 @@
 /**
- * ValidateMetadataExtension Handler - Validate ABAP MetadataExtension Name
+ * ValidateMetadataExtensionLow Handler - Validate ABAP Metadata Extension Name
  *
- * Uses AdtClient.validateMetadataExtension from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getMetadataExtension().validate from @mcp-abap-adt/adt-clients 19.
  */
 
+import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseValidationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseValidation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ValidateMetadataExtensionLow',
@@ -25,15 +24,16 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'MetadataExtension name to validate (e.g., ZI_MY_DDLX).',
-      },
-      description: {
-        type: 'string',
-        description: 'MetadataExtension description.',
+        description: 'Metadata Extension name to validate (e.g., ZI_MY_DDLX).',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description:
+          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+      },
+      description: {
+        type: 'string',
+        description: 'Metadata Extension description. Required for validation.',
       },
       session_id: {
         type: 'string',
@@ -50,127 +50,58 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
-    required: ['name', 'description', 'package_name'],
+    required: ['name', 'package_name', 'description'],
   },
 } as const;
 
 interface ValidateMetadataExtensionArgs {
   name: string;
-  description: string;
   package_name: string;
+  description: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ValidateMetadataExtension MCP tool
- *
- * Uses AdtClient.validateMetadataExtension - low-level single method call
- */
 export async function handleValidateMetadataExtension(
   context: HandlerContext,
   args: ValidateMetadataExtensionArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, description, package_name, session_id, session_state } =
-      args as ValidateMetadataExtensionArgs;
+  const { name, package_name, description, session_id, session_state } = args;
 
-    // Validation
-    if (!name || !description || !package_name) {
-      return return_error(
-        new Error('name, description, and package_name are required'),
-      );
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const ddlxName = name.toUpperCase();
-
-    logger?.info(`Starting metadata extension validation: ${ddlxName}`);
-
-    try {
-      // Validate metadata extension
-      const validationState = await client.getMetadataExtension().validate({
-        name: ddlxName,
-        description: description || '',
-        packageName: package_name || '',
-      });
-      const validationResponse = validationState.validationResponse;
-      if (!validationResponse) {
-        throw new Error('Validation did not return a result');
-      }
-      const result = parseValidationResponse(
-        validationResponse as AxiosResponse,
-      );
-
-      // Get updated session state after validation
-
-      logger?.info(
-        `✅ ValidateMetadataExtension completed: ${ddlxName} (valid=${result.valid})`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: result.valid,
-            name: ddlxName,
-            validation_result: result,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: result.valid
-              ? `MetadataExtension ${ddlxName} is valid and available`
-              : `MetadataExtension ${ddlxName} validation failed: ${result.message}`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(`Error validating metadata extension ${ddlxName}:`, error);
-
-      // Parse error message
-      let errorMessage = `Failed to validate metadata extension: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `MetadataExtension ${ddlxName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!name || !package_name || !description) {
+    return return_error(
+      new Error('name, package_name, and description are required'),
+    );
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const ddlxName = name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ValidateMetadataExtensionLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
+        .validate(
+          {
+            name: ddlxName,
+            description,
+            packageName: package_name.toUpperCase(),
+          },
+          { analyse: analyseValidation },
+        ),
+    project(detail, terseValidation),
+  );
 }

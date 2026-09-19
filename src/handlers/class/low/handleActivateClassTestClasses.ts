@@ -1,22 +1,36 @@
 /**
  * ActivateClassTestClasses Handler - Activate ABAP Unit test include for a class
  *
- * Uses AdtClient.activateTestClasses from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getClass().activate from @mcp-abap-adt/adt-clients 19.
+ *
+ * Despite the name, this activates the parent class itself — that activates
+ * all of its local includes (test classes, definitions, macros) together, the
+ * same `activate()` member `ActivateClassLow` calls. There is no separate
+ * `activateTestClasses()` request to make: v19's `AdtClass.activateTestClasses`
+ * exists but takes no `options`/`analyse` and is not what this tool has ever
+ * called (the doc comment claiming otherwise was stale even before this
+ * migration — the old code already called `.activate({ className })`).
+ *
+ * `test_class_name` stays on this tool's surface (removing it would be a
+ * surface change beyond the one this migration is allowed) but was never
+ * read by the old handler either — `activate({ className })` activates
+ * everything the class owns, test classes included, without naming one.
+ * Ignored, not newly ignored.
  */
 
+import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseActivation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateClassTestClassesLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.',
   inputSchema: {
@@ -29,7 +43,7 @@ export const TOOL_DEFINITION = {
       test_class_name: {
         type: 'string',
         description:
-          'Optional ABAP Unit test class name (e.g., LTCL_MY_CLASS). Defaults to auto-detected value.',
+          'Ignored. This activates the whole class, test classes included, without naming one — there is no per-test-class activation to target.',
       },
       session_id: {
         type: 'string',
@@ -46,6 +60,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['class_name'],
   },
@@ -60,6 +75,7 @@ interface ActivateClassTestClassesArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleActivateClassTestClasses(
@@ -67,60 +83,25 @@ export async function handleActivateClassTestClasses(
   args: ActivateClassTestClassesArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { class_name, test_class_name, session_id, session_state } =
-      args as ActivateClassTestClassesArgs;
+  const { class_name, session_id, session_state } = args;
 
-    if (!class_name) {
-      return return_error(new Error('class_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-    }
-
-    const className = class_name.toUpperCase();
-    const testClassName = test_class_name
-      ? test_class_name.toUpperCase()
-      : undefined;
-
-    logger?.info(`Starting test classes activation for: ${className}`);
-
-    try {
-      const classClient = client.getClass();
-      // Activate the parent class — this activates all its local includes (test classes, definitions, etc.)
-      const activationResult = await classClient.activate({ className });
-
-      logger?.info(`✅ ActivateClassTestClasses completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            session_id: session_id || null,
-            status: activationResult?.activateResult?.status,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Test classes for ${className} activated successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error activating test classes for ${className}: ${error?.message || error}`,
-      );
-      const reason =
-        error?.response?.status === 404
-          ? `Class ${className} not found or test classes are missing.`
-          : error?.message || String(error);
-      return return_error(new Error(reason));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!class_name) {
+    return return_error(new Error('class_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const className = class_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ActivateClassTestClassesLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getClass(resultsFor(classDocuments))
+        .activate({ className }, { analyse: analyseActivation }),
+    project(detail, terseActivation),
+  );
 }

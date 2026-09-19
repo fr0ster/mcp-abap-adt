@@ -1,0 +1,10 @@
+FUNCTION z_mcp_shr_fm
+  IMPORTING
+    VALUE(iv_input) TYPE string
+  EXPORTING
+    VALUE(ev_output) TYPE string.
+
+
+
+  ev_output = |Echo: { iv_input }|.
+ENDFUNCTION.

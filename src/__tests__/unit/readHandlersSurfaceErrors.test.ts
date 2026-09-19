@@ -1,99 +1,116 @@
 /**
  * Unit test (#159): readonly handlers must NOT mask a failed read as
- * `success:true` + null. When the underlying read throws (auth/network/404/5xx),
- * the handler must return a structured failure (isError:true).
+ * `success:true` + null. When the underlying read is refused, the handler
+ * must surface a structured failure (isError:true) carrying the refusal's
+ * own message — never a re-summarised one.
  *
- * SAP-free via a mocked AdtClient. Domain and Class stand in for the whole
- * family of 17 handlers that share the identical read+readMetadata structure.
+ * One row per handler in the two-call `read`/`readMetadata` family (task 9's
+ * `handleReadClass` is the template; task 11 applies its shape to the other
+ * sixteen). `refusingClient` refuses whatever member is called, so this
+ * proves the refusal reaches the caller regardless of which call — `read`,
+ * `readMetadata`, or the single `readMetadata` a container object answers
+ * for both — a given handler happens to make first.
+ *
+ * The same table is reused below for a second question a refusal cannot
+ * answer: a THROWN failure (`client_threw`) carries the answer's own `tool`
+ * identifier, and nothing else in this family pins it — a handler built
+ * from another's copy-pasted `{ tool: '...' }` would pass every refusal row
+ * above and the whole rest of the suite.
  */
-
-const mockDomainRead = jest.fn();
-const mockDomainReadMeta = jest.fn();
-const mockClassRead = jest.fn();
-const mockClassReadMeta = jest.fn();
-
-jest.mock('../../lib/clients', () => ({
-  createAdtClient: () => ({
-    getDomain: () => ({
-      read: mockDomainRead,
-      readMetadata: mockDomainReadMeta,
-    }),
-    getClass: () => ({
-      read: mockClassRead,
-      readMetadata: mockClassReadMeta,
-    }),
-  }),
-}));
-
-import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
+import { handleReadBehaviorDefinition } from '../../handlers/behavior_definition/readonly/handleReadBehaviorDefinition';
+import { handleReadBehaviorImplementation } from '../../handlers/behavior_implementation/readonly/handleReadBehaviorImplementation';
+import { handleReadDataElement } from '../../handlers/data_element/readonly/handleReadDataElement';
+import { handleReadDdl } from '../../handlers/ddl/readonly/handleReadDdl';
 import { handleReadDomain } from '../../handlers/domain/readonly/handleReadDomain';
+import { handleReadFunctionGroup } from '../../handlers/function_group/readonly/handleReadFunctionGroup';
+import { handleReadFunctionInclude } from '../../handlers/function_include/readonly/handleReadFunctionInclude';
+import { handleReadFunctionModule } from '../../handlers/function_module/readonly/handleReadFunctionModule';
+import { handleReadInterface } from '../../handlers/interface/readonly/handleReadInterface';
+import { handleReadMetadataExtension } from '../../handlers/metadata_extension/readonly/handleReadMetadataExtension';
+import { handleReadPackage } from '../../handlers/package/readonly/handleReadPackage';
+import { handleReadProgram } from '../../handlers/program/readonly/handleReadProgram';
+import { handleReadServiceBinding } from '../../handlers/service_binding/readonly/handleReadServiceBinding';
+import { handleReadServiceDefinition } from '../../handlers/service_definition/readonly/handleReadServiceDefinition';
+import { handleReadStructure } from '../../handlers/structure/readonly/handleReadStructure';
+import { handleReadTable } from '../../handlers/table/readonly/handleReadTable';
+import { refusingClient, throwingClient } from '../helpers/fakeClient';
 
-const ctx = { connection: {}, logger: undefined } as any;
+let fakeClient: any;
+jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
 
-function payload(result: any) {
-  const text =
-    (result.content.find((c: any) => c.type === 'text') as any)?.text || '';
-  try {
-    return JSON.parse(text);
-  } catch {
-    return { raw: text };
-  }
-}
+const context = { connection: {} as any, logger: undefined };
+
+const rows: Array<[string, (ctx: any, args: any) => Promise<any>, any]> = [
+  ['ReadTable', handleReadTable, { table_name: 'ZT' }],
+  ['ReadStructure', handleReadStructure, { structure_name: 'ZS' }],
+  [
+    'ReadServiceDefinition',
+    handleReadServiceDefinition,
+    { service_definition_name: 'ZSD' },
+  ],
+  [
+    'ReadServiceBinding',
+    handleReadServiceBinding,
+    { service_binding_name: 'ZSB' },
+  ],
+  ['ReadProgram', handleReadProgram, { program_name: 'ZP' }],
+  [
+    'ReadMetadataExtension',
+    handleReadMetadataExtension,
+    { metadata_extension_name: 'ZME' },
+  ],
+  ['ReadInterface', handleReadInterface, { interface_name: 'ZIF' }],
+  [
+    'ReadFunctionModule',
+    handleReadFunctionModule,
+    { function_module_name: 'ZFM', function_group_name: 'ZFG' },
+  ],
+  [
+    'ReadFunctionInclude',
+    handleReadFunctionInclude,
+    { include_name: 'ZINC', function_group_name: 'ZFG' },
+  ],
+  ['ReadDdl', handleReadDdl, { ddl_name: 'ZDDL' }],
+  [
+    'ReadBehaviorImplementation',
+    handleReadBehaviorImplementation,
+    { behavior_implementation_name: 'ZBI' },
+  ],
+  [
+    'ReadBehaviorDefinition',
+    handleReadBehaviorDefinition,
+    { behavior_definition_name: 'ZBD' },
+  ],
+  ['ReadDomain', handleReadDomain, { domain_name: 'ZD' }],
+  ['ReadDataElement', handleReadDataElement, { data_element_name: 'ZDE' }],
+  ['ReadPackage', handleReadPackage, { package_name: 'ZPKG' }],
+  [
+    'ReadFunctionGroup',
+    handleReadFunctionGroup,
+    { function_group_name: 'ZFG' },
+  ],
+];
 
 describe('readonly handlers surface read failures as isError (#159)', () => {
-  beforeEach(() => {
-    mockDomainRead.mockReset();
-    mockDomainReadMeta.mockReset();
-    mockClassRead.mockReset();
-    mockClassReadMeta.mockReset();
-  });
-
-  it('ReadDomain: happy path returns success with data', async () => {
-    mockDomainRead.mockResolvedValue({ readResult: { data: '<domain/>' } });
-    mockDomainReadMeta.mockResolvedValue({
-      metadataResult: { data: '<meta/>' },
-    });
-
-    const result = await handleReadDomain(ctx, { domain_name: 'ZD_OK' });
-
-    expect(result.isError).toBe(false);
-    const p = payload(result);
-    expect(p.success).toBe(true);
-    expect(p.source_code).toBe('<domain/>');
-  });
-
-  it('ReadDomain: a thrown read (e.g. expired token) → isError, NOT false success', async () => {
-    const err: any = new Error('JWT token has expired');
-    err.response = { status: 401 };
-    mockDomainRead.mockRejectedValue(err);
-    mockDomainReadMeta.mockRejectedValue(err);
-
-    const result = await handleReadDomain(ctx, { domain_name: 'ZD_LOCKED' });
-
+  it.each(
+    rows,
+  )('%s reports a refusal as an error', async (_name, handler, args) => {
+    fakeClient = refusingClient('Resource not found');
+    const result: any = await handler(context as any, args);
     expect(result.isError).toBe(true);
-    expect(payload(result).success).not.toBe(true);
+    expect(JSON.parse(result.content[0].text).message).toBe(
+      'Resource not found',
+    );
   });
 
-  it('ReadDomain: a not-found (404) read → isError, NOT false success:true+null', async () => {
-    const err: any = new Error("Domain 'ZD_NOPE' not found");
-    err.response = { status: 404 };
-    mockDomainRead.mockRejectedValue(err);
-    mockDomainReadMeta.mockRejectedValue(err);
-
-    const result = await handleReadDomain(ctx, { domain_name: 'ZD_NOPE' });
-
+  it.each(
+    rows,
+  )('%s names a thrown failure client_threw, carrying its own tool', async (name, handler, args) => {
+    fakeClient = throwingClient('boom');
+    const result: any = await handler(context as any, args);
     expect(result.isError).toBe(true);
-  });
-
-  it('ReadClass: a thrown read → isError, NOT false success', async () => {
-    const err: any = new Error('Request failed with status code 500');
-    err.response = { status: 500 };
-    mockClassRead.mockRejectedValue(err);
-    mockClassReadMeta.mockRejectedValue(err);
-
-    const result = await handleReadClass(ctx, { class_name: 'ZCL_BOOM' });
-
-    expect(result.isError).toBe(true);
-    expect(payload(result).success).not.toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toBe('client_threw');
+    expect(payload.tool).toBe(name);
   });
 });

@@ -1,22 +1,27 @@
 /**
- * CheckFunctionGroup Handler - Syntax check for ABAP FunctionGroup
+ * CheckFunctionGroupLow Handler - Syntax check for ABAP Function Group
  *
- * Uses AdtClient.checkFunctionGroup from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getFunctionGroup().check from @mcp-abap-adt/adt-clients 19.
+ *
+ * No `version` parameter exists on this tool, so `status` is always
+ * `undefined`. The shipped `check(config, status, options)` reads `status
+ * === 'active' ? 'active' : 'inactive'`, so an omitted status checks the
+ * inactive version. Verified against `AdtFunctionGroup.js`.
  */
 
-import { parseCheckRunResponse } from '../../../lib/checkRunParser';
+import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseCheck } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+
 export const TOOL_DEFINITION = {
   name: 'CheckFunctionGroupLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
@@ -41,6 +46,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['function_group_name'],
   },
@@ -54,113 +60,36 @@ interface CheckFunctionGroupArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for CheckFunctionGroup MCP tool
- *
- * Uses AdtClient.checkFunctionGroup - low-level single method call
- */
 export async function handleCheckFunctionGroup(
   context: HandlerContext,
   args: CheckFunctionGroupArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { function_group_name, session_id, session_state } =
-      args as CheckFunctionGroupArgs;
+  const { function_group_name, session_id, session_state } = args;
 
-    // Validation
-    if (!function_group_name) {
-      return return_error(new Error('function_group_name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    } else {
-      // Ensure connection is established
-    }
-
-    const functionGroupName = function_group_name.toUpperCase();
-
-    logger?.info(`Starting function group check: ${functionGroupName}`);
-
-    try {
-      // Check function group
-      const checkState = await client
-        .getFunctionGroup()
-        .check({ functionGroupName: functionGroupName });
-      const response = checkState.checkResult;
-
-      if (!response) {
-        throw new Error(
-          `Check did not return a response for function group ${functionGroupName}`,
-        );
-      }
-
-      // Parse check results
-      const checkResult = parseCheckRunResponse(response as AxiosResponse);
-
-      // Get updated session state after check
-
-      logger?.info(`✅ CheckFunctionGroup completed: ${functionGroupName}`);
-      logger?.debug(
-        `Status: ${checkResult.status} | Errors: ${checkResult.errors.length}, Warnings: ${checkResult.warnings.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: checkResult.success,
-            function_group_name: functionGroupName,
-            check_result: checkResult,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: checkResult.success
-              ? `FunctionGroup ${functionGroupName} has no syntax errors`
-              : `FunctionGroup ${functionGroupName} has ${checkResult.errors.length} error(s) and ${checkResult.warnings.length} warning(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error checking function group ${functionGroupName}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to check function group: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `FunctionGroup ${functionGroupName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!function_group_name) {
+    return return_error(new Error('function_group_name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const functionGroupName = function_group_name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'CheckFunctionGroupLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getFunctionGroup(resultsFor(functionGroupDocuments))
+        // `status` left undefined: the shipped default checks the inactive
+        // version, and there is no `version` parameter on this tool to say
+        // otherwise.
+        .check({ functionGroupName }, undefined, { analyse: analyseCheck }),
+    project(detail, terseCheck),
+  );
 }

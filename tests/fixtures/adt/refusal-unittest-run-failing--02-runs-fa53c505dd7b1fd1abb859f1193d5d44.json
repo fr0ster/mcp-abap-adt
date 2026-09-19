@@ -1,0 +1,34 @@
+{
+  "case": "refusal-unittest-run-failing",
+  "step": 2,
+  "stepTag": "runs-fa53c505dd7b1fd1abb859f1193d5d44",
+  "capturedAt": "2026-09-11T09:26:05.384Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB859F1193D5D44?withLongPolling=true",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/abapunit/runs/FA53C505DD7B1FD1ABB859F1193D5D44?withLongPolling=true",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.api.abapunit.run-status.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.api.abapunit.run-status.v1+xml; charset=utf-8",
+      "content-length": "883",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=4058",
+      "sap-server": "true",
+      "sap-perf-fesrec": "5864.000000",
+      "connection": "close"
+    },
+    "bodyFile": "refusal-unittest-run-failing--02-runs-fa53c505dd7b1fd1abb859f1193d5d44.body.xml"
+  }
+}

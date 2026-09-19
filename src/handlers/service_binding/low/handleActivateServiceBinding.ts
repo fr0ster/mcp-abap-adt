@@ -1,19 +1,22 @@
 /**
  * ActivateServiceBinding Handler - Activate ABAP Service Binding
  *
- * Uses AdtClient.getServiceBinding().activate() from @mcp-abap-adt/adt-clients.
- * Low-level handler: single method call.
+ * Uses AdtClient.getServiceBinding().activate from @mcp-abap-adt/adt-clients 19.
+ *
+ * `getServiceBinding()` is `AdtServiceBinding`, declared over `serviceDocuments`
+ * (the same result-set shape `AdtService` — the OData-publication subclass —
+ * shares), and its `activate(config, options)` reads `config.bindingName`.
  */
 
+import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  parseActivationResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseActivation } from '../../../lib/strategies/projections';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ActivateServiceBindingLow',
@@ -42,6 +45,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['name'],
   },
@@ -55,121 +59,33 @@ interface ActivateServiceBindingArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for ActivateServiceBinding MCP tool
- *
- * Uses AdtClient.getServiceBinding().activate() - low-level single method call
- */
 export async function handleActivateServiceBinding(
   context: HandlerContext,
   args: ActivateServiceBindingArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { name, session_id, session_state } =
-      args as ActivateServiceBindingArgs;
+  const { name, session_id, session_state } = args;
 
-    // Validation
-    if (!name) {
-      return return_error(new Error('name is required'));
-    }
-
-    const client = createAdtClient(connection, logger);
-
-    // Restore session state if provided
-    if (session_id && session_state) {
-      await restoreSessionInConnection(connection, session_id, session_state);
-    }
-
-    const serviceBindingName = name.toUpperCase();
-
-    logger?.info(`Starting service binding activation: ${serviceBindingName}`);
-
-    try {
-      // Activate service binding
-      const activateState = await client
-        .getServiceBinding()
-        .activate({ bindingName: serviceBindingName });
-      const response = activateState.activateResult;
-
-      if (!response) {
-        throw new Error(
-          `Activation did not return a response for service binding ${serviceBindingName}`,
-        );
-      }
-
-      // Parse activation response
-      const activationResult = parseActivationResponse(response.data);
-      const success = activationResult.activated && activationResult.checked;
-
-      logger?.info(`ActivateServiceBinding completed: ${serviceBindingName}`);
-      logger?.debug(
-        `Activated: ${activationResult.activated}, Checked: ${activationResult.checked}, Messages: ${activationResult.messages.length}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success,
-            name: serviceBindingName,
-            activation: {
-              activated: activationResult.activated,
-              checked: activationResult.checked,
-              generated: activationResult.generated,
-            },
-            messages: activationResult.messages,
-            warnings: activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
-            ),
-            errors: activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            ),
-            session_id: session_id || null,
-            session_state: null,
-            message: success
-              ? `Service binding ${serviceBindingName} activated successfully`
-              : `Service binding ${serviceBindingName} activation completed with ${activationResult.messages.length} message(s)`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error activating service binding ${serviceBindingName}: ${error?.message || error}`,
-      );
-
-      let errorMessage = `Failed to activate service binding: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Service binding ${serviceBindingName} not found.`;
-      } else if (
-        error.response?.data &&
-        typeof error.response.data === 'string'
-      ) {
-        try {
-          const { XMLParser } = require('fast-xml-parser');
-          const parser = new XMLParser({
-            ignoreAttributes: false,
-            attributeNamePrefix: '@_',
-          });
-          const errorData = parser.parse(error.response.data);
-          const errorMsg =
-            errorData['exc:exception']?.message?.['#text'] ||
-            errorData['exc:exception']?.message;
-          if (errorMsg) {
-            errorMessage = `SAP Error: ${errorMsg}`;
-          }
-        } catch (_parseError) {
-          // Ignore parse errors
-        }
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
+  if (!name) {
+    return return_error(new Error('name is required'));
   }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const bindingName = name.toUpperCase();
+  const detail = detailOf(args);
+
+  return answer(
+    { tool: 'ActivateServiceBindingLow', detail },
+    () =>
+      createAdtClient(connection, logger)
+        .getServiceBinding(resultsFor(serviceDocuments))
+        .activate({ bindingName }, { analyse: analyseActivation }),
+    project(detail, terseActivation),
+  );
 }

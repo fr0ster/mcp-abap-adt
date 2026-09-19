@@ -1,13 +1,27 @@
 /**
  * GetObjectStructure Handler - Low-level handler for object structure
  *
- * Uses getObjectStructure from @mcp-abap-adt/adt-clients AdtUtils.
- * Retrieves ADT object structure as compact JSON tree.
+ * Uses AdtClient.getUtils().getObjectStructure from @mcp-abap-adt/adt-clients
+ * 19. `getObjectStructure(objectType, objectName)` takes no options object at
+ * all — no `analyse` to pass. The tree-text projection is the same one
+ * `GetObjectStructure` (read-only, `src/handlers/system/readonly/`) already
+ * built and exports — both tools read the same `projectexplorer:
+ * objectstructure` document through the same `ourUtils.objectStructure`
+ * (`structured`) reading, and a second copy of the flattening logic would be
+ * two things to keep in sync against one document shape.
  */
 
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error, return_response } from '../../../lib/utils';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project } from '../../../lib/strategies/projections';
+import { ourUtils } from '../../../lib/strategies/resultSets';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+import {
+  assertObjectStructurePresent,
+  treeText,
+} from '../readonly/handleGetObjectStructure';
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectStructureLow',
@@ -41,6 +55,7 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['object_type', 'object_name'],
   },
@@ -55,59 +70,46 @@ interface GetObjectStructureArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for GetObjectStructureLow MCP tool
- *
- * Uses getObjectStructure from AdtUtils
- */
 export async function handleGetObjectStructure(
   context: HandlerContext,
   args: GetObjectStructureArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    // Validate required parameters
-    if (!args?.object_type) {
-      return return_error(new Error('object_type is required'));
-    }
-    if (!args?.object_name) {
-      return return_error(new Error('object_name is required'));
-    }
+  const { object_type, object_name, session_id, session_state } = args;
 
-    // Restore session state if provided
-    if (args.session_id && args.session_state) {
-      const { restoreSessionInConnection } = await import(
-        '../../../lib/utils.js'
-      );
-      await restoreSessionInConnection(
-        connection,
-        args.session_id,
-        args.session_state,
-      );
-    }
-
-    // Create AdtClient and get utilities
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
-
-    logger?.info(
-      `Fetching object structure for ${args.object_type}/${args.object_name}`,
-    );
-
-    const result = await utils.getObjectStructure(
-      args.object_type,
-      args.object_name,
-    );
-
-    logger?.debug(
-      `Object structure fetched successfully for ${args.object_type}/${args.object_name}`,
-    );
-
-    return return_response(result);
-  } catch (error: any) {
-    logger?.error('Failed to fetch object structure', error);
-    return return_error(error);
+  if (!object_type) {
+    return return_error(new Error('object_type is required'));
   }
+  if (!object_name) {
+    return return_error(new Error('object_name is required'));
+  }
+
+  if (session_id && session_state) {
+    await restoreSessionInConnection(connection, session_id, session_state);
+  }
+
+  const detail = detailOf(args);
+
+  // The presence check runs here, inside the call, only for `terse` — the
+  // same place and the same condition `GetObjectStructure` (read-only) uses,
+  // so both surface an indeterminate answer through `answer()`'s
+  // `client_threw` path, matching `GetNodeStructureLow`'s guard rather than
+  // disagreeing with it on which kind a caller sees for the same class of
+  // defect. `raw`/`full` always answer the document exactly as it arrived.
+  return answer(
+    { tool: 'GetObjectStructureLow', detail },
+    async () => {
+      const response = await createAdtClient(connection, logger)
+        .getUtils(ourUtils)
+        .getObjectStructure(object_type, object_name);
+      if (detail === 'terse' && response.ok) {
+        assertObjectStructurePresent(response.getResult().value.value);
+      }
+      return response;
+    },
+    project(detail, (value) => treeText(value)),
+  );
 }

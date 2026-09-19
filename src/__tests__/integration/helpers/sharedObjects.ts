@@ -15,6 +15,7 @@
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
 import { createAdtClient } from '../../../lib/clients';
+import { withLock } from '../../../lib/strategies/withLock';
 import {
   getSharedDependenciesConfig,
   getSystemType,
@@ -77,10 +78,11 @@ export async function ensureSharedPackage(
 
   const packageName = sharedConfig.package;
 
-  // Check if package exists
+  // Check if package exists. A package has no source, only its own document
+  // (IAdtMetadataReadable, not IAdtReadable) — see IAdtCapabilities.ts.
   try {
-    const readResult = await client.getPackage().read({ packageName });
-    if (readResult?.readResult) {
+    const readResult = await client.getPackage().readMetadata({ packageName });
+    if (readResult.ok) {
       log?.info?.(`Shared package ${packageName} already exists`);
       _sharedPackageReady = true;
       return;
@@ -171,18 +173,21 @@ export async function ensureSharedDependency(
   const packageName = resolvePackageName();
   const transportRequest = resolveTransportRequest();
 
-  // Check if the object already exists
+  // Check if the object already exists. Nothing here throws any more — a
+  // missing object is `ok: false`, not a rejected promise (IAdtCapabilities.ts)
+  // — so existence is read off `.ok`, and the try/catch stays only for a
+  // genuine connection-level throw.
   let exists = false;
   try {
     if (type === 'tables') {
       const result = await client.getTable().read({ tableName: name });
-      exists = result?.readResult !== undefined;
+      exists = result.ok;
     } else if (type === 'views') {
       const result = await client.getDdl().read({ ddlName: name });
-      exists = result !== undefined;
+      exists = result.ok;
     } else if (type === 'behavior_definitions') {
       const result = await client.getBehaviorDefinition().read({ name });
-      exists = result !== undefined;
+      exists = result.ok;
     }
   } catch {
     exists = false;
@@ -194,71 +199,96 @@ export async function ensureSharedDependency(
     return { existed: true, created: false };
   }
 
-  // Create the object
+  // Create the object. `create` posts a metadata document only — no create
+  // implementation in adt-clients 19 carries source (IAdtCreatable.create's
+  // own comment) — so the source, when there is one, goes through a
+  // lock -> update -> unlock -> activate cycle afterwards, the same shape
+  // every migrated UpdateX handler in src/handlers uses via `withLock`.
   log?.info?.(`Creating shared ${type} ${name}...`);
   try {
     const activate = !options?.skipActivation;
 
     if (type === 'tables') {
-      await client.getTable().create({
+      const created = await client.getTable().create({
         tableName: name,
         packageName,
         description: depConfig.description || 'Shared test table',
-        ddlCode: depConfig.source,
         transportRequest,
       });
+      if (!created.ok) throw new Error(created.getError().message);
+
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared table ${name}...`);
-        await client.getTable().update(
-          {
-            tableName: name,
-            ddlCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        const obj = client.getTable();
+        const written = await withLock(
+          () => obj.lock({ tableName: name }),
+          (lockHandle) =>
+            obj.update(
+              { tableName: name, transportRequest },
+              { sourceCode: depConfig.source, lockHandle },
+            ),
+          (lockHandle) => obj.unlock({ tableName: name }, lockHandle),
         );
+        if (!written.ok) throw new Error(written.getError().message);
+
+        const activated = await obj.activate({ tableName: name });
+        if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared table ${name} activated`);
       }
     } else if (type === 'views') {
-      await client.getDdl().create({
+      const created = await client.getDdl().create({
         ddlName: name,
         packageName,
         description: depConfig.description || 'Shared test view',
-        ddlSource: depConfig.source,
         transportRequest,
       });
+      if (!created.ok) throw new Error(created.getError().message);
+
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared view ${name}...`);
-        await client.getDdl().update(
-          {
-            ddlName: name,
-            ddlSource: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        const obj = client.getDdl();
+        const written = await withLock(
+          () => obj.lock({ ddlName: name }),
+          (lockHandle) =>
+            obj.update(
+              { ddlName: name, transportRequest },
+              { sourceCode: depConfig.source, lockHandle },
+            ),
+          (lockHandle) => obj.unlock({ ddlName: name }, lockHandle),
         );
+        if (!written.ok) throw new Error(written.getError().message);
+
+        const activated = await obj.activate({ ddlName: name });
+        if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared view ${name} activated`);
       }
     } else if (type === 'behavior_definitions') {
-      await client.getBehaviorDefinition().create({
+      const created = await client.getBehaviorDefinition().create({
         name,
         packageName,
         rootEntity: depConfig.root_entity || name,
         implementationType: depConfig.implementation_type || 'Managed',
         description: depConfig.description || 'Shared test BDEF',
-        sourceCode: depConfig.source,
         transportRequest,
       });
+      if (!created.ok) throw new Error(created.getError().message);
+
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared behavior definition ${name}...`);
-        await client.getBehaviorDefinition().update(
-          {
-            name,
-            sourceCode: depConfig.source,
-            transportRequest,
-          },
-          { activateOnUpdate: true, sourceCode: depConfig.source },
+        const obj = client.getBehaviorDefinition();
+        const written = await withLock(
+          () => obj.lock({ name }),
+          (lockHandle) =>
+            obj.update(
+              { name, transportRequest },
+              { sourceCode: depConfig.source, lockHandle },
+            ),
+          (lockHandle) => obj.unlock({ name }, lockHandle),
         );
+        if (!written.ok) throw new Error(written.getError().message);
+
+        const activated = await obj.activate({ name });
+        if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared behavior definition ${name} activated`);
       }
     }

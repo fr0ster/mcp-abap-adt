@@ -101,9 +101,17 @@ describe('System High-Level Handlers Integration', () => {
           expect(responseData.package_name).toBe(testPackage.toUpperCase());
           expect(responseData.tree).toBeDefined();
           expect(responseData.tree.name).toBe(testPackage.toUpperCase());
-          expect(responseData.tree.adtType).toBe('DEVC/K');
-          expect(responseData.tree.type).toBe('package');
-          expect(responseData.tree.is_package).toBe(true);
+          // The node's own field names, not a snake_case rewrite of them.
+          // `adtType`/`is_package`/`type: 'package'` came from a client older
+          // than 18: `IPackageHierarchyNode` at tag `v18.0.2`
+          // (`src/core/shared/utilResults.ts:113`, extending `IAdtObjectHit`
+          // at `:25`) already answered `name`, `type` — the ADT type code —
+          // `kind` and `isPackage`, which is exactly what `assembleTree`
+          // builds today. So this is a stale assertion against a shape that
+          // predates the migration, not a contract the migration moved.
+          expect(responseData.tree.type).toBe('DEVC/K');
+          expect(responseData.tree.kind).toBe('package');
+          expect(responseData.tree.isPackage).toBe(true);
 
           logger?.info('✅ Package tree fetched successfully');
         });
@@ -162,9 +170,10 @@ describe('System High-Level Handlers Integration', () => {
           expect(responseData.package_name).toBe(testPackage.toUpperCase());
           expect(responseData.tree).toBeDefined();
           expect(responseData.tree.name).toBe(testPackage.toUpperCase());
-          expect(responseData.tree.adtType).toBe('DEVC/K');
-          expect(responseData.tree.type).toBe('package');
-          expect(responseData.tree.is_package).toBe(true);
+          // Same node shape as the test above.
+          expect(responseData.tree.type).toBe('DEVC/K');
+          expect(responseData.tree.kind).toBe('package');
+          expect(responseData.tree.isPackage).toBe(true);
           expect(responseData.metadata.include_subpackages).toBe(true);
           expect(responseData.metadata.max_depth).toBe(2);
 

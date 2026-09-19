@@ -508,9 +508,11 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 |-------|-------------|---------|
 | `cloud` | ABAP Cloud / BTP systems | **Yes** (default) |
 | `onprem` | On-premise systems (BASIS ≥ 7.50) | No |
-| `legacy` | Legacy on-premise systems (BASIS < 7.50) | No |
+| `legacy` | Legacy on-premise systems (BASIS < 7.50) — **not supported at present**, see below | No |
 
-**Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` and `legacy` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
+**Why this matters:** Different SAP environments support different ADT endpoints. For example, Programs are only available on `onprem` systems. The server uses `SAP_SYSTEM_TYPE` to filter tools accordingly.
+
+**On `legacy`:** no tool declares that environment, so a server started with `SAP_SYSTEM_TYPE=legacy` offers none. Support for legacy systems is parked on the `parked/legacy-support` branch until it can be tried against a live one — it was declared on 142 tools and had never been run against such a system, which is a claim rather than a fact.
 
 **Default is `cloud`** — this covers most modern scenarios. On-premise users must set `SAP_SYSTEM_TYPE=onprem` to access on-premise-only tools (e.g., Programs).
 
@@ -524,7 +526,7 @@ When embedding the server via `EmbeddableMcpServer`, pass `systemType` in the co
 new EmbeddableMcpServer({
   connection,
   exposition: ['readonly', 'high'],
-  systemType: 'onprem', // or 'cloud' / 'legacy'
+  systemType: 'onprem', // or 'cloud'
 });
 ```
 
@@ -546,6 +548,42 @@ When creating or updating ABAP objects on on-premise systems, SAP ADT requires `
 **On-premise systems** do not support the `getSystemInformation()` API endpoint, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.
 
 **Cloud systems** (ABAP Cloud / BTP) resolve system context automatically via the `getSystemInformation()` API — no additional configuration is needed.
+
+#### Per-request responsible and master system (embedding hosts)
+
+**TL;DR:** a host that serves several SAP users from one process sets the responsible person per request, not in the process context.
+
+The values above live in one process-wide cache. That is right for one MCP session per process. It is wrong for a host that runs requests from different SAP users side by side: every concurrent create would use whichever user wrote the cache last.
+
+Wrap each request in a request scope instead:
+
+```typescript
+import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+
+await runWithRequestContext(
+  { responsible: 'JSMITH', masterSystem: 'DEV', masterLanguage: 'EN' },
+  () => handleTheRequest(),
+);
+```
+
+How the scope combines with the process context:
+
+| Key in the scope | Result for this request |
+|---|---|
+| `responsible` / `masterSystem` present (even `undefined`) | The scope's value |
+| `responsible` / `masterSystem` absent | The process value (env / `getSystemInformation()`) |
+| `masterLanguage` | Always the scope's value inside a scope, never the process value |
+
+Outside any scope (stdio) nothing changes.
+
+**ABAP Cloud fills the gaps.** If a tool call still has no `responsible` or `masterSystem` after the rules above, and its connection is to ABAP Cloud, the library asks the system and fills only the missing one:
+
+- `responsible` ← the system's user name, `masterSystem` ← its system id.
+- One lookup per connection, only when a call lacks a value. On-premise: no lookup, nothing filled.
+- Only a key that is **absent** counts as missing. A scope carrying `responsible: undefined` has said this request has no responsible, and nothing fills it.
+- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs.
+
+Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
 
 **Example `.env` for on-premise:**
 ```env

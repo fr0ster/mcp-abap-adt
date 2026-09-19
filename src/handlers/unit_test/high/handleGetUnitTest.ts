@@ -1,23 +1,21 @@
-/**
- * GetUnitTest Handler - Read ABAP Unit test status/result via AdtClient
- *
- * Uses AdtClient.getUnitTest().read() for high-level read operation.
- * Retrieves test run status and result for a previously started run.
- */
-
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { ourUnitTest } from '../../../lib/strategies/resultSets';
+import { return_error } from '../../../lib/utils';
 import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+  MAX_STATUS_POLLS,
+  pollUntilFinished,
+  type RunOutcome,
+} from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP Unit test run status and result for a previously started run_id.',
+    'Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -25,6 +23,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Run identifier returned by RunUnitTest.',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['run_id'],
   },
@@ -32,70 +31,64 @@ export const TOOL_DEFINITION = {
 
 interface GetUnitTestArgs {
   run_id: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for GetUnitTest MCP tool
- *
- * Uses AdtClient.getUnitTest().read() - high-level read operation
- */
 export async function handleGetUnitTest(
   context: HandlerContext,
   args: GetUnitTestArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    const { run_id } = args as GetUnitTestArgs;
+  const { run_id } = args;
+  if (!run_id) return return_error(new Error('run_id is required'));
 
-    // Validation
-    if (!run_id) {
-      return return_error(new Error('run_id is required'));
-    }
+  // The pre-migration handler called the v18 convenience `.read({runId})`,
+  // which answered status and result together. That method no longer
+  // exists on `AdtUnitTest` in v19. Its work moved here: `pollUntilFinished`
+  // reconstructs it (bounded status polling, only fetching the result once
+  // the run is confirmed `FINISHED`) rather than fetching both blindly —
+  // see `pollRun.ts`'s own comment for why a naive `pair()` was wrong here.
+  // Neither `getStatus` nor `getResult` takes an options object at all —
+  // confirmed against the shipped `AdtUnitTest.d.ts` — so no `analyse` is
+  // passed to either.
+  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const detail = detailOf(args);
 
-    const client = createAdtClient(connection, logger);
-    const unitTest = client.getUnitTest();
-
-    logger?.info(`Reading unit test run status/result for run_id: ${run_id}`);
-
-    try {
-      // Read test run using AdtClient
-      const readResult = await unitTest.read({ runId: run_id });
-
-      if (!readResult) {
-        throw new Error(`Unit test run ${run_id} not found`);
-      }
-
-      logger?.info(
-        `✅ GetUnitTest completed successfully for run_id: ${run_id}`,
-      );
-
-      return return_response({
-        data: JSON.stringify(
-          {
+  return answer(
+    { tool: 'GetUnitTest', detail },
+    () =>
+      pollUntilFinished(
+        (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
+        run_id,
+        () => unitTest.getResult(run_id),
+      ),
+    // Task 28 fix round 1: `status` and, once finished, `result` are both
+    // `structured` `AdtReading`s (`getResult`'s slot is `structured` in
+    // `READING_BY_SLOT`, same as `getStatus`'s) — a real reading was behind
+    // this answer all along, and `detail` was owed. `raw` answers the wire
+    // documents; `terse` and `full` both answer the parse, because no
+    // fixture in the corpus proves a further reduction of a test-run result
+    // is safe (see `GetCdsUnitTestResult`'s own doc comment on the same
+    // point) — `detail` is still genuinely different at `raw`, which is
+    // what makes the parameter real rather than decorative.
+    (outcome: RunOutcome<AdtReading<unknown>>) =>
+      outcome.finished
+        ? {
             success: true,
-            run_id: readResult.runId,
-            run_status: readResult.runStatus,
-            run_result: readResult.runResult,
+            run_id,
+            finished: true,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
+            run_result:
+              detail === 'raw' ? outcome.result?.raw : outcome.result?.value,
+          }
+        : {
+            success: true,
+            run_id,
+            finished: false,
+            run_status:
+              detail === 'raw' ? outcome.status.raw : outcome.status.value,
+            message: `Run ${run_id} has not finished after ${MAX_STATUS_POLLS} status checks; call GetUnitTest again to keep polling.`,
           },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error reading unit test run ${run_id}: ${error?.message || error}`,
-      );
-
-      // Parse error message
-      let errorMessage = `Failed to read unit test run: ${error.message || String(error)}`;
-
-      if (error.response?.status === 404) {
-        errorMessage = `Unit test run ${run_id} not found.`;
-      }
-
-      return return_error(new Error(errorMessage));
-    }
-  } catch (error: any) {
-    return return_error(error);
-  }
+  );
 }

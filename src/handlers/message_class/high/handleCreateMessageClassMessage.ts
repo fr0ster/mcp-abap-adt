@@ -1,19 +1,37 @@
 /**
  * CreateMessageClassMessage Handler - Add (upsert) a single message to a
- * Message Class (MSAG) via AdtClient.
+ * Message Class (MSAG)
  *
- * Uses AdtClient.getMessageClassMessage().create(). The parent message class
- * must already exist (create it with CreateMessageClass). Lock/unlock of the
- * class and the message is handled internally by the client.
+ * Uses AdtClient.getMessageClassMessage().create from
+ * @mcp-abap-adt/adt-clients 19. The parent message class must already exist
+ * (create it with CreateMessageClass).
+ *
+ * **No lock handle needed.** Unlike the class-level members, `AdtMessageClass
+ * Message`'s write is not `IAdtLockable` at all — `create()`/`update()` (the
+ * same upsert; ADT upserts) manage their own message-level and
+ * class-for-message locks internally, end to end, via direct module calls
+ * (`lockMessageIfGranted`/`lockClassForMessageOrPlain`/`unlockMessageClass`),
+ * never through this object's own `lock()`/`unlock()` — because it has none.
+ * Verified against `AdtMessageClassMessage.js`.
+ *
+ * **No `resultsFor(messageDocuments)`, and no `detail`.**
+ * `IMessageClassMessageResults<TRead, TWritten, TDeleted>` fixes its three
+ * type parameters to literal `string` at the factory's own generic bound
+ * (`R extends IMessageClassMessageResults`, which — no explicit type
+ * arguments at that bound — means `IMessageClassMessageResults<string,
+ * string, string>`), so passing `resultsFor(...)`'s `AdtReading`-producing
+ * functions does not type-check against it; `GetMessageClassMessage` found
+ * the same disagreement on the read side. The default `messageDocuments`
+ * answers the raw PUT response body as a plain string, with no `status`
+ * alongside it to build `AdtReading`/`project(detail, terseWrite)` from —
+ * matching why this tool carries no `detail` parameter.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateMessageClassMessage',
@@ -70,46 +88,40 @@ export async function handleCreateMessageClassMessage(
   args: CreateMessageClassMessageArgs,
 ) {
   const { connection, logger } = context;
-  try {
-    if (!args?.message_class_name) {
-      return return_error('message_class_name is required');
-    }
-    if (!args?.msgno) {
-      return return_error('msgno is required');
-    }
-    if (args?.msgtext === undefined || args?.msgtext === null) {
-      return return_error('msgtext is required');
-    }
 
-    const client = createAdtClient(connection, logger);
-    const className = args.message_class_name.toUpperCase();
-
-    logger?.info(`Creating message ${args.msgno} in class ${className}`);
-
-    const state = await client.getMessageClassMessage().create({
-      className,
-      msgno: args.msgno,
-      msgtext: args.msgtext,
-      selfExplanatory: args.self_explanatory ?? false,
-      description: args.description,
-      transportRequest: args.transport_request,
-    });
-
-    logger?.info(
-      `✅ CreateMessageClassMessage completed: ${className}/${args.msgno}`,
-    );
-
-    return return_response({
-      data: JSON.stringify({
-        success: true,
-        message_class_name: className,
-        msgno: args.msgno,
-        transport_request: args.transport_request,
-        status: state.createResult?.status ?? state.updateResult?.status,
-        message: `Message ${args.msgno} created in message class ${className}`,
-      }),
-    } as AxiosResponse);
-  } catch (error) {
-    return return_error(error);
+  if (!args?.message_class_name) {
+    return return_error(new Error('message_class_name is required'));
   }
+  if (!args?.msgno) {
+    return return_error(new Error('msgno is required'));
+  }
+  if (args?.msgtext === undefined || args?.msgtext === null) {
+    return return_error(new Error('msgtext is required'));
+  }
+
+  const className = args.message_class_name.toUpperCase();
+
+  return answer(
+    { tool: 'CreateMessageClassMessage', detail: 'terse' },
+    () =>
+      createAdtClient(connection, logger)
+        .getMessageClassMessage()
+        .create(
+          {
+            className,
+            msgno: args.msgno,
+            msgtext: args.msgtext,
+            selfExplanatory: args.self_explanatory ?? false,
+            description: args.description,
+            transportRequest: args.transport_request,
+          },
+          { analyse: analyseException },
+        ),
+    () => ({
+      success: true,
+      message_class_name: className,
+      msgno: args.msgno,
+      message: `Message ${args.msgno} created in message class ${className}`,
+    }),
+  );
 }

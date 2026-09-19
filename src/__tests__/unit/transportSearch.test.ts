@@ -110,6 +110,46 @@ describe('ListTransports asks for the saved search rather than assuming one', ()
     expect(payload.count).toBe(1);
   });
 
+  it('does not hand an unowned request to whoever is asking', async () => {
+    // `tm:owner` missing from the document: the parser answers `''`, and a
+    // filter that treated that as "matches anybody" would report someone
+    // else's — or nobody's — transport as the caller's own.
+    const unowned =
+      '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:workbench><tm:modifiable><tm:request tm:number="TRLK900999" tm:desc="no owner recorded" tm:type="K" tm:status="D"/></tm:modifiable></tm:workbench></tm:root>';
+
+    fakeClient = fakeClientOf({
+      searchConfigurations: async () => okResponse([configuration(REAL_URI)]),
+      list: async () => okResponse(reading(parseStructure(unowned), unowned)),
+    });
+
+    const asked: any = await handleListTransports(context as any, {
+      user: 'SAPUSER01',
+    });
+    expect(JSON.parse(asked.content[0].text).count).toBe(0);
+
+    // Without a user to filter by there is nothing to attribute, so it shows.
+    // `SAP_USERNAME` is cleared for this half: the handler falls back to it
+    // when the caller names nobody, and an environment that happened to carry
+    // one would turn this into a filtered call and pass for the wrong reason.
+    const savedUser = process.env.SAP_USERNAME;
+    process.env.SAP_USERNAME = '';
+    try {
+      fakeClient = fakeClientOf({
+        searchConfigurations: async () => okResponse([configuration(REAL_URI)]),
+        list: async () => okResponse(reading(parseStructure(unowned), unowned)),
+      });
+      const unfiltered: any = await handleListTransports(context as any, {});
+      expect(JSON.parse(unfiltered.content[0].text).count).toBe(1);
+    } finally {
+      if (savedUser === undefined) {
+        process.env.SAP_USERNAME = undefined;
+        delete process.env.SAP_USERNAME;
+      } else {
+        process.env.SAP_USERNAME = savedUser;
+      }
+    }
+  });
+
   it('stops at the cap and says so, rather than turning one call into many', async () => {
     let calls = 0;
     fakeClient = clientWith(

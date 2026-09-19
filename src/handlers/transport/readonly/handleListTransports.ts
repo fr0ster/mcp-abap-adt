@@ -311,9 +311,13 @@ export async function handleListTransports(
     },
     project(detail, (value) => {
       const parsed = parseTransportListValue(value);
-      const byUser = user
-        ? parsed.filter((t) => !t.owner || t.owner === user)
-        : parsed;
+      // Strictly the owner asked for. An entry whose `tm:owner` the document
+      // omits — the parser answers `''` for it — is one whose owner is
+      // unknown, and attributing it to whoever happens to be asking is a
+      // guess presented as an answer. The tool promises the transports of the
+      // current or specified user; a request nobody can be shown to own is
+      // not one of them, so it is left out rather than counted in.
+      const byUser = user ? parsed.filter((t) => t.owner === user) : parsed;
       const transports = modifiableOnly
         ? byUser.filter((t) => isModifiableStatus(t.status))
         : byUser;

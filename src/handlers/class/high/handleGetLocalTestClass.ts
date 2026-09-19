@@ -9,7 +9,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve local test class source code from a class. Supports reading active or inactive version.',
   inputSchema: {

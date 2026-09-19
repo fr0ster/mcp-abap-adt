@@ -25,7 +25,7 @@ import { handleCheckClass as handleCheckClassLow } from '../low/handleCheckClass
 
 export const TOOL_DEFINITION = {
   name: 'CheckClass',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Perform syntax check on an ABAP class. Can check existing class (active/inactive) or validate hypothetical source code. Returns syntax errors, warnings, and messages.',
   inputSchema: {

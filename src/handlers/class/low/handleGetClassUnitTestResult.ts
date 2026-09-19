@@ -52,12 +52,9 @@ import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetClassUnitTestResultLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id. ' +
-    'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
-    'RunClassUnitTestsLow, but AdtClientLegacy.getUnitTest() returns a new instance every time it is called, ' +
-    'even on the same client, so this tool always refuses (issue #208).',
+    '[low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -1011,25 +1011,6 @@ export function isCloudConnection(config?: SapConfig): boolean {
 }
 
 /**
- * Is the current connection a legacy SAP system (BASIS < 7.50)?
- *
- * Same mechanism `createAdtClient` uses to pick `AdtClientLegacy` over
- * `AdtClient` — `getSystemContext().isLegacy`, which reads `SAP_SYSTEM_TYPE`
- * (or an explicit override) rather than probing the connection. A handler
- * that reaches a factory `AdtClientLegacy` declares never available
- * (`getDomain`, `getStructure`, `getCdsUnitTest`, …) throws synchronously if
- * it calls that factory on legacy; this guard is what lets such a handler
- * refuse with a message instead, before making any call at all.
- */
-export function isLegacyConnection(): boolean {
-  try {
-    return getSystemContext().isLegacy ?? false;
-  } catch {
-    return false;
-  }
-}
-
-/**
  * Parse validation response from ADT
  * Checks for CHECK_RESULT=X (success) or SEVERITY=ERROR with message
  * @param response - AxiosResponse from validation endpoint

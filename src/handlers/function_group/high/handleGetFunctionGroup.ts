@@ -9,7 +9,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetFunctionGroup',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve ABAP function group definition. Supports reading active or inactive version.',
   inputSchema: {

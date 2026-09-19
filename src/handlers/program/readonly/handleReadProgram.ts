@@ -10,7 +10,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     '[read-only] Read a MAIN ABAP program (report) source code and metadata by name. Works ONLY for main programs (adtcore type PROG/P); NOT for includes — use GetInclude for include source. Include names (PROG/I) and other object types are rejected with error "invalid_object_type". Answers: "show program code", "display report source", "view program X", "get program source". Returns source code, package, responsible, description.',
   inputSchema: {

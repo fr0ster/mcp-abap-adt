@@ -50,7 +50,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Update a CDS unit test class local test class source code. Manages lock, update, and unlock of the container class.',
   inputSchema: {

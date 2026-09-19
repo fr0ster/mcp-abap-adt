@@ -209,12 +209,10 @@ describe('version diff tools (#30)', () => {
     expect(tool('GetClassVersionDiff').toolDefinition.available_in).toEqual([
       'onprem',
       'cloud',
-      'legacy',
     ]);
-    // program diff is onprem/legacy-gated (mirrors GetProgram)
+    // program diff is onprem-gated (mirrors GetProgram)
     expect(tool('GetProgramVersionDiff').toolDefinition.available_in).toEqual([
       'onprem',
-      'legacy',
     ]);
   });
 });

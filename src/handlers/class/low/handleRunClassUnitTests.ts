@@ -43,13 +43,9 @@ type DurationOptions = {
 
 export const TOOL_DEFINITION = {
   name: 'RunClassUnitTestsLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers. ' +
-    'On legacy systems (BASIS < 7.50) the run finishes synchronously inside this call, but run_id is a fixed ' +
-    'placeholder, not a real identifier — AdtClientLegacy.getUnitTest() returns a new instance every time it is ' +
-    'called, even on the same client, so a later GetClassUnitTestStatusLow/GetClassUnitTestResultLow call always ' +
-    'refuses, whatever the outcome was (issue #208).',
+    '[low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.',
   inputSchema: {
     type: 'object',
     properties: {

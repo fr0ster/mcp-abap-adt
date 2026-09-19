@@ -39,7 +39,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteCdsUnitTest',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description: 'Delete a CDS unit test class (global class).',
   inputSchema: {
     type: 'object',

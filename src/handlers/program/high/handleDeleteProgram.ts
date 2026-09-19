@@ -19,7 +19,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     'Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {

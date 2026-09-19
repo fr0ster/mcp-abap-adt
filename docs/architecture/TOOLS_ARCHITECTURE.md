@@ -122,7 +122,6 @@ if (availableIn?.length > 0 && !availableIn.includes(currentEnv)) {
 
 See generated documentation:
 - [All Tools](../user-guide/AVAILABLE_TOOLS.md)
-- [Legacy-Available Tools](../user-guide/AVAILABLE_TOOLS_LEGACY.md)
 
 ### 4. Central registry
 

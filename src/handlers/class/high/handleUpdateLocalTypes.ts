@@ -32,7 +32,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTypes',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Update local types definitions in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
   inputSchema: {

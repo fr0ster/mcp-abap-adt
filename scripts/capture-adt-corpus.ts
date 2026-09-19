@@ -814,7 +814,7 @@ async function main(): Promise<void> {
 
   const ctx = await resolveSystemContext(connection);
   console.log(
-    `system: isLegacy=${ctx.isLegacy ?? false} responsible=${ctx.responsible ?? '(unset)'} masterSystem=${ctx.masterSystem ?? '(unset)'}`,
+    `system: responsible=${ctx.responsible ?? '(unset)'} masterSystem=${ctx.masterSystem ?? '(unset)'}`,
   );
   // The SAP user id is only knowable now. SAP writes it into ordinary answer
   // text, so replace it everywhere from here on.

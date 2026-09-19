@@ -50,11 +50,11 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { isLegacyConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     "Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. " +
     'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
@@ -112,18 +112,6 @@ export async function handleCreateCdsUnitTest(
   }
   if (!args?.cds_view_name) {
     return return_error(new Error('cds_view_name is required'));
-  }
-
-  // `AdtClientLegacy.getCdsUnitTest()` throws synchronously — the CDS
-  // framework endpoints this needs are absent from a legacy system's
-  // discovery catalog. Refuse before making the call rather than letting
-  // that throw escape.
-  if (isLegacyConnection()) {
-    return return_error(
-      new Error(
-        'CDS unit tests are not available on legacy SAP systems (BASIS < 7.50): the CDS framework endpoints this needs are not present there.',
-      ),
-    );
   }
 
   const className = args.class_name.toUpperCase();

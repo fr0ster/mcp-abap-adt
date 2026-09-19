@@ -33,9 +33,9 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteObjectLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem/legacy only — calling it on ABAP Cloud will fail.',
+    '[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
       object_type: {
         type: 'string',
         description:
-          'Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).',
+          'Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).',
       },
       function_group_name: {
         type: 'string',

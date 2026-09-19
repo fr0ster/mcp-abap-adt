@@ -36,13 +36,9 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'CreateUnitTest',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. ' +
-    'On legacy systems (BASIS < 7.50) the run finishes synchronously inside this call, but run_id is a fixed ' +
-    'placeholder, not a real identifier — AdtClientLegacy.getUnitTest() returns a new instance every time it is ' +
-    'called, even on the same client, so a later GetUnitTest/GetUnitTestStatus/GetUnitTestResult call always ' +
-    'refuses, whatever the outcome was (issue #208).',
+    'Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.',
   inputSchema: {
     type: 'object',
     properties: {

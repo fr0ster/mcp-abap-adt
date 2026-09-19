@@ -33,7 +33,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ListFunctionModules',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] List the function modules of an ABAP function group.',
   inputSchema: {

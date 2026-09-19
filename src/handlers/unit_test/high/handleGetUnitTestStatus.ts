@@ -9,12 +9,8 @@ import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
-  description:
-    'Retrieve ABAP Unit test run status for a run_id. ' +
-    'On legacy systems (BASIS < 7.50) this always refuses: a legacy run answers its result synchronously inside ' +
-    'RunUnitTest/CreateUnitTest, but AdtClientLegacy.getUnitTest() returns a new instance every time it is ' +
-    'called, even on the same client, so this tool always refuses (issue #208).',
+  available_in: ['onprem', 'cloud'] as const,
+  description: 'Retrieve ABAP Unit test run status for a run_id.',
   inputSchema: {
     type: 'object',
     properties: {

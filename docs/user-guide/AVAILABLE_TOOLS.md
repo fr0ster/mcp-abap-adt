@@ -788,7 +788,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description. 
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -2150,7 +2150,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercreate-high-level-compact"></a>
 #### HandlerCreate (High-Level / Compact)
-**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
+**Description:** Create operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, package_name*, root_entity*, implementation_type*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, package_name*), METADATA_EXTENSION(name*, package_name*), UNIT_TEST(tests*), CDS_UNIT_TEST(class_name*, package_name*, cds_view_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCreate.ts`
 
@@ -2194,7 +2194,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerdelete-high-level-compact"></a>
 #### HandlerDelete (High-Level / Compact)
-**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
+**Description:** Delete operation. object_type required: DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerDelete.ts`
 
@@ -2248,7 +2248,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerget-high-level-compact"></a>
 #### HandlerGet (High-Level / Compact)
-**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
+**Description:** Read operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(behavior_definition_name*), BEHAVIOR_IMPLEMENTATION(behavior_implementation_name*), METADATA_EXTENSION(metadata_extension_name*), UNIT_TEST(run_id*), CDS_UNIT_TEST(run_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerGet.ts`
 
@@ -2439,7 +2439,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerupdate-high-level-compact"></a>
 #### HandlerUpdate (High-Level / Compact)
-**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem/legacy only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
+**Description:** Update operation. object_type required: PACKAGE(package_name*), DOMAIN(domain_name*), DATA_ELEMENT(data_element_name*), TABLE(table_name*), STRUCTURE(structure_name*), DDL(ddl_name*), SERVICE_DEFINITION(service_definition_name*), SERVICE_BINDING(service_binding_name*), CLASS(class_name*), LOCAL_TEST_CLASS(class_name*), LOCAL_TYPES(class_name*), LOCAL_DEFINITIONS(class_name*), LOCAL_MACROS(class_name*), PROGRAM(program_name*) [onprem only], INTERFACE(interface_name*), FUNCTION_GROUP(function_group_name*), FUNCTION_MODULE(function_module_name*, function_group_name*), BEHAVIOR_DEFINITION(name*, source_code*), BEHAVIOR_IMPLEMENTATION(class_name*, behavior_definition*, implementation_code*), METADATA_EXTENSION(name*, source_code*), UNIT_TEST(run_id*), CDS_UNIT_TEST(class_name*, test_class_source*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUpdate.ts`
 
@@ -3218,7 +3218,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getpackage-high-level-package"></a>
 #### GetPackage (High-Level / Package)
-**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version. 
+**Description:** Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.
 
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
@@ -3642,7 +3642,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. 
+**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -3717,7 +3717,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittest-high-level-unit-test"></a>
 #### GetUnitTest (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
+**Description:** Retrieve ABAP Unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTest.ts`
 
@@ -3728,7 +3728,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
+**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
@@ -3741,7 +3741,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunitteststatus-high-level-unit-test"></a>
 #### GetUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run status for a run_id. 
+**Description:** Retrieve ABAP Unit test run status for a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestStatus.ts`
 
@@ -3753,7 +3753,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries. 
+**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -4042,7 +4042,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclassunittestresultlow-low-level-class"></a>
 #### GetClassUnitTestResultLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id. 
+**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestResult.ts`
 
@@ -4057,7 +4057,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclassunitteststatuslow-low-level-class"></a>
 #### GetClassUnitTestStatusLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id. 
+**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestStatus.ts`
 
@@ -4095,7 +4095,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runclassunittestslow-low-level-class"></a>
 #### RunClassUnitTestsLow (Low-Level / Class)
-**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers. 
+**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
 
 **Source:** `src/handlers/class/low/handleRunClassUnitTests.ts`
 
@@ -4214,14 +4214,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem/legacy only — calling it on ABAP Cloud will fail.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
+- `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
 
 ---
@@ -5113,7 +5113,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletepackagelow-low-level-package"></a>
 #### DeletePackageLow (Low-Level / Package)
-**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. 
+**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
 
@@ -5156,7 +5156,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatepackagelow-low-level-package"></a>
 #### UpdatePackageLow (Low-Level / Package)
-**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. 
+**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleUpdatePackage.ts`
 
@@ -5630,4 +5630,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-16*
+*Last updated: 2026-09-17*

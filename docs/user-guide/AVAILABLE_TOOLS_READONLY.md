@@ -440,7 +440,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readpackage-read-only-package"></a>
 #### ReadPackage (Read-Only / Package)
-**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description. 
+**Description:** [read-only] Read ABAP package definition and metadata. Answers: "show package X", "display package properties", "view package contents", "get package info". Returns definition, super-package, responsible, description.
 
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
@@ -1033,4 +1033,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-16*
+*Last updated: 2026-09-17*

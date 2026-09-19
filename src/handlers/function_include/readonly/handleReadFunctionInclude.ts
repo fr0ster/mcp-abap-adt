@@ -10,7 +10,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'ReadFunctionInclude',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Read ABAP function group include source code and metadata. Answers: "show function group include code", "display include source", "view include of function group". Returns source code and include metadata.',
   inputSchema: {

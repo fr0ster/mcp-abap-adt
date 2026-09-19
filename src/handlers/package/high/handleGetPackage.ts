@@ -9,11 +9,9 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetPackage',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version. ' +
-    'On legacy systems (BASIS < 7.50) every package operation is refused outright before any request is made — ' +
-    'the client answers UNSUPPORTED_OPERATION without accepting a caller strategy (issue #207).',
+    'Retrieve ABAP package metadata (description, super-package, etc.). Supports reading active or inactive version.',
   inputSchema: {
     type: 'object',
     properties: {

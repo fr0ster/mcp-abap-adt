@@ -11,7 +11,9 @@ export type { HandlerContext };
  * SAP environment types for tool availability filtering.
  * - 'cloud'  — BTP ABAP Environment (jwt auth)
  * - 'onprem' — Modern on-premise (BASIS >= 7.50)
- * - 'legacy' — Legacy on-premise (BASIS < 7.50)
+ * - 'legacy' — Legacy on-premise (BASIS < 7.50). Accepted by the type and
+ *   declared by no tool: that support is parked on `parked/legacy-support`
+ *   until it can be tried against a live legacy system.
  */
 export type SapEnvironment = 'cloud' | 'onprem' | 'legacy';
 

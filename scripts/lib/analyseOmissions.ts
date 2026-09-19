@@ -246,217 +246,6 @@ function lineOf(source: ts.SourceFile, node: ts.Node): number {
 }
 
 /**
- * Which `(handler, Legacy class, member)` pairs land on a member the legacy
- * contract does not parameterise — meaning: does not accept, in any form,
- * what a caller on a modern system would pass it.
- *
- * A handler reaches a member through `client.getPackage().readMetadata(...)`;
- * the factory (`getPackage`) decides which class serves the call on a legacy
- * system, and only four of the ten overridden classes are affected —
- * eighteen members across them, measured against the shipped `.js`, not the
- * `.d.ts`.
- *
- * **Not all eighteen drop the same thing, and calling all of it "the
- * strategy" overstates nine of them.** Nine genuinely drop `analyse` — a
- * caller-supplied failure verdict modern accepts and legacy ignores. The
- * other nine never accepted `analyse` on modern either; what legacy drops
- * there is something else — a positional argument, a run identifier, a table
- * name, an already-single-purpose options field — which is a different
- * failure mode, and in the unit-test trio's case a worse one (see
- * `AdtUnitTestLegacy.js` below and issue #208, which this ledger's
- * construction surfaced rather than caused).
- *
- * - `AdtPackageLegacy.js` (6: 5 genuinely drop `analyse`, 1 never had one):
- *   `create`, `readMetadata`, `validate`, `updateMetadata`, `delete` are
- *   declared with an EMPTY parameter list and always answer
- *   `failed(UNSUPPORTED)` — modern `AdtPackage` accepts
- *   `IAdtOperationOptions<E>`/`IAdtCreateOptions<E>` on every one of these, so
- *   whatever a caller passes, including `analyse`, is discarded before it is
- *   ever bound to a name. `read()` is also declared and overridden with an
- *   empty parameter list, but modern `AdtPackage` implements
- *   `IAdtMetadataReadable`, not `IAdtReadable` — it has no public `read`
- *   member at all, so no caller on either system could ever have handed this
- *   one an `analyse` to begin with; the legacy override is dead code from the
- *   type's perspective, not a dropped strategy.
- * - `AdtUnitTestLegacy.js` (3, none of which had a caller `analyse` to drop):
- *   `run(tests, options)` binds `options` but the wire call underneath is
- *   `startClassUnitTestRunLegacy(connection, tests, _options)` — renamed,
- *   unread — and `answering(runFn, () => LEGACY_SYNC_RUN_ID)` takes only two
- *   arguments, dropping the shipped `startedRun` verdict modern's `run` adds
- *   as a third; `IClassUnitTestRunOptions` never declared `analyse` on either
- *   system, so what is lost here is the library's own default check, not a
- *   caller's. `getStatus()`/`getResult()` are declared and called with NO
- *   parameters at all — not even the run id modern's `getResult(runId,
- *   options)` takes, and modern's `getStatus`/`getResult` never accepted
- *   `analyse` either — and simply replay whatever `run()` already captured.
- * - `AdtRequestLegacy.js` (5: 4 genuinely drop `analyse`, 1 never had one):
- *   `create`, `readMetadata`, `updateMetadata`, `delete` all either take no
- *   parameters (`create`/`updateMetadata`/`delete`, hardcoded refusal, same
- *   shape as `AdtPackageLegacy`) or bind `options`/`config` and never read
- *   `analyse` out of it (`readMetadata`). Modern's `AdtRequest` accepts
- *   `IAdtOperationOptions<E>`/`IAdtCreateOptions<E>` on all four. `list` is
- *   declared and overridden too, and it does bind `options` and reads only
- *   `options?.configUri` out of it — but modern's own `IListTransportsOptions`
- *   is `{ configUri?: string }`, one field and never an `analyse`, so there
- *   was nothing for either system's `list` to drop.
- * - `AdtUtilsLegacy.js` (4, none of which had a caller `analyse` to drop):
- *   `activateObjectsGroup(objects, preauditRequested)` has no third parameter
- *   on legacy OR modern — `AdtUtils.d.ts` declares none either — so this one
- *   is inert everywhere, not legacy-specific (also tracked in #200);
- *   `getTableColumns`, `getTableContents` and `getSqlQuery` all take their
- *   single positional argument renamed with a leading underscore and answer a
- *   hardcoded connection failure instead of making the call — modern accepts
- *   no options on these three either, so what legacy drops is the argument
- *   itself (a table name, a query), not a strategy layered on top of one.
- *
- * **`AdtRequestLegacy.create` is in this list.** It shares `AdtPackageLegacy`'s
- * empty-parameter-list, always-refuse shape and was missing from an earlier
- * draft of this table (which counted seventeen, not eighteen, across a
- * four-entry `getRequest` list rather than this one's five). No handler this
- * repository ships reaches `getRequest()` on a system declaring `'legacy'` in
- * `available_in` (checked against every handler under `src/handlers`), so the
- * whole factory's exposure is real but currently unreachable — the addition
- * changes no entry in `tests/fixtures/legacy-exposure.json`.
- */
-export const LEGACY_NO_STRATEGY: Record<string, readonly string[]> = {
-  getPackage: [
-    'create',
-    'read',
-    'readMetadata',
-    'updateMetadata',
-    'delete',
-    'validate',
-  ],
-  getUnitTest: ['run', 'getStatus', 'getResult'],
-  getRequest: ['create', 'delete', 'updateMetadata', 'list', 'readMetadata'],
-  getUtils: [
-    'activateObjectsGroup',
-    'getTableContents',
-    'getTableColumns',
-    'getSqlQuery',
-  ],
-};
-
-/**
- * Factories `AdtClientLegacy` declares as never available — the no-arg
- * overload throws unconditionally, regardless of any argument a caller
- * passes (a results set does not save it; `getCdsUnitTest(ourUnitTest)`
- * throws exactly like `getCdsUnitTest()`, since the override takes no
- * parameters and JS ignores extras). Read from `AdtClientLegacy.js` directly:
- * every one of these is `throw new Error(unsupportedError(...))`, not an
- * answered failure — the one shape `AdtPackageLegacy`/`AdtRequestLegacy`
- * never take.
- *
- * `getService` is `AdtServiceBinding`'s deprecated alias for
- * `getServiceBinding` and throws the same way; classified as
- * `getServiceBinding` below since it is the same class either name reaches.
- */
-export const LEGACY_THROWS = new Set([
-  'getCdsUnitTest',
-  'getDomain',
-  'getDataElement',
-  'getStructure',
-  'getTable',
-  'getTableType',
-  'getAccessControl',
-  'getServiceDefinition',
-  'getServiceBinding',
-  'getService',
-  'getBehaviorDefinition',
-  'getBehaviorImplementation',
-  'getMetadataExtension',
-  'getEnhancement',
-]);
-
-/**
- * The handlers a legacy system can actually reach.
- *
- * **The ledger is meaningless without this filter.** A handful of handlers
- * call the four factories whose `Legacy` class drops the strategy, and most of
- * them are not offered on legacy at all — the package creates, the searches,
- * the transport tools. Recorded unfiltered, the ledger would carry more false
- * entries than real ones and read as a much worse problem than exists.
- *
- * A file with no `available_in` is available everywhere, legacy included. No
- * handler is in that state today; the branch is here because the field is
- * optional by contract, not because something needs it.
- *
- * **Approximation, recorded and not fixed.** This reads `available_in`
- * out of the handler's own file. Forty-one tools declare their availability
- * in a shared table elsewhere rather than in their own `TOOL_DEFINITION`, so
- * for those this function's "no `available_in` found" branch answers
- * "available everywhere" whether or not the shared table actually restricts
- * them — a handler-level fixture is an approximation of a tool-level fact.
- * Left as a known gap rather than papered over with a second data source this
- * function would then have to trust blindly.
- */
-export function legacyEnabledHandlers(
-  pattern = 'src/handlers/**/handle*.ts',
-): string[] {
-  const AVAILABLE_IN = /available_in\s*:\s*\[([^\]]*)\]/;
-  // Either quote style. The repository writes single quotes today, and a
-  // formatter switching them would otherwise empty this list without a word.
-  const LEGACY = /['"`]legacy['"`]/;
-  return globSync(pattern).filter((file) => {
-    const declared = AVAILABLE_IN.exec(readFileSync(file, 'utf8'));
-    return declared === null || LEGACY.test(declared[1]);
-  });
-}
-
-export function legacyExposure(handlers: string[]): string[] {
-  const program = ts.createProgram(handlers, compilerOptions());
-  const checker = program.getTypeChecker();
-  const found = new Set<string>();
-  for (const file of handlers) {
-    const source = program.getSourceFile(file);
-    if (source === undefined) continue;
-    for (const call of memberCallsIn(source)) {
-      const access = call.expression as ts.PropertyAccessExpression;
-      const member = access.name.getText();
-      const factory = factoryOf(access.expression, checker);
-      if (
-        factory !== undefined &&
-        LEGACY_NO_STRATEGY[factory]?.includes(member)
-      ) {
-        found.add(
-          `${file.replace('src/handlers/', '')} → ${factory}().${member}`,
-        );
-      }
-    }
-  }
-  return [...found].sort();
-}
-
-/**
- * Which handlers reach a factory `AdtClientLegacy` declares never available —
- * one `throw`, not an answered failure, and not gated by anything this
- * repository's own code checks first.
- *
- * Unlike `legacyExposure`, there is no per-member table here: the factory
- * call itself is what throws, before any member on its result could be
- * reached, so the finding is the factory name, once per handler.
- */
-export function legacyThrows(handlers: string[]): string[] {
-  const program = ts.createProgram(handlers, compilerOptions());
-  const checker = program.getTypeChecker();
-  const found = new Set<string>();
-  for (const file of handlers) {
-    const source = program.getSourceFile(file);
-    if (source === undefined) continue;
-    for (const call of memberCallsIn(source)) {
-      const access = call.expression as ts.PropertyAccessExpression;
-      const member = access.name.getText();
-      if (!LEGACY_THROWS.has(member)) continue;
-      const receiver = classify(access.expression, checker);
-      if (receiver === 'AdtClient') {
-        found.add(`${file.replace('src/handlers/', '')} → ${member}()`);
-      }
-    }
-  }
-  return [...found].sort();
-}
-
-/**
  * Which factory produced this receiver, or `'AdtClient'` for the receiver
  * that names factories in the first place — resolved from the receiver's
  * TYPE, not from the syntax that produced it.
@@ -548,6 +337,8 @@ const ALIAS_FACTORY: Record<string, string> = {
 
 const SYMBOL_FACTORY: Record<string, string> = {
   AdtClient: 'AdtClient',
+  // Kept: the resolver maps a symbol to the factory it stands for, and this
+  // one costs a line. No handler reaches it now that legacy is parked.
   AdtClientLegacy: 'AdtClient',
   AdtUnitTest: 'getUnitTest',
   AdtUtils: 'getUtils',
@@ -580,7 +371,7 @@ function classifyType(type: ts.Type): string | undefined {
   return undefined;
 }
 
-/** Alias kept for `legacyExposure`'s call site — `factoryOf` reads better there. */
+/** `factoryOf` reads better at a call site than the resolver's own name. */
 function factoryOf(
   receiver: ts.Expression,
   checker: ts.TypeChecker,

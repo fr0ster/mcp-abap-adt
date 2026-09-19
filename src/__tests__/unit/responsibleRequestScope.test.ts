@@ -42,7 +42,6 @@ describe('responsible and master system are request-scoped', () => {
     resetSystemContextCache();
     (AdtClient as jest.Mock).mockClear();
     setSystemContext({
-      isLegacy: false,
       masterSystem: 'PROC_SYS',
       responsible: 'PROC_USER',
     });

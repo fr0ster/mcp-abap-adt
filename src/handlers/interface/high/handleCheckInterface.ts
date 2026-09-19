@@ -25,7 +25,7 @@ import { handleCheckInterface as handleCheckInterfaceLow } from '../low/handleCh
 
 export const TOOL_DEFINITION = {
   name: 'CheckInterface',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Perform syntax check on an ABAP interface. Returns syntax errors, warnings, and messages.',
   inputSchema: {

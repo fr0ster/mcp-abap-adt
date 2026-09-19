@@ -16,7 +16,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteDdlLow',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
   inputSchema: {

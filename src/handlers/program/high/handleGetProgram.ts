@@ -9,7 +9,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     'Retrieve ABAP program definition. Supports reading active or inactive version.',
   inputSchema: {

@@ -25,7 +25,7 @@ import { handleCheckDdl as handleCheckDdlLow } from '../low/handleCheckDdl';
 
 export const TOOL_DEFINITION = {
   name: 'CheckDdl',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Perform syntax check on an ABAP CDS view. Can check existing view (active/inactive) or validate hypothetical DDL source. Returns syntax errors, warnings, and messages.',
   inputSchema: {

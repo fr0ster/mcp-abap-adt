@@ -9,7 +9,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'GetLocalTypes',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve local types source code from a class (implementations include). Supports reading active or inactive version.',
   inputSchema: {

@@ -404,7 +404,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclassunittestresultlow-low-level-class"></a>
 #### GetClassUnitTestResultLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id. 
+**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestResult.ts`
 
@@ -419,7 +419,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getclassunitteststatuslow-low-level-class"></a>
 #### GetClassUnitTestStatusLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id. 
+**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
 
 **Source:** `src/handlers/class/low/handleGetClassUnitTestStatus.ts`
 
@@ -457,7 +457,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runclassunittestslow-low-level-class"></a>
 #### RunClassUnitTestsLow (Low-Level / Class)
-**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers. 
+**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
 
 **Source:** `src/handlers/class/low/handleRunClassUnitTests.ts`
 
@@ -576,14 +576,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem/legacy only — calling it on ABAP Cloud will fail.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
-- `object_type` (string, required) - Object type. Supported: class, program (onprem/legacy only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
+- `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number
 
 ---
@@ -1475,7 +1475,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletepackagelow-low-level-package"></a>
 #### DeletePackageLow (Low-Level / Package)
-**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. 
+**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
 
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
 
@@ -1518,7 +1518,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatepackagelow-low-level-package"></a>
 #### UpdatePackageLow (Low-Level / Package)
-**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. 
+**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleUpdatePackage.ts`
 
@@ -1992,4 +1992,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-16*
+*Last updated: 2026-09-17*

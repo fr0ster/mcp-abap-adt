@@ -48,7 +48,7 @@ import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
   inputSchema: {

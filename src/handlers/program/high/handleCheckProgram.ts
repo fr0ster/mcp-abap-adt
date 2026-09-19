@@ -25,7 +25,7 @@ import { handleCheckProgram as handleCheckProgramLow } from '../low/handleCheckP
 
 export const TOOL_DEFINITION = {
   name: 'CheckProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     'Perform syntax check on an ABAP program. Returns syntax errors, warnings, and messages. Not available on cloud.',
   inputSchema: {

@@ -25,7 +25,7 @@ import { handleCheckFunctionModule as handleCheckFunctionModuleLow } from '../lo
 
 export const TOOL_DEFINITION = {
   name: 'CheckFunctionModule',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Perform syntax check on an ABAP function module. Returns syntax errors, warnings, and messages.',
   inputSchema: {

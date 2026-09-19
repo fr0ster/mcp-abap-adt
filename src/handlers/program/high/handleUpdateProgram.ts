@@ -35,7 +35,7 @@ import { isCloudConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     'Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {

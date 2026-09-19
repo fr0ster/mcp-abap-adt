@@ -119,7 +119,7 @@ export async function buildVersionDiff(
 
 export const TOOL_DEFINITION = {
   name: 'GetObjectVersionDiff',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     '[read-only] Compute a unified diff between two object versions. Pass the two opaque content_uris from GetObjectVersions entries; returns the unified diff (jsdiff) of their sources.',
   inputSchema: {

@@ -25,7 +25,7 @@ import { handleCheckFunctionGroup as handleCheckFunctionGroupLow } from '../low/
 
 export const TOOL_DEFINITION = {
   name: 'CheckFunctionGroup',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Perform syntax check on an ABAP function group. Returns syntax errors, warnings, and messages.',
   inputSchema: {

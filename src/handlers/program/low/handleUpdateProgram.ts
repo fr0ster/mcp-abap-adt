@@ -30,7 +30,7 @@ import {
 
 export const TOOL_DEFINITION = {
   name: 'UpdateProgramLow',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     '[low-level] Update source code of an existing ABAP program. Requires lock handle from LockObject. - use UpdateProgram (high-level) for full workflow with lock/unlock/activate.',
   inputSchema: {

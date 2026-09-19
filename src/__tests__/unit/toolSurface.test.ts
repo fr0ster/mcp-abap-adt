@@ -90,63 +90,29 @@ describe('the MCP tool surface', () => {
   });
 
   /**
-   * Two tools narrow deliberately, and they are named here so the narrowing
-   * cannot spread by accident.
+   * The snapshot moved once, deliberately, and this is what it moved by.
    *
-   * A package cannot be edited on a legacy system — reading its metadata and
-   * its contents is fine, changing it is not. `CreatePackage` and
-   * `ValidatePackageLow` already said so; `UpdatePackageLow` and
-   * `DeletePackageLow` still offered `legacy` and could only refuse there.
+   * Every tool that declared `legacy` stopped: support for legacy systems
+   * (BASIS < 7.50) is parked on `parked/legacy-support` until it can be tried
+   * against a live one. Nothing in this repository ever was — the environment
+   * was declared on 142 tools, and `available_in` naming an environment
+   * nobody had verified is a claim rather than a fact.
    *
-   * **Why editing is the line, and why `available_in` cannot draw it
-   * exactly.** On a legacy system editing needs a lock, and lock/unlock there
-   * go over RFC — so editing works on legacy-over-RFC and not on
-   * legacy-over-HTTP, where only reading was ever allowed. `available_in`
-   * knows three values, `onprem | cloud | legacy`, and none of them is a
-   * transport: the connection type is a separate setting
-   * (`connectionType: 'rfc'`, `connectionFactory.ts`) that this vocabulary
-   * cannot reach. So the surface cannot say "legacy, but only over RFC".
-   *
-   * What makes the narrowing safe anyway is that it does not depend on the
-   * transport at all: `AdtPackageLegacy` refuses `updateMetadata` and
-   * `delete` unconditionally, RFC or HTTP alike. Those two tools could not
-   * work on legacy by any route, which is a stronger statement than the
-   * transport one and the one this list rests on.
-   *
-   * The reads keep `legacy` for the opposite reason: reading a package on
-   * legacy is precisely the thing that was always meant to work over HTTP.
-   * `AdtPackageLegacy` blocks `read`/`readMetadata` too, and that blanket
-   * block is upstream and contradicts the rule rather than expressing it —
-   * the commit that introduced it (`mcp-abap-adt-clients` `0c9ae6b9`) blocked
-   * every member at once over an RFC observation. Hiding the read tools here
-   * would bake that over-block into this repository's surface and make the
-   * upstream fix invisible when it comes.
-   *
-   * Lock and unlock keep `legacy` for the transport reason above: they are
-   * not overridden by the legacy class and they do work over RFC, which is
-   * the only way editing happens there at all.
+   * The refreeze was checked rather than trusted: `inputs` had to match the
+   * old snapshot row for row, and each `available_in` had to equal the old
+   * one with `legacy` removed and nothing else. A tool that had quietly
+   * gained or lost anything else would have stopped the refreeze.
    */
-  const NARROWED_ON_PURPOSE: Record<string, string> = {
-    'low/UpdatePackageLow': 'cloud, onprem',
-    'low/DeletePackageLow': 'cloud, onprem',
-  };
+  it('no tool declares legacy', () => {
+    expect(current.filter((r) => /legacy/.test(r.available_in))).toEqual([]);
+  });
 
-  it('changes no tool availability, except where this file says so', () => {
+  it('changes no tool availability', () => {
     const now = availability(current);
     for (const [tool, before] of availability(frozen)) {
       expect({ tool, available_in: now.get(tool) }).toEqual({
         tool,
-        available_in: NARROWED_ON_PURPOSE[tool] ?? before,
-      });
-    }
-  });
-
-  it('every deliberate narrowing is still one — a stale entry hides nothing', () => {
-    const frozenAvailability = availability(frozen);
-    for (const [tool, narrowed] of Object.entries(NARROWED_ON_PURPOSE)) {
-      expect({ tool, was: frozenAvailability.get(tool) }).not.toEqual({
-        tool,
-        was: narrowed,
+        available_in: before,
       });
     }
   });

@@ -232,11 +232,10 @@ async function main(): Promise<void> {
     await connection.connect();
   }
 
-  // Resolve the system context the handlers read (master system, responsible, isLegacy).
-  // Without this a legacy env would be measured with the wrong client behaviour.
+  // Resolve the system context the handlers read (master system, responsible).
   const ctx = await resolveSystemContext(connection);
   console.log(
-    `system:    isLegacy=${ctx.isLegacy ?? false} client=${ctx.client ?? '(default)'} responsible=${ctx.responsible ?? '(unset)'}\n`,
+    `system:    client=${ctx.client ?? '(default)'} responsible=${ctx.responsible ?? '(unset)'}\n`,
   );
 
   const meter = instrument(connection);

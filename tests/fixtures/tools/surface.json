@@ -9,19 +9,19 @@
     "group": "readonly",
     "name": "GetPackageContents",
     "inputs": "package_name*, include_subpackages, max_depth, include_descriptions",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "GetInclude",
     "inputs": "include_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "GetIncludesList",
     "inputs": "object_name*, object_type*, detailed, timeout",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
@@ -57,19 +57,19 @@
     "group": "readonly",
     "name": "ReadClass",
     "inputs": "class_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ReadInterface",
     "inputs": "interface_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ReadProgram",
     "inputs": "program_name*, version",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "readonly",
@@ -87,31 +87,31 @@
     "group": "readonly",
     "name": "GetStructuresList",
     "inputs": "structure_name*, version, include_extensions, timeout",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "GetObjectVersions",
     "inputs": "object_type*, object_name*, function_group_name",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "GetObjectVersionSource",
     "inputs": "object_type*, content_uri*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "GetObjectVersionDiff",
     "inputs": "object_type*, content_uri_from*, content_uri_to*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ReadDdl",
     "inputs": "ddl_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
@@ -141,37 +141,37 @@
     "group": "readonly",
     "name": "ReadFunctionModule",
     "inputs": "function_module_name*, function_group_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ReadFunctionInclude",
     "inputs": "function_group_name*, include_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ListFunctionGroupIncludes",
     "inputs": "function_group_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ListFunctionModules",
     "inputs": "function_group_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ReadFunctionGroup",
     "inputs": "function_group_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
     "name": "ReadPackage",
     "inputs": "package_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "readonly",
@@ -207,7 +207,7 @@
     "group": "high",
     "name": "ActivateObjects",
     "inputs": "objects*, preaudit",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -237,37 +237,37 @@
     "group": "high",
     "name": "ActivateDdl",
     "inputs": "ddl_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateClass",
     "inputs": "class_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateInterface",
     "inputs": "interface_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateProgram",
     "inputs": "program_name*, session_id, session_state, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "ActivateFunctionModule",
     "inputs": "function_module_name*, function_group_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "ActivateFunctionGroup",
     "inputs": "function_group_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -303,7 +303,7 @@
     "group": "high",
     "name": "GetPackage",
     "inputs": "package_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -459,25 +459,25 @@
     "group": "high",
     "name": "CreateDdl",
     "inputs": "ddl_name*, package_name*, transport_request, description, master_language, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetDdl",
     "inputs": "ddl_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateDdl",
     "inputs": "ddl_name*, ddl_source*, transport_request, activate, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteDdl",
     "inputs": "ddl_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -543,289 +543,289 @@
     "group": "high",
     "name": "GetClass",
     "inputs": "class_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateClass",
     "inputs": "class_name*, description, package_name*, transport_request, superclass, final, abstract, create_protected, master_language, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateClass",
     "inputs": "class_name*, source_code*, transport_request, activate, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteClass",
     "inputs": "class_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateUnitTest",
     "inputs": "tests*, title, context, scope, risk_level, duration",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "RunUnitTest",
     "inputs": "tests*, title, context, scope, risk_level, duration",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetUnitTest",
     "inputs": "run_id*, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetUnitTestStatus",
     "inputs": "run_id*, with_long_polling, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetUnitTestResult",
     "inputs": "run_id*, with_navigation_uris, format, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateUnitTest",
     "inputs": "run_id*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteUnitTest",
     "inputs": "run_id*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateCdsUnitTest",
     "inputs": "class_name*, package_name*, cds_view_name*, description, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetCdsUnitTest",
     "inputs": "run_id*, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetCdsUnitTestStatus",
     "inputs": "run_id*, with_long_polling, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetCdsUnitTestResult",
     "inputs": "run_id*, with_navigation_uris, format, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateCdsUnitTest",
     "inputs": "class_name*, test_class_source*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteCdsUnitTest",
     "inputs": "class_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetLocalTestClass",
     "inputs": "class_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateLocalTestClass",
     "inputs": "class_name*, test_class_code*, transport_request, activate_on_update, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteLocalTestClass",
     "inputs": "class_name*, transport_request, activate_on_delete, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetLocalTypes",
     "inputs": "class_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateLocalTypes",
     "inputs": "class_name*, local_types_code*, transport_request, activate_on_update, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteLocalTypes",
     "inputs": "class_name*, transport_request, activate_on_delete, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetLocalDefinitions",
     "inputs": "class_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateLocalDefinitions",
     "inputs": "class_name*, definitions_code*, transport_request, activate_on_update, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteLocalDefinitions",
     "inputs": "class_name*, transport_request, activate_on_delete, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetLocalMacros",
     "inputs": "class_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateLocalMacros",
     "inputs": "class_name*, macros_code*, transport_request, activate_on_update, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteLocalMacros",
     "inputs": "class_name*, transport_request, activate_on_delete, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateProgram",
     "inputs": "program_name*, description, package_name*, transport_request, program_type, application, master_language, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "GetProgram",
     "inputs": "program_name*, version",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "UpdateProgram",
     "inputs": "program_name*, source_code*, transport_request, activate, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "DeleteProgram",
     "inputs": "program_name*, transport_request, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "CreateInterface",
     "inputs": "interface_name*, description, package_name*, transport_request, master_language, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetInterface",
     "inputs": "interface_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateInterface",
     "inputs": "interface_name*, source_code*, transport_request, activate, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteInterface",
     "inputs": "interface_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateFunctionGroup",
     "inputs": "function_group_name*, description, package_name*, transport_request, activate, master_language, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetFunctionGroup",
     "inputs": "function_group_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateFunctionGroup",
     "inputs": "function_group_name*, description*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteFunctionGroup",
     "inputs": "function_group_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateFunctionModule",
     "inputs": "function_group_name*, function_module_name*, description, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetFunctionModule",
     "inputs": "function_module_name*, function_group_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateFunctionModule",
     "inputs": "function_group_name*, function_module_name*, source_code*, transport_request, activate, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteFunctionModule",
     "inputs": "function_module_name*, function_group_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CreateFunctionInclude",
     "inputs": "function_group_name*, include_name*, description, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "UpdateFunctionInclude",
     "inputs": "function_group_name*, include_name*, source_code*, transport_request, activate, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "DeleteFunctionInclude",
     "inputs": "function_group_name*, include_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -909,7 +909,7 @@
     "group": "high",
     "name": "CheckClass",
     "inputs": "class_name*, version, source_code",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -927,19 +927,19 @@
     "group": "high",
     "name": "CheckFunctionGroup",
     "inputs": "function_group_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CheckFunctionModule",
     "inputs": "function_group_name*, function_module_name*, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CheckInterface",
     "inputs": "interface_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -951,13 +951,13 @@
     "group": "high",
     "name": "CheckPackage",
     "inputs": "package_name*, super_package*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CheckProgram",
     "inputs": "program_name*",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
@@ -975,79 +975,79 @@
     "group": "high",
     "name": "CheckDdl",
     "inputs": "ddl_name*, version, ddl_source",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetClassVersions",
     "inputs": "class_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetClassVersionSource",
     "inputs": "content_uri*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetClassVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersions",
     "inputs": "program_name*",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersionSource",
     "inputs": "content_uri*",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "GetProgramVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "high",
     "name": "GetInterfaceVersions",
     "inputs": "interface_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetInterfaceVersionSource",
     "inputs": "content_uri*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetInterfaceVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetFunctionModuleVersions",
     "inputs": "function_module_name*, function_group_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetFunctionModuleVersionSource",
     "inputs": "content_uri*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetFunctionModuleVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1089,19 +1089,19 @@
     "group": "high",
     "name": "GetDdlVersions",
     "inputs": "ddl_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetDdlVersionSource",
     "inputs": "content_uri*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetDdlVersionDiff",
     "inputs": "content_uri_from*, content_uri_to*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "high",
@@ -1143,37 +1143,37 @@
     "group": "low",
     "name": "ActivateObjectLow",
     "inputs": "objects*, preaudit, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UpdatePackageLow",
     "inputs": "package_name*, super_package*, updated_description*, lock_handle*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockPackageLow",
     "inputs": "package_name*, super_package*, lock_handle*, session_id*, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckPackageLow",
     "inputs": "package_name*, super_package*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "DeletePackageLow",
     "inputs": "package_name*, transport_request, force_new_connection, connection_config, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockPackageLow",
     "inputs": "package_name*, super_package*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
@@ -1389,325 +1389,325 @@
     "group": "low",
     "name": "UpdateDdlLow",
     "inputs": "ddl_name*, ddl_source*, lock_handle*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckDdlLow",
     "inputs": "ddl_name*, ddl_source, version, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "DeleteDdlLow",
     "inputs": "ddl_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockDdlLow",
     "inputs": "ddl_name*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockDdlLow",
     "inputs": "ddl_name*, lock_handle*, session_id*, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ValidateDdlLow",
     "inputs": "ddl_name*, package_name*, description*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CreateDdlLow",
     "inputs": "ddl_name*, description*, package_name*, transport_request, application, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ActivateDdlLow",
     "inputs": "ddl_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UpdateClassLow",
     "inputs": "class_name*, source_code*, lock_handle*, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "DeleteClassLow",
     "inputs": "class_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockClassLow",
     "inputs": "class_name*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockClassLow",
     "inputs": "class_name*, lock_handle*",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CreateClassLow",
     "inputs": "class_name*, description*, package_name*, transport_request, superclass, final, abstract, create_protected, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ValidateClassLow",
     "inputs": "class_name*, package_name*, description*, superclass, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckClassLow",
     "inputs": "class_name*, version, source_code, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ActivateClassLow",
     "inputs": "class_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockClassTestClassesLow",
     "inputs": "class_name*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockClassTestClassesLow",
     "inputs": "class_name*, lock_handle*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UpdateClassTestClassesLow",
     "inputs": "class_name*, test_class_source*, lock_handle*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ActivateClassTestClassesLow",
     "inputs": "class_name*, test_class_name, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "RunClassUnitTestsLow",
     "inputs": "tests*, title, context, scope, risk_level, duration, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "GetClassUnitTestStatusLow",
     "inputs": "run_id*, with_long_polling, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "GetClassUnitTestResultLow",
     "inputs": "run_id*, with_navigation_uris, format, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UpdateProgramLow",
     "inputs": "program_name*, source_code*, lock_handle*, session_id, session_state, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "CheckProgramLow",
     "inputs": "program_name*, session_id, session_state, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "DeleteProgramLow",
     "inputs": "program_name*, transport_request, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "LockProgramLow",
     "inputs": "program_name*, session_id, session_state",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "UnlockProgramLow",
     "inputs": "program_name*, lock_handle*, session_id*, session_state",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "ValidateProgramLow",
     "inputs": "program_name*, package_name*, description*, session_id, session_state, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "CreateProgramLow",
     "inputs": "program_name*, description*, package_name*, transport_request, program_type, application, session_id, session_state, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "ActivateProgramLow",
     "inputs": "program_name*, session_id, session_state, detail",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "UpdateInterfaceLow",
     "inputs": "interface_name*, source_code*, lock_handle*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckInterfaceLow",
     "inputs": "interface_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "DeleteInterfaceLow",
     "inputs": "interface_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockInterfaceLow",
     "inputs": "interface_name*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockInterfaceLow",
     "inputs": "interface_name*, lock_handle*, session_id*, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ValidateInterfaceLow",
     "inputs": "interface_name*, package_name*, description*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CreateInterfaceLow",
     "inputs": "interface_name*, description*, package_name*, transport_request, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ActivateInterfaceLow",
     "inputs": "interface_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckFunctionGroupLow",
     "inputs": "function_group_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "DeleteFunctionGroupLow",
     "inputs": "function_group_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "DeleteFunctionModuleLow",
     "inputs": "function_module_name*, function_group_name*, transport_request, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockFunctionGroupLow",
     "inputs": "function_group_name*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "LockFunctionModuleLow",
     "inputs": "function_module_name*, function_group_name*, session_id, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockFunctionGroupLow",
     "inputs": "function_group_name*, lock_handle*, session_id*, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UnlockFunctionModuleLow",
     "inputs": "function_module_name*, function_group_name*, lock_handle*, session_id*, session_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ValidateFunctionGroupLow",
     "inputs": "function_group_name*, package_name, description, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CreateFunctionGroupLow",
     "inputs": "function_group_name*, description*, package_name*, transport_request, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CreateFunctionModuleLow",
     "inputs": "function_module_name*, function_group_name*, description*, package_name*, transport_request, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "UpdateFunctionModuleLow",
     "inputs": "function_module_name*, function_group_name*, source_code*, transport_request, lock_handle*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ValidateFunctionModuleLow",
     "inputs": "function_group_name*, function_module_name*, description, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckFunctionModuleLow",
     "inputs": "function_group_name*, function_module_name*, version, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ActivateFunctionModuleLow",
     "inputs": "function_module_name*, function_group_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "ActivateFunctionGroupLow",
     "inputs": "function_group_name*, session_id, session_state, detail",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "low",
@@ -1947,25 +1947,25 @@
     "group": "compact",
     "name": "HandlerCreate",
     "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, description, transport_request, activate, program_type, application, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, name, root_entity, implementation_type, behavior_definition, cds_view_name, fields, tests",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerGet",
     "inputs": "object_type*, package_name, class_name, interface_name, program_name, domain_name, data_element_name, table_name, structure_name, ddl_name, function_module_name, function_group_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, service_definition_name, service_binding_name, run_id, response_format, version",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerUpdate",
     "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, package_name, ddl_name, source_code, ddl_source, transport_request, activate, description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, service_name, name, behavior_definition, ddl_code, implementation_code, test_class_source, test_class_code, local_types_code, definitions_code, macros_code, run_id, binding_variant, desired_publication_state",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerDelete",
     "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name, run_id",
-    "available_in": "cloud, legacy, onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "system",
@@ -2157,7 +2157,7 @@
     "group": "search",
     "name": "SearchSource",
     "inputs": "query*, query2, exclude, packages*, include_subpackages, object_filter, object_types, exclude_comments, max_hits_per_object, emit_no_hits, max_objects, concurrency, version, time_budget_ms",
-    "available_in": "legacy, onprem"
+    "available_in": "onprem"
   },
   {
     "group": "search",

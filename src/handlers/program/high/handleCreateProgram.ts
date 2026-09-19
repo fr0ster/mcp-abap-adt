@@ -25,7 +25,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'CreateProgram',
-  available_in: ['onprem', 'legacy'] as const,
+  available_in: ['onprem'] as const,
   description:
     'Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
   inputSchema: {

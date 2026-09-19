@@ -4,12 +4,12 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
 import { ourUnitTest } from '../../../lib/strategies/resultSets';
-import { isLegacyConnection, return_error } from '../../../lib/utils';
+import { return_error } from '../../../lib/utils';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Retrieve CDS unit test run status for a run_id. ' +
     'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
@@ -44,18 +44,6 @@ export async function handleGetCdsUnitTestStatus(
   const { connection, logger } = context;
   const { run_id, with_long_polling = true } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
-
-  // `AdtClientLegacy.getCdsUnitTest()` throws synchronously — the CDS
-  // framework endpoints this needs are absent from a legacy system's
-  // discovery catalog. Refuse before making the call rather than letting
-  // that throw escape unhandled.
-  if (isLegacyConnection()) {
-    return return_error(
-      new Error(
-        'CDS unit tests are not available on legacy SAP systems (BASIS < 7.50): the CDS framework endpoints this needs are not present there.',
-      ),
-    );
-  }
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getStatus` unchanged
   // — same v18-convenience departure and same "no options object at all,

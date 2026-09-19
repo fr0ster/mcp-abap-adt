@@ -22,7 +22,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'CreateInterface',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.',
   inputSchema: {

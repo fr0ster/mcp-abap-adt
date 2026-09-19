@@ -28,7 +28,7 @@ import { validateTransportRequest } from '../../../utils/transportValidation.js'
 
 export const TOOL_DEFINITION = {
   name: 'CreateDdl',
-  available_in: ['onprem', 'cloud', 'legacy'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
   inputSchema: {

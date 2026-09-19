@@ -51,7 +51,14 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     expect(JSON.parse(result.content[0].text).message).toBe('Update refused');
   });
 
-  it('reports a succeeded write under a refused unlock as a failure naming both', async () => {
+  /**
+   * The write landed, so the tool says so — and says the lock is still held.
+   *
+   * This asserted `isError: true` for a while. A caller was told their update
+   * had failed when it had not, which is the opposite of what these handlers
+   * did before the migration (catch the refused unlock, warn, carry on).
+   */
+  it('answers the write under a refused unlock, and names the lock left behind', async () => {
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       update: async () => okResponse(reading(undefined, '', 200)),
@@ -61,32 +68,43 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
+    expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
-    expect(result.isError).toBe(true);
-    expect(payload.message).toBe('Unlock refused');
-    expect(payload.operation).toBe('succeeded');
+    expect(payload.result).toBe('SUCCESS');
+    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
   });
 
-  it('gates the write on a pre-write check, but only when activating (fix round 1)', async () => {
+  /**
+   * The pre-write check informs; it does not gate.
+   *
+   * It was a `sequence` step for a while, so a check that refused stopped the
+   * update — and with the shipped `analyseCheck` on it, a syntax finding was
+   * a refusal, so a caller could not save work in progress. The
+   * pre-migration handler ran the check in its own `try`, warned about
+   * whatever came back and wrote anyway.
+   */
+  it('runs the pre-write check when activating, and writes regardless of it', async () => {
+    const check = jest.fn(async () =>
+      refusedResponse('Syntax error in new source'),
+    );
     const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
     const unlock = jest.fn(async () => okResponse(undefined));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
-      check: async () => refusedResponse('Syntax error in new source'),
+      check,
       update,
       unlock,
+      activate: async () => okResponse(reading(undefined, '', 200)),
     });
     const result: any = await handleUpdateClass(context as any, {
       class_name: 'ZCL_X',
       source_code: 'bad source',
       activate: true,
     });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Syntax error in new source',
-    );
-    expect(update).not.toHaveBeenCalled();
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
     expect(unlock).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBe(false);
   });
 
   it('skips the pre-write check on the default (non-activating) path', async () => {

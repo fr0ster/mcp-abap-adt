@@ -1,9 +1,7 @@
 import {
   analyseActivation,
-  analyseCheck,
   analyseDeletion,
   analyseException,
-  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateDomain } from '../../handlers/domain/low/handleActivateDomain';
 import { handleCheckDomain } from '../../handlers/domain/low/handleCheckDomain';
@@ -128,12 +126,12 @@ describe('CheckDomainLow', () => {
     });
   });
 
-  it('hands check its own analyseCheck, and status undefined (the inactive default)', async () => {
+  it('hands check its own analyseException, and status undefined (the inactive default)', async () => {
     fakeClient = seen.client;
     await handleCheckDomain(context as any, { domain_name: 'ZD' });
     const call = seen.calls.filter((c) => c.member === 'check').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[1]).toBeUndefined();
   });
 });
@@ -170,10 +168,10 @@ describe('ActivateDomainLow', () => {
 });
 
 describe('ValidateDomainLow', () => {
-  it('reports an inadmissible name as an error, against the real analyseValidation', async () => {
+  it('reports an inadmissible name as an error, against the real analyseException', async () => {
     // refusal-validation-name-taken-domain--01-domains-validation is a genuine
     // HTTP 400: adt-clients already built its own verdict before consulting
-    // `analyse`, and analyseValidation ENRICHES that verdict from the
+    // `analyse`, and analyseException ENRICHES that verdict from the
     // exc:exception document rather than replacing it (readValidationRefusal,
     // the 200-embedded asx:abap form, does not apply to this fixture — it
     // never reaches it, because the verdict handed in is not
@@ -231,7 +229,7 @@ describe('ValidateDomainLow', () => {
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
   });
 
-  it('hands validate its own analyseValidation', async () => {
+  it('hands validate its own analyseException', async () => {
     fakeClient = seen.client;
     await handleValidateDomain(context as any, {
       domain_name: 'ZD',
@@ -240,7 +238,7 @@ describe('ValidateDomainLow', () => {
     });
     const call = seen.calls.filter((c) => c.member === 'validate').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseValidation);
+    expect(call?.analyse).toBe(analyseException);
   });
 });
 

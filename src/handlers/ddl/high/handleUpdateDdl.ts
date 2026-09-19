@@ -18,7 +18,6 @@
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -112,7 +111,7 @@ export async function handleUpdateDdl(
                   obj.check(
                     { ddlName, ddlSource: args.ddl_source },
                     'inactive',
-                    { analyse: analyseCheck },
+                    { analyse: analyseException },
                   ),
                 update,
               )

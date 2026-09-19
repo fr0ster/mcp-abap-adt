@@ -31,9 +31,7 @@
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
-  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
@@ -219,7 +217,7 @@ export async function handleCreateDataElement(
               description: args.description || dataElementName,
               packageName: args.package_name,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           ),
         () =>
           obj.create(
@@ -287,7 +285,7 @@ export async function handleCreateDataElement(
             )
             .catch(() => undefined);
           return obj.check({ dataElementName }, undefined, {
-            analyse: analyseCheck,
+            analyse: analyseException,
           });
         },
       );

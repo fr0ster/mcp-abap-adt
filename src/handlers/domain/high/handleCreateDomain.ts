@@ -30,9 +30,7 @@
 import { domainDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
-  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
@@ -204,7 +202,7 @@ export async function handleCreateDomain(
               description: args.description || domainName,
               packageName: args.package_name,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           ),
         () =>
           obj.create(
@@ -267,7 +265,7 @@ export async function handleCreateDomain(
             )
             .catch(() => undefined);
           return obj.check({ domainName }, undefined, {
-            analyse: analyseCheck,
+            analyse: analyseException,
           });
         },
       );

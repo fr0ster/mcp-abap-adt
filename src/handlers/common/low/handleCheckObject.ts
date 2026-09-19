@@ -3,7 +3,19 @@
  *
  * A dispatcher: one branch runs per call, over the same family clients every
  * low-level CheckX handler in this migration uses. Each branch carries its
- * own `resultsFor(xDocuments)` and `analyseCheck`.
+ * own `resultsFor(xDocuments)` and `analyseException`.
+ *
+ * **Why not `analyseCheck`.** A check tool's answer IS its findings. The
+ * shipped `analyseCheck` turns a `chkrun:checkMessage` of type `E` into a
+ * refusal, which makes a check that did its job — ran, found something, said
+ * what — look like a call that failed. Before this migration these handlers
+ * answered `return_response` every time, with `success` inside and the
+ * findings beside it; a caller read the messages either way. That is the
+ * behaviour restored here, in the new shape: `terseCheck` answers `ran`,
+ * `status_text` and `messages`, so "it ran and found errors" and "it never
+ * ran" are both readable, and neither is dressed as a transport failure.
+ * `analyseException` still refuses what genuinely failed: an
+ * `exc:exception`, a non-2xx, a connection that broke.
  */
 
 import {
@@ -19,7 +31,7 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -157,67 +169,67 @@ export async function handleCheckObject(
           return client
             .getClass(resultsFor(classDocuments))
             .check({ className: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'program':
           return client
             .getProgram(resultsFor(programDocuments))
             .check({ programName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'interface':
           return client
             .getInterface(resultsFor(interfaceDocuments))
             .check({ interfaceName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'function_group':
           return client
             .getFunctionGroup(resultsFor(functionGroupDocuments))
             .check({ functionGroupName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))
             .check({ tableName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'structure':
           return client
             .getStructure(resultsFor(structureDocuments))
             .check({ structureName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'ddl':
           return client
             .getDdl(resultsFor(ddlDocuments))
             .check({ ddlName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'domain':
           return client
             .getDomain(resultsFor(domainDocuments))
             .check({ domainName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'data_element':
           return client
             .getDataElement(resultsFor(dataElementDocuments))
             .check({ dataElementName: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
             .check({ name: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         case 'metadata_extension':
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
             .check({ name: objectName }, checkVersion, {
-              analyse: analyseCheck,
+              analyse: analyseException,
             });
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.

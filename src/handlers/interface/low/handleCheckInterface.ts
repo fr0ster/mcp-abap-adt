@@ -5,7 +5,7 @@
  */
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -83,7 +83,7 @@ export async function handleCheckInterface(
         .getInterface(resultsFor(interfaceDocuments))
         // `status` left undefined: the shipped default checks the inactive
         // version, which is what a caller wants right after a write.
-        .check({ interfaceName }, undefined, { analyse: analyseCheck }),
+        .check({ interfaceName }, undefined, { analyse: analyseException }),
     project(detail, terseCheck),
   );
 }

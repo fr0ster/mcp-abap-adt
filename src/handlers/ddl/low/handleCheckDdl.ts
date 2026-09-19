@@ -11,7 +11,7 @@
  */
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -103,7 +103,7 @@ export async function handleCheckDdl(
       createAdtClient(connection, logger)
         .getDdl(resultsFor(ddlDocuments))
         .check({ ddlName, ddlSource: ddl_source }, checkVersion, {
-          analyse: analyseCheck,
+          analyse: analyseException,
         }),
     project(detail, terseCheck),
   );

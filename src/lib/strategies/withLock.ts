@@ -106,20 +106,56 @@ export async function withLock<H, T>(
     return failure<T>({ ...value.getError(), cleanup: released.carrier });
   }
 
-  // The body succeeded, so the release's own outcome becomes the answer — in
-  // its own channel. A refusal is a failure; a throw stays a throw.
+  // **The body succeeded, so the call succeeded.** A release that failed
+  // afterwards is reported beside the result, never instead of it.
+  //
+  // This answered a failure for a while — the write had landed, and the tool
+  // said the call had failed, with `operation: 'succeeded'` buried in the
+  // payload for whoever thought to read it. That is a regression against what
+  // these handlers did before the migration, where a refused unlock was
+  // caught and `logger.warn`'d and the update still answered success
+  // (`handleUpdateClass`, pre-19: "Failed to unlock class …" on the warn
+  // channel, then on to activate). A caller who asked to write, and whose
+  // write is on the server, has not had a failure.
+  //
+  // What must not be lost is the lock: it is still held, and the caller is
+  // the only one who can do anything about it. So it travels on the success
+  // answer as `cleanup`, the same shape `answer()` already renders on the
+  // failure path, rather than being dropped.
   if (released.kind === 'ok') return value;
   if (released.kind === 'refused') {
-    // From `released.carrier`, not `released.error` — the error is the raw
-    // answer from `release`, and `error.request` has not been through
-    // `safeRequest`. The carrier is narrowed once, in `runRelease`, and every
-    // branch that reports a release outcome reads it from there.
-    return failure<T>({
-      ...released.carrier,
-      operation: 'succeeded',
-    } as IAdtError & CleanupCarrier);
+    return succeededWithCleanup(value, { cleanup: released.carrier });
   }
-  throw new LockNotReleased(released.thrown, { operation: 'succeeded' });
+  return succeededWithCleanup(value, {
+    cleanup: { error: 'client_threw', message: messageOf(released.thrown) },
+  });
+}
+
+/**
+ * The body's own answer, carrying what the release left behind.
+ *
+ * `getResult()` is preserved rather than rebuilt: the value is whatever the
+ * result strategy made, and this has no business reshaping it. Only the
+ * cleanup note is added, on a property `answer()` knows how to render.
+ */
+function succeededWithCleanup<T>(
+  value: IAdtResponse<T, IAdtError>,
+  carrier: CleanupCarrier,
+): IAdtResponse<T, IAdtError> {
+  if (!value.ok) return value;
+  const result = value.getResult();
+  return {
+    ok: true,
+    getResult: () => result,
+    getError: () => {
+      throw new Error('withLock: asked for the error of a success');
+    },
+    cleanup: carrier.cleanup,
+  } as unknown as IAdtResponse<T, IAdtError>;
+}
+
+function messageOf(thrown: unknown): string {
+  return thrown instanceof Error ? thrown.message : String(thrown);
 }
 
 /**

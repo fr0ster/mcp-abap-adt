@@ -20,7 +20,6 @@
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -119,7 +118,7 @@ export async function handleUpdateInterface(
                   obj.check(
                     { interfaceName, sourceCode: args.source_code },
                     'inactive',
-                    { analyse: analyseCheck },
+                    { analyse: analyseException },
                   ),
                 update,
               )

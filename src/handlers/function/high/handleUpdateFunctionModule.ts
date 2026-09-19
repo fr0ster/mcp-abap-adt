@@ -22,7 +22,6 @@
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -140,7 +139,7 @@ export async function handleUpdateFunctionModule(
               ),
             () =>
               obj.check({ functionModuleName, functionGroupName }, undefined, {
-                analyse: analyseCheck,
+                analyse: analyseException,
               }),
           ),
         (lockHandle) =>

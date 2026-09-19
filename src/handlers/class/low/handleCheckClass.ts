@@ -7,7 +7,7 @@
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -108,7 +108,7 @@ export async function handleCheckClass(
       createAdtClient(connection, logger)
         .getClass(resultsFor(classDocuments))
         .check({ className, sourceCode: source_code }, checkVersion, {
-          analyse: analyseCheck,
+          analyse: analyseException,
         }),
     project(detail, terseCheck),
   );

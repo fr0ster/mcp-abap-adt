@@ -9,7 +9,7 @@
  */
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { BehaviorDefinitionImplementationType } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -143,7 +143,7 @@ export async function handleValidateBehaviorDefinition(
             packageName: package_name.toUpperCase(),
             implementationType: implementation_type,
           },
-          { analyse: analyseValidation },
+          { analyse: analyseException },
         ),
     project(detail, terseValidation),
   );

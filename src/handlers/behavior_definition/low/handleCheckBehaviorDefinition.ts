@@ -5,7 +5,7 @@
  */
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseCheck } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -83,7 +83,7 @@ export async function handleCheckBehaviorDefinition(
         .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
         // `status` left undefined: the shipped default checks the inactive
         // version, which is what a caller wants right after a write.
-        .check({ name: bdefName }, undefined, { analyse: analyseCheck }),
+        .check({ name: bdefName }, undefined, { analyse: analyseException }),
     project(detail, terseCheck),
   );
 }

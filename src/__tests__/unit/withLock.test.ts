@@ -124,20 +124,33 @@ describe('withLock', () => {
     });
   });
 
-  it('reports a succeeded write under a REFUSED unlock as a failure', async () => {
+  /**
+   * A write that landed is not a failed call.
+   *
+   * This asserted the opposite for a while: a refused unlock turned the whole
+   * operation into a failure, with `operation: 'succeeded'` inside the error
+   * payload for whoever thought to look. That is a regression against the
+   * pre-migration handlers — `handleUpdateClass` caught a refused unlock,
+   * `logger.warn`'d it and carried on — and it told a caller their write had
+   * failed when it had not.
+   *
+   * What the old code DID lose is the lock: the warning went to a log nobody
+   * reads. So the result is the body's, and the dangling lock rides along as
+   * `cleanup`.
+   */
+  it('answers the write, and carries the dangling lock, under a REFUSED unlock', async () => {
     const result = await withLock(
       async () => ok('handle-1'),
       async () => ok('written'),
       async () => refused('Unlock refused'),
     );
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('expected the release refusal');
-    expect(result.getError().message).toBe('Unlock refused');
-    expect(result.getError().origin).toBe('refusal');
-    expect((result.getError() as { operation?: unknown }).operation).toBe(
-      'succeeded',
-    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected the write to stand');
+    expect(result.getResult().value).toBe('written');
+    expect(
+      (result as { cleanup?: { message?: string } }).cleanup,
+    ).toMatchObject({ message: 'Unlock refused' });
   });
 
   it('never puts a transport config in a succeeded write under a REFUSED unlock', async () => {
@@ -154,33 +167,36 @@ describe('withLock', () => {
         }),
     );
 
-    expect(result.ok).toBe(false);
-    if (result.ok) throw new Error('expected the release refusal');
-    expect(result.getError().request).toEqual({ method: 'POST', url: '/u' });
-    expect(JSON.stringify(result.getError())).not.toContain(SECRET);
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected the write to stand');
+    const cleanup = (result as { cleanup?: { request?: unknown } }).cleanup;
+    expect(cleanup?.request).toEqual({ method: 'POST', url: '/u' });
+    // The rule the cleanup channel exists for: nothing reaches a caller except
+    // by name, so the Authorization header cannot ride out on the lock note.
+    expect(JSON.stringify(result)).not.toContain(SECRET);
   });
 
-  it('rethrows a THROWN release after a successful body rather than inventing an origin', async () => {
-    expect.assertions(3);
-    try {
-      await withLock(
-        async () => ok('handle-1'),
-        async () => ok('written'),
-        async () => {
-          throw new Error('unlock called with no handle');
-        },
-      );
-    } catch (thrown) {
-      const error = thrown as Error & {
-        operation?: unknown;
-        cleanup?: unknown;
-      };
-      // A throw stays a throw. Turning it into an IAdtResponse failure would
-      // mean giving it an AdtFailureOrigin it does not have.
-      expect(error.message).toBe('unlock called with no handle');
-      expect(error.operation).toBe('succeeded');
-      expect(error.cleanup).toBeUndefined();
-    }
+  /**
+   * Same rule when the release throws rather than refusing: the body's answer
+   * stands, and what the release did is reported beside it. This used to
+   * rethrow, which made a landed write reach the caller as an exception.
+   */
+  it('answers the write when the release THROWS, naming what threw', async () => {
+    const result = await withLock(
+      async () => ok('handle-1'),
+      async () => ok('written'),
+      async () => {
+        throw new Error('unlock called with no handle');
+      },
+    );
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected the write to stand');
+    expect(result.getResult().value).toBe('written');
+    expect((result as { cleanup?: unknown }).cleanup).toEqual({
+      error: 'client_threw',
+      message: 'unlock called with no handle',
+    });
   });
 
   it('carries the dangling lock out with a THROWN body when the release is refused', async () => {

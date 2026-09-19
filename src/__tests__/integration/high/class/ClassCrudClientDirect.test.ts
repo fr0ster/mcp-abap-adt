@@ -14,9 +14,7 @@
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
-  analyseCheck,
   analyseException,
-  analyseValidation,
   type IAdtMessageFailure,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -322,7 +320,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         // any more (IAdtResponse.ts: `IAdtResult<T>` is `{ value }`).
         const validateResponse = await client
           .getClass()
-          .validate(validateParams, { analyse: analyseValidation });
+          .validate(validateParams, { analyse: analyseException });
 
         debugLog('VALIDATE_RESPONSE', `Validation completed`, {
           ok: validateResponse.ok,
@@ -480,7 +478,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         }
         const checkResponse = await client
           .getClass()
-          .check(checkParams, undefined, { analyse: analyseCheck });
+          .check(checkParams, undefined, { analyse: analyseException });
         // The old assertion just confirmed a status field existed on the
         // envelope — true of every response before this migration and true
         // of none after it (`ok` is always a defined boolean; success carries

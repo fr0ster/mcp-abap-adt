@@ -7,7 +7,7 @@
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -125,7 +125,7 @@ export async function handleValidateBehaviorImplementation(
             packageName: package_name.toUpperCase(),
             description,
           },
-          { analyse: analyseValidation },
+          { analyse: analyseException },
         ),
     project(detail, terseValidation),
   );

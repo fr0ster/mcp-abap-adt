@@ -19,7 +19,6 @@
 import { serviceDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -115,7 +114,7 @@ export async function handleUpdateServiceDefinition(
               ),
             () =>
               obj.check({ serviceDefinitionName }, undefined, {
-                analyse: analyseCheck,
+                analyse: analyseException,
               }),
           ),
         (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),

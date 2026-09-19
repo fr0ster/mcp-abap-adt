@@ -24,20 +24,22 @@
  * `check`), the lock/unlock pair is dropped rather than faithfully
  * reproduced.
  *
- * **`check` now gates the answer; it did not before.** The pre-migration
- * handler's own `catch` on a genuine (non-"already checked") check failure
- * only `logger.warn`'d — the create still answered success and still went
- * on to activate. `analyseCheck` makes a refusal here a refusal of the
- * whole call, same as every other check in this migration. Deliberate, not
- * an oversight: see CHANGELOG.md.
+ * **`check` does not gate the answer, and did not before either.** The
+ * pre-migration handler caught a genuine (non-"already checked") check
+ * failure and only `logger.warn`'d it: the create still answered success and
+ * still went on to activate. A migration pass gave this step `analyseCheck`,
+ * which turns a `chkrun:checkMessage` of type `E` into a refusal, so a create
+ * whose source has a syntax error stopped answering at all — and that change
+ * was then written up here as deliberate. It was not: it is a regression,
+ * and this step carries `analyseException` again. What genuinely failed —
+ * an `exc:exception`, a non-2xx, a broken connection — still stops the
+ * chain; findings do not.
  */
 
 import { structureDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
-  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
@@ -233,7 +235,7 @@ export async function handleCreateStructure(
               description: args.description || structureName,
               packageName: args.package_name,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           ),
         () =>
           obj.create(
@@ -247,7 +249,9 @@ export async function handleCreateStructure(
             { analyse: analyseException },
           ),
         () =>
-          obj.check({ structureName }, 'inactive', { analyse: analyseCheck }),
+          obj.check({ structureName }, 'inactive', {
+            analyse: analyseException,
+          }),
       );
 
       if (!checked.ok || !shouldActivate) {

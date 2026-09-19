@@ -5,7 +5,7 @@
  */
 
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -90,10 +90,7 @@ export async function handleValidatePackage(
     () =>
       createAdtClient(connection, logger)
         .getPackage(resultsFor(packageDocuments))
-        .validate(
-          { packageName, superPackage },
-          { analyse: analyseValidation },
-        ),
+        .validate({ packageName, superPackage }, { analyse: analyseException }),
     project(detail, terseValidation),
   );
 }

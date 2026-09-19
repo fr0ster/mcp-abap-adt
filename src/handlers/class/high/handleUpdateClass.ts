@@ -26,7 +26,6 @@
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -105,7 +104,9 @@ export async function handleUpdateClass(
 
       const written = await withLock(
         () => obj.lock({ className }),
-        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        async (
+          lockHandle,
+        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
               { className, transportRequest: args.transport_request },
@@ -115,21 +116,31 @@ export async function handleUpdateClass(
                 analyse: analyseException,
               },
             );
-          // A conditional phase of the sequence, not a hand-rolled
-          // short-circuit: when activating, the check is a real first step
-          // and a refusal stops the write via `sequence`'s own discipline;
-          // when not, there is no first step and `update` runs alone.
-          return shouldActivate
-            ? sequence(
-                () =>
-                  obj.check(
-                    { className, sourceCode: args.source_code },
-                    'inactive',
-                    { analyse: analyseCheck },
-                  ),
-                update,
-              )
-            : update();
+          // **The check runs for its findings; it does not gate the write.**
+          // It was a `sequence` step for a while, so a check that refused
+          // stopped the update — and with the shipped `analyseCheck` on it, a
+          // syntax finding counted as a refusal, which meant a caller could
+          // not save work in progress. The pre-migration handler did neither:
+          // it ran the check inside its own `try`, `logger.warn`'d whatever
+          // came back and went on to write (`safeCheckOperation`, then
+          // "Inactive version check had issues: …" on the warn channel).
+          //
+          // So: awaited for its diagnostics and its answer discarded. The
+          // write's own refusal is still the write's, and that is the one
+          // that stops anything.
+          if (shouldActivate) {
+            const checked = await obj.check(
+              { className, sourceCode: args.source_code },
+              'inactive',
+              { analyse: analyseException },
+            );
+            if (!checked.ok) {
+              logger?.warn(
+                `Pre-write check on ${className} did not complete: ${checked.getError().message}`,
+              );
+            }
+          }
+          return update();
         },
         (lockHandle) => obj.unlock({ className }, lockHandle),
       );

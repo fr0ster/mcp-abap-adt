@@ -36,7 +36,6 @@
 import { domainDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -210,7 +209,9 @@ export async function handleUpdateDomain(
                 { lockHandle, analyse: analyseException },
               ),
             () =>
-              obj.check({ domainName }, undefined, { analyse: analyseCheck }),
+              obj.check({ domainName }, undefined, {
+                analyse: analyseException,
+              }),
           ),
         (lockHandle) => obj.unlock({ domainName }, lockHandle),
       );

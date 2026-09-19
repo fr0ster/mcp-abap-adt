@@ -23,7 +23,6 @@
 import { tableDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -118,7 +117,7 @@ export async function handleUpdateTable(
             ? sequence(
                 () =>
                   obj.check({ tableName, ddlCode: args.ddl_code }, 'inactive', {
-                    analyse: analyseCheck,
+                    analyse: analyseException,
                   }),
                 update,
               )

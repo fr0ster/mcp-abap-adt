@@ -17,7 +17,6 @@
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type {
@@ -146,7 +145,7 @@ export async function handleCreateBehaviorDefinition(
 
       const checked = await withLock(
         () => obj.lock({ name }),
-        () => obj.check({ name }, undefined, { analyse: analyseCheck }),
+        () => obj.check({ name }, undefined, { analyse: analyseException }),
         (lockHandle) => obj.unlock({ name }, lockHandle),
       );
       if (!checked.ok) {

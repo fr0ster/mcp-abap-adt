@@ -1502,6 +1502,28 @@ async function main(): Promise<void> {
         );
     });
 
+    // The same listing with `?targets=true`, which is a different document.
+    //
+    // ADT inserts a `tm:target` level between `tm:workbench` and
+    // `tm:modifiable` when targets are asked for — same data, same system,
+    // different request. Both shapes are real, and a parser that walks a
+    // fixed path passes one and answers zero requests on the other. The
+    // corpus held only the flat one, so the deeper shape was covered by a
+    // fixture reconstructed by hand (#176 captured it properly; this is that
+    // capture, taken the way every other document here is taken).
+    await withCase('read-transport-list-with-targets', async () => {
+      if (!transportConfigUri) return;
+      await connection.makeAdtRequest({
+        method: 'GET',
+        url: '/sap/bc/adt/cts/transportrequests',
+        params: { targets: 'true', configUri: transportConfigUri },
+        headers: {
+          Accept:
+            'application/vnd.sap.adt.transportorganizertree.v1+xml, application/vnd.sap.adt.transportorganizer.v1+xml',
+        },
+      });
+    });
+
     // -----------------------------------------------------------------
     // Data preview — a result with blank cells in it.
     //

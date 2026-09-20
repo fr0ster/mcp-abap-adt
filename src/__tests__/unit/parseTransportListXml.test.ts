@@ -2,6 +2,7 @@ import {
   isModifiableStatus,
   parseTransportListXml,
 } from '../../handlers/transport/readonly/handleListTransports';
+import { corpusBody } from '../../lib/adtCorpus';
 
 /**
  * Guard for #168: `ListTransports` reported `count: 0` on a system where the
@@ -12,10 +13,21 @@ import {
  * where requests sit under status containers one level deeper and `tm:workbench`
  * repeats per transport target.
  *
- * NOTE: the tree fixture below is RECONSTRUCTED from that representation, not
- * captured from a live system — the reporter could not dump the payload and no
- * on-premise system was reachable here. `scripts/probe-transport-list.ts` dumps
- * the real thing; replace this fixture with a capture once one is available.
+ * **Both real shapes are in the corpus now, and the reconstruction stays
+ * beside them.** The note that used to sit here said the tree fixture below
+ * was reconstructed, because no reachable system owned a transport request,
+ * and asked for a capture to replace it. #176 made that capture; this is it,
+ * taken the way every other document here is taken —
+ * `read-transport-list-structure` without `?targets=true`
+ * (`tm:workbench > tm:modifiable > tm:request`) and
+ * `read-transport-list-with-targets` with it, where ADT inserts a `tm:target`
+ * level in between. Same system, same data, different request.
+ *
+ * The reconstruction is kept rather than deleted: it carries five requests
+ * across released, protected and several branches, which the captures cannot
+ * — this trial owns exactly one transport. So it still covers the branching
+ * the parser walks, while the captures prove the two shapes it walks through
+ * are the shapes SAP sends.
  */
 const TREE_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?>
 <tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="">
@@ -60,6 +72,50 @@ const EMPTY_PAYLOAD = `<?xml version="1.0" encoding="utf-8"?>
  * An empty result is a bare self-closing root with no status containers at all.
  */
 const CAPTURED_NO_TRANSPORTS = `<?xml version="1.0" encoding="utf-8"?><tm:root adtcore:name="CB9980008038" adtcore:changedAt="2026-07-28T13:53:59Z" adtcore:createdAt="2026-07-28T13:53:59Z" adtcore:changedBy="CB9980008038" adtcore:createdBy="CB9980008038" xmlns:tm="http://www.sap.com/cts/adt/tm" xmlns:adtcore="http://www.sap.com/adt/core"/>`;
+
+/**
+ * The two shapes as SAP actually sends them — the reason the parser recurses
+ * by element name instead of walking a path. A path-shaped parser passes one
+ * of these and answers zero requests on the other; `@mcp-abap-adt/adt-clients`
+ * says the same in `parseTransportTree.js`, having met both.
+ */
+const CAPTURED_FLAT = corpusBody(
+  'read-transport-list-structure--01-cts-transportrequests',
+);
+const CAPTURED_WITH_TARGETS = corpusBody(
+  'read-transport-list-with-targets--01-cts-transportrequests',
+);
+
+describe('the two captured shapes of one listing', () => {
+  it('reads the request without ?targets=true', () => {
+    const [entry, ...rest] = parseTransportListXml(CAPTURED_FLAT);
+    expect(rest).toEqual([]);
+    expect(entry).toMatchObject({
+      number: 'TRLK900438',
+      description: 'adt-clients integration tests',
+      type: 'K',
+      status: 'D',
+      owner: 'SAPUSER01',
+    });
+  });
+
+  it('reads the same request through the tm:target level ?targets=true adds', () => {
+    // The level is really there: the document differs, the answer must not.
+    expect(CAPTURED_WITH_TARGETS).toContain('<tm:target ');
+    expect(CAPTURED_FLAT).not.toContain('<tm:target ');
+
+    expect(parseTransportListXml(CAPTURED_WITH_TARGETS)).toEqual(
+      parseTransportListXml(CAPTURED_FLAT),
+    );
+  });
+
+  it('does not report the task inside it as a request', () => {
+    const numbers = parseTransportListXml(CAPTURED_WITH_TARGETS).map(
+      (t) => t.number,
+    );
+    expect(numbers).toEqual(['TRLK900438']);
+  });
+});
 
 describe('parseTransportListXml — transportorganizertree shape (#168)', () => {
   it('finds requests nested under status containers, in every branch', () => {

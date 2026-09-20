@@ -7,7 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [11.0.0] - 2026-09-21
+
+### Added
+
+- **ABAP Test Cockpit, as three tools.** `RunATC` composes the three calls an
+  ATC run is — the check variant, a worklist for it, then the run — because
+  `AdtAtc` deliberately stopped being `IAdtRunnable` in 19.0.0 and left the
+  composing to whoever calls it. `GetATCRunStatus` answers the server's own
+  word for the state and the one flag the client derives from it;
+  `GetATCFindings` reads the worklist into findings a caller can act on —
+  object, source position, priority, which check ran and what it said — with
+  the counts per priority beside them. `wait` decides only whether the server
+  holds the request: the findings are written into the worklist either way,
+  so `worklist_id` is in every answer and `run_id` only when there is a run to
+  poll. A worklist a run has not filled yet says so, rather than reading as a
+  clean check.
+
+- **`CheckMetadataExtension` and `CheckMetadataExtensionLow` take `version`**
+  (`active` | `inactive`, default `active`). The DDLX checkruns endpoint does
+  not fall back to whichever version exists, unlike the DDLS one: measured on
+  a live system, an activated extension answers `processed` for `active` and
+  `notProcessed` — "Error while reading the object … from the database" — for
+  `inactive`, and an extension that was never activated answers the mirror
+  image. The shipped default is `inactive`, so every activated extension was
+  unanswerable through these tools. Reported by @eseuve in #178.
+
+### Fixed
+
+- **A blank cell no longer moves every value below it up a row.** ADT sends an
+  empty cell in a data preview as a self-closing `<dataPreview:data/>`, which
+  the regular expression reading the document could not match. The cell was
+  dropped, its column came back short, and every value below the first blank
+  attached itself to the wrong record — silently, with nothing in the answer
+  to say so. `GetSqlQuery` and `GetTableContents` both carried it. The reading
+  is a parser now, injected on the `query` and `contents` slots rather than
+  called from inside the handler, so entities are decoded as well and a short
+  column is padded instead of shortening the rows after it. Found by
+  @mpauspor (#179) and @anggakharisma (#180), each on their own system.
+
+- **The answers that had become refusals.** Five behaviours turned into
+  failures during the migration, each because something an adt-clients method
+  used to do inside itself became this repository's job. A check reports its
+  findings again instead of refusing on them (27 `CheckX` tools — and
+  `CheckFunctionGroup`, which could not answer at all, since SAP reports
+  `MESSAGE(G46)` for every function group); a pre-write check informs a write
+  rather than being turned into a false failure by the wrong reading; a write
+  that landed is a success even when the unlock afterwards was refused; a
+  create that worked is confirmed by reading the object back; and a name that
+  is not free is an answer rather than an error. Reported as #183 by
+  @azzarabe for the function-group half.
+
+- **A lock nobody released now reaches the caller.** When an unlock fails, the
+  write still succeeded — and the note about the held lock travels on the
+  answer that is actually returned, across the activation that follows, across
+  the steps of a `sequence`, and out on an exception when the next call throws
+  rather than answers. Previously it was reported instead of the result, then
+  dropped on every path that answered something afterwards.
+
+- **The installation guides no longer recommend a 45-second deadline.**
+  `.env.example` shipped `SAP_TIMEOUT_DEFAULT=45000` uncommented and the three
+  platform guides told readers to copy it. `@mcp-abap-adt/adt-clients` removed
+  that default deliberately: an aborted request is retried into a new session
+  while the ABAP session underneath keeps the enqueue locks, leaving the object
+  locked and inactive. Nothing in the code was cutting anything at 45 s — only
+  our own documentation could arm it.
+
+- **Three development-scope advisories resolved in range** — js-yaml (high),
+  browserslist (high) and baseline-browser-mapping (moderate), all transitive
+  under `jest`. One lock update rather than three separate bumps, and no
+  `overrides` entry: an override pins a version the tree never asked for and
+  keeps pinning it long after the advisory is history.
+
+- **`AUTH_BROKER_PATH` survives a Windows drive letter.** The value was split
+  on both `:` and `;`, which tears `D:\tools\project` in two. Quiet on the
+  same drive, invisible from another. Contributed by @mpauspor (#185).
+
 ### Changed
+
+- **Legacy support (BASIS < 7.50) is parked**, on `parked/legacy-support`,
+  until it can be tried against a live system. `available_in` declared
+  `legacy` on 142 tools and nothing here had ever run against such a system —
+  an environment nobody has verified is a claim rather than a fact. The
+  documentation page regenerates itself the moment any tool declares it again.
+
+- **`detail: 'full'` on a data preview answers the whole document's parse**,
+  not a chosen few of its fields, so nothing a caller could reach through the
+  generic parse before is missing from it.
+
+- **The corpus gained the documents these changes are written against**: an
+  ATC worklist with findings in it, a data preview carrying both cell shapes,
+  a transport listing with `?targets=true` (where ADT inserts a `tm:target`
+  level the flat listing has no sign of), and a DDLX checkrun in each version.
+  A reading designed without one is a guess about a shape.
 
 - **Two patterns run through the whole migration and are worth stating once,
   in general, rather than only inside each task's own entry below.**

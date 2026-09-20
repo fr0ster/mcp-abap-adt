@@ -155,6 +155,7 @@ Key examples of high-value workflows and tools:
 - **ABAP OO CRUD**: `CreateClass`, `UpdateClass`, `GetClass`, `DeleteClass`, `CreateInterface`, `UpdateInterface`, `GetInterface`, `DeleteInterface`
 - **Function module/group CRUD**: `CreateFunctionGroup`, `UpdateFunctionGroup`, `GetFunctionGroup`, `DeleteFunctionGroup`, `CreateFunctionModule`, `UpdateFunctionModule`, `GetFunctionModule`, `DeleteFunctionModule`
 - **Transport and activation support**: `CreateTransport`, `GetTransport`, `ActivateObject`
+- **Quality and testing**: `RunATC`, `GetATCRunStatus`, `GetATCFindings` (ABAP Test Cockpit — one run over several objects, findings read back by worklist), `RunUnitTest`, `GetUnitTestResult`, `CheckClass` and the rest of the `Check*` family
 
 ## Registries
 

@@ -180,3 +180,30 @@ export class LockNotReleased extends Error {
     this.operation = extra.operation;
   }
 }
+
+/**
+ * Carries a held lock across the call that follows the locked work.
+ *
+ * `withLock` answers the body's own result and hangs the note about an
+ * unreleased lock on it as `cleanup`. That note only reaches the caller if the
+ * answer it rides on is the one returned — and in every `lock → write →
+ * unlock → activate` handler it is not: the write's answer is checked for
+ * `ok`, then discarded in favour of the activation's. The lock disappeared
+ * exactly where it matters most, since a write that could not be unlocked is
+ * also a write whose activation is likely to fail on that same lock.
+ *
+ * So the note is moved onto the answer that is actually returned. Nothing else
+ * about either answer changes: a failed activation keeps its own error and
+ * gains a `cleanup` field, a successful one keeps its result. An `onto` that
+ * already carries a cleanup of its own keeps it — this only fills a gap.
+ */
+export function carryCleanup<T, U>(
+  from: IAdtResponse<T, IAdtError>,
+  onto: IAdtResponse<U, IAdtError>,
+): IAdtResponse<U, IAdtError> {
+  const cleanup = (from as unknown as CleanupCarrier).cleanup;
+  if (cleanup === undefined) return onto;
+  if ((onto as unknown as CleanupCarrier).cleanup !== undefined) return onto;
+  if (!onto.ok) return failure<U>({ ...onto.getError(), cleanup });
+  return succeededWithCleanup(onto, { cleanup });
+}

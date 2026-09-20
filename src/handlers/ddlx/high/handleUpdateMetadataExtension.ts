@@ -29,7 +29,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -135,7 +135,10 @@ export async function handleUpdateMetadataExtension(
         return written;
       }
 
-      return obj.activate({ name: ddlxName }, { analyse: analyseActivation });
+      return carryCleanup(
+        written,
+        await obj.activate({ name: ddlxName }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

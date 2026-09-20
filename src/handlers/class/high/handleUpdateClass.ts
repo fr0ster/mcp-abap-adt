@@ -37,7 +37,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -104,9 +104,7 @@ export async function handleUpdateClass(
 
       const written = await withLock(
         () => obj.lock({ className }),
-        async (
-          lockHandle,
-        ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+        (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
               { className, transportRequest: args.transport_request },
@@ -116,31 +114,36 @@ export async function handleUpdateClass(
                 analyse: analyseException,
               },
             );
-          // **The check runs for its findings; it does not gate the write.**
-          // It was a `sequence` step for a while, so a check that refused
-          // stopped the update — and with the shipped `analyseCheck` on it, a
-          // syntax finding counted as a refusal, which meant a caller could
-          // not save work in progress. The pre-migration handler did neither:
-          // it ran the check inside its own `try`, `logger.warn`'d whatever
-          // came back and went on to write (`safeCheckOperation`, then
-          // "Inactive version check had issues: …" on the warn channel).
+          // **A finding does not stop the write; a check that could not run
+          // does.** Which is where the line sat before the migration, and the
+          // only thing wrong with this step was the reading on it.
           //
-          // So: awaited for its diagnostics and its answer discarded. The
-          // write's own refusal is still the write's, and that is the one
-          // that stops anything.
-          if (shouldActivate) {
-            const checked = await obj.check(
-              { className, sourceCode: args.source_code },
-              'inactive',
-              { analyse: analyseException },
-            );
-            if (!checked.ok) {
-              logger?.warn(
-                `Pre-write check on ${className} did not complete: ${checked.getError().message}`,
-              );
-            }
-          }
-          return update();
+          // With the shipped `analyseCheck` a `chkrun:checkMessage` of type
+          // `E` was a refusal, so `sequence` stopped the update on a syntax
+          // error and a caller could not save work in progress. `analyseException`
+          // refuses on an `exc:exception`, a non-2xx or a broken connection
+          // and nothing else, so findings now travel as data through a step
+          // that still gates.
+          //
+          // I removed the gate entirely for a while, on the strength of the
+          // pre-19 handler's `logger.warn` — but that warn belonged to the
+          // *post-unlock* informational check ("Inactive version check had
+          // issues: …"). The pre-write one went through `safeCheckOperation`
+          // and threw ("New code check failed: …"), which aborted the update
+          // before the lock was released. A check that cannot run leaves the
+          // caller no answer about the code being written, and that was
+          // always a reason not to write.
+          return shouldActivate
+            ? sequence(
+                () =>
+                  obj.check(
+                    { className, sourceCode: args.source_code },
+                    'inactive',
+                    { analyse: analyseException },
+                  ),
+                update,
+              )
+            : update();
         },
         (lockHandle) => obj.unlock({ className }, lockHandle),
       );
@@ -148,7 +151,10 @@ export async function handleUpdateClass(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ className }, { analyse: analyseActivation });
+      return carryCleanup(
+        written,
+        await obj.activate({ className }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

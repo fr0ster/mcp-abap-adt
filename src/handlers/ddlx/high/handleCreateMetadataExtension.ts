@@ -28,7 +28,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -141,7 +141,10 @@ export async function handleCreateMetadataExtension(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ name }, { analyse: analyseActivation });
+      return carryCleanup(
+        checked,
+        await obj.activate({ name }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

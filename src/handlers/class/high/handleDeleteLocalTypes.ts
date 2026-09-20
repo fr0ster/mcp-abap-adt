@@ -23,7 +23,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -95,7 +95,10 @@ export async function handleDeleteLocalTypes(
         return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ className }, { analyse: analyseActivation });
+      return carryCleanup(
+        deleted,
+        await obj.activate({ className }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

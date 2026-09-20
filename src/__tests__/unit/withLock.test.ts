@@ -1,5 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { withLock } from '../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../lib/strategies/withLock';
 
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
   return {
@@ -239,5 +239,53 @@ describe('withLock', () => {
       .cleanup;
     expect(cleanup?.request).toEqual({ method: 'POST', url: '/u' });
     expect(JSON.stringify(result.getError())).not.toContain(SECRET);
+  });
+});
+
+/**
+ * The note about a lock nobody released has to reach the answer the caller
+ * actually gets. In a `lock → write → unlock → activate` handler that is the
+ * activation's answer, not the write's, and for a while the note stopped at
+ * the write.
+ */
+describe('carryCleanup', () => {
+  const held = { message: 'Unlock refused', origin: 'refusal' as const };
+
+  const withCleanup = <T>(
+    answer: IAdtResponse<T, IAdtError>,
+  ): IAdtResponse<T, IAdtError> =>
+    ({ ...answer, cleanup: held }) as unknown as IAdtResponse<T, IAdtError>;
+
+  it('moves the note onto a success', () => {
+    const carried = carryCleanup(withCleanup(ok('written')), ok('activated'));
+    if (!carried.ok) throw new Error('expected the activation to stand');
+    expect(carried.getResult().value).toBe('activated');
+    expect((carried as { cleanup?: unknown }).cleanup).toEqual(held);
+  });
+
+  it('moves the note onto a failure without touching its error', () => {
+    const carried = carryCleanup(
+      withCleanup(ok('written')),
+      refused('Object is locked'),
+    );
+    if (carried.ok) throw new Error('expected the activation refusal');
+    const error = carried.getError() as IAdtError & { cleanup?: unknown };
+    expect(error.message).toBe('Object is locked');
+    expect(error.cleanup).toEqual(held);
+  });
+
+  it('hands back the second answer untouched when there is no note', () => {
+    const activated = ok('activated');
+    expect(carryCleanup(ok('written'), activated)).toBe(activated);
+  });
+
+  it('does not overwrite a note the second answer already carries', () => {
+    const own = { message: 'Its own cleanup', origin: 'refusal' as const };
+    const activated = {
+      ...ok('activated'),
+      cleanup: own,
+    } as unknown as IAdtResponse<string, IAdtError>;
+    const carried = carryCleanup(withCleanup(ok('written')), activated);
+    expect((carried as { cleanup?: unknown }).cleanup).toEqual(own);
   });
 });

@@ -29,7 +29,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { isCloudConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -137,7 +137,10 @@ export async function handleUpdateProgram(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ programName }, { analyse: analyseActivation });
+      return carryCleanup(
+        written,
+        await obj.activate({ programName }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

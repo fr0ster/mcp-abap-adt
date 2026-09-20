@@ -1095,14 +1095,24 @@ describe('ddl', () => {
 });
 
 describe('ddlx (metadataExtension)', () => {
-  it("CheckMetadataExtensionLow leaves the check member's status undefined (the shipped inactive default) — checkMetadataExtension takes no source parameter at all", async () => {
+  /**
+   * This asserted `undefined` — the shipped default, which is the INACTIVE
+   * version — until the DDLX checkruns endpoint was measured: it does not
+   * fall back to the version that exists, so an activated extension answered
+   * `notProcessed` and the tool could not check it at all (#178). The version
+   * is named now, and defaults to `active`; `ddlxCheckVersion.test.ts` covers
+   * the behaviour against both captured documents, and this keeps pinning
+   * what this file is for — the factory, the arguments and the injected
+   * reading.
+   */
+  it('CheckMetadataExtensionLow asks for the active version and carries our analyse — checkMetadataExtension takes no source parameter at all', async () => {
     await handleCheckMetadataExtension(context as any, { name: 'ZI_X_DDLX' });
     const call = callTo('check');
     expect(call?.factory).toBe('getMetadataExtension');
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
-    expect(call?.args[1]).toBeUndefined();
+    expect(call?.args[1]).toBe('active');
   });
 
   it('UpdateMetadataExtensionLow passes sourceCode via options, not config — the shipped AdtMetadataExtension.update() reads options.sourceCode only, with no config fallback (the exact empty-write shape found four times in cluster 14)', async () => {

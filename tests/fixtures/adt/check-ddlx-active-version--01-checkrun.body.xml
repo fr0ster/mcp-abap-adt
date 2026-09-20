@@ -1,0 +1,1 @@
+<?xml version="1.0" encoding="utf-8"?><chkrun:checkRunReports xmlns:chkrun="http://www.sap.com/adt/checkrun"><chkrun:checkReport chkrun:reporter="abapCheckRun" chkrun:triggeringUri="/sap/bc/adt/ddic/ddlx/sources/zmcp_bld_ddlx_chk" chkrun:status="processed" chkrun:statusText="Object ZMCP_BLD_DDLX_CHK has been checked"/></chkrun:checkRunReports>

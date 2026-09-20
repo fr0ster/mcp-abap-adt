@@ -1502,6 +1502,28 @@ async function main(): Promise<void> {
         );
     });
 
+    // DDLX checkruns, once per version — the two answers #178 is about.
+    //
+    // The endpoint does NOT fall back to the version that exists, unlike the
+    // DDLS one: an activated metadata extension answers `processed` for
+    // `active` and `notProcessed` ("Error while reading the object … from the
+    // database") for `inactive`, and an extension that was never activated
+    // answers the mirror image. Measured on trial, 2026-09-20, which is why
+    // both documents are here: a reading tested against one of them alone
+    // cannot tell a check that found nothing from a check that never ran.
+    //
+    // Needs an ACTIVATED DDLX. `ZMCP_BLD_DDLX_CHK` over `ZMCP_BLD_V_DDLX` (a
+    // view entity with `@Metadata.allowExtensions: true` over `I_Country`) is
+    // the one captured; both live in the dev package, not among the shared
+    // polygon objects.
+    const ddlxForCheck = client.getMetadataExtension();
+    await withCase('check-ddlx-active-version', async () => {
+      await ddlxForCheck.check({ name: 'ZMCP_BLD_DDLX_CHK' }, 'active');
+    });
+    await withCase('check-ddlx-inactive-version', async () => {
+      await ddlxForCheck.check({ name: 'ZMCP_BLD_DDLX_CHK' }, 'inactive');
+    });
+
     // The same listing with `?targets=true`, which is a different document.
     //
     // ADT inserts a `tm:target` level between `tm:workbench` and

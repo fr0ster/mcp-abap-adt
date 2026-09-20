@@ -122,7 +122,11 @@ export async function handleCreateMetadataExtension(
 
       const checked = await withLock(
         () => obj.lock({ name }),
-        () => obj.check({ name }, undefined, { analyse: analyseException }),
+        // `inactive` said out loud, now that the tools name their version:
+        // this runs between the write and the activation, so the only version
+        // that exists yet is the unsaved one. The endpoint does not fall back
+        // — asking for `active` here answers `notProcessed`.
+        () => obj.check({ name }, 'inactive', { analyse: analyseException }),
         (lockHandle) => obj.unlock({ name }, lockHandle),
       );
       if (!checked.ok) {

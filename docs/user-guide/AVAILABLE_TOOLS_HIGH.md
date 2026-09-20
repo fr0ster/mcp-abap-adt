@@ -1543,6 +1543,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `name` (string, required) - Metadata extension name (e.g., ZC_MY_DDLX).
+- `version` (string, optional (default: active)) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
+- `want` (any, optional) - 
 
 ---
 

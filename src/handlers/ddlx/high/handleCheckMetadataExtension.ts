@@ -35,6 +35,19 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Metadata extension name (e.g., ZC_MY_DDLX).',
       },
+      // **The one knob that is not a knob.** This wrapper deliberately offers
+      // less than its low-tier sibling — no `detail`, no session control — but
+      // `version` is not a refinement a caller may or may not want: ask for
+      // the version an extension does not have and the endpoint answers
+      // `notProcessed` instead of checking the other one, so without it half
+      // the objects in a system cannot be checked from this tier at all.
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        default: 'active',
+        description:
+          "Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.",
+      },
     },
     required: ['name'],
   },
@@ -42,7 +55,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckMetadataExtension(
   context: HandlerContext,
-  args: { name: string },
+  args: { name: string; version?: 'active' | 'inactive' },
 ) {
   const result = await handleCheckMetadataExtensionLow(context, args);
   return normalizeCheckResponse(result, args.name?.toUpperCase());

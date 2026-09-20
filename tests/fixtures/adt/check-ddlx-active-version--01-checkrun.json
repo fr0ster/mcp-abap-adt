@@ -1,0 +1,35 @@
+{
+  "case": "check-ddlx-active-version",
+  "step": 1,
+  "stepTag": "checkrun",
+  "capturedAt": "2026-09-20T18:31:48.905Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/checkruns?reporters=abapCheckRun",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.checkmessages+xml",
+      "Content-Type": "application/vnd.sap.adt.checkobjects+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<chkrun:checkObjectList xmlns:chkrun=\"http://www.sap.com/adt/checkrun\" xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <chkrun:checkObject adtcore:uri=\"/sap/bc/adt/ddic/ddlx/sources/zmcp_bld_ddlx_chk\" chkrun:version=\"active\"/>\n</chkrun:checkObjectList>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.checkmessages+xml; charset=utf-8",
+      "content-length": "345",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=714094",
+      "sap-server": "true",
+      "sap-perf-fesrec": "720029.000000",
+      "connection": "close"
+    },
+    "bodyFile": "check-ddlx-active-version--01-checkrun.body.xml"
+  }
+}

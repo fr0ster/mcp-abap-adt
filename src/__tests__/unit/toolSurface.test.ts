@@ -76,15 +76,28 @@ describe('the MCP tool surface', () => {
       const had = parameters(before);
       const has = parameters(after ?? '(none)');
 
-      // Nothing may leave, and the only thing that may arrive is `detail` —
-      // optional, so it carries no `*`.
+      // Nothing may leave, and what may arrive is `detail` — optional, so it
+      // carries no `*` — or, on the two DDLX check tools, `version`.
+      //
+      // **Why that second exception exists.** The DDLX checkruns endpoint
+      // does not fall back to the version that exists: an activated
+      // extension answers `notProcessed` when asked for `inactive`, which is
+      // what the shipped default asked for, so from these two tools an
+      // activated extension could not be checked at all (#178, eseuve). A
+      // parameter was the only way to say which one — measured on trial and
+      // captured in `check-ddlx-active-version` /
+      // `check-ddlx-inactive-version`.
       expect({ tool, lost: had.filter((p) => !has.includes(p)) }).toEqual({
         tool,
         lost: [],
       });
+      const MAY_GAIN_VERSION = new Set([
+        'high/CheckMetadataExtension',
+        'low/CheckMetadataExtensionLow',
+      ]);
       expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
         tool,
-        added: ['detail'],
+        added: MAY_GAIN_VERSION.has(tool) ? ['version'] : ['detail'],
       });
     }
   });

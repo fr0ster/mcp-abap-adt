@@ -6,7 +6,33 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import type { SqlPreview } from '../../../lib/strategies/sqlPreview';
 import { return_error } from '../../../lib/utils';
+
+/**
+ * The answer's shape, shared with `GetTableContents`, which reads the same
+ * `/datapreview/freestyle` document for a whole table.
+ *
+ * The parse behind it is `sqlPreview` (`lib/strategies/sqlPreview.ts`),
+ * injected on the `query` and `contents` slots. It used to be a set of
+ * regular expressions here, with the handler projecting `reading.raw` past
+ * the result set so they could keep running — see that file for what that
+ * cost.
+ */
+export interface SqlQueryResponse {
+  sql_query: string;
+  row_number: number;
+  execution_time?: number;
+  total_rows?: number;
+  columns: Array<{ name: string; type: string; description?: string }>;
+  rows: Array<Record<string, string | null>>;
+  /**
+   * `detail: 'full'` only — the whole document, parsed generically, so
+   * nothing the rows do not need is dropped on the way.
+   */
+  document?: unknown;
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetSqlQuery',
   available_in: ['onprem', 'cloud'] as const,
@@ -30,175 +56,6 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-/**
- * `project(detail, terse)` from `projections.ts` hands `terse` only
- * `reading.value` (the generic `structured` parse of `query`/`contents` — see
- * `resultSets.ts`'s `READING_BY_SLOT`; both slots default to `rawDocument`
- * unparsed in `@mcp-abap-adt/adt-clients` itself, so there is no shipped
- * reading to read real `dataPreview:*` tag names off of, and no fixture under
- * `tests/fixtures/adt/` captures one either). `parseSqlQueryXml` below is the
- * pre-migration regex parser, proven against real ADT responses; redesigning
- * it against the generic parse tree with no corpus and no shipped reference
- * would be guessing at column/row nesting that the fast-xml-parser
- * `REPEATABLE` list was never tuned for (`dataPreview:columns` and
- * `dataPreview:data` are not in it). So this projects `reading.raw` — the
- * identical bytes the regex always ran against — rather than `reading.value`.
- */
-export function projectRaw(
-  detail: AnswerDetail,
-  reading: AdtReading<unknown>,
-  terseRaw: (raw: string, status: number) => unknown,
-): unknown {
-  if (detail === 'raw') return reading.raw;
-  if (detail === 'full') return reading.value ?? reading.raw;
-  return terseRaw(reading.raw, reading.status);
-}
-
-/**
- * Interface for SQL query execution response
- */
-export interface SqlQueryResponse {
-  sql_query: string;
-  row_number: number;
-  execution_time?: number;
-  total_rows?: number;
-  columns: Array<{
-    name: string;
-    type: string;
-    description?: string;
-    length?: number;
-  }>;
-  rows: Array<Record<string, any>>;
-}
-
-/**
- * Parse SAP ADT XML response from freestyle SQL query and convert to JSON format
- * @param xmlData - Raw XML response from ADT
- * @param sqlQuery - Original SQL query
- * @param rowNumber - Number of rows requested
- * @returns Parsed SQL query response
- */
-export function parseSqlQueryXml(
-  xmlData: string,
-  sqlQuery: string,
-  rowNumber: number,
-  logger?: ILogger,
-): SqlQueryResponse {
-  try {
-    // Extract basic information
-    const totalRowsMatch = xmlData.match(
-      /<dataPreview:totalRows>(\d+)<\/dataPreview:totalRows>/,
-    );
-    const totalRows = totalRowsMatch ? parseInt(totalRowsMatch[1], 10) : 0;
-
-    const queryTimeMatch = xmlData.match(
-      /<dataPreview:queryExecutionTime>([\d.]+)<\/dataPreview:queryExecutionTime>/,
-    );
-    const queryExecutionTime = queryTimeMatch
-      ? parseFloat(queryTimeMatch[1])
-      : 0;
-
-    // Extract column metadata
-    const columns: Array<{
-      name: string;
-      type: string;
-      description?: string;
-      length?: number;
-    }> = [];
-    const columnMatches = xmlData.match(/<dataPreview:metadata[^>]*>/g);
-
-    if (columnMatches) {
-      columnMatches.forEach((match) => {
-        const nameMatch = match.match(/dataPreview:name="([^"]+)"/);
-        const typeMatch = match.match(/dataPreview:type="([^"]+)"/);
-        const descMatch = match.match(/dataPreview:description="([^"]+)"/);
-        const lengthMatch = match.match(/dataPreview:length="(\d+)"/);
-
-        if (nameMatch) {
-          columns.push({
-            name: nameMatch[1],
-            type: typeMatch ? typeMatch[1] : 'UNKNOWN',
-            description: descMatch ? descMatch[1] : '',
-            length: lengthMatch ? parseInt(lengthMatch[1], 10) : undefined,
-          });
-        }
-      });
-    }
-
-    // Extract row data
-    const rows: Array<Record<string, any>> = [];
-
-    // Find all column sections
-    const columnSections = xmlData.match(
-      /<dataPreview:columns>.*?<\/dataPreview:columns>/gs,
-    );
-
-    if (columnSections && columnSections.length > 0) {
-      // Extract data for each column
-      const columnData: Record<string, (string | null)[]> = {};
-
-      columnSections.forEach((section, index) => {
-        if (index < columns.length) {
-          const columnName = columns[index].name;
-          const dataMatches = section.match(
-            /<dataPreview:data[^>]*>(.*?)<\/dataPreview:data>/g,
-          );
-
-          if (dataMatches) {
-            columnData[columnName] = dataMatches.map((match) => {
-              const content = match.replace(/<[^>]+>/g, '');
-              return content || null;
-            });
-          } else {
-            columnData[columnName] = [];
-          }
-        }
-      });
-
-      // Convert column-based data to row-based data
-      const maxRowCount = Math.max(
-        ...Object.values(columnData).map((arr) => arr.length),
-        0,
-      );
-
-      for (let rowIndex = 0; rowIndex < maxRowCount; rowIndex++) {
-        const row: Record<string, any> = {};
-        columns.forEach((column) => {
-          const columnValues = columnData[column.name] || [];
-          row[column.name] = columnValues[rowIndex] || null;
-        });
-        rows.push(row);
-      }
-    }
-
-    return {
-      sql_query: sqlQuery,
-      row_number: rowNumber,
-      execution_time: queryExecutionTime,
-      total_rows: totalRows,
-      columns,
-      rows,
-    };
-  } catch (parseError) {
-    logger?.error('Failed to parse SQL query XML:', parseError as any);
-
-    // Return basic structure on parse error
-    return {
-      sql_query: sqlQuery,
-      row_number: rowNumber,
-      columns: [],
-      rows: [],
-      error: 'Failed to parse XML response',
-    } as any;
-  }
-}
-
-/**
- * Handler to execute freestyle SQL queries via SAP ADT Data Preview API
- *
- * @param args - Tool arguments containing sql_query and optional row_number parameter
- * @returns Response with parsed SQL query results or error
- */
 export async function handleGetSqlQuery(
   context: HandlerContext,
   args: { sql_query: string; row_number?: number; detail?: AnswerDetail },
@@ -224,13 +81,30 @@ export async function handleGetSqlQuery(
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
         .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber }),
-    (reading: AdtReading<unknown>) =>
-      projectRaw(detail, reading, (raw) => {
-        const parsedData = parseSqlQueryXml(raw, sqlQuery, rowNumber, logger);
-        logger?.debug(
-          `Parsed SQL query data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
-        );
-        return parsedData;
-      }),
+    (reading: AdtReading<SqlPreview>) => {
+      if (detail === 'raw') return reading.raw;
+      const preview = reading.value;
+      logger?.debug(
+        `Parsed SQL query data: rows=${preview.rows.length}/${preview.total_rows ?? 0}, columns=${preview.columns.length}`,
+      );
+      const answered: SqlQueryResponse = {
+        sql_query: sqlQuery,
+        row_number: rowNumber,
+        execution_time: preview.execution_time,
+        total_rows: preview.total_rows,
+        columns: preview.columns,
+        rows: preview.rows,
+      };
+      // **`full` is the whole parse, and `terse` the fields you act on.**
+      // These two were identical for a moment, which took away everything the
+      // generic parse used to carry here — and naming two of the missing
+      // fields, as the next attempt did, still left `keyAttribute`,
+      // `colType`, `isKeyFigure` and whatever SAP adds next outside an answer
+      // that called itself full. So `full` is the document's own parse,
+      // beside the rows this reading exists to get right.
+      return detail === 'full'
+        ? { ...answered, document: preview.document }
+        : answered;
+    },
   );
 }

@@ -1503,6 +1503,25 @@ async function main(): Promise<void> {
     });
 
     // -----------------------------------------------------------------
+    // Data preview — a result with blank cells in it.
+    //
+    // The corpus had no `dataPreview` document, which is why the SQL reading
+    // stayed a regular expression inside the handler: there was nothing to
+    // write a parse against. A query whose every cell is filled would not
+    // have helped either — the defect is the blank one, which ADT sends as a
+    // self-closing `<dataPreview:data/>`. `I_Country` answers both shapes at
+    // once: 51 paired cells and 14 self-closing ones over 13 columns
+    // (measured on trial, 2026-09-20), and its `dataSet` elements are the
+    // second half of the same defect, since `<dataPreview:data[^>]*>` matches
+    // `<dataPreview:dataSet>` too.
+    // -----------------------------------------------------------------
+    await withCase('read-sql-query-with-blank-cells', async () => {
+      await client
+        .getUtils()
+        .getSqlQuery({ sql_query: 'SELECT * FROM I_Country', row_number: 5 });
+    });
+
+    // -----------------------------------------------------------------
     // ATC — a worklist with findings in it.
     //
     // The corpus held no ATC document at all, because no tool here had ever

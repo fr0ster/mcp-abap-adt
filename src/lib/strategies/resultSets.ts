@@ -2,6 +2,7 @@ import { unitTestDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
 import { nodeLevel } from './packageWalk';
 import { statusOnly, structured, verbatim } from './reading';
+import { sqlPreview } from './sqlPreview';
 
 /**
  * Which reading a result-set slot wants — keyed on the slot, because that is
@@ -170,6 +171,18 @@ export function resultsFor<
 export const ourUtils = {
   ...resultsFor(utilDocuments, ['activation']),
   node: nodeLevel,
+  // `query` for the same reason as `node`: the generic `structured` parse has
+  // never carried `dataPreview:columns` or `dataPreview:data` in its
+  // repeatable list, so a preview read through it collapses a column's cells
+  // into one. `GetSqlQuery` worked around that by projecting `reading.raw`
+  // and running a regular expression over it inside the handler — which is
+  // where a defect that silently reordered a caller's rows sat through the
+  // whole migration. `sqlPreview` is that parse, in the place a parse
+  // belongs.
+  query: sqlPreview,
+  // `GetTableContents` reads the same `/datapreview/freestyle` document
+  // through a different slot, and carried the same regular expression.
+  contents: sqlPreview,
 };
 
 /**

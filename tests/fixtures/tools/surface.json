@@ -205,6 +205,24 @@
   },
   {
     "group": "high",
+    "name": "RunATC",
+    "inputs": "objects*, check_variant, max_findings, wait",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetATCRunStatus",
+    "inputs": "run_id*",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "GetATCFindings",
+    "inputs": "worklist_id*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
     "name": "ActivateObjects",
     "inputs": "objects*, preaudit",
     "available_in": "cloud, onprem"

@@ -73,7 +73,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { getSapConfigFromEnv } from '../src/__tests__/integration/helpers/configHelpers';
@@ -1495,9 +1495,38 @@ async function main(): Promise<void> {
       // with no `configUri`, `list()` resolves one itself and the case
       // records two requests — which is the very composite the consumer now
       // makes explicitly.
-      await client.getRequest().list(
-        transportConfigUri ? { configUri: transportConfigUri } : undefined,
+      await client
+        .getRequest()
+        .list(
+          transportConfigUri ? { configUri: transportConfigUri } : undefined,
+        );
+    });
+
+    // -----------------------------------------------------------------
+    // ATC — a worklist with findings in it.
+    //
+    // The corpus held no ATC document at all, because no tool here had ever
+    // asked for one, and `GetATCFindings` has to read the worklist. A run
+    // over one clean class answers `<atcobject:findings/>` — an empty element
+    // that would let any reading pass — so this runs the shared package,
+    // which on the trial system answers four priority-2 and two priority-3
+    // findings (measured 2026-09-20).
+    // -----------------------------------------------------------------
+    const atc = new AdtRuntimeClient(connection, undefined).getAtc();
+    let atcWorklistId = '';
+    await withCase('atc-run-package-with-findings', async () => {
+      const variant = await atc.resolveCheckVariant();
+      atcWorklistId = await atc.createWorklist(variant);
+      await atc.startRun(
+        atcWorklistId,
+        { objects: [{ objectName: 'ZMCP_SHR_PKG', objectType: 'package' }] },
+        { wait: true, maximumVerdicts: 100 },
       );
+    });
+
+    await withCase('atc-findings-worklist', async () => {
+      if (!atcWorklistId) return;
+      await atc.getFindings(atcWorklistId);
     });
 
     // -----------------------------------------------------------------

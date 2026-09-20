@@ -1,0 +1,34 @@
+{
+  "case": "atc-findings-worklist",
+  "step": 1,
+  "stepTag": "worklists-2aaa2806861e1fd1ad9bd28dca5c37ed",
+  "capturedAt": "2026-09-20T10:32:52.074Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/atc/worklists/2AAA2806861E1FD1AD9BD28DCA5C37ED?includeExemptedFindings=false",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/atc/worklists/2AAA2806861E1FD1AD9BD28DCA5C37ED?includeExemptedFindings=false",
+    "headers": {
+      "Accept": "application/atc.worklist.v1+xml, application/vnd.sap.atc.worklist.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/atc.worklist.v1+xml; charset=utf-8",
+      "content-length": "1864",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=2697964",
+      "sap-server": "true",
+      "sap-perf-fesrec": "2704436.000000",
+      "connection": "close"
+    },
+    "bodyFile": "atc-findings-worklist--01-worklists-2aaa2806861e1fd1ad9bd28dca5c37ed.body.xml"
+  }
+}

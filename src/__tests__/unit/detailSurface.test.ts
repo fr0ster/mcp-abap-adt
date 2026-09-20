@@ -224,6 +224,13 @@ const JSON_ANSWERING: readonly string[] = [
   'DeleteStructureLow',
   'DeleteTable',
   'DeleteTableLow',
+  // The ATC worklist: `getFindings()` answers the document, this repository
+  // reads it into findings, and `raw` is where the document itself is still
+  // available. `RunATC` and `GetATCRunStatus` are deliberately absent — the
+  // first composes its answer from three calls with no document behind it,
+  // the second answers the four fields the client parses out of the run
+  // resource, so neither has three levels to offer.
+  'GetATCFindings',
   'GetAdtTypes',
   'GetCdsUnitTest',
   'GetCdsUnitTestResult',

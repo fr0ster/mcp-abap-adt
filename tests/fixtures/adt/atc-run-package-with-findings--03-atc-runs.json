@@ -1,0 +1,35 @@
+{
+  "case": "atc-run-package-with-findings",
+  "step": 3,
+  "stepTag": "atc-runs",
+  "capturedAt": "2026-09-20T10:32:30.638Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/atc/runs?worklistId=2AAA2806861E1FD1AD9BD28DCA5C37ED&clientWait=true",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/atc/runs?worklistId=2AAA2806861E1FD1AD9BD28DCA5C37ED&clientWait=true",
+    "headers": {
+      "Content-Type": "application/xml",
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?><atc:run maximumVerdicts=\"100\" xmlns:atc=\"http://www.sap.com/adt/atc\"><objectSets xmlns:adtcore=\"http://www.sap.com/adt/core\"><objectSet kind=\"inclusive\"><adtcore:objectReferences><adtcore:objectReference adtcore:uri=\"/sap/bc/adt/packages/ZMCP_SHR_PKG\"/></adtcore:objectReferences></objectSet></objectSets></atc:run>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8",
+      "content-length": "726",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=20707404",
+      "sap-server": "true",
+      "sap-perf-fesrec": "20712380.000000",
+      "connection": "close"
+    },
+    "bodyFile": "atc-run-package-with-findings--03-atc-runs.body.xml"
+  }
+}

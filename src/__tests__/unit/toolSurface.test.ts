@@ -103,6 +103,24 @@ describe('the MCP tool surface', () => {
    * one with `legacy` removed and nothing else. A tool that had quietly
    * gained or lost anything else would have stopped the refreeze.
    */
+  /**
+   * The second deliberate move: three tools arrived.
+   *
+   * ATC was in `@mcp-abap-adt/adt-clients` 19 and exposed by nothing here —
+   * `AdtRuntimeClient.getAtc()` with the variant, the worklist, the run, its
+   * status and its findings, and no `src/handlers/atc` to reach them. The
+   * refreeze was checked rather than trusted: every existing row had to match
+   * the old snapshot exactly, in `inputs` and in `available_in`, and the only
+   * difference allowed was these three names appearing. A tool that had
+   * quietly gained or lost anything else would have stopped it.
+   */
+  it('adds tools only deliberately', () => {
+    const arrived = [...read(current).keys()].filter(
+      (tool) => !read(frozen).has(tool),
+    );
+    expect(arrived).toEqual([]);
+  });
+
   it('no tool declares legacy', () => {
     expect(current.filter((r) => /legacy/.test(r.available_in))).toEqual([]);
   });

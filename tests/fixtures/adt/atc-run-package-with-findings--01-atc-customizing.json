@@ -1,0 +1,34 @@
+{
+  "case": "atc-run-package-with-findings",
+  "step": 1,
+  "stepTag": "atc-customizing",
+  "capturedAt": "2026-09-20T10:32:29.342Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/atc/customizing",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/atc/customizing",
+    "headers": {
+      "Accept": "application/xml, application/vnd.sap.atc.customizing-v1+xml, application/vnd.sap.atc.customizing-v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.atc.customizing-v2+xml; charset=utf-8",
+      "content-length": "659",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=130683",
+      "sap-server": "true",
+      "sap-perf-fesrec": "135551.000000",
+      "connection": "close"
+    },
+    "bodyFile": "atc-run-package-with-findings--01-atc-customizing.body.xml"
+  }
+}

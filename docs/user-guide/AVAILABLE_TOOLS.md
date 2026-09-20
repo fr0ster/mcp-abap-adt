@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 353
+- Total tools: 356
 - Read-only tools: 64
-- High-level tools: 165
+- High-level tools: 168
 - Low-level tools: 124
 
 - Compact tools: 22 (included in High-level group)
@@ -111,6 +111,10 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
 - [High-Level Group](#high-level-group)
+  - [Atc](#high-level-atc)
+    - [GetATCFindings](#getatcfindings-high-level-atc)
+    - [GetATCRunStatus](#getatcrunstatus-high-level-atc)
+    - [RunATC](#runatc-high-level-atc)
   - [Behavior Definition](#high-level-behavior-definition)
     - [CheckBehaviorDefinition](#checkbehaviordefinition-high-level-behavior-definition)
     - [CreateBehaviorDefinition](#createbehaviordefinition-high-level-behavior-definition)
@@ -1383,6 +1387,45 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="high-level-group"></a>
 ## High-Level Group
+
+<a id="high-level-atc"></a>
+### High-Level / Atc
+
+<a id="getatcfindings-high-level-atc"></a>
+#### GetATCFindings (High-Level / Atc)
+**Description:** Read what an ATC run found, by the worklist_id RunATC answered. Works whether or not the run waited. Answers each finding with the object, the source position, the priority, which check ran and what it said, plus how many objects were covered and the counts per priority.
+
+**Source:** `src/handlers/atc/high/handleGetATCFindings.ts`
+
+**Parameters:**
+- `worklist_id` (string, required) - Worklist identifier answered by RunATC.
+
+---
+
+<a id="getatcrunstatus-high-level-atc"></a>
+#### GetATCRunStatus (High-Level / Atc)
+**Description:** Ask whether an ATC run has ended. Takes the run_id from RunATC (only a run started with wait=false has one). Answers the status the server reports and whether it is finished — finished means ended, not that the checks passed. Read what it found with GetATCFindings, by worklist_id.
+
+**Source:** `src/handlers/atc/high/handleGetATCRunStatus.ts`
+
+**Parameters:**
+- `run_id` (string, required) - Run identifier answered by RunATC when wait was false.
+
+---
+
+<a id="runatc-high-level-atc"></a>
+#### RunATC (High-Level / Atc)
+**Description:** Run ABAP Test Cockpit checks over one or more objects. Creates a worklist for the check variant, then starts the run. Answers worklist_id always — findings stay readable with GetATCFindings whether or not the run waited. With wait=false it also answers run_id, for GetATCRunStatus; with wait=true the server holds the request until the checks finish and answers the finding counts.
+
+**Source:** `src/handlers/atc/high/handleRunATC.ts`
+
+**Parameters:**
+- `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
+- `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
+- `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
+
+---
 
 <a id="high-level-behavior-definition"></a>
 ### High-Level / Behavior Definition
@@ -5630,4 +5673,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-17*
+*Last updated: 2026-09-20*

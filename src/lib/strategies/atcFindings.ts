@@ -15,10 +15,22 @@
  * nothing sends end up in a parser.
  *
  * An object element carries the object; the finding inside it carries where
- * and what. Both halves are needed: `atcfinding:location` names the source
- * position, which for a function module is the include rather than the
- * object the run was asked about.
+ * and what. Both halves are needed: the finding's `location` names the source
+ * position, which for a function module is the include rather than the object
+ * the run was asked about.
+ *
+ * **Parsed, not matched.** This read the document with regular expressions
+ * over literal `atcobject:`/`atcfinding:`/`adtcore:` prefixes until review
+ * pointed out what that costs: an XML prefix is chosen by whoever writes the
+ * document, so a byte-for-byte equivalent worklist bound to the same
+ * namespaces under `o:`/`f:`/`c:` would have answered no objects and no
+ * findings — silently, reading exactly like a clean check. Entities were the
+ * other half: a `messageTitle` carrying `&amp;` reached the caller with the
+ * escape still in it. `fast-xml-parser` with `removeNSPrefix` settles both,
+ * and it is what the ATC parse inside adt-clients uses, and what
+ * `reading.ts` and `packageWalk.ts` here use.
  */
+import { XMLParser } from 'fast-xml-parser';
 
 export interface AtcFinding {
   /** `adtcore:name` of the enclosing object element. */
@@ -51,14 +63,29 @@ export interface AtcWorklistReading {
   by_priority: Record<string, number>;
 }
 
-const OBJECT_ELEMENT =
-  /<atcobject:object\b([^>]*)>([\s\S]*?)<\/atcobject:object>/g;
-const SELF_CLOSING_OBJECT = /<atcobject:object\b([^>]*)\/>/g;
-const FINDING_ELEMENT = /<atcfinding:finding\b([^>]*?)\/?>/g;
+const parser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  attributesGroupName: '@',
+  parseAttributeValue: false,
+  parseTagValue: false,
+  // The prefixes go, so `atcfinding:priority` and a document that called the
+  // same namespace `f:` both arrive as `priority`.
+  removeNSPrefix: true,
+});
 
-const attribute = (source: string, name: string): string | undefined => {
-  const match = new RegExp(`\\b${name}="([^"]*)"`).exec(source);
-  return match?.[1];
+type Element = Record<string, unknown> & { '@'?: Record<string, string> };
+
+/** One element, several, or none — all three arrive here as a list. */
+function asList(value: unknown): Element[] {
+  if (Array.isArray(value)) return value as Element[];
+  if (value && typeof value === 'object') return [value as Element];
+  return [];
+}
+
+const attribute = (element: Element, name: string): string | undefined => {
+  const value = element['@']?.[name];
+  return typeof value === 'string' && value !== '' ? value : undefined;
 };
 
 /** `/…/source/main#start=9,0` → the source and the 9. */
@@ -77,31 +104,35 @@ export function parseAtcWorklist(document: string): AtcWorklistReading {
   const by_priority: Record<string, number> = {};
   let objects_checked = 0;
 
-  for (const object of document.matchAll(OBJECT_ELEMENT)) {
-    objects_checked += 1;
-    const name = attribute(object[1], 'adtcore:name') ?? '';
-    const type = attribute(object[1], 'adtcore:type') ?? '';
+  const parsed = parser.parse(document) as Element;
+  const worklist = (parsed.worklist ?? {}) as Element;
 
-    for (const finding of object[2].matchAll(FINDING_ELEMENT)) {
-      const attributes = finding[1];
-      const priority = attribute(attributes, 'atcfinding:priority');
-      if (priority) by_priority[priority] = (by_priority[priority] ?? 0) + 1;
-      findings.push({
-        object: name,
-        object_type: type,
-        ...position(attribute(attributes, 'atcfinding:location')),
-        priority: priority ? Number(priority) : undefined,
-        check: attribute(attributes, 'atcfinding:checkTitle'),
-        message: attribute(attributes, 'atcfinding:messageTitle'),
-      });
+  for (const objects of asList(worklist.objects)) {
+    for (const object of asList(objects.object)) {
+      // Counted whether or not it found anything: an object with nothing to
+      // report still had the checks run over it, and leaving those out would
+      // make a clean package look like a package nothing looked at.
+      objects_checked += 1;
+      const name = attribute(object, 'name') ?? '';
+      const type = attribute(object, 'type') ?? '';
+
+      for (const group of asList(object.findings)) {
+        for (const finding of asList(group.finding)) {
+          const priority = attribute(finding, 'priority');
+          if (priority)
+            by_priority[priority] = (by_priority[priority] ?? 0) + 1;
+          findings.push({
+            object: name,
+            object_type: type,
+            ...position(attribute(finding, 'location')),
+            priority: priority ? Number(priority) : undefined,
+            check: attribute(finding, 'checkTitle'),
+            message: attribute(finding, 'messageTitle'),
+          });
+        }
+      }
     }
   }
-
-  // An object with nothing to report comes back self-closing — the majority,
-  // on a clean run. They carry no finding, but they are objects the run
-  // covered, and a count that left them out would make a clean package look
-  // like a package nothing looked at.
-  for (const _ of document.matchAll(SELF_CLOSING_OBJECT)) objects_checked += 1;
 
   return { findings, objects_checked, by_priority };
 }

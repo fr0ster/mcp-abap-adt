@@ -58,6 +58,39 @@ describe('the ATC worklist reading, against the captured document', () => {
     expect(finding.object_type).toBe('FUGR');
   });
 
+  /**
+   * The prefix is the document author's to choose, not ours to depend on.
+   *
+   * This read the worklist with regular expressions over literal
+   * `atcobject:`/`atcfinding:`/`adtcore:` until review pointed out that a
+   * document binding the same namespaces under different prefixes would have
+   * answered nothing at all — and nothing reads exactly like a clean check.
+   */
+  it('reads the same document under different namespace prefixes', () => {
+    const renamed = WORKLIST.replace(/atcworklist:/g, 'w:')
+      .replace(/atcobject:/g, 'o:')
+      .replace(/atcfinding:/g, 'f:')
+      .replace(/adtcore:/g, 'c:')
+      .replace(/xmlns:w=/g, 'xmlns:w=')
+      .replace(/xmlns:o=/g, 'xmlns:o=')
+      .replace(/xmlns:f=/g, 'xmlns:f=')
+      .replace(/xmlns:c=/g, 'xmlns:c=');
+
+    expect(parseAtcWorklist(renamed)).toEqual(parseAtcWorklist(WORKLIST));
+  });
+
+  it('decodes what the document escaped', () => {
+    // A check message is free text and carries whatever the checker wrote;
+    // an ampersand reaches the wire as an entity, and a caller handed
+    // `&amp;` back has been given the escape rather than the message.
+    const escaped =
+      '<atcworklist:worklist><atcworklist:objects><atcobject:object adtcore:name="ZCL_X" adtcore:type="CLAS"><atcobject:findings><atcfinding:finding atcfinding:priority="2" atcfinding:checkTitle="Check &amp; Verify" atcfinding:messageTitle="&quot;A&quot; &lt; &quot;B&quot; &amp; more"/></atcobject:findings></atcobject:object></atcworklist:objects></atcworklist:worklist>';
+
+    const [finding] = parseAtcWorklist(escaped).findings;
+    expect(finding.check).toBe('Check & Verify');
+    expect(finding.message).toBe('"A" < "B" & more');
+  });
+
   it('answers an empty reading for a document with no findings', () => {
     // The shape a clean object answers: `<atcobject:findings/>`, self-closing.
     const clean =

@@ -86,15 +86,14 @@ export async function handleGetTableContents(
         rows: preview.rows,
       };
       // **`full` is the whole parse, and `terse` the fields you act on.**
-      // These two were identical for a moment, which quietly took away what
-      // the generic parse used to carry here — the statement ADT actually ran
-      // and the analytical-view flag. `detail` may not cost a caller a field.
+      // These two were identical for a moment, which took away everything the
+      // generic parse used to carry here — and naming two of the missing
+      // fields, as the next attempt did, still left `keyAttribute`,
+      // `colType`, `isKeyFigure` and whatever SAP adds next outside an answer
+      // that called itself full. So `full` is the document's own parse,
+      // beside the rows this reading exists to get right.
       return detail === 'full'
-        ? {
-            ...answered,
-            executed_query_string: preview.executed_query_string,
-            is_hana_analytical_view: preview.is_hana_analytical_view,
-          }
+        ? { ...answered, document: preview.document }
         : answered;
     },
   );

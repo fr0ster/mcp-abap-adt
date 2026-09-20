@@ -63,16 +63,32 @@ describe('a data preview, read from the captured document', () => {
   });
 
   /**
-   * `detail: 'full'` promises the whole parse, so the parse has to hold the
-   * whole document. These two fields were reachable through the generic
-   * `structured` parse the slot used to carry; a reading of our own that
-   * dropped them would have taken a field away while fixing a defect — which
-   * it briefly did, until review caught it.
+   * `detail: 'full'` promises the whole parse, so the reading carries the
+   * whole document beside the rows — not a hand-picked set of extra fields,
+   * which is what the first two attempts at this were: one dropped
+   * everything, the next named `executedQueryString` and
+   * `isHanaAnalyticalView` and still dropped the column attributes.
    */
-  it('keeps the rest of the document, not only the rows', () => {
-    expect(preview.executed_query_string).toContain('SELECT * FROM I_COUNTRY');
-    expect(preview.is_hana_analytical_view).toBe(false);
+  it('carries the whole document, not a chosen few of its fields', () => {
     expect(preview.execution_time).toBeCloseTo(0.316, 3);
+
+    const document = preview.document as any;
+    const table = document['dataPreview:tableData'];
+    expect(table['dataPreview:executedQueryString']).toContain(
+      'SELECT * FROM I_COUNTRY',
+    );
+    expect(table['dataPreview:isHanaAnalyticalView']).toBe('false');
+
+    // The column attributes the shaped reading has no use for, and which a
+    // hand-picked `full` left behind.
+    const metadata = JSON.stringify(table['dataPreview:columns']);
+    for (const attribute of [
+      'dataPreview:keyAttribute',
+      'dataPreview:colType',
+      'dataPreview:isKeyFigure',
+    ]) {
+      expect(metadata).toContain(attribute);
+    }
   });
 
   it('reports a blank cell as null rather than as an empty string', () => {
@@ -131,10 +147,13 @@ describe('what the regular expression got wrong, one case each', () => {
   });
 
   it('answers an empty reading for a document that is not a preview', () => {
-    expect(parseSqlPreview('<other:thing/>')).toEqual({
-      columns: [],
-      rows: [],
-    });
+    // No columns and no rows, but the document is still carried: `full`
+    // promises the parse of whatever came back, including the answer that
+    // explains why there are no rows in it.
+    const nothing = parseSqlPreview('<other:thing/>');
+    expect(nothing.columns).toEqual([]);
+    expect(nothing.rows).toEqual([]);
+    expect(nothing.document).toEqual({ 'other:thing': '' });
   });
 });
 
@@ -178,14 +197,19 @@ describe('detail over a data preview', () => {
   it('answers the acting fields on terse', async () => {
     const terse = await answerOf();
     expect(terse.rows).toHaveLength(5);
-    expect(terse.executed_query_string).toBeUndefined();
+    expect(terse.document).toBeUndefined();
   });
 
   it('answers the whole parse on full', async () => {
     const full = await answerOf('full');
     expect(full.rows).toHaveLength(5);
-    expect(full.executed_query_string).toContain('SELECT * FROM I_COUNTRY');
-    expect(full.is_hana_analytical_view).toBe(false);
+    const table = full.document['dataPreview:tableData'];
+    expect(table['dataPreview:executedQueryString']).toContain(
+      'SELECT * FROM I_COUNTRY',
+    );
+    expect(JSON.stringify(table['dataPreview:columns'])).toContain(
+      'dataPreview:isKeyFigure',
+    );
   });
 
   it('answers the document on raw', async () => {

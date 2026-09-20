@@ -1,5 +1,5 @@
 import { XMLParser } from 'fast-xml-parser';
-import { type AdtReading, reading } from './reading';
+import { type AdtReading, parseStructure, reading } from './reading';
 
 /**
  * What a data preview answers, read as a document rather than matched.
@@ -53,18 +53,23 @@ export interface SqlPreview {
   /** `dataPreview:queryExecutionTime`, in seconds as the server reports it. */
   execution_time?: number;
   /**
-   * What the server says it ran — the caller's SELECT wrapped in the ABAP
-   * statement ADT built around it.
+   * The whole document, parsed generically — what `detail: 'full'` answers.
    *
-   * This and the flag below are the rest of the document, and they are here
-   * because `detail: 'full'` promises the whole parse. They were reachable
-   * before this reading existed, through the generic `structured` parse the
-   * slot used to carry, and a reading of our own that dropped them would have
-   * taken a field away while fixing a defect.
+   * Not a hand-picked set of extra fields. I tried that first, adding
+   * `executedQueryString` and `isHanaAnalyticalView` because review named
+   * them, and review was right again: `keyAttribute`, `colType`,
+   * `isKeyFigure` and anything SAP adds tomorrow were still being dropped,
+   * while the answer went on calling itself the whole parse. A shaped
+   * reading is the right answer for `terse`, where the point is the fields a
+   * caller acts on; it is the wrong one for `full`, where the point is that
+   * nothing was left out.
+   *
+   * This is the same `parseStructure` the generic `structured` reading uses —
+   * the one the slot carried before `sqlPreview` replaced it — so `full`
+   * answers exactly what it answered then, and the rows are correct beside
+   * it.
    */
-  executed_query_string?: string;
-  /** `dataPreview:isHanaAnalyticalView`, as the document words it. */
-  is_hana_analytical_view?: boolean;
+  document: unknown;
 }
 
 const parser = new XMLParser({
@@ -117,7 +122,8 @@ export function parseSqlPreview(document: string): SqlPreview {
   const table = (parser.parse(document) as Element)?.tableData as
     | Element
     | undefined;
-  if (!table) return { columns: [], rows: [] };
+  if (!table)
+    return { columns: [], rows: [], document: parseStructure(document) };
 
   const columns: SqlColumn[] = [];
   const byColumn: Array<Array<string | null>> = [];
@@ -150,22 +156,12 @@ export function parseSqlPreview(document: string): SqlPreview {
     return row;
   });
 
-  const executed = table.executedQueryString;
-  const analytical = table.isHanaAnalyticalView;
-
   return {
     columns,
     rows,
     total_rows: numberOf(table.totalRows),
     execution_time: numberOf(table.queryExecutionTime),
-    executed_query_string:
-      executed === undefined || executed === '' ? undefined : String(executed),
-    // `false` is a real answer and has to survive; only an absent element is
-    // absent.
-    is_hana_analytical_view:
-      analytical === undefined || analytical === ''
-        ? undefined
-        : String(analytical).trim().toLowerCase() === 'true',
+    document: parseStructure(document),
   };
 }
 

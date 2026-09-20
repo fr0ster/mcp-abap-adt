@@ -4,9 +4,18 @@
  * A dispatcher, not an object family of its own: one branch runs per call,
  * over the same family clients every other `validate` handler in this
  * migration uses. Each branch carries its own `resultsFor(xDocuments)` and
- * `analyseValidation`, so a refusal ADT embeds in a 200 (the validation shape
- * every low-level ValidateX handler now reads) is read as a failure here too,
- * rather than folded into `admissible: true`.
+ * `analyseException`.
+ *
+ * **A name that is not admissible is an answer, not a failure.** Two families
+ * of validation answer differently — class, domain and table refuse a taken
+ * name with HTTP 400 and an `exc:exception`, while DDL and function groups
+ * answer 200 with `SEVERITY=ERROR` — and only the first is a failed call.
+ * `analyseException` draws exactly that line. For a while these handlers
+ * carried `analyseValidation`, which refuses on the body verdict too, so
+ * asking whether a name was free and hearing "no" came back as an error;
+ * the pre-migration handlers answered `success: result.valid` with the
+ * reason beside it, and the creates that call `validate` first ignored its
+ * verdict entirely. `terseValidation` carries it now, as `admissible`.
  */
 
 import {
@@ -23,7 +32,7 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -252,7 +261,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'class':
           return client.getClass(resultsFor(classDocuments)).validate(
@@ -261,7 +270,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'interface':
           return client.getInterface(resultsFor(interfaceDocuments)).validate(
@@ -270,7 +279,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'function_group':
           return client
@@ -280,7 +289,7 @@ export async function handleValidateObject(
                 functionGroupName: objectName,
                 description: normalizedDescription,
               },
-              { analyse: analyseValidation },
+              { analyse: analyseException },
             );
         case 'table':
           return client.getTable(resultsFor(tableDocuments)).validate(
@@ -289,7 +298,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'structure':
           return client.getStructure(resultsFor(structureDocuments)).validate(
@@ -298,7 +307,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'ddl':
           return client.getDdl(resultsFor(ddlDocuments)).validate(
@@ -307,7 +316,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'domain':
           return client.getDomain(resultsFor(domainDocuments)).validate(
@@ -316,7 +325,7 @@ export async function handleValidateObject(
               packageName,
               description: normalizedDescription,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           );
         case 'data_element':
           return client
@@ -327,14 +336,14 @@ export async function handleValidateObject(
                 packageName,
                 description: normalizedDescription,
               },
-              { analyse: analyseValidation },
+              { analyse: analyseException },
             );
         case 'package':
           return client
             .getPackage(resultsFor(packageDocuments))
             .validate(
               { packageName: objectName, description: normalizedDescription },
-              { analyse: analyseValidation },
+              { analyse: analyseException },
             );
         case 'behavior_definition':
           return client
@@ -347,7 +356,7 @@ export async function handleValidateObject(
                 rootEntity: root_entity,
                 implementationType: normalizedImplementationType,
               },
-              { analyse: analyseValidation },
+              { analyse: analyseException },
             );
         case 'behavior_implementation':
           // A behavior implementation IS a class (`BDEF/BDO`'s implementation
@@ -365,7 +374,7 @@ export async function handleValidateObject(
                   ? { description: normalizedDescription }
                   : {}),
               },
-              { analyse: analyseValidation },
+              { analyse: analyseException },
             );
         case 'metadata_extension':
         case 'ddlx/ex':
@@ -377,7 +386,7 @@ export async function handleValidateObject(
                 description: normalizedDescription,
                 packageName,
               },
-              { analyse: analyseValidation },
+              { analyse: analyseException },
             );
         default:
           // Unreachable: normalizedType was already checked against

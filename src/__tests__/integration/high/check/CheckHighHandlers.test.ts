@@ -42,7 +42,7 @@ import {
  * The three fields this used to require — `success`, `message`,
  * `check_result` — were the pre-migration handler's own envelope, built by
  * `parseCheckRunResponse` around a boolean this repository derived itself.
- * The verdict now belongs to `analyseCheck`: a check run that reports
+ * The verdict now belongs to `analyseException`: a check run that reports
  * errors is a refusal and never reaches here, which is why no `success`
  * boolean survives on the success path. `check_result` is gone with the
  * envelope; its content is `status_text` plus `messages`.
@@ -56,25 +56,48 @@ function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
 }
 
 /**
- * Assert a check that SAP refused, and that its own words came through.
+ * Assert a check that ran and had something to say.
  *
- * A refusal is not passed through `normalizeCheckResponse` — it returns an
- * error response untouched — so there is no `object_name` here, and nothing
- * to parse into the terse shape. What there is, is the failure payload
- * `answer()` builds: the message, `origin: 'refusal'`, and the check's own
- * `messages`. That is the whole point of the migration on this path, so the
- * test reads it rather than settling for `isError`.
+ * **A check tool's findings are its answer.** This used to require
+ * `isError: true`, because the handlers carried the shipped `analyseCheck`,
+ * which reads a `chkrun:checkMessage` of type `E` as a refusal. That turned a
+ * check doing its job into a call that failed — a regression against the
+ * pre-migration handlers, which answered `return_response` every time with
+ * `success` inside and the findings beside it. The handlers carry
+ * `analyseException` now: what genuinely failed refuses, what was found is
+ * reported.
  */
-function assertCheckRefusal(
+function assertCheckFindings(
   response: { isError: boolean; content: Array<{ text: string }> },
   expected: RegExp,
 ): any {
-  expect(response.isError).toBe(true);
-  const payload = JSON.parse(response.content[0].text);
-  expect(payload.origin).toBe('refusal');
-  expect(payload.message).toMatch(expected);
-  expect(payload.messages?.length).toBeGreaterThan(0);
-  return payload;
+  expect(response.isError).toBe(false);
+  const data = JSON.parse(response.content[0].text);
+  expect(data.ran).toBe(true);
+  expect(data.messages?.length).toBeGreaterThan(0);
+  expect(data.messages.map((m: { text: string }) => m.text).join('; ')).toMatch(
+    expected,
+  );
+  return data;
+}
+
+/**
+ * Assert a check that never ran, and said why.
+ *
+ * `status="notProcessed"` with the reason in `statusText`. A check that did
+ * not run is not a check that found nothing, and `ran: false` is how the two
+ * are told apart — still an answer, which is how the pre-migration handler
+ * reported it too.
+ */
+function assertCheckDidNotRun(
+  response: { isError: boolean; content: Array<{ text: string }> },
+  expected: RegExp,
+): any {
+  expect(response.isError).toBe(false);
+  const data = JSON.parse(response.content[0].text);
+  expect(data.ran).toBe(false);
+  expect(data.status_text).toMatch(expected);
+  return data;
 }
 
 describe('Check High-Level Handlers Integration', () => {
@@ -196,12 +219,13 @@ describe('Check High-Level Handlers Integration', () => {
           // tool's inability to ask about the active version is a real gap,
           // and a `version` input is what would close it.
           //
-          // Before the migration the same answer was parsed into
-          // `success: false` inside an `isError: false` response.
-          const payload = assertCheckRefusal(response, /Inactive version/i);
+          // That is an answer, and the tool reports it as one: `ran: false`
+          // with SAP's own sentence, which is what `success: false` carried
+          // before the migration.
+          const data = assertCheckDidNotRun(response, /Inactive version/i);
 
           logger?.success(
-            `✅ check: ${objectName} — refused: ${payload.message}`,
+            `✅ check: ${objectName} — did not run: ${data.status_text}`,
           );
         });
       },
@@ -435,7 +459,7 @@ describe('Check High-Level Handlers Integration', () => {
             // the check endpoint treats as `inactive`; the shared table is
             // active-only, so SAP answers `status="notProcessed"` with
             // `statusText="Inactive version for TABL ZMCP_SHR_RTABL does not
-            // exist"` — a check that never ran, which `analyseCheck` reports
+            // exist"` — a check that never ran, which `analyseException` reports
             // as the refusal it is. Before the migration the same answer was
             // parsed into `success: false` inside an `isError: false`
             // response, which is the masking this work removed. Asking for
@@ -774,14 +798,13 @@ describe('Check High-Level Handlers Integration', () => {
           // include, so this is what SAP says about a function group, not
           // about this one being broken (measured 2026-09-16).
           //
-          // `analyseCheck` makes a check carrying an `E` a refusal, which is
-          // the contract this migration adopted wholesale from
-          // `@mcp-abap-adt/adt-strategies`. The findings are not lost — they
-          // are in `messages`, which is what this asserts.
-          const payload = assertCheckRefusal(response, /REPORT\/PROGRAM/i);
+          // Which is the whole point: a check that ran and found something
+          // is a check that worked. The finding is the answer, and this
+          // asserts it is reported rather than raised.
+          const data = assertCheckFindings(response, /REPORT\/PROGRAM/i);
 
           logger?.success(
-            `✅ check: ${objectName} — refused: ${payload.message}`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages.length} message(s))`,
           );
         });
       },

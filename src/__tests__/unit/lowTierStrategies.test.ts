@@ -8,8 +8,8 @@
  * have no low tier at all).
  *
  * Task 10's per-operation table (Create/Update -> analyseException, statusOnly,
- * terseWrite; Check -> analyseCheck, structured, terseCheck; Activate ->
- * analyseActivation; Validate -> analyseValidation; Delete -> analyseDeletion;
+ * terseWrite; Check -> analyseException, structured, terseCheck; Activate ->
+ * analyseActivation; Validate -> analyseException; Delete -> analyseDeletion;
  * Lock/Unlock -> no strategy at all) applies unchanged across every family in
  * this cluster. What differs per family is the factory, the shipped result
  * set and the config key — this file pins the pairing per family rather than
@@ -34,10 +34,8 @@
  */
 import {
   analyseActivation,
-  analyseCheck,
   analyseDeletion,
   analyseException,
-  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
@@ -438,7 +436,7 @@ it.each([
   const validateCall = callTo('validate');
   expect(validateCall?.factory).toBe(factory);
   expect(validateCall?.carriedAnalyse).toBe(true);
-  expect(validateCall?.analyse).toBe(analyseValidation);
+  expect(validateCall?.analyse).toBe(analyseException);
 });
 
 describe('class', () => {
@@ -447,7 +445,7 @@ describe('class', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getClass');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[1]).toBe('active');
   });
 
@@ -564,7 +562,7 @@ describe('interface', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getInterface');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[1]).toBeUndefined();
   });
 
@@ -674,7 +672,7 @@ describe('behavior_definition', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getBehaviorDefinition');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[1]).toBeUndefined();
   });
 
@@ -821,7 +819,7 @@ describe('behavior_implementation — declared over the class document set', () 
     const validateCall = callTo('validate');
     expect(validateCall?.factory).toBe('getBehaviorImplementation');
     expect(validateCall?.carriedAnalyse).toBe(true);
-    expect(validateCall?.analyse).toBe(analyseValidation);
+    expect(validateCall?.analyse).toBe(analyseException);
   });
 
   it('CreateBehaviorImplementationLow, with implementation_code, sequences create then a locked update — field by field', async () => {
@@ -937,7 +935,7 @@ describe('ddl', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getDdl');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({
       ddlName: 'ZVW_X',
       ddlSource: 'define view ZVW_X as select from t000 {client};',
@@ -1102,7 +1100,7 @@ describe('ddlx (metadataExtension)', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getMetadataExtension');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
     expect(call?.args[1]).toBeUndefined();
   });
@@ -1267,7 +1265,7 @@ describe('structure', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getStructure');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({
       structureName: 'ZST_X',
       ddlCode: 'define structure zst_x { client : abap.clnt; }',
@@ -1424,7 +1422,7 @@ describe('table', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getTable');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     // ddl_code is accepted by the tool but never reaches config — unlike
     // structure's sibling handler, table's check has nothing to forward it to.
     expect(call?.args[0]).toEqual({ tableName: 'ZT_X' });
@@ -1575,7 +1573,7 @@ describe('program', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getProgram');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({ programName: 'Z_X' });
     expect(call?.args[1]).toBeUndefined();
   });
@@ -1649,7 +1647,7 @@ describe('program', () => {
       packageName: 'ZP',
     });
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseValidation);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('LockProgramLow passes no analyse and carries no detail parameter', async () => {
@@ -1832,7 +1830,7 @@ describe('function (function group)', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getFunctionGroup');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({ functionGroupName: 'ZFG_X' });
     expect(call?.args[1]).toBeUndefined();
   });
@@ -1971,7 +1969,7 @@ describe('function (function group)', () => {
       description: 'ZFG_X',
     });
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseValidation);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('ValidateFunctionGroupLow reads a real corpus document (function-group-specific refusal fixture) through terseValidation', async () => {
@@ -2027,7 +2025,7 @@ describe('function (function module)', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getFunctionModule');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({
       functionModuleName: 'ZFM_X',
       functionGroupName: 'ZFG_X',
@@ -2187,7 +2185,7 @@ describe('function (function module)', () => {
       description: 'x',
     });
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseValidation);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('ValidateFunctionModuleLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {
@@ -2239,7 +2237,7 @@ describe('data_element', () => {
     const call = callTo('check');
     expect(call?.factory).toBe('getDataElement');
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[1]).toBeUndefined();
   });
 
@@ -2915,7 +2913,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
     expect(call?.args[1]).toBeUndefined();
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseCheck);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('CheckPackageLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {
@@ -3090,7 +3088,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     });
   });
 
-  it('ValidatePackageLow reaches getPackage with analyseValidation, forwarding superPackage — validatePackageBasic reads it as the parent package', async () => {
+  it('ValidatePackageLow reaches getPackage with analyseException, forwarding superPackage — validatePackageBasic reads it as the parent package', async () => {
     await handleValidatePackage(context as any, {
       package_name: 'zp_x',
       super_package: 'zp',
@@ -3099,7 +3097,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(call?.factory).toBe('getPackage');
     expect(call?.args[0]).toEqual({ packageName: 'ZP_X', superPackage: 'ZP' });
     expect(call?.carriedAnalyse).toBe(true);
-    expect(call?.analyse).toBe(analyseValidation);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('ValidatePackageLow reads a real corpus document (generic admissible-name fixture) through terseValidation', async () => {

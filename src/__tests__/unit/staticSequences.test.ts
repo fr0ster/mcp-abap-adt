@@ -39,10 +39,7 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
-import {
-  analyseException,
-  analyseValidation,
-} from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleListFunctionGroupIncludes } from '../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
@@ -143,7 +140,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
     expect(result.content[0].text).not.toContain('step');
   });
 
-  it('ValidateServiceBinding passes analyseValidation, not analyseException', async () => {
+  it('ValidateServiceBinding passes analyseException, not analyseException', async () => {
     const seen: unknown[] = [];
     fakeClient = fakeClientOf({
       validate: async (_config: unknown, options: any) => {
@@ -155,7 +152,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
       service_binding_name: 'ZSB',
       service_definition_name: 'ZSD',
     });
-    expect(seen).toEqual([analyseValidation]);
+    expect(seen).toEqual([analyseException]);
   });
 
   it('packageResolver searches through the renamed member, with a strategy', async () => {

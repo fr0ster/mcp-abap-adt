@@ -17,16 +17,20 @@
  * `UpdateFunctionModuleLow` add the members that carry source. Verified
  * against `AdtFunctionGroup.js`.
  *
- * **A pre-migration compensation was dropped here, deliberately.** The old
- * handler special-cased ADT's 400 for "Interface SAPL* ... has not been
- * created" by re-reading the object and reporting success anyway — a genuine
- * masking of a refusal ADT never softened into a 200. This handler now
- * reports that 400 as the refusal it is. The high-tier `CreateFunctionGroup`
- * still does the equivalent for two other 400 messages ("Kerberos library
- * not loaded", "Business partner does not exist"), without even the
- * read-back this low handler used to have — an inconsistency this task did
- * not introduce and does not have in scope to fix, since it sits one
- * directory over.
+ * **The read-back on ADT's interface 400 is kept, and it is not masking.**
+ * Creating a function group can answer `400` with "Interface SAPL… has not
+ * been created" while the group itself is there. The pre-migration handler
+ * answered that by reading the object back and, only if it read, reporting
+ * success. A migration pass removed it as "masking a refusal" — which it is
+ * not: masking is claiming success without looking, and this looks. Removing
+ * it made a create that had worked report failure, so it is back.
+ *
+ * `read()` no longer exists on the 19 contract for a function group — a
+ * group has no source of its own — so the read-back is `readMetadata()`,
+ * the same call `GetFunctionGroup` and `ReadFunctionGroup` make.
+ *
+ * Every other 400 is still the refusal it is: this branch is entered only
+ * for that one message, and only after the create has already failed.
  */
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
@@ -131,18 +135,60 @@ export async function handleCreateFunctionGroup(
 
   return answer(
     { tool: 'CreateFunctionGroupLow', detail },
-    () =>
-      createAdtClient(connection, logger)
-        .getFunctionGroup(resultsFor(functionGroupDocuments))
-        .create(
-          {
-            functionGroupName,
-            description,
-            packageName: package_name,
-            transportRequest: transport_request,
-          },
-          { analyse: analyseException },
-        ),
+    async () => {
+      const obj = createAdtClient(connection, logger).getFunctionGroup(
+        resultsFor(functionGroupDocuments),
+      );
+
+      const created = await obj.create(
+        {
+          functionGroupName,
+          description,
+          packageName: package_name,
+          transportRequest: transport_request,
+        },
+        { analyse: analyseException },
+      );
+
+      if (created.ok || !isInterfaceNotCreated(created.getError())) {
+        return created;
+      }
+
+      // ADT said no and made the object anyway. Ask it, rather than believe
+      // either answer on its own.
+      logger?.warn(
+        `CreateFunctionGroup answered the interface 400 for ${functionGroupName}; reading it back to see whether it exists`,
+      );
+      const readBack = await obj.readMetadata(
+        { functionGroupName },
+        { analyse: analyseException },
+      );
+      if (!readBack.ok) {
+        // It really did not happen: the create's own refusal, not the read's.
+        return created;
+      }
+      logger?.info(
+        `CreateFunctionGroup: ${functionGroupName} reads back, so the create landed`,
+      );
+      return readBack as unknown as typeof created;
+    },
     project(detail, terseWrite),
+  );
+}
+
+/**
+ * ADT's one refusal that can accompany a successful create.
+ *
+ * Matched on the message because that is where ADT puts it — the status is
+ * 400 for a dozen unrelated reasons, and the `exc:exception` type id is the
+ * generic one. Both fragments are required so that a message mentioning only
+ * one of them does not trigger a read-back that would answer a different
+ * question.
+ */
+function isInterfaceNotCreated(error: { message?: string }): boolean {
+  const message = error?.message ?? '';
+  return (
+    message.includes('Interface SAPL') &&
+    message.includes('has not been created')
   );
 }

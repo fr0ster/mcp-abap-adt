@@ -18,7 +18,6 @@
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -30,7 +29,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { isCloudConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -125,7 +124,7 @@ export async function handleUpdateProgram(
                   obj.check(
                     { programName, sourceCode: args.source_code },
                     'inactive',
-                    { analyse: analyseCheck },
+                    { analyse: analyseException },
                   ),
                 update,
               )
@@ -138,7 +137,9 @@ export async function handleUpdateProgram(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ programName }, { analyse: analyseActivation });
+      return carryCleanup(written, () =>
+        obj.activate({ programName }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

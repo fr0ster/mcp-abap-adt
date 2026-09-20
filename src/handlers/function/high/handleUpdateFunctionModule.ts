@@ -22,7 +22,6 @@
 import { functionModuleDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -34,7 +33,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -140,7 +139,7 @@ export async function handleUpdateFunctionModule(
               ),
             () =>
               obj.check({ functionModuleName, functionGroupName }, undefined, {
-                analyse: analyseCheck,
+                analyse: analyseException,
               }),
           ),
         (lockHandle) =>
@@ -163,9 +162,11 @@ export async function handleUpdateFunctionModule(
         return written;
       }
 
-      return obj.activate(
-        { functionModuleName, functionGroupName },
-        { analyse: analyseActivation },
+      return carryCleanup(written, () =>
+        obj.activate(
+          { functionModuleName, functionGroupName },
+          { analyse: analyseActivation },
+        ),
       );
     },
     project(detail, terseWrite),

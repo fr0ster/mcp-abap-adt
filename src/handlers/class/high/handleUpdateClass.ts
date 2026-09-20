@@ -26,7 +26,6 @@
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -38,7 +37,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -115,17 +114,32 @@ export async function handleUpdateClass(
                 analyse: analyseException,
               },
             );
-          // A conditional phase of the sequence, not a hand-rolled
-          // short-circuit: when activating, the check is a real first step
-          // and a refusal stops the write via `sequence`'s own discipline;
-          // when not, there is no first step and `update` runs alone.
+          // **A finding does not stop the write; a check that could not run
+          // does.** Which is where the line sat before the migration, and the
+          // only thing wrong with this step was the reading on it.
+          //
+          // With the shipped `analyseCheck` a `chkrun:checkMessage` of type
+          // `E` was a refusal, so `sequence` stopped the update on a syntax
+          // error and a caller could not save work in progress. `analyseException`
+          // refuses on an `exc:exception`, a non-2xx or a broken connection
+          // and nothing else, so findings now travel as data through a step
+          // that still gates.
+          //
+          // I removed the gate entirely for a while, on the strength of the
+          // pre-19 handler's `logger.warn` — but that warn belonged to the
+          // *post-unlock* informational check ("Inactive version check had
+          // issues: …"). The pre-write one went through `safeCheckOperation`
+          // and threw ("New code check failed: …"), which aborted the update
+          // before the lock was released. A check that cannot run leaves the
+          // caller no answer about the code being written, and that was
+          // always a reason not to write.
           return shouldActivate
             ? sequence(
                 () =>
                   obj.check(
                     { className, sourceCode: args.source_code },
                     'inactive',
-                    { analyse: analyseCheck },
+                    { analyse: analyseException },
                   ),
                 update,
               )
@@ -137,7 +151,9 @@ export async function handleUpdateClass(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ className }, { analyse: analyseActivation });
+      return carryCleanup(written, () =>
+        obj.activate({ className }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

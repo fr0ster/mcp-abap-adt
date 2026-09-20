@@ -31,9 +31,7 @@
 import { dataElementDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
-  analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
 import { answer } from '../../../lib/answer';
@@ -45,7 +43,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
@@ -219,7 +217,7 @@ export async function handleCreateDataElement(
               description: args.description || dataElementName,
               packageName: args.package_name,
             },
-            { analyse: analyseValidation },
+            { analyse: analyseException },
           ),
         () =>
           obj.create(
@@ -287,7 +285,7 @@ export async function handleCreateDataElement(
             )
             .catch(() => undefined);
           return obj.check({ dataElementName }, undefined, {
-            analyse: analyseCheck,
+            analyse: analyseException,
           });
         },
       );
@@ -296,7 +294,9 @@ export async function handleCreateDataElement(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ dataElementName }, { analyse: analyseActivation });
+      return carryCleanup(checked, () =>
+        obj.activate({ dataElementName }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

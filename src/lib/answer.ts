@@ -176,6 +176,29 @@ export function return_answer<T>(
     );
   }
 
+  // A lock left behind survives a success.
+  //
+  // `withLock` answers the body's own result when the body succeeded, even
+  // if the release afterwards did not — a write that landed is not a failed
+  // call, which is what these handlers said before the migration. But the
+  // lock is still held and only the caller can act on it, so the note rides
+  // along instead of being dropped on the floor the way the old
+  // `logger.warn` dropped it.
+  //
+  // Shape: unchanged when there is nothing to report, which is almost
+  // always. A terse write's `'SUCCESS'` is a string and has nowhere to put a
+  // field, so in the rare case it becomes `{ result: 'SUCCESS', cleanup }`.
+  const cleanup = safeCleanup(
+    (answer as { cleanup?: unknown } | undefined)?.cleanup,
+  );
+  if (cleanup !== undefined) {
+    return json(
+      typeof projected === 'string'
+        ? { result: projected, cleanup }
+        : { ...(projected as Record<string, unknown>), cleanup },
+    );
+  }
+
   return typeof projected === 'string' ? text(projected) : json(projected);
 }
 

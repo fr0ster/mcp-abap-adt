@@ -26,13 +26,12 @@
  * strategy and which projection a handler chose; the channel file proves
  * what reaches the wire. Neither is a substitute for the other.
  *
- * The thirteen checks (`analyseCheck`/`terseCheck`) and the six
+ * The thirteen checks (`analyseException`/`terseCheck`) and the six
  * not-deletion-service exceptions (`analyseException`, not
  * `analyseDeletion`) are proven the same way, for the same reason.
  */
 
 import {
-  analyseCheck,
   analyseDeletion,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
@@ -275,7 +274,7 @@ describe('the six not-deletion-service exceptions: analyseException, never analy
   });
 });
 
-describe('the thirteen checks: analyseCheck, and terseCheck fields', () => {
+describe('the thirteen checks: analyseException, and terseCheck fields', () => {
   it.each([
     [
       'CheckBehaviorDefinition',
@@ -310,7 +309,7 @@ describe('the thirteen checks: analyseCheck, and terseCheck fields', () => {
     ['CheckProgram', handleCheckProgram, { program_name: 'ZPROG' }],
     ['CheckStructure', handleCheckStructure, { structure_name: 'ZST' }],
     ['CheckTable', handleCheckTable, { table_name: 'ZTAB' }],
-  ])('%s takes analyseCheck and projects the check report', async (_n, handler, args) => {
+  ])('%s takes analyseException and projects the check report', async (_n, handler, args) => {
     const document = corpusBody('check-success-verdict--01-checkrun');
     const seen: unknown[] = [];
     fakeClient = fakeClientOf({
@@ -320,7 +319,7 @@ describe('the thirteen checks: analyseCheck, and terseCheck fields', () => {
       },
     });
     const result: any = await (handler as any)(context as any, args);
-    expect(seen).toEqual([analyseCheck]);
+    expect(seen).toEqual([analyseException]);
     // terseCheck's own fields, so a projection swapped for terseDeletion fails
     // here rather than passing as "some JSON came back".
     expect(JSON.parse(result.content[0].text)).toMatchObject({ ran: true });

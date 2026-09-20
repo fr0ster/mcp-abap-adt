@@ -203,7 +203,7 @@ describe('what a strategy never does', () => {
   it('answers a token, not undefined, when there is no failure', () => {
     // "there is no strategy here" and "this is not a failure" must not be the
     // same value.
-    const verdict = analyseCheck(
+    const verdict = analyseException(
       ADT_NO_FAILURE,
       wire('check-success-verdict--01-checkrun'),
     );

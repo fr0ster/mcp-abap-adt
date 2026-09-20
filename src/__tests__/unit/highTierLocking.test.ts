@@ -51,7 +51,14 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     expect(JSON.parse(result.content[0].text).message).toBe('Update refused');
   });
 
-  it('reports a succeeded write under a refused unlock as a failure naming both', async () => {
+  /**
+   * The write landed, so the tool says so — and says the lock is still held.
+   *
+   * This asserted `isError: true` for a while. A caller was told their update
+   * had failed when it had not, which is the opposite of what these handlers
+   * did before the migration (catch the refused unlock, warn, carry on).
+   */
+  it('answers the write under a refused unlock, and names the lock left behind', async () => {
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
       update: async () => okResponse(reading(undefined, '', 200)),
@@ -61,32 +68,166 @@ describe('high-tier writes that hold a lock, through withLock', () => {
       class_name: 'ZCL_X',
       source_code: 'x',
     });
+    expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
-    expect(result.isError).toBe(true);
-    expect(payload.message).toBe('Unlock refused');
-    expect(payload.operation).toBe('succeeded');
+    expect(payload.result).toBe('SUCCESS');
+    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
   });
 
-  it('gates the write on a pre-write check, but only when activating (fix round 1)', async () => {
+  /**
+   * And the lock survives the activation that follows.
+   *
+   * `withLock` hangs the note on the write's answer, but a handler asked to
+   * activate checks that answer for `ok` and then returns the activation's
+   * instead — so the one call where a held lock matters most is the one that
+   * dropped it. `carryCleanup` moves the note onto the answer that is really
+   * returned, on both its outcomes.
+   */
+  it('keeps the lock note on the activation that follows the write', async () => {
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check: async () => okResponse(reading({ ran: true, messages: [] })),
+      update: async () => okResponse(reading(undefined, '', 200)),
+      unlock: async () => refusedResponse('Unlock refused'),
+      activate: async () => okResponse(reading(undefined, '', 200)),
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+      activate: true,
+    });
+    expect(result.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text).cleanup).toMatchObject({
+      message: 'Unlock refused',
+    });
+  });
+
+  it('keeps the lock note on an activation that failed', async () => {
+    // The likeliest pairing of all: the activation fails *because* of the lock
+    // nobody released, and its error is the only thing the caller sees.
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check: async () => okResponse(reading({ ran: true, messages: [] })),
+      update: async () => okResponse(reading(undefined, '', 200)),
+      unlock: async () => refusedResponse('Unlock refused'),
+      activate: async () => refusedResponse('Object is locked by SAPUSER01'),
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+      activate: true,
+    });
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.message).toBe('Object is locked by SAPUSER01');
+    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
+  });
+
+  it('keeps the lock note when the activation throws outright', async () => {
+    // Not a refusal: a broken connection, a parser defect — anything that
+    // leaves the client with an exception rather than an answer. The answer
+    // the caller gets is `client_threw`, and for a round it carried nothing
+    // about the lock still held, because the throw unwound past the carrying.
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check: async () => okResponse(reading({ ran: true, messages: [] })),
+      update: async () => okResponse(reading(undefined, '', 200)),
+      unlock: async () => refusedResponse('Unlock refused'),
+      activate: async () => {
+        throw new Error('socket hang up');
+      },
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+      activate: true,
+    });
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toBe('client_threw');
+    expect(payload.message).toBe('socket hang up');
+    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
+  });
+
+  /**
+   * The pre-write check carries its findings past the write, and a check that
+   * could not run still stops it.
+   *
+   * Two readings were wrong here in turn. First the shipped `analyseCheck`,
+   * which makes a `chkrun:checkMessage` of type `E` a refusal — so `sequence`
+   * stopped the update on a syntax finding and a caller could not save work in
+   * progress. Then, fixing that, the gate came out altogether, on the strength
+   * of a `logger.warn` in the pre-19 handler that in fact belonged to the
+   * *post-unlock* informational check. The pre-write one threw ("New code
+   * check failed: …") and the update never happened.
+   *
+   * With `analyseException` the step gates on exactly what it should: an
+   * `exc:exception`, a non-2xx or a broken connection. The earlier version of
+   * this test hid the difference by handing the check a `refusedResponse`
+   * labelled "Syntax error", which under `analyseException` is not a refusal
+   * at all.
+   */
+  it('writes past what the pre-write check found', async () => {
+    // Findings arrive as a successful answer: `ran` and the messages beside
+    // it, which is what `terseCheck` renders. Nothing here refuses.
+    const check = jest.fn(async () =>
+      okResponse(
+        reading(
+          {
+            ran: true,
+            messages: [{ type: 'E', text: 'Syntax error in line 3' }],
+          },
+          '<chkrun:checkRunReports/>',
+          200,
+        ),
+      ),
+    );
     const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
     const unlock = jest.fn(async () => okResponse(undefined));
     fakeClient = fakeClientOf({
       lock: async () => okResponse('handle-1'),
-      check: async () => refusedResponse('Syntax error in new source'),
+      check,
       update,
       unlock,
+      activate: async () => okResponse(reading(undefined, '', 200)),
     });
     const result: any = await handleUpdateClass(context as any, {
       class_name: 'ZCL_X',
       source_code: 'bad source',
       activate: true,
     });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(update).toHaveBeenCalledTimes(1);
+    expect(unlock).toHaveBeenCalledTimes(1);
+    expect(result.isError).toBe(false);
+  });
+
+  it('does not write when the pre-write check could not run', async () => {
+    const check = jest.fn(async () =>
+      refusedResponse('Resource not found', { origin: 'refusal' }),
+    );
+    const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
+    const unlock = jest.fn(async () => okResponse(undefined));
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check,
+      update,
+      unlock,
+      activate: async () => okResponse(reading(undefined, '', 200)),
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+      activate: true,
+    });
+    expect(check).toHaveBeenCalledTimes(1);
+    expect(update).not.toHaveBeenCalled();
+    // The lock is still released: `withLock` is not a `sequence`.
+    expect(unlock).toHaveBeenCalledTimes(1);
     expect(result.isError).toBe(true);
     expect(JSON.parse(result.content[0].text).message).toBe(
-      'Syntax error in new source',
+      'Resource not found',
     );
-    expect(update).not.toHaveBeenCalled();
-    expect(unlock).toHaveBeenCalledTimes(1);
   });
 
   it('skips the pre-write check on the default (non-activating) path', async () => {

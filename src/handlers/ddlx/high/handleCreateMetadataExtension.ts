@@ -18,7 +18,6 @@
 import { metadataExtensionDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
-  analyseCheck,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
@@ -29,7 +28,7 @@ import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -123,7 +122,7 @@ export async function handleCreateMetadataExtension(
 
       const checked = await withLock(
         () => obj.lock({ name }),
-        () => obj.check({ name }, undefined, { analyse: analyseCheck }),
+        () => obj.check({ name }, undefined, { analyse: analyseException }),
         (lockHandle) => obj.unlock({ name }, lockHandle),
       );
       if (!checked.ok) {
@@ -142,7 +141,9 @@ export async function handleCreateMetadataExtension(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ name }, { analyse: analyseActivation });
+      return carryCleanup(checked, () =>
+        obj.activate({ name }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

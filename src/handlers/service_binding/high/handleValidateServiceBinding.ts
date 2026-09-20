@@ -33,7 +33,7 @@
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseValidation } from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -114,7 +114,7 @@ export async function handleValidateServiceBinding(
             packageName: args.package_name?.trim().toUpperCase(),
             description: args.description?.trim(),
           },
-          { analyse: analyseValidation },
+          { analyse: analyseException },
         ),
     project(detail, terseValidation),
   );

@@ -1421,7 +1421,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `check_variant` (string, optional) - ATC check variant. Omitted, the system's own default variant is used.
-- `max_findings` (number, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). Default 100.
+- `max_findings` (integer, optional (default: 100)) - Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.
 - `objects` (array, required) - The objects to check. One run may cover several; each needs a name and a type.
 - `wait` (boolean, optional (default: false)) - Hold the request until the checks finish and answer the finding counts. Default false: the run starts and answers a run_id to poll.
 

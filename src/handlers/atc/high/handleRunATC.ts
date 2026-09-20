@@ -68,9 +68,10 @@ export const TOOL_DEFINITION = {
           "ATC check variant. Omitted, the system's own default variant is used.",
       },
       max_findings: {
-        type: 'number',
+        type: 'integer',
+        minimum: 1,
         description:
-          'Cap on findings the run records (maximumVerdicts). Default 100.',
+          'Cap on findings the run records (maximumVerdicts). A whole number, at least 1. Default 100.',
         default: 100,
       },
       wait: {
@@ -121,9 +122,24 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
   }));
   const target = { objects: [first, ...rest] as const };
 
+  // **Said in the schema and checked here, for the same reason the client
+  // gives for checking it at all:** *"The server answers 0 with a 400, and a
+  // client that can name the problem should not spend a round trip being
+  // told."* `AdtAtc.assertMaximumVerdicts` does throw on 0, on a negative and
+  // on a fraction — but a throw is rendered `client_threw`, which reads as a
+  // fault of this process rather than an argument the caller can fix. A tool
+  // that can name it in its own schema should not leave it to an exception.
+  const maximumVerdicts = args.max_findings ?? 100;
+  if (!Number.isInteger(maximumVerdicts) || maximumVerdicts < 1) {
+    return return_error(
+      new Error(
+        `max_findings must be a whole number of at least 1; got ${JSON.stringify(args.max_findings)}.`,
+      ),
+    );
+  }
+
   const atc = new AdtRuntimeClient(connection, logger).getAtc();
   const wait = args.wait === true;
-  const maximumVerdicts = args.max_findings ?? 100;
 
   return answer(
     { tool: 'RunATC', detail: 'terse' },

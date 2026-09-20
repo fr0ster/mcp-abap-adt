@@ -205,6 +205,31 @@ describe('RunATC composes the three calls', () => {
     expect(payload(result).error).toBe('client_threw');
   });
 
+  it.each([
+    0,
+    -1,
+    2.5,
+    Number.NaN,
+  ])('refuses max_findings %p before making any call', async (max_findings) => {
+    // The client throws on these too, but a throw is rendered
+    // `client_threw` — this process blamed for an argument the caller can
+    // fix. Named here instead.
+    atc = {
+      resolveCheckVariant: async () => {
+        throw new Error('should not be called');
+      },
+    };
+    const result: any = await handleRunATC(context as any, {
+      objects: [{ name: 'ZCL_X', type: 'class' }],
+      max_findings,
+    });
+    expect(result.isError).toBe(true);
+    // `return_error` answers text, not the JSON envelope `answer()` builds:
+    // this refusal is raised before any call, so there is no ADT answer to
+    // shape.
+    expect(String(result.content[0].text)).toContain('max_findings');
+  });
+
   it('refuses an empty object list before making any call', async () => {
     atc = {
       resolveCheckVariant: async () => {

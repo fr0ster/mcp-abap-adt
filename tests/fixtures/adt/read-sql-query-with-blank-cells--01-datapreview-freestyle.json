@@ -1,0 +1,35 @@
+{
+  "case": "read-sql-query-with-blank-cells",
+  "step": 1,
+  "stepTag": "datapreview-freestyle",
+  "capturedAt": "2026-09-20T13:01:11.544Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/datapreview/freestyle?rowNumber=5",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/datapreview/freestyle?rowNumber=5",
+    "headers": {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Accept": "application/xml, application/vnd.sap.adt.datapreview.table.v1+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "SELECT * FROM I_Country"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/vnd.sap.adt.datapreview.table.v1+xml; charset=utf-8",
+      "content-length": "636",
+      "sap-authenticated": "true",
+      "sap-adt-saplb": "REDACTED",
+      "sap-cache-control": "+0",
+      "sap-isc-uagent": "0",
+      "x-sap-adt-profiling": "server-time=407070",
+      "sap-server": "true",
+      "sap-perf-fesrec": "412158.000000",
+      "connection": "close"
+    },
+    "bodyFile": "read-sql-query-with-blank-cells--01-datapreview-freestyle.body.xml"
+  }
+}

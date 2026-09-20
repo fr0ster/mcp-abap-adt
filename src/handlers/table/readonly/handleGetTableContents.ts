@@ -6,11 +6,9 @@ import { detailOf } from '../../../lib/strategies/detail';
 import type { AnswerDetail } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { ourUtils } from '../../../lib/strategies/resultSets';
+import type { SqlPreview } from '../../../lib/strategies/sqlPreview';
 import { return_error } from '../../../lib/utils';
-import {
-  parseSqlQueryXml,
-  projectRaw,
-} from '../../system/readonly/handleGetSqlQuery';
+import type { SqlQueryResponse } from '../../system/readonly/handleGetSqlQuery';
 
 export const TOOL_DEFINITION = {
   name: 'GetTableContents',
@@ -73,13 +71,20 @@ export async function handleGetTableContents(
         max_rows: maxRows,
         sql_query: sqlQuery,
       }),
-    (reading: AdtReading<unknown>) =>
-      projectRaw(detail, reading, (raw) => {
-        const parsedData = parseSqlQueryXml(raw, sqlQuery, maxRows, logger);
-        logger?.debug(
-          `Parsed table data: rows=${parsedData.rows.length}/${parsedData.total_rows ?? 0}, columns=${parsedData.columns.length}`,
-        );
-        return parsedData;
-      }),
+    (reading: AdtReading<SqlPreview>) => {
+      if (detail === 'raw') return reading.raw;
+      const preview = reading.value;
+      logger?.debug(
+        `Parsed table data: rows=${preview.rows.length}/${preview.total_rows ?? 0}, columns=${preview.columns.length}`,
+      );
+      return {
+        sql_query: sqlQuery,
+        row_number: maxRows,
+        execution_time: preview.execution_time,
+        total_rows: preview.total_rows,
+        columns: preview.columns,
+        rows: preview.rows,
+      } satisfies SqlQueryResponse;
+    },
   );
 }

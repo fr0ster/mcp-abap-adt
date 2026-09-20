@@ -177,9 +177,18 @@ SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
 TLS_REJECT_UNAUTHORIZED=0
-SAP_TIMEOUT_DEFAULT=45000
 "@ | Out-File -FilePath .env -Encoding utf8
 ```
+
+> **No `SAP_TIMEOUT_DEFAULT` here on purpose.** The sample used to set it to
+> `45000`, and copying that arms a 45-second deadline on every ADT request the
+> server is still working on. `@mcp-abap-adt/adt-clients` removed that default
+> for a measured reason: an aborted `POST /deletion/delete` was retried into a
+> *new* session, while the ABAP session underneath kept the enqueue locks — the
+> lock handle dead, the lock alive and unreachable, the object left locked and
+> inactive. Leave the variable unset and requests run without a client-side
+> deadline; set it only when you have a specific reason to cut one short, and
+> expect that cost.
 
 Or copy from template:
 

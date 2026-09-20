@@ -192,12 +192,40 @@ export class LockNotReleased extends Error {
  * exactly where it matters most, since a write that could not be unlocked is
  * also a write whose activation is likely to fail on that same lock.
  *
- * So the note is moved onto the answer that is actually returned. Nothing else
- * about either answer changes: a failed activation keeps its own error and
- * gains a `cleanup` field, a successful one keeps its result. An `onto` that
- * already carries a cleanup of its own keeps it — this only fills a gap.
+ * **It owns the call rather than taking its answer**, because a call has three
+ * outcomes and only two of them are an answer. Written as
+ * `carryCleanup(written, await obj.activate(…))` the await runs first, so an
+ * activation that *threw* — a broken connection, a parser defect — unwound
+ * straight past the carrying and the lock was lost on the one path where the
+ * caller can least afford to lose it. Taking a thunk closes that: the throw is
+ * caught here, wrapped in a `LockNotReleased` that keeps the original as its
+ * `cause` and its message, and `answer()` renders the note off the thrown
+ * object exactly as it does off a refusal.
+ *
+ * Nothing else about either outcome changes: a failed call keeps its own error
+ * and gains a `cleanup` field, a successful one keeps its result. An answer
+ * that already carries a cleanup of its own keeps it — this only fills a gap.
  */
-export function carryCleanup<T, U>(
+export async function carryCleanup<T, U>(
+  from: IAdtResponse<T, IAdtError>,
+  next: () => Promise<IAdtResponse<U, IAdtError>>,
+): Promise<IAdtResponse<U, IAdtError>> {
+  const cleanup = (from as unknown as CleanupCarrier).cleanup;
+  let answered: IAdtResponse<U, IAdtError>;
+  try {
+    answered = await next();
+  } catch (error) {
+    if (cleanup === undefined) throw error;
+    throw new LockNotReleased(error, { cleanup });
+  }
+  return attachCleanup(from, answered);
+}
+
+/**
+ * The same carrying between two answers already in hand, for the combinators
+ * that have no call left to make — `pair`, building its tuple from scratch.
+ */
+export function attachCleanup<T, U>(
   from: IAdtResponse<T, IAdtError>,
   onto: IAdtResponse<U, IAdtError>,
 ): IAdtResponse<U, IAdtError> {

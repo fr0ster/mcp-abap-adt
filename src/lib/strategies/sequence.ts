@@ -1,5 +1,5 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { carryCleanup } from './withLock';
+import { attachCleanup, carryCleanup } from './withLock';
 
 /**
  * A handler that issues several calls, with the strategies still in charge.
@@ -88,14 +88,17 @@ export async function sequence(
     // The failing step's answer is the answer. Not re-wrapped, not summarised:
     // the strategy that judged it already said everything there is to say.
     if (!answer.ok) return answer;
-    const next = await step(answer.getResult().value);
     // **A step's answer replaces the one before it; a held lock does not.**
     // A `withLock` step inside a lifecycle create answers the write with the
     // unreleased lock hung on it as `cleanup`, and the check that follows
     // then answered in its place — so the lock vanished one step before
     // anyone could carry it to the caller. Only that note travels; the answer
     // is still wholly the latest step's.
-    answer = carryCleanup(answer, next);
+    //
+    // The step is handed over rather than awaited here, so a step that throws
+    // carries the note out on the exception instead of unwinding past it.
+    const previous = answer.getResult().value;
+    answer = await carryCleanup(answer, () => step(previous));
   }
   return answer;
 }
@@ -142,5 +145,5 @@ export async function pair<A, B>(
   const both: [A, B] = [valueA, b.getResult().value];
   // Built fresh, so anything hanging off either answer would be dropped here
   // unless it is carried over — the same held lock `sequence` carries.
-  return carryCleanup(a, carryCleanup(b, succeededWith(both)));
+  return attachCleanup(a, attachCleanup(b, succeededWith(both)));
 }

@@ -136,12 +136,8 @@ export async function handleUpdateServiceDefinition(
         return written;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate(
-          { serviceDefinitionName },
-          { analyse: analyseActivation },
-        ),
+      return carryCleanup(written, () =>
+        obj.activate({ serviceDefinitionName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

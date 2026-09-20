@@ -135,9 +135,8 @@ export async function handleUpdateMetadataExtension(
         return written;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ name: ddlxName }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ name: ddlxName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

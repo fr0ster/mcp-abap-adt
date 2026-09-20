@@ -29,6 +29,13 @@ const HANDLERS = join(__dirname, '../../handlers');
  */
 const RETURNS_AN_ACTIVATION = /\n\s*return (?!carryCleanup)\w+\.activate\(/;
 
+/**
+ * And the carrying has to own the call. `carryCleanup(written, await …)`
+ * type-checks no longer, but it read as correct for a whole round, so the
+ * shape is pinned rather than trusted to the compiler.
+ */
+const AWAITS_BEFORE_CARRYING = /carryCleanup\(\s*\w+,\s*await /;
+
 const sources = readdirSync(HANDLERS, {
   recursive: true,
   encoding: 'utf-8',
@@ -54,6 +61,13 @@ describe('a lock nobody released is carried to the caller', () => {
     expect(offenders).toEqual([]);
   });
 
+  it('never awaits the call it is supposed to be carrying across', () => {
+    const offenders = sources
+      .filter(({ text }) => AWAITS_BEFORE_CARRYING.test(text))
+      .map(({ name }) => name);
+    expect(offenders).toEqual([]);
+  });
+
   /**
    * And the two places the note can be dropped between calls rather than by a
    * handler: a sequence's later step, and the tuple `pair` builds from scratch.
@@ -63,7 +77,12 @@ describe('a lock nobody released is carried to the caller', () => {
       join(__dirname, '../../lib/strategies/sequence.ts'),
       'utf-8',
     );
-    expect(sequenceSource).toContain('answer = carryCleanup(answer, next)');
-    expect(sequenceSource).toContain('carryCleanup(a, carryCleanup(b,');
+    // The call is handed over, not awaited first: an awaited call that throws
+    // unwinds past the carrying, which is the shape the fourth review round
+    // found.
+    expect(sequenceSource).toContain(
+      'await carryCleanup(answer, () => step(previous))',
+    );
+    expect(sequenceSource).toContain('attachCleanup(a, attachCleanup(b,');
   });
 });

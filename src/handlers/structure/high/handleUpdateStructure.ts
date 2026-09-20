@@ -131,9 +131,8 @@ export async function handleUpdateStructure(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ structureName }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ structureName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

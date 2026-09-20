@@ -261,6 +261,42 @@ describe('a sequence carries a held lock past the step that answers next', () =>
     expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
   });
 
+  /**
+   * The outcome the carrying could not see while it took an answer instead of
+   * making the call: a step that throws. The lock is held, the connection
+   * breaks mid-check, and the exception unwound past everything that knew
+   * about the lock. `answer()` reads `cleanup` off a thrown object, so the
+   * note goes out on the exception.
+   */
+  it('carries it out on a step that threw', async () => {
+    const boom = new Error('socket hang up');
+    await expect(
+      sequence(
+        async () => holding('written'),
+        async () => {
+          throw boom;
+        },
+      ),
+    ).rejects.toMatchObject({
+      name: 'LockNotReleased',
+      message: 'socket hang up',
+      cleanup: held,
+      cause: boom,
+    });
+  });
+
+  it('lets a step’s throw past untouched when no lock is held', async () => {
+    const boom = new Error('socket hang up');
+    await expect(
+      sequence(
+        async () => ok('written'),
+        async () => {
+          throw boom;
+        },
+      ),
+    ).rejects.toBe(boom);
+  });
+
   it('leaves an answer alone when no step held anything', async () => {
     const result = await sequence(
       async () => ok('written'),

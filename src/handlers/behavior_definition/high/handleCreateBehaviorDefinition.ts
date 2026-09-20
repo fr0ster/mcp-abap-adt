@@ -164,9 +164,8 @@ export async function handleCreateBehaviorDefinition(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        checked,
-        await obj.activate({ name }, { analyse: analyseActivation }),
+      return carryCleanup(checked, () =>
+        obj.activate({ name }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

@@ -123,6 +123,32 @@ describe('high-tier writes that hold a lock, through withLock', () => {
     expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
   });
 
+  it('keeps the lock note when the activation throws outright', async () => {
+    // Not a refusal: a broken connection, a parser defect — anything that
+    // leaves the client with an exception rather than an answer. The answer
+    // the caller gets is `client_threw`, and for a round it carried nothing
+    // about the lock still held, because the throw unwound past the carrying.
+    fakeClient = fakeClientOf({
+      lock: async () => okResponse('handle-1'),
+      check: async () => okResponse(reading({ ran: true, messages: [] })),
+      update: async () => okResponse(reading(undefined, '', 200)),
+      unlock: async () => refusedResponse('Unlock refused'),
+      activate: async () => {
+        throw new Error('socket hang up');
+      },
+    });
+    const result: any = await handleUpdateClass(context as any, {
+      class_name: 'ZCL_X',
+      source_code: 'x',
+      activate: true,
+    });
+    expect(result.isError).toBe(true);
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.error).toBe('client_threw');
+    expect(payload.message).toBe('socket hang up');
+    expect(payload.cleanup).toMatchObject({ message: 'Unlock refused' });
+  });
+
   /**
    * The pre-write check carries its findings past the write, and a check that
    * could not run still stops it.

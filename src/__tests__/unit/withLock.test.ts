@@ -1,5 +1,10 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
-import { carryCleanup, withLock } from '../../lib/strategies/withLock';
+import {
+  attachCleanup,
+  carryCleanup,
+  LockNotReleased,
+  withLock,
+} from '../../lib/strategies/withLock';
 
 function ok<T>(value: T): IAdtResponse<T, IAdtError> {
   return {
@@ -256,16 +261,17 @@ describe('carryCleanup', () => {
   ): IAdtResponse<T, IAdtError> =>
     ({ ...answer, cleanup: held }) as unknown as IAdtResponse<T, IAdtError>;
 
-  it('moves the note onto a success', () => {
-    const carried = carryCleanup(withCleanup(ok('written')), ok('activated'));
+  it('moves the note onto a success', async () => {
+    const carried = await carryCleanup(withCleanup(ok('written')), async () =>
+      ok('activated'),
+    );
     if (!carried.ok) throw new Error('expected the activation to stand');
     expect(carried.getResult().value).toBe('activated');
     expect((carried as { cleanup?: unknown }).cleanup).toEqual(held);
   });
 
-  it('moves the note onto a failure without touching its error', () => {
-    const carried = carryCleanup(
-      withCleanup(ok('written')),
+  it('moves the note onto a failure without touching its error', async () => {
+    const carried = await carryCleanup(withCleanup(ok('written')), async () =>
       refused('Object is locked'),
     );
     if (carried.ok) throw new Error('expected the activation refusal');
@@ -274,18 +280,58 @@ describe('carryCleanup', () => {
     expect(error.cleanup).toEqual(held);
   });
 
-  it('hands back the second answer untouched when there is no note', () => {
-    const activated = ok('activated');
-    expect(carryCleanup(ok('written'), activated)).toBe(activated);
+  /**
+   * The third outcome, and the one the value-taking version of this could not
+   * see: written as `carryCleanup(written, await obj.activate(…))` the await
+   * ran first, so a call that threw unwound straight past the carrying. The
+   * thunk is what makes this reachable at all.
+   */
+  it('carries the note out on a call that threw', async () => {
+    const boom = new Error('socket hang up');
+    await expect(
+      carryCleanup(withCleanup(ok('written')), async () => {
+        throw boom;
+      }),
+    ).rejects.toMatchObject({
+      name: 'LockNotReleased',
+      message: 'socket hang up',
+      cleanup: held,
+      cause: boom,
+    });
   });
 
-  it('does not overwrite a note the second answer already carries', () => {
+  it('lets a throw past untouched when no lock is held', async () => {
+    const boom = new Error('socket hang up');
+    await expect(
+      carryCleanup(ok('written'), async () => {
+        throw boom;
+      }),
+    ).rejects.toBe(boom);
+  });
+
+  it('hands back the call’s answer untouched when there is no note', async () => {
+    const activated = ok('activated');
+    expect(await carryCleanup(ok('written'), async () => activated)).toBe(
+      activated,
+    );
+  });
+
+  it('does not overwrite a note the answer already carries', async () => {
     const own = { message: 'Its own cleanup', origin: 'refusal' as const };
     const activated = {
       ...ok('activated'),
       cleanup: own,
     } as unknown as IAdtResponse<string, IAdtError>;
-    const carried = carryCleanup(withCleanup(ok('written')), activated);
+    const carried = await carryCleanup(
+      withCleanup(ok('written')),
+      async () => activated,
+    );
     expect((carried as { cleanup?: unknown }).cleanup).toEqual(own);
+  });
+
+  it('carries between two answers already in hand, for pair', () => {
+    const carried = attachCleanup(withCleanup(ok('document')), ok('metadata'));
+    expect((carried as { cleanup?: unknown }).cleanup).toEqual(held);
+    expect(LockNotReleased.name).toBe('LockNotReleased');
   });
 });

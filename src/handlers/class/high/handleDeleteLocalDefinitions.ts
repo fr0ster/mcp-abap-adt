@@ -111,9 +111,8 @@ export async function handleDeleteLocalDefinitions(
         return deleted as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        deleted,
-        await obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(deleted, () =>
+        obj.activate({ className }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

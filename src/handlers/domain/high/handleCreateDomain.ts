@@ -274,9 +274,8 @@ export async function handleCreateDomain(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        checked,
-        await obj.activate({ domainName }, { analyse: analyseActivation }),
+      return carryCleanup(checked, () =>
+        obj.activate({ domainName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

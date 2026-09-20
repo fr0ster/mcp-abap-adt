@@ -123,9 +123,8 @@ export async function handleUpdateDdl(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ ddlName }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ ddlName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

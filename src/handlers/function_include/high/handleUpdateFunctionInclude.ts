@@ -142,9 +142,8 @@ export async function handleUpdateFunctionInclude(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate(
+      return carryCleanup(written, () =>
+        obj.activate(
           { functionGroupName, includeName },
           { analyse: analyseActivation },
         ),

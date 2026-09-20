@@ -162,9 +162,8 @@ export async function handleUpdateFunctionModule(
         return written;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate(
+      return carryCleanup(written, () =>
+        obj.activate(
           { functionModuleName, functionGroupName },
           { analyse: analyseActivation },
         ),

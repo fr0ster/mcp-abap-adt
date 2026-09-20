@@ -133,9 +133,8 @@ export async function handleUpdateBehaviorDefinition(
         return written;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ name }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ name }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

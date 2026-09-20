@@ -294,9 +294,8 @@ export async function handleCreateDataElement(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        checked,
-        await obj.activate({ dataElementName }, { analyse: analyseActivation }),
+      return carryCleanup(checked, () =>
+        obj.activate({ dataElementName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

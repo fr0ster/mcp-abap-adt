@@ -234,9 +234,8 @@ export async function handleUpdateDomain(
         return written;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ domainName }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ domainName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

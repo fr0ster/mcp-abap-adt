@@ -130,9 +130,8 @@ export async function handleUpdateTable(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ tableName }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ tableName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

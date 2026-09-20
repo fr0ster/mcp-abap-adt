@@ -265,9 +265,8 @@ export async function handleUpdateDataElement(
         return written;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ dataElementName }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ dataElementName }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

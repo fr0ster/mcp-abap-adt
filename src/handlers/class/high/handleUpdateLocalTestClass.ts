@@ -129,9 +129,8 @@ export async function handleUpdateLocalTestClass(
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return carryCleanup(
-        written,
-        await obj.activate({ className }, { analyse: analyseActivation }),
+      return carryCleanup(written, () =>
+        obj.activate({ className }, { analyse: analyseActivation }),
       );
     },
     project(detail, terseWrite),

@@ -212,3 +212,70 @@ describe('sequence, at four and five steps', () => {
     expect(fifth).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * A lifecycle create runs its `withLock` write as one step of a sequence, and
+ * the check that follows answers in its place. The note about a lock nobody
+ * released rode on the write's answer, so it was gone one step before the
+ * handler could carry it to the caller — `carryCleanup` at the end of
+ * `handleCreateDomain` had nothing left to move.
+ *
+ * So the carrying happens between the steps too. Only the note travels: the
+ * answer is still entirely the last step's.
+ */
+describe('a sequence carries a held lock past the step that answers next', () => {
+  const held = { message: 'Unlock refused', origin: 'refusal' as const };
+
+  const holding = <T>(value: T): IAdtResponse<T, IAdtError> =>
+    ({ ...ok(value), cleanup: held }) as unknown as IAdtResponse<T, IAdtError>;
+
+  it('carries it onto a later step that succeeded', async () => {
+    const result = await sequence(
+      async () => holding('written'),
+      async () => ok('checked'),
+    );
+    if (!result.ok) throw new Error('expected the check to stand');
+    expect(result.getResult().value).toBe('checked');
+    expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
+  });
+
+  it('carries it onto a later step that refused, error untouched', async () => {
+    const result = await sequence(
+      async () => holding('written'),
+      async () => refused('Check refused'),
+    );
+    if (result.ok) throw new Error('expected the check refusal');
+    const error = result.getError() as IAdtError & { cleanup?: unknown };
+    expect(error.message).toBe('Check refused');
+    expect(error.cleanup).toEqual(held);
+  });
+
+  it('carries it across every step that follows, not just the next one', async () => {
+    const result = await sequence(
+      async () => holding('written'),
+      async () => ok('checked'),
+      async () => ok('read back'),
+    );
+    if (!result.ok) throw new Error('expected the last step to stand');
+    expect(result.getResult().value).toBe('read back');
+    expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
+  });
+
+  it('leaves an answer alone when no step held anything', async () => {
+    const result = await sequence(
+      async () => ok('written'),
+      async () => ok('checked'),
+    );
+    expect((result as { cleanup?: unknown }).cleanup).toBeUndefined();
+  });
+
+  it('keeps it through a pair, which builds its answer from scratch', async () => {
+    const result = await pair(
+      async () => holding('document'),
+      async () => ok('metadata'),
+    );
+    if (!result.ok) throw new Error('expected both answers');
+    expect(result.getResult().value).toEqual(['document', 'metadata']);
+    expect((result as { cleanup?: unknown }).cleanup).toEqual(held);
+  });
+});

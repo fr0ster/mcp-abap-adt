@@ -42,7 +42,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
-import { withLock } from '../../../lib/strategies/withLock';
+import { carryCleanup, withLock } from '../../../lib/strategies/withLock';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation';
@@ -274,7 +274,10 @@ export async function handleCreateDomain(
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      return obj.activate({ domainName }, { analyse: analyseActivation });
+      return carryCleanup(
+        checked,
+        await obj.activate({ domainName }, { analyse: analyseActivation }),
+      );
     },
     project(detail, terseWrite),
   );

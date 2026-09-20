@@ -899,6 +899,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional (default: active)) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.
 
 ---
 

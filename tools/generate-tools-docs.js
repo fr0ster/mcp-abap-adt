@@ -235,16 +235,39 @@ function extractTopLevelRequiredArray(block) {
     .filter(Boolean);
 }
 
+/**
+ * Skip whitespace, separators AND comments from `i` onward.
+ *
+ * The comments matter: this scanner reads a tool's `properties` object as
+ * text, and a `//` comment inside it is text too. A sentence containing the
+ * words "may or may not want:" put a parameter called `want` into three
+ * published documentation files, typed `any` and described with nothing —
+ * a parameter no tool has and no caller can pass. Prose belongs in a schema
+ * block as much as anywhere else; it is this reader that had to learn to
+ * step over it.
+ */
+function skipIgnorable(text, i) {
+  for (;;) {
+    while (i < text.length && /[\s,\n\r\t]/.test(text[i])) i++;
+    if (text[i] === '/' && text[i + 1] === '/') {
+      const end = text.indexOf('\n', i);
+      i = end === -1 ? text.length : end + 1;
+      continue;
+    }
+    if (text[i] === '/' && text[i + 1] === '*') {
+      const end = text.indexOf('*/', i + 2);
+      i = end === -1 ? text.length : end + 2;
+      continue;
+    }
+    return i;
+  }
+}
+
 function parseTopLevelProperties(propertiesContent) {
   const props = {};
   let i = 0;
   while (i < propertiesContent.length) {
-    while (
-      i < propertiesContent.length &&
-      /[\s,\n\r\t]/.test(propertiesContent[i])
-    ) {
-      i++;
-    }
+    i = skipIgnorable(propertiesContent, i);
     if (i >= propertiesContent.length) break;
 
     const keyMatch = propertiesContent.slice(i).match(/^([A-Za-z0-9_]+)/);
@@ -255,10 +278,10 @@ function parseTopLevelProperties(propertiesContent) {
     const key = keyMatch[1];
     i += key.length;
 
-    while (i < propertiesContent.length && /\s/.test(propertiesContent[i])) i++;
+    i = skipIgnorable(propertiesContent, i);
     if (propertiesContent[i] !== ':') continue;
     i++;
-    while (i < propertiesContent.length && /\s/.test(propertiesContent[i])) i++;
+    i = skipIgnorable(propertiesContent, i);
     if (propertiesContent[i] === '{') {
       const open = i;
       const close = findMatchingBrace(propertiesContent, open);
@@ -374,9 +397,7 @@ function extractToolDefinition(filePath) {
   }
 
   // Extract available_in array
-  const availableInMatch = block.match(
-    /available_in\s*:\s*\[([^\]]*)\]/,
-  );
+  const availableInMatch = block.match(/available_in\s*:\s*\[([^\]]*)\]/);
   let availableIn = [];
   if (availableInMatch) {
     availableIn = availableInMatch[1]
@@ -439,9 +460,7 @@ function loadCompactMatrix() {
   const content = fs.readFileSync(COMPACT_MATRIX_PATH, 'utf8');
   const crudBlock = extractConstObjectBlock(content, 'COMPACT_CRUD_MATRIX');
   if (!crudBlock) {
-    throw new Error(
-      'Failed to read COMPACT_CRUD_MATRIX from compactMatrix.ts',
-    );
+    throw new Error('Failed to read COMPACT_CRUD_MATRIX from compactMatrix.ts');
   }
 
   return {
@@ -1027,6 +1046,7 @@ if (require.main === module) {
 module.exports = {
   extractToolDefinition,
   loadToolsFromHandlers,
+  parseTopLevelProperties,
   generateMarkdown,
   generateLevelMarkdown,
   generateCompactMarkdown,

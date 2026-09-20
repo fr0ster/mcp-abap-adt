@@ -1,0 +1,210 @@
+{
+  "startedAt": "2026-09-20T18:31:46.656Z",
+  "finishedAt": "2026-09-20T18:31:50.805Z",
+  "substitutions": [
+    "REDACTED",
+    "REDACTED",
+    "SAPUSER01"
+  ],
+  "cases": [
+    {
+      "case": "refusal-object-not-found",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-check-nonexistent-object",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-tree",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-contents-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-objectslist-empty",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-package-not-found-hierarchy-direct",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-class-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-function-module-source-text",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "check-success-verdict",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-table-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-package-contents-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-function-group",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-function-module",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-behavior-definition",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-service-definition",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-metadata-package",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-class",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-domain",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-table",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-table",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "refusal-validation-name-taken-functiongroup",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "validation-name-free-ddl",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-empty-package-contents",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-object-tree-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-where-used-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-transport-search-configurations",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-transport-list-structure",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "check-ddlx-active-version",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-20T18:31:48.905Z",
+      "endedAt": "2026-09-20T18:31:50.170Z"
+    },
+    {
+      "case": "check-ddlx-inactive-version",
+      "outcome": "completed",
+      "exchanges": 1,
+      "startedAt": "2026-09-20T18:31:50.170Z",
+      "endedAt": "2026-09-20T18:31:50.801Z"
+    },
+    {
+      "case": "read-transport-list-with-targets",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "read-sql-query-with-blank-cells",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "atc-run-package-with-findings",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "atc-findings-worklist",
+      "outcome": "skipped",
+      "exchanges": 0
+    },
+    {
+      "case": "delete-success",
+      "outcome": "skipped",
+      "exchanges": 0
+    }
+  ]
+}

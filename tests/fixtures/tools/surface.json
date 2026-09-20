@@ -962,7 +962,7 @@
   {
     "group": "high",
     "name": "CheckMetadataExtension",
-    "inputs": "name*",
+    "inputs": "name*, version",
     "available_in": "cloud, onprem"
   },
   {
@@ -1796,7 +1796,7 @@
   {
     "group": "low",
     "name": "CheckMetadataExtensionLow",
-    "inputs": "name*, session_id, session_state, detail",
+    "inputs": "name*, version, session_id, session_state, detail",
     "available_in": "cloud, onprem"
   },
   {

@@ -52,6 +52,19 @@ export interface SqlPreview {
   total_rows?: number;
   /** `dataPreview:queryExecutionTime`, in seconds as the server reports it. */
   execution_time?: number;
+  /**
+   * What the server says it ran — the caller's SELECT wrapped in the ABAP
+   * statement ADT built around it.
+   *
+   * This and the flag below are the rest of the document, and they are here
+   * because `detail: 'full'` promises the whole parse. They were reachable
+   * before this reading existed, through the generic `structured` parse the
+   * slot used to carry, and a reading of our own that dropped them would have
+   * taken a field away while fixing a defect.
+   */
+  executed_query_string?: string;
+  /** `dataPreview:isHanaAnalyticalView`, as the document words it. */
+  is_hana_analytical_view?: boolean;
 }
 
 const parser = new XMLParser({
@@ -137,11 +150,22 @@ export function parseSqlPreview(document: string): SqlPreview {
     return row;
   });
 
+  const executed = table.executedQueryString;
+  const analytical = table.isHanaAnalyticalView;
+
   return {
     columns,
     rows,
     total_rows: numberOf(table.totalRows),
     execution_time: numberOf(table.queryExecutionTime),
+    executed_query_string:
+      executed === undefined || executed === '' ? undefined : String(executed),
+    // `false` is a real answer and has to survive; only an absent element is
+    // absent.
+    is_hana_analytical_view:
+      analytical === undefined || analytical === ''
+        ? undefined
+        : String(analytical).trim().toLowerCase() === 'true',
   };
 }
 

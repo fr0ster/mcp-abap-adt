@@ -62,6 +62,19 @@ describe('a data preview, read from the captured document', () => {
     }
   });
 
+  /**
+   * `detail: 'full'` promises the whole parse, so the parse has to hold the
+   * whole document. These two fields were reachable through the generic
+   * `structured` parse the slot used to carry; a reading of our own that
+   * dropped them would have taken a field away while fixing a defect — which
+   * it briefly did, until review caught it.
+   */
+  it('keeps the rest of the document, not only the rows', () => {
+    expect(preview.executed_query_string).toContain('SELECT * FROM I_COUNTRY');
+    expect(preview.is_hana_analytical_view).toBe(false);
+    expect(preview.execution_time).toBeCloseTo(0.316, 3);
+  });
+
   it('reports a blank cell as null rather than as an empty string', () => {
     const blanks = preview.rows.flatMap((row) =>
       Object.values(row).filter((value) => value === null),
@@ -122,5 +135,60 @@ describe('what the regular expression got wrong, one case each', () => {
       columns: [],
       rows: [],
     });
+  });
+});
+
+/**
+ * The two tools over this reading, and the one thing `detail` must not do:
+ * cost a caller a field.
+ */
+describe('detail over a data preview', () => {
+  let fakeClient: any;
+  jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+
+  const {
+    handleGetSqlQuery,
+  } = require('../../handlers/system/readonly/handleGetSqlQuery');
+  const { okResponse } = require('../helpers/fakeClient');
+  const { sqlPreview } = require('../../lib/strategies/sqlPreview');
+
+  const context = { connection: {} as any, logger: undefined };
+  const answerOf = async (detail?: string) => {
+    fakeClient = {
+      getUtils: () => ({
+        getSqlQuery: async () =>
+          okResponse(sqlPreview({ data: PREVIEW, status: 200 })),
+      }),
+    };
+    const result: any = await handleGetSqlQuery(context as any, {
+      sql_query: 'SELECT * FROM I_Country',
+      row_number: 5,
+      detail,
+    });
+    // `raw` answers the document itself, which is text and not the JSON
+    // envelope the other two levels build.
+    const text = String(result.content[0].text);
+    try {
+      return JSON.parse(text);
+    } catch {
+      return text;
+    }
+  };
+
+  it('answers the acting fields on terse', async () => {
+    const terse = await answerOf();
+    expect(terse.rows).toHaveLength(5);
+    expect(terse.executed_query_string).toBeUndefined();
+  });
+
+  it('answers the whole parse on full', async () => {
+    const full = await answerOf('full');
+    expect(full.rows).toHaveLength(5);
+    expect(full.executed_query_string).toContain('SELECT * FROM I_COUNTRY');
+    expect(full.is_hana_analytical_view).toBe(false);
+  });
+
+  it('answers the document on raw', async () => {
+    expect(String(await answerOf('raw'))).toContain('<dataPreview:tableData');
   });
 });

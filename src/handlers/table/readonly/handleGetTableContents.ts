@@ -77,14 +77,25 @@ export async function handleGetTableContents(
       logger?.debug(
         `Parsed table data: rows=${preview.rows.length}/${preview.total_rows ?? 0}, columns=${preview.columns.length}`,
       );
-      return {
+      const answered: SqlQueryResponse = {
         sql_query: sqlQuery,
         row_number: maxRows,
         execution_time: preview.execution_time,
         total_rows: preview.total_rows,
         columns: preview.columns,
         rows: preview.rows,
-      } satisfies SqlQueryResponse;
+      };
+      // **`full` is the whole parse, and `terse` the fields you act on.**
+      // These two were identical for a moment, which quietly took away what
+      // the generic parse used to carry here — the statement ADT actually ran
+      // and the analytical-view flag. `detail` may not cost a caller a field.
+      return detail === 'full'
+        ? {
+            ...answered,
+            executed_query_string: preview.executed_query_string,
+            is_hana_analytical_view: preview.is_hana_analytical_view,
+          }
+        : answered;
     },
   );
 }

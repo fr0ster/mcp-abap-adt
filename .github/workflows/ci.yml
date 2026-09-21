@@ -36,9 +36,14 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # No `continue-on-error` here. It was on this step from the day the
+      # workflow was written, so the suite ran on six platform/Node
+      # combinations and its verdict was thrown away on all six: a red
+      # `packageEntryPoints` sat inside green runs until `release.yml`, which
+      # has no such line, gated a tag on it. Tests that do not gate are a
+      # report nobody reads.
       - name: Run tests
         run: npm test
-        continue-on-error: true
 
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22

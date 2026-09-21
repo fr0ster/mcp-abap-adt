@@ -252,10 +252,9 @@ async function createConnectionViaBroker(
       // Only pass connection logger if DEBUG_CONNECTION is set
       const connectionLogger = createConnectionLogger();
       const connectionLoggerWithCsrf = connectionLogger
-        ? {
-            ...connectionLogger,
-            csrfToken: connectionLogger.debug,
-          }
+        ? Object.assign(connectionLogger, {
+            csrfToken: connectionLogger.debug.bind(connectionLogger),
+          })
         : undefined;
       return createAbapConnection(config, connectionLoggerWithCsrf);
     }
@@ -318,10 +317,9 @@ export async function createTestConnectionAndSession(): Promise<{
       // Only pass connection logger if DEBUG_CONNECTION is set
       const connectionLogger = createConnectionLogger();
       const connectionLoggerWithCsrf = connectionLogger
-        ? {
-            ...connectionLogger,
-            csrfToken: connectionLogger.debug,
-          }
+        ? Object.assign(connectionLogger, {
+            csrfToken: connectionLogger.debug.bind(connectionLogger),
+          })
         : undefined;
 
       // Create connection directly (fallback when AuthBroker is not available)

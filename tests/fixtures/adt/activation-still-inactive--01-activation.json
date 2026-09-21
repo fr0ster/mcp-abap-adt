@@ -1,0 +1,27 @@
+{
+  "case": "activation-still-inactive",
+  "step": 1,
+  "stepTag": "activation",
+  "capturedAt": "2026-09-21T00:00:00.000Z",
+  "request": {
+    "method": "POST",
+    "url": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/activation?method=activate&preauditRequested=true",
+    "headers": {
+      "Content-Type": "application/xml",
+      "Accept": "application/xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<adtcore:objectReferences xmlns:adtcore=\"http://www.sap.com/adt/core\">\n  <adtcore:objectReference adtcore:uri=\"/sap/bc/adt/functions/groups/zmcp_bld_fgr_l1\" adtcore:name=\"ZMCP_BLD_FGR_L1\"/>\n</adtcore:objectReferences>"
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "activation-still-inactive--01-activation.body.xml"
+  },
+  "note": "Captured live against E19 (RFC connection) 2026-09-21 while chasing mcp-abap-adt#221/#223: ActivateFunctionGroupLow answered `ioc:inactiveObjects` instead of `chkl:messages` for ZMCP_BLD_FGR_L1 — terseActivation previously read that as `undefined` and the tool reported `projection_failed` for a call SAP had, in fact, answered."
+}

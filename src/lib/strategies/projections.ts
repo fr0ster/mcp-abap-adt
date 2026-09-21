@@ -89,21 +89,63 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  */
 export const terseActivation: Terse<any> = (value) => {
   const root = value?.['chkl:messages'];
-  if (!root) return undefined;
-  const messages = (root.msg ?? []).map((m: unknown) => ({
-    type: attrs(m).type,
-    text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
-  }));
-  const activated =
-    attrs(root['chkl:properties']).activationExecuted === 'true';
-  return {
-    activated,
-    generated: attrs(root['chkl:properties']).generationExecuted === 'true',
-    ...(!activated && messages.length === 0
-      ? { nothing_to_activate: true }
-      : {}),
-    ...(messages.length ? { messages } : {}),
-  };
+  if (root) {
+    const messages = (root.msg ?? []).map((m: unknown) => ({
+      type: attrs(m).type,
+      text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
+    }));
+    const activated =
+      attrs(root['chkl:properties']).activationExecuted === 'true';
+    return {
+      activated,
+      generated: attrs(root['chkl:properties']).generationExecuted === 'true',
+      ...(!activated && messages.length === 0
+        ? { nothing_to_activate: true }
+        : {}),
+      ...(messages.length ? { messages } : {}),
+    };
+  }
+
+  // `ioc:inactiveObjects` — a function group's own activation answer,
+  // measured live against `ActivateFunctionGroupLow` (E19, 2026-09-21):
+  // rather than a `chkl:messages` checklist (measured so far only against
+  // classes), a container object like a function group answers with the
+  // objects it found inactive and processed. Confirmed live, same run: a
+  // fresh function group's `GetInactiveObjects` read `count: 0` immediately
+  // after this response — the objects named here were NOT left inactive, so
+  // this document is this object kind's success shape, not a failure one.
+  // (No case of a genuine activation failure taking this shape has been
+  // captured yet — if one turns up with real content in `ioc:object`'s
+  // sibling fields, e.g. an error, this reading should learn to tell the
+  // two apart instead of always reading success.)
+  //
+  // `ioc:object` is itself an array per entry (`[""]` on the transport-only
+  // entry that opens the list, `[{ "ioc:ref": {...} }]` on an object one) —
+  // `first()` un-wraps it the same way every other reading here does.
+  const inactive = value?.['ioc:inactiveObjects'];
+  if (inactive) {
+    const entriesRaw = inactive['ioc:entry'];
+    const entries = Array.isArray(entriesRaw)
+      ? entriesRaw
+      : entriesRaw
+        ? [entriesRaw]
+        : [];
+    const processed = entries
+      .map((entry: any) =>
+        attrs((first(entry?.['ioc:object']) as any)?.['ioc:ref']),
+      )
+      .filter((a: Record<string, string>) => a['adtcore:name'])
+      .map((a: Record<string, string>) => ({
+        type: a['adtcore:type'] ?? '',
+        name: a['adtcore:name'] ?? '',
+      }));
+    return {
+      activated: true,
+      ...(processed.length ? { objects: processed } : {}),
+    };
+  }
+
+  return undefined;
 };
 
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */

@@ -63,6 +63,23 @@ describe('activation', () => {
       text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
     });
   });
+
+  it("reads a function group's `ioc:inactiveObjects` answer as activated, not as nothing at all", () => {
+    // Measured live against E19 (RFC), 2026-09-21: ActivateFunctionGroupLow's
+    // 2xx answer for a function group comes back as `ioc:inactiveObjects`,
+    // not `chkl:messages` — and a `GetInactiveObjects` read straight after
+    // confirmed `count: 0`, i.e. the named objects were NOT left inactive.
+    // Before this case was known, `undefined` here turned that real, successful
+    // SAP answer into `projection_failed`.
+    const r = readingOf('activation-still-inactive--01-activation');
+    expect(terseActivation(r.value as never, r.status)).toEqual({
+      activated: true,
+      objects: [
+        { type: 'FUGR/F', name: 'ZMCP_BLD_FGR_L1' },
+        { type: 'FUGR/F', name: 'ZMCP_BLD_FGR_L1' },
+      ],
+    });
+  });
 });
 
 describe('check runs', () => {

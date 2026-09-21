@@ -1,3 +1,4 @@
+import { LogLevel } from '@mcp-abap-adt/interfaces';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 
 /**
@@ -20,7 +21,7 @@ describe('adding a channel to a logger keeps the logger', () => {
   const channels = ['debug', 'info', 'warn', 'error'] as const;
 
   it('loses every method when spread — which is what went wrong', () => {
-    const logger = new DefaultLogger('debug') as unknown as Record<
+    const logger = new DefaultLogger(LogLevel.DEBUG) as unknown as Record<
       string,
       unknown
     >;
@@ -32,7 +33,7 @@ describe('adding a channel to a logger keeps the logger', () => {
   });
 
   it('keeps every method when the channel is assigned to it', () => {
-    const logger = new DefaultLogger('debug') as unknown as Record<
+    const logger = new DefaultLogger(LogLevel.DEBUG) as unknown as Record<
       string,
       unknown
     > & { debug: (message: string) => void };
@@ -53,7 +54,7 @@ describe('adding a channel to a logger keeps the logger', () => {
         said.push(message);
       }
     }
-    const logger = new Spy('debug');
+    const logger = new Spy(LogLevel.DEBUG);
     const withChannel = Object.assign(logger, {
       csrfToken: logger.debug.bind(logger),
     });

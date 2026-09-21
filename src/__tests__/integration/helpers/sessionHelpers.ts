@@ -1,3 +1,4 @@
+import type { ILogger } from '@mcp-abap-adt/interfaces';
 /**
  * Session management helpers for low-level handler integration tests
  *
@@ -35,6 +36,28 @@ import {
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
 import { extractSessionState } from './testHelpers';
+
+/**
+ * The connection logger, with the `csrfToken` channel the connection expects.
+ *
+ * **Not a spread.** `createConnectionLogger()` answers a class instance, and
+ * spreading one copies its own enumerable fields — `logLevel` and nothing
+ * else — while `debug`, `info`, `warn` and `error` live on the prototype and
+ * are left behind. The result was an object that looked like a logger and had
+ * no methods, so the moment `DEBUG_CONNECTION` was set the connection died on
+ * `this.logger?.debug is not a function`: the one switch that exists to
+ * diagnose a connection could not be turned on. Found during on-premise
+ * testing of #220, reported in #222.
+ *
+ * `Object.assign` adds the channel to the instance itself, so the prototype
+ * chain stays. `debug` is bound because it is handed on as a bare function
+ * reference and would otherwise lose its receiver.
+ */
+function withCsrfChannel(logger: ILogger | undefined): ILogger | undefined {
+  return logger
+    ? Object.assign(logger, { csrfToken: logger.debug.bind(logger) })
+    : undefined;
+}
 
 const sessionLogger = createTestLogger('connection');
 
@@ -251,12 +274,7 @@ async function createConnectionViaBroker(
       });
       // Only pass connection logger if DEBUG_CONNECTION is set
       const connectionLogger = createConnectionLogger();
-      const connectionLoggerWithCsrf = connectionLogger
-        ? {
-            ...connectionLogger,
-            csrfToken: connectionLogger.debug,
-          }
-        : undefined;
+      const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
       return createAbapConnection(config, connectionLoggerWithCsrf);
     }
   } catch (error: any) {
@@ -317,12 +335,7 @@ export async function createTestConnectionAndSession(): Promise<{
 
       // Only pass connection logger if DEBUG_CONNECTION is set
       const connectionLogger = createConnectionLogger();
-      const connectionLoggerWithCsrf = connectionLogger
-        ? {
-            ...connectionLogger,
-            csrfToken: connectionLogger.debug,
-          }
-        : undefined;
+      const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
 
       // Create connection directly (fallback when AuthBroker is not available)
       connection = createAbapConnection(config, connectionLoggerWithCsrf);

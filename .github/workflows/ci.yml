@@ -80,8 +80,12 @@ jobs:
           npm install --no-audit --no-fund \
             "$GITHUB_WORKSPACE"/mcp-abap-adt-lib-*.tgz \
             "$GITHUB_WORKSPACE"/mcp-abap-adt-core-*.tgz
-          node -e "const v=p=>require(p+'/package.json').version;
-            const lib=v('@mcp-abap-adt/lib'), core=v('@mcp-abap-adt/core');
+          # Read, not require: a package's `exports` map does not offer
+          # `./package.json`, so requiring that subpath is
+          # ERR_PACKAGE_PATH_NOT_EXPORTED.
+          node -e "const {readFileSync}=require('node:fs');
+            const v=n=>JSON.parse(readFileSync('node_modules/@mcp-abap-adt/'+n+'/package.json','utf8')).version;
+            const lib=v('lib'), core=v('core');
             if (lib !== core) { console.error('lib '+lib+' != core '+core); process.exit(1); }
             console.log('installed lib and core at '+lib);"
           ./node_modules/.bin/mcp-abap-adt --help

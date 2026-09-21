@@ -60,10 +60,28 @@ jobs:
           npm pack
           npm pack ./server
 
+      # **Both tarballs in one install, or this step cannot pass a release.**
+      # `core` depends on `lib` by range, so installing the core tarball alone
+      # sends npm to the registry for `@mcp-abap-adt/lib@^11.0.0` — a version
+      # that does not exist yet, because publishing happens after this.
+      # `ETARGET: No matching version found` is the shape of that, and it is
+      # guaranteed on any pull request that raises the major. Naming both as
+      # top-level requests lets the sibling tarball satisfy the range, which
+      # is also the arrangement a consumer ends up with once both are on npm.
+      #
+      # Installed locally rather than globally: a global install needs the
+      # runner's permissions for nothing this check is about, and the point is
+      # that the binary the package declares runs at all.
       - name: Test package installation (Unix)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
-          ls mcp-abap-adt-lib-*.tgz
-          PACKAGE_FILE=$(ls mcp-abap-adt-core-*.tgz)
-          npm install -g "./$PACKAGE_FILE"
-          mcp-abap-adt --help || true
+          mkdir -p /tmp/install-check && cd /tmp/install-check
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund \
+            "$GITHUB_WORKSPACE"/mcp-abap-adt-lib-*.tgz \
+            "$GITHUB_WORKSPACE"/mcp-abap-adt-core-*.tgz
+          node -e "const v=p=>require(p+'/package.json').version;
+            const lib=v('@mcp-abap-adt/lib'), core=v('@mcp-abap-adt/core');
+            if (lib !== core) { console.error('lib '+lib+' != core '+core); process.exit(1); }
+            console.log('installed lib and core at '+lib);"
+          ./node_modules/.bin/mcp-abap-adt --help

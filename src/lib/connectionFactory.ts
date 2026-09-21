@@ -97,6 +97,45 @@ function onPremCredential(config: SapConfig) {
   }
 }
 
+/**
+ * Whether the RFC wire should log what it carries, and how much of it.
+ *
+ * **Off unless asked for, and asked for by environment rather than by
+ * argument.** The question this answers is diagnostic — "did the body we built
+ * reach `SADT_REST_RFC_ENDPOINT` intact?" — and it is asked by whoever is
+ * sitting in front of a misbehaving on-premise system, not by a caller writing
+ * code. An argument would have to be threaded through every call site for a
+ * switch nobody sets in production; an environment variable is read where the
+ * transport is built and nowhere else. `DEBUG_CONNECTORS` already works this
+ * way.
+ *
+ * `@mcp-abap-adt/connection` 8.1.0 is what made this possible, and it is also
+ * why the output is safe to paste into an issue: it replaces the values of
+ * `Authorization`, any `Cookie`, and anything matching `token`, `secret`,
+ * `password`, `credential` or an API key with `[redacted]` — keeping the
+ * names — and clips a body at `maxLoggedBodyChars`. Bodies themselves are not
+ * redacted, so a body carrying a credential would still be logged: this is for
+ * a payload under suspicion, not for routine logging.
+ *
+ * `DEBUG_RFC_BODY_CHARS` takes `0` for the size alone and `Infinity` for the
+ * whole body; anything unparseable is left to the package, which falls back to
+ * its own default rather than failing a connection over a debug option.
+ */
+function rfcWireOptions(): { logWire: boolean; maxLoggedBodyChars?: number } {
+  const asked =
+    process.env.DEBUG_RFC_WIRE === 'true' || process.env.DEBUG_RFC_WIRE === '1';
+  const ceiling = process.env.DEBUG_RFC_BODY_CHARS;
+  return {
+    logWire: asked,
+    ...(ceiling === undefined || ceiling === ''
+      ? {}
+      : {
+          maxLoggedBodyChars:
+            ceiling === 'Infinity' ? Number.POSITIVE_INFINITY : Number(ceiling),
+        }),
+  };
+}
+
 export function createAbapConnection(
   config: SapConfig,
   logger?: ILogger | null,
@@ -126,7 +165,7 @@ export function createAbapConnection(
     return new AdtOnPremConnector(
       config,
       credential,
-      new RfcTransport(rfcConversationFrom(config), logger),
+      new RfcTransport(rfcConversationFrom(config), logger, rfcWireOptions()),
       logger,
       sessionId,
     ) as unknown as IAbapConnection;

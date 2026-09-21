@@ -80,12 +80,32 @@ jobs:
           npm install --no-audit --no-fund \
             "$GITHUB_WORKSPACE"/mcp-abap-adt-lib-*.tgz \
             "$GITHUB_WORKSPACE"/mcp-abap-adt-core-*.tgz
-          # Read, not require: a package's `exports` map does not offer
-          # `./package.json`, so requiring that subpath is
+          # **Did `core` accept the `lib` we just built, or fetch another
+          # one?** Not "are the versions equal" — they need not be, and this
+          # repository has shipped lib 10.1.0 and 10.2.0 against an unchanged
+          # core 10.0.1. What must not happen is `core` silently resolving a
+          # DIFFERENT lib from the registry because its declared range does
+          # not accept ours: the install still succeeds, the binary still
+          # runs, and nobody is told. npm shows it in the tree — a dependency
+          # a top-level package cannot satisfy is installed nested under the
+          # one that wanted it.
+          #
+          # Measured both ways before this was written: core requiring
+          # `^11.0.0` beside lib 11.0.0 leaves no nested copy, and the same
+          # core requiring `^10.0.0` pulls lib 10.2.0 into
+          # `core/node_modules/`.
+          #
+          # `readFileSync`, not `require`: a package's `exports` map does not
+          # offer `./package.json`, so requiring that subpath is
           # ERR_PACKAGE_PATH_NOT_EXPORTED.
-          node -e "const {readFileSync}=require('node:fs');
-            const v=n=>JSON.parse(readFileSync('node_modules/@mcp-abap-adt/'+n+'/package.json','utf8')).version;
-            const lib=v('lib'), core=v('core');
-            if (lib !== core) { console.error('lib '+lib+' != core '+core); process.exit(1); }
-            console.log('installed lib and core at '+lib);"
+          node -e "const {readFileSync,existsSync}=require('node:fs');
+            const v=p=>JSON.parse(readFileSync(p+'/package.json','utf8')).version;
+            const top='node_modules/@mcp-abap-adt/lib';
+            const nested='node_modules/@mcp-abap-adt/core/node_modules/@mcp-abap-adt/lib';
+            if (existsSync(nested)) {
+              console.error('core did not accept the lib built here: it resolved '+v(nested)+' of its own, beside '+v(top)+' at the top level.');
+              console.error('Its declared range is '+JSON.parse(readFileSync('node_modules/@mcp-abap-adt/core/package.json','utf8')).dependencies['@mcp-abap-adt/lib']+'.');
+              process.exit(1);
+            }
+            console.log('core '+v('node_modules/@mcp-abap-adt/core')+' resolved lib '+v(top)+' — the one built here');"
           ./node_modules/.bin/mcp-abap-adt --help

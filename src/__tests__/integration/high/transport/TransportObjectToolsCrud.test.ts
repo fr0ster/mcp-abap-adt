@@ -108,6 +108,12 @@ import {
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
+  OBJECT_URIS,
+  releaseObjectLockIfHeld,
+  sapIsConfigured,
+  systemUserName,
+} from '../../helpers/objectLocks';
+import {
   createTestConnectionAndSession,
   type SessionInfo,
 } from '../../helpers/sessionHelpers';
@@ -146,6 +152,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
   const programName = `ZMCP_BLD_TR${Date.now().toString(36).toUpperCase().slice(-6)}`;
   let taskNumber = '';
   let testEnabled = false;
+  let skipReason = '';
 
   beforeAll(async () => {
     await loadTestEnv();
@@ -155,22 +162,69 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
       config?.environment?.default_transport || '',
     ).trim();
     packageName = String(config?.environment?.default_package || '').trim();
-    targetUser = String(process.env.SAP_USERNAME || '').trim();
 
-    if (!parentTransport || !packageName || !targetUser) {
-      logger?.warn(
-        'Missing default_transport / default_package / SAP_USERNAME — skipping',
-      );
+    // **A skip that reads as a pass is the failure this block is about.**
+    //
+    // This warned and returned for a missing transport, package or user, and
+    // jest printed `1 passed` for a run that had done nothing. Measured on a
+    // cloud session, where the suite is structurally unable to run at all —
+    // step 2 creates a PROGRAM and ABAP Cloud has none — it reported green.
+    //
+    // Three cases, and they are not the same thing:
+    //
+    //  1. **No system.** A legitimate skip, and the only one.
+    //  2. **A system that keeps no transports.** `default_transport: ""` is a
+    //     supported setup, documented in the template for `$TMP` and local
+    //     packages — this suite simply does not apply there. A skip too, but
+    //     one that says which system it met rather than listing fields.
+    //  3. **A system that transports, and a suite that cannot name an owner.**
+    //     That is a fault: `CreateTransportTask` will not guess a user, the
+    //     server resolves an empty owner and refuses, and quietly skipping
+    //     would hide a real gap behind the same green as case 1.
+    //
+    // Every skip is logged with ⏭️ and its reason, because the run says
+    // `passed` either way and the log is the only place the difference
+    // survives.
+    if (!sapIsConfigured()) {
+      skipReason = 'no SAP_URL — there is no system to run against';
+      logger?.warn(`⏭️ SKIPPED — ${skipReason}`);
       return;
+    }
+
+    if (!parentTransport || !packageName) {
+      skipReason =
+        `this system keeps no transport for the suite to work in ` +
+        `(default_transport="${parentTransport}", default_package="${packageName}") ` +
+        "— a local-package setup, where a request's object list has nothing to hold";
+      logger?.warn(`⏭️ SKIPPED — ${skipReason}`);
+      return;
+    }
+
+    const result = await createTestConnectionAndSession();
+    connection = result.connection;
+    session = result.session;
+
+    // The owner the task will belong to. `SAP_USERNAME` is the configured
+    // answer and wins where it is set; a JWT session has none, so the system
+    // is asked — `/sap/bc/adt/core/http/systeminformation` is a cloud
+    // endpoint and answers nothing on-premise, which is exactly the gap it
+    // fills. Without this the suite skipped invisibly on every cloud run.
+    targetUser = String(process.env.SAP_USERNAME || '').trim();
+    if (!targetUser) {
+      targetUser = (await systemUserName(connection, logger)) ?? '';
+    }
+    if (!targetUser) {
+      throw new Error(
+        'this system transports, but no user could be named for the task: ' +
+          'SAP_USERNAME is unset and systeminformation answered none. ' +
+          'CreateTransportTask will not guess one — the server resolves an ' +
+          'empty owner and refuses — so this is a fault, not a skip.',
+      );
     }
 
     logger?.info(
       `Parent transport: ${parentTransport}, package: ${packageName}, user: ${targetUser}`,
     );
-
-    const result = await createTestConnectionAndSession();
-    connection = result.connection;
-    session = result.session;
     testEnabled = true;
   }, getTimeout('long'));
 
@@ -179,6 +233,15 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
     if (programName) {
       try {
+        // Release before deleting, the way `LowTester`'s own cleanup does:
+        // a delete aimed at a locked object is refused, and that refusal was
+        // being logged and accepted — the object stayed, and so did the lock.
+        await releaseObjectLockIfHeld(
+          connection,
+          OBJECT_URIS.program(programName),
+          programName,
+          logger,
+        );
         const ctx = createHandlerContext({ connection, logger });
         const deleteResponse = await handleDeleteProgram(ctx, {
           program_name: programName,
@@ -224,163 +287,187 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
     'creates a task, adds/removes/re-adds an object, and confirms via log + re-reads',
     async () => {
       if (!testEnabled) {
-        logger?.warn('Skipping — test not enabled or missing config');
+        // The only reason to be here is the one `beforeAll` allows: no SAP.
+        // Everything else threw there, which is why this needs no second
+        // list of conditions.
+        logger?.warn(`⏭️ SKIPPED — ${skipReason || 'no system'}`);
         return;
       }
 
-      // Step 1: task under the pinned request
-      logger?.info(
-        `Step 1: CreateTransportTask under ${parentTransport} for ${targetUser}`,
-      );
-      const taskCtx = createHandlerContext({ connection, logger });
-      const taskResponse = await handleCreateTransportTask(taskCtx, {
-        transport_number: parentTransport,
-        target_user: targetUser,
-      });
+      // **Everything below runs inside a `finally` that drops the lock.**
+      //
+      // `expectOk` throws on a refusal, and there is a window where a throw
+      // leaves a real ENQUEUE lock behind: `CreateProgram` takes one (SAP's
+      // own EU510 says so) and `UpdateProgram`'s lock/write/unlock is what
+      // closes it. A failure between them — or in any later step — used to
+      // end the run with the object stuck, and `afterAll`'s delete then met
+      // that lock and logged its own refusal. SM12 by hand was the rest of
+      // the procedure.
+      //
+      // Releasing costs two requests and only acts when a lock is actually
+      // held, so a passing run pays nothing.
+      try {
+        // Step 1: task under the pinned request
+        logger?.info(
+          `Step 1: CreateTransportTask under ${parentTransport} for ${targetUser}`,
+        );
+        const taskCtx = createHandlerContext({ connection, logger });
+        const taskResponse = await handleCreateTransportTask(taskCtx, {
+          transport_number: parentTransport,
+          target_user: targetUser,
+        });
 
-      expectOk(taskResponse, 'Step 1 CreateTransportTask', logger);
-      const taskData = parseHandlerResponse(taskResponse);
-      expect(taskData.success).toBe(true);
-      expect(taskData.task_number).toBeTruthy();
-      taskNumber = taskData.task_number;
-      logger?.success(`Step 1: task ${taskNumber} created`);
+        expectOk(taskResponse, 'Step 1 CreateTransportTask', logger);
+        const taskData = parseHandlerResponse(taskResponse);
+        expect(taskData.success).toBe(true);
+        expect(taskData.task_number).toBeTruthy();
+        taskNumber = taskData.task_number;
+        logger?.success(`Step 1: task ${taskNumber} created`);
 
-      await delay(getOperationDelay('create'));
+        await delay(getOperationDelay('create'));
 
-      // Step 2: create a program directly on the TASK (see the file header
-      // for why a program rather than a class, and why the task rather than
-      // the parent request).
-      logger?.info(
-        `Step 2: creating program ${programName} on task ${taskNumber}`,
-      );
-      const createCtx = createHandlerContext({ connection, logger });
-      const createResponse = await handleCreateProgram(createCtx, {
-        program_name: programName,
-        package_name: packageName,
-        transport_request: taskNumber,
-        description: 'MCP test program for transport-object-tools (#221)',
-      });
+        // Step 2: create a program directly on the TASK (see the file header
+        // for why a program rather than a class, and why the task rather than
+        // the parent request).
+        logger?.info(
+          `Step 2: creating program ${programName} on task ${taskNumber}`,
+        );
+        const createCtx = createHandlerContext({ connection, logger });
+        const createResponse = await handleCreateProgram(createCtx, {
+          program_name: programName,
+          package_name: packageName,
+          transport_request: taskNumber,
+          description: 'MCP test program for transport-object-tools (#221)',
+        });
 
-      expectOk(createResponse, 'Step 2 CreateProgram', logger);
-      expect(createResponse.content[0]?.text).toBe('SUCCESS');
-      logger?.success(
-        `Step 2: program ${programName} created on ${taskNumber}`,
-      );
+        expectOk(createResponse, 'Step 2 CreateProgram', logger);
+        expect(createResponse.content[0]?.text).toBe('SUCCESS');
+        logger?.success(
+          `Step 2: program ${programName} created on ${taskNumber}`,
+        );
 
-      await delay(getOperationDelay('create'));
+        await delay(getOperationDelay('create'));
 
-      // Step 2a: set source via UpdateProgram — its lock/write/unlock cycle
-      // is what closes out the ENQUEUE lock CreateProgram leaves behind (see
-      // the file header). Skipping this orphaned SM12 entries more than once
-      // while this test was being written.
-      logger?.info(`Step 2a: UpdateProgram — closing out the create lock`);
-      const updateCtx = createHandlerContext({ connection, logger });
-      const updateResponse = await handleUpdateProgram(updateCtx, {
-        program_name: programName,
-        transport_request: taskNumber,
-        source_code: `REPORT ${programName.toLowerCase()}.`,
-      });
-      expectOk(updateResponse, 'Step 2a UpdateProgram', logger);
-      logger?.success('Step 2a: UpdateProgram succeeded, lock closed out');
+        // Step 2a: set source via UpdateProgram — its lock/write/unlock cycle
+        // is what closes out the ENQUEUE lock CreateProgram leaves behind (see
+        // the file header). Skipping this orphaned SM12 entries more than once
+        // while this test was being written.
+        logger?.info(`Step 2a: UpdateProgram — closing out the create lock`);
+        const updateCtx = createHandlerContext({ connection, logger });
+        const updateResponse = await handleUpdateProgram(updateCtx, {
+          program_name: programName,
+          transport_request: taskNumber,
+          source_code: `REPORT ${programName.toLowerCase()}.`,
+        });
+        expectOk(updateResponse, 'Step 2a UpdateProgram', logger);
+        logger?.success('Step 2a: UpdateProgram succeeded, lock closed out');
 
-      await delay(getOperationDelay('update'));
+        await delay(getOperationDelay('update'));
 
-      // Step 3: ReadTransportObjects — find the entry, capture its position
-      logger?.info('Step 3: ReadTransportObjects — locating the entry');
-      const readCtx1 = createHandlerContext({ connection, logger });
-      const readResponse1 = await handleReadTransportObjects(readCtx1, {
-        transport_number: taskNumber,
-      });
+        // Step 3: ReadTransportObjects — find the entry, capture its position
+        logger?.info('Step 3: ReadTransportObjects — locating the entry');
+        const readCtx1 = createHandlerContext({ connection, logger });
+        const readResponse1 = await handleReadTransportObjects(readCtx1, {
+          transport_number: taskNumber,
+        });
 
-      expectOk(readResponse1, 'Step 3 ReadTransportObjects', logger);
-      const readData1 = parseHandlerResponse(readResponse1);
-      expect(readData1.success).toBe(true);
-      const entry1 = readData1.objects.find(
-        (o: any) => o.name === programName && o.type === 'PROG',
-      );
-      expect(entry1).toBeDefined();
-      expect(entry1.position).toBeTruthy();
-      const position = entry1.position as string;
-      logger?.success(`Step 3: found entry at position ${position}`);
+        expectOk(readResponse1, 'Step 3 ReadTransportObjects', logger);
+        const readData1 = parseHandlerResponse(readResponse1);
+        expect(readData1.success).toBe(true);
+        const entry1 = readData1.objects.find(
+          (o: any) => o.name === programName && o.type === 'PROG',
+        );
+        expect(entry1).toBeDefined();
+        expect(entry1.position).toBeTruthy();
+        const position = entry1.position as string;
+        logger?.success(`Step 3: found entry at position ${position}`);
 
-      // Step 4: RemoveTransportObject
-      logger?.info(`Step 4: RemoveTransportObject at position ${position}`);
-      const removeCtx = createHandlerContext({ connection, logger });
-      const removeResponse = await handleRemoveTransportObject(removeCtx, {
-        transport_number: taskNumber,
-        object_name: programName,
-        object_type: 'PROG',
-        position,
-      });
+        // Step 4: RemoveTransportObject
+        logger?.info(`Step 4: RemoveTransportObject at position ${position}`);
+        const removeCtx = createHandlerContext({ connection, logger });
+        const removeResponse = await handleRemoveTransportObject(removeCtx, {
+          transport_number: taskNumber,
+          object_name: programName,
+          object_type: 'PROG',
+          position,
+        });
 
-      expectOk(removeResponse, 'Step 4 RemoveTransportObject', logger);
-      const removeData = parseHandlerResponse(removeResponse);
-      expect(removeData.accepted).toBe(true);
-      logger?.success('Step 4: RemoveTransportObject accepted');
+        expectOk(removeResponse, 'Step 4 RemoveTransportObject', logger);
+        const removeData = parseHandlerResponse(removeResponse);
+        expect(removeData.accepted).toBe(true);
+        logger?.success('Step 4: RemoveTransportObject accepted');
 
-      await delay(getOperationDelay('update'));
+        await delay(getOperationDelay('update'));
 
-      // Step 5: re-read — the tool's own doc says a 200 above is not proof
-      logger?.info('Step 5: ReadTransportObjects — confirming removal');
-      const readCtx2 = createHandlerContext({ connection, logger });
-      const readResponse2 = await handleReadTransportObjects(readCtx2, {
-        transport_number: taskNumber,
-      });
+        // Step 5: re-read — the tool's own doc says a 200 above is not proof
+        logger?.info('Step 5: ReadTransportObjects — confirming removal');
+        const readCtx2 = createHandlerContext({ connection, logger });
+        const readResponse2 = await handleReadTransportObjects(readCtx2, {
+          transport_number: taskNumber,
+        });
 
-      expectOk(readResponse2, 'Step 5 ReadTransportObjects', logger);
-      const readData2 = parseHandlerResponse(readResponse2);
-      const entry2 = readData2.objects.find(
-        (o: any) => o.name === programName && o.type === 'PROG',
-      );
-      expect(entry2).toBeUndefined();
-      logger?.success('Step 5: entry confirmed removed');
+        expectOk(readResponse2, 'Step 5 ReadTransportObjects', logger);
+        const readData2 = parseHandlerResponse(readResponse2);
+        const entry2 = readData2.objects.find(
+          (o: any) => o.name === programName && o.type === 'PROG',
+        );
+        expect(entry2).toBeUndefined();
+        logger?.success('Step 5: entry confirmed removed');
 
-      // Step 6: AddTransportObject — reattach it
-      logger?.info('Step 6: AddTransportObject — reattaching');
-      const addCtx = createHandlerContext({ connection, logger });
-      const addResponse = await handleAddTransportObject(addCtx, {
-        transport_number: taskNumber,
-        object_name: programName,
-        object_type: 'PROG',
-      });
+        // Step 6: AddTransportObject — reattach it
+        logger?.info('Step 6: AddTransportObject — reattaching');
+        const addCtx = createHandlerContext({ connection, logger });
+        const addResponse = await handleAddTransportObject(addCtx, {
+          transport_number: taskNumber,
+          object_name: programName,
+          object_type: 'PROG',
+        });
 
-      expectOk(addResponse, 'Step 6 AddTransportObject', logger);
-      const addData = parseHandlerResponse(addResponse);
-      expect(addData.accepted).toBe(true);
-      logger?.success('Step 6: AddTransportObject accepted');
+        expectOk(addResponse, 'Step 6 AddTransportObject', logger);
+        const addData = parseHandlerResponse(addResponse);
+        expect(addData.accepted).toBe(true);
+        logger?.success('Step 6: AddTransportObject accepted');
 
-      await delay(getOperationDelay('update'));
+        await delay(getOperationDelay('update'));
 
-      // Step 7: re-read — confirm it is back
-      logger?.info('Step 7: ReadTransportObjects — confirming re-attachment');
-      const readCtx3 = createHandlerContext({ connection, logger });
-      const readResponse3 = await handleReadTransportObjects(readCtx3, {
-        transport_number: taskNumber,
-      });
+        // Step 7: re-read — confirm it is back
+        logger?.info('Step 7: ReadTransportObjects — confirming re-attachment');
+        const readCtx3 = createHandlerContext({ connection, logger });
+        const readResponse3 = await handleReadTransportObjects(readCtx3, {
+          transport_number: taskNumber,
+        });
 
-      expectOk(readResponse3, 'Step 7 ReadTransportObjects', logger);
-      const readData3 = parseHandlerResponse(readResponse3);
-      const entry3 = readData3.objects.find(
-        (o: any) => o.name === programName && o.type === 'PROG',
-      );
-      expect(entry3).toBeDefined();
-      logger?.success('Step 7: entry confirmed back on the task');
+        expectOk(readResponse3, 'Step 7 ReadTransportObjects', logger);
+        const readData3 = parseHandlerResponse(readResponse3);
+        const entry3 = readData3.objects.find(
+          (o: any) => o.name === programName && o.type === 'PROG',
+        );
+        expect(entry3).toBeDefined();
+        logger?.success('Step 7: entry confirmed back on the task');
 
-      // Step 8: ReadTransportActionLog — confirm the task recorded activity
-      logger?.info('Step 8: ReadTransportActionLog');
-      const logCtx = createHandlerContext({ connection, logger });
-      const logResponse = await handleReadTransportActionLog(logCtx, {
-        transport_number: taskNumber,
-      });
+        // Step 8: ReadTransportActionLog — confirm the task recorded activity
+        logger?.info('Step 8: ReadTransportActionLog');
+        const logCtx = createHandlerContext({ connection, logger });
+        const logResponse = await handleReadTransportActionLog(logCtx, {
+          transport_number: taskNumber,
+        });
 
-      expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
-      const logData = parseHandlerResponse(logResponse);
-      expect(logData.success).toBe(true);
-      expect(logData.count).toBeGreaterThan(0);
-      expect(Array.isArray(logData.entries)).toBe(true);
-      logger?.success(
-        `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
-      );
+        expectOk(logResponse, 'Step 8 ReadTransportActionLog', logger);
+        const logData = parseHandlerResponse(logResponse);
+        expect(logData.success).toBe(true);
+        expect(logData.count).toBeGreaterThan(0);
+        expect(Array.isArray(logData.entries)).toBe(true);
+        logger?.success(
+          `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
+        );
+      } finally {
+        await releaseObjectLockIfHeld(
+          connection,
+          OBJECT_URIS.program(programName),
+          programName,
+          logger,
+        );
+      }
     },
     getTimeout('long'),
   );

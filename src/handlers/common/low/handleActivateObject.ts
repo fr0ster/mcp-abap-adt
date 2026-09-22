@@ -261,9 +261,22 @@ export async function handleActivateObject(
   const detail = detailOf(args);
   const client = createAdtClient(connection, logger);
 
+  // **`uri` is carried, not dropped.** The schema above has advertised it
+  // since this handler existed — "Optional ADT URI" — and this mapping kept
+  // only the type and the name, so a caller who supplied one was answered as
+  // though they had not. It matters for exactly the objects that cannot be
+  // addressed from a name: a function module lives under its function group,
+  // and `IObjectReference.uri` is where ADT's own address goes. `parentName`
+  // travels for the same reason and by the same contract — "Owning object,
+  // where the reference is to a part of one".
+  //
+  // Neither is invented when absent: an object the client can address from a
+  // name is unaffected, which is every case that worked before.
   const activationObjects = args.objects.map((obj) => ({
     type: obj.type,
     name: obj.name.toUpperCase(),
+    ...(obj.uri ? { uri: obj.uri } : {}),
+    ...(obj.parentName ? { parentName: obj.parentName } : {}),
   }));
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);

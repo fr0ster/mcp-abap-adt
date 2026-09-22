@@ -34,6 +34,8 @@ jest.mock('../../handlers/common/low/handleActivateObject', () => {
 const context = {} as never;
 const typeSent = () =>
   (sent as { objects: { type: string }[] }).objects[0].type;
+const nameSent = () =>
+  (sent as { objects: { name: string }[] }).objects[0].name;
 
 describe('HandlerActivate and the type it was given', () => {
   it('passes a friendly name the activation map knows, as it always did', async () => {
@@ -121,18 +123,29 @@ describe('HandlerActivate and the type it was given', () => {
     expect(sent).toBeUndefined();
   });
 
-  it('activates a function module through the batch form, which carries the address', async () => {
+  /**
+   * The route the refusal recommends, in the form the client can address.
+   * `buildObjectUri` requires `GROUP|MODULE` for `fugr/ff` and throws on
+   * anything else — it reads neither `uri` nor `parentName` for that type,
+   * which took two measurements to establish and is why this test names the
+   * pipe rather than an address.
+   */
+  it('activates a function module through the batch form, named GROUP|MODULE', async () => {
     await handleHandlerActivate(context, {
-      objects: [
-        {
-          name: 'Z_AC_FM01',
-          type: 'FUGR/FF',
-          uri: '/sap/bc/adt/functions/groups/zac_fgr01/fmodules/z_ac_fm01',
-        },
-      ],
+      objects: [{ name: 'ZAC_FGR01|Z_AC_FM01', type: 'FUGR/FF' }],
     });
 
     expect(typeSent()).toBe('FUGR/FF');
+    expect(nameSent()).toBe('ZAC_FGR01|Z_AC_FM01');
+  });
+
+  it('says so in the refusal, so the caller does not have to find out', async () => {
+    await expect(
+      handleHandlerActivate(context, {
+        object_name: 'Z_AC_FM01',
+        object_type: 'FUNCTION_MODULE',
+      }),
+    ).rejects.toThrow(/GROUP\|MODULE/);
   });
 
   it('still takes a batch untouched', async () => {

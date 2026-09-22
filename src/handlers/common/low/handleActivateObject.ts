@@ -261,14 +261,24 @@ export async function handleActivateObject(
   const detail = detailOf(args);
   const client = createAdtClient(connection, logger);
 
-  // **`uri` is carried, not dropped.** The schema above has advertised it
-  // since this handler existed — "Optional ADT URI" — and this mapping kept
-  // only the type and the name, so a caller who supplied one was answered as
-  // though they had not. It matters for exactly the objects that cannot be
-  // addressed from a name: a function module lives under its function group,
-  // and `IObjectReference.uri` is where ADT's own address goes. `parentName`
-  // travels for the same reason and by the same contract — "Owning object,
-  // where the reference is to a part of one".
+  // **`uri` is carried, not dropped — and today nothing downstream reads
+  // it.** The schema above has advertised it since this handler existed,
+  // "Optional ADT URI", and this mapping kept only the type and the name, so
+  // a caller who supplied one was answered as though they had not. Accepting
+  // a field and discarding it is wrong whoever reads it next, which is the
+  // whole reason to carry it.
+  //
+  // What it does NOT do is fix addressing, and saying so here saves the next
+  // person the two measurements it took: `activateObjectsGroup` builds the
+  // reference with `buildObjectUri(name, type, parentName)` and never looks
+  // at `uri`; and for `fugr/ff` that builder ignores `parentName` as well,
+  // requiring the group inside the name — `GROUP|MODULE` — and throwing
+  // otherwise. A function module is therefore activated by naming it that
+  // way, not by supplying an address.
+  //
+  // `parentName` travels by the same contract — "Owning object, where the
+  // reference is to a part of one" — and is read for the types whose builder
+  // uses it.
   //
   // Neither is invented when absent: an object the client can address from a
   // name is unaffected, which is every case that worked before.

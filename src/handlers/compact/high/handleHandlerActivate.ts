@@ -34,13 +34,17 @@ const ADT_TYPE_BY_COMPACT_TYPE: Partial<Record<CompactObjectType, string>> = {
  * *"`FUGR/FF` needs a group name this array does not carry"* — which is
  * exactly the sentence the map entry contradicted.
  *
- * So the translation stops here and the refusal says what does work: the
- * batch form, where `objects[].uri` carries the address this form cannot
- * derive, or `ActivateFunctionModuleLow`, which takes the group.
+ * So the translation stops here and the refusal says what does work — and
+ * what that is was measured in the client rather than assumed twice over.
+ * `buildObjectUri` ignores `uri` for every type and, for `fugr/ff`, ignores
+ * `parentName` too: it requires the group inside the NAME, `GROUP|MODULE`,
+ * and throws otherwise. So the batch form works for a function module when
+ * the name carries the group, which is a convention worth stating rather
+ * than leaving to a thrown error.
  */
 const NEEDS_MORE_THAN_A_NAME: Partial<Record<CompactObjectType, string>> = {
   FUNCTION_MODULE:
-    "a function module is addressed under its function group, which this form does not take — use the batch form with objects[].uri, or ActivateFunctionModuleLow, which takes the group's name",
+    'a function module is addressed under its function group, which this form does not take — use the batch form with objects[].name as "GROUP|MODULE" and type FUGR/FF, or ActivateFunctionModuleLow, which takes the group as its own argument',
 };
 
 /** What `object_type` alone can be activated as, or undefined. */
@@ -60,7 +64,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].uri, because a module is addressed under its function group. Batch mode(objects[].name*, objects[].type*, objects[].uri).',
+    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].name as "GROUP|MODULE", because a module is addressed under its function group. Batch mode(objects[].name*, objects[].type*, objects[].uri).',
   inputSchema: compactActivateSchema,
 } as const;
 

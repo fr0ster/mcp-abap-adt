@@ -25,12 +25,12 @@ import { handleActivateObject } from '../../handlers/common/low/handleActivateOb
  * supplied one was answered as though they had not, one layer below anything
  * that asserted.
  *
- * It matters for the objects that cannot be addressed from a name at all. A
- * function module lives under its function group, so activating one by name
- * addresses a group that does not exist — and `uri` is how a caller says
- * where the object actually is. `HandlerActivate` recommends exactly that
- * route, which is how the loss was found: the advice was right and could not
- * work.
+ * **What carrying it does not do is fix addressing**, and that is worth
+ * stating where the tests are: `activateObjectsGroup` builds its reference
+ * with `buildObjectUri(name, type, parentName)` and never reads `uri`; for
+ * `fugr/ff` that builder ignores `parentName` too, requiring the group inside
+ * the name — `GROUP|MODULE`. So a function module is activated by naming it
+ * that way. These cases pin the passthrough, not a cure.
  */
 const context = { connection: {}, logger: undefined } as never;
 

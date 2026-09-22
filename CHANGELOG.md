@@ -23,8 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Setting the variable is enough. `RfcTransport` writes only when it has both
   the option and a logger, and the server's own path builds its connection
   with none — so asking for the wire brings one at `debug` where nothing else
-  supplied it. A logger the caller already has is used as it is and never
-  redirected.
+  supplied it. It writes to **stderr**: in stdio transport stdout carries
+  JSON-RPC, and a debug switch that interleaves `RFC HEADERS: …` with the
+  protocol would take the session down, which is worse than printing nothing.
+  A logger the caller already has is used as it is and never redirected.
 
   An environment variable rather than an argument: the question is asked by
   whoever is sitting in front of a misbehaving on-premise system, not by code,

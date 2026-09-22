@@ -138,6 +138,49 @@ describe('the RFC wire logs only when asked', () => {
     expect(loggerFromLastCall()).toBeUndefined();
   });
 
+  /**
+   * **stdout belongs to JSON-RPC.** This server is usually run over stdio,
+   * where every byte on stdout is protocol. `DefaultLogger` puts `debug` and
+   * `info` there, so a wire log through one would interleave `RFC HEADERS: …`
+   * with the messages the client is parsing and take the session down — a
+   * debug switch that breaks the server being worse than one that prints
+   * nothing, which is what this began as.
+   */
+  it('writes to stderr, never to the stream JSON-RPC uses', () => {
+    process.env.DEBUG_RFC_WIRE = 'true';
+    createAbapConnection(rfcConfig as never, undefined, undefined);
+    const supplied = loggerFromLastCall() as {
+      debug: (m: string) => void;
+      info: (m: string) => void;
+    };
+
+    const out: string[] = [];
+    const err: string[] = [];
+    const stdout = jest
+      .spyOn(process.stdout, 'write')
+      .mockImplementation((chunk: unknown) => {
+        out.push(String(chunk));
+        return true;
+      });
+    const stderr = jest
+      .spyOn(process.stderr, 'write')
+      .mockImplementation((chunk: unknown) => {
+        err.push(String(chunk));
+        return true;
+      });
+    try {
+      supplied.debug('RFC HEADERS: [{"NAME":"Accept"}]');
+      supplied.info('something at info');
+    } finally {
+      stdout.mockRestore();
+      stderr.mockRestore();
+    }
+
+    expect(err.join('')).toContain('RFC HEADERS:');
+    expect(err.join('')).toContain('something at info');
+    expect(out).toEqual([]);
+  });
+
   it("never replaces the caller's own logger", () => {
     process.env.DEBUG_RFC_WIRE = 'true';
     const mine = { debug() {}, info() {}, warn() {}, error() {} };

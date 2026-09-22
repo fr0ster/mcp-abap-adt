@@ -34,7 +34,6 @@ import type {
   IAbapConnection,
   ITokenRefresher,
 } from '@mcp-abap-adt/interfaces';
-import { DefaultLogger, LogLevel } from '@mcp-abap-adt/logger';
 
 export type AbapSystemKind = 'onprem' | 'cloud';
 
@@ -136,12 +135,35 @@ function onPremCredential(config: SapConfig) {
  * and this must not redirect it. Only when there is none does asking for the
  * wire bring one, at `debug`, because a wire log below `debug` is a wire log
  * nobody sees.
+ *
+ * **It writes to stderr, and that is not a preference.** In stdio transport —
+ * how this server is usually run — stdout carries JSON-RPC and nothing else.
+ * `DefaultLogger` puts `debug` and `info` on stdout, so supplying one here
+ * would interleave `RFC HEADERS: …` with the protocol and break the session
+ * with the client: a debug switch that takes the server down is worse than
+ * one that prints nothing, which is what this started as.
+ *
+ * stderr is where a server's diagnostics belong for exactly this reason, and
+ * it is where `DefaultLogger` already puts `warn` and `error` — so this is
+ * that logger's own convention applied to the two levels it does not.
  */
 function wireLogger(logger: ILogger | null | undefined): ILogger | undefined {
   if (logger) return logger;
-  return rfcWireOptions().logWire
-    ? new DefaultLogger(LogLevel.DEBUG)
-    : undefined;
+  if (!rfcWireOptions().logWire) return undefined;
+
+  const write =
+    (level: string) =>
+    (message: string, meta?: unknown): void => {
+      process.stderr.write(`[${level}] ${message}\n`);
+      if (meta !== undefined) process.stderr.write(`${JSON.stringify(meta)}\n`);
+    };
+
+  return {
+    debug: write('DEBUG'),
+    info: write('INFO'),
+    warn: write('WARN'),
+    error: write('ERROR'),
+  };
 }
 
 function rfcWireOptions(): { logWire: boolean; maxLoggedBodyChars?: number } {

@@ -465,8 +465,10 @@ These are typically set in `.env` file:
   channel (true|1). **RFC only**, off by default, and the only way to see a
   payload that was mis-serialised before it reached `SADT_REST_RFC_ENDPOINT`.
   Setting it is enough: where nothing else configured a logger, asking for the
-  wire brings one at `debug`. A logger the caller already supplied is used as
-  it is and never redirected.
+  wire brings one at `debug`, **writing to stderr** — stdout carries JSON-RPC
+  in stdio transport and must stay clean. A logger the caller already supplied
+  is used as it is and never redirected, so a caller who supplies one that
+  writes to stdout is responsible for that choice.
   Credential header values are replaced with `[redacted]` by
   `@mcp-abap-adt/connection`, so the output is safe to paste into an issue —
   but bodies are clipped, not redacted, so treat a body carrying a secret

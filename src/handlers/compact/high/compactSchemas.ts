@@ -39,7 +39,8 @@ export const compactCreateSchema = {
     },
     transport_request: {
       type: 'string',
-      description: 'Transport request id (if required by system).',
+      description:
+        'Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
     },
     activate: { type: 'boolean', description: 'Activate object after create.' },
     program_type: { type: 'string', description: 'ABAP program type.' },
@@ -230,7 +231,8 @@ export const compactUpdateSchema = {
     },
     transport_request: {
       type: 'string',
-      description: 'Transport request id (if required by system).',
+      description:
+        'Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
     },
     activate: { type: 'boolean', description: 'Activate object after update.' },
     description: {
@@ -360,7 +362,8 @@ export const compactDeleteSchema = {
     },
     transport_request: {
       type: 'string',
-      description: 'Transport request id (if required by system).',
+      description:
+        'Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
     },
     table_name: { type: 'string', description: 'Table name.' },
     structure_name: { type: 'string', description: 'Structure name.' },

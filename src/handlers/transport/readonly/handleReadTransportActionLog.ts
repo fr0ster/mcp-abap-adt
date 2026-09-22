@@ -29,7 +29,8 @@ export const TOOL_DEFINITION = {
     properties: {
       transport_number: {
         type: 'string',
-        description: 'Transport request or task number, e.g. E19K905942.',
+        description:
+          'Transport REQUEST or TASK number, e.g. E19K905942. A request answers its own lifecycle events; a task answers the events of the objects on it.',
       },
       ...DETAIL_PROPERTY,
     },

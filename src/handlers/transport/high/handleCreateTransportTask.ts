@@ -39,7 +39,8 @@ export const TOOL_DEFINITION = {
     properties: {
       transport_number: {
         type: 'string',
-        description: 'The request to create the task under, e.g. E19K905941.',
+        description:
+          'The REQUEST to create the task under, e.g. E19K905941 — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.',
       },
       target_user: {
         type: 'string',

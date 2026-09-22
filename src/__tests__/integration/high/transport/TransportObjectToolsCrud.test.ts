@@ -25,24 +25,14 @@
  *   7. ReadTransportObjects again — confirm it is back
  *   8. ReadTransportActionLog — confirm the task's log recorded activity
  *
- * **`transport_number`/`transport_request` value by call — request or task:**
- *
- * The rule is: name the REQUEST everywhere, except the one call whose job
- * is to move an entry onto a specific TASK — `AddTransportObject` is the
- * only place a task number is the point of the call, not an
- * afterthought. Everything else addresses wherever the object actually is
- * at that moment, which starts as the request and becomes the task the
- * instant `AddTransportObject` succeeds.
- *
- *   - CreateTransportTask   `transport_number`  → REQUEST (`parentTransport`) — creates the task under it
- *   - CreateProgram         `transport_request` → REQUEST (`parentTransport`) — an object is born on the request
- *   - UpdateProgram         `transport_request` → REQUEST (`parentTransport`) — still there, not yet moved
- *   - AddTransportObject (step 2b) `transport_number` → TASK (`taskNumber`) — THE move: request → task
- *   - ReadTransportObjects (steps 3, 5, 7) `transport_number` → TASK (`taskNumber`) — the entry lives there now
- *   - RemoveTransportObject (step 4) `transport_number` → TASK (`taskNumber`) — same reason
- *   - AddTransportObject (step 6)   `transport_number` → TASK (`taskNumber`) — re-attaching to the same task
- *   - ReadTransportActionLog (step 8) `transport_number` → TASK (`taskNumber`)
- *   - DeleteProgram (cleanup)       `transport_request` → TASK (`taskNumber`) — where step 2b left it
+ * **Which number goes where is not documented here.** It was, as a table of
+ * one line per call — and a table in a test file is read by whoever is
+ * debugging this test, which is the one person who already knows. The rule
+ * belongs where a caller meets it, so each tool's own parameter says it now:
+ * `CreateTransportTask` takes the request, `AddTransportObject` and
+ * `RemoveTransportObject` take the task, `ReadTransportObjects` takes either
+ * and says what each answers, and every `transport_request` on a create or
+ * update says it is the request and what a task number costs.
  *
  * **Why a PROGRAM, not a CLASS.** An earlier version of this test used a
  * class and hit a real, reproducible SAP quirk: a class is not one CTS

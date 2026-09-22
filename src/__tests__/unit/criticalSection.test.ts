@@ -20,6 +20,16 @@ describe('isMutatingToolName', () => {
       expect(isMutatingToolName(n)).toBe(true);
     }
   });
+
+  it('matches AddTransportObject/RemoveTransportObject (#221, PR227)', () => {
+    // Measured live: SAP's addobject/removeobject backend takes the same
+    // ENQUEUE lock a Create/Update/Delete does before validating the
+    // request — these two need the same critical section, or a slow call
+    // orphans the lock exactly like an unprotected mutating tool would.
+    for (const n of ['AddTransportObject', 'RemoveTransportObject']) {
+      expect(isMutatingToolName(n)).toBe(true);
+    }
+  });
   it('does not match read/activate tools', () => {
     for (const n of ['GetDomain', 'ReadTable', 'ActivateClass', 'GetSession']) {
       expect(isMutatingToolName(n)).toBe(false);

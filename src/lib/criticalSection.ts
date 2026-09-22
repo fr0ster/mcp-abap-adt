@@ -47,7 +47,22 @@ export function withCriticalSection<H extends (...args: any[]) => any>(
   };
 }
 
-/** Tool names that run a lock → modify → unlock chain and must not be interrupted. */
+/**
+ * Tool names that run a lock → modify → unlock chain and must not be
+ * interrupted.
+ *
+ * `Add`/`Remove` cover `AddTransportObject`/`RemoveTransportObject` (#221,
+ * PR227) specifically — they are the only two tools in this codebase with
+ * either prefix. Measured live (2026-09-22/23) against an on-premise system:
+ * SAP's own backend for `useraction=addobject`/`removeobject` takes an
+ * ENQUEUE lock on the ABAP object being attached/detached before it validates
+ * the request, the same as any Create/Update/Delete's lock → modify → unlock
+ * chain — but neither tool's name started with Create/Update/Delete, so
+ * neither ever got the critical section below, and a slow call left the
+ * object's lock orphaned exactly the way this file's own header describes for
+ * an unprotected mutating call. `CreateTransportTask` already matched
+ * (`Create`); these two did not.
+ */
 export function isMutatingToolName(name: string): boolean {
-  return /^(Create|Update|Delete)/.test(name);
+  return /^(Create|Update|Delete|Add|Remove)/.test(name);
 }

@@ -155,7 +155,7 @@ type ActivationFamily =
  * not named here — `FUGR/FF` included — falls back to group activation; see
  * the module doc comment.
  */
-const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
+export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
   'clas/oc': 'class',
   class: 'class',
   'prog/p': 'program',

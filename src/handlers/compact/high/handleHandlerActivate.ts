@@ -1,14 +1,47 @@
 import type { IObjectReference } from '@mcp-abap-adt/interfaces';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { handleActivateObject } from '../../common/low/handleActivateObject';
-import type { CompactObjectType } from './compactObjectTypes';
+import {
+  handleActivateObject,
+  TYPE_TO_FAMILY,
+} from '../../common/low/handleActivateObject';
+import {
+  COMPACT_OBJECT_TYPES,
+  type CompactObjectType,
+} from './compactObjectTypes';
 import { compactActivateSchema } from './compactSchemas';
+
+/**
+ * ADT type codes for compact types the activation map does not name, taken
+ * from documents this repository has actually seen — `DEVC/K` in twenty
+ * corpus documents, `SRVD/SRV`, `SRVB/SVB` and `FUGR/FF` in its handlers and
+ * captures. A code nobody here has observed is not added: the point of
+ * refusing is that a guess reaches SAP looking exactly like knowledge.
+ */
+const ADT_TYPE_BY_COMPACT_TYPE: Partial<Record<CompactObjectType, string>> = {
+  PACKAGE: 'DEVC/K',
+  SERVICE_DEFINITION: 'SRVD/SRV',
+  SERVICE_BINDING: 'SRVB/SVB',
+  FUNCTION_MODULE: 'FUGR/FF',
+};
+
+/** What `object_type` alone can be activated as, or undefined. */
+function adtTypeFor(type: CompactObjectType | undefined): string | undefined {
+  if (!type) return undefined;
+  const friendly = type.toLowerCase();
+  if (TYPE_TO_FAMILY[friendly]) return friendly;
+  return ADT_TYPE_BY_COMPACT_TYPE[type];
+}
+
+/** The types a caller may name without reaching for `object_adt_type`. */
+function knownCompactTypes(): string[] {
+  return COMPACT_OBJECT_TYPES.filter((type) => adtTypeFor(type) !== undefined);
+}
 
 export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). Batch mode(objects[].name*, objects[].type*).',
+    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). Batch mode(objects[].name*, objects[].type*).',
   inputSchema: compactActivateSchema,
 } as const;
 
@@ -31,21 +64,37 @@ export async function handleHandlerActivate(
     });
   }
 
-  // `handleActivateObject`'s own type map (`TYPE_TO_FAMILY`) already accepts
-  // a lowercase friendly name alongside the raw ADT code — 'program' next to
-  // 'prog/p', 'function_group' next to 'fugr/f', and so on — and every one
-  // of those friendly names is `CompactObjectType.toLowerCase()`, because
-  // both were named from the same object list. So `object_type` (the field
-  // every other Handler* tool already takes) is enough on its own; a caller
-  // never had to know ADT's own type-code convention for this one tool.
-  // `object_adt_type` stays as the explicit escape hatch for a type this
-  // mapping does not cover (e.g. `FUGR/FF` for a function module, which
-  // `handleActivateObject` falls back to group activation for either way).
-  const singleType = args.object_adt_type ?? args.object_type?.toLowerCase();
-
-  if (!args.object_name || !singleType) {
+  // `handleActivateObject`'s own type map accepts a lowercase friendly name
+  // alongside the raw ADT code — 'program' next to 'prog/p' — and every one
+  // of those names is a `CompactObjectType.toLowerCase()`, because both were
+  // named from the same object list. So `object_type` is enough for the types
+  // that map names.
+  //
+  // **It is not enough for the rest, and handing them on lowercased was
+  // wrong.** The schema admits 25 object types and the map knows eleven
+  // names; a `PACKAGE` lowercased to `package` is not an ADT type code, and
+  // it reached the group-activation request as though it were. That is a
+  // malformed request answered by SAP rather than an argument refused here,
+  // and it is worse than the inconvenience it replaced — before, a caller
+  // had to pass `object_adt_type` and therefore passed a code that worked.
+  //
+  // So: a friendly name the map knows goes through as before; a type this
+  // repository has a MEASURED code for is translated; anything else is
+  // refused, naming the field that settles it. Nothing is guessed — a code
+  // invented here would be the same malformed request with more ceremony.
+  if (!args.object_name) {
     throw new Error(
       'Provide either objects[] or object_name + (object_type or object_adt_type) for activation',
+    );
+  }
+
+  const singleType = args.object_adt_type ?? adtTypeFor(args.object_type);
+
+  if (!singleType) {
+    throw new Error(
+      args.object_type
+        ? `HandlerActivate cannot turn object_type "${args.object_type}" into an ADT type code — pass object_adt_type instead (e.g. "CLAS/OC"). Known without it: ${knownCompactTypes().join(', ')}.`
+        : 'Provide either objects[] or object_name + (object_type or object_adt_type) for activation',
     );
   }
 

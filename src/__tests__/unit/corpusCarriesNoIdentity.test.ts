@@ -56,4 +56,34 @@ describe('the recorded corpus', () => {
     const withUser = files.filter((name) => /SAPUSER01/.test(text(name)));
     expect(withUser.length).toBeGreaterThan(0);
   });
+
+  /**
+   * **And every user id in the corpus IS that placeholder.**
+   *
+   * The check above only proves the placeholder is somewhere, which a file
+   * carrying a real name passes just as easily. One did: a document captured
+   * by hand while chasing #211 went in with `adtcore:responsible`,
+   * `createdBy` and `changedBy` naming the person who ran it, past every
+   * pattern here, into a public repository — because the patterns were
+   * written for secrets and a colleague's user id is not a secret, it is an
+   * identity.
+   *
+   * `_SAPSUPPORT`, `DDIC` and the other names beginning with `_` or `SAP` are
+   * SAP's own and say nothing about anybody.
+   */
+  const ALLOWED_USER = /^(?:SAPUSER01|DDIC|SAP\*?|_[A-Z0-9_]+)$/;
+
+  it('names no real user in adtcore:responsible, createdBy or changedBy', () => {
+    const offenders: string[] = [];
+    for (const name of files) {
+      for (const match of text(name).matchAll(
+        /adtcore:(?:responsible|createdBy|changedBy)="([^"]*)"/g,
+      )) {
+        const who = match[1];
+        if (who !== '' && !ALLOWED_USER.test(who))
+          offenders.push(`${name}: ${who}`);
+      }
+    }
+    expect(offenders).toEqual([]);
+  });
 });

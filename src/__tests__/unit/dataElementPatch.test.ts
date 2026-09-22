@@ -38,6 +38,34 @@ describe('patching a data element changes what was asked and nothing else', () =
       patchDataElementXml('<other/>', { description: 'x' }),
     ).toThrow();
   });
+
+  it("sets the data element's own description, not packageRef's, when the root has none yet", () => {
+    // Measured live against E19 (RFC), 2026-09-21, GitHub #211: a fresh
+    // data element's readMetadata answers with no adtcore:description on
+    // the root at all, while the sibling packageRef carries the package's
+    // own description. The unscoped patch used to match packageRef's
+    // (the first occurrence in the string) and silently corrupt it while
+    // leaving the data element's own description unset — which is what SAP
+    // then rejected the PUT for, correctly, as "The description is missing".
+    const before = corpusBody(
+      'read-metadata-data-element--01-ddic-dataelements',
+    );
+    // Sanity: this fixture is exactly the shape that broke the old patch —
+    // no description on the root, one on packageRef.
+    expect(/<blue:wbobj\b[^>]*adtcore:description=/.test(before)).toBe(false);
+    expect(before).toContain(
+      '<adtcore:packageRef adtcore:uri="/sap/bc/adt/packages/zmcp_req_test" adtcore:type="DEVC/K" adtcore:name="ZMCP_REQ_TEST" adtcore:description="Request test"/>',
+    );
+
+    const after = patchDataElementXml(before, {
+      description: 'issue 211 wire debug',
+    });
+
+    expect(after).toMatch(
+      /<blue:wbobj\b[^>]*adtcore:description="issue 211 wire debug"/,
+    );
+    expect(after).toContain('adtcore:description="Request test"');
+  });
 });
 
 it.todo(

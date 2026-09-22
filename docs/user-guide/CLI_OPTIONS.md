@@ -461,6 +461,20 @@ These are typically set in `.env` file:
 - `DEBUG_CONNECTORS` - Enable connector debug logging (true|false)
 - `DEBUG_CONNECTION_MANAGER` - Enable connection manager debug logging (true|false)
 - `HANDLER_LOG_SILENT` - Disable all handler logs (true|false)
+- `DEBUG_RFC_WIRE` - Put the RFC request headers and both bodies on the debug
+  channel (true|1). **RFC only**, off by default, and the only way to see a
+  payload that was mis-serialised before it reached `SADT_REST_RFC_ENDPOINT`.
+  Setting it is enough: where nothing else configured a logger, asking for the
+  wire brings one at `debug`, **writing to stderr** — stdout carries JSON-RPC
+  in stdio transport and must stay clean. A logger the caller already supplied
+  is used as it is and never redirected, so a caller who supplies one that
+  writes to stdout is responsible for that choice.
+  Credential header values are replaced with `[redacted]` by
+  `@mcp-abap-adt/connection`, so the output is safe to paste into an issue —
+  but bodies are clipped, not redacted, so treat a body carrying a secret
+  accordingly.
+- `DEBUG_RFC_BODY_CHARS` - Ceiling on a logged body, in characters (default
+  2000). `0` logs the size alone, `Infinity` the whole body.
 
 ### Example Environment Setup
 

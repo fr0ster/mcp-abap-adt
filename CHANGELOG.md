@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`DEBUG_RFC_WIRE` and `DEBUG_RFC_BODY_CHARS`** — the RFC wire can be asked
+  what it carried: the request headers and both bodies on the debug channel,
+  off unless asked for.
+
+  It exists because an investigation stopped for want of it. #222 reports
+  `CreatePackage` losing `superPackage` over RFC while the identical call
+  succeeds over HTTP, and the connector logged `RFC → POST
+  /sap/bc/adt/packages` and a status — nothing about the document, so whether
+  what this repository builds reaches `SADT_REST_RFC_ENDPOINT` intact could
+  not be answered at all.
+
+  Setting the variable is enough. `RfcTransport` writes only when it has both
+  the option and a logger, and the server's own path builds its connection
+  with none — so asking for the wire brings one at `debug` where nothing else
+  supplied it. It writes to **stderr**: in stdio transport stdout carries
+  JSON-RPC, and a debug switch that interleaves `RFC HEADERS: …` with the
+  protocol would take the session down, which is worse than printing nothing.
+  A logger the caller already has is used as it is and never redirected.
+
+  An environment variable rather than an argument: the question is asked by
+  whoever is sitting in front of a misbehaving on-premise system, not by code,
+  and an argument would have to be threaded through every call site for a
+  switch nobody sets in production. `DEBUG_CONNECTORS` already works this way.
+
+  `@mcp-abap-adt/connection` `^8.1.0` is what makes it possible, and is also
+  why the output is safe to paste into an issue: it replaces the values of
+  `Authorization`, `Cookie` and anything matching `token`, `secret`,
+  `password`, `credential` or an API key with `[redacted]`, keeping the names.
+  **Bodies are clipped, not redacted** — `DEBUG_RFC_BODY_CHARS` sets the
+  ceiling, default 2000, `0` for the size alone and `Infinity` for all of it —
+  so a body carrying a credential would still be logged. This is for a payload
+  under suspicion, not for routine logging.
+
+
 ## [11.0.0] - 2026-09-21
 
 ### Added

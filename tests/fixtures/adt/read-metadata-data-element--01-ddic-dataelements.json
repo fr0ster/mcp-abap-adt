@@ -1,0 +1,26 @@
+{
+  "case": "read-metadata-data-element",
+  "step": 1,
+  "stepTag": "ddic-dataelements",
+  "capturedAt": "2026-09-21T13:14:40.000Z",
+  "request": {
+    "method": "GET",
+    "url": "/sap/bc/adt/ddic/dataelements/zmcp_bld_dtel211d",
+    "params": null,
+    "effectiveUrl": "/sap/bc/adt/ddic/dataelements/zmcp_bld_dtel211d",
+    "headers": {
+      "Accept": "application/vnd.sap.adt.dataelements.v2+xml"
+    },
+    "headersNote": "Caller-supplied headers only. The connection adds Accept, sap-adt-connection-id, the stateful-session headers, CSRF and Authorization below this interception point.",
+    "body": null
+  },
+  "response": {
+    "status": 200,
+    "statusText": "OK",
+    "headers": {
+      "content-type": "application/xml; charset=utf-8"
+    },
+    "bodyFile": "read-metadata-data-element--01-ddic-dataelements.body.xml"
+  },
+  "note": "Captured live against E19 (RFC) 2026-09-21 while chasing GitHub #211: a fresh data element's own readMetadata answers with NO adtcore:description on the root <blue:wbobj> element at all — SAP does not echo it back there — while the sibling adtcore:packageRef DOES carry one (the package's own description). This is the document shape that made the unscoped patchXmlAttribute('adtcore:description', ...) corrupt packageRef's description instead of setting the data element's own, and is what create-dataelement--01-ddic-dataelements (a CREATE response, which does echo description on root) does not exercise."
+}

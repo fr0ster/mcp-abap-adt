@@ -1,4 +1,4 @@
-import { patchIf, patchXmlAttribute, patchXmlElement } from './xmlPatch';
+import { patchIf, patchXmlElement, patchXmlElementAttribute } from './xmlPatch';
 
 /**
  * ADT truncates a description at 60 characters, so this does too rather than
@@ -42,17 +42,31 @@ export interface DataElementChanges {
  * which is the whole reason this patches text rather than building a document
  * from the caller's fields.
  *
- * **The description half is verified against a real captured document; the
- * element-level fields below it are not, and I cannot prove them wrong.**
+ * **The description half is scoped to the root element, on purpose — an
+ * unscoped match corrupted the wrong attribute.** Measured live against E19
+ * (2026-09-21, GitHub #211): a freshly created data element's own
+ * `readMetadata` answers `<blue:wbobj …>` with **no `adtcore:description`
+ * attribute on the root at all** — SAP does not echo it back there — while
+ * the sibling `<adtcore:packageRef … adtcore:description="…">` element
+ * (the *package's* description) does carry one. The unscoped
+ * `patchXmlAttribute(xml, 'adtcore:description', …)` this used to call matches
+ * the first occurrence of that attribute name anywhere in the string, found
+ * `packageRef`'s, and silently overwrote the package's description with the
+ * data element's — while the data element's own description was never set at
+ * all. SAP's PUT then answered `SWB_TOOL 019`, "The description is missing
+ * for …", correctly: it was. `patchXmlElementAttribute`, scoped to
+ * `blue:wbobj`, both fixes the target and adds the attribute when (as here)
+ * the root does not already carry one — patching a description onto a fresh
+ * data element had never worked, which is why every prior report against this
+ * path was really the same bug from a different angle (#210, #211).
+ *
  * `create-dataelement--01-ddic-dataelements.body.xml` is the one genuine
  * data-element document in the corpus — a create response, not a metadata
  * read, but `verbatim` per `resultSets.ts` either way. Its root element is
  * `<blue:wbobj … xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel">` —
  * SAP bound this document's `dtel` namespace to the alias `blue`, not to
- * `dtel`. `adtcore:description` does not care (it is unprefixed, matched by
- * `patchXmlAttribute` regardless of which alias the root uses), so
- * `dataElementPatch.test.ts` can and does assert the description half
- * against these real bytes. But every element-level patch below
+ * `dtel`, which is why the element name passed to `patchXmlElementAttribute`
+ * is `blue:wbobj`, not `dtel:wbobj`. But every element-level patch below
  * (`dtel:typeKind`, `dtel:typeName`, `dtel:dataType`, the labels, the search
  * help fields) is hardcoded to the `dtel:` alias — and this particular
  * document has no populated children of any kind to check them against: a
@@ -73,8 +87,9 @@ export function patchDataElementXml(
   let xml = currentXml;
 
   if (changes.description) {
-    xml = patchXmlAttribute(
+    xml = patchXmlElementAttribute(
       xml,
+      'blue:wbobj',
       'adtcore:description',
       limitDescription(changes.description),
     );

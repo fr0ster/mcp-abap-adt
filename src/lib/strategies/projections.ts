@@ -89,21 +89,80 @@ export const terseWrite: Terse<unknown> = (_value, status) =>
  */
 export const terseActivation: Terse<any> = (value) => {
   const root = value?.['chkl:messages'];
-  if (!root) return undefined;
-  const messages = (root.msg ?? []).map((m: unknown) => ({
-    type: attrs(m).type,
-    text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
-  }));
-  const activated =
-    attrs(root['chkl:properties']).activationExecuted === 'true';
-  return {
-    activated,
-    generated: attrs(root['chkl:properties']).generationExecuted === 'true',
-    ...(!activated && messages.length === 0
-      ? { nothing_to_activate: true }
-      : {}),
-    ...(messages.length ? { messages } : {}),
-  };
+  if (root) {
+    const messages = (root.msg ?? []).map((m: unknown) => ({
+      type: attrs(m).type,
+      text: text((m as any)?.shortText?.txt) || attrs(m).objDescr,
+    }));
+    const activated =
+      attrs(root['chkl:properties']).activationExecuted === 'true';
+    return {
+      activated,
+      generated: attrs(root['chkl:properties']).generationExecuted === 'true',
+      ...(!activated && messages.length === 0
+        ? { nothing_to_activate: true }
+        : {}),
+      ...(messages.length ? { messages } : {}),
+    };
+  }
+
+  // `ioc:inactiveObjects` — what a function group's activate call answers
+  // instead of a `chkl:messages` checklist, measured live against
+  // `ActivateFunctionGroupLow` (2026-09-21). Not finding a checklist, this
+  // used to answer `undefined`, which `answer.ts` turns into
+  // `projection_failed`: a real, successful call reported as a broken one.
+  //
+  // **What it does not do is call it activated.** The document is a list of
+  // objects; it contains no verdict, and an activation that failed answers
+  // `200` just as this one did — that masking was the root of #154, and the
+  // rule this library works by is that a status code is not a result, the
+  // answer is. So this reading reports what the answer holds, the objects it
+  // named, and says plainly that the answer stated no outcome.
+  //
+  // Evidence that it is not a failure either, from the same run: a
+  // `GetInactiveObjects` read straight afterwards answered `count: 0`, so
+  // the objects named here were not left inactive. That is a measurement of
+  // the *system*, taken by a second request — which is exactly what
+  // `activation_not_stated` tells a caller to do, and exactly what a
+  // projection over one document cannot do for them.
+  //
+  // **And that read-back is a snapshot, not a proof.** Activation is
+  // asynchronous: the work can still be running when the next request goes
+  // out, so `count: 0` settled that run and `count` above zero would settle
+  // nothing — it would mean "not yet" as readily as "not done". A caller who
+  // needs certainty reads again; an LLM does that naturally, and a test that
+  // asserts once on the first read is asserting a race.
+  //
+  // `ioc:object` is itself an array per entry (`[""]` on the transport-only
+  // entry that opens the list, `[{ "ioc:ref": {...} }]` on an object one) —
+  // `first()` un-wraps it the same way every other reading here does.
+  const inactive = value?.['ioc:inactiveObjects'];
+  if (inactive) {
+    const entriesRaw = inactive['ioc:entry'];
+    const entries = Array.isArray(entriesRaw)
+      ? entriesRaw
+      : entriesRaw
+        ? [entriesRaw]
+        : [];
+    const processed = entries
+      .map((entry: any) =>
+        attrs((first(entry?.['ioc:object']) as any)?.['ioc:ref']),
+      )
+      .filter((a: Record<string, string>) => a['adtcore:name'])
+      .map((a: Record<string, string>) => ({
+        type: a['adtcore:type'] ?? '',
+        name: a['adtcore:name'] ?? '',
+      }));
+    return {
+      // Deliberately not `activated`. The caller reads the state back — with
+      // `GetInactiveObjects`, which answers the question this document does
+      // not.
+      activation_not_stated: true,
+      ...(processed.length ? { objects: processed } : {}),
+    };
+  }
+
+  return undefined;
 };
 
 /** `chkrun:checkRunReports` — did the check run, and what did it find. */

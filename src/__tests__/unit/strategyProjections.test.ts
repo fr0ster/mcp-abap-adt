@@ -63,6 +63,40 @@ describe('activation', () => {
       text: 'Type "STRONG_BUT_NOT_A_REAL_TYPE" is unknown.',
     });
   });
+
+  it("reads a function group's `ioc:inactiveObjects` answer, and states no verdict of its own", () => {
+    // Measured live (RFC, 2026-09-21): ActivateFunctionGroupLow's 2xx answer
+    // for a function group comes back as `ioc:inactiveObjects`, not
+    // `chkl:messages`. Before this case was known, `undefined` here turned a
+    // real SAP answer into `projection_failed`.
+    //
+    // **And it must not turn it into `activated: true` either.** The document
+    // lists objects and says nothing about an outcome; an activation that
+    // failed answers 200 just the same, which is what #154 was. What the
+    // reading offers instead is the objects the answer named, and the fact
+    // that the answer stated no outcome — which is a caller's cue to read the
+    // state back with `GetInactiveObjects`, as the run that measured this did:
+    // it answered `count: 0`. That read is a snapshot — activation is
+    // asynchronous, so a later run seeing a count above zero would mean "not
+    // yet" as readily as "not done", which is why the verdict belongs to
+    // whoever can read again and not to this function.
+    const r = readingOf('activation-still-inactive--01-activation');
+    expect(terseActivation(r.value as never, r.status)).toEqual({
+      activation_not_stated: true,
+      objects: [
+        { type: 'FUGR/F', name: 'ZMCP_BLD_FGR_L1' },
+        { type: 'FUGR/F', name: 'ZMCP_BLD_FGR_L1' },
+      ],
+    });
+  });
+
+  /** A checklist still answers a verdict, because a checklist states one. */
+  it('still reads a class checklist as activated', () => {
+    const r = readingOf('activation-success-verdict--01-activation');
+    expect(terseActivation(r.value as never, r.status)).toMatchObject({
+      activated: true,
+    });
+  });
 });
 
 describe('check runs', () => {

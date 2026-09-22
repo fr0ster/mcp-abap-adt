@@ -51,6 +51,28 @@ function extractDumpIdsFromFeedEntries(entries: any[]): string[] {
   return entries.map(extractDumpIdFromFeedEntry).filter(Boolean);
 }
 
+/**
+ * `{ id, title }` per entry, newest first (the feed's own order — confirmed
+ * live, 2026-09-22).
+ *
+ * The list carries `title` (the exception's short text, e.g. "Division by 0
+ * (type I or INT8)") for free — no per-entry fetch — but never `content` (it
+ * reads empty on this system, so it cannot narrow anything). `title` names
+ * the exception TYPE, not the dumping class, so it is a cheap pre-filter for
+ * "is this even the right kind of dump", not proof of which run made it —
+ * that still needs one `RuntimeGetDumpById` per surviving candidate.
+ */
+function extractDumpCandidatesFromFeedEntries(
+  entries: any[],
+): Array<{ id: string; title: string }> {
+  return entries
+    .map((entry) => ({
+      id: extractDumpIdFromFeedEntry(entry),
+      title: String(entry?.title ?? ''),
+    }))
+    .filter((c) => c.id);
+}
+
 function extractHandlerErrorText(result: any): string {
   try {
     const textContent = result?.content?.find((c: any) => c.type === 'text');
@@ -812,6 +834,20 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
           const dumpFeedTop = toPositiveInt(context.params?.dump_feed_top, 50);
           const dumpsUser = context.params?.dumps_user || undefined;
+          // How many title-matched candidates to open and content-check per
+          // poll before giving up on this poll and waiting for the next one.
+          const maxCandidatesPerPoll = toPositiveInt(
+            context.params?.dump_candidates_per_poll,
+            5,
+          );
+          // The exception this run's own class dumps with — a cheap
+          // pre-filter on the feed's free `title` field, so a poll with no
+          // matching entry costs zero detail fetches. `buildDumpClassSource`
+          // divides an I by 0, which ADT titles this exact way; a caller
+          // dumping some other way sets `params.dump_title_filter`.
+          const dumpTitleFilter = (
+            context.params?.dump_title_filter ?? 'division by 0'
+          ).toLowerCase();
 
           for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
             const listResult = await invoke(
@@ -835,8 +871,10 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             );
             expect(listResult.isError).toBe(false);
             const listData = parseTextPayload(listResult);
-            let dumpIds = extractDumpIdsFromFeedEntries(listData.entries ?? []);
-            if (dumpIds.length === 0 && dumpsUser) {
+            let candidates = extractDumpCandidatesFromFeedEntries(
+              listData.entries ?? [],
+            );
+            if (candidates.length === 0 && dumpsUser) {
               // Fallback to unfiltered feed if user filter returns empty on this system.
               const unfilteredResult = await invoke(
                 'RuntimeListFeeds',
@@ -857,12 +895,50 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
               );
               expect(unfilteredResult.isError).toBe(false);
               const unfilteredData = parseTextPayload(unfilteredResult);
-              dumpIds = extractDumpIdsFromFeedEntries(
+              candidates = extractDumpCandidatesFromFeedEntries(
                 unfilteredData.entries ?? [],
               );
             }
-            if (dumpIds.length > 0) {
-              dumpIdFromGeneratedFailure = dumpIds[0];
+
+            // The newest feed entry is not necessarily THIS run's dump — on a
+            // system anyone else (or an earlier action in this same session)
+            // is using, both true (a genuinely newer dump can land ahead of
+            // it) and repeated runs of THIS SAME test each leave their own
+            // "Division by 0" entry behind, so even the newest matching
+            // title can be a previous run's, not this one's. Confirmed live
+            // (2026-09-22, E19): filtering by the correct current user still
+            // was not enough on its own. `title` narrows to the right kind
+            // of dump for free; content, from the one candidate actually
+            // worth opening, decides which run made it.
+            const titleMatches = candidates
+              .filter((c) => c.title.toLowerCase().includes(dumpTitleFilter))
+              .slice(0, maxCandidatesPerPoll);
+            for (const candidate of titleMatches) {
+              const candidateResult = await invoke(
+                'RuntimeGetDumpById',
+                { dump_id: candidate.id, view: 'default' },
+                async () => {
+                  const handlerContext = createHandlerContext({
+                    connection: context.connection,
+                    logger,
+                  });
+                  return handleRuntimeGetDumpById(handlerContext, {
+                    dump_id: candidate.id,
+                    view: 'default',
+                  });
+                },
+              );
+              if (candidateResult.isError) continue;
+              const candidateData = parseTextPayload(candidateResult);
+              const candidateText = JSON.stringify(
+                candidateData.payload ?? candidateData,
+              ).toUpperCase();
+              if (candidateText.includes(dumpClassName.toUpperCase())) {
+                dumpIdFromGeneratedFailure = candidate.id;
+                break;
+              }
+            }
+            if (dumpIdFromGeneratedFailure) {
               break;
             }
             if (attempt < maxAttempts) {

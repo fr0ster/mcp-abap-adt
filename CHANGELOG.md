@@ -9,6 +9,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Five tools for a transport request's object list**, which is what
+  fr0ster/mcp-abap-adt#221 asked for: `ReadTransportObjects`,
+  `RemoveTransportObject`, `AddTransportObject`, `CreateTransportTask` and
+  `ReadTransportActionLog`.
+
+  The problem they answer: **deleting an ABAP object does not free its name.**
+  The CTS object-directory entry stays on the request that carried it — on
+  purpose, so that transporting the request deletes the object in the target
+  system too — and until it is detached, creating the same name again is
+  refused with `CTS_WBO_API 019`, *even passing that same request as the
+  transport*. The ways out were releasing the whole request, shipping
+  everything else in it, or SE09 by hand. It was found the hard way: two
+  shared function groups in an on-premise integration polygon became
+  permanently unusable.
+
+  Two things the tools cannot soften, both measured against an on-premise
+  system on 2026-09-21:
+
+  - **`position` is required for a removal, and is what makes it do
+    anything.** Twenty-two objects asked for by `pgmid`/`type`/`name` alone
+    each answered `200` with the usual echo document, and a re-read found all
+    twenty-two still on the task. `ReadTransportObjects` is where the number
+    comes from — there is nowhere else.
+  - **`target_user` is required for a task.** Without `tm:targetuser` the
+    server resolves an empty owner and refuses with `400 SCTS_ADT_MSG 009`,
+    *"User  does not exist in the system (or locked)"* — two spaces where the
+    name should be.
+
+  And one thing the answers say rather than hide: **a `200` from a user action
+  is not evidence.** The endpoint echoes whatever it was asked about, for an
+  entry that exists and for one that never did, so `RemoveTransportObject` and
+  `AddTransportObject` answer `accepted` with the reading that would settle it
+  named — `ReadTransportActionLog`, or a re-read of the objects — rather than
+  reporting a success nobody measured.
+
+  Objects live on **tasks**: a request displays its tasks' entries and refuses
+  to detach one, saying the entry "does not exist in request/task". Every tool
+  says so where a caller will read it.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` `^20.0.0`, `adt-strategies` `^0.3.0`,
+  `interfaces` `^46.0.1`.** The major is what carries the five members above,
+  with the two required arguments their first run against a server measured.
+
+  `adt-strategies` 0.3.0 brings `analyseActivation` reading
+  `activationExecuted` as three states, so an activation with nothing to do is
+  no longer answered as a refusal.
+
+  Five slots arrive with the client — `removedObject`, `addedObject`,
+  `createdTask`, `actionLog`, `objects` — and each gets a reading in
+  `READING_BY_SLOT`, which is what `resultSets.test.ts` insists on: a slot
+  adt-clients adds arrives at the table, not as an unshaped answer at a call
+  site.
+
+
+### Added
+
 - **`DEBUG_RFC_WIRE` and `DEBUG_RFC_BODY_CHARS`** — the RFC wire can be asked
   what it carried: the request headers and both bodies on the debug channel,
   off unless asked for.

@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 64
+- Total tools: 66
 
 ## Navigation
 
@@ -96,6 +96,8 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
+    - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
+    - [ReadTransportObjects](#readtransportobjects-read-only-transport)
 
 ---
 
@@ -1033,4 +1035,26 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-20*
+<a id="readtransportactionlog-read-only-transport"></a>
+#### ReadTransportActionLog (Read-Only / Transport)
+**Description:** [read-only] Read the action log of a transport request: one entry per lifecycle event — created, object added, object deleted, owner changed. This is what confirms a RemoveTransportObject landed, since that call answers by echoing what it was asked.
+
+**Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
+
+**Parameters:**
+- `transport_number` (string, required) - Transport request or task number, e.g. E19K905942.
+
+---
+
+<a id="readtransportobjects-read-only-transport"></a>
+#### ReadTransportObjects (Read-Only / Transport)
+**Description:** [read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. Objects live on TASKS: a request shows its tasks' entries, but a removal addressed at the request is refused. Read a task number to get entries that can be acted on.
+
+**Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
+
+**Parameters:**
+- `transport_number` (string, required) - Transport request or task number, e.g. E19K905942. A task is itself a request resource and reads the same way.
+
+---
+
+*Last updated: 2026-09-22*

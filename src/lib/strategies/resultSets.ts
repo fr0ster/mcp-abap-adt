@@ -103,6 +103,32 @@ export const READING_BY_SLOT = {
   columns: structured,
   contents: structured,
   discovery: structured,
+
+  // Arrived with adt-clients 20.0.0, on the four user actions a request's
+  // object list answers to and the reading that lists it.
+  //
+  // The three echo documents get `structured` because that is what they are:
+  // the server repeats the object it was asked about and says nothing else.
+  // **A `200` from `removedObject` is not evidence a removal happened** —
+  // measured on an on-premise system, an entry asked for without a position
+  // echoed back exactly the same way while staying on the task. What settles
+  // it is `actionLog` or a re-read through `objects`, which is why all four
+  // are here rather than one of them standing in for the rest.
+  removedObject: structured,
+  addedObject: structured,
+  createdTask: structured,
+  actionLog: structured,
+  // `objects` is the one a call site keeps rather than stamps, like
+  // `searchConfigurations` above: the package parses the entries and, with
+  // them, the `tm:position` that `removeObject` requires. Stamped with
+  // `structured` it would hand back a parsed document and leave a caller
+  // digging a position out of it — which is the work `readObjects` exists to
+  // end. `ReadTransportObjects` therefore calls
+  // `resultsFor(transportDocuments, ['objects'])`. The table still declares
+  // the slot, because the ratchet in `resultSets.test.ts` asks for a reading
+  // per slot and a call site that forgets the keep-list should get something
+  // rather than a throw.
+  objects: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**

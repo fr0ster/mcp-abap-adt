@@ -4,9 +4,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 356
-- Read-only tools: 64
-- High-level tools: 168
+- Total tools: 361
+- Read-only tools: 66
+- High-level tools: 171
 - Low-level tools: 124
 
 - Compact tools: 22 (included in High-level group)
@@ -110,6 +110,8 @@ Generated from code in `src/handlers/**` (not from docs).
   - [Transport](#read-only-transport)
     - [GetTransport](#gettransport-read-only-transport)
     - [ListTransports](#listtransports-read-only-transport)
+    - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
+    - [ReadTransportObjects](#readtransportobjects-read-only-transport)
 - [High-Level Group](#high-level-group)
   - [Atc](#high-level-atc)
     - [GetATCFindings](#getatcfindings-high-level-atc)
@@ -290,7 +292,10 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetTable](#gettable-high-level-table)
     - [UpdateTable](#updatetable-high-level-table)
   - [Transport](#high-level-transport)
+    - [AddTransportObject](#addtransportobject-high-level-transport)
     - [CreateTransport](#createtransport-high-level-transport)
+    - [CreateTransportTask](#createtransporttask-high-level-transport)
+    - [RemoveTransportObject](#removetransportobject-high-level-transport)
   - [Unit Test](#high-level-unit-test)
     - [CreateCdsUnitTest](#createcdsunittest-high-level-unit-test)
     - [CreateUnitTest](#createunittest-high-level-unit-test)
@@ -1382,6 +1387,28 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `modifiable_only` (boolean, optional) - Only return modifiable (not yet released) transports; applied client-side. Default: true.
 - `user` (string, optional) - SAP user name to filter to; applied client-side. If not provided, defaults to the current session user, so an unfiltered call already answers only that user's transports.
+
+---
+
+<a id="readtransportactionlog-read-only-transport"></a>
+#### ReadTransportActionLog (Read-Only / Transport)
+**Description:** [read-only] Read the action log of a transport request: one entry per lifecycle event — created, object added, object deleted, owner changed. This is what confirms a RemoveTransportObject landed, since that call answers by echoing what it was asked.
+
+**Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
+
+**Parameters:**
+- `transport_number` (string, required) - Transport request or task number, e.g. E19K905942.
+
+---
+
+<a id="readtransportobjects-read-only-transport"></a>
+#### ReadTransportObjects (Read-Only / Transport)
+**Description:** [read-only] List the objects a transport request or task holds, each with the `position` that RemoveTransportObject needs. Objects live on TASKS: a request shows its tasks' entries, but a removal addressed at the request is refused. Read a task number to get entries that can be acted on.
+
+**Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
+
+**Parameters:**
+- `transport_number` (string, required) - Transport request or task number, e.g. E19K905942. A task is itself a request resource and reads the same way.
 
 ---
 
@@ -3652,6 +3679,20 @@ Generated from code in `src/handlers/**` (not from docs).
 <a id="high-level-transport"></a>
 ### High-Level / Transport
 
+<a id="addtransportobject-high-level-transport"></a>
+#### AddTransportObject (High-Level / Transport)
+**Description:** Attach an existing object to a transport task, so it travels with that request. The way back from RemoveTransportObject, which leaves the object in no request at all. Refused when another task holds the object, with SCTS_ADT_MSG 009 naming the holder — that refusal is the server's answer, read it rather than pre-checking. A 200 says the request was understood; confirm with ReadTransportObjects.
+
+**Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
+
+**Parameters:**
+- `object_name` (string, required) - Object name, e.g. ZCL_MY_CLASS.
+- `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
+- `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
+- `transport_number` (string, required) - The TASK number to attach the object to, e.g. E19K905943.
+
+---
+
 <a id="createtransport-high-level-transport"></a>
 #### CreateTransport (High-Level / Transport)
 **Description:** Create a new ABAP transport request in SAP system for development objects.
@@ -3663,6 +3704,33 @@ Generated from code in `src/handlers/**` (not from docs).
 - `owner` (string, optional) - Transport owner (optional, defaults to current user)
 - `target_system` (string, optional) - Target system for transport (optional, e.g., 'PRD', 'QAS'). If not provided or empty, uses 'LOCAL'
 - `transport_type` (string, optional (default: workbench)) - Transport type: 'workbench' (cross-client) or 'customizing' (client-specific)
+
+---
+
+<a id="createtransporttask-high-level-transport"></a>
+#### CreateTransportTask (High-Level / Transport)
+**Description:** Create a task under an existing transport request, owned by a named user. The task is itself a request resource — it reads, writes and releases like one — and is what RemoveTransportObject addresses, since a request's objects live on its tasks. `target_user` is required: without it the server resolves an empty owner and refuses with SCTS_ADT_MSG 009.
+
+**Source:** `src/handlers/transport/high/handleCreateTransportTask.ts`
+
+**Parameters:**
+- `target_user` (string, required) - SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
+- `transport_number` (string, required) - The request to create the task under, e.g. E19K905941.
+
+---
+
+<a id="removetransportobject-high-level-transport"></a>
+#### RemoveTransportObject (High-Level / Transport)
+**Description:** Detach one object's entry from a transport TASK, so its name can be used again after the object was deleted. Address the task that holds the entry, not the request above it — a request displays its tasks' entries and refuses to detach one. `position` comes from ReadTransportObjects and is required: without it the server answers 200 and removes nothing. A 200 here is not proof either; confirm with ReadTransportActionLog or by re-reading the objects.
+
+**Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
+
+**Parameters:**
+- `object_name` (string, required) - Object name, e.g. ZCL_MY_CLASS.
+- `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
+- `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
+- `position` (string, required) - The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200.
+- `transport_number` (string, required) - The TASK number holding the entry, e.g. E19K905943. Read it from ReadTransportObjects.
 
 ---
 
@@ -5675,4 +5743,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-20*
+*Last updated: 2026-09-22*

@@ -267,6 +267,58 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
     if (taskNumber) {
       try {
+        // **Detaching comes before deleting, and this suite of all suites
+        // should know it.** Deleting the program does not empty the task: the
+        // object-directory entry stays, deliberately, so that transporting
+        // the task deletes the object in the target system too — which is
+        // the whole premise of #221 and of the tools under test here. A task
+        // that still holds an entry is not deletable, so the old cleanup
+        // logged "may not be empty" and left it, and every run added one
+        // more.
+        //
+        // So the cleanup uses the tool it exists to test: read what the task
+        // holds, detach each entry, read again to see it gone, and only then
+        // ask for the task. `accepted` from a removal is not evidence — the
+        // re-read is, exactly as the scenario above asserts it.
+        const readCtx = createHandlerContext({ connection, logger });
+        const held = parseHandlerResponse(
+          await handleReadTransportObjects(readCtx, {
+            transport_number: taskNumber,
+          }),
+        );
+        for (const entry of held?.objects ?? []) {
+          if (!entry?.position) {
+            logger?.warn(
+              `Cleanup: ${entry?.name} is listed without a position — cannot detach it`,
+            );
+            continue;
+          }
+          await handleRemoveTransportObject(
+            createHandlerContext({ connection, logger }),
+            {
+              transport_number: taskNumber,
+              object_name: entry.name,
+              object_type: entry.type,
+              position: entry.position,
+              ...(entry.pgmid ? { pgmid: entry.pgmid } : {}),
+            },
+          );
+          logger?.info(`Cleanup: detached ${entry.type} ${entry.name}`);
+        }
+
+        const left = parseHandlerResponse(
+          await handleReadTransportObjects(
+            createHandlerContext({ connection, logger }),
+            { transport_number: taskNumber },
+          ),
+        );
+        if ((left?.count ?? 0) > 0) {
+          logger?.warn(
+            `Cleanup: task ${taskNumber} still holds ${left.count} entr(y|ies) — not deleting it, left for manual review`,
+          );
+          return;
+        }
+
         const deleted = await createAdtClient(connection, logger)
           .getRequest()
           .delete({ transportNumber: taskNumber } as any);
@@ -274,7 +326,7 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           logger?.success(`Cleanup: task ${taskNumber} deleted`);
         } else {
           logger?.warn(
-            `Cleanup: task ${taskNumber} was not deleted — it may not be empty; leaving it for manual review`,
+            `Cleanup: task ${taskNumber} is empty but was not deleted — ${deleted.getError().message}`,
           );
         }
       } catch (e: any) {

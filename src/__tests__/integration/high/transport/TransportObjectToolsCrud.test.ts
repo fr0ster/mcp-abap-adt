@@ -10,10 +10,11 @@
  * again), on a fresh task under the pinned request so nothing here disturbs
  * shared test state.
  *
- * Scenario, all on one freshly created task:
+ * Scenario:
  *   1. CreateTransportTask under the pinned request, owned by the test user
- *   2. Create a program directly on that task, then UpdateProgram to give it
- *      source (see the two notes below for why both steps matter here)
+ *   2. Create a program on the REQUEST (not the task — see the note below),
+ *      then UpdateProgram to give it source
+ *   2b. AddTransportObject — move the entry onto the task just created
  *   3. ReadTransportObjects — find its entry, capture `position`
  *   4. RemoveTransportObject — detach it
  *   5. ReadTransportObjects again — confirm the entry is actually gone (a
@@ -24,35 +25,55 @@
  *   7. ReadTransportObjects again — confirm it is back
  *   8. ReadTransportActionLog — confirm the task's log recorded activity
  *
- * **Why a PROGRAM, not a CLASS.** The first versions of this test used a
+ * **`transport_number`/`transport_request` value by call — request or task:**
+ *
+ * The rule is: name the REQUEST everywhere, except the one call whose job
+ * is to move an entry onto a specific TASK — `AddTransportObject` is the
+ * only place a task number is the point of the call, not an
+ * afterthought. Everything else addresses wherever the object actually is
+ * at that moment, which starts as the request and becomes the task the
+ * instant `AddTransportObject` succeeds.
+ *
+ *   - CreateTransportTask   `transport_number`  → REQUEST (`parentTransport`) — creates the task under it
+ *   - CreateProgram         `transport_request` → REQUEST (`parentTransport`) — an object is born on the request
+ *   - UpdateProgram         `transport_request` → REQUEST (`parentTransport`) — still there, not yet moved
+ *   - AddTransportObject (step 2b) `transport_number` → TASK (`taskNumber`) — THE move: request → task
+ *   - ReadTransportObjects (steps 3, 5, 7) `transport_number` → TASK (`taskNumber`) — the entry lives there now
+ *   - RemoveTransportObject (step 4) `transport_number` → TASK (`taskNumber`) — same reason
+ *   - AddTransportObject (step 6)   `transport_number` → TASK (`taskNumber`) — re-attaching to the same task
+ *   - ReadTransportActionLog (step 8) `transport_number` → TASK (`taskNumber`)
+ *   - DeleteProgram (cleanup)       `transport_request` → TASK (`taskNumber`) — where step 2b left it
+ *
+ * **Why a PROGRAM, not a CLASS.** An earlier version of this test used a
  * class and hit a real, reproducible SAP quirk: a class is not one CTS
  * entry, it is several (the class itself, R3TR CLAS, plus its definition
- * include, LIMU CLSD, and others) and they do not always resolve to the
- * same task. Creating a class with a TASK as `transport_request` answered a
- * genuine HTTP 500 — "Public section of class <name> is already locked in
- * request <parent>" — every time, even though the class itself (R3TR CLAS)
- * really had been created on the intended task (confirmed by reading it
- * back). The very next call, UpdateClass, then hit a real 409
- * `ExceptionResourceLockConflict` because the definition include (LIMU
- * CLSD) had resolved to the PARENT request instead of the task. A program
- * is a single R3TR PROG entry with no split sub-objects, so it does not
- * have this failure mode.
+ * include, LIMU CLSD, and others), which made an already-confusing debugging
+ * session harder to reason about. A program is a single R3TR PROG entry
+ * with no split sub-objects.
  *
- * **Why step 2 creates directly on the task, not on the parent request.**
- * Measured live (2026-09-22): passing the parent REQUEST as
- * `transport_request` does not record the object against the request at all
- * — a plain workbench create/update is only ever valid inside a task
- * (`TK127`: "Repository and customizing objects can only be maintained
- * within the framework of a task"), so SAP silently resolves the request
- * number to whichever task it already has open for the calling user. On the
- * pinned request that turned out to be a long-lived pre-existing task
- * carrying dozens of old shared test objects — never the task this test just
- * created. That made a later AddTransportObject onto the fresh task fail
- * with a "held elsewhere" refusal (SCTS_ADT_MSG 009, rendered here as
- * TK127's oddly-worded "is not a task" text) before it could ever attach
- * anything, since the entry had never belonged to that task to begin with.
- * Creating straight on `taskNumber` removes the ambiguity: step 3's read is
- * what confirms the entry actually landed where this test controls it.
+ * **Why step 2 creates on the REQUEST, and only step 2b names the task.**
+ * A create/update's `transport_request` is always the REQUEST — the task is
+ * what `AddTransportObject`/`RemoveTransportObject` address, to move an
+ * object's entry onto (or off of) one, and there is nothing yet to move at
+ * create time. An earlier version of this test passed the freshly created
+ * TASK number straight to `CreateProgram`/`UpdateProgram` instead, on the
+ * reasoning that the entry should land exactly where the test controls it.
+ * `CreateProgram` answered `SUCCESS` for that every time — the object really
+ * was created — but the very next `UpdateProgram`, addressing the same task
+ * corrNr, reproducibly refused with `CTS_WBO_API 020`: *"Object R3TR PROG
+ * <name> is already locked in request <parent>"*. Passing the request at
+ * create/update time and moving the entry with `AddTransportObject`
+ * afterward, as this version does, is the convention `AddTransportObject`'s
+ * own doc already describes ("attach an EXISTING object to a transport
+ * task") — an object is created on a request, then moved onto a task, never
+ * created onto a task directly.
+ *
+ * **Status: step 2b itself is not yet passing.** With create/update correctly
+ * on the request, `AddTransportObject(taskNumber, ...)` right afterward still
+ * answers `400 SCTS_ADT_MSG 009` / `TK127`, the same garbled "is not a task"
+ * text, even though `CreateTransportTask` minted `taskNumber` moments earlier
+ * and nothing else has touched it since. Under active investigation; not yet
+ * a settled finding the way the request-vs-task rule above is.
  *
  * **Why step 2 is immediately followed by an UpdateProgram, matching
  * TransportedObjectCrud.test.ts's own proven create-then-update pattern.**
@@ -378,41 +399,66 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
         await delay(getOperationDelay('create'));
 
-        // Step 2: create a program directly on the TASK (see the file header
-        // for why a program rather than a class, and why the task rather than
-        // the parent request).
+        // Step 2: create a program on the REQUEST, not the task.
+        //
+        // A plain create/edit always takes the REQUEST as its corrNr — the
+        // task is what AddTransportObject/RemoveTransportObject address
+        // afterward, to move an object's entry onto (or off of) one. The
+        // object does not exist yet at create time, so there is nothing yet
+        // to add to a task; the request is the only thing to name.
         logger?.info(
-          `Step 2: creating program ${programName} on task ${taskNumber}`,
+          `Step 2: creating program ${programName} on request ${parentTransport}`,
         );
         const createCtx = createHandlerContext({ connection, logger });
         const createResponse = await handleCreateProgram(createCtx, {
           program_name: programName,
           package_name: packageName,
-          transport_request: taskNumber,
+          transport_request: parentTransport,
           description: 'MCP test program for transport-object-tools (#221)',
         });
 
         expectOk(createResponse, 'Step 2 CreateProgram', logger);
         expect(createResponse.content[0]?.text).toBe('SUCCESS');
         logger?.success(
-          `Step 2: program ${programName} created on ${taskNumber}`,
+          `Step 2: program ${programName} created on ${parentTransport}`,
         );
 
         await delay(getOperationDelay('create'));
 
-        // Step 2a: set source via UpdateProgram — its lock/write/unlock cycle
-        // is what closes out the ENQUEUE lock CreateProgram leaves behind (see
-        // the file header). Skipping this orphaned SM12 entries more than once
-        // while this test was being written.
+        // Step 2a: set source via UpdateProgram, same request. Its
+        // lock/write/unlock cycle is what closes out the ENQUEUE lock
+        // CreateProgram leaves behind (see the file header). Skipping this
+        // orphaned SM12 entries more than once while this test was being
+        // written.
         logger?.info(`Step 2a: UpdateProgram — closing out the create lock`);
         const updateCtx = createHandlerContext({ connection, logger });
         const updateResponse = await handleUpdateProgram(updateCtx, {
           program_name: programName,
-          transport_request: taskNumber,
+          transport_request: parentTransport,
           source_code: `REPORT ${programName.toLowerCase()}.`,
         });
         expectOk(updateResponse, 'Step 2a UpdateProgram', logger);
         logger?.success('Step 2a: UpdateProgram succeeded, lock closed out');
+
+        await delay(getOperationDelay('update'));
+
+        // Step 2b: AddTransportObject — move the entry onto the task. This
+        // is the tool's own documented purpose: "attach an EXISTING object
+        // to a transport task" — the object exists now (steps 2-2a), and it
+        // currently sits wherever the request put it, not yet on our task.
+        logger?.info(
+          `Step 2b: AddTransportObject — moving entry onto ${taskNumber}`,
+        );
+        const firstAddCtx = createHandlerContext({ connection, logger });
+        const firstAddResponse = await handleAddTransportObject(firstAddCtx, {
+          transport_number: taskNumber,
+          object_name: programName,
+          object_type: 'PROG',
+        });
+        expectOk(firstAddResponse, 'Step 2b AddTransportObject', logger);
+        const firstAddData = parseHandlerResponse(firstAddResponse);
+        expect(firstAddData.accepted).toBe(true);
+        logger?.success('Step 2b: AddTransportObject accepted');
 
         await delay(getOperationDelay('update'));
 

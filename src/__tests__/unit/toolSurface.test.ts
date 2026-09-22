@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { spawnOptionsForNpx } from '../helpers/platform';
 
 /**
  * The tool surface is a contract with callers who never read this repository.
@@ -50,6 +51,7 @@ describe('the MCP tool surface', () => {
 
   const current: Row[] = JSON.parse(
     execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], {
+      ...spawnOptionsForNpx,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
     }),

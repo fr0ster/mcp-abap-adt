@@ -501,6 +501,12 @@ export const compactProfileRunSchema = {
       type: 'string',
       description: 'Program name for profiling.',
     },
+    profiling: {
+      type: 'boolean',
+      default: true,
+      description:
+        'Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.',
+    },
     description: { type: 'string', description: 'Profiler run description.' },
     all_procedural_units: {
       type: 'boolean',
@@ -558,6 +564,18 @@ export const compactProfileViewSchema = {
       enum: ['hitlist', 'statements', 'db_accesses'],
       description: 'Profiler trace view kind.',
     },
+    mode: {
+      type: 'string',
+      enum: ['raw', 'analyze'],
+      default: 'raw',
+      description:
+        '"raw" returns the parsed trace payload as-is (default). "analyze" returns a compact summary instead — totals plus the top-ranked entries — via the same trace view.',
+    },
+    top: {
+      type: 'number',
+      description:
+        'Number of top-ranked rows to include when mode is "analyze". Default 10. Ignored for mode "raw".',
+    },
     with_system_events: {
       type: 'boolean',
       description: 'Include system events in analysis.',
@@ -575,8 +593,15 @@ export const compactProfileViewSchema = {
 export const compactDumpListSchema = {
   type: 'object',
   properties: {
-    user: { type: 'string', description: 'Filter dumps by user.' },
-    top: { type: 'number', description: 'Limit number of returned dumps.' },
+    feed_type: {
+      type: 'string',
+      enum: ['dumps', 'system_messages', 'gateway_errors'],
+      default: 'dumps',
+      description:
+        'Which runtime feed to list. Default "dumps" (ABAP short dumps). "system_messages" and "gateway_errors" read the other two ADT runtime feeds through the same call.',
+    },
+    user: { type: 'string', description: 'Filter entries by user.' },
+    top: { type: 'number', description: 'Limit number of returned entries.' },
     from: {
       type: 'string',
       description: 'Start of time range (YYYYMMDDHHMMSS).',
@@ -859,7 +884,10 @@ export const compactCheckRunSchema = {
 export const compactActivateSchema = {
   type: 'object',
   properties: {
-    object_type: commonObjectTypeSchema,
+    object_type: {
+      ...commonObjectTypeSchema,
+      description: `${commonObjectTypeSchema.description} For single-object activation, this alone is enough — no ADT type code needed.`,
+    },
     object_name: {
       type: 'string',
       description: 'Object name for single-object activation form.',
@@ -867,7 +895,7 @@ export const compactActivateSchema = {
     object_adt_type: {
       type: 'string',
       description:
-        'ADT object type code (e.g. CLAS/OC, PROG/P). Required for single-object activation form.',
+        'ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.',
     },
     objects: {
       type: 'array',

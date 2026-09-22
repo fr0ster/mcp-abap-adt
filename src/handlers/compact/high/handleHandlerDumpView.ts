@@ -4,7 +4,7 @@ import { compactDumpViewSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpView',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
     'Runtime dump view. object_type: not used. Required: dump_id*. Optional: view(default|summary|formatted). Response: JSON.',
   inputSchema: compactDumpViewSchema,

@@ -1947,6 +1947,14 @@ runtime_readonly_handlers:
         dump_feed_retry_delay_ms: 1500
         # How many recent dumps to request per poll when looking for generated dump
         dump_feed_top: 50
+        # Cheap pre-filter on the feed's own `title` (the exception's short
+        # text), so a poll opens only the entries worth opening. The default
+        # matches what this test's class throws on an English session; the
+        # title is language-dependent, and a filter matching nothing falls
+        # back to the newest entries rather than giving up.
+        dump_title_filter: "division by 0"
+        # How many candidates to open and content-check per poll
+        dump_candidates_per_poll: 5
         # Dump read view for RuntimeGetDumpById: default|summary|formatted
         dump_view: "default"
         # Optional fallback dump ID when feed parsing does not provide one

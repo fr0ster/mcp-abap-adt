@@ -18,6 +18,7 @@ import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/syste
 import { createAdtClient } from '../../../../lib/clients';
 import { withLock } from '../../../../lib/strategies/withLock';
 import { getTimeout } from '../../helpers/configHelpers';
+import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -910,10 +911,18 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             // was not enough on its own. `title` narrows to the right kind
             // of dump for free; content, from the one candidate actually
             // worth opening, decides which run made it.
-            const titleMatches = candidates
-              .filter((c) => c.title.toLowerCase().includes(dumpTitleFilter))
-              .slice(0, maxCandidatesPerPoll);
-            for (const candidate of titleMatches) {
+            // See `candidatesWorthOpening`: the title is a saving, not a gate.
+            const { chosen: worthOpening, narrowed } = candidatesWorthOpening(
+              candidates,
+              dumpTitleFilter,
+              maxCandidatesPerPoll,
+            );
+            if (!narrowed && candidates.length > 0) {
+              logger?.info?.(
+                `no feed entry matched "${dumpTitleFilter}" — opening the ${worthOpening.length} newest instead, since the title is language-dependent`,
+              );
+            }
+            for (const candidate of worthOpening) {
               const candidateResult = await invoke(
                 'RuntimeGetDumpById',
                 { dump_id: candidate.id, view: 'default' },

@@ -99,16 +99,24 @@ export async function handleRemoveTransportObject(
 
   const detail = detailOf(args);
 
+  // **No `success` here, and that is the point of the tool.**
+  //
+  // Every other write in this repository says `success: true` because its
+  // answer means the write happened. This one's does not: the endpoint echoes
+  // the object it was asked about whether or not an entry went away — for an
+  // entry that exists and for one that never did — so `success` beside
+  // `accepted` would contradict itself, and a reader who stops at the first
+  // field would skip the re-read that is the only thing establishing the
+  // outcome. The field a caller finds instead is `accepted`, and next to it
+  // the reading that settles the question.
   const terseRemoval: Terse<unknown> = () => ({
-    success: true,
+    accepted: true,
+    removed: 'unknown',
     transport_number: args.transport_number,
     object: `${args.pgmid ?? 'R3TR'} ${args.object_type} ${args.object_name}`,
     position: args.position,
-    // Not "removed". The endpoint echoes the object it was asked about
-    // whether or not an entry went away, so this says what was established.
-    accepted: true,
     confirm_with:
-      'ReadTransportActionLog, or ReadTransportObjects on the same task — this answer only says the request was understood.',
+      'ReadTransportActionLog, or ReadTransportObjects on the same task — this answer only says the request was understood, never that an entry went away.',
   });
 
   return answer(

@@ -83,13 +83,16 @@ export async function handleAddTransportObject(
 
   const detail = detailOf(args);
 
+  // No `success`, for the reason `RemoveTransportObject` gives at length: the
+  // answer is an echo of the request, not a report of what happened, and a
+  // reader who stops at `success` would skip the re-read that establishes it.
   const terseAddition: Terse<unknown> = () => ({
-    success: true,
+    accepted: true,
+    added: 'unknown',
     transport_number: args.transport_number,
     object: `${args.pgmid ?? 'R3TR'} ${args.object_type} ${args.object_name}`,
-    accepted: true,
     confirm_with:
-      'ReadTransportObjects on the same task — this answer only says the request was understood.',
+      'ReadTransportObjects on the same task — this answer only says the request was understood, never that the object was attached.',
   });
 
   return answer(

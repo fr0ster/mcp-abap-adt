@@ -40,9 +40,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   And one thing the answers say rather than hide: **a `200` from a user action
   is not evidence.** The endpoint echoes whatever it was asked about, for an
   entry that exists and for one that never did, so `RemoveTransportObject` and
-  `AddTransportObject` answer `accepted` with the reading that would settle it
-  named — `ReadTransportActionLog`, or a re-read of the objects — rather than
-  reporting a success nobody measured.
+  `AddTransportObject` answer `accepted: true`, `removed`/`added: "unknown"`
+  and the reading that would settle it — `ReadTransportActionLog`, or a
+  re-read of the objects.
+
+  **Neither carries `success`**, though every other write in this repository
+  does. There it means the write happened; here it would contradict the field
+  beside it, and a reader who stopped at `success` would skip the re-read that
+  is the only thing establishing the outcome.
 
   Objects live on **tasks**: a request displays its tasks' entries and refuses
   to detach one, saying the entry "does not exist in request/task". Every tool

@@ -166,8 +166,13 @@ describe('RemoveTransportObject', () => {
     );
 
     expect(answered.accepted).toBe(true);
-    expect(answered.removed).toBeUndefined();
+    expect(answered.removed).toBe('unknown');
     expect(answered.confirm_with).toMatch(/ReadTransportActionLog/);
+    // **And no `success`.** Every other write here says `success: true`
+    // because its answer means the write happened; this one's does not, and
+    // a reader who stopped at that field would skip the re-read that is the
+    // only thing establishing the outcome.
+    expect('success' in answered).toBe(false);
   });
 
   it('refuses to call the server without a position', async () => {
@@ -206,6 +211,25 @@ describe('AddTransportObject', () => {
 
     expect(sent).toEqual({ name: 'ZCL_X', type: 'CLAS' });
     expect('position' in sent).toBe(false);
+  });
+
+  it('claims acceptance, not attachment, and says what would settle it', async () => {
+    fakeClient = fakeClientOf({
+      addObject: () => okResponse(reading('<tm:root/>')),
+    });
+
+    const answered = body(
+      await handleAddTransportObject(context as any, {
+        transport_number: 'E19K905943',
+        object_name: 'ZCL_X',
+        object_type: 'CLAS',
+      }),
+    );
+
+    expect(answered.accepted).toBe(true);
+    expect(answered.added).toBe('unknown');
+    expect('success' in answered).toBe(false);
+    expect(answered.confirm_with).toMatch(/ReadTransportObjects/);
   });
 });
 

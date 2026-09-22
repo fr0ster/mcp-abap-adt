@@ -475,9 +475,21 @@ import {
   handleActivateTable,
 } from '../../../handlers/table/low/handleActivateTable';
 import {
+  TOOL_DEFINITION as AddTransportObject_Tool,
+  handleAddTransportObject,
+} from '../../../handlers/transport/high/handleAddTransportObject';
+import {
   TOOL_DEFINITION as CreateTransport_Tool,
   handleCreateTransport,
 } from '../../../handlers/transport/high/handleCreateTransport';
+import {
+  TOOL_DEFINITION as CreateTransportTask_Tool,
+  handleCreateTransportTask,
+} from '../../../handlers/transport/high/handleCreateTransportTask';
+import {
+  handleRemoveTransportObject,
+  TOOL_DEFINITION as RemoveTransportObject_Tool,
+} from '../../../handlers/transport/high/handleRemoveTransportObject';
 import {
   TOOL_DEFINITION as CreateCdsUnitTest_Tool,
   handleCreateCdsUnitTest,
@@ -777,6 +789,18 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: CreateTransport_Tool,
         handler: withContext(handleCreateTransport),
+      },
+      {
+        toolDefinition: CreateTransportTask_Tool,
+        handler: withContext(handleCreateTransportTask),
+      },
+      {
+        toolDefinition: RemoveTransportObject_Tool,
+        handler: withContext(handleRemoveTransportObject),
+      },
+      {
+        toolDefinition: AddTransportObject_Tool,
+        handler: withContext(handleAddTransportObject),
       },
       {
         toolDefinition: CreateTable_Tool,

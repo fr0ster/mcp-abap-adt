@@ -134,6 +134,14 @@ import {
   handleListTransports,
   TOOL_DEFINITION as ListTransports_Tool,
 } from '../../../handlers/transport/readonly/handleListTransports';
+import {
+  handleReadTransportActionLog,
+  TOOL_DEFINITION as ReadTransportActionLog_Tool,
+} from '../../../handlers/transport/readonly/handleReadTransportActionLog';
+import {
+  handleReadTransportObjects,
+  TOOL_DEFINITION as ReadTransportObjects_Tool,
+} from '../../../handlers/transport/readonly/handleReadTransportObjects';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 import {
@@ -213,6 +221,15 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ListTransports_Tool,
         handler: (args: any) => handleListTransports(this.context, args),
+      },
+      {
+        toolDefinition: ReadTransportObjects_Tool,
+        handler: (args: any) => handleReadTransportObjects(this.context, args),
+      },
+      {
+        toolDefinition: ReadTransportActionLog_Tool,
+        handler: (args: any) =>
+          handleReadTransportActionLog(this.context, args),
       },
       // Read object source + metadata handlers
       {

@@ -55,6 +55,18 @@
   },
   {
     "group": "readonly",
+    "name": "ReadTransportObjects",
+    "inputs": "transport_number*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
+    "name": "ReadTransportActionLog",
+    "inputs": "transport_number*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "readonly",
     "name": "ReadClass",
     "inputs": "class_name*, version",
     "available_in": "cloud, onprem"
@@ -423,6 +435,24 @@
     "group": "high",
     "name": "CreateTransport",
     "inputs": "transport_type, description*, target_system, owner, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "CreateTransportTask",
+    "inputs": "transport_number*, target_user*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "RemoveTransportObject",
+    "inputs": "transport_number*, object_name*, object_type*, position*, pgmid, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "AddTransportObject",
+    "inputs": "transport_number*, object_name*, object_type*, pgmid, detail",
     "available_in": "cloud, onprem"
   },
   {

@@ -156,7 +156,7 @@ Preferred dedicated compact tools and minimal payloads:
 
 <a id="handleractivate-compact"></a>
 #### HandlerActivate (Compact)
-**Description:** Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, FUNCTION_MODULE, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). Batch mode(objects[].name*, objects[].type*).
+**Description:** Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].uri, because a module is addressed under its function group. Batch mode(objects[].name*, objects[].type*, objects[].uri).
 
 **Source:** `src/handlers/compact/high/handleHandlerActivate.ts`
 

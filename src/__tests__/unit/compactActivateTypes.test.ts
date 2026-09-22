@@ -100,6 +100,41 @@ describe('HandlerActivate and the type it was given', () => {
     ).rejects.toThrow(/PACKAGE/);
   });
 
+  /**
+   * **A right type code is not a right address.** `FUGR/FF` was in the
+   * translation table for one commit — it is the correct type for a function
+   * module — and that was the wrong fix: a module's ADT address is built
+   * under its function GROUP, and this form carries one name. Given only the
+   * module's, group activation would address a group by that name, which is
+   * a confident request for an object that does not exist.
+   */
+  it('refuses a function module from a name alone, and says what does work', async () => {
+    sent = undefined;
+
+    await expect(
+      handleHandlerActivate(context, {
+        object_name: 'Z_AC_FM01',
+        object_type: 'FUNCTION_MODULE',
+      }),
+    ).rejects.toThrow(/addressed under its function group/);
+
+    expect(sent).toBeUndefined();
+  });
+
+  it('activates a function module through the batch form, which carries the address', async () => {
+    await handleHandlerActivate(context, {
+      objects: [
+        {
+          name: 'Z_AC_FM01',
+          type: 'FUGR/FF',
+          uri: '/sap/bc/adt/functions/groups/zac_fgr01/fmodules/z_ac_fm01',
+        },
+      ],
+    });
+
+    expect(typeSent()).toBe('FUGR/FF');
+  });
+
   it('still takes a batch untouched', async () => {
     await handleHandlerActivate(context, {
       objects: [{ name: 'ZCL_X', type: 'CLAS/OC' }],

@@ -1946,32 +1946,32 @@
   {
     "group": "compact",
     "name": "HandlerProfileRun",
-    "inputs": "target_type*, class_name, program_name, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing",
-    "available_in": "onprem"
+    "inputs": "target_type*, class_name, program_name, profiling, description, all_procedural_units, all_misc_abap_statements, all_internal_table_events, all_dynpro_events, aggregate, explicit_on_off, with_rfc_tracing, all_system_kernel_events, sql_trace, all_db_events, max_size_for_trace_file, amdp_trace, max_time_for_tracing",
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerProfileList",
     "inputs": "(none)",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerProfileView",
-    "inputs": "trace_id_or_uri*, view*, with_system_events, id, with_details, auto_drill_down_threshold",
-    "available_in": "onprem"
+    "inputs": "trace_id_or_uri*, view*, mode, top, with_system_events, id, with_details, auto_drill_down_threshold",
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerDumpList",
-    "inputs": "user, top, from, to",
-    "available_in": "onprem"
+    "inputs": "feed_type, user, top, from, to",
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",
     "name": "HandlerDumpView",
     "inputs": "dump_id*, view",
-    "available_in": "onprem"
+    "available_in": "cloud, onprem"
   },
   {
     "group": "compact",

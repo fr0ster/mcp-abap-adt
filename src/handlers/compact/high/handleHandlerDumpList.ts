@@ -4,13 +4,14 @@ import { compactDumpListSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runtime dump list. object_type: not used. Required: none. Optional: user, top, from, to. Response: JSON.',
+    'Runtime feed list. object_type: not used. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, top, from, to. Response: JSON.',
   inputSchema: compactDumpListSchema,
 } as const;
 
 type HandlerDumpListArgs = {
+  feed_type?: 'dumps' | 'system_messages' | 'gateway_errors';
   user?: string;
   top?: number;
   from?: string;
@@ -22,7 +23,7 @@ export async function handleHandlerDumpList(
   args: HandlerDumpListArgs,
 ) {
   return handleRuntimeListFeeds(context, {
-    feed_type: 'dumps',
+    feed_type: args?.feed_type ?? 'dumps',
     user: args?.user,
     max_results: args?.top,
     from: args?.from,

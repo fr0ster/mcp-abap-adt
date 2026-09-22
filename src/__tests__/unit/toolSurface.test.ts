@@ -89,6 +89,22 @@ describe('the MCP tool surface', () => {
       // parameter was the only way to say which one — measured on trial and
       // captured in `check-ddlx-active-version` /
       // `check-ddlx-inactive-version`.
+      //
+      // **Third exception: three compact runtime tools closed real coverage
+      // gaps against the readonly surface.** `HandlerProfileRun` could only
+      // ever run WITH profiling (`handleRuntimeRunClassWithProfiling`/
+      // `handleRuntimeRunProgramWithProfiling`) — a plain run
+      // (`handleRuntimeRunClass`/`handleRuntimeRunProgram`) was unreachable
+      // from compact mode, so `profiling` (default true) was added.
+      // `HandlerProfileView` only ever returned the raw trace payload
+      // (`handleRuntimeGetProfilerTraceData`) — the dedicated analysis
+      // endpoint (`handleRuntimeAnalyzeProfilerTrace`, totals + top-ranked
+      // entries) had no compact tool at all, so `mode` (raw|analyze, default
+      // raw) and `top` (analyze's row limit) were added. `HandlerDumpList`
+      // hardcoded `feed_type: 'dumps'` into `handleRuntimeListFeeds`, which
+      // also serves `system_messages` and `gateway_errors` — two more feed
+      // types compact could not reach — so `feed_type` (default 'dumps') was
+      // added instead of new tool names.
       expect({ tool, lost: had.filter((p) => !has.includes(p)) }).toEqual({
         tool,
         lost: [],
@@ -97,9 +113,16 @@ describe('the MCP tool surface', () => {
         'high/CheckMetadataExtension',
         'low/CheckMetadataExtensionLow',
       ]);
+      const EXTRA_ALLOWED_ADDITIONS: Record<string, string[]> = {
+        'compact/HandlerProfileRun': ['profiling'],
+        'compact/HandlerProfileView': ['mode', 'top'],
+        'compact/HandlerDumpList': ['feed_type'],
+      };
       expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
         tool,
-        added: MAY_GAIN_VERSION.has(tool) ? ['version'] : ['detail'],
+        added: MAY_GAIN_VERSION.has(tool)
+          ? ['version']
+          : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail']),
       });
     }
   });

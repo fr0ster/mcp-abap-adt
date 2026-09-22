@@ -1,13 +1,15 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { handleRuntimeRunClass } from '../../system/readonly/handleRuntimeRunClass';
 import { handleRuntimeRunClassWithProfiling } from '../../system/readonly/handleRuntimeRunClassWithProfiling';
+import { handleRuntimeRunProgram } from '../../system/readonly/handleRuntimeRunProgram';
 import { handleRuntimeRunProgramWithProfiling } from '../../system/readonly/handleRuntimeRunProgramWithProfiling';
 import { compactProfileRunSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
-  available_in: ['onprem'] as const,
+  available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional profiling flags and description. Response: JSON.',
+    'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.',
   inputSchema: compactProfileRunSchema,
 } as const;
 
@@ -15,6 +17,7 @@ type HandlerProfileRunArgs = {
   target_type: 'CLASS' | 'PROGRAM';
   class_name?: string;
   program_name?: string;
+  profiling?: boolean;
   description?: string;
   all_procedural_units?: boolean;
   all_misc_abap_statements?: boolean;
@@ -35,10 +38,20 @@ export async function handleHandlerProfileRun(
   context: HandlerContext,
   args: HandlerProfileRunArgs,
 ) {
+  const profiling = args.profiling ?? true;
+
   if (args.target_type === 'CLASS') {
     if (!args.class_name) {
       throw new Error('class_name is required when target_type is CLASS');
     }
+
+    if (!profiling) {
+      return handleRuntimeRunClass(context, {
+        class_name: args.class_name,
+        profile: false,
+      });
+    }
+
     return handleRuntimeRunClassWithProfiling(context, {
       class_name: args.class_name,
       description: args.description,
@@ -61,6 +74,14 @@ export async function handleHandlerProfileRun(
   if (!args.program_name) {
     throw new Error('program_name is required when target_type is PROGRAM');
   }
+
+  if (!profiling) {
+    return handleRuntimeRunProgram(context, {
+      program_name: args.program_name,
+      profile: false,
+    });
+  }
+
   return handleRuntimeRunProgramWithProfiling(context, {
     program_name: args.program_name,
     description: args.description,

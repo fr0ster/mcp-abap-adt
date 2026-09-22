@@ -104,6 +104,11 @@ export const TOOL_DEFINITION = {
                 "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')",
             },
             uri: { type: 'string', description: 'Optional ADT URI' },
+            parentName: {
+              type: 'string',
+              description:
+                "Owning object, for a part of one. A function module's group belongs here: the address is built from it, and without it the group is named after the module.",
+            },
           },
           required: ['name', 'type'],
         },
@@ -155,7 +160,7 @@ type ActivationFamily =
  * not named here — `FUGR/FF` included — falls back to group activation; see
  * the module doc comment.
  */
-const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
+export const TYPE_TO_FAMILY: Record<string, ActivationFamily> = {
   'clas/oc': 'class',
   class: 'class',
   'prog/p': 'program',
@@ -261,9 +266,32 @@ export async function handleActivateObject(
   const detail = detailOf(args);
   const client = createAdtClient(connection, logger);
 
+  // **`uri` is carried, not dropped — and today nothing downstream reads
+  // it.** The schema above has advertised it since this handler existed,
+  // "Optional ADT URI", and this mapping kept only the type and the name, so
+  // a caller who supplied one was answered as though they had not. Accepting
+  // a field and discarding it is wrong whoever reads it next, which is the
+  // whole reason to carry it.
+  //
+  // What it does NOT do is fix addressing, and saying so here saves the next
+  // person the two measurements it took: `activateObjectsGroup` builds the
+  // reference with `buildObjectUri(name, type, parentName)` and never looks
+  // at `uri`; and for `fugr/ff` that builder ignores `parentName` as well,
+  // requiring the group inside the name — `GROUP|MODULE` — and throwing
+  // otherwise. A function module is therefore activated by naming it that
+  // way, not by supplying an address.
+  //
+  // `parentName` travels by the same contract — "Owning object, where the
+  // reference is to a part of one" — and is read for the types whose builder
+  // uses it.
+  //
+  // Neither is invented when absent: an object the client can address from a
+  // name is unaffected, which is every case that worked before.
   const activationObjects = args.objects.map((obj) => ({
     type: obj.type,
     name: obj.name.toUpperCase(),
+    ...(obj.uri ? { uri: obj.uri } : {}),
+    ...(obj.parentName ? { parentName: obj.parentName } : {}),
   }));
 
   logger?.info(`Starting activation of ${activationObjects.length} object(s)`);

@@ -934,12 +934,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handleractivate-high-level-compact"></a>
 #### HandlerActivate (High-Level / Compact)
-**Description:** Activate operation. Single mode(object_name*, object_adt_type*). Batch mode(objects[].name*, objects[].type*).
+**Description:** Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].parentName set to its function group, because a module is addressed under the group. Batch mode(objects[].name*, objects[].type*, objects[].parentName, objects[].uri).
 
 **Source:** `src/handlers/compact/high/handleHandlerActivate.ts`
 
 **Parameters:**
-- `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P). Required for single-object activation form.
+- `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.
 - `object_name` (string, optional) - Object name for single-object activation form.
 - `object_type` (any, optional) - 
 - `objects` (array, optional) - Explicit objects list for batch activation.
@@ -967,6 +967,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - Use explicit on/off trace sections.
 - `max_size_for_trace_file` (number, optional) - Maximum trace file size.
 - `max_time_for_tracing` (number, optional) - Maximum tracing time.
+- `profiling` (boolean, optional (default: true)) - Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.
 - `program_name` (string, optional) - Program name for profiling.
 - `sql_trace` (boolean, optional) - Enable SQL trace.
 - `target_type` (string, required) - Profile execution target kind.
@@ -994,6 +995,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - Use explicit on/off trace sections.
 - `max_size_for_trace_file` (number, optional) - Maximum trace file size.
 - `max_time_for_tracing` (number, optional) - Maximum tracing time.
+- `profiling` (boolean, optional (default: true)) - Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.
 - `program_name` (string, optional) - Program name for profiling.
 - `sql_trace` (boolean, optional) - Enable SQL trace.
 - `target_type` (string, required) - Profile execution target kind.
@@ -1003,7 +1005,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlercheckrun-high-level-compact"></a>
 #### HandlerCheckRun (High-Level / Compact)
-**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** CheckRun operation (syntax, no activation). object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerCheckRun.ts`
 
@@ -1088,15 +1090,16 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerdumplist-high-level-compact"></a>
 #### HandlerDumpList (High-Level / Compact)
-**Description:** Runtime dump list. object_type: not used. Required: none. Optional: user, top, from, to. Response: JSON.
+**Description:** Runtime feed list. object_type: not used. Optional: feed_type(dumps|system_messages|gateway_errors, default dumps), user, top, from, to. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerDumpList.ts`
 
 **Parameters:**
+- `feed_type` (string, optional (default: dumps)) - Which runtime feed to list. Default "dumps" (ABAP short dumps). "system_messages" and "gateway_errors" read the other two ADT runtime feeds through the same call.
 - `from` (string, optional) - Start of time range (YYYYMMDDHHMMSS).
 - `to` (string, optional) - End of time range (YYYYMMDDHHMMSS).
-- `top` (number, optional) - Limit number of returned dumps.
-- `user` (string, optional) - Filter dumps by user.
+- `top` (number, optional) - Limit number of returned entries.
+- `user` (string, optional) - Filter entries by user.
 
 ---
 
@@ -1144,7 +1147,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerlock-high-level-compact"></a>
 #### HandlerLock (High-Level / Compact)
-**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
+**Description:** Lock operation. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerLock.ts`
 
@@ -1168,7 +1171,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerprofilerun-high-level-compact"></a>
 #### HandlerProfileRun (High-Level / Compact)
-**Description:** Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional profiling flags and description. Response: JSON.
+**Description:** Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerProfileRun.ts`
 
@@ -1186,6 +1189,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `explicit_on_off` (boolean, optional) - Use explicit on/off trace sections.
 - `max_size_for_trace_file` (number, optional) - Maximum trace file size.
 - `max_time_for_tracing` (number, optional) - Maximum tracing time.
+- `profiling` (boolean, optional (default: true)) - Whether to capture a profiler trace while running. Default true. Set false for a plain run with no tracing — the profiling flags below are then ignored.
 - `program_name` (string, optional) - Program name for profiling.
 - `sql_trace` (boolean, optional) - Enable SQL trace.
 - `target_type` (string, required) - Profile execution target kind.
@@ -1195,13 +1199,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerprofileview-high-level-compact"></a>
 #### HandlerProfileView (High-Level / Compact)
-**Description:** Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.
+**Description:** Runtime profiling view. object_type: not used. Required: trace_id_or_uri*, view*(hitlist|statements|db_accesses). Optional: mode(raw|analyze, default raw), top(analyze only), with_system_events, id, with_details, auto_drill_down_threshold. Response: JSON.
 
 **Source:** `src/handlers/compact/high/handleHandlerProfileView.ts`
 
 **Parameters:**
 - `auto_drill_down_threshold` (number, optional) - Auto drill-down threshold.
 - `id` (number, optional) - Optional statement/access id.
+- `mode` (string, optional (default: raw)) - "raw" returns the parsed trace payload as-is (default). "analyze" returns a compact summary instead — totals plus the top-ranked entries — via the same trace view.
+- `top` (number, optional) - Number of top-ranked rows to include when mode is "analyze". Default 10. Ignored for mode "raw".
 - `trace_id_or_uri` (string, required) - Profiler trace id or URI.
 - `view` (string, required) - Profiler trace view kind.
 - `with_details` (boolean, optional) - Include detailed payload.
@@ -1292,7 +1298,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlerunlock-high-level-compact"></a>
 #### HandlerUnlock (High-Level / Compact)
-**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*), INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), DDL(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
+**Description:** Unlock operation. object_type required: CLASS(object_name*, lock_handle*, session_id*), PROGRAM(object_name*, lock_handle*, session_id*) [onprem only], INTERFACE(object_name*, lock_handle*, session_id*), FUNCTION_GROUP(object_name*, lock_handle*, session_id*), FUNCTION_MODULE(object_name*, lock_handle*, session_id*), TABLE(object_name*, lock_handle*, session_id*), STRUCTURE(object_name*, lock_handle*, session_id*), DDL(object_name*, lock_handle*, session_id*), DOMAIN(object_name*, lock_handle*, session_id*), DATA_ELEMENT(object_name*, lock_handle*, session_id*), PACKAGE(object_name*, lock_handle*, session_id*), BEHAVIOR_DEFINITION(object_name*, lock_handle*, session_id*), BEHAVIOR_IMPLEMENTATION(object_name*, lock_handle*, session_id*), METADATA_EXTENSION(object_name*, lock_handle*, session_id*).
 
 **Source:** `src/handlers/compact/high/handleHandlerUnlock.ts`
 
@@ -1355,7 +1361,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="handlervalidate-high-level-compact"></a>
 #### HandlerValidate (High-Level / Compact)
-**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*), INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
+**Description:** Validate before create only. object_type required: CLASS(object_name*), PROGRAM(object_name*) [onprem only], INTERFACE(object_name*), FUNCTION_GROUP(object_name*), FUNCTION_MODULE(object_name*), TABLE(object_name*), STRUCTURE(object_name*), DDL(object_name*), DOMAIN(object_name*), DATA_ELEMENT(object_name*), PACKAGE(object_name*), BEHAVIOR_DEFINITION(object_name*), BEHAVIOR_IMPLEMENTATION(object_name*), METADATA_EXTENSION(object_name*), SERVICE_BINDING(object_name*=service_binding_name*, service_definition_name*).
 
 **Source:** `src/handlers/compact/high/handleHandlerValidate.ts`
 

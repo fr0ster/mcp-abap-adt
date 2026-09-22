@@ -34,6 +34,7 @@ import type {
   IAbapConnection,
   ITokenRefresher,
 } from '@mcp-abap-adt/interfaces';
+import { DefaultLogger, LogLevel } from '@mcp-abap-adt/logger';
 
 export type AbapSystemKind = 'onprem' | 'cloud';
 
@@ -121,6 +122,28 @@ function onPremCredential(config: SapConfig) {
  * whole body; anything unparseable is left to the package, which falls back to
  * its own default rather than failing a connection over a debug option.
  */
+/**
+ * The logger the RFC wire writes to, which the switch has to provide itself.
+ *
+ * **Asking for the wire and getting nothing is the failure this exists to
+ * prevent.** `RfcTransport` writes only when it has both `logWire` and a
+ * logger, and the server's own path builds its connection with no logger at
+ * all — `BaseMcpServer` passes `undefined`. So `DEBUG_RFC_WIRE=true` set the
+ * option, the transport checked for a logger, found none, and the documented
+ * switch did nothing on the one path that matters most.
+ *
+ * A caller's logger always wins: it is theirs, it may go somewhere specific,
+ * and this must not redirect it. Only when there is none does asking for the
+ * wire bring one, at `debug`, because a wire log below `debug` is a wire log
+ * nobody sees.
+ */
+function wireLogger(logger: ILogger | null | undefined): ILogger | undefined {
+  if (logger) return logger;
+  return rfcWireOptions().logWire
+    ? new DefaultLogger(LogLevel.DEBUG)
+    : undefined;
+}
+
 function rfcWireOptions(): { logWire: boolean; maxLoggedBodyChars?: number } {
   const asked =
     process.env.DEBUG_RFC_WIRE === 'true' || process.env.DEBUG_RFC_WIRE === '1';
@@ -165,7 +188,11 @@ export function createAbapConnection(
     return new AdtOnPremConnector(
       config,
       credential,
-      new RfcTransport(rfcConversationFrom(config), logger, rfcWireOptions()),
+      new RfcTransport(
+        rfcConversationFrom(config),
+        wireLogger(logger),
+        rfcWireOptions(),
+      ),
       logger,
       sessionId,
     ) as unknown as IAbapConnection;

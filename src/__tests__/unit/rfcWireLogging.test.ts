@@ -37,6 +37,10 @@ const rfcConfig = {
 const optionsFromLastCall = () =>
   (RfcTransport as unknown as jest.Mock).mock.calls.at(-1)?.[2];
 
+/** The second — the logger, without which the option writes nothing. */
+const loggerFromLastCall = () =>
+  (RfcTransport as unknown as jest.Mock).mock.calls.at(-1)?.[1];
+
 describe('the RFC wire logs only when asked', () => {
   const saved = {
     wire: process.env.DEBUG_RFC_WIRE,
@@ -113,6 +117,32 @@ describe('the RFC wire logs only when asked', () => {
     const options = optionsFromLastCall();
     expect(options.logWire).toBe(true);
     expect(Number.isNaN(options.maxLoggedBodyChars)).toBe(true);
+  });
+
+  /**
+   * **The option alone is not the switch.** `RfcTransport` writes only when it
+   * has a logger too, and the server's own path builds its connection with
+   * none — `BaseMcpServer` passes `undefined`. So asking for the wire has to
+   * bring a logger with it, or the documented switch does nothing exactly
+   * where it is needed. A caller's own logger is never replaced.
+   */
+  it('brings a logger when the caller has none and the wire was asked for', () => {
+    process.env.DEBUG_RFC_WIRE = 'true';
+    createAbapConnection(rfcConfig as never, undefined, undefined);
+    expect(loggerFromLastCall()).toBeDefined();
+  });
+
+  it('leaves the caller without one when the wire was not asked for', () => {
+    delete process.env.DEBUG_RFC_WIRE;
+    createAbapConnection(rfcConfig as never, undefined, undefined);
+    expect(loggerFromLastCall()).toBeUndefined();
+  });
+
+  it("never replaces the caller's own logger", () => {
+    process.env.DEBUG_RFC_WIRE = 'true';
+    const mine = { debug() {}, info() {}, warn() {}, error() {} };
+    createAbapConnection(rfcConfig as never, mine as never, undefined);
+    expect(loggerFromLastCall()).toBe(mine);
   });
 
   it('says nothing about the ceiling when it was not set', () => {

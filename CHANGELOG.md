@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what this repository builds reaches `SADT_REST_RFC_ENDPOINT` intact could
   not be answered at all.
 
+  Setting the variable is enough. `RfcTransport` writes only when it has both
+  the option and a logger, and the server's own path builds its connection
+  with none — so asking for the wire brings one at `debug` where nothing else
+  supplied it. A logger the caller already has is used as it is and never
+  redirected.
+
   An environment variable rather than an argument: the question is asked by
   whoever is sitting in front of a misbehaving on-premise system, not by code,
   and an argument would have to be threaded through every call site for a

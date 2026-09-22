@@ -464,6 +464,9 @@ These are typically set in `.env` file:
 - `DEBUG_RFC_WIRE` - Put the RFC request headers and both bodies on the debug
   channel (true|1). **RFC only**, off by default, and the only way to see a
   payload that was mis-serialised before it reached `SADT_REST_RFC_ENDPOINT`.
+  Setting it is enough: where nothing else configured a logger, asking for the
+  wire brings one at `debug`. A logger the caller already supplied is used as
+  it is and never redirected.
   Credential header values are replaced with `[redacted]` by
   `@mcp-abap-adt/connection`, so the output is safe to paste into an issue —
   but bodies are clipped, not redacted, so treat a body carrying a secret

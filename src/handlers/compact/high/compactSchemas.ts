@@ -906,6 +906,11 @@ export const compactActivateSchema = {
           name: { type: 'string', description: 'Object name.' },
           type: { type: 'string', description: 'ADT object type code.' },
           uri: { type: 'string', description: 'Optional ADT object URI.' },
+          parentName: {
+            type: 'string',
+            description:
+              'Owning object, for a part of one — a function module needs its function group here, or the address is built under a group named after the module.',
+          },
         },
         required: ['name', 'type'],
       },

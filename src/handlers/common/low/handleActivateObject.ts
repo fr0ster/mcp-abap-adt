@@ -104,6 +104,11 @@ export const TOOL_DEFINITION = {
                 "Object type code (e.g., 'CLAS/OC', 'PROG/P', 'DDLS/DF')",
             },
             uri: { type: 'string', description: 'Optional ADT URI' },
+            parentName: {
+              type: 'string',
+              description:
+                "Owning object, for a part of one. A function module's group belongs here: the address is built from it, and without it the group is named after the module.",
+            },
           },
           required: ['name', 'type'],
         },

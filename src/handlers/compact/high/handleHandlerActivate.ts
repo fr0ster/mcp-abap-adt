@@ -34,17 +34,25 @@ const ADT_TYPE_BY_COMPACT_TYPE: Partial<Record<CompactObjectType, string>> = {
  * *"`FUGR/FF` needs a group name this array does not carry"* — which is
  * exactly the sentence the map entry contradicted.
  *
- * So the translation stops here and the refusal says what does work — and
- * what that is was measured in the client rather than assumed twice over.
- * `buildObjectUri` ignores `uri` for every type and, for `fugr/ff`, ignores
- * `parentName` too: it requires the group inside the NAME, `GROUP|MODULE`,
- * and throws otherwise. So the batch form works for a function module when
- * the name carries the group, which is a convention worth stating rather
- * than leaving to a thrown error.
+ * So the translation stops here and the refusal says what does work. What
+ * that is was established by CALLING the builder the activation path uses —
+ * `utils/activationUtils.buildObjectUri` — rather than by reading a function
+ * of the same name in `whereUsed.js`, which is a different one with a
+ * different convention and cost this file two wrong recommendations:
+ *
+ *     name 'ZAC_FGR01|Z_AC_FM01'            → groups/zac_fgr01%7cz_ac_fm01/
+ *                                             fmodules/zac_fgr01%7cz_ac_fm01
+ *     name 'Z_AC_FM01', parentName 'ZAC_FGR01' → groups/zac_fgr01/
+ *                                                fmodules/z_ac_fm01
+ *     name 'Z_AC_FM01' alone                → groups/z_ac_fm01/fmodules/z_ac_fm01
+ *
+ * The middle one is the address. The last is the failure this refusal exists
+ * to prevent, and note that it does not throw: a group named after the module
+ * is a request SAP answers, about an object nobody meant.
  */
 const NEEDS_MORE_THAN_A_NAME: Partial<Record<CompactObjectType, string>> = {
   FUNCTION_MODULE:
-    'a function module is addressed under its function group, which this form does not take — use the batch form with objects[].name as "GROUP|MODULE" and type FUGR/FF, or ActivateFunctionModuleLow, which takes the group as its own argument',
+    'a function module is addressed under its function group, which this form does not take — use the batch form with objects[].parentName set to the group (name stays the module, type FUGR/FF), or ActivateFunctionModuleLow, which takes the group as its own argument',
 };
 
 /** What `object_type` alone can be activated as, or undefined. */
@@ -64,7 +72,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerActivate',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].name as "GROUP|MODULE", because a module is addressed under its function group. Batch mode(objects[].name*, objects[].type*, objects[].uri).',
+    'Activate operation. Single mode(object_name*, object_type or object_adt_type*). object_type is enough for CLASS, PROGRAM [onprem only], INTERFACE, FUNCTION_GROUP, TABLE, STRUCTURE, DDL, DOMAIN, DATA_ELEMENT, BEHAVIOR_DEFINITION, METADATA_EXTENSION, PACKAGE, SERVICE_DEFINITION and SERVICE_BINDING; any other type needs object_adt_type (e.g. "CLAS/OC"). FUNCTION_MODULE needs the batch mode with objects[].parentName set to its function group, because a module is addressed under the group. Batch mode(objects[].name*, objects[].type*, objects[].parentName, objects[].uri).',
   inputSchema: compactActivateSchema,
 } as const;
 

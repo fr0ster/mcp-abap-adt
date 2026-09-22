@@ -36,6 +36,8 @@ const typeSent = () =>
   (sent as { objects: { type: string }[] }).objects[0].type;
 const nameSent = () =>
   (sent as { objects: { name: string }[] }).objects[0].name;
+const parentSent = () =>
+  (sent as { objects: { parentName?: string }[] }).objects[0].parentName;
 
 describe('HandlerActivate and the type it was given', () => {
   it('passes a friendly name the activation map knows, as it always did', async () => {
@@ -124,19 +126,21 @@ describe('HandlerActivate and the type it was given', () => {
   });
 
   /**
-   * The route the refusal recommends, in the form the client can address.
-   * `buildObjectUri` requires `GROUP|MODULE` for `fugr/ff` and throws on
-   * anything else — it reads neither `uri` nor `parentName` for that type,
-   * which took two measurements to establish and is why this test names the
-   * pipe rather than an address.
+   * The route the refusal recommends. What makes it the right one is asserted
+   * in `activationUriIsBuiltFromTheParent.test.ts`, against the builder the
+   * activation path actually calls — this case only checks that the fields
+   * travel.
    */
-  it('activates a function module through the batch form, named GROUP|MODULE', async () => {
+  it('activates a function module through the batch form, with its group', async () => {
     await handleHandlerActivate(context, {
-      objects: [{ name: 'ZAC_FGR01|Z_AC_FM01', type: 'FUGR/FF' }],
+      objects: [
+        { name: 'Z_AC_FM01', type: 'FUGR/FF', parentName: 'ZAC_FGR01' },
+      ],
     });
 
     expect(typeSent()).toBe('FUGR/FF');
-    expect(nameSent()).toBe('ZAC_FGR01|Z_AC_FM01');
+    expect(nameSent()).toBe('Z_AC_FM01');
+    expect(parentSent()).toBe('ZAC_FGR01');
   });
 
   it('says so in the refusal, so the caller does not have to find out', async () => {
@@ -145,7 +149,7 @@ describe('HandlerActivate and the type it was given', () => {
         object_name: 'Z_AC_FM01',
         object_type: 'FUNCTION_MODULE',
       }),
-    ).rejects.toThrow(/GROUP\|MODULE/);
+    ).rejects.toThrow(/parentName/);
   });
 
   it('still takes a batch untouched', async () => {

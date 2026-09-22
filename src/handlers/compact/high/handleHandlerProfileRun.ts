@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.',
+    'Runtime profiling run. object_type: not used. Required: target_type*(CLASS|PROGRAM) + class_name* for CLASS or program_name* for PROGRAM [onprem only — ABAP Cloud has no programs]. Optional: profiling(default true; set false for a plain run with no trace), profiling flags, description. Response: JSON.',
   inputSchema: compactProfileRunSchema,
 } as const;
 

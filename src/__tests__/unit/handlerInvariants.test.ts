@@ -1,6 +1,7 @@
-import { globSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import { analyseOmissions } from '../../../scripts/lib/analyseOmissions';
+import { globSync } from '../helpers/platform';
 
 const handlers = globSync('src/handlers/**/handle*.ts');
 

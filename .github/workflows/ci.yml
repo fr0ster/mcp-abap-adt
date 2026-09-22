@@ -36,9 +36,14 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # No `continue-on-error` here. It was on this step from the day the
+      # workflow was written, so the suite ran on six platform/Node
+      # combinations and its verdict was thrown away on all six: a red
+      # `packageEntryPoints` sat inside green runs until `release.yml`, which
+      # has no such line, gated a tag on it. Tests that do not gate are a
+      # report nobody reads.
       - name: Run tests
         run: npm test
-        continue-on-error: true
 
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
@@ -55,10 +60,52 @@ jobs:
           npm pack
           npm pack ./server
 
+      # **Both tarballs in one install, or this step cannot pass a release.**
+      # `core` depends on `lib` by range, so installing the core tarball alone
+      # sends npm to the registry for `@mcp-abap-adt/lib@^11.0.0` — a version
+      # that does not exist yet, because publishing happens after this.
+      # `ETARGET: No matching version found` is the shape of that, and it is
+      # guaranteed on any pull request that raises the major. Naming both as
+      # top-level requests lets the sibling tarball satisfy the range, which
+      # is also the arrangement a consumer ends up with once both are on npm.
+      #
+      # Installed locally rather than globally: a global install needs the
+      # runner's permissions for nothing this check is about, and the point is
+      # that the binary the package declares runs at all.
       - name: Test package installation (Unix)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
-          ls mcp-abap-adt-lib-*.tgz
-          PACKAGE_FILE=$(ls mcp-abap-adt-core-*.tgz)
-          npm install -g "./$PACKAGE_FILE"
-          mcp-abap-adt --help || true
+          mkdir -p /tmp/install-check && cd /tmp/install-check
+          npm init -y > /dev/null
+          npm install --no-audit --no-fund \
+            "$GITHUB_WORKSPACE"/mcp-abap-adt-lib-*.tgz \
+            "$GITHUB_WORKSPACE"/mcp-abap-adt-core-*.tgz
+          # **Did `core` accept the `lib` we just built, or fetch another
+          # one?** Not "are the versions equal" — they need not be, and this
+          # repository has shipped lib 10.1.0 and 10.2.0 against an unchanged
+          # core 10.0.1. What must not happen is `core` silently resolving a
+          # DIFFERENT lib from the registry because its declared range does
+          # not accept ours: the install still succeeds, the binary still
+          # runs, and nobody is told. npm shows it in the tree — a dependency
+          # a top-level package cannot satisfy is installed nested under the
+          # one that wanted it.
+          #
+          # Measured both ways before this was written: core requiring
+          # `^11.0.0` beside lib 11.0.0 leaves no nested copy, and the same
+          # core requiring `^10.0.0` pulls lib 10.2.0 into
+          # `core/node_modules/`.
+          #
+          # `readFileSync`, not `require`: a package's `exports` map does not
+          # offer `./package.json`, so requiring that subpath is
+          # ERR_PACKAGE_PATH_NOT_EXPORTED.
+          node -e "const {readFileSync,existsSync}=require('node:fs');
+            const v=p=>JSON.parse(readFileSync(p+'/package.json','utf8')).version;
+            const top='node_modules/@mcp-abap-adt/lib';
+            const nested='node_modules/@mcp-abap-adt/core/node_modules/@mcp-abap-adt/lib';
+            if (existsSync(nested)) {
+              console.error('core did not accept the lib built here: it resolved '+v(nested)+' of its own, beside '+v(top)+' at the top level.');
+              console.error('Its declared range is '+JSON.parse(readFileSync('node_modules/@mcp-abap-adt/core/package.json','utf8')).dependencies['@mcp-abap-adt/lib']+'.');
+              process.exit(1);
+            }
+            console.log('core '+v('node_modules/@mcp-abap-adt/core')+' resolved lib '+v(top)+' — the one built here');"
+          ./node_modules/.bin/mcp-abap-adt --help

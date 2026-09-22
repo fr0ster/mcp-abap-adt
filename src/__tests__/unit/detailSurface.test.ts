@@ -59,7 +59,7 @@
  *     `detailWiring` (a wiring check, not a behavioural one) cannot see.
  */
 import { execFileSync } from 'node:child_process';
-import { globSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import {
   detailWiring,
@@ -67,6 +67,7 @@ import {
 } from '../../../scripts/lib/analyseOmissions';
 import { handleCheckClass } from '../../handlers/class/low/handleCheckClass';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import { globSync, spawnOptionsForNpx } from '../helpers/platform';
 
 const handlers = globSync('src/handlers/**/handle*.ts');
 
@@ -299,6 +300,7 @@ const JSON_ANSWERING: readonly string[] = [
 const surface: Array<{ group: string; name: string; inputs: string }> =
   JSON.parse(
     execFileSync('npx', ['tsx', 'scripts/list-tools.ts'], {
+      ...spawnOptionsForNpx,
       encoding: 'utf8',
       maxBuffer: 32 * 1024 * 1024,
     }),

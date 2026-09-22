@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
-import { globSync } from 'node:fs';
 import { basename, join } from 'node:path';
 import { analyseOmissions } from '../../../scripts/lib/analyseOmissions';
+import { globSync, spawnOptionsForNpx } from '../helpers/platform';
 
 /**
  * `analyseOmissions` lives under `scripts/`, not `src/` — it is dev tooling,
@@ -82,6 +82,7 @@ describe('analyseOmissions — the twelve verdict fixtures', () => {
 
     const run = (pattern: string) =>
       spawnSync('npx', ['tsx', 'scripts/check-analyse.ts', pattern], {
+        ...spawnOptionsForNpx,
         encoding: 'utf8',
       });
 

@@ -97,6 +97,24 @@ describe('the RFC wire logs only when asked', () => {
     });
   });
 
+  /**
+   * **A typo must not fail a connection, and must not silently become a
+   * ceiling either.** `Number('lots')` is `NaN`, and what happens to it is the
+   * package's decision: `@mcp-abap-adt/connection` compares `asked >= 0`,
+   * which `NaN` fails, and falls back to its own default rather than throwing
+   * or reaching `slice(0, NaN)`. That behaviour is depended on here, so it is
+   * pinned here — if the package ever starts honouring a nonsense ceiling,
+   * this is the test that notices.
+   */
+  it('hands a nonsense ceiling on rather than guessing at it', () => {
+    process.env.DEBUG_RFC_WIRE = 'true';
+    process.env.DEBUG_RFC_BODY_CHARS = 'lots';
+    connect();
+    const options = optionsFromLastCall();
+    expect(options.logWire).toBe(true);
+    expect(Number.isNaN(options.maxLoggedBodyChars)).toBe(true);
+  });
+
   it('says nothing about the ceiling when it was not set', () => {
     process.env.DEBUG_RFC_WIRE = 'true';
     delete process.env.DEBUG_RFC_BODY_CHARS;

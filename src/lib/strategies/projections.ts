@@ -106,18 +106,32 @@ export const terseActivation: Terse<any> = (value) => {
     };
   }
 
-  // `ioc:inactiveObjects` — a function group's own activation answer,
-  // measured live against `ActivateFunctionGroupLow` (E19, 2026-09-21):
-  // rather than a `chkl:messages` checklist (measured so far only against
-  // classes), a container object like a function group answers with the
-  // objects it found inactive and processed. Confirmed live, same run: a
-  // fresh function group's `GetInactiveObjects` read `count: 0` immediately
-  // after this response — the objects named here were NOT left inactive, so
-  // this document is this object kind's success shape, not a failure one.
-  // (No case of a genuine activation failure taking this shape has been
-  // captured yet — if one turns up with real content in `ioc:object`'s
-  // sibling fields, e.g. an error, this reading should learn to tell the
-  // two apart instead of always reading success.)
+  // `ioc:inactiveObjects` — what a function group's activate call answers
+  // instead of a `chkl:messages` checklist, measured live against
+  // `ActivateFunctionGroupLow` (2026-09-21). Not finding a checklist, this
+  // used to answer `undefined`, which `answer.ts` turns into
+  // `projection_failed`: a real, successful call reported as a broken one.
+  //
+  // **What it does not do is call it activated.** The document is a list of
+  // objects; it contains no verdict, and an activation that failed answers
+  // `200` just as this one did — that masking was the root of #154, and the
+  // rule this library works by is that a status code is not a result, the
+  // answer is. So this reading reports what the answer holds, the objects it
+  // named, and says plainly that the answer stated no outcome.
+  //
+  // Evidence that it is not a failure either, from the same run: a
+  // `GetInactiveObjects` read straight afterwards answered `count: 0`, so
+  // the objects named here were not left inactive. That is a measurement of
+  // the *system*, taken by a second request — which is exactly what
+  // `activation_not_stated` tells a caller to do, and exactly what a
+  // projection over one document cannot do for them.
+  //
+  // **And that read-back is a snapshot, not a proof.** Activation is
+  // asynchronous: the work can still be running when the next request goes
+  // out, so `count: 0` settled that run and `count` above zero would settle
+  // nothing — it would mean "not yet" as readily as "not done". A caller who
+  // needs certainty reads again; an LLM does that naturally, and a test that
+  // asserts once on the first read is asserting a race.
   //
   // `ioc:object` is itself an array per entry (`[""]` on the transport-only
   // entry that opens the list, `[{ "ioc:ref": {...} }]` on an object one) —
@@ -140,7 +154,10 @@ export const terseActivation: Terse<any> = (value) => {
         name: a['adtcore:name'] ?? '',
       }));
     return {
-      activated: true,
+      // Deliberately not `activated`. The caller reads the state back — with
+      // `GetInactiveObjects`, which answers the question this document does
+      // not.
+      activation_not_stated: true,
       ...(processed.length ? { objects: processed } : {}),
     };
   }

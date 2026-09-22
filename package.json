@@ -72,7 +72,7 @@
     }
   },
   "scripts": {
-    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
+    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' \u2014 edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
@@ -155,7 +155,7 @@
     "@mcp-abap-adt/auth-broker": "^2.0.0",
     "@mcp-abap-adt/auth-providers": "^2.0.0",
     "@mcp-abap-adt/auth-stores": "^1.0.4",
-    "@mcp-abap-adt/connection": "^8.0.1",
+    "@mcp-abap-adt/connection": "^8.1.0",
     "@mcp-abap-adt/header-validator": "^0.1.8",
     "@mcp-abap-adt/interfaces": "^44.0.0",
     "@mcp-abap-adt/logger": "^0.3.1",

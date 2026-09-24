@@ -72,6 +72,29 @@ When checking whether an installed npm package contains specific code, always se
 
 ## Dependencies
 
+**The rule over this whole section: on runtime and toolchain versions we follow
+SAP.** Not the newest release, not what the developer's machine happens to run —
+what SAP builds and runs against. Two cases are settled below; a third that looks
+like them is decided the same way.
+
+### Node follows what SAP BTP actually runs
+
+`engines.node` is `>=22`, the CI and release matrices are **22 and 24**, and
+`@types/node` is `^22`.
+
+SAP BTP Cloud Foundry supports Node **22** and **24**; 20 reached end of life on
+2026-04-30 and was removed, so restaging a Node 20 app fails. Odd-numbered
+releases (21, 23, 25) are not on the platform at all, and `@sap/cds` 10.1.0,
+`@sap/cds-compiler` 7.1.0 and `@cap-js/cds-typer` 0.41.1 all declare
+`engines.node >=22`.
+
+`@types/node` tracks the **oldest** runtime we claim to support, not the newest
+available: types a major or two ahead describe API that is not there on 22, and
+the compiler would wave it through. `^22` was measured clean across
+`tsconfig.json`, `tsconfig.test.json`, `server/tsconfig.json` and the full suite.
+
+A newer Node on a development machine is fine; nothing here may require it.
+
 ### The TypeScript major follows SAP
 
 Stay on `typescript@^6.x`. Take 6.x patches and minors; leave 7 alone until the
@@ -93,9 +116,6 @@ upgrade waiting to happen. Measured 2026-09-24:
 The cheap signal, if the question ever comes back:
 `npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
 deciding condition, not ts-jest.
-
-`@types/node` follows the same shape for a different reason: it tracks
-`engines.node` (`>=22`), not the newest Node major.
 
 ## Plans and Specs
 

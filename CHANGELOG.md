@@ -134,9 +134,17 @@ Migration: [`docs/MIGRATION-12.0.md`](docs/MIGRATION-12.0.md).
 
 - **Third-party majors: `js-yaml` 5, `diff` 9, `dotenv` 18,
   `@modelcontextprotocol/inspector` 2.** All three runtime majors keep a
-  CommonJS entry, which this build needs. `@types/node` stays on `^25` because
-  `engines.node` is `>=22`, and `typescript` 7 is deliberately left for its own
-  branch.
+  CommonJS entry, which this build needs.
+
+- **Node and TypeScript versions follow SAP, and `CLAUDE.md` now says so.**
+  `@types/node` moves **down** to `^22`, matching `engines.node` rather than the
+  newest release, and the CI and release matrices run **22 and 24** instead of
+  22/25 and 22/24/25: SAP BTP Cloud Foundry supports 22 and 24, 20 was removed
+  on 2026-04-30, and odd-numbered releases are not on the platform. `typescript`
+  stays on `^6.x` — no CAP package declares a `typescript` peer, but `cds-typer`
+  and `cds-types` are developed on `^6.0.3`, `ts-jest` 29.4.13 declares
+  `typescript: ">=4.3 <7"`, and cloud-llm-hub type-checks against this project's
+  declarations on 6.
 
 - **`overrides` is gone.** It pinned `@hono/node-server` to `^2.0.5` against an
   sdk that declared `^1.19.9`; sdk 1.30.1 declares `^1.19.9 || ^2.0.5` itself,

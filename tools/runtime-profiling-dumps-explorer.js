@@ -725,18 +725,42 @@ async function upsertExecutableObject(ctx, rl) {
       );
     }
     const lockHandle = locked.getResult().value;
+
+    // Write and release are reported together. **`unlock` answers
+    // `IAdtResponse<void>` and does not throw when the server refuses**, so
+    // dropping its answer in a `finally` guarantees the attempt and not the
+    // release: the object stays locked, the activation below runs anyway, and
+    // the log claims a success. That is how a test run locked
+    // `ZMCP_SHR_I_BDFL` out of every run after it.
+    const failures = [];
     try {
       const written = await adt
         .getClass()
         .update(payload, { lockHandle, source: sourceCode });
       if (!written?.ok) {
-        throw new Error(
-          `Write to ${className} refused: ${written?.getError?.()?.message ?? 'no answer'}`,
+        failures.push(
+          `write refused: ${written?.getError?.()?.message ?? 'no answer'}`,
         );
       }
-    } finally {
-      await adt.getClass().unlock({ className }, lockHandle);
+    } catch (error) {
+      failures.push(`write threw: ${error?.message ?? String(error)}`);
     }
+    try {
+      const released = await adt.getClass().unlock({ className }, lockHandle);
+      if (!released?.ok) {
+        failures.push(
+          `the lock was NOT released and stays on ${className} in SAP: ${released?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
+    } catch (error) {
+      failures.push(
+        `the lock was NOT released and stays on ${className} in SAP: ${error?.message ?? String(error)}`,
+      );
+    }
+    if (failures.length > 0) {
+      throw new Error(`${className}: ${failures.join('; ')}`);
+    }
+
     const activated = await adt.getClass().activate({ className });
     if (!activated?.ok) {
       throw new Error(

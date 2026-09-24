@@ -902,7 +902,16 @@ async function main(): Promise<void> {
     if (!lockHandle) return;
     heldLocks.delete(className);
     try {
-      await client.getClass().unlock({ className }, lockHandle);
+      // `unlock` answers `IAdtResponse<void>` and does not throw when the
+      // server refuses, so the answer has to be read: a dropped one leaves the
+      // object locked with nothing said, and the handle is gone by then.
+      const released = await client.getClass().unlock({ className }, lockHandle);
+      if (!released.ok) {
+        console.error(
+          `  WARNING: ${className} was NOT unlocked — ${released.getError().message}. ` +
+            'The handle is gone; the object stays locked until the session ends.',
+        );
+      }
     } catch (error) {
       console.error(
         `  WARNING: ${className} could not be unlocked — ${(error as Error).message}. ` +

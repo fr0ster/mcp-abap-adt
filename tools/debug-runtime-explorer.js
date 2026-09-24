@@ -476,15 +476,39 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
       );
     }
     const lockHandle = locked.getResult().value;
+
+    // The write and the release are reported together, and neither hides the
+    // other. **`unlock` answers `IAdtResponse<void>` and does not throw on a
+    // refusal**, so an ignored answer here ends with the object still locked
+    // while the caller goes on to activate it and log a success — which is the
+    // exact shape that left `ZMCP_SHR_I_BDFL` locked out of every later test
+    // run. A `finally` that calls `unlock` and drops its answer guarantees the
+    // attempt, not the release.
+    const failures = [];
     try {
       const written = await api.update(config, { lockHandle, source });
       if (!written?.ok) {
-        throw new Error(
-          `Write to ${probe.className} refused: ${written?.getError?.()?.message ?? 'no answer'}`,
+        failures.push(
+          `write refused: ${written?.getError?.()?.message ?? 'no answer'}`,
         );
       }
-    } finally {
-      await api.unlock({ className: probe.className }, lockHandle);
+    } catch (error) {
+      failures.push(`write threw: ${error?.message ?? String(error)}`);
+    }
+    try {
+      const released = await api.unlock({ className: probe.className }, lockHandle);
+      if (!released?.ok) {
+        failures.push(
+          `the lock was NOT released and stays on ${probe.className} in SAP: ${released?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
+    } catch (error) {
+      failures.push(
+        `the lock was NOT released and stays on ${probe.className} in SAP: ${error?.message ?? String(error)}`,
+      );
+    }
+    if (failures.length > 0) {
+      throw new Error(`${probe.className}: ${failures.join('; ')}`);
     }
   };
 

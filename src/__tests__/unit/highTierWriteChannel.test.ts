@@ -465,12 +465,13 @@ const cases: WireCase[] = [
 ];
 
 describe('wire channel: every high-tier locked write lands where its shipped member reads it', () => {
-  it.each(
-    cases,
-  )('$name reaches $expectFactory and lands in $channel.$field', async (c) => {
-    const result = await c.run();
-    expect(result.factory).toBe(c.expectFactory);
-    const half = c.channel === 'options' ? result.options : result.config;
-    expect(String(half?.[c.field] ?? '')).toContain(c.marker);
-  });
+  it.each(cases)(
+    '$name reaches $expectFactory and lands in $channel.$field',
+    async (c) => {
+      const result = await c.run();
+      expect(result.factory).toBe(c.expectFactory);
+      const half = c.channel === 'options' ? result.options : result.config;
+      expect(String(half?.[c.field] ?? '')).toContain(c.marker);
+    },
+  );
 });

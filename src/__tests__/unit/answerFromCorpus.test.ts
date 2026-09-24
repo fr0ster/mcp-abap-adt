@@ -69,18 +69,19 @@ describe('a real refusal, read and then answered', () => {
     expect(['E', 'W', 'I', 'S']).toContain(payload.messages[0].type);
   });
 
-  it.each(
-    REFUSALS,
-  )('%s never leaks a credential the strategy attached', (name) => {
-    for (const detail of ['terse', 'full', 'raw'] as const) {
-      const text = return_answer(failureFrom(name), (v) => v, {
-        tool: 'AnyTool',
-        detail,
-      }).content[0].text;
-      expect(text).not.toContain('Bearer');
-      expect(text).not.toContain('authorization');
-    }
-  });
+  it.each(REFUSALS)(
+    '%s never leaks a credential the strategy attached',
+    (name) => {
+      for (const detail of ['terse', 'full', 'raw'] as const) {
+        const text = return_answer(failureFrom(name), (v) => v, {
+          tool: 'AnyTool',
+          detail,
+        }).content[0].text;
+        expect(text).not.toContain('Bearer');
+        expect(text).not.toContain('authorization');
+      }
+    },
+  );
 
   it('keeps the T100 key where the document had one', () => {
     const payload = JSON.parse(

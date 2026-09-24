@@ -50,23 +50,24 @@ describe('the read that feeds a write gives the document back untouched', () => 
     expect(verbatim(wire(name)).value).toBe(corpusBody(name));
   });
 
-  it.each(
-    XML_BODIED,
-  )('%s is a family whose update replaces the whole document', (name) => {
-    // Nothing clever here: the point is that the bytes a handler would send
-    // back are the bytes it read, with its own edit and nothing else.
-    const read = verbatim(wire(name)).value as string;
-    const edited = read.replace(
-      /adtcore:description="[^"]*"/,
-      'adtcore:description="edited"',
-    );
-    expect(edited).not.toBe(read);
-    expect(edited.length).toBeCloseTo(read.length, -2);
-    // everything outside the edit is identical
-    expect(edited.replace('adtcore:description="edited"', '')).toBe(
-      read.replace(/adtcore:description="[^"]*"/, ''),
-    );
-  });
+  it.each(XML_BODIED)(
+    '%s is a family whose update replaces the whole document',
+    (name) => {
+      // Nothing clever here: the point is that the bytes a handler would send
+      // back are the bytes it read, with its own edit and nothing else.
+      const read = verbatim(wire(name)).value as string;
+      const edited = read.replace(
+        /adtcore:description="[^"]*"/,
+        'adtcore:description="edited"',
+      );
+      expect(edited).not.toBe(read);
+      expect(edited.length).toBeCloseTo(read.length, -2);
+      // everything outside the edit is identical
+      expect(edited.replace('adtcore:description="edited"', '')).toBe(
+        read.replace(/adtcore:description="[^"]*"/, ''),
+      );
+    },
+  );
 });
 
 describe('why a parsed reading cannot feed a write', () => {

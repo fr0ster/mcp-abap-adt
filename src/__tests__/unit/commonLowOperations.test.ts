@@ -360,18 +360,18 @@ describe('CheckObjectLow', () => {
   // call now checks the ACTIVE version, which for a freshly-created,
   // not-yet-activated object may not exist yet. Kept deliberately (see the
   // task report), but it must stay pinned here rather than merely declared.
-  it.each([
-    'function_group',
-    'behavior_definition',
-  ] as const)("defaults %s's check to the active version when the caller omits it", async (objectType) => {
-    fakeClient = seen.client;
-    await handleCheckObject(context as any, {
-      object_type: objectType,
-      object_name: 'zx',
-    });
-    const call = seen.calls.filter((c) => c.member === 'check').at(-1);
-    expect(call?.args[1]).toBe('active');
-  });
+  it.each(['function_group', 'behavior_definition'] as const)(
+    "defaults %s's check to the active version when the caller omits it",
+    async (objectType) => {
+      fakeClient = seen.client;
+      await handleCheckObject(context as any, {
+        object_type: objectType,
+        object_name: 'zx',
+      });
+      const call = seen.calls.filter((c) => c.member === 'check').at(-1);
+      expect(call?.args[1]).toBe('active');
+    },
+  );
 
   it('behavior_definition and metadata_extension reach their own factory', async () => {
     fakeClient = seen.client;

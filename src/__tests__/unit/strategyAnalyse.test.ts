@@ -36,16 +36,19 @@ describe('a refusal inside an HTTP 200 — what the design exists for', () => {
     ['refusal-syntax-check--01-checkrun', analyseCheck],
     ['refusal-check-nonexistent-object--01-checkrun', analyseCheck],
     ['refusal-validation-name-taken-ddl--01-ddl-validation', analyseValidation],
-  ] as const)('%s is a failure though the library saw none', (name, analyse) => {
-    expect(corpusSidecar(name).response.status).toBe(200);
+  ] as const)(
+    '%s is a failure though the library saw none',
+    (name, analyse) => {
+      expect(corpusSidecar(name).response.status).toBe(200);
 
-    const verdict = analyse(ADT_NO_FAILURE, wire(name));
-    expect(verdict).not.toBe(ADT_NO_FAILURE);
-    const failure = verdict as IAdtError & { messages: unknown[] };
-    expect(failure.origin).toBe('refusal');
-    expect(failure.message.length).toBeGreaterThan(0);
-    expect(failure.messages.length).toBeGreaterThan(0);
-  });
+      const verdict = analyse(ADT_NO_FAILURE, wire(name));
+      expect(verdict).not.toBe(ADT_NO_FAILURE);
+      const failure = verdict as IAdtError & { messages: unknown[] };
+      expect(failure.origin).toBe('refusal');
+      expect(failure.message.length).toBeGreaterThan(0);
+      expect(failure.messages.length).toBeGreaterThan(0);
+    },
+  );
 });
 
 describe('a success stays a success', () => {

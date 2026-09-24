@@ -211,24 +211,23 @@ describe('return_answer — failure', () => {
 describe('the failure payload carries everything it has', () => {
   const document = corpusBody('refusal-object-not-found--01-read-source');
 
-  it.each([
-    'terse',
-    'full',
-    'raw',
-  ] as const)('carries raw_body at detail=%s', (detail) => {
-    // `detail` is a parameter of the RESULT projection, and a failure is not
-    // a projection: on this path the consumer wants everything.
-    const result = return_answer(
-      failure({
-        message: 'Not found',
-        origin: 'refusal',
-        response: { data: document },
-      } as never),
-      project,
-      { tool: 'ReadClass', detail },
-    );
-    expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
-  });
+  it.each(['terse', 'full', 'raw'] as const)(
+    'carries raw_body at detail=%s',
+    (detail) => {
+      // `detail` is a parameter of the RESULT projection, and a failure is not
+      // a projection: on this path the consumer wants everything.
+      const result = return_answer(
+        failure({
+          message: 'Not found',
+          origin: 'refusal',
+          response: { data: document },
+        } as never),
+        project,
+        { tool: 'ReadClass', detail },
+      );
+      expect(JSON.parse(result.content[0].text).raw_body).toBe(document);
+    },
+  );
 
   it.each([
     ['a connection failure', {}],

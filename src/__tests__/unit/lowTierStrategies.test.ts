@@ -414,30 +414,33 @@ it.each([
   ],
   // behavior_implementation has no Activate/Delete tool — it cannot join
   // this row; see its own describe block below.
-])('%s pairs each operation with its own strategy, on its own factory', async (_family, activate, remove, validate, factory, expectedDeleteAnalyse, args) => {
-  await (activate as any)(context as any, args);
-  const activateCall = callTo('activate');
-  expect(activateCall?.factory).toBe(factory);
-  expect(activateCall?.carriedAnalyse).toBe(true);
-  expect(activateCall?.analyse).toBe(analyseActivation);
+])(
+  '%s pairs each operation with its own strategy, on its own factory',
+  async (_family, activate, remove, validate, factory, expectedDeleteAnalyse, args) => {
+    await (activate as any)(context as any, args);
+    const activateCall = callTo('activate');
+    expect(activateCall?.factory).toBe(factory);
+    expect(activateCall?.carriedAnalyse).toBe(true);
+    expect(activateCall?.analyse).toBe(analyseActivation);
 
-  // Delete -> analyseDeletion, except `ddlx (metadataExtension)`: its
-  // `delete()` is a plain DELETE on the object's own URL, never a POST to
-  // the deletion service, so it never answers a `del:deletionResult`
-  // document and takes `analyseException` instead — see
-  // `ddlx/low/handleDeleteMetadataExtension.ts`'s own doc comment.
-  await (remove as any)(context as any, args);
-  const deleteCall = callTo('delete');
-  expect(deleteCall?.factory).toBe(factory);
-  expect(deleteCall?.carriedAnalyse).toBe(true);
-  expect(deleteCall?.analyse).toBe(expectedDeleteAnalyse);
+    // Delete -> analyseDeletion, except `ddlx (metadataExtension)`: its
+    // `delete()` is a plain DELETE on the object's own URL, never a POST to
+    // the deletion service, so it never answers a `del:deletionResult`
+    // document and takes `analyseException` instead — see
+    // `ddlx/low/handleDeleteMetadataExtension.ts`'s own doc comment.
+    await (remove as any)(context as any, args);
+    const deleteCall = callTo('delete');
+    expect(deleteCall?.factory).toBe(factory);
+    expect(deleteCall?.carriedAnalyse).toBe(true);
+    expect(deleteCall?.analyse).toBe(expectedDeleteAnalyse);
 
-  await (validate as any)(context as any, args);
-  const validateCall = callTo('validate');
-  expect(validateCall?.factory).toBe(factory);
-  expect(validateCall?.carriedAnalyse).toBe(true);
-  expect(validateCall?.analyse).toBe(analyseException);
-});
+    await (validate as any)(context as any, args);
+    const validateCall = callTo('validate');
+    expect(validateCall?.factory).toBe(factory);
+    expect(validateCall?.carriedAnalyse).toBe(true);
+    expect(validateCall?.analyse).toBe(analyseException);
+  },
+);
 
 describe('class', () => {
   it('CheckClassLow defaults the check member\'s status to "active" when version is omitted', async () => {
@@ -1808,27 +1811,29 @@ describe('program', () => {
       ],
     ];
 
-    it.each(
-      rows,
-    )('%s refuses on a cloud connection and never reaches the client', async (_name, handler, member, args) => {
-      const result: any = await sessionContext.run(cloudStore, () =>
-        handler(context as any, args),
-      );
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        'Programs are not available on cloud systems',
-      );
-      // The half that matters: a handler that explains and calls anyway
-      // is the same bug wearing a message.
-      expect(callTo(member)).toBeUndefined();
-    });
+    it.each(rows)(
+      '%s refuses on a cloud connection and never reaches the client',
+      async (_name, handler, member, args) => {
+        const result: any = await sessionContext.run(cloudStore, () =>
+          handler(context as any, args),
+        );
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain(
+          'Programs are not available on cloud systems',
+        );
+        // The half that matters: a handler that explains and calls anyway
+        // is the same bug wearing a message.
+        expect(callTo(member)).toBeUndefined();
+      },
+    );
 
-    it.each(
-      rows,
-    )('%s proceeds on a non-cloud connection and reaches its member', async (_name, handler, member, args) => {
-      await handler(context as any, args);
-      expect(callTo(member)).toBeDefined();
-    });
+    it.each(rows)(
+      '%s proceeds on a non-cloud connection and reaches its member',
+      async (_name, handler, member, args) => {
+        await handler(context as any, args);
+        expect(callTo(member)).toBeDefined();
+      },
+    );
   });
 });
 

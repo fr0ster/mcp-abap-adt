@@ -9,7 +9,7 @@ const { stdin, stdout } = require('node:process');
 const dotenv = require('dotenv');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('@mcp-abap-adt/connection');
-const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces');
+const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
   AdtRuntimeClient,
@@ -697,12 +697,30 @@ async function upsertExecutableObject(ctx, rl) {
     await askWithDefault(rl, 'Transport request (optional)', '')
   ).toUpperCase();
   const sourceCode = buildClassSource(className);
+  // The metadata half of every call below. The body is not here: it travels as
+  // `options.source` on an `update`, which is the only member that writes one.
   const payload = {
     className,
     packageName,
     description: `Profiling probe ${className}`,
-    sourceCode,
     transportRequest: transportRequest || undefined,
+  };
+
+  // **Lock, write, unlock, activate — four requests, because a member is one
+  // request.** This file used to pass `{ activateOnCreate: true }` and
+  // `{ activateOnUpdate: true }`, which have not existed for a class since
+  // adt-clients moved the lock and the activation to the caller. In a plain JS
+  // object those were ignored extra properties, so the tool reported "created"
+  // over an inactive, empty skeleton.
+  const writeAndActivate = async () => {
+    const locked = await adt.getClass().lock({ className });
+    const lockHandle = locked?.getValue?.() ?? locked?.data ?? locked;
+    try {
+      await adt.getClass().update(payload, { lockHandle, source: sourceCode });
+    } finally {
+      await adt.getClass().unlock({ className }, lockHandle);
+    }
+    await adt.getClass().activate({ className });
   };
   await validateAllowAlreadyExists(
     () =>
@@ -716,11 +734,12 @@ async function upsertExecutableObject(ctx, rl) {
   );
 
   try {
-    await adt.getClass().create(payload, { activateOnCreate: true });
+    await adt.getClass().create(payload);
+    await writeAndActivate();
     console.log(`[ok] Class ${className} created`);
   } catch (error) {
     if (isAlreadyExistsError(error)) {
-      await adt.getClass().update(payload, { activateOnUpdate: true });
+      await writeAndActivate();
       console.log(`[ok] Class ${className} updated`);
     } else if (isNotFoundError(error)) {
       throw new Error(
@@ -736,7 +755,7 @@ async function upsertExecutableObject(ctx, rl) {
   }
 
   // Always enforce profiling template after create/update to avoid empty skeleton classes.
-  await adt.getClass().update(payload, { activateOnUpdate: true });
+  await writeAndActivate();
   const activeState = await adt.getClass().read({ className }, 'active');
   if (!hasRunnableClassMain(activeState?.sourceCode)) {
     throw new Error(

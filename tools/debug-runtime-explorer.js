@@ -7,11 +7,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
-const yaml = require('yaml');
+// `js-yaml`, which this project declares, rather than `yaml`, which it never
+// did: that one resolved only because lint-staged happened to hoist it, and it
+// stopped resolving the moment the tree changed.
+const yaml = require('js-yaml');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('@mcp-abap-adt/connection');
 const { AuthBrokerFactory } = require('../dist/lib/auth/brokerFactory.js');
-const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces');
+const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
   AdtRuntimeClient,
@@ -121,7 +124,7 @@ function loadProjectTestConfig() {
   const cfgPath = path.resolve(process.cwd(), 'tests/test-config.yaml');
   if (!fs.existsSync(cfgPath)) return null;
   const raw = fs.readFileSync(cfgPath, 'utf8');
-  return yaml.parse(raw);
+  return yaml.load(raw);
 }
 
 function getAuthFromTestConfig() {
@@ -452,17 +455,39 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
     classSource,
   );
 
+  // **Three requests per object, because a member is one request.** `create`
+  // posts the metadata skeleton only, the body goes in `options.source` on an
+  // `update` the caller locks for, and activation is its own call. The
+  // `{ activateOnCreate: true }` / `{ activateOnUpdate: true }` this used to
+  // pass has not existed for a class in adt-clients since the member model
+  // changed — it was an ignored extra property in a plain JS object, so this
+  // tool has been leaving inactive objects behind and saying "Created".
+  const writeSource = async (api, config, source) => {
+    const locked = await api.lock({ className: probe.className });
+    const lockHandle = locked?.getValue?.() ?? locked?.data ?? locked;
+    try {
+      await api.update(config, { lockHandle, source });
+    } finally {
+      await api.unlock({ className: probe.className }, lockHandle);
+    }
+  };
+
   try {
-    await classApi.create(
+    await classApi.create({
+      className: probe.className,
+      packageName: probe.packageName,
+      description: `Debug probe ${probe.className}`,
+      transportRequest: probe.transportRequest,
+    });
+    await writeSource(
+      classApi,
       {
         className: probe.className,
-        packageName: probe.packageName,
-        description: `Debug probe ${probe.className}`,
-        sourceCode: classSource,
         transportRequest: probe.transportRequest,
       },
-      { activateOnCreate: true },
+      classSource,
     );
+    await classApi.activate({ className: probe.className });
     logger.info(`Created class ${probe.className}`);
   } catch (error) {
     if (error?.response?.status === 403) {
@@ -472,14 +497,15 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
     }
     if (isAlreadyExistsError(error)) {
       logger.warn(`Class ${probe.className} exists, switching to update`);
-      await classApi.update(
+      await writeSource(
+        classApi,
         {
           className: probe.className,
-          sourceCode: classSource,
           transportRequest: probe.transportRequest,
         },
-        { activateOnUpdate: true },
+        classSource,
       );
+      await classApi.activate({ className: probe.className });
       logger.info(`Updated class ${probe.className}`);
     } else {
       throw error;
@@ -487,15 +513,20 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
   }
 
   try {
-    await localTestApi.create(
+    await localTestApi.create({
+      className: probe.className,
+      testClassName: probe.testClassName,
+      transportRequest: probe.transportRequest,
+    });
+    await writeSource(
+      localTestApi,
       {
         className: probe.className,
-        testClassCode: testSource,
-        testClassName: probe.testClassName,
         transportRequest: probe.transportRequest,
       },
-      { activateOnCreate: true },
+      testSource,
     );
+    await classApi.activate({ className: probe.className });
     logger.info(`Created local test class ${probe.testClassName}`);
   } catch (_error) {
     if (_error?.response?.status === 403) {
@@ -506,14 +537,15 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
     logger.warn(
       `Local test class exists or create failed, trying update for ${probe.className}`,
     );
-    await localTestApi.update(
+    await writeSource(
+      localTestApi,
       {
         className: probe.className,
-        testClassCode: testSource,
         transportRequest: probe.transportRequest,
       },
-      { activateOnUpdate: true },
+      testSource,
     );
+    await classApi.activate({ className: probe.className });
     logger.info(`Updated local test class include for ${probe.className}`);
   }
 }

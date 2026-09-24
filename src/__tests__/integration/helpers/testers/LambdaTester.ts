@@ -737,15 +737,23 @@ export class LambdaTester {
    * Force-release a DDIC lock on an object if one is held.
    * `/sap/bc/adt/deletion/check` detects it; `ddic/ddlock/locks` drops it.
    *
-   * **Detection works everywhere; the release does not.** Measured against BTP
-   * ABAP on 2026-09-24 with a behavior definition left locked by an earlier
-   * run: the check answered `isDeletable="false"` with
-   * `<del:lockUser>` naming the holder, and the release answered **404** — that
-   * endpoint manages DDIC locks, and a BDEF is not DDIC. So this is worth
-   * calling (it costs one request and does release what it can), and it is not
-   * something a suite may rely on: the protection that works is not orphaning
-   * the lock in the first place, which is why the unlock in a suite must fail
-   * the suite rather than warn.
+   * **Detection works; the release does not, at least not here.** Measured
+   * against BTP ABAP on 2026-09-24 with a behavior definition left locked by an
+   * earlier run: `deletion/check` answered `isDeletable="false"` with
+   * `<del:lockUser>` naming the holder, and `ddic/ddlock/locks` answered
+   * **404 — `Resource /sap/bc/adt/ddic/ddlock/locks does not exist`**. The
+   * endpoint is absent from that system altogether, not merely unsuitable for a
+   * BDEF. It is left wired because it costs one request and on-premise systems
+   * do serve it; it is not something a suite may rely on.
+   *
+   * Nothing else releases such a lock from outside its session either — all
+   * measured the same day, and `scripts/probe-object-lock.ts` is what measures
+   * it: a stateful `?_action=LOCK&accessMode=MODIFY` answers `403` EU510, the
+   * same with `&force=true` answers `403` unchanged, and `?_action=UNLOCK`
+   * without a handle answers `200` with an empty body and leaves the lock
+   * exactly where it was. So the protection that works is not orphaning the
+   * lock in the first place, which is why a suite's unlock must fail the suite
+   * rather than warn.
    */
   protected async forceReleaseLock(
     connection: any,

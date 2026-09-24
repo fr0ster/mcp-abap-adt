@@ -329,75 +329,12 @@ shared_dependencies:
           Fld4
         }
 
-    # CDS views for BDEF HIGH test (creates/deletes its own BDEF on these views)
-    - name: "ZMCP_SHR_I_BDEF"
-      description: "Shared root CDS view for BDEF HIGH test"
-      available_in: ["onprem", "cloud"]
-      source: |
-        @EndUserText.label : 'Shared root CDS view for BDEF HIGH test'
-        @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity ZMCP_SHR_I_BDEF
-          as select from zmcp_shr_btabl
-          composition [0..*] of ZMCP_SHR_I_BCHD as _children
-        {
-          key fld1 as Fld1,
-          fld2 as Fld2,
-          fld3 as Fld3,
-          fld4 as Fld4,
-          _children
-        }
-
-    - name: "ZMCP_SHR_I_BCHD"
-      description: "Shared child CDS view for BDEF HIGH test"
-      available_in: ["onprem", "cloud"]
-      source: |
-        @EndUserText.label : 'Shared child CDS view for BDEF HIGH test'
-        @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define view entity ZMCP_SHR_I_BCHD
-          as select from zmcp_shr_bctbl
-          association to parent ZMCP_SHR_I_BDEF as _parent
-            on $projection.ParentId = _parent.Fld1
-        {
-          key chld_id as ChldId,
-          parent_id as ParentId,
-          fld2 as Fld2,
-          _parent
-        }
-
-    # CDS views for BDEF LOW test (separate pair to avoid conflict with HIGH test)
-    - name: "ZMCP_SHR_I_BDFL"
-      description: "Shared root CDS view for BDEF LOW test"
-      available_in: ["onprem", "cloud"]
-      source: |
-        @EndUserText.label : 'Shared root CDS view for BDEF LOW test'
-        @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define root view entity ZMCP_SHR_I_BDFL
-          as select from zmcp_shr_bltbl
-          composition [0..*] of ZMCP_SHR_I_BCHL as _children
-        {
-          key fld1 as Fld1,
-          fld2 as Fld2,
-          fld3 as Fld3,
-          fld4 as Fld4,
-          _children
-        }
-
-    - name: "ZMCP_SHR_I_BCHL"
-      description: "Shared child CDS view for BDEF LOW test"
-      available_in: ["onprem", "cloud"]
-      source: |
-        @EndUserText.label : 'Shared child CDS view for BDEF LOW test'
-        @AccessControl.authorizationCheck : #NOT_REQUIRED
-        define view entity ZMCP_SHR_I_BCHL
-          as select from zmcp_shr_blctl
-          association to parent ZMCP_SHR_I_BDFL as _parent
-            on $projection.ParentId = _parent.Fld1
-        {
-          key chld_id as ChldId,
-          parent_id as ParentId,
-          fld2 as Fld2,
-          _parent
-        }
+    # The BDEF suites own their root and child views now: a behavior
+    # definition must carry its root entity's name, so a test that creates
+    # and deletes a BDEF cannot borrow a shared entity's name for it. The
+    # four views that used to sit here — the SHR-named pairs for the HIGH and
+    # LOW tiers — are created by those suites under their own ZMCP_BLD_I_*
+    # names instead. The tables underneath stay shared and untouched.
 
     # CDS view for CDS unit test dependency
     - name: "ZMCP_BLD_CDSV_H1"
@@ -547,7 +484,8 @@ auth_broker:
 # ============================================================================
 
 # Behavior Definition (Behavior Definition - Low-Level)
-# Uses fully isolated shared CDS views ZMCP_SHR_I_BDFL/BCHL with own tables
+# The suite creates its own root and child views (ZMCP_BLD_I_BDFL/BCHL) over
+# the shared tables, because a BDEF must carry its root entity's name
 create_behavior_definition_low:
   test_cases:
     - name: "full_workflow"
@@ -555,15 +493,27 @@ create_behavior_definition_low:
       available_in: ["onprem", "cloud"]
       description: "Behavior Definition low-level handler full workflow test"
       params:
-        name: "ZMCP_SHR_I_BDFL"
+        name: "ZMCP_BLD_I_BDFL"
         description: "Behavior Definition low-level handler test"
-        root_entity: "ZMCP_SHR_I_BDFL"
+        root_entity: "ZMCP_BLD_I_BDFL"
         implementation_type: "Managed"
+        root_view_name: "ZMCP_BLD_I_BDFL"
+        root_view_source: |
+          @EndUserText.label : 'Root view for the BDEF low-tier test'
+          @AccessControl.authorizationCheck : #NOT_REQUIRED
+          define root view entity ZMCP_BLD_I_BDFL
+            as select from zmcp_shr_bltbl
+          {
+            key fld1 as Fld1,
+            fld2 as Fld2,
+            fld3 as Fld3,
+            fld4 as Fld4
+          }
         source_code: |
-          managed implementation in class zbp_mcp_shr_i_bdfl unique;
+          managed implementation in class zbp_mcp_bld_i_bdfl unique;
           strict ( 2 );
 
-          define behavior for ZMCP_SHR_I_BDFL
+          define behavior for ZMCP_BLD_I_BDFL
           persistent table zmcp_shr_bltbl
           lock master
           authorization master ( instance )
@@ -572,24 +522,12 @@ create_behavior_definition_low:
             update;
             delete;
             field ( readonly ) Fld1;
-            association _children { create; }
-          }
-
-          define behavior for ZMCP_SHR_I_BCHL
-          persistent table zmcp_shr_blctl
-          lock dependent by _parent
-          authorization dependent by _parent
-          {
-            update;
-            delete;
-            field ( readonly:update ) ChldId, ParentId;
-            association _parent;
           }
         update_source_code: |
-          managed implementation in class zbp_mcp_shr_i_bdfl unique;
+          managed implementation in class zbp_mcp_bld_i_bdfl unique;
           strict ( 2 );
 
-          define behavior for ZMCP_SHR_I_BDFL
+          define behavior for ZMCP_BLD_I_BDFL
           persistent table zmcp_shr_bltbl
           lock master
           authorization master ( instance )
@@ -599,22 +537,68 @@ create_behavior_definition_low:
             delete;
             field ( readonly ) Fld1;
             field ( readonly ) Fld2;
-            association _children { create; }
           }
 
-          define behavior for ZMCP_SHR_I_BCHL
-          persistent table zmcp_shr_blctl
-          lock dependent by _parent
-          authorization dependent by _parent
+# Behavior Definition (Behavior Definition - High-Level)
+# Its own set, disjoint from the low tier's: the two suites used to read this
+# same case and fought over one object, and the BIMPL case named a third BDEF
+# that nothing created. The suite creates the views, the BDEF and the class, and
+# deletes all four in cleanup.
+create_behavior_definition:
+  test_cases:
+    - name: "full_workflow"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Behavior Definition high-level handler workflow test"
+      params:
+        name: "ZMCP_BLD_I_BDEF"
+        description: "Behavior Definition high-level handler test"
+        root_entity: "ZMCP_BLD_I_BDEF"
+        implementation_type: "Managed"
+        root_view_name: "ZMCP_BLD_I_BDEF"
+        root_view_source: |
+          @EndUserText.label : 'Root view for the BDEF high-tier test'
+          @AccessControl.authorizationCheck : #NOT_REQUIRED
+          define root view entity ZMCP_BLD_I_BDEF
+            as select from zmcp_shr_btabl
           {
+            key fld1 as Fld1,
+            fld2 as Fld2,
+            fld3 as Fld3,
+            fld4 as Fld4
+          }
+        source_code: |
+          managed implementation in class zbp_mcp_bld_i_bdef unique;
+          strict ( 2 );
+
+          define behavior for ZMCP_BLD_I_BDEF
+          persistent table zmcp_shr_btabl
+          lock master
+          authorization master ( instance )
+          {
+            create ( authorization : global );
             update;
             delete;
-            field ( readonly:update ) ChldId, ParentId;
-            association _parent;
+            field ( readonly ) Fld1;
+          }
+        update_source_code: |
+          managed implementation in class zbp_mcp_bld_i_bdef unique;
+          strict ( 2 );
+
+          define behavior for ZMCP_BLD_I_BDEF
+          persistent table zmcp_shr_btabl
+          lock master
+          authorization master ( instance )
+          {
+            create ( authorization : global );
+            update;
+            delete;
+            field ( readonly ) Fld1;
+            field ( readonly ) Fld2;
           }
 
 # Behavior Implementation (Behavior Implementation - High-Level)
-# Used in combined BDEF+BIMPL test — BDEF (ZMCP_SHR_I_BDEF) is created first in the same test
+# Used in combined BDEF+BIMPL test — BDEF (ZMCP_BLD_I_BDEF) is created first in the same test
 create_behavior_implementation:
   test_cases:
     - name: "builder_behavior_implementation"
@@ -622,22 +606,22 @@ create_behavior_implementation:
       available_in: ["onprem", "cloud"]
       description: "Behavior Implementation used by combined BDEF+BIMPL workflow tests (high-level)"
       params:
-        class_name: "ZBP_MCP_SHR_I_BDEF"
-        description: "Behavior Implementation for ZMCP_SHR_I_BDEF (high-level)"
-        behavior_definition: "ZMCP_SHR_I_BDEF"
+        class_name: "ZBP_MCP_BLD_I_BDEF"
+        description: "Behavior Implementation for ZMCP_BLD_I_BDEF (high-level)"
+        behavior_definition: "ZMCP_BLD_I_BDEF"
         implementation_code: |
-          CLASS lhc_ZMCP_SHR_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_BLD_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdef RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdef RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDEF IMPLEMENTATION.
+          CLASS lhc_ZMCP_BLD_I_BDEF IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -647,21 +631,21 @@ create_behavior_implementation:
 
           ENDCLASS.
         update_implementation_code: |
-          CLASS lhc_ZMCP_SHR_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_BLD_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdef RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdef RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdef RESULT result.
 
               METHODS create FOR MODIFY
-                IMPORTING entities FOR CREATE zmcp_shr_i_bdef.
+                IMPORTING entities FOR CREATE zmcp_bld_i_bdef.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDEF IMPLEMENTATION.
+          CLASS lhc_ZMCP_BLD_I_BDEF IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -676,7 +660,7 @@ create_behavior_implementation:
           ENDCLASS.
 
 # Behavior Implementation (Behavior Implementation - Low-Level)
-# Used in combined BDEF+BIMPL test — BDEF (ZMCP_SHR_I_BDFL) is created first in the same test
+# Used in combined BDEF+BIMPL test — BDEF (ZMCP_BLD_I_BDFL) is created first in the same test
 create_behavior_implementation_low:
   test_cases:
     - name: "full_workflow"
@@ -684,22 +668,22 @@ create_behavior_implementation_low:
       available_in: ["onprem", "cloud"]
       description: "Behavior Implementation low-level handler full workflow test (combined with BDEF)"
       params:
-        class_name: "ZBP_MCP_SHR_I_BDFL"
-        description: "Behavior Implementation for ZMCP_SHR_I_BDFL"
-        behavior_definition: "ZMCP_SHR_I_BDFL"
+        class_name: "ZBP_MCP_BLD_I_BDFL"
+        description: "Behavior Implementation for ZMCP_BLD_I_BDFL"
+        behavior_definition: "ZMCP_BLD_I_BDFL"
         source_code: |
-          CLASS lhc_ZMCP_SHR_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDFL IMPLEMENTATION.
+          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -709,18 +693,18 @@ create_behavior_implementation_low:
 
           ENDCLASS.
         implementation_code: |
-          CLASS lhc_ZMCP_SHR_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDFL IMPLEMENTATION.
+          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.
@@ -730,18 +714,18 @@ create_behavior_implementation_low:
 
           ENDCLASS.
         update_source_code: |
-          CLASS lhc_ZMCP_SHR_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
+          CLASS lhc_ZMCP_BLD_I_BDFL DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
 
               METHODS get_instance_authorizations FOR INSTANCE AUTHORIZATION
-                IMPORTING keys REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
+                IMPORTING keys REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
 
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
-                IMPORTING REQUEST requested_authorizations FOR zmcp_shr_i_bdfl RESULT result.
+                IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdfl RESULT result.
 
           ENDCLASS.
 
-          CLASS lhc_ZMCP_SHR_I_BDFL IMPLEMENTATION.
+          CLASS lhc_ZMCP_BLD_I_BDFL IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
             ENDMETHOD.

@@ -18,12 +18,19 @@
 import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
+import { handleValidateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { handleCreateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import {
+  assertNameAvailable,
+  createView,
+  deleteView,
+  type ViewFixture,
+} from '../../helpers/rapFixtures';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -40,7 +47,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
 
   beforeAll(async () => {
     tester = new LambdaTester(
-      'create_behavior_definition_low',
+      'create_behavior_definition',
       'full_workflow',
       'bdef-bimpl-high',
     );
@@ -86,8 +93,14 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
                   content: { type: string; text: string }[];
                 },
               );
-              testLogger?.error?.(`Delete BIMPL class refused: ${detail}`);
-              leftBehind.push(`BIMPL class ${bimplClassName}: ${detail}`);
+              if (/does not exist|not found|404/i.test(detail)) {
+                testLogger?.info?.(
+                  `BIMPL class ${bimplClassName} was not there`,
+                );
+              } else {
+                testLogger?.error?.(`Delete BIMPL class refused: ${detail}`);
+                leftBehind.push(`BIMPL class ${bimplClassName}: ${detail}`);
+              }
             } else {
               testLogger?.info?.(`Deleted BIMPL class ${bimplClassName}`);
             }
@@ -119,8 +132,12 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
                   content: { type: string; text: string }[];
                 },
               );
-              testLogger?.error?.(`Delete BDEF refused: ${detail}`);
-              leftBehind.push(`BDEF ${objectName}: ${detail}`);
+              if (/does not exist|not found|404/i.test(detail)) {
+                testLogger?.info?.(`BDEF ${objectName} was not there`);
+              } else {
+                testLogger?.error?.(`Delete BDEF refused: ${detail}`);
+                leftBehind.push(`BDEF ${objectName}: ${detail}`);
+              }
             } else {
               testLogger?.info?.(`Deleted BDEF ${objectName}`);
             }
@@ -131,6 +148,23 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
               leftBehind.push(`BDEF ${objectName}: ${msg}`);
             }
           }
+        }
+
+        // 3. Delete the view this suite created.
+        const cleanupParams = context.params ?? {};
+        if (cleanupParams.root_view_name) {
+          leftBehind.push(
+            ...(await deleteView(
+              createHandlerContext({ connection, logger: testLogger }),
+              {
+                name: cleanupParams.root_view_name,
+                description: `Root view for ${objectName}`,
+                source: cleanupParams.root_view_source,
+              },
+              transportRequest,
+              testLogger,
+            )),
+          );
         }
 
         if (leftBehind.length > 0) {
@@ -198,7 +232,34 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
           }
         };
 
+        // ── Step 0: the view this BDEF is defined over — this suite's own, under
+        // its own name, so nothing here can lock a shared name out.
+        const rootView: ViewFixture = {
+          name: params.root_view_name,
+          description: `Root view for ${objectName}`,
+          source: params.root_view_source,
+        };
+        await createView(
+          handlerCtx,
+          rootView,
+          packageName,
+          transportRequest,
+          testLogger,
+        );
+
         // ── Step 1: Create BDEF (skip activation — will activate together with BIMPL)
+        // Ask first whether the name is free: `admissible: false` carries the
+        // server's reason, and a run that skips this finds out from a create
+        // that is refused for something that reads like another problem.
+        await assertNameAvailable(`BDEF ${objectName}`, () =>
+          handleValidateBehaviorDefinition(handlerCtx, {
+            name: objectName,
+            package_name: packageName,
+            description: params.description || objectName,
+            root_entity: params.root_entity,
+            implementation_type: params.implementation_type,
+          }),
+        );
         testLogger?.info?.(`   * create BDEF: ${objectName}`);
         await mustSucceed(`Create BDEF ${objectName}`, () =>
           handleCreateBehaviorDefinition(handlerCtx, {
@@ -262,6 +323,13 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
 
         // ── Step 5: Update BIMPL
         testLogger?.info?.(`   * update BIMPL: ${bimplClassName}`);
+        // **`activate: false`, because the class cannot compile on its own yet.**
+        // The handler activates by default, and the include it writes is
+        // generated against the behavior definition — which is still inactive at
+        // this point, by design, so that step 6 can activate BDEF and class
+        // together. Letting the default run answered *"Activation failed: Class
+        // …, Class Include (Local Data Types, Object Types, Macros) IMP"*, and
+        // the suite never noticed because it read no answers.
         await mustSucceed(`Update BIMPL ${bimplClassName}`, () =>
           handleUpdateBehaviorImplementation(handlerCtx, {
             class_name: bimplClassName,
@@ -269,6 +337,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
             implementation_code:
               bimplParams.update_implementation_code ||
               bimplParams.implementation_code,
+            activate: false,
             ...(transportRequest && { transport_request: transportRequest }),
           }),
         );

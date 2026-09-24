@@ -1,8 +1,17 @@
 /**
  * Combined integration tests for BehaviorDefinition + BehaviorImplementation Low-Level Handlers
  *
+ * **Every object here belongs to this suite.** The root and child view
+ * entities, the behavior definition and the implementation class are created
+ * under `ZMCP_BLD_I_*` and deleted in cleanup; the tables underneath are shared
+ * and only read from. A BDEF has to carry its root entity's name, so defining
+ * one over a shared entity would mean creating and deleting an object under a
+ * `ZMCP_SHR_*` name — which is how one run left an ENQUEUE lock on
+ * `ZMCP_SHR_I_BDFL` that nothing in ADT could release.
+ *
  * BDEF must exist before BIMPL can be created, so both are tested in a single
  * test with guaranteed ordering:
+ *   0. Views:  Validate names -> Create both -> write sources -> activate both
  *   1. BDEF:  Validate -> Create -> Lock -> Update -> Unlock (no activate yet)
  *   2. BIMPL: Validate -> CreateClass -> CheckClass -> LockBimpl -> Update(AdtClient) -> UnlockClass
  *   3. Group-activate BDEF + BIMPL class together (avoids activation warnings)
@@ -31,6 +40,12 @@ import { handleActivateObject } from '../../../../handlers/common/low/handleActi
 import { createAdtClient } from '../../../../lib/clients';
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import {
+  assertNameAvailable,
+  createView,
+  deleteView,
+  type ViewFixture,
+} from '../../helpers/rapFixtures';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -140,8 +155,13 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
                 0,
                 300,
               );
-              testLogger?.error?.(`Delete BDEF returned error: ${detail}`);
-              leftBehind.push(`BDEF ${objectName}: ${detail}`);
+              // A BDEF the run never got as far as creating is not a leftover.
+              if (/does not exist|not found|404/i.test(detail)) {
+                testLogger?.info?.(`BDEF ${objectName} was not there`);
+              } else {
+                testLogger?.error?.(`Delete BDEF returned error: ${detail}`);
+                leftBehind.push(`BDEF ${objectName}: ${detail}`);
+              }
             } else {
               testLogger?.info?.(`Deleted BDEF ${objectName}`);
             }
@@ -153,6 +173,23 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
           // Wait after delete — SAP needs time to finalize deletion in transport
           await delay(context.getOperationDelay('delete') || 5000);
+        }
+
+        // 3. Delete the view this suite created.
+        const cleanupParams = context.params ?? {};
+        if (cleanupParams.root_view_name) {
+          leftBehind.push(
+            ...(await deleteView(
+              createHandlerContext({ connection, logger: testLogger }),
+              {
+                name: cleanupParams.root_view_name,
+                description: `Root view for ${objectName}`,
+                source: cleanupParams.root_view_source,
+              },
+              transportRequest,
+              testLogger,
+            )),
+          );
         }
 
         if (leftBehind.length > 0) {
@@ -196,6 +233,23 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         });
 
         // ═══════════════════════════════════════════════════════════
+        // Part 0: the views this BDEF is defined over — ours, not shared
+        // ═══════════════════════════════════════════════════════════
+
+        const rootView: ViewFixture = {
+          name: params.root_view_name,
+          description: `Root view for ${objectName}`,
+          source: params.root_view_source,
+        };
+        await createView(
+          handlerCtx,
+          rootView,
+          packageName,
+          transportRequest,
+          testLogger,
+        );
+
+        // ═══════════════════════════════════════════════════════════
         // Part 1: BDEF — Validate → Create → Lock → Update → Unlock
         // ═══════════════════════════════════════════════════════════
 
@@ -224,7 +278,16 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             `Validate BDEF failed: ${extractErrorMessage(validateBdefResponse)}`,
           );
         }
-        testLogger?.info?.(`   + BDEF validated`);
+        // **Answering is not the same as being free.** `terseValidation` reports
+        // `admissible: false` with the server's reason when the name is taken,
+        // and this used to be read as a pass: the run went on to a create that
+        // was refused three steps later, where the message reads like something
+        // else entirely.
+        await assertNameAvailable(
+          `BDEF ${objectName}`,
+          async () => validateBdefResponse,
+        );
+        testLogger?.info?.(`   + BDEF validated, and the name is free`);
 
         // Create BDEF
         testLogger?.info?.(`   * create BDEF: ${objectName}`);

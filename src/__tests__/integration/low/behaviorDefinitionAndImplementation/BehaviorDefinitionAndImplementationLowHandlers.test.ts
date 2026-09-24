@@ -57,9 +57,19 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
       async (context: LambdaTesterContext) => {
         await ensureSharedObjects(context.connection);
       },
-      // Cleanup lambda: delete BIMPL class first, then BDEF
+      // Cleanup lambda: delete BIMPL class first, then BDEF.
+      //
+      // **A refusal here is reported, not swallowed.** Both deletes used to log
+      // a warning and return, so `LambdaTester` — which decides by whether this
+      // lambda threw — ended a refused delete with
+      // `✅ Cleanup completed successfully`. That is how an object left locked
+      // and undeleted read as a clean run. Everything is still attempted; the
+      // refusals are collected and thrown at the end, which makes
+      // `LambdaTester` say `Object left in SAP system` and leaves the suite's
+      // own verdict alone.
       async (context: LambdaTesterContext) => {
         const { connection, objectName, transportRequest } = context;
+        const leftBehind: string[] = [];
 
         const bimplTestCase = getEnabledTestCase(
           'create_behavior_implementation_low',
@@ -95,7 +105,8 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (!msg.includes('not found') && !msg.includes('404')) {
-              testLogger?.warn?.(`Failed to delete BIMPL class: ${msg}`);
+              testLogger?.error?.(`Failed to delete BIMPL class: ${msg}`);
+              leftBehind.push(`BIMPL class ${bimplClassName}: ${msg}`);
             }
           }
         }
@@ -125,19 +136,29 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
               },
             );
             if (deleteResponse.isError) {
-              testLogger?.warn?.(
-                `Delete BDEF returned error: ${JSON.stringify(deleteResponse.content)?.substring(0, 300)}`,
+              const detail = JSON.stringify(deleteResponse.content)?.substring(
+                0,
+                300,
               );
+              testLogger?.error?.(`Delete BDEF returned error: ${detail}`);
+              leftBehind.push(`BDEF ${objectName}: ${detail}`);
             } else {
               testLogger?.info?.(`Deleted BDEF ${objectName}`);
             }
           } catch (e: any) {
             const msg = e?.message || String(e);
-            testLogger?.warn?.(`Delete BDEF exception: ${msg}`);
+            testLogger?.error?.(`Delete BDEF exception: ${msg}`);
+            leftBehind.push(`BDEF ${objectName}: ${msg}`);
           }
 
           // Wait after delete — SAP needs time to finalize deletion in transport
           await delay(context.getOperationDelay('delete') || 5000);
+        }
+
+        if (leftBehind.length > 0) {
+          throw new Error(
+            `cleanup did not remove ${leftBehind.length} object(s): ${leftBehind.join('; ')}`,
+          );
         }
       },
     );
@@ -262,11 +283,27 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         }
         const bdefLockData = parseHandlerResponse(bdefLockResponse);
         const bdefLockHandle = extractLockHandle(bdefLockData);
+        // **The session id is half of the lock.** `UnlockBehaviorDefinitionLow`
+        // declares `session_id` required and refuses an empty one, and the ADT
+        // lock is bound to the ABAP session that took it — a handle alone
+        // cannot release it. This test used to pass `session_id: ''`, so every
+        // run left an ENQUEUE lock on the object and the next run of this same
+        // suite was refused with `403 ExceptionResourceNoAccess`, *"User … is
+        // currently editing …"*. Measured on BTP ABAP 2026-09-24.
+        const bdefSessionId = String(
+          (bdefLockData as { session_id?: unknown })?.session_id ?? '',
+        );
+        if (!bdefSessionId) {
+          throw new Error(
+            'Lock BDEF answered no session_id, so the lock it took cannot be released — unlock requires it. Refusing to write under a lock this test would then orphan.',
+          );
+        }
         testLogger?.info?.(`   + BDEF locked`);
 
         await delay(context.getOperationDelay('lock'));
 
         // Update + Unlock BDEF (guarantee unlock even if update fails)
+        let bdefUnlockFailure: string | undefined;
         try {
           testLogger?.info?.(`   * update BDEF: ${objectName}`);
           const updateBdefResponse = await tester.invokeToolOrHandler(
@@ -301,27 +338,40 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
               {
                 name: objectName,
                 lock_handle: bdefLockHandle,
-                session_id: '',
+                session_id: bdefSessionId,
               },
               async () =>
                 handleUnlockBehaviorDefinition(handlerCtx, {
                   name: objectName,
                   lock_handle: bdefLockHandle,
-                  session_id: '',
+                  session_id: bdefSessionId,
                 }),
             );
             if (unlockResponse.isError) {
-              testLogger?.warn?.(
-                `Unlock BDEF failed: ${extractErrorMessage(unlockResponse)}`,
+              bdefUnlockFailure = extractErrorMessage(unlockResponse);
+              testLogger?.error?.(
+                `Unlock BDEF failed: ${bdefUnlockFailure}. The lock is still held.`,
               );
             } else {
               testLogger?.info?.(`   + BDEF unlocked`);
             }
           } catch (unlockError: any) {
-            testLogger?.warn?.(
-              `Unlock BDEF exception: ${unlockError?.message}`,
+            bdefUnlockFailure = unlockError?.message || String(unlockError);
+            testLogger?.error?.(
+              `Unlock BDEF exception: ${bdefUnlockFailure}. The lock is still held.`,
             );
           }
+        }
+
+        // **A lock this test fails to release has to fail this test.** It was a
+        // warning, and a warning is invisible to a green run: the suite passed
+        // and the NEXT run of it was refused at the lock. The throw goes after
+        // the `finally` on purpose, so a failed update keeps its own error and
+        // this one only speaks when the write itself went through.
+        if (bdefUnlockFailure) {
+          throw new Error(
+            `BDEF ${objectName} was left locked: ${bdefUnlockFailure}`,
+          );
         }
 
         await delay(context.getOperationDelay('unlock'));
@@ -445,6 +495,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         }
         const lockData = parseHandlerResponse(lockResponse);
         const lockHandle = extractLockHandle(lockData);
+        let classUnlockFailure: string | undefined;
         testLogger?.info?.(`   + BIMPL locked`);
 
         await delay(context.getOperationDelay('lock'));
@@ -491,15 +542,27 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
                 }),
             );
             if (unlockResponse.isError) {
-              testLogger?.warn?.(
-                `Unlock failed: ${extractErrorMessage(unlockResponse)}`,
+              classUnlockFailure = extractErrorMessage(unlockResponse);
+              testLogger?.error?.(
+                `Unlock failed: ${classUnlockFailure}. The lock is still held.`,
               );
             } else {
               testLogger?.info?.(`   + class unlocked`);
             }
           } catch (unlockError: any) {
-            testLogger?.warn?.(`Unlock exception: ${unlockError?.message}`);
+            classUnlockFailure = unlockError?.message || String(unlockError);
+            testLogger?.error?.(
+              `Unlock exception: ${classUnlockFailure}. The lock is still held.`,
+            );
           }
+        }
+
+        // Same reason as the BDEF above: a lock left behind poisons the next run
+        // of this suite, and a warning does not say so.
+        if (classUnlockFailure) {
+          throw new Error(
+            `BIMPL class ${className} was left locked: ${classUnlockFailure}`,
+          );
         }
 
         await delay(context.getOperationDelay('unlock'));

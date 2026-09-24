@@ -395,6 +395,32 @@ export class LambdaTester {
       );
     }
 
+    // **Release the lock before trying to delete anything.** A suite that
+    // created an object and then failed before its unlock leaves a real SAP
+    // ENQUEUE lock behind — EU510, *"is currently being edited"* — and every
+    // later run of that suite is refused at its own lock, while the delete in
+    // this cleanup is refused with *"You are already editing"*. The whole
+    // mechanism for this was already here, `forceReleaseLock` below, written
+    // for exactly this and called from nowhere: measured 2026-09-24, zero
+    // callers in the repository. One run of the BDEF suite was enough to lock
+    // `ZMCP_SHR_I_BDFL` out for every run after it.
+    //
+    // Never throws: cleanup tidying up must not replace the failure that
+    // brought us here.
+    if (this.context.objectName) {
+      try {
+        await this.forceReleaseLock(
+          this.context.connection,
+          this.context.objectName,
+          this.context.logger,
+        );
+      } catch (error: any) {
+        this.context.logger?.warn?.(
+          `could not release a lock on ${this.context.objectName}: ${error?.message || String(error)}`,
+        );
+      }
+    }
+
     // Execute cleanup lambda (errors are caught and logged, but don't fail the cleanup process)
     // TODO: Legacy systems may report a delete error (false negative) even though the object
     // is actually deleted successfully. Do not treat cleanup errors on legacy as real failures.
@@ -708,8 +734,18 @@ export class LambdaTester {
   }
 
   /**
-   * Force-release DDIC lock on an object if it's locked.
-   * Uses /sap/bc/adt/deletion/check to detect locks, then ddlock/locks to release.
+   * Force-release a DDIC lock on an object if one is held.
+   * `/sap/bc/adt/deletion/check` detects it; `ddic/ddlock/locks` drops it.
+   *
+   * **Detection works everywhere; the release does not.** Measured against BTP
+   * ABAP on 2026-09-24 with a behavior definition left locked by an earlier
+   * run: the check answered `isDeletable="false"` with
+   * `<del:lockUser>` naming the holder, and the release answered **404** — that
+   * endpoint manages DDIC locks, and a BDEF is not DDIC. So this is worth
+   * calling (it costs one request and does release what it can), and it is not
+   * something a suite may rely on: the protection that works is not orphaning
+   * the lock in the first place, which is why the unlock in a suite must fail
+   * the suite rather than warn.
    */
   protected async forceReleaseLock(
     connection: any,

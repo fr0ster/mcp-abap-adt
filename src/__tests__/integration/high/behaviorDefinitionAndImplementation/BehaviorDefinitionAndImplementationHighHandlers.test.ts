@@ -27,7 +27,11 @@ import { createTestLogger } from '../../helpers/loggerHelpers';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import { createHandlerContext, delay } from '../../helpers/testHelpers';
+import {
+  createHandlerContext,
+  delay,
+  extractErrorMessage,
+} from '../../helpers/testHelpers';
 
 const testLogger = createTestLogger('bdef-bimpl-high');
 
@@ -46,8 +50,14 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         await ensureSharedObjects(context.connection);
       },
       // Cleanup lambda: delete BIMPL class first, then BDEF
+      // A refused delete is reported here, not printed as a success. Both
+      // branches below used to log `Deleted …` straight after the call: these
+      // handlers answer `isError: true` instead of throwing, so the line said
+      // the object was gone whatever the server replied. That is exactly how an
+      // object still held by an ENQUEUE lock read as cleaned up.
       async (context: LambdaTesterContext) => {
         const { connection, objectName, transportRequest } = context;
+        const leftBehind: string[] = [];
 
         // Load BIMPL config to get class name
         const bimplTestCase = getEnabledTestCase(
@@ -63,13 +73,24 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
               connection,
               logger: testLogger,
             });
-            await handleDeleteClass(deleteCtx, {
+            const answer = await handleDeleteClass(deleteCtx, {
               class_name: bimplClassName,
               ...(transportRequest && {
                 transport_request: transportRequest,
               }),
             });
-            testLogger?.info?.(`Deleted BIMPL class ${bimplClassName}`);
+            if ((answer as { isError?: boolean })?.isError) {
+              const detail = extractErrorMessage(
+                answer as {
+                  isError: boolean;
+                  content: { type: string; text: string }[];
+                },
+              );
+              testLogger?.error?.(`Delete BIMPL class refused: ${detail}`);
+              leftBehind.push(`BIMPL class ${bimplClassName}: ${detail}`);
+            } else {
+              testLogger?.info?.(`Deleted BIMPL class ${bimplClassName}`);
+            }
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (!msg.includes('not found') && !msg.includes('404')) {
@@ -85,19 +106,37 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
               connection,
               logger: testLogger,
             });
-            await handleDeleteBehaviorDefinition(deleteCtx, {
+            const answer = await handleDeleteBehaviorDefinition(deleteCtx, {
               name: objectName,
               ...(transportRequest && {
                 transport_request: transportRequest,
               }),
             });
-            testLogger?.info?.(`Deleted BDEF ${objectName}`);
+            if ((answer as { isError?: boolean })?.isError) {
+              const detail = extractErrorMessage(
+                answer as {
+                  isError: boolean;
+                  content: { type: string; text: string }[];
+                },
+              );
+              testLogger?.error?.(`Delete BDEF refused: ${detail}`);
+              leftBehind.push(`BDEF ${objectName}: ${detail}`);
+            } else {
+              testLogger?.info?.(`Deleted BDEF ${objectName}`);
+            }
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (!msg.includes('not found') && !msg.includes('404')) {
-              testLogger?.warn?.(`Failed to delete BDEF: ${msg}`);
+              testLogger?.error?.(`Failed to delete BDEF: ${msg}`);
+              leftBehind.push(`BDEF ${objectName}: ${msg}`);
             }
           }
+        }
+
+        if (leftBehind.length > 0) {
+          throw new Error(
+            `cleanup did not remove ${leftBehind.length} object(s): ${leftBehind.join('; ')}`,
+          );
         }
       },
     );
@@ -134,27 +173,56 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
           logger: testLogger,
         });
 
+        /**
+         * **What this suite was missing entirely.** Every step below used to be
+         * `await handler(...)` followed by a log line announcing success, and
+         * these handlers do not throw on a refusal — they answer
+         * `isError: true` with the server's account in the payload. Measured on
+         * 2026-09-24: `grep -c isError` over this file returned **0**, so the
+         * suite passed as long as nothing crashed, and its log said `Deleted
+         * BDEF`, `BDEF updated` and `group activation completed` over answers
+         * nobody read. A cleanup line of exactly that kind is what made an
+         * ENQUEUE lock left by the low-tier suite look like it had been
+         * cleared.
+         */
+        const mustSucceed = async (
+          step: string,
+          run: () => Promise<unknown>,
+        ): Promise<void> => {
+          const answer = (await run()) as {
+            isError: boolean;
+            content: { type: string; text: string }[];
+          };
+          if (answer?.isError) {
+            throw new Error(`${step} failed: ${extractErrorMessage(answer)}`);
+          }
+        };
+
         // ── Step 1: Create BDEF (skip activation — will activate together with BIMPL)
         testLogger?.info?.(`   * create BDEF: ${objectName}`);
-        await handleCreateBehaviorDefinition(handlerCtx, {
-          name: objectName,
-          package_name: packageName,
-          description: params.description || objectName,
-          root_entity: params.root_entity,
-          implementation_type: params.implementation_type,
-          activate: false,
-          ...(transportRequest && { transport_request: transportRequest }),
-        });
+        await mustSucceed(`Create BDEF ${objectName}`, () =>
+          handleCreateBehaviorDefinition(handlerCtx, {
+            name: objectName,
+            package_name: packageName,
+            description: params.description || objectName,
+            root_entity: params.root_entity,
+            implementation_type: params.implementation_type,
+            activate: false,
+            ...(transportRequest && { transport_request: transportRequest }),
+          }),
+        );
         testLogger?.info?.(`   + BDEF created (not activated)`);
 
         // ── Step 2: Update BDEF (skip activation)
         testLogger?.info?.(`   * update BDEF: ${objectName}`);
-        await handleUpdateBehaviorDefinition(handlerCtx, {
-          name: objectName,
-          source_code: params.update_source_code || params.source_code,
-          activate: false,
-          ...(transportRequest && { transport_request: transportRequest }),
-        });
+        await mustSucceed(`Update BDEF ${objectName}`, () =>
+          handleUpdateBehaviorDefinition(handlerCtx, {
+            name: objectName,
+            source_code: params.update_source_code || params.source_code,
+            activate: false,
+            ...(transportRequest && { transport_request: transportRequest }),
+          }),
+        );
         testLogger?.info?.(`   + BDEF updated (not activated)`);
 
         await delay(context.getOperationDelay('update'));
@@ -179,27 +247,31 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         // ── Step 4: Create BIMPL (high-level handler auto-activates internally,
         //            but BIMPL alone can activate OK — BDEF just gets a warning)
         testLogger?.info?.(`   * create BIMPL: ${bimplClassName}`);
-        await handleCreateBehaviorImplementation(handlerCtx, {
-          class_name: bimplClassName,
-          description: bimplParams.description,
-          behavior_definition: behaviorDefinition,
-          package_name: packageName,
-          ...(transportRequest && { transport_request: transportRequest }),
-        });
+        await mustSucceed(`Create BIMPL ${bimplClassName}`, () =>
+          handleCreateBehaviorImplementation(handlerCtx, {
+            class_name: bimplClassName,
+            description: bimplParams.description,
+            behavior_definition: behaviorDefinition,
+            package_name: packageName,
+            ...(transportRequest && { transport_request: transportRequest }),
+          }),
+        );
         testLogger?.info?.(`   + BIMPL created`);
 
         await delay(context.getOperationDelay('create'));
 
         // ── Step 5: Update BIMPL
         testLogger?.info?.(`   * update BIMPL: ${bimplClassName}`);
-        await handleUpdateBehaviorImplementation(handlerCtx, {
-          class_name: bimplClassName,
-          behavior_definition: behaviorDefinition,
-          implementation_code:
-            bimplParams.update_implementation_code ||
-            bimplParams.implementation_code,
-          ...(transportRequest && { transport_request: transportRequest }),
-        });
+        await mustSucceed(`Update BIMPL ${bimplClassName}`, () =>
+          handleUpdateBehaviorImplementation(handlerCtx, {
+            class_name: bimplClassName,
+            behavior_definition: behaviorDefinition,
+            implementation_code:
+              bimplParams.update_implementation_code ||
+              bimplParams.implementation_code,
+            ...(transportRequest && { transport_request: transportRequest }),
+          }),
+        );
         testLogger?.info?.(`   + BIMPL updated`);
 
         await delay(context.getOperationDelay('update'));
@@ -208,12 +280,16 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         testLogger?.info?.(
           `   * group activate: ${objectName} + ${bimplClassName}`,
         );
-        await handleActivateObject(handlerCtx, {
-          objects: [
-            { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-            { name: bimplClassName.toUpperCase(), type: 'CLAS/OC' },
-          ],
-        });
+        await mustSucceed(
+          `Group activation of ${objectName} + ${bimplClassName}`,
+          () =>
+            handleActivateObject(handlerCtx, {
+              objects: [
+                { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
+                { name: bimplClassName.toUpperCase(), type: 'CLAS/OC' },
+              ],
+            }),
+        );
         testLogger?.info?.(`   + group activation completed`);
 
         testLogger?.info?.('Full BDEF+BIMPL high-level workflow completed');

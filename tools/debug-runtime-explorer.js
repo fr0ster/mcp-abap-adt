@@ -462,11 +462,27 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
   // pass has not existed for a class in adt-clients since the member model
   // changed — it was an ignored extra property in a plain JS object, so this
   // tool has been leaving inactive objects behind and saying "Created".
+  // **The handle is `getResult().value`, and the answer has to be read first.**
+  // `lock(config)` answers `IAdtResponse<string>`: `ok` with a result, or a
+  // failure with `getError()`. There is no `getValue()` and no `data` on it —
+  // a fallback chain guessing at those assigns the whole response object, and
+  // `update`/`unlock` then send an object where the handle belongs. This is the
+  // same read as `src/lib/strategies/withLock.ts`.
   const writeSource = async (api, config, source) => {
     const locked = await api.lock({ className: probe.className });
-    const lockHandle = locked?.getValue?.() ?? locked?.data ?? locked;
+    if (!locked?.ok) {
+      throw new Error(
+        `Lock ${probe.className} refused: ${locked?.getError?.()?.message ?? 'no answer'}`,
+      );
+    }
+    const lockHandle = locked.getResult().value;
     try {
-      await api.update(config, { lockHandle, source });
+      const written = await api.update(config, { lockHandle, source });
+      if (!written?.ok) {
+        throw new Error(
+          `Write to ${probe.className} refused: ${written?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
     } finally {
       await api.unlock({ className: probe.className }, lockHandle);
     }
@@ -487,7 +503,12 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
       },
       classSource,
     );
-    await classApi.activate({ className: probe.className });
+    const activated = await classApi.activate({ className: probe.className });
+    if (!activated?.ok) {
+      throw new Error(
+        `Activation of ${probe.className} refused: ${activated?.getError?.()?.message ?? 'no answer'}`,
+      );
+    }
     logger.info(`Created class ${probe.className}`);
   } catch (error) {
     if (error?.response?.status === 403) {
@@ -505,19 +526,27 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
         },
         classSource,
       );
-      await classApi.activate({ className: probe.className });
+      const reactivated = await classApi.activate({
+        className: probe.className,
+      });
+      if (!reactivated?.ok) {
+        throw new Error(
+          `Activation of ${probe.className} refused: ${reactivated?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
       logger.info(`Updated class ${probe.className}`);
     } else {
       throw error;
     }
   }
 
+  // **There is no `create` for a local test class, and there never was.** The
+  // include exists as part of the class; `AdtLocalTestClass` offers validate,
+  // read, update, delete, check and getVersions, plus lock/unlock/activate from
+  // its base — no `create`. The call that used to be here threw a TypeError
+  // straight into the `catch` below, which is why the "trying update" branch
+  // was the one that ever ran.
   try {
-    await localTestApi.create({
-      className: probe.className,
-      testClassName: probe.testClassName,
-      transportRequest: probe.transportRequest,
-    });
     await writeSource(
       localTestApi,
       {
@@ -526,27 +555,20 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
       },
       testSource,
     );
-    await classApi.activate({ className: probe.className });
-    logger.info(`Created local test class ${probe.testClassName}`);
-  } catch (_error) {
-    if (_error?.response?.status === 403) {
+    const activated = await classApi.activate({ className: probe.className });
+    if (!activated?.ok) {
       throw new Error(
-        `No change authorization for local test class create/update (${_error?.response?.data || _error?.message || String(_error)}).`,
+        `Activation of ${probe.className} refused: ${activated?.getError?.()?.message ?? 'no answer'}`,
       );
     }
-    logger.warn(
-      `Local test class exists or create failed, trying update for ${probe.className}`,
-    );
-    await writeSource(
-      localTestApi,
-      {
-        className: probe.className,
-        transportRequest: probe.transportRequest,
-      },
-      testSource,
-    );
-    await classApi.activate({ className: probe.className });
-    logger.info(`Updated local test class include for ${probe.className}`);
+    logger.info(`Wrote local test class include for ${probe.className}`);
+  } catch (error) {
+    if (error?.response?.status === 403) {
+      throw new Error(
+        `No change authorization for the local test class (${error?.response?.data || error?.message || String(error)}).`,
+      );
+    }
+    throw error;
   }
 }
 

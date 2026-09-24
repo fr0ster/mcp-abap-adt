@@ -712,15 +712,37 @@ async function upsertExecutableObject(ctx, rl) {
   // adt-clients moved the lock and the activation to the caller. In a plain JS
   // object those were ignored extra properties, so the tool reported "created"
   // over an inactive, empty skeleton.
+  // The handle is `getResult().value` on an `ok` answer — `lock(config)` answers
+  // `IAdtResponse<string>`, which has no `getValue()` and no `data`. Reading it
+  // any other way puts the response object itself where the handle belongs, and
+  // the write goes out with nonsense. Same read as
+  // `src/lib/strategies/withLock.ts`.
   const writeAndActivate = async () => {
     const locked = await adt.getClass().lock({ className });
-    const lockHandle = locked?.getValue?.() ?? locked?.data ?? locked;
+    if (!locked?.ok) {
+      throw new Error(
+        `Lock ${className} refused: ${locked?.getError?.()?.message ?? 'no answer'}`,
+      );
+    }
+    const lockHandle = locked.getResult().value;
     try {
-      await adt.getClass().update(payload, { lockHandle, source: sourceCode });
+      const written = await adt
+        .getClass()
+        .update(payload, { lockHandle, source: sourceCode });
+      if (!written?.ok) {
+        throw new Error(
+          `Write to ${className} refused: ${written?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
     } finally {
       await adt.getClass().unlock({ className }, lockHandle);
     }
-    await adt.getClass().activate({ className });
+    const activated = await adt.getClass().activate({ className });
+    if (!activated?.ok) {
+      throw new Error(
+        `Activation of ${className} refused: ${activated?.getError?.()?.message ?? 'no answer'}`,
+      );
+    }
   };
   await validateAllowAlreadyExists(
     () =>

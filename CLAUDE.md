@@ -70,6 +70,33 @@ Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available every
 
 When checking whether an installed npm package contains specific code, always search inside `node_modules/` directly (e.g., `grep -r "pattern" node_modules/@scope/package/`). VS Code search and ripgrep skip `node_modules` by default due to `.gitignore`, which leads to false "not found" conclusions. The code may be there — you're just not looking in the right place.
 
+## Dependencies
+
+### The TypeScript major follows SAP
+
+Stay on `typescript@^6.x`. Take 6.x patches and minors; leave 7 alone until the
+CAP toolchain moves, and treat it as a decision already made rather than an
+upgrade waiting to happen. Measured 2026-09-24:
+
+- `@sap/cds` 10.1.0, `@sap/cds-dk` 10.1.0, `@sap/cds-compiler` 7.1.0,
+  `@cap-js/cds-typer` 0.41.1 and `@cap-js/cds-types` 0.19.0 declare no
+  `typescript` peer at all, and CAP's docs name no version — `cds watch` runs
+  `cds-tsx`, which transpiles without type checking. But cds-typer and cds-types
+  both devDepend on `typescript ^6.0.3`, so 6 is what SAP tests.
+- `ts-jest` caps it: the latest, 29.4.13, declares
+  `peerDependencies.typescript: ">=4.3 <7"`, and every suite here runs through
+  it. `.npmrc` sets `legacy-peer-deps=true`, so npm would install the conflict
+  silently rather than refuse it.
+- cloud-llm-hub type-checks against this project's `.d.ts` on TypeScript 6 with
+  `moduleResolution: node`.
+
+The cheap signal, if the question ever comes back:
+`npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
+deciding condition, not ts-jest.
+
+`@types/node` follows the same shape for a different reason: it tracks
+`engines.node` (`>=22`), not the newest Node major.
+
 ## Plans and Specs
 
 Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.

@@ -30,6 +30,15 @@
  * current session's, and the classic enqueue function modules are not released
  * for ABAP for Cloud. A lock orphaned this way outlives every route we have.
  *
+ * **`deletion/check` gives a false negative once the object is gone.** Measured
+ * the same day: after the behavior definition had been deleted, the check
+ * answered `200` with no `<del:lockUser>` at all and the message *"Object does
+ * not exist"* — while the enqueue entry on the NAME was still held, and a
+ * `POST /sap/bc/adt/bo/behaviordefinitions` to create it again answered `403`
+ * EU510, *"User … is currently editing …"*, in any package. So a quiet check is
+ * evidence about a lock only while the object exists; for a name that is locked
+ * but unoccupied, the create refusal is the only tell we have.
+ *
  *   npx tsx scripts/probe-object-lock.ts \
  *     --env trial.env \
  *     --uri /sap/bc/adt/bo/behaviordefinitions/zmcp_shr_i_bdfl \

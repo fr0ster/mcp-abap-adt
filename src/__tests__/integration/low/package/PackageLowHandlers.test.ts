@@ -259,12 +259,14 @@ describe('Package Low-Level Handlers Integration', () => {
                 packageObj.updateMetadata(
                   {
                     packageName: objectName,
-                    document: patchPackageXml(
+                  },
+                  {
+                    source: patchPackageXml(
                       extractXmlString(current, `package ${objectName}`),
                       { description: updatedDescription },
                     ),
+                    lockHandle,
                   },
-                  { lockHandle },
                 ),
             ),
           (lockHandle) =>

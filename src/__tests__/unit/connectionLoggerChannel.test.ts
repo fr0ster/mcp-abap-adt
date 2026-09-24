@@ -1,4 +1,4 @@
-import { LogLevel } from '@mcp-abap-adt/interfaces';
+import { LogLevel } from '@mcp-abap-adt/interfaces-utils';
 import { DefaultLogger } from '@mcp-abap-adt/logger';
 
 /**

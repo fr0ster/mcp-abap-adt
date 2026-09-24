@@ -22,14 +22,16 @@ import {
   SafeBtpSessionStore,
 } from '@mcp-abap-adt/auth-stores';
 import type {
-  IAuthorizationConfig,
-  IConnectionConfig,
-  ILogger,
-  IServiceKeyStore,
-  ISessionStore,
   ITokenProvider,
   ITokenResult,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-auth';
+import type {
+  IAuthorizationConfig,
+  IConnectionConfig,
+  IServiceKeyStore,
+  ISessionStore,
+} from '@mcp-abap-adt/interfaces-auth-sap';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { detectStoreType } from '../stores';
 import { getPlatformPaths } from '../stores/platformPaths';
 import type { IAuthBrokerFactory } from './IAuthBrokerFactory.js';

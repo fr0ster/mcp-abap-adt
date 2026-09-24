@@ -1,4 +1,4 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { corpusBody } from '../../lib/adtCorpus';
 import { answer, return_answer } from '../../lib/answer';
 

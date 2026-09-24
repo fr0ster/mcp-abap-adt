@@ -1,4 +1,4 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../lib/answer';
 import { writeProjection } from '../../lib/strategies/promised';
 import { pair, sequence } from '../../lib/strategies/sequence';

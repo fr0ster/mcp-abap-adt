@@ -20,7 +20,10 @@
  * client cannot supply here is the optionality of the FIRST parameter, not
  * the shape of the options themselves.
  */
-import type { IAdtError, IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type {
+  IAdtError,
+  IAdtOperationOptions,
+} from '@mcp-abap-adt/interfaces-adt';
 
 declare const obj: {
   read(options?: IAdtOperationOptions<IAdtError>): Promise<void>;

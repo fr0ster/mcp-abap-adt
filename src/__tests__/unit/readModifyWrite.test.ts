@@ -1,5 +1,5 @@
 import * as fs from 'node:fs';
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { XMLBuilder } from 'fast-xml-parser';
 import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {

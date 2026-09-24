@@ -1,8 +1,16 @@
 /**
  * One table over all eighteen high-tier locked writes: per handler, which
  * factory it reaches and which field the body actually lands in — the
- * `options` field for a source write, the `config.document`/`config.
- * description` field for a metadata write.
+ * `options.source` field for every write that carries a body — source text or
+ * metadata document alike — and `config.description` for a create that only
+ * names the object.
+ *
+ * **One channel, since `interfaces-adt@9`.** There were two: `options.
+ * sourceCode` for ABAP text and `config.document` for an XML metadata
+ * document, split by what the body happened to contain. The contract merged
+ * them into `options.source` (decision 33), so a metadata write that still
+ * passed `config.document` would now send no body at all — which is what this
+ * table catches.
  *
  * `fakeClientOf`'s own doc comment names the exact defect this guards
  * against: its outer proxy ignores the factory name, so a handler that
@@ -100,7 +108,7 @@ interface Captured {
 interface WireCase {
   name: string;
   expectFactory: string;
-  /** 'options' for a source write, 'config' for a metadata write or a create. */
+  /** 'options' for any write that carries a body, 'config' for a create's description. */
   channel: 'options' | 'config';
   field: string;
   marker: string;
@@ -134,7 +142,7 @@ const cases: WireCase[] = [
     name: 'UpdateClass',
     expectFactory: 'getClass',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_CLASS',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -151,7 +159,7 @@ const cases: WireCase[] = [
     name: 'UpdateDdl',
     expectFactory: 'getDdl',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_DDL',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -186,7 +194,7 @@ const cases: WireCase[] = [
     name: 'UpdateMetadataExtension',
     expectFactory: 'getMetadataExtension',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_DDLX_UPDATE',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -223,7 +231,7 @@ const cases: WireCase[] = [
     name: 'UpdateBehaviorDefinition',
     expectFactory: 'getBehaviorDefinition',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_BDEF_UPDATE',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -239,8 +247,8 @@ const cases: WireCase[] = [
   {
     name: 'CreateDomain',
     expectFactory: 'getDomain',
-    channel: 'config',
-    field: 'document',
+    channel: 'options',
+    field: 'source',
     marker: 'MARKER_DOMAIN_CREATE',
     run: async () => {
       const { members, captured } = capture(
@@ -260,8 +268,8 @@ const cases: WireCase[] = [
   {
     name: 'UpdateDomain',
     expectFactory: 'getDomain',
-    channel: 'config',
-    field: 'document',
+    channel: 'options',
+    field: 'source',
     marker: 'MARKER_DOMAIN_UPDATE',
     run: async () => {
       const { members, captured } = capture(
@@ -281,8 +289,8 @@ const cases: WireCase[] = [
   {
     name: 'CreateDataElement',
     expectFactory: 'getDataElement',
-    channel: 'config',
-    field: 'document',
+    channel: 'options',
+    field: 'source',
     marker: 'MARKER_DTEL_CREATE',
     run: async () => {
       const { members, captured } = capture(
@@ -302,8 +310,8 @@ const cases: WireCase[] = [
   {
     name: 'UpdateDataElement',
     expectFactory: 'getDataElement',
-    channel: 'config',
-    field: 'document',
+    channel: 'options',
+    field: 'source',
     marker: 'MARKER_DTEL_UPDATE',
     run: async () => {
       const { members, captured } = capture(
@@ -323,8 +331,8 @@ const cases: WireCase[] = [
   {
     name: 'UpdateFunctionGroup',
     expectFactory: 'getFunctionGroup',
-    channel: 'config',
-    field: 'document',
+    channel: 'options',
+    field: 'source',
     marker: 'MARKER_FG',
     run: async () => {
       const { members, captured } = capture(
@@ -344,7 +352,7 @@ const cases: WireCase[] = [
     name: 'UpdateFunctionModule',
     expectFactory: 'getFunctionModule',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_FM',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -362,7 +370,7 @@ const cases: WireCase[] = [
     name: 'UpdateInterface',
     expectFactory: 'getInterface',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_INTF',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -379,7 +387,7 @@ const cases: WireCase[] = [
     name: 'UpdateProgram',
     expectFactory: 'getProgram',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_PROG',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -396,7 +404,7 @@ const cases: WireCase[] = [
     name: 'UpdateServiceDefinition',
     expectFactory: 'getServiceDefinition',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_SRVD',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -432,7 +440,7 @@ const cases: WireCase[] = [
     name: 'UpdateStructure',
     expectFactory: 'getStructure',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_STRUCT_UPDATE',
     run: async () => {
       const { members, captured } = capture({}, 'update');
@@ -449,7 +457,7 @@ const cases: WireCase[] = [
     name: 'UpdateTable',
     expectFactory: 'getTable',
     channel: 'options',
-    field: 'sourceCode',
+    field: 'source',
     marker: 'MARKER_TABLE',
     run: async () => {
       const { members, captured } = capture({}, 'update');

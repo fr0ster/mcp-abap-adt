@@ -5,7 +5,7 @@ import { patchPackageXml } from '../../lib/strategies/packagePatch';
  * `patchPackageXml`'s own test, standalone from any handler — proves the
  * patch against the real corpus document, not a hand-written stand-in.
  * `lowTierStrategies.test.ts` and `highTierWriteChannel.test.ts` separately
- * prove `UpdatePackageLow` wires this in through `config.document`; this file
+ * prove `UpdatePackageLow` wires this in through `options.source`; this file
  * proves only what the function itself does to bytes.
  */
 describe('patching a package changes what was asked and nothing else', () => {

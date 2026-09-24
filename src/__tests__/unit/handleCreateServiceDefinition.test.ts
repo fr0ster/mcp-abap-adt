@@ -88,7 +88,7 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
     expect(mockUpdate).toHaveBeenCalledWith(
       { serviceDefinitionName: 'ZSD', transportRequest: undefined },
       expect.objectContaining({
-        sourceCode: src,
+        source: src,
         lockHandle: 'LOCK1',
         analyse: expect.any(Function),
       }),

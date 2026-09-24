@@ -19,10 +19,10 @@ import {
   SafeBtpSessionStore,
 } from '@mcp-abap-adt/auth-stores';
 import type {
-  ILogger,
   IServiceKeyStore,
   ISessionStore,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-auth-sap';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { getPlatformPaths } from './platformPaths';
 
 /**

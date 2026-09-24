@@ -6,8 +6,8 @@ import {
   analyseUnitTest,
   analyseValidation,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 
 /**

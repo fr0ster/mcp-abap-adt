@@ -1,5 +1,5 @@
 import { unitTestDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { nodeLevel } from './packageWalk';
 import { statusOnly, structured, verbatim } from './reading';
 import { sqlPreview } from './sqlPreview';
@@ -129,6 +129,14 @@ export const READING_BY_SLOT = {
   // per slot and a call site that forgets the keep-list should get something
   // rather than a throw.
   objects: structured,
+  // Arrived with adt-clients 22.0.0, on `changeTaskType`. `structured` for the
+  // same reason the echoes above are: the answer is the task document read
+  // back, and a `200` says the request was accepted, not that the type is now
+  // what was asked for — a re-read through `objects` or the request listing is
+  // what settles that. Measured on BTP ABAP: a task is born `Unclassified`,
+  // `tm:type` on the creating call is ignored, and CTS also assigns a type on
+  // its own when the first object lands.
+  taskTypeChanged: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**

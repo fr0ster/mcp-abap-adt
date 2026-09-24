@@ -33,7 +33,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -247,7 +247,9 @@ export async function handleCreateDataElement(
                     {
                       dataElementName,
                       transportRequest: args.transport_request,
-                      document: patchDataElementXml(
+                    },
+                    {
+                      source: patchDataElementXml(
                         extractXmlString(
                           current.raw,
                           `data element ${dataElementName}`,
@@ -268,8 +270,9 @@ export async function handleCreateDataElement(
                           set_get_parameter: args.set_get_parameter,
                         },
                       ),
+                      lockHandle,
+                      analyse: analyseException,
                     },
-                    { lockHandle, analyse: analyseException },
                   ),
               ),
             (lockHandle) => obj.unlock({ dataElementName }, lockHandle),

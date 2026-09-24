@@ -20,7 +20,7 @@
  * it onto the caller, it moves it onto this handler.
  *
  * **The source goes in `options`, not `config`.** The shipped `update()`
- * reads `options?.sourceCode ?? config.testClassCode`. Verified against
+ * reads `options?.source ?? config.source`. Verified against
  * `AdtLocalTestClass.js`.
  *
  * Activation is restored: `activate()` is on the same accessor (delegating
@@ -35,7 +35,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -117,7 +117,7 @@ export async function handleUpdateLocalTestClass(
           obj.update(
             { className, transportRequest: args.transport_request },
             {
-              sourceCode: args.test_class_code,
+              source: args.test_class_code,
               lockHandle,
               analyse: analyseException,
             },

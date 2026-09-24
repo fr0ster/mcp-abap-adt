@@ -223,7 +223,7 @@ describe('the six not-deletion-service exceptions: analyseException, never analy
         },
         update: async (_c: unknown, o: any) => {
           order.push('update');
-          seenSourceCode.push(o.sourceCode);
+          seenSourceCode.push(o.source);
           seenAnalyse.push(o.analyse);
           return okResponse(reading(undefined, '', 200));
         },

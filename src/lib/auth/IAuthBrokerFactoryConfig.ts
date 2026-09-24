@@ -3,7 +3,7 @@
  * Different server versions can implement their own config that conforms to this
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface IAuthBrokerFactoryConfig {
   /** Default MCP destination from --mcp parameter */

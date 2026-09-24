@@ -12,7 +12,7 @@
  * the two families apart on the wire (see the low-tier strategy test).
  *
  * **`implementation_code` cannot reach `create()` itself.** v19's `create()`
- * is typed `Omit<IBehaviorImplementationConfig, 'sourceCode'> & {sourceCode?:
+ * is typed `Omit<IBehaviorImplementationConfig, 'source'> & {source?:
  * never}` — the class is created plain, because the implementations
  * include's `FOR BEHAVIOR OF` clause cannot be written until the class shell
  * exists. But this repository's own invariant (`create()` = shell, `update()`
@@ -24,10 +24,10 @@
  * or throwing `update()` must not leave the object locked.
  *
  * **The source goes in `options`, not `config`.**
- * `IBehaviorImplementationConfig` still declares a `sourceCode` field, so
- * `update({ className, sourceCode }, ...)` compiles either way and answers
+ * `IBehaviorImplementationConfig` still declares a `source` field, so
+ * `update({ className, source }, ...)` compiles either way and answers
  * `SUCCESS` — but the shipped `AdtBehaviorImplementation.update()` reads
- * `options?.sourceCode` only (`const source = options?.sourceCode;` in
+ * `options?.source` only (`const source = options?.source;` in
  * `AdtBehaviorImplementation.js`). With the source in `config`, the request
  * this issues has no body at all, and the implementations include endpoint
  * *replaces* rather than merges: an empty write against a locked class is
@@ -48,14 +48,14 @@
  * never called from `update()`. **A class created and written through this
  * handler does not get its `FOR BEHAVIOR OF` clause from this call.**
  * Writing the main source is a separate `getClass().update({ className },
- * { sourceCode: mainSourceFor(className, behaviorDefinition) })`, which this
+ * { source: mainSourceFor(className, behaviorDefinition) })`, which this
  * handler does not invent on its own — under-promising here beats claiming
  * a second write nobody has observed happening.
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -199,8 +199,8 @@ export async function handleCreateBehaviorImplementation(
       }
 
       // The body was passed; write it under a lock this call also releases.
-      // sourceCode belongs in options, not config — AdtBehaviorImplementation
-      // .update() reads options?.sourceCode only (see the module doc comment).
+      // source belongs in options, not config — AdtBehaviorImplementation
+      // .update() reads options?.source only (see the module doc comment).
       return withLock(
         () => client.lock({ className }),
         (lockHandle) =>
@@ -211,7 +211,7 @@ export async function handleCreateBehaviorImplementation(
               transportRequest: transport_request,
             },
             {
-              sourceCode: implementation_code,
+              source: implementation_code,
               lockHandle,
               analyse: analyseException,
             },

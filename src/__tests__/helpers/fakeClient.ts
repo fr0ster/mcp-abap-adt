@@ -1,4 +1,4 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 /** A success carrying whatever a result strategy would have produced. */
 export function okResponse<T>(value: T): IAdtResponse<T, IAdtError> {

@@ -10,6 +10,9 @@
 
 import { handleCheckBehaviorDefinition } from '../../../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleCheckClass } from '../../../../handlers/class/high/handleCheckClass';
+import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
+import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { handleCheckDataElement } from '../../../../handlers/data_element/high/handleCheckDataElement';
 import { handleCheckDdl } from '../../../../handlers/ddl/high/handleCheckDdl';
 import { handleCheckMetadataExtension } from '../../../../handlers/ddlx/high/handleCheckMetadataExtension';
@@ -123,6 +126,115 @@ describe('Check High-Level Handlers Integration', () => {
         });
       },
       getTimeout('medium'),
+    );
+  });
+
+  // CheckClass — a finding is an answer, not a failure
+  //
+  // A check that finds an error has done its job: the handler answers it
+  // (`isError: false`) with the error among the messages. The shared objects
+  // are correct by definition, so this uses a class of the test's own,
+  // created on the test request with a misspelt keyword in its method
+  // (`DAAT` for `DATA`). It cannot activate, so it is saved inactive, and it
+  // is the inactive version that is checked.
+  describe('CheckClass finds an error', () => {
+    let tester: LambdaTester;
+
+    beforeAll(async () => {
+      tester = new LambdaTester(
+        'check_class_high',
+        'check_findings',
+        'check-class-findings',
+      );
+      await tester.beforeAll(
+        async () => {},
+        async (context: LambdaTesterContext) => {
+          const { connection, params, transportRequest } = context;
+          if (!params?.class_name) return;
+          await handleDeleteClass(
+            createHandlerContext({
+              connection,
+              logger: createTestLogger('check-findings-cleanup'),
+            }),
+            {
+              class_name: params.class_name,
+              ...(transportRequest && { transport_request: transportRequest }),
+            },
+          );
+        },
+      );
+    }, getTimeout('long'));
+
+    afterAll(async () => {
+      await tester.afterAll(async () => {});
+    });
+    beforeEach(async () => {
+      await tester.beforeEach(async () => {});
+    });
+    afterEach(async () => {
+      await tester.afterEach();
+    });
+
+    it(
+      'answers the keyword error as a finding, not as a failed call',
+      async () => {
+        await tester.run(async (context: LambdaTesterContext) => {
+          const { connection, params, logger, packageName, transportRequest } =
+            context;
+          const objectName = params.class_name;
+          const ctx = () =>
+            createHandlerContext({
+              connection,
+              logger: createTestLogger('check-findings'),
+            });
+
+          logger?.info(`   • create: ${objectName}`);
+          const created = await handleCreateClass(ctx(), {
+            class_name: objectName,
+            description: params.description,
+            package_name: packageName,
+            ...(transportRequest && { transport_request: transportRequest }),
+          } as any);
+          expect(created.isError).toBe(false);
+
+          logger?.info(
+            `   • write the broken source (inactive): ${objectName}`,
+          );
+          const written = await handleUpdateClass(ctx(), {
+            class_name: objectName,
+            source_code: params.source_code,
+            ...(transportRequest && { transport_request: transportRequest }),
+            activate: false,
+          } as any);
+          expect(written.isError).toBe(false);
+
+          logger?.info(`   • check the inactive version: ${objectName}`);
+          const response = await tester.invokeToolOrHandler(
+            'CheckClass',
+            { class_name: objectName, version: 'inactive' },
+            async () =>
+              handleCheckClass(ctx(), {
+                class_name: objectName,
+                version: 'inactive',
+              }),
+          );
+
+          // Reported, not raised: the finding is the answer.
+          expect(response.isError).toBe(false);
+          const data = parseHandlerResponse(response);
+          expect(data.object_name).toBe(objectName.toUpperCase());
+          expect(data.ran).toBe(true);
+          const errors = (data.messages ?? []).filter(
+            (m: { type?: string }) => m.type === 'E',
+          );
+          expect(errors.length).toBeGreaterThan(0);
+
+          logger?.success(
+            `✅ check: ${objectName} — ${errors.length} error(s): ${errors.map((e: { text?: string }) => e.text).join('; ')}`,
+          );
+        });
+      },
+      getTimeout('long'),
     );
   });
 

@@ -2071,6 +2071,27 @@ check_class_high:
       description: "Check an existing ABAP class for syntax errors"
       params:
         class_name: "ZCL_MCP_SHARED_CLS"
+    # A class of the test's own with a misspelt keyword (DAAT for DATA): it is
+    # created on the test request, saved inactive, and its check must answer
+    # the error as a finding (isError: false). Never a shared object.
+    - name: "check_findings"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check answers a keyword error as a finding"
+      params:
+        class_name: "ZMCP_BLD_CHK_ERR"
+        description: "Check findings test class"
+        source_code: |
+          CLASS zmcp_bld_chk_err DEFINITION PUBLIC FINAL CREATE PUBLIC.
+            PUBLIC SECTION.
+              METHODS run.
+          ENDCLASS.
+
+          CLASS zmcp_bld_chk_err IMPLEMENTATION.
+            METHOD run.
+              DAAT lv_value TYPE i.
+            ENDMETHOD.
+          ENDCLASS.
 
 # CheckBehaviorDefinition
 check_bdef_high:

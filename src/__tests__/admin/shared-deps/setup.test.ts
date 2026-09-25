@@ -17,7 +17,7 @@
 
 import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { asItCame } from '@mcp-abap-adt/adt-strategies';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,
@@ -51,7 +51,7 @@ async function forceSaveViewSource(
 ): Promise<void> {
   // adt-clients 19: `lock` answers `IAdtResponse<string>`, not a bare handle
   // (IAdtCapabilities.ts), and `update` takes the source through
-  // `options.sourceCode`, not `config.ddlSource` (see UpdateDdlLow).
+  // `options.source`, not `config.source` (see UpdateDdlLow).
   const lockResponse = await client.getDdl().lock({ ddlName: viewName });
   if (!lockResponse.ok) {
     throw new Error(lockResponse.getError().message);
@@ -62,7 +62,7 @@ async function forceSaveViewSource(
       .getDdl()
       .update(
         { ddlName: viewName, transportRequest },
-        { sourceCode: ddlSource, lockHandle },
+        { source: ddlSource, lockHandle },
       );
     if (!updated.ok) {
       throw new Error(updated.getError().message);
@@ -183,7 +183,7 @@ describe('Admin: Setup shared dependencies', () => {
                 tableName: item.name,
                 packageName,
                 description: item.description || 'Shared test table',
-                ddlCode: item.source,
+                source: item.source,
                 transportRequest,
               });
               testsLogger?.info?.(`Created table ${item.name}`);
@@ -195,10 +195,10 @@ describe('Admin: Setup shared dependencies', () => {
                 await client.getTable().update(
                   {
                     tableName: item.name,
-                    ddlCode: item.source,
+                    source: item.source,
                     transportRequest,
                   },
-                  { sourceCode: item.source },
+                  { source: item.source },
                 );
                 testsLogger?.info?.(`Updated table ${item.name} source`);
               } catch (updateError: any) {
@@ -316,10 +316,10 @@ describe('Admin: Setup shared dependencies', () => {
               await client.getStructure().update(
                 {
                   structureName: item.name,
-                  ddlCode: item.source,
+                  source: item.source,
                   transportRequest,
                 },
-                { sourceCode: item.source },
+                { source: item.source },
               );
               testsLogger?.info?.(`Updated structure ${item.name} source`);
             }
@@ -374,7 +374,7 @@ describe('Admin: Setup shared dependencies', () => {
                 ddlName: item.name,
                 packageName,
                 description: item.description || 'Shared test view',
-                ddlSource: item.source,
+                source: item.source,
                 transportRequest,
               });
               testsLogger?.info?.(`Created view ${item.name}`);
@@ -385,10 +385,10 @@ describe('Admin: Setup shared dependencies', () => {
                 await client.getDdl().update(
                   {
                     ddlName: item.name,
-                    ddlSource: item.source,
+                    source: item.source,
                     transportRequest,
                   },
-                  { sourceCode: item.source },
+                  { source: item.source },
                 );
                 testsLogger?.info?.(`Updated view ${item.name} source`);
               } catch (updateError: any) {
@@ -484,7 +484,7 @@ describe('Admin: Setup shared dependencies', () => {
                 rootEntity: item.root_entity || item.name,
                 implementationType: item.implementation_type || 'Managed',
                 description: item.description || 'Shared test BDEF',
-                sourceCode: item.source,
+                source: item.source,
                 transportRequest,
               });
               testsLogger?.info?.(`Created behavior definition ${item.name}`);
@@ -495,10 +495,10 @@ describe('Admin: Setup shared dependencies', () => {
                 await client.getBehaviorDefinition().update(
                   {
                     name: item.name,
-                    sourceCode: item.source,
+                    source: item.source,
                     transportRequest,
                   },
-                  { sourceCode: item.source },
+                  { source: item.source },
                 );
                 testsLogger?.info?.(
                   `Updated behavior definition ${item.name} source`,
@@ -741,14 +741,13 @@ describe('Admin: Setup shared dependencies', () => {
             if (!exists) {
               // `create` posts a metadata document only — no create in
               // adt-clients 19 carries source (IAdtCreatable.create's own
-              // comment) — so the empty `sourceCode` this used to send is
+              // comment) — so the empty `source` this used to send is
               // dropped rather than ported; it never reached the wire either
               // way, and the type now says so.
               await client.getFunctionModule().create({
                 functionModuleName: item.name,
                 functionGroupName: item.group,
                 description: item.description || 'Shared test function module',
-                packageName: '',
                 transportRequest,
               });
               testsLogger?.info?.(`Created function module ${item.name}`);
@@ -772,7 +771,7 @@ describe('Admin: Setup shared dependencies', () => {
                       functionGroupName: item.group,
                       transportRequest,
                     },
-                    { sourceCode: item.source, lockHandle },
+                    { source: item.source, lockHandle },
                   );
                   if (!updated.ok) {
                     throw new Error(updated.getError().message);
@@ -874,7 +873,7 @@ describe('Admin: Setup shared dependencies', () => {
                 packageName,
                 description:
                   item.description || 'Shared test service definition',
-                sourceCode: item.source,
+                source: item.source,
                 transportRequest,
               });
               testsLogger?.info?.(`Created service definition ${item.name}`);
@@ -885,10 +884,10 @@ describe('Admin: Setup shared dependencies', () => {
                 await client.getServiceDefinition().update(
                   {
                     serviceDefinitionName: item.name,
-                    sourceCode: item.source,
+                    source: item.source,
                     transportRequest,
                   },
-                  { sourceCode: item.source },
+                  { source: item.source },
                 );
                 testsLogger?.info?.(
                   `Updated service definition ${item.name} source`,

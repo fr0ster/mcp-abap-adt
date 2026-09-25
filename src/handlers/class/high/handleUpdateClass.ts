@@ -18,8 +18,8 @@
  *
  * **The source goes in `options` for `update`, `config` for `check`.** See
  * `UpdateClassLow` for `update` — the shipped `AdtClass.update()` reads
- * `options?.sourceCode` only. `AdtClass.check()`'s shipped body reads
- * `config.sourceCode` — the one channel `check` alone still uses, for a
+ * `options?.source` only. `AdtClass.check()`'s shipped body reads
+ * `config.source` — the one channel `check` alone still uses, for a
  * source that is not on the server yet.
  */
 
@@ -28,7 +28,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -109,7 +109,7 @@ export async function handleUpdateClass(
             obj.update(
               { className, transportRequest: args.transport_request },
               {
-                sourceCode: args.source_code,
+                source: args.source_code,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -137,7 +137,7 @@ export async function handleUpdateClass(
             ? sequence(
                 () =>
                   obj.check(
-                    { className, sourceCode: args.source_code },
+                    { className, source: args.source_code },
                     'inactive',
                     { analyse: analyseException },
                   ),

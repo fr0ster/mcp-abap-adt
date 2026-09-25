@@ -107,7 +107,7 @@ export async function handleCheckClass(
     () =>
       createAdtClient(connection, logger)
         .getClass(resultsFor(classDocuments))
-        .check({ className, sourceCode: source_code }, checkVersion, {
+        .check({ className, source: source_code }, checkVersion, {
           analyse: analyseException,
         }),
     project(detail, terseCheck),

@@ -4,10 +4,10 @@
  * Uses AdtClient.getBehaviorDefinition().update from @mcp-abap-adt/adt-clients 19.
  *
  * **The source goes in `options`, not `config`.**
- * `IBehaviorDefinitionConfig` still declares a `sourceCode` field, so
- * `update({ name, sourceCode }, ...)` compiles either way — but the shipped
- * `AdtBehaviorDefinition.update()` reads `options?.sourceCode` only (its own
- * comment: "This used to fall back to `config.sourceCode` — two channels
+ * `IBehaviorDefinitionConfig` still declares a `source` field, so
+ * `update({ name, source }, ...)` compiles either way — but the shipped
+ * `AdtBehaviorDefinition.update()` reads `options?.source` only (its own
+ * comment: "This used to fall back to `config.source` — two channels
  * for one value, where the contract documents one"). `transportRequest`
  * stays in `config` — the same member reads `config.transportRequest`
  * directly. A `.d.ts` comment is not evidence for where a value lands; the
@@ -125,7 +125,7 @@ export async function handleUpdateBehaviorDefinition(
             transportRequest: transport_request,
           },
           {
-            sourceCode: source_code,
+            source: source_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

@@ -81,7 +81,7 @@ import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

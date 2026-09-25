@@ -20,12 +20,12 @@
  * 404, so a slow read can otherwise patch nothing and PUT a document
  * missing a field that was in fact set all along.
  *
- * **The patched document goes in `config.document`, not `options.xmlContent`.**
- * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only and
- * passes it straight to the PUT body; `options.xmlContent` is declared on the
- * options type but never read by this member. Verified against the compiled
- * `AdtDomain.js` and `core/domain/update.js`, not the declaration file. See
- * `handleUpdateDomain.ts` (low) for the same fix.
+ * **The patched document goes in `options.source`.** One channel since
+ * `interfaces-adt@9`, which merged the old `config.document`/
+ * `options.sourceCode` split and dropped the `xmlContent` nothing read:
+ * `AdtDomain.updateMetadata()` reads `options?.source` and passes it straight
+ * to the PUT body. Verified against `AdtDomain.ts` and `core/domain/update.ts`
+ * in adt-clients 22. See `handleUpdateDomain.ts` (low) for the longer account.
  *
  * **`config.packageName` never reaches the wire on an update.** The shipped
  * `updateDomain()` wire function (`core/domain/update.js`) builds its URL
@@ -38,7 +38,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -191,7 +191,9 @@ export async function handleUpdateDomain(
                 {
                   domainName,
                   transportRequest: args.transport_request,
-                  document: patchDomainXml(
+                },
+                {
+                  source: patchDomainXml(
                     extractXmlString(current.raw, `domain ${domainName}`),
                     {
                       description: args.description,
@@ -205,8 +207,9 @@ export async function handleUpdateDomain(
                       fixed_values: args.fixed_values,
                     },
                   ),
+                  lockHandle,
+                  analyse: analyseException,
                 },
-                { lockHandle, analyse: analyseException },
               ),
             () =>
               obj.check({ domainName }, undefined, {

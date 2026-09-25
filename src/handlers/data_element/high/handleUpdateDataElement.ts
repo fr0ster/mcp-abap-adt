@@ -20,9 +20,9 @@
  * gone — it tolerated exactly one refusal shape from an endpoint an update
  * never needs to call.
  *
- * **The patched document goes in `config.document`, not `options.xmlContent`.**
- * See `UpdateDataElementLow` — the shipped `AdtDataElement.updateMetadata()`
- * reads `config.document` only.
+ * **The patched document goes in `options.source`.** See
+ * `UpdateDataElementLow` — since `interfaces-adt@9` that is the one body
+ * channel, and `AdtDataElement.updateMetadata()` reads `options?.source` only.
  *
  * **`config.packageName` never reaches the wire on an update.** The shipped
  * `updateDataElement()` wire function (`core/dataElement/update.js`) builds
@@ -36,7 +36,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -231,15 +231,18 @@ export async function handleUpdateDataElement(
                 {
                   dataElementName,
                   transportRequest: args.transport_request,
-                  document: patchDataElementXml(
+                },
+                {
+                  source: patchDataElementXml(
                     extractXmlString(
                       current.raw,
                       `data element ${dataElementName}`,
                     ),
                     changes,
                   ),
+                  lockHandle,
+                  analyse: analyseException,
                 },
-                { lockHandle, analyse: analyseException },
               ),
             () =>
               obj.check({ dataElementName }, undefined, {

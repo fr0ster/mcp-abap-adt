@@ -7,11 +7,14 @@ const fs = require('node:fs');
 const path = require('node:path');
 const readline = require('node:readline/promises');
 const { stdin, stdout } = require('node:process');
-const yaml = require('yaml');
+// `js-yaml`, which this project declares, rather than `yaml`, which it never
+// did: that one resolved only because lint-staged happened to hoist it, and it
+// stopped resolving the moment the tree changed.
+const yaml = require('js-yaml');
 const { XMLParser } = require('fast-xml-parser');
 const { createAbapConnection } = require('@mcp-abap-adt/connection');
 const { AuthBrokerFactory } = require('../dist/lib/auth/brokerFactory.js');
-const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces');
+const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
   AdtRuntimeClient,
@@ -121,7 +124,7 @@ function loadProjectTestConfig() {
   const cfgPath = path.resolve(process.cwd(), 'tests/test-config.yaml');
   if (!fs.existsSync(cfgPath)) return null;
   const raw = fs.readFileSync(cfgPath, 'utf8');
-  return yaml.parse(raw);
+  return yaml.load(raw);
 }
 
 function getAuthFromTestConfig() {
@@ -452,17 +455,84 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
     classSource,
   );
 
+  // **Three requests per object, because a member is one request.** `create`
+  // posts the metadata skeleton only, the body goes in `options.source` on an
+  // `update` the caller locks for, and activation is its own call. The
+  // `{ activateOnCreate: true }` / `{ activateOnUpdate: true }` this used to
+  // pass has not existed for a class in adt-clients since the member model
+  // changed — it was an ignored extra property in a plain JS object, so this
+  // tool has been leaving inactive objects behind and saying "Created".
+  // **The handle is `getResult().value`, and the answer has to be read first.**
+  // `lock(config)` answers `IAdtResponse<string>`: `ok` with a result, or a
+  // failure with `getError()`. There is no `getValue()` and no `data` on it —
+  // a fallback chain guessing at those assigns the whole response object, and
+  // `update`/`unlock` then send an object where the handle belongs. This is the
+  // same read as `src/lib/strategies/withLock.ts`.
+  const writeSource = async (api, config, source) => {
+    const locked = await api.lock({ className: probe.className });
+    if (!locked?.ok) {
+      throw new Error(
+        `Lock ${probe.className} refused: ${locked?.getError?.()?.message ?? 'no answer'}`,
+      );
+    }
+    const lockHandle = locked.getResult().value;
+
+    // The write and the release are reported together, and neither hides the
+    // other. **`unlock` answers `IAdtResponse<void>` and does not throw on a
+    // refusal**, so an ignored answer here ends with the object still locked
+    // while the caller goes on to activate it and log a success — which is the
+    // exact shape that left `ZMCP_SHR_I_BDFL` locked out of every later test
+    // run. A `finally` that calls `unlock` and drops its answer guarantees the
+    // attempt, not the release.
+    const failures = [];
+    try {
+      const written = await api.update(config, { lockHandle, source });
+      if (!written?.ok) {
+        failures.push(
+          `write refused: ${written?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
+    } catch (error) {
+      failures.push(`write threw: ${error?.message ?? String(error)}`);
+    }
+    try {
+      const released = await api.unlock({ className: probe.className }, lockHandle);
+      if (!released?.ok) {
+        failures.push(
+          `the lock was NOT released and stays on ${probe.className} in SAP: ${released?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
+    } catch (error) {
+      failures.push(
+        `the lock was NOT released and stays on ${probe.className} in SAP: ${error?.message ?? String(error)}`,
+      );
+    }
+    if (failures.length > 0) {
+      throw new Error(`${probe.className}: ${failures.join('; ')}`);
+    }
+  };
+
   try {
-    await classApi.create(
+    await classApi.create({
+      className: probe.className,
+      packageName: probe.packageName,
+      description: `Debug probe ${probe.className}`,
+      transportRequest: probe.transportRequest,
+    });
+    await writeSource(
+      classApi,
       {
         className: probe.className,
-        packageName: probe.packageName,
-        description: `Debug probe ${probe.className}`,
-        sourceCode: classSource,
         transportRequest: probe.transportRequest,
       },
-      { activateOnCreate: true },
+      classSource,
     );
+    const activated = await classApi.activate({ className: probe.className });
+    if (!activated?.ok) {
+      throw new Error(
+        `Activation of ${probe.className} refused: ${activated?.getError?.()?.message ?? 'no answer'}`,
+      );
+    }
     logger.info(`Created class ${probe.className}`);
   } catch (error) {
     if (error?.response?.status === 403) {
@@ -472,49 +542,57 @@ async function prepareProbeArtifacts(adtClient, probe, logger) {
     }
     if (isAlreadyExistsError(error)) {
       logger.warn(`Class ${probe.className} exists, switching to update`);
-      await classApi.update(
+      await writeSource(
+        classApi,
         {
           className: probe.className,
-          sourceCode: classSource,
           transportRequest: probe.transportRequest,
         },
-        { activateOnUpdate: true },
+        classSource,
       );
+      const reactivated = await classApi.activate({
+        className: probe.className,
+      });
+      if (!reactivated?.ok) {
+        throw new Error(
+          `Activation of ${probe.className} refused: ${reactivated?.getError?.()?.message ?? 'no answer'}`,
+        );
+      }
       logger.info(`Updated class ${probe.className}`);
     } else {
       throw error;
     }
   }
 
+  // **There is no `create` for a local test class, and there never was.** The
+  // include exists as part of the class; `AdtLocalTestClass` offers validate,
+  // read, update, delete, check and getVersions, plus lock/unlock/activate from
+  // its base — no `create`. The call that used to be here threw a TypeError
+  // straight into the `catch` below, which is why the "trying update" branch
+  // was the one that ever ran.
   try {
-    await localTestApi.create(
+    await writeSource(
+      localTestApi,
       {
         className: probe.className,
-        testClassCode: testSource,
-        testClassName: probe.testClassName,
         transportRequest: probe.transportRequest,
       },
-      { activateOnCreate: true },
+      testSource,
     );
-    logger.info(`Created local test class ${probe.testClassName}`);
-  } catch (_error) {
-    if (_error?.response?.status === 403) {
+    const activated = await classApi.activate({ className: probe.className });
+    if (!activated?.ok) {
       throw new Error(
-        `No change authorization for local test class create/update (${_error?.response?.data || _error?.message || String(_error)}).`,
+        `Activation of ${probe.className} refused: ${activated?.getError?.()?.message ?? 'no answer'}`,
       );
     }
-    logger.warn(
-      `Local test class exists or create failed, trying update for ${probe.className}`,
-    );
-    await localTestApi.update(
-      {
-        className: probe.className,
-        testClassCode: testSource,
-        transportRequest: probe.transportRequest,
-      },
-      { activateOnUpdate: true },
-    );
-    logger.info(`Updated local test class include for ${probe.className}`);
+    logger.info(`Wrote local test class include for ${probe.className}`);
+  } catch (error) {
+    if (error?.response?.status === 403) {
+      throw new Error(
+        `No change authorization for the local test class (${error?.response?.data || error?.message || String(error)}).`,
+      );
+    }
+    throw error;
   }
 }
 

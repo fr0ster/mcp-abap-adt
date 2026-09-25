@@ -11,8 +11,8 @@
  * pre-migration handler's *post*-unlock check is gone: its own `catch`
  * never rethrew, so it could never have changed the answer.
  *
- * **The source goes through `options.sourceCode` for `update`,
- * `config.ddlSource` for `check`.** See `UpdateDdlLow` for `update`.
+ * **The source goes through `options.source` for `update`,
+ * `config.source` for `check`.** See `UpdateDdlLow` for `update`.
  */
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
@@ -20,7 +20,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -98,7 +98,7 @@ export async function handleUpdateDdl(
             obj.update(
               { ddlName, transportRequest: args.transport_request },
               {
-                sourceCode: args.ddl_source,
+                source: args.ddl_source,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -108,11 +108,9 @@ export async function handleUpdateDdl(
           return shouldActivate
             ? sequence(
                 () =>
-                  obj.check(
-                    { ddlName, ddlSource: args.ddl_source },
-                    'inactive',
-                    { analyse: analyseException },
-                  ),
+                  obj.check({ ddlName, source: args.ddl_source }, 'inactive', {
+                    analyse: analyseException,
+                  }),
                 update,
               )
             : update();

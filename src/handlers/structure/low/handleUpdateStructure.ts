@@ -3,9 +3,9 @@
  *
  * Uses AdtClient.getStructure().update from @mcp-abap-adt/adt-clients 19.
  *
- * **The source goes through `options.sourceCode`.** `AdtStructure.update()`'s
- * shipped body does keep a fallback — `const source = options?.sourceCode ||
- * config.ddlCode` — but this handler writes through `options` only, the one
+ * **The source goes through `options.source`.** `AdtStructure.update()`'s
+ * shipped body does keep a fallback — `const source = options?.source ||
+ * config.source` — but this handler writes through `options` only, the one
  * channel every sibling family in this cluster shares, and never puts a
  * source string on `config`. Verified against `AdtStructure.js`, not the
  * declaration file.
@@ -106,7 +106,7 @@ export async function handleUpdateStructure(
         .update(
           { structureName },
           {
-            sourceCode: ddl_code,
+            source: ddl_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

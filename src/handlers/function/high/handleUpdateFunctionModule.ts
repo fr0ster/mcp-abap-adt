@@ -15,7 +15,7 @@
  * discarded for its result but not for what it does — see
  * `handleUpdateDomain.ts` (high) for the live incident this guards against.
  *
- * **The source goes through `options.sourceCode`.** See
+ * **The source goes through `options.source`.** See
  * `UpdateFunctionModuleLow`.
  */
 
@@ -24,7 +24,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -132,7 +132,7 @@ export async function handleUpdateFunctionModule(
                   transportRequest: args.transport_request,
                 },
                 {
-                  sourceCode: args.source_code,
+                  source: args.source_code,
                   lockHandle,
                   analyse: analyseException,
                 },

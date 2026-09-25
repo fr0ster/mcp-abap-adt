@@ -11,8 +11,8 @@
  * pre-migration handler's *post*-unlock check is gone: its own `catch`
  * never rethrew, so it could never have changed the answer.
  *
- * **The source goes through `options.sourceCode` for `update`,
- * `config.sourceCode` for `check`.** See `UpdateProgramLow` for `update`.
+ * **The source goes through `options.source` for `update`,
+ * `config.source` for `check`.** See `UpdateProgramLow` for `update`.
  */
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
@@ -20,7 +20,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -111,7 +111,7 @@ export async function handleUpdateProgram(
             obj.update(
               { programName, transportRequest: args.transport_request },
               {
-                sourceCode: args.source_code,
+                source: args.source_code,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -122,7 +122,7 @@ export async function handleUpdateProgram(
             ? sequence(
                 () =>
                   obj.check(
-                    { programName, sourceCode: args.source_code },
+                    { programName, source: args.source_code },
                     'inactive',
                     { analyse: analyseException },
                   ),

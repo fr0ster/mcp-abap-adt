@@ -37,7 +37,7 @@ import {
   analyseDeletion,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces';
+import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import { handleActivateBehaviorDefinition } from '../../handlers/behavior_definition/low/handleActivateBehaviorDefinition';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
@@ -414,30 +414,33 @@ it.each([
   ],
   // behavior_implementation has no Activate/Delete tool — it cannot join
   // this row; see its own describe block below.
-])('%s pairs each operation with its own strategy, on its own factory', async (_family, activate, remove, validate, factory, expectedDeleteAnalyse, args) => {
-  await (activate as any)(context as any, args);
-  const activateCall = callTo('activate');
-  expect(activateCall?.factory).toBe(factory);
-  expect(activateCall?.carriedAnalyse).toBe(true);
-  expect(activateCall?.analyse).toBe(analyseActivation);
+])(
+  '%s pairs each operation with its own strategy, on its own factory',
+  async (_family, activate, remove, validate, factory, expectedDeleteAnalyse, args) => {
+    await (activate as any)(context as any, args);
+    const activateCall = callTo('activate');
+    expect(activateCall?.factory).toBe(factory);
+    expect(activateCall?.carriedAnalyse).toBe(true);
+    expect(activateCall?.analyse).toBe(analyseActivation);
 
-  // Delete -> analyseDeletion, except `ddlx (metadataExtension)`: its
-  // `delete()` is a plain DELETE on the object's own URL, never a POST to
-  // the deletion service, so it never answers a `del:deletionResult`
-  // document and takes `analyseException` instead — see
-  // `ddlx/low/handleDeleteMetadataExtension.ts`'s own doc comment.
-  await (remove as any)(context as any, args);
-  const deleteCall = callTo('delete');
-  expect(deleteCall?.factory).toBe(factory);
-  expect(deleteCall?.carriedAnalyse).toBe(true);
-  expect(deleteCall?.analyse).toBe(expectedDeleteAnalyse);
+    // Delete -> analyseDeletion, except `ddlx (metadataExtension)`: its
+    // `delete()` is a plain DELETE on the object's own URL, never a POST to
+    // the deletion service, so it never answers a `del:deletionResult`
+    // document and takes `analyseException` instead — see
+    // `ddlx/low/handleDeleteMetadataExtension.ts`'s own doc comment.
+    await (remove as any)(context as any, args);
+    const deleteCall = callTo('delete');
+    expect(deleteCall?.factory).toBe(factory);
+    expect(deleteCall?.carriedAnalyse).toBe(true);
+    expect(deleteCall?.analyse).toBe(expectedDeleteAnalyse);
 
-  await (validate as any)(context as any, args);
-  const validateCall = callTo('validate');
-  expect(validateCall?.factory).toBe(factory);
-  expect(validateCall?.carriedAnalyse).toBe(true);
-  expect(validateCall?.analyse).toBe(analyseException);
-});
+    await (validate as any)(context as any, args);
+    const validateCall = callTo('validate');
+    expect(validateCall?.factory).toBe(factory);
+    expect(validateCall?.carriedAnalyse).toBe(true);
+    expect(validateCall?.analyse).toBe(analyseException);
+  },
+);
 
 describe('class', () => {
   it('CheckClassLow defaults the check member\'s status to "active" when version is omitted', async () => {
@@ -449,7 +452,7 @@ describe('class', () => {
     expect(call?.args[1]).toBe('active');
   });
 
-  it('UpdateClassLow passes sourceCode via options, not config — the shipped AdtClass.update() only reads it there', async () => {
+  it('UpdateClassLow passes source via options, not config — the shipped AdtClass.update() only reads it there', async () => {
     await handleUpdateClass(context as any, {
       class_name: 'ZCL_X',
       source_code: 'CLASS zcl_x IMPLEMENTATION.\nENDCLASS.',
@@ -459,7 +462,7 @@ describe('class', () => {
     expect(call?.factory).toBe('getClass');
     expect(call?.args[0]).toEqual({ className: 'ZCL_X' });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'CLASS zcl_x IMPLEMENTATION.\nENDCLASS.',
+      source: 'CLASS zcl_x IMPLEMENTATION.\nENDCLASS.',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -566,7 +569,7 @@ describe('interface', () => {
     expect(call?.args[1]).toBeUndefined();
   });
 
-  it('UpdateInterfaceLow passes sourceCode via options, not config — the shipped AdtInterface.update() only reads it there', async () => {
+  it('UpdateInterfaceLow passes source via options, not config — the shipped AdtInterface.update() only reads it there', async () => {
     await handleUpdateInterface(context as any, {
       interface_name: 'ZIF_X',
       source_code: 'INTERFACE zif_x.\nENDINTERFACE.',
@@ -576,7 +579,7 @@ describe('interface', () => {
     expect(call?.factory).toBe('getInterface');
     expect(call?.args[0]).toEqual({ interfaceName: 'ZIF_X' });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'INTERFACE zif_x.\nENDINTERFACE.',
+      source: 'INTERFACE zif_x.\nENDINTERFACE.',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -676,7 +679,7 @@ describe('behavior_definition', () => {
     expect(call?.args[1]).toBeUndefined();
   });
 
-  it('UpdateBehaviorDefinitionLow passes sourceCode via options and transportRequest via config — the shipped AdtBehaviorDefinition.update() only reads sourceCode there', async () => {
+  it('UpdateBehaviorDefinitionLow passes source via options and transportRequest via config — the shipped AdtBehaviorDefinition.update() only reads source there', async () => {
     await handleUpdateBehaviorDefinition(context as any, {
       name: 'ZBDEF_X',
       source_code: 'behavior definitions',
@@ -690,7 +693,7 @@ describe('behavior_definition', () => {
       transportRequest: 'E19K900001',
     });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'behavior definitions',
+      source: 'behavior definitions',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -847,8 +850,8 @@ describe('behavior_implementation — declared over the class document set', () 
     expect(lockCall?.factory).toBe('getBehaviorImplementation');
     expect(lockCall?.args[0]).toEqual({ className: 'ZBP_X' });
 
-    // The one field this round exists for: sourceCode belongs in options
-    // (AdtBehaviorImplementation.update() reads `options?.sourceCode` only —
+    // The one field this round exists for: source belongs in options
+    // (AdtBehaviorImplementation.update() reads `options?.source` only —
     // with it in config the request carries no body at all), and
     // transportRequest belongs in config (the member reads
     // `config.transportRequest` directly).
@@ -860,7 +863,7 @@ describe('behavior_implementation — declared over the class document set', () 
       transportRequest: 'E19K900001',
     });
     expect(updateCall?.args[1]).toMatchObject({
-      sourceCode: 'CLASS lhc_x DEFINITION.\nENDCLASS.',
+      source: 'CLASS lhc_x DEFINITION.\nENDCLASS.',
       analyse: analyseException,
     });
     expect((updateCall?.args[1] as any)?.lockHandle).toBeDefined();
@@ -927,7 +930,7 @@ describe('behavior_implementation — declared over the class document set', () 
 });
 
 describe('ddl', () => {
-  it("CheckDdlLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_source via config.ddlSource — checkDdl reads it, unlike most sibling families in this cluster", async () => {
+  it("CheckDdlLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_source via config.source — checkDdl reads it, unlike most sibling families in this cluster", async () => {
     await handleCheckDdl(context as any, {
       ddl_name: 'ZVW_X',
       ddl_source: 'define view ZVW_X as select from t000 {client};',
@@ -938,7 +941,7 @@ describe('ddl', () => {
     expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({
       ddlName: 'ZVW_X',
-      ddlSource: 'define view ZVW_X as select from t000 {client};',
+      source: 'define view ZVW_X as select from t000 {client};',
     });
     expect(call?.args[1]).toBe('inactive');
   });
@@ -952,7 +955,7 @@ describe('ddl', () => {
     expect(call?.args[1]).toBe('active');
   });
 
-  it('UpdateDdlLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
+  it('UpdateDdlLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
     await handleUpdateDdl(context as any, {
       ddl_name: 'ZVW_X',
       ddl_source: 'define view ZVW_X as select from t000 {client};',
@@ -962,7 +965,7 @@ describe('ddl', () => {
     expect(call?.factory).toBe('getDdl');
     expect(call?.args[0]).toEqual({ ddlName: 'ZVW_X' });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'define view ZVW_X as select from t000 {client};',
+      source: 'define view ZVW_X as select from t000 {client};',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -1115,7 +1118,7 @@ describe('ddlx (metadataExtension)', () => {
     expect(call?.args[1]).toBe('active');
   });
 
-  it('UpdateMetadataExtensionLow passes sourceCode via options, not config — the shipped AdtMetadataExtension.update() reads options.sourceCode only, with no config fallback (the exact empty-write shape found four times in cluster 14)', async () => {
+  it('UpdateMetadataExtensionLow passes source via options, not config — the shipped AdtMetadataExtension.update() reads options.source only, with no config fallback (the exact empty-write shape found four times in cluster 14)', async () => {
     await handleUpdateMetadataExtension(context as any, {
       name: 'ZI_X_DDLX',
       source_code: '@Metadata.layer: #CORE\nannotate view ZI_X_DDLX with {}',
@@ -1125,12 +1128,12 @@ describe('ddlx (metadataExtension)', () => {
     expect(call?.factory).toBe('getMetadataExtension');
     expect(call?.args[0]).toEqual({ name: 'ZI_X_DDLX' });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: '@Metadata.layer: #CORE\nannotate view ZI_X_DDLX with {}',
+      source: '@Metadata.layer: #CORE\nannotate view ZI_X_DDLX with {}',
       lockHandle: 'h',
     });
-    // The negative half of the assertion: config carries no sourceCode at
+    // The negative half of the assertion: config carries no source at
     // all, so a regression that moves it back cannot pass silently.
-    expect((call?.args[0] as any)?.sourceCode).toBeUndefined();
+    expect((call?.args[0] as any)?.source).toBeUndefined();
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
   });
@@ -1267,7 +1270,7 @@ describe('ddlx (metadataExtension)', () => {
 });
 
 describe('structure', () => {
-  it("CheckStructureLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_code via config.ddlCode — checkStructure reads it", async () => {
+  it("CheckStructureLow defaults the check member's status to 'inactive' when version is omitted, and forwards ddl_code via config.source — checkStructure reads it", async () => {
     await handleCheckStructure(context as any, {
       structure_name: 'ZST_X',
       ddl_code: 'define structure zst_x { client : abap.clnt; }',
@@ -1278,7 +1281,7 @@ describe('structure', () => {
     expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({
       structureName: 'ZST_X',
-      ddlCode: 'define structure zst_x { client : abap.clnt; }',
+      source: 'define structure zst_x { client : abap.clnt; }',
     });
     expect(call?.args[1]).toBe('inactive');
   });
@@ -1292,7 +1295,7 @@ describe('structure', () => {
     expect(call?.args[1]).toBe('active');
   });
 
-  it('UpdateStructureLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
+  it('UpdateStructureLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares', async () => {
     await handleUpdateStructure(context as any, {
       structure_name: 'ZST_X',
       ddl_code: 'define structure zst_x { client : abap.clnt; }',
@@ -1302,7 +1305,7 @@ describe('structure', () => {
     expect(call?.factory).toBe('getStructure');
     expect(call?.args[0]).toEqual({ structureName: 'ZST_X' });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'define structure zst_x { client : abap.clnt; }',
+      source: 'define structure zst_x { client : abap.clnt; }',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -1448,7 +1451,7 @@ describe('table', () => {
     expect(call?.args[1]).toBe('active');
   });
 
-  it('UpdateTableLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
+  it('UpdateTableLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
     await handleUpdateTable(context as any, {
       table_name: 'ZT_X',
       ddl_code: 'define table zt_x { client : abap.clnt; }',
@@ -1462,7 +1465,7 @@ describe('table', () => {
       transportRequest: 'E19K900001',
     });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'define table zt_x { client : abap.clnt; }',
+      source: 'define table zt_x { client : abap.clnt; }',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -1588,7 +1591,7 @@ describe('program', () => {
     expect(call?.args[1]).toBeUndefined();
   });
 
-  it('UpdateProgramLow passes sourceCode via options, not config — the shipped AdtProgram.update() only reads it there', async () => {
+  it('UpdateProgramLow passes source via options, not config — the shipped AdtProgram.update() only reads it there', async () => {
     await handleUpdateProgram(context as any, {
       program_name: 'Z_X',
       source_code: 'REPORT z_x.',
@@ -1598,7 +1601,7 @@ describe('program', () => {
     expect(call?.factory).toBe('getProgram');
     expect(call?.args[0]).toEqual({ programName: 'Z_X' });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'REPORT z_x.',
+      source: 'REPORT z_x.',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -1808,27 +1811,29 @@ describe('program', () => {
       ],
     ];
 
-    it.each(
-      rows,
-    )('%s refuses on a cloud connection and never reaches the client', async (_name, handler, member, args) => {
-      const result: any = await sessionContext.run(cloudStore, () =>
-        handler(context as any, args),
-      );
-      expect(result.isError).toBe(true);
-      expect(result.content[0].text).toContain(
-        'Programs are not available on cloud systems',
-      );
-      // The half that matters: a handler that explains and calls anyway
-      // is the same bug wearing a message.
-      expect(callTo(member)).toBeUndefined();
-    });
+    it.each(rows)(
+      '%s refuses on a cloud connection and never reaches the client',
+      async (_name, handler, member, args) => {
+        const result: any = await sessionContext.run(cloudStore, () =>
+          handler(context as any, args),
+        );
+        expect(result.isError).toBe(true);
+        expect(result.content[0].text).toContain(
+          'Programs are not available on cloud systems',
+        );
+        // The half that matters: a handler that explains and calls anyway
+        // is the same bug wearing a message.
+        expect(callTo(member)).toBeUndefined();
+      },
+    );
 
-    it.each(
-      rows,
-    )('%s proceeds on a non-cloud connection and reaches its member', async (_name, handler, member, args) => {
-      await handler(context as any, args);
-      expect(callTo(member)).toBeDefined();
-    });
+    it.each(rows)(
+      '%s proceeds on a non-cloud connection and reaches its member',
+      async (_name, handler, member, args) => {
+        await handler(context as any, args);
+        expect(callTo(member)).toBeDefined();
+      },
+    );
   });
 });
 
@@ -2053,7 +2058,7 @@ describe('function (function module)', () => {
     expect(call?.args[1]).toBe('inactive');
   });
 
-  it('UpdateFunctionModuleLow passes sourceCode via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
+  it('UpdateFunctionModuleLow passes source via options, not config — this handler writes through options only, the channel every sibling family in this cluster shares; transportRequest belongs in config, which the shipped member reads directly', async () => {
     await handleUpdateFunctionModule(context as any, {
       function_module_name: 'ZFM_X',
       function_group_name: 'ZFG_X',
@@ -2069,7 +2074,7 @@ describe('function (function module)', () => {
       transportRequest: 'E19K900001',
     });
     expect(call?.args[1]).toMatchObject({
-      sourceCode: 'FUNCTION zfm_x.\nENDFUNCTION.',
+      source: 'FUNCTION zfm_x.\nENDFUNCTION.',
       lockHandle: 'h',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -2368,7 +2373,7 @@ describe('data_element', () => {
   // below are hand-built from patchDataElementXml's own dtel: tag names
   // (ported from adt-clients v18.0.2), the same disclosure the transport
   // block below makes for its own missing fixture.
-  it('UpdateDataElementLow passes the patched document via config.document, reaches getDataElement (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and no stray xmlContent survives in options', async () => {
+  it('UpdateDataElementLow passes the patched document via options.source, reaches getDataElement (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and leaves no body in the config', async () => {
     const currentXml =
       '<?xml version="1.0" encoding="UTF-8"?><blue:wbobj xmlns:blue="http://www.sap.com/wbobj/dictionary/dtel" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZDT_X" adtcore:description="before"/>';
     let updateCall: { config: any; options: any } | undefined;
@@ -2392,14 +2397,14 @@ describe('data_element', () => {
     expect(updateCall?.config).toEqual({
       dataElementName: 'ZDT_X',
       transportRequest: 'E19K900001',
-      document: expect.stringContaining('adtcore:description="after"'),
     });
     expect(updateCall?.options).toEqual({
+      source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,
     });
     expect(
-      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+      (updateCall?.config as { document?: unknown })?.document,
     ).toBeUndefined();
   });
 
@@ -2409,8 +2414,8 @@ describe('data_element', () => {
     let patched = '';
     fakeClient = fakeClientOf({
       readMetadata: async () => okResponse(currentXml),
-      updateMetadata: async (config: any) => {
-        patched = config.document;
+      updateMetadata: async (_config: any, options: any) => {
+        patched = options.source;
         return okResponse(undefined);
       },
     });
@@ -3126,7 +3131,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
   });
 
-  it('UpdatePackageLow reads the real read-metadata-package fixture, patches only adtcore:description, reaches getPackage (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and passes it via config.document — no stray xmlContent survives in options', async () => {
+  it('UpdatePackageLow reads the real read-metadata-package fixture, patches only adtcore:description, reaches getPackage (not an unrelated family sharing the same {readMetadata, updateMetadata} shape), and passes it via options.source — no body in the config', async () => {
     const currentXml = corpusBody(
       'read-metadata-package--01-packages-zmcpshrpkg',
     );
@@ -3151,19 +3156,22 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(double.factory).toBe('getPackage');
     expect(updateCall?.config).toEqual({
       packageName: 'ZMCP_SHR_PKG',
-      document: expect.stringContaining('adtcore:description="after"'),
     });
+    expect(updateCall?.options.source).toEqual(
+      expect.stringContaining('adtcore:description="after"'),
+    );
     // The real document's own super package (`ZADT_BLD_PKG03`) survives
     // unpatched — only the field the caller named changed.
-    expect(updateCall?.config.document).toContain(
+    expect(updateCall?.options.source).toContain(
       'adtcore:name="ZADT_BLD_PKG03"',
     );
     expect(updateCall?.options).toEqual({
+      source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,
     });
     expect(
-      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+      (updateCall?.config as { document?: unknown })?.document,
     ).toBeUndefined();
   });
 });

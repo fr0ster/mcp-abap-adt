@@ -1,4 +1,4 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { attachCleanup, carryCleanup } from './withLock';
 
 /**
@@ -15,18 +15,20 @@ import { attachCleanup, carryCleanup } from './withLock';
  * const domain = client.getDomain(resultsFor(domainDocuments));
  * return answer(ctx, () => sequence(
  *   () => domain.readMetadata({ domainName }, { analyse: analyseException }),
- *   (current) => domain.updateMetadata({ domainName, document: patch(current) }, { lockHandle, analyse: analyseException }),
+ *   (current) => domain.updateMetadata({ domainName }, { source: patch(current), lockHandle, analyse: analyseException }),
  * ), project(detail, terseWrite));
  * ```
  *
- * **The patched document goes in the config's `document` field, not
- * `options.xmlContent`.** The shipped `updateMetadata()` reads
- * `config.document` for the PUT body and nothing from `options` but the lock
- * handle, the timeout and the strategy — verified against the compiled
- * `AdtDomain.js`, not this package's own declaration file, which is why the
- * example above names the field it does. `options.xmlContent` exists on the
- * type and is read by nothing; `handleUpdateDomain.ts` (low and high) both
- * carried this exact mistake until fix round 3 of task 14 found it.
+ * **The patched document goes in `options.source`.** The shipped
+ * `updateMetadata()` reads it there and takes nothing else from a caller but
+ * the lock handle, the timeout and the strategy — verified against
+ * `AdtDomain.ts` in adt-clients 22, which is why the example above names the
+ * field it does. There were two channels before `interfaces-adt@9`, a
+ * `config.document` and an `options.sourceCode`, beside an
+ * `options.xmlContent` nothing read; `handleUpdateDomain.ts` (low and high)
+ * both put the document in that dead field until fix round 3 of task 14 found
+ * it. The contract has one channel now, and `document` is gone from the
+ * configs, so the same mistake fails to compile.
  *
  * This example used to pass `writeProjection` (from `promised.ts`) straight
  * to `answer()` in place of the last line above. That does not compile:

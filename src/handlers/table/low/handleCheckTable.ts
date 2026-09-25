@@ -7,7 +7,7 @@
  * `AdtTable.check()` calls `runTableCheckRun(connection, 'abapCheckRun',
  * name, undefined, version)` — the reporter is hardcoded to `'abapCheckRun'`
  * and the fourth argument (where a source would go) is hardcoded
- * `undefined`, never `config.ddlCode`. Unlike `structure`'s sibling member,
+ * `undefined`, never `config.source`. Unlike `structure`'s sibling member,
  * there is no unsaved-code check here. Both parameters stay on the tool
  * schema (removing an existing parameter is not this migration's job) but
  * neither is forwarded, since forwarding them would say they do something

@@ -6,7 +6,7 @@
  *
  * Workflow: create -> (write the body, under a lock, iff source_code is
  * given) -> (activate). `create` posts a metadata document only —
- * `AdtServiceDefinition.js`'s `create()` never reads `sourceCode` — so a
+ * `AdtServiceDefinition.js`'s `create()` never reads `source` — so a
  * caller who passed `source_code` and got only the shell back would have an
  * object created and activated empty. This repository has fixed that exact
  * bug once already (`project_create_shell_update_writes_body`: "create()=
@@ -18,7 +18,7 @@
  * lifecycle through the same accessor's own `lock`/`unlock`.
  *
  * **The source goes in `options`, not `config`.** The shipped `update()`
- * reads `options?.sourceCode` — `config.sourceCode` belongs to `check`
+ * reads `options?.source` — `config.source` belongs to `check`
  * alone. Verified against `AdtServiceDefinition.js`.
  */
 
@@ -27,7 +27,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -153,7 +153,7 @@ export async function handleCreateServiceDefinition(
                 transportRequest: args.transport_request,
               },
               {
-                sourceCode: args.source_code,
+                source: args.source_code,
                 lockHandle,
                 analyse: analyseException,
               },

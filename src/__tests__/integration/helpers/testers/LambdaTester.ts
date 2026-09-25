@@ -621,7 +621,9 @@ export class LambdaTester {
     return isHardModeEnabled();
   }
 
-  getConnection(): import('@mcp-abap-adt/interfaces').IAbapConnection | null {
+  getConnection():
+    | import('@mcp-abap-adt/interfaces-adt').IAbapConnection
+    | null {
     return this.context?.connection ?? null;
   }
 

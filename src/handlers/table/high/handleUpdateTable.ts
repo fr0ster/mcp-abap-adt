@@ -9,14 +9,14 @@
  * (activate). The pre-write check gates the write exactly as the
  * pre-migration handler did — only when `activate` is true. **Unlike
  * `AdtStructure.check()`, the shipped `AdtTable.check()` never forwards
- * `config.ddlCode` to the wire call** (`runTableCheckRun(..., undefined,
+ * `config.source` to the wire call** (`runTableCheckRun(..., undefined,
  * version)` hardcodes no source) — so this check validates the
  * already-saved inactive version, not the unsaved `ddl_code`, the same
  * limitation the pre-migration handler's identical call already had. The
  * pre-migration handler's *post*-unlock check is gone: its own `catch`
  * never rethrew, so it could never have changed the answer.
  *
- * **The source goes through `options.sourceCode` for `update`.** See
+ * **The source goes through `options.source` for `update`.** See
  * `UpdateTableLow`.
  */
 
@@ -25,7 +25,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -106,7 +106,7 @@ export async function handleUpdateTable(
             obj.update(
               { tableName, transportRequest: args.transport_request },
               {
-                sourceCode: args.ddl_code,
+                source: args.ddl_code,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -116,7 +116,7 @@ export async function handleUpdateTable(
           return shouldActivate
             ? sequence(
                 () =>
-                  obj.check({ tableName, ddlCode: args.ddl_code }, 'inactive', {
+                  obj.check({ tableName, source: args.ddl_code }, 'inactive', {
                     analyse: analyseException,
                   }),
                 update,

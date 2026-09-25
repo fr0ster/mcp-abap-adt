@@ -14,7 +14,7 @@
  *    implements a `delete()` method regardless, but its body is exactly
  *    `return this.update({ ...config, definitionsCode: '' }, options)` — a
  *    convenience name for the empty write, not a different call. Calling
- *    `update()` with `sourceCode: ''` directly is the identical wire
+ *    `update()` with `source: ''` directly is the identical wire
  *    request, made through a method the declared type actually has.
  * 2. `update()` never locks itself. The same accessor composes
  *    `IAdtLockable`, delegating to the class's own lock, so this handler
@@ -31,7 +31,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -103,7 +103,7 @@ export async function handleDeleteLocalDefinitions(
         (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
-            { sourceCode: '', lockHandle, analyse: analyseException },
+            { source: '', lockHandle, analyse: analyseException },
           ),
         (lockHandle) => obj.unlock({ className }, lockHandle),
       );

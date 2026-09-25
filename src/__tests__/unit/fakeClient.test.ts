@@ -1,4 +1,4 @@
-import type { IAdtError } from '@mcp-abap-adt/interfaces';
+import type { IAdtError } from '@mcp-abap-adt/interfaces-adt';
 import {
   fakeClientOf,
   okResponse,

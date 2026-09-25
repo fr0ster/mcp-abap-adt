@@ -14,7 +14,7 @@
  * does not move it onto the caller, it moves it onto this handler.
  *
  * **The source goes in `options`, not `config`.** The shipped `update()`
- * reads `options?.sourceCode` — `config.sourceCode` belongs to `check`
+ * reads `options?.source` — `config.source` belongs to `check`
  * alone.
  *
  * Activation is restored: `activate()` is on the same accessor and
@@ -28,7 +28,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -129,7 +129,7 @@ export async function handleUpdateFunctionInclude(
               transportRequest: args.transport_request,
             },
             {
-              sourceCode: args.source_code,
+              source: args.source_code,
               lockHandle,
               analyse: analyseException,
             },

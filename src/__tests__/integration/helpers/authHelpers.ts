@@ -4,7 +4,7 @@
  */
 
 import * as path from 'node:path';
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   DefaultLogger,
   defaultLogger,

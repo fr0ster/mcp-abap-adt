@@ -15,7 +15,7 @@
  * (ReadOnly group) stay; these are HighLevel-only per-type equivalents.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type {
   HandlerContext,

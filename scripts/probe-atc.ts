@@ -15,7 +15,7 @@
  *   npx tsx scripts/probe-atc.ts [OBJECT_NAME] [object_type]
  */
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import type { AtcObjectType } from '@mcp-abap-adt/interfaces';
+import type { AtcObjectType } from '@mcp-abap-adt/interfaces-adt';
 import { createTestConnectionAndSession } from '../src/__tests__/integration/helpers/sessionHelpers';
 import { handleGetATCFindings } from '../src/handlers/atc/high/handleGetATCFindings';
 import { handleGetATCRunStatus } from '../src/handlers/atc/high/handleGetATCRunStatus';

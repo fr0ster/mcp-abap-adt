@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/lib",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "11.0.0",
+  "version": "12.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -72,7 +72,7 @@
     }
   },
   "scripts": {
-    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' \u2014 edit lines marked CHANGE')}\"",
+    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
@@ -127,46 +127,38 @@
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.10",
-    "@modelcontextprotocol/inspector": "^0.21.1",
-    "@types/diff": "^5.2.3",
+    "@modelcontextprotocol/inspector": "^2.8.0",
     "@types/jest": "^30.0.0",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^25.5.2",
-    "commander": "^14.0.3",
-    "cors": "^2.8.6",
-    "dotenv": "^17.4.0",
+    "@types/node": "^22.20.4",
+    "dotenv": "^18.0.3",
     "express": "^5.1.0",
-    "express-rate-limit": "^8.3.2",
     "husky": "^9.1.7",
     "jest": "^30.3.0",
-    "jest-util": "^30.3.0",
+    "jest-util": "^30.5.1",
     "lint-staged": "^16.4.0",
-    "open": "^11.0.0",
-    "pino": "^10.3.0",
-    "pino-pretty": "^13.1.3",
-    "serve-handler": "^6.1.7",
     "ts-jest": "^29.2.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.2"
   },
   "dependencies": {
-    "@mcp-abap-adt/adt-clients": "^20.0.0",
-    "@mcp-abap-adt/adt-strategies": "^0.3.0",
+    "@mcp-abap-adt/adt-clients": "^22.0.0",
+    "@mcp-abap-adt/adt-strategies": "^0.4.0",
     "@mcp-abap-adt/auth-broker": "^2.0.0",
     "@mcp-abap-adt/auth-providers": "^2.0.0",
     "@mcp-abap-adt/auth-stores": "^1.0.4",
-    "@mcp-abap-adt/connection": "^8.1.0",
-    "@mcp-abap-adt/header-validator": "^0.1.8",
-    "@mcp-abap-adt/interfaces": "^46.0.1",
-    "@mcp-abap-adt/logger": "^0.3.1",
+    "@mcp-abap-adt/connection": "^9.2.1",
+    "@mcp-abap-adt/interfaces-adt": "^9.0.0",
+    "@mcp-abap-adt/interfaces-auth": "^1.2.0",
+    "@mcp-abap-adt/interfaces-auth-sap": "^1.0.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.0",
+    "@mcp-abap-adt/logger": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "axios": "^1.18.1",
-    "diff": "^5.2.2",
+    "diff": "^9.0.0",
     "fast-xml-parser": "^5.9.3",
-    "js-yaml": "^4.3.0",
+    "js-yaml": "^5.4.2",
     "pino": "^10.1.0",
     "pino-pretty": "^13.1.3",
-    "xml-js": "^1.6.11",
     "zod": "^4.3.6"
   },
   "optionalDependencies": {
@@ -229,8 +221,5 @@
       "biome check --write"
     ]
   },
-  "private": false,
-  "overrides": {
-    "@hono/node-server": "^2.0.5"
-  }
+  "private": false
 }

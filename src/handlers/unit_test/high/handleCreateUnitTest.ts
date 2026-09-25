@@ -9,7 +9,7 @@
  * 'start a run'". The pre-migration handler here called `unitTest.create({
  * tests, options })`, which was already the pre-12.0.0 shape — in v19
  * `create()` posts the *container class* (`Omit<IUnitTestConfig,
- * 'sourceCode'>`, no `tests` field at all) and answers no `runId`.
+ * 'source'>`, no `tests` field at all) and answers no `runId`.
  *
  * What this tool always promised — start a run for named container/test
  * class pairs, answer its id — is `AdtUnitTest.run(tests, options)`:

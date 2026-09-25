@@ -213,15 +213,18 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-12.0.md](docs/MIGRATION-12.0.md)** - What a consumer on the 11.x contract changes
 
 ## Dependencies
 
-This project uses two npm packages:
+Two packages do the work:
 
 - **[@mcp-abap-adt/connection](https://www.npmjs.com/package/@mcp-abap-adt/connection)** – connection/auth/session layer
 - **[@mcp-abap-adt/adt-clients](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients)** – Builder-first ADT clients
 
-These packages are automatically installed via `npm install` and are published to npm.
+and four packages declare the contracts both of them and this project are written against — `@mcp-abap-adt/interfaces-adt`, `-auth`, `-auth-sap` and `-utils`. They replace the single `@mcp-abap-adt/interfaces` umbrella, which is no longer published: a consumer naming a contract package directly gets one copy of it in the tree and takes its majors one domain at a time.
+
+Everything above is installed by `npm install` and published to npm. `@mcp-abap-adt/sap-rfc-lite` is optional and only needed for the RFC transport, which also requires the SAP NW RFC SDK on the machine.
 
 ---
 
@@ -476,11 +479,16 @@ network service, means passing on the same freedoms under AGPL section 13 —
 including the source. That is why the two are separate packages: installing the
 library never puts the server in your dependency tree.
 
-**The libraries underneath are LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
-`connection`, `interfaces` and `logger` — and the library links them at runtime.
-LGPL does not reach your own code, but its terms do travel with those four
-packages whatever this project is licensed as. Plan for that, not for the
-notice on this repository.
+**The packages underneath are LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
+`adt-strategies`, `connection`, `logger`, `auth-broker`, `auth-providers`,
+`auth-stores` and the contract packages `interfaces-adt`, `interfaces-auth`,
+`interfaces-auth-sap` and `interfaces-utils` — and the library links them at
+runtime. It was four of them when this paragraph was written; the rule is the
+whole scope now, libraries LGPL and servers AGPL or GPL, and the MIT that a few
+of the auth packages still carried was an oversight rather than an offer. LGPL
+does not reach your own code, but its terms do travel with those packages
+whatever this project is licensed as. Plan for that, not for the notice on this
+repository.
 
 **Other terms are possible.** Apache-2.0 is what the library is offered under
 publicly, not the only way it can be offered. The copyright holder may license

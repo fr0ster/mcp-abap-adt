@@ -5,7 +5,7 @@ import { patchFunctionGroupXml } from '../../lib/strategies/functionGroupPatch';
  * `patchFunctionGroupXml`'s own test, standalone from any handler — proves
  * the patch against the real corpus document, not a hand-written stand-in.
  * `highTierWriteChannel.test.ts` separately proves `UpdateFunctionGroup`
- * wires this in through `config.document`, via a `withLock`-held sequence;
+ * wires this in through `options.source`, via a `withLock`-held sequence;
  * this file proves only what the function itself does to bytes.
  */
 describe('patching a function group changes what was asked and nothing else', () => {

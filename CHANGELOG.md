@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [12.0.0] - 2026-09-24
+
+Migration: [`docs/MIGRATION-12.0.md`](docs/MIGRATION-12.0.md).
+
 ### Added
 
 - **Five tools for a transport request's object list**, which is what
@@ -55,9 +59,101 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **`@mcp-abap-adt/adt-clients` `^20.0.0`, `adt-strategies` `^0.3.0`,
-  `interfaces` `^46.0.1`.** The major is what carries the five members above,
-  with the two required arguments their first run against a server measured.
+- **BREAKING: the contract comes from the packages that declare it.**
+  `@mcp-abap-adt/interfaces` is gone from this project's dependencies. It last
+  shipped 51.0.0 and nothing further will: `adt-clients` 22.0.0, `connection`
+  9.2.1 and `adt-strategies` 0.4.0 all take `interfaces-adt@^9` directly, while
+  the facade carries `^7`. Keeping it would have put two majors of the contract
+  in one tree, and they differ — 9's `IAdtWireResponse` extends
+  `IHttpWireResponse` from `interfaces-network@2`, 7's does not.
+
+  111 import statements in 108 files under `src/`, plus
+  `server/src/AuthBrokerConfig.ts`, now name the package the contract lives in:
+
+  | package | names taken |
+  |---|---|
+  | `@mcp-abap-adt/interfaces-adt@^9.0.0` | 18, from `IAdtError` and `IAdtResponse` down to `TRANSPORT_SEARCH_CONFIGURATIONS_URL` |
+  | `@mcp-abap-adt/interfaces-utils@^1.1.0` | `ILogger`, `LogLevel` |
+  | `@mcp-abap-adt/interfaces-auth@^1.2.0` | `ITokenRefresher`, `ITokenProvider`, `ITokenResult` |
+  | `@mcp-abap-adt/interfaces-auth-sap@^1.0.0` | `SapAuthType`, `IServiceKeyStore`, `ISessionStore`, `IAuthorizationConfig`, `IConnectionConfig` |
+
+  Nothing was renamed, so **a consumer of this library changes an import path
+  and installs the packages it names.** `interfaces-network` is not among them
+  because nothing here imports from it.
+
+  **`@mcp-abap-adt/lib/utils` no longer re-exports the contract.** The star
+  export was described as re-exporting the header constants; those live in
+  `interfaces-network` now, and measured before removing it, nothing in this
+  repository imported one through there. A consumer who did takes them from
+  `@mcp-abap-adt/interfaces-network` directly — which is also where
+  cloud-llm-hub already takes them from.
+
+- **BREAKING: a write's body has one channel, `options.source`.**
+  `interfaces-adt@9` merged what used to be `options.sourceCode` (ABAP text),
+  `config.document` (an XML metadata document), `config.ddlCode`,
+  `config.ddlSource`, `config.testClassCode` and an `options.xmlContent` that
+  nothing ever read. Every member in adt-clients 22 reads `options?.source`.
+
+  ```diff
+  - await domain.updateMetadata({ domainName, document: patched }, { lockHandle });
+  + await domain.updateMetadata({ domainName }, { source: patched, lockHandle });
+  ```
+
+  This reaches a caller of the MCP tools not at all — no tool parameter
+  changed — and a caller of `@mcp-abap-adt/lib`'s handlers not at all either.
+  It is recorded because of how it was found: **the compiler flagged 8 of the
+  ~38 call sites**, the ones whose member has two overloads. The rest would have
+  compiled and silently sent no body, so they were found by reading the
+  contract instead of the error list.
+
+- **`@mcp-abap-adt/adt-clients` `^22.0.0`, `connection` `^9.2.1`, `logger`
+  `^0.4.0`, `adt-strategies` `^0.4.0`.** The adt-clients major is what carries
+  the five transport members above, with the two required arguments their first
+  run against a server measured. `connection` 9.2.1 also drops its optional
+  `kerberos` dependency, so an install no longer builds a native module for a
+  code path nothing reached.
+
+  `taskTypeChanged` joins `READING_BY_SLOT` for `changeTaskType`, new in
+  adt-clients 22. `resultSets.test.ts` is what found it — `resultsFor` throws on
+  a slot with no reading, and every transport tool failed until it was declared.
+
+- **Dependencies removed that nothing imports**, measured over every `.ts`,
+  `.js`, `.mjs` and `.cjs` outside `node_modules`, plus the npm scripts and the
+  husky hooks: `xml-js` and `@mcp-abap-adt/header-validator` (both **runtime**,
+  so both shipped in the tarball), `cors`, `express-rate-limit`,
+  `serve-handler`, `commander` and `open`, and the `@types/diff` and
+  `@types/js-yaml` stubs that duplicate declarations those packages now ship
+  themselves. `pino`/`pino-pretty` lose their duplicate dev entries and stay as
+  runtime dependencies, because `@mcp-abap-adt/logger` declares them as peers
+  and this repository's `.npmrc` sets `legacy-peer-deps=true`.
+
+  `jest-util` looked like the same case and is not: with
+  `install-strategy=nested` in `.npmrc`, `ts-jest` cannot find it unless this
+  package declares it, and `npm test` fails before a suite runs. It stays, with
+  that reason written beside it.
+
+- **Third-party majors: `js-yaml` 5, `diff` 9, `dotenv` 18,
+  `@modelcontextprotocol/inspector` 2.** All three runtime majors keep a
+  CommonJS entry, which this build needs.
+
+- **Node and TypeScript versions follow SAP, and `CLAUDE.md` now says so.**
+  `@types/node` moves **down** to `^22`, matching `engines.node` rather than the
+  newest release, and the CI and release matrices run **22 and 24** instead of
+  22/25 and 22/24/25: SAP BTP Cloud Foundry supports 22 and 24, 20 was removed
+  on 2026-04-30, and odd-numbered releases are not on the platform. `typescript`
+  stays on `^6.x` — no CAP package declares a `typescript` peer, but `cds-typer`
+  and `cds-types` are developed on `^6.0.3`, `ts-jest` 29.4.13 declares
+  `typescript: ">=4.3 <7"`, and cloud-llm-hub type-checks against this project's
+  declarations on 6.
+
+- **`overrides` is gone.** It pinned `@hono/node-server` to `^2.0.5` against an
+  sdk that declared `^1.19.9`; sdk 1.30.1 declares `^1.19.9 || ^2.0.5` itself,
+  and a clean resolve of the sdk alone lands 2.1.1 with no help.
+
+- The earlier statement of this release's dependency set — `adt-clients
+  ^20.0.0`, `adt-strategies ^0.3.0`, `interfaces ^46.0.1` — is superseded by
+  the rows above; it was written when the five transport tools landed, before
+  the contract split reached this repository.
 
   `adt-strategies` 0.3.0 brings `analyseActivation` reading
   `activationExecuted` as three states, so an activation with nothing to do is

@@ -146,12 +146,15 @@ describe('readonlySingleCall handlers answer through the adapter and surface a r
         content_uri_to: 'uri2',
       },
     ],
-  ])('%s answers through the adapter and surfaces a refusal', async (_n, handler, args) => {
-    fakeClient = refusingClient('Not found');
-    const result: any = await (handler as any)(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe('Not found');
-  });
+  ])(
+    '%s answers through the adapter and surfaces a refusal',
+    async (_n, handler, args) => {
+      fakeClient = refusingClient('Not found');
+      const result: any = await (handler as any)(context as any, args);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe('Not found');
+    },
+  );
 });
 
 /**
@@ -797,12 +800,15 @@ describe('the high-tier Get*/List* handlers answer through the adapter and surfa
     ['GetCdsUnitTest', handleGetCdsUnitTest, { run_id: 'r1' }],
     ['GetCdsUnitTestStatus', handleGetCdsUnitTestStatus, { run_id: 'r1' }],
     ['GetCdsUnitTestResult', handleGetCdsUnitTestResult, { run_id: 'r1' }],
-  ])('%s answers through the adapter and surfaces a refusal', async (_n, handler, args) => {
-    fakeClient = refusingClient('Not found');
-    const result: any = await (handler as any)(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe('Not found');
-  });
+  ])(
+    '%s answers through the adapter and surfaces a refusal',
+    async (_n, handler, args) => {
+      fakeClient = refusingClient('Not found');
+      const result: any = await (handler as any)(context as any, args);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe('Not found');
+    },
+  );
 });
 
 /**
@@ -1028,27 +1034,21 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     },
   ];
 
-  it.each(
-    rows,
-  )("$name calls the right factory and member, with the caller's own identity, and its strategy exactly where the signature accepts one", async ({
-    handler,
-    args,
-    factory,
-    member,
-    identity,
-    hasAnalyse,
-  }) => {
-    const seen = recordAnalyse();
-    fakeClient = seen.client;
+  it.each(rows)(
+    "$name calls the right factory and member, with the caller's own identity, and its strategy exactly where the signature accepts one",
+    async ({ handler, args, factory, member, identity, hasAnalyse }) => {
+      const seen = recordAnalyse();
+      fakeClient = seen.client;
 
-    await handler(context as any, args);
+      await handler(context as any, args);
 
-    const call = seen.calls.filter((c) => c.member === member).at(-1);
-    expect(call?.factory).toBe(factory);
-    expect(call?.args[0]).toEqual(identity);
-    expect(call?.carriedAnalyse).toBe(hasAnalyse);
-    if (hasAnalyse) expect(call?.analyse).toBe(analyseException);
-  });
+      const call = seen.calls.filter((c) => c.member === member).at(-1);
+      expect(call?.factory).toBe(factory);
+      expect(call?.args[0]).toEqual(identity);
+      expect(call?.carriedAnalyse).toBe(hasAnalyse);
+      if (hasAnalyse) expect(call?.analyse).toBe(analyseException);
+    },
+  );
 
   it('ListServiceBindingTypes calls getServiceBinding().getServiceBindingTypes() with no arguments at all', async () => {
     const seen = recordAnalyse();

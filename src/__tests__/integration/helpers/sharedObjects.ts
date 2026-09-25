@@ -13,7 +13,8 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection, ILogger } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { createAdtClient } from '../../../lib/clients';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
@@ -225,7 +226,7 @@ export async function ensureSharedDependency(
           (lockHandle) =>
             obj.update(
               { tableName: name, transportRequest },
-              { sourceCode: depConfig.source, lockHandle },
+              { source: depConfig.source, lockHandle },
             ),
           (lockHandle) => obj.unlock({ tableName: name }, lockHandle),
         );
@@ -252,7 +253,7 @@ export async function ensureSharedDependency(
           (lockHandle) =>
             obj.update(
               { ddlName: name, transportRequest },
-              { sourceCode: depConfig.source, lockHandle },
+              { source: depConfig.source, lockHandle },
             ),
           (lockHandle) => obj.unlock({ ddlName: name }, lockHandle),
         );
@@ -281,7 +282,7 @@ export async function ensureSharedDependency(
           (lockHandle) =>
             obj.update(
               { name, transportRequest },
-              { sourceCode: depConfig.source, lockHandle },
+              { source: depConfig.source, lockHandle },
             ),
           (lockHandle) => obj.unlock({ name }, lockHandle),
         );

@@ -4,11 +4,11 @@
  * Uses AdtClient.getClass().update from @mcp-abap-adt/adt-clients 19.
  *
  * **The source goes in `options`, not `config`.** `IClassConfig` still
- * declares a `sourceCode` field, so `update({ className, sourceCode }, ...)`
+ * declares a `source` field, so `update({ className, source }, ...)`
  * compiles either way — but the shipped `AdtClass.update()` reads
- * `options?.sourceCode` only (its own comment: "This used to fall back to
- * `config.sourceCode` — two channels for one value, where the contract
- * documents one. `config.sourceCode` is `check`'s alone now"). A `.d.ts`
+ * `options?.source` only (its own comment: "This used to fall back to
+ * `config.source` — two channels for one value, where the contract
+ * documents one. `config.source` is `check`'s alone now"). A `.d.ts`
  * comment is not evidence for where a value lands; the compiled JavaScript
  * is. Verified against `AdtClass.js`, not the declaration file.
  */
@@ -83,7 +83,7 @@ export async function handleUpdateClass(
         .update(
           { className },
           {
-            sourceCode: source_code,
+            source: source_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

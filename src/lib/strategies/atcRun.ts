@@ -1,5 +1,5 @@
 import { AdtSAPError } from '@mcp-abap-adt/adt-clients';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 
 /**
  * The two steps an ATC run needs before it can start, and which channel their

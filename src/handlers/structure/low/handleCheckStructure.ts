@@ -4,8 +4,8 @@
  * Uses AdtClient.getStructure().check from @mcp-abap-adt/adt-clients 19.
  *
  * `ddl_code` is not a dead parameter: the shipped `AdtStructure.check()`
- * passes `config.ddlCode` straight into
- * `checkStructure(connection, name, version, config.ddlCode, logger)`, so a
+ * passes `config.source` straight into
+ * `checkStructure(connection, name, version, config.source, logger)`, so a
  * caller validating unsaved code still reaches the server with it. Verified
  * against `AdtStructure.js`, not the declaration file.
  */
@@ -102,7 +102,7 @@ export async function handleCheckStructure(
     () =>
       createAdtClient(connection, logger)
         .getStructure(resultsFor(structureDocuments))
-        .check({ structureName, ddlCode: ddl_code }, checkVersion, {
+        .check({ structureName, source: ddl_code }, checkVersion, {
           analyse: analyseException,
         }),
     project(detail, terseCheck),

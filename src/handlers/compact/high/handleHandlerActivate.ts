@@ -1,4 +1,4 @@
-import type { IObjectReference } from '@mcp-abap-adt/interfaces';
+import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   handleActivateObject,

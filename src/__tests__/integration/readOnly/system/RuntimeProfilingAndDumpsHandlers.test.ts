@@ -173,7 +173,7 @@ WRITE: / 'MCP runtime program profiling ${programName}'.
 async function createRunnableClass(
   context: LambdaTesterContext,
   className: string,
-  sourceCode: string,
+  source: string,
   invokeTool?: (
     toolName: string,
     args: Record<string, unknown>,
@@ -189,7 +189,7 @@ async function createRunnableClass(
         package_name: context.packageName,
         transport_request: context.transportRequest,
         description: `MCP runtime test ${className}`.slice(0, 60),
-        source_code: sourceCode,
+        source_code: source,
         activate: true,
       },
       async () => {
@@ -212,7 +212,7 @@ async function createRunnableClass(
     description: `MCP runtime test ${className}`.slice(0, 60),
   });
   // adt-clients 19 has no `activateOnUpdate` convenience — the source goes
-  // through `options.sourceCode` under a caller-held lock (see
+  // through `options.source` under a caller-held lock (see
   // UpdateClassLow), and activation is its own call after unlock.
   const obj = client.getClass();
   const written = await withLock(
@@ -220,7 +220,7 @@ async function createRunnableClass(
     (lockHandle) =>
       obj.update(
         { className, transportRequest: context.transportRequest },
-        { sourceCode, lockHandle },
+        { source, lockHandle },
       ),
     (lockHandle) => obj.unlock({ className }, lockHandle),
   );
@@ -276,7 +276,7 @@ async function deleteClassIfExists(
 async function createRunnableProgram(
   context: LambdaTesterContext,
   programName: string,
-  sourceCode: string,
+  source: string,
   invokeTool?: (
     toolName: string,
     args: Record<string, unknown>,
@@ -291,7 +291,7 @@ async function createRunnableProgram(
         package_name: context.packageName,
         transport_request: context.transportRequest,
         description: `MCP runtime test ${programName}`.slice(0, 60),
-        source_code: sourceCode,
+        source_code: source,
         activate: true,
       },
       async () => {
@@ -321,7 +321,7 @@ async function createRunnableProgram(
     (lockHandle) =>
       obj.update(
         { programName, transportRequest: context.transportRequest },
-        { sourceCode, lockHandle },
+        { source, lockHandle },
       ),
     (lockHandle) => obj.unlock({ programName }, lockHandle),
   );

@@ -1,7 +1,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { readAdtRefusal } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { ADT_CORPUS_DIR, corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import { return_answer } from '../../lib/answer';
 
@@ -69,18 +69,19 @@ describe('a real refusal, read and then answered', () => {
     expect(['E', 'W', 'I', 'S']).toContain(payload.messages[0].type);
   });
 
-  it.each(
-    REFUSALS,
-  )('%s never leaks a credential the strategy attached', (name) => {
-    for (const detail of ['terse', 'full', 'raw'] as const) {
-      const text = return_answer(failureFrom(name), (v) => v, {
-        tool: 'AnyTool',
-        detail,
-      }).content[0].text;
-      expect(text).not.toContain('Bearer');
-      expect(text).not.toContain('authorization');
-    }
-  });
+  it.each(REFUSALS)(
+    '%s never leaks a credential the strategy attached',
+    (name) => {
+      for (const detail of ['terse', 'full', 'raw'] as const) {
+        const text = return_answer(failureFrom(name), (v) => v, {
+          tool: 'AnyTool',
+          detail,
+        }).content[0].text;
+        expect(text).not.toContain('Bearer');
+        expect(text).not.toContain('authorization');
+      }
+    },
+  );
 
   it('keeps the T100 key where the document had one', () => {
     const payload = JSON.parse(

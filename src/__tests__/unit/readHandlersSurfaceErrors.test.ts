@@ -92,25 +92,27 @@ const rows: Array<[string, (ctx: any, args: any) => Promise<any>, any]> = [
 ];
 
 describe('readonly handlers surface read failures as isError (#159)', () => {
-  it.each(
-    rows,
-  )('%s reports a refusal as an error', async (_name, handler, args) => {
-    fakeClient = refusingClient('Resource not found');
-    const result: any = await handler(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Resource not found',
-    );
-  });
+  it.each(rows)(
+    '%s reports a refusal as an error',
+    async (_name, handler, args) => {
+      fakeClient = refusingClient('Resource not found');
+      const result: any = await handler(context as any, args);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe(
+        'Resource not found',
+      );
+    },
+  );
 
-  it.each(
-    rows,
-  )('%s names a thrown failure client_threw, carrying its own tool', async (name, handler, args) => {
-    fakeClient = throwingClient('boom');
-    const result: any = await handler(context as any, args);
-    expect(result.isError).toBe(true);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.error).toBe('client_threw');
-    expect(payload.tool).toBe(name);
-  });
+  it.each(rows)(
+    '%s names a thrown failure client_threw, carrying its own tool',
+    async (name, handler, args) => {
+      fakeClient = throwingClient('boom');
+      const result: any = await handler(context as any, args);
+      expect(result.isError).toBe(true);
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.error).toBe('client_threw');
+      expect(payload.tool).toBe(name);
+    },
+  );
 });

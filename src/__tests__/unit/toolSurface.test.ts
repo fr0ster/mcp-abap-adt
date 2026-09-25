@@ -113,7 +113,9 @@ describe('the MCP tool surface', () => {
       // now types the task itself, `S` by default; the parameter is how a
       // caller asks for Repair (`R`) or leaves it Unclassified (`X`).
       //
-      // **Sixth exception: CheckDomain and CheckDataElement gained `version`.**
+      // **Sixth exception: six check tools gained `version`** — CheckDomain,
+      // CheckDataElement, CheckBehaviorDefinition, CheckProgram,
+      // CheckFunctionGroup and CheckInterface.
       // They could only ask about the inactive version, and an object that
       // is only active has none: SAP answered "Error while importing object
       // … from the database" for the shared domain and data element (E19,
@@ -148,6 +150,14 @@ describe('the MCP tool surface', () => {
         'low/CheckDomainLow': ['version'],
         'high/CheckDataElement': ['version'],
         'low/CheckDataElementLow': ['version'],
+        'high/CheckBehaviorDefinition': ['version'],
+        'low/CheckBdefLow': ['version'],
+        'high/CheckProgram': ['version'],
+        'low/CheckProgramLow': ['version'],
+        'high/CheckFunctionGroup': ['version'],
+        'low/CheckFunctionGroupLow': ['version'],
+        'high/CheckInterface': ['version'],
+        'low/CheckInterfaceLow': ['version'],
         // The eighth of the same family, found while reviewing the other
         // seven: `core/package/update.ts` appends `&corrNr=` when a transport
         // is given and `IPackageConfig` declares `transportRequest`, but the

@@ -261,6 +261,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1685,6 +1686,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name (e.g., ZFGRP_MY_GROUP).
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1871,6 +1873,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -2114,6 +2117,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., ZMCP_MY_PROGRAM).
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 

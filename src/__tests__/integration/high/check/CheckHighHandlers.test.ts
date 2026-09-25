@@ -53,25 +53,13 @@ function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
   expect(typeof data.status_text).toBe('string');
   expect(data).not.toHaveProperty('session_id');
   expect(data).not.toHaveProperty('session_state');
-}
-
-/**
- * Assert a check that never ran, and said why.
- *
- * `status="notProcessed"` with the reason in `statusText`. A check that did
- * not run is not a check that found nothing, and `ran: false` is how the two
- * are told apart — still an answer, which is how the pre-migration handler
- * reported it too.
- */
-function assertCheckDidNotRun(
-  response: { isError: boolean; content: Array<{ text: string }> },
-  expected: RegExp,
-): any {
-  expect(response.isError).toBe(false);
-  const data = JSON.parse(response.content[0].text);
-  expect(data.ran).toBe(false);
-  expect(data.status_text).toMatch(expected);
-  return data;
+  // The shared objects are active and correct, and every check here asks
+  // about the active version: an error is a broken test environment or a
+  // broken implementation, not an answer to accept. Warnings may stand.
+  const errors = (data.messages ?? []).filter(
+    (m: { type?: string }) => m.type === 'E',
+  );
+  expect(errors).toEqual([]);
 }
 
 describe('Check High-Level Handlers Integration', () => {
@@ -175,34 +163,29 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-bdef');
           const response = await tester.invokeToolOrHandler(
             'CheckBehaviorDefinition',
-            { name: objectName },
+            { name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckBehaviorDefinition(ctx, { name: objectName });
+              return handleCheckBehaviorDefinition(ctx, {
+                name: objectName,
+                version: 'active',
+              });
             },
           );
 
-          // `CheckBehaviorDefinition` takes a name and nothing else — no
-          // `version`, on either tier — and the shipped `check` member
-          // defaults to the inactive version (see the note in
-          // `handleCheckBehaviorDefinition.ts`, low tier). The shared
-          // behaviour definition is active-only, so SAP answers
-          // `status="notProcessed"`, `statusText="Inactive version for BDEF
-          // ZMCP_SHR_I_ROOT does not exist"` — measured 2026-09-16. That is
-          // the honest answer to the question the tool is able to ask; the
-          // tool's inability to ask about the active version is a real gap,
-          // and a `version` input is what would close it.
-          //
-          // That is an answer, and the tool reports it as one: `ran: false`
-          // with SAP's own sentence, which is what `success: false` carried
-          // before the migration.
-          const data = assertCheckDidNotRun(response, /Inactive version/i);
+          // It used to take a name and nothing else, so it could only ask
+          // about the inactive version — which an active behaviour
+          // definition does not have ("Inactive version … does not exist").
+          // It asks about the active one now, like every check here.
+          expect(response.isError).toBe(false);
+          const data = parseHandlerResponse(response);
+          assertNormalizedCheckResponse(data, objectName);
 
           logger?.success(
-            `✅ check: ${objectName} — did not run: ${data.status_text}`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },
@@ -573,13 +556,16 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-interface');
           const response = await tester.invokeToolOrHandler(
             'CheckInterface',
-            { interface_name: objectName },
+            { interface_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckInterface(ctx, { interface_name: objectName });
+              return handleCheckInterface(ctx, {
+                interface_name: objectName,
+                version: 'active',
+              });
             },
           );
 
@@ -699,13 +685,16 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-program');
           const response = await tester.invokeToolOrHandler(
             'CheckProgram',
-            { program_name: objectName },
+            { program_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckProgram(ctx, { program_name: objectName });
+              return handleCheckProgram(ctx, {
+                program_name: objectName,
+                version: 'active',
+              });
             },
           );
 
@@ -759,7 +748,7 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-fgrp');
           const response = await tester.invokeToolOrHandler(
             'CheckFunctionGroup',
-            { function_group_name: objectName },
+            { function_group_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
@@ -767,6 +756,7 @@ describe('Check High-Level Handlers Integration', () => {
               });
               return handleCheckFunctionGroup(ctx, {
                 function_group_name: objectName,
+                version: 'active',
               });
             },
           );

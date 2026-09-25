@@ -182,6 +182,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `name` (string, required) - BehaviorDefinition name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1149,6 +1150,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1354,6 +1356,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `interface_name` (string, required) - Interface name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1581,6 +1584,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 

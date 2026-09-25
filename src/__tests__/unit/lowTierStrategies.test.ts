@@ -3481,3 +3481,46 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
     },
   );
 });
+
+/**
+ * The checkrun body carries the version (`chkrun:version`), exactly as ADT
+ * sends it; these tools could only ever ask about the inactive one, and an
+ * active-only object has none — E19, 2026-09-25: G46 "REPORT/PROGRAM
+ * statement is missing" for an active program, "Inactive version … does not
+ * exist" for an active BDEF. `version` reaches the check member now.
+ */
+describe('check tools pass version through to the check member', () => {
+  const cases: [string, string, string, Record<string, unknown>][] = [
+    [
+      'CheckBdefLow',
+      '../../handlers/behavior_definition/low/handleCheckBehaviorDefinition',
+      'handleCheckBehaviorDefinition',
+      { name: 'ZBDEF_X' },
+    ],
+    [
+      'CheckProgramLow',
+      '../../handlers/program/low/handleCheckProgram',
+      'handleCheckProgram',
+      { program_name: 'ZPROG_X' },
+    ],
+    [
+      'CheckFunctionGroupLow',
+      '../../handlers/function/low/handleCheckFunctionGroup',
+      'handleCheckFunctionGroup',
+      { function_group_name: 'ZFG_X' },
+    ],
+    [
+      'CheckInterfaceLow',
+      '../../handlers/interface/low/handleCheckInterface',
+      'handleCheckInterface',
+      { interface_name: 'ZIF_X' },
+    ],
+  ];
+  it.each(cases)('%s', async (_tool, path, fn, args) => {
+    const handler = require(path)[fn];
+    await handler(context as any, { ...args, version: 'active' });
+    expect(callTo('check')?.args[1]).toBe('active');
+    await handler(context as any, args);
+    expect(callTo('check')?.args[1]).toBeUndefined();
+  });
+});

@@ -19,13 +19,14 @@
  * also how a task is made for somebody else.
  *
  * **The task is typed before it is handed back, and that is measured too.**
- * `newtask` creates every task `Unclassified`. On premise, 2026-09-25, the
- * first `addobject` onto such a task was refused —
- * `400 SCTS_ADT_MSG 009` / TK127, *"Changes to objects are only allowed in
- * correction/repair"* — and the same call answered 200 once the task had been
- * given type `S` by `changetasktype`. CTS does not type it on the first
- * object there, whatever it does on BTP. So this tool types the task itself,
- * `S` unless asked otherwise; `X` leaves it as created.
+ * A task CTS creates itself — with the request, or when an object is first
+ * locked on a request — gets its type there. A task created by hand, through
+ * `newtask`, stays `Unclassified`, and on premise, 2026-09-25, `addobject`
+ * onto one was refused — `400 SCTS_ADT_MSG 009` / TK127, *"Changes to
+ * objects are only allowed in correction/repair"* — and the same call
+ * answered 200 once the task had been given type `S` by `changetasktype`.
+ * Typing it is the consumer's job, not adt-clients': so this tool types the
+ * task itself, `S` unless asked otherwise; `X` leaves it as created.
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';

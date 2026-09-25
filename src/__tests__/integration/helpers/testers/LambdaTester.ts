@@ -683,71 +683,20 @@ export class LambdaTester {
   }
 
   /**
-   * Resolve ADT URI for an object based on handler name.
+   * **No ADT endpoint is addressed from this repository.** What used to sit
+   * here — `resolveObjectUri` and `forceReleaseLock`, a `deletion/check` and a
+   * `ddic/ddlock/locks` built by hand — is gone: every endpoint belongs to
+   * `@mcp-abap-adt/adt-clients`, and a test helper reaching past it addresses a
+   * URL nobody else maintains. It had no callers for as long as it existed, and
+   * measured on BTP ABAP on 2026-09-24 the release half could not have worked:
+   * `/sap/bc/adt/ddic/ddlock/locks` answers `404 — Resource does not exist`
+   * there.
+   *
+   * Asking whether an object is locked is a member — `checkDeletion` on the
+   * object's own accessor, which answers `isDeletable` with the holder in
+   * `lockUser`. Releasing another session's lock is not a member, and not
+   * something ADT offers us: the protection that works is a suite never
+   * orphaning its lock, which is what the unlock discipline in these suites is
+   * for.
    */
-  protected resolveObjectUri(objectName: string): string | null {
-    const name = encodeURIComponent(objectName.toLowerCase());
-    const handlerName = this.handlerName || '';
-    if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
-    if (handlerName.includes('ddl') || handlerName.includes('view'))
-      return `/sap/bc/adt/ddic/ddl/sources/${name}`;
-    if (handlerName.includes('structure'))
-      return `/sap/bc/adt/ddic/structures/${name}`;
-    if (handlerName.includes('data_element'))
-      return `/sap/bc/adt/ddic/dataelements/${name}`;
-    if (handlerName.includes('domain'))
-      return `/sap/bc/adt/ddic/domains/${name}`;
-    if (handlerName.includes('metadata_extension'))
-      return `/sap/bc/adt/ddic/ddlx/sources/${name}`;
-    if (handlerName.includes('interface'))
-      return `/sap/bc/adt/oo/interfaces/${name}`;
-    if (handlerName.includes('class')) return `/sap/bc/adt/oo/classes/${name}`;
-    if (handlerName.includes('behavior_definition'))
-      return `/sap/bc/adt/bo/behaviordefinitions/${name}`;
-    if (handlerName.includes('service_definition'))
-      return `/sap/bc/adt/ddic/srvd/sources/${name}`;
-    return null;
-  }
-
-  /**
-   * Force-release DDIC lock on an object if it's locked.
-   * Uses /sap/bc/adt/deletion/check to detect locks, then ddlock/locks to release.
-   */
-  protected async forceReleaseLock(
-    connection: any,
-    objectName: string,
-    logger?: any,
-  ): Promise<void> {
-    const objectUri = this.resolveObjectUri(objectName);
-    if (!objectUri) return;
-
-    const checkResponse = await connection.makeAdtRequest({
-      url: '/sap/bc/adt/deletion/check',
-      method: 'POST',
-      timeout: 30000,
-      data: `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${objectUri}"/></del:checkRequest>`,
-      headers: {
-        Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
-        'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
-      },
-    });
-    const responseText =
-      typeof checkResponse.data === 'string' ? checkResponse.data : '';
-    const isLocked =
-      responseText.includes('isDeletable="false"') &&
-      responseText.includes('lockUser');
-    if (isLocked) {
-      logger?.debug?.(
-        `🔒 Object ${objectName} is locked, releasing DDIC lock...`,
-      );
-      await connection.makeAdtRequest({
-        url: `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeURIComponent(objectName)}`,
-        method: 'POST',
-        timeout: 30000,
-        data: '',
-        headers: {},
-      });
-      logger?.debug?.(`🔓 Released DDIC lock for ${objectName}`);
-    }
-  }
 }

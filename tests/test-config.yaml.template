@@ -1863,7 +1863,9 @@ list_transports_readonly:
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
       description: "ListTransports handler read-only tests"
-      params:
+      # `params: {}`, not an empty `params:` — YAML reads the latter as null,
+      # and the tester fails to start ("Cannot read properties of null").
+      params: {}
         # user: "DEVELOPER"              # Optional: SAP user name (defaults to current session user)
         # modifiable_only: true           # Optional: only modifiable transports (default: true)
 

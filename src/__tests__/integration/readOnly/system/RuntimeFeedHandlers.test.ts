@@ -3,7 +3,7 @@
  *
  * Scenarios:
  * - List feed descriptors
- * - List feed variants (skipped if not available on system)
+ * - List feed variants (read out of the feed list)
  * - Read dumps feed (skipped — XML entity expansion limit, see mcp-abap-adt-clients#13)
  * - Read system messages feed
  * - Read gateway errors feed (on-prem only)
@@ -111,7 +111,8 @@ describe('Runtime Feed Handlers Integration', () => {
     'should list feed variants (if available)',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        // /sap/bc/adt/feeds/variants may not be available on all systems
+        // The variants are read out of the feed list (feed:queryVariants),
+        // which every system answers; a system may simply define none.
         const result = await tester.invokeToolOrHandler(
           'RuntimeListFeeds',
           { feed_type: 'variants' },

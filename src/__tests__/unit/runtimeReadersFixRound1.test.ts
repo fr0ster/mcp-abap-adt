@@ -34,6 +34,16 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
     getDumps: () => dumps,
   })),
   AdtExecutor: jest.fn(() => ({ getClassExecutor: () => classExecutor })),
+  // RuntimeListFeeds reads the variants with a FeedRepository of its own
+  // reading: the fake answers the feed list and applies that reading to it.
+  FeedRepository: jest.fn(
+    (_connection: unknown, _logger: unknown, results: any) => ({
+      list: async () => ({
+        ok: true,
+        getResult: () => ({ value: results.feeds({ data: feedListXml }) }),
+      }),
+    }),
+  ),
 }));
 
 // `handleGetPackageTree` is the only handler in this file that reaches
@@ -43,6 +53,21 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 jest.mock('../../lib/clients', () => ({
   createAdtClient: () => packageClient,
 }));
+
+/**
+ * A cut of E19's `GET /sap/bc/adt/feeds` (2026-09-26): the dumps feed with its
+ * two query variants, and a feed with none.
+ */
+const feedListXml =
+  '<atom:feed xmlns:atom="http://www.w3.org/2005/Atom">' +
+  '<atom:entry><atom:id>/sap/bc/adt/runtime/dumps</atom:id><atom:title>ABAP Runtime Errors</atom:title>' +
+  '<feed:extendedData xmlns:feed="http://www.sap.com/adt/feeds"><feed:queryVariants>' +
+  '<feed:queryVariant queryString="and ( equals ( user , OKYSLYTSIA ) )" title="Runtime Errors caused by me (OKYSLYTSIA)" isDefault="true"/>' +
+  '<feed:queryVariant queryString="and ( equals ( responsible , OKYSLYTSIA ) )" title="Runtime Errors for objects I am responsible for (OKYSLYTSIA)" isDefault="false"/>' +
+  '</feed:queryVariants></feed:extendedData></atom:entry>' +
+  '<atom:entry><atom:id>/sap/bc/adt/runtime/systemmessages</atom:id><atom:title>ABAP System Messages</atom:title>' +
+  '<feed:extendedData xmlns:feed="http://www.sap.com/adt/feeds"/></atom:entry>' +
+  '</atom:feed>';
 
 // ---------------------------------------------------------------------------
 
@@ -381,10 +406,7 @@ describe('RuntimeListFeeds', () => {
     },
   );
 
-  it('feed_type variants refuses locally and never calls the library — an unmeasured category must not become a silent request', async () => {
-    const variants = jest.fn(async () => okResponse([]));
-    feeds = { variants };
-
+  it("feed_type variants reads each feed's query variants out of the feed list", async () => {
     const result: any = await handleRuntimeListFeeds(
       context as any,
       {
@@ -392,9 +414,27 @@ describe('RuntimeListFeeds', () => {
       } as any,
     );
 
-    expect(variants).not.toHaveBeenCalled();
-    expect(result.isError).toBe(true);
-    expect(result.content[0].text).toMatch(/category/i);
+    expect(result.isError).toBe(false);
+    const body = JSON.parse(result.content[0].text);
+    expect(body.feed_type).toBe('variants');
+    // The feed with no variant is left out.
+    expect(body.count).toBe(1);
+    expect(body.entries[0]).toEqual({
+      feed: '/sap/bc/adt/runtime/dumps',
+      title: 'ABAP Runtime Errors',
+      variants: [
+        {
+          title: 'Runtime Errors caused by me (OKYSLYTSIA)',
+          query: 'and ( equals ( user , OKYSLYTSIA ) )',
+          is_default: true,
+        },
+        {
+          title: 'Runtime Errors for objects I am responsible for (OKYSLYTSIA)',
+          query: 'and ( equals ( responsible , OKYSLYTSIA ) )',
+          is_default: false,
+        },
+      ],
+    });
   });
 });
 

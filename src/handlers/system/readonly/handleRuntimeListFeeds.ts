@@ -1,6 +1,7 @@
-import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { AdtRuntimeClient, FeedRepository } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { feedVariantsOf } from '../../../lib/strategies/feedVariants';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -94,37 +95,25 @@ export async function handleRuntimeListFeeds(
     case 'descriptors':
       return answer(ctx, () => feeds.list(), project);
     case 'variants':
-      // `variants(category)` takes a required `category` as of adt-clients
-      // 19 — ADT's own endpoint always required one (`GET
-      // /sap/bc/adt/feeds/variants` with none answers 400
-      // `ExceptionParameterNotFound`, measured; see `FeedRepository.
-      // variants`'s own doc: "Everything that called this before
-      // @mcp-abap-adt/interfaces@26.0.0 fixed the contract was getting that
-      // 400"). The tool surface is frozen for this migration (only an
-      // optional `detail` parameter may be added), so there is nowhere to
-      // take a real category from.
-      //
-      // **Fix round 1, task 25.** The first pass here called
-      // `feeds.variants('')`, reasoning that an empty category reaches "the
-      // same refusal" a categoryless call always did. That is a guess, not
-      // a measurement: the pre-19 wire sent no `category` query parameter
-      // at all, and the 19.0.0 wire always appends one — `category=` is a
-      // request nobody has measured, on a package whose own doc explicitly
-      // separates "no parameter" (measured: 400) from "a parameter with
-      // some value" (measured: 200, empty body) without ever measuring "a
-      // parameter with an empty value". If ADT reads an empty string as a
-      // present-but-blank category, this branch would silently start
-      // answering 200 with an empty list where a caller previously got an
-      // error — success fabricated from an answer nobody watched happen.
-      // Refused locally instead: honest about what this branch cannot do,
-      // never a guess dressed as a request.
-      return return_error(
-        new Error(
-          'RuntimeListFeeds cannot list variants: adt-clients 19 requires a ' +
-            'category argument for this endpoint, and the frozen tool surface ' +
-            'has no parameter to supply one from. Use feed_type "descriptors" ' +
-            'to list the feeds this system offers instead.',
-        ),
+      // On premise each feed's query variants come inside the feed list —
+      // `feed:queryVariants` in every `atom:entry` of `GET /sap/bc/adt/feeds`
+      // — while `GET /sap/bc/adt/feeds/variants?category=…` answered 200 with
+      // an empty body for every feed id E19 lists (2026-09-26). So the
+      // variants are a reading of the answer `list()` already fetches: the
+      // same request, with this repository's reading in the `feeds` slot
+      // (feedVariantsOf) in place of the library's, which keeps the feeds and
+      // drops their variants. No category is needed, and none is invented.
+      return answer(
+        ctx,
+        () =>
+          new FeedRepository(
+            connection,
+            logger as never,
+            {
+              feeds: feedVariantsOf,
+            } as never,
+          ).list() as never,
+        project,
       );
     case 'dumps':
       return answer(ctx, () => feeds.dumps(queryOptions), project);

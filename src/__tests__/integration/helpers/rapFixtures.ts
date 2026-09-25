@@ -39,8 +39,10 @@ import { handleLockDdl } from '../../../handlers/ddl/low/handleLockDdl';
 import { handleUnlockDdl } from '../../../handlers/ddl/low/handleUnlockDdl';
 import { handleUpdateDdl } from '../../../handlers/ddl/low/handleUpdateDdl';
 import { handleValidateDdl } from '../../../handlers/ddl/low/handleValidateDdl';
+import { handleGetInactiveObjects } from '../../../handlers/system/readonly/handleGetInactiveObjects';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
+  delay,
   extractErrorMessage,
   extractLockHandle,
   parseHandlerResponse,
@@ -188,30 +190,16 @@ export async function createView(
   logger?.info?.(`   + view ${view.name} created with its source`);
 
   logger?.info?.(`   * activate view: ${view.name}`);
-  const activated = (await handleActivateObject(context, {
-    objects: [{ name: view.name.toUpperCase(), type: 'DDLS/DF' }],
-  })) as HandlerAnswer;
-  if (activated.isError) {
-    throw new Error(
-      `activate view ${view.name}: ${extractErrorMessage(activated)}`,
-    );
-  }
-  // **`isError: false` is not "activated".** ADT answers an activation with
-  // `200` whether or not it did anything, and the projection says which it was:
-  // `activated: true` when the server stated it, `activation_not_stated` when
-  // the answer carried an inactive-objects list instead. Reading only `isError`
-  // logged "activated" over a view that was still inactive, and the next step —
-  // the BDEF's own validation — was what noticed, with *"The referenced STOB
-  // object … does not exist"*.
-  const verdict = parseHandlerResponse(activated) as {
-    activated?: boolean;
-    activation_not_stated?: boolean;
-  };
-  if (verdict?.activated !== true) {
-    throw new Error(
-      `activate view ${view.name}: the server did not state an activation — ${JSON.stringify(verdict).substring(0, 600)}`,
-    );
-  }
+  // Same confirmation as the group activation below: the answer says what the
+  // server stated, `GetInactiveObjects` says what is true, and activation is
+  // asynchronous. Reading only `isError` here logged "activated" over a view
+  // that was still inactive, and the BDEF's validation was what noticed, with
+  // *"The referenced STOB object … does not exist"*.
+  await activateAndConfirm(
+    context,
+    [{ name: view.name, type: 'DDLS/DF' }],
+    logger,
+  );
   logger?.info?.(`   + view ${view.name} activated`);
 }
 
@@ -247,5 +235,103 @@ export async function deleteView(
     if (/does not exist|not found|404/i.test(message)) return [];
     logger?.error?.(`Delete view ${view.name} threw: ${message}`);
     return [`view ${view.name}: ${message}`];
+  }
+}
+
+/** One object as an activation names it. */
+export interface ActivationTarget {
+  name: string;
+  type: string;
+}
+
+/**
+ * Which of these objects the system still lists as inactive.
+ *
+ * `GetInactiveObjects` is the member for it, and this is the second request the
+ * activation projection tells a caller to make: the activation document says
+ * what the server stated, and only a read of the system says what is true.
+ */
+async function stillInactive(
+  context: HandlerContext,
+  targets: ActivationTarget[],
+): Promise<string[]> {
+  const answer = (await handleGetInactiveObjects(context, {})) as HandlerAnswer;
+  if (answer.isError) {
+    throw new Error(
+      `could not read the inactive objects: ${extractErrorMessage(answer)}`,
+    );
+  }
+  const payload = parseHandlerResponse(answer) as {
+    objects?: { name?: string; type?: string }[];
+  };
+  const listed = new Set(
+    (payload?.objects ?? []).map((o) => String(o?.name ?? '').toUpperCase()),
+  );
+  return targets
+    .map((t) => t.name.toUpperCase())
+    .filter((name) => listed.has(name));
+}
+
+/**
+ * Activate these objects together, and then confirm from the system that they
+ * are active.
+ *
+ * **Two reasons the answer alone will not do.** The group endpoint reports that
+ * the request was accepted — for several objects it answers an
+ * `ioc:inactiveObjects` list rather than a checklist with a verdict, so
+ * `isError: false` says nothing about either object having activated; and
+ * activation is asynchronous, so even a stated success can be ahead of the
+ * system. A suite that logs "group activation completed" off that answer passes
+ * green over a failed activation, which is the defect this exists to close.
+ *
+ * So: refuse an answer carrying error messages, then poll `GetInactiveObjects`
+ * until neither object is listed. The poll is what makes this a measurement
+ * rather than a hope.
+ */
+export async function activateAndConfirm(
+  context: HandlerContext,
+  targets: ActivationTarget[],
+  logger?: { info?: (message: string) => void; warn?: (m: string) => void },
+  attempts = 8,
+  waitMs = 2000,
+): Promise<void> {
+  const label = targets.map((t) => t.name).join(' + ');
+  const activation = (await handleActivateObject(context, {
+    objects: targets.map((t) => ({ name: t.name.toUpperCase(), type: t.type })),
+  })) as HandlerAnswer;
+  if (activation.isError) {
+    throw new Error(`activate ${label}: ${extractErrorMessage(activation)}`);
+  }
+  const verdict = parseHandlerResponse(activation) as {
+    activated?: boolean;
+    activation_not_stated?: boolean;
+    messages?: { type?: string; text?: string }[];
+  };
+  const refusals = (verdict?.messages ?? []).filter((m) =>
+    /^[EAX]$/i.test(String(m?.type ?? '')),
+  );
+  if (refusals.length > 0) {
+    throw new Error(
+      `activate ${label}: ${JSON.stringify(refusals).substring(0, 600)}`,
+    );
+  }
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    const inactive = await stillInactive(context, targets);
+    if (inactive.length === 0) {
+      logger?.info?.(
+        `   + activation confirmed: ${label} are not in the inactive list`,
+      );
+      return;
+    }
+    if (attempt === attempts) {
+      throw new Error(
+        `activate ${label}: still inactive after ${attempts} reads over ${((attempts - 1) * waitMs) / 1000}s — ${inactive.join(', ')}. The activation answered ${JSON.stringify(verdict).substring(0, 400)}`,
+      );
+    }
+    logger?.warn?.(
+      `   … ${inactive.join(', ')} still inactive, reading again (${attempt}/${attempts - 1})`,
+    );
+    await delay(waitMs);
   }
 }

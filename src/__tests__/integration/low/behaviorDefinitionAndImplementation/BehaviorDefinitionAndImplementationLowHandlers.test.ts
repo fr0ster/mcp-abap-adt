@@ -41,6 +41,7 @@ import { createAdtClient } from '../../../../lib/clients';
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
+  activateAndConfirm,
   assertNameAvailable,
   createView,
   deleteView,
@@ -439,6 +440,20 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
 
         await delay(context.getOperationDelay('unlock'));
 
+        // **The BDEF is activated here, before the class exists.** The BIMPL
+        // validation below asks ADT to generate against the behavior definition
+        // and refuses while there is no active version of it — measured:
+        // `400 BehaviorImplementationGenerationError`, *"An active version of
+        // Behavior Definition … does not exist"*. The suite used to leave the
+        // activation to the end and treat that refusal as a reason to `return`,
+        // so every run stopped after Part 1 and still reported success.
+        testLogger?.info?.(`   * activate BDEF: ${objectName}`);
+        await activateAndConfirm(
+          handlerCtx,
+          [{ name: objectName, type: 'BDEF/BDO' }],
+          testLogger,
+        );
+
         // ═══════════════════════════════════════════════════════════════
         // Part 2: BIMPL — Validate → Create → Check → Lock → Update → Unlock
         // ═══════════════════════════════════════════════════════════════
@@ -480,14 +495,20 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             }),
         );
 
+        // **No silent skip.** This used to log the refusal and `return`, which
+        // ended the test after Part 1 with a pass — the BIMPL half and the group
+        // activation never ran, and nothing said so. If the validation refuses,
+        // the suite has nothing to stand on and says it.
         if (validateResponse.isError) {
-          const errorMsg = extractErrorMessage(validateResponse);
-          testLogger?.info?.(
-            `Validation error for ${className}: ${errorMsg}, skipping BIMPL`,
+          throw new Error(
+            `Validate BIMPL ${className} failed: ${extractErrorMessage(validateResponse)}`,
           );
-          return;
         }
-        testLogger?.info?.(`   + BIMPL validated`);
+        await assertNameAvailable(
+          `BIMPL class ${className}`,
+          async () => validateResponse,
+        );
+        testLogger?.info?.(`   + BIMPL validated, and the name is free`);
 
         // Create class
         testLogger?.info?.(`   * create class: ${className}`);
@@ -634,24 +655,22 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // Part 3: Group-activate BDEF + BIMPL class together
         // ═══════════════════════════════════════════════════════════
 
+        // **The answer is not the outcome, and this step used to accept it as
+        // one.** For several objects the activation answers an
+        // `ioc:inactiveObjects` list rather than a verdict, so `isError: false`
+        // says nothing about either object having activated — and activation is
+        // asynchronous besides, so even a stated success can be ahead of the
+        // system. `activateAndConfirm` refuses an answer carrying error messages
+        // and then reads `GetInactiveObjects` until neither object is listed.
         testLogger?.info?.(`   * group activate: ${objectName} + ${className}`);
-        await tester.invokeToolOrHandler(
-          'ActivateObjectLow',
-          {
-            objects: [
-              { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-              { name: className.toUpperCase(), type: 'CLAS/OC' },
-            ],
-          },
-          async () =>
-            handleActivateObject(handlerCtx, {
-              objects: [
-                { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-                { name: className.toUpperCase(), type: 'CLAS/OC' },
-              ],
-            }),
+        await activateAndConfirm(
+          handlerCtx,
+          [
+            { name: objectName, type: 'BDEF/BDO' },
+            { name: className, type: 'CLAS/OC' },
+          ],
+          testLogger,
         );
-        testLogger?.info?.(`   + group activation completed`);
 
         testLogger?.info?.('Full BDEF+BIMPL low-level workflow completed');
       });

@@ -26,6 +26,7 @@ import { handleActivateObject } from '../../../../handlers/common/low/handleActi
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
+  activateAndConfirm,
   assertNameAvailable,
   createView,
   deleteView,
@@ -349,17 +350,20 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         testLogger?.info?.(
           `   * group activate: ${objectName} + ${bimplClassName}`,
         );
-        await mustSucceed(
-          `Group activation of ${objectName} + ${bimplClassName}`,
-          () =>
-            handleActivateObject(handlerCtx, {
-              objects: [
-                { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-                { name: bimplClassName.toUpperCase(), type: 'CLAS/OC' },
-              ],
-            }),
+        // `mustSucceed` is not enough here, and that is the point: for several
+        // objects the activation answers an `ioc:inactiveObjects` list rather
+        // than a verdict, so a clean answer says only that the request was
+        // taken — and activation is asynchronous, so it can be ahead of the
+        // system either way. `activateAndConfirm` reads
+        // `GetInactiveObjects` until neither object is listed.
+        await activateAndConfirm(
+          handlerCtx,
+          [
+            { name: objectName, type: 'BDEF/BDO' },
+            { name: bimplClassName, type: 'CLAS/OC' },
+          ],
+          testLogger,
         );
-        testLogger?.info?.(`   + group activation completed`);
 
         testLogger?.info?.('Full BDEF+BIMPL high-level workflow completed');
       });

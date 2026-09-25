@@ -57,6 +57,13 @@ export interface EnhancementResponse {
   enhancements: EnhancementImplementation[];
   detailed?: boolean;
   total_enhancements?: number;
+  /**
+   * Probes that were refused rather than answering "not this kind of object".
+   * Present only when there is something to say: an empty enhancement list and
+   * a list nobody was allowed to read are different answers, and they used to
+   * look the same.
+   */
+  unreadable?: { url: string; message: string }[];
 }
 
 /**
@@ -193,6 +200,8 @@ async function determineObjectTypeAndPath(
   type: 'program' | 'include' | 'class' | 'function_group';
   basePath: string;
   context?: string;
+  /** Probes that were refused rather than answering "not this kind". */
+  unreadable?: { url: string; message: string }[];
 }> {
   const name = objectName.toUpperCase();
   const enc = encodeSapObjectName(name);
@@ -214,6 +223,21 @@ async function determineObjectTypeAndPath(
   const saplGroup =
     name.startsWith('SAPL') && name.length > 4 ? name.slice(4) : undefined;
 
+  /**
+   * What could not be read, and why. A probe that finds nothing is how this
+   * handler learns which kind of object it was given; a probe that is REFUSED is
+   * something else entirely, and both used to come back as `undefined`.
+   *
+   * So a `404` — the object is not of that kind, or not there — keeps the probe
+   * going and says nothing, and anything else is collected and travels in the
+   * answer beside the enhancements that were found. `ExceptionResourceNoAccess`
+   * is the case that mattered: an object this user may not read answered "no
+   * enhancements", which is a different statement from "could not look".
+   */
+  const unreadable: { url: string; message: string }[] = [];
+  /** Carry the refusals out with whichever path was resolved. */
+  const withReport = <T extends { basePath: string }>(path: T) =>
+    unreadable.length > 0 ? { ...path, unreadable } : path;
   const probe = async (url: string, accept: string) => {
     try {
       const response = await makeAdtRequestWithTimeout(
@@ -225,8 +249,23 @@ async function determineObjectTypeAndPath(
         undefined,
         { Accept: accept },
       );
-      return response.status === 200 ? response : undefined;
-    } catch {
+      if (response.status === 200) return response;
+      if (response.status !== 404) {
+        unreadable.push({ url, message: `answered ${response.status}` });
+      }
+      return undefined;
+    } catch (error: any) {
+      const status = error?.response?.status;
+      if (status !== 404) {
+        unreadable.push({
+          url,
+          message: String(
+            error?.response?.data?.toString?.().slice(0, 200) ??
+              error?.message ??
+              error,
+          ),
+        });
+      }
       return undefined;
     }
   };
@@ -259,7 +298,7 @@ async function determineObjectTypeAndPath(
 
   // The type the caller named, taken at its word.
   if (kind === 'CLASS' || kind === 'CLAS' || kind === 'CLAS/OC') {
-    return classPath;
+    return withReport(classPath);
   }
   if (
     kind === 'FUNCTION_GROUP' ||
@@ -270,23 +309,23 @@ async function determineObjectTypeAndPath(
     return groupPath(saplGroup ?? name);
   }
   if (kind === 'PROGRAM' || kind === 'PROG' || kind === 'PROG/P') {
-    return saplGroup ? groupPath(saplGroup) : programPath;
+    return withReport(saplGroup ? groupPath(saplGroup) : programPath);
   }
   if (kind === 'INCLUDE' || kind === 'PROG/I') {
     const include = await asInclude();
-    if (include) return include;
+    if (include) return withReport(include);
     throw new EnhancementInputError(`Include ${objectName} could not be read.`);
   }
 
   // No usable type: find out, one independent probe at a time.
-  if (saplGroup) return groupPath(saplGroup);
+  if (saplGroup) return withReport(groupPath(saplGroup));
   if (
     await probe(
       `/sap/bc/adt/oo/classes/${enc}`,
       'application/vnd.sap.adt.oo.classes.v4+xml',
     )
   ) {
-    return classPath;
+    return withReport(classPath);
   }
   if (
     await probe(
@@ -294,10 +333,10 @@ async function determineObjectTypeAndPath(
       'application/vnd.sap.adt.programs.v3+xml',
     )
   ) {
-    return programPath;
+    return withReport(programPath);
   }
   const include = await asInclude();
-  if (include) return include;
+  if (include) return withReport(include);
   throw new EnhancementInputError(
     `Could not determine object type for: ${objectName}. Object is neither a valid class, program, include, nor a function group's main program.`,
   );
@@ -488,6 +527,7 @@ async function getEnhancementsForSingleObject(
       object_type: objectInfo.type,
       context: objectInfo.context,
       enhancements: enhancements,
+      ...(objectInfo.unreadable ? { unreadable: objectInfo.unreadable } : {}),
     };
 
     return enhancementResponse;
@@ -550,6 +590,7 @@ function filterMinimalEnhancements(response: any): any {
       detailed: false,
       total_enhancements: filteredEnhancements.length,
       enhancements: filteredEnhancements,
+      ...(response.unreadable ? { unreadable: response.unreadable } : {}),
     };
   }
 }

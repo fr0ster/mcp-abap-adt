@@ -100,10 +100,43 @@ export function includeStatementsOf(source: string): string[] {
 
 /** The text inside a source reading — a string, or `{value, raw}`. */
 function textOf(response: any): string {
-  if (!response?.ok) return '';
-  const v = response.getResult?.().value;
+  const v = response?.getResult?.().value;
   if (typeof v === 'string') return v;
   return String(v?.value ?? v?.raw ?? '');
+}
+
+/**
+ * Why a source produced no text: it is not there, or the server refused to give
+ * it.
+ *
+ * **These were the same thing, and that is a defect.** `textOf` used to answer
+ * `''` for any failure, so an include this user may not read — or a server
+ * error — arrived as "this include names no others", and the tree came back
+ * short with nothing saying so. ADT distinguishes the two itself: a missing
+ * resource is `ExceptionResourceNotFound` over `404`, and a refusal is its own
+ * exception (`ExceptionResourceNoAccess` for a lock or an authorization), which
+ * is exactly the case that used to disappear.
+ *
+ * `absent` keeps the old behaviour where it was right: not that kind of object,
+ * or an include that is not there, so the walk goes on. `refused` is collected
+ * and travels in the answer beside the tree — the same shape `withLock` uses for
+ * a release that failed after a write that landed: what was found, plus what
+ * could not be read, never one instead of the other.
+ */
+type SourceRead =
+  | { kind: 'text'; text: string }
+  | { kind: 'absent' }
+  | { kind: 'refused'; message: string };
+
+function readSource(response: any): SourceRead {
+  if (response?.ok) return { kind: 'text', text: textOf(response) };
+  const error = response?.getError?.() ?? {};
+  const absent =
+    error?.response?.status === 404 ||
+    error?.adtType === 'ExceptionResourceNotFound';
+  return absent
+    ? { kind: 'absent' }
+    : { kind: 'refused', message: String(error?.message ?? 'no answer') };
 }
 
 export async function handleGetIncludesList(
@@ -156,8 +189,23 @@ export async function handleGetIncludesList(
     );
 
     const utils = createAdtClient(connection, logger).getUtils(ourUtils) as any;
+
+    /** What could not be read, and why — reported beside the tree. */
+    const unreadable: { name: string; message: string }[] = [];
+    const sourceOf = async (
+      what: string,
+      read: Promise<unknown>,
+    ): Promise<string> => {
+      const answer = await readSource(await read);
+      if (answer.kind === 'text') return answer.text;
+      if (answer.kind === 'refused') {
+        logger?.warn?.(`could not read ${what}: ${answer.message}`);
+        unreadable.push({ name: what, message: answer.message });
+      }
+      return '';
+    };
     const readInclude = async (name: string) =>
-      textOf(await withTimeout(utils.getInclude(name), `reading ${name}`));
+      sourceOf(name, withTimeout(utils.getInclude(name), `reading ${name}`));
 
     const visited = new Set<string>([parent.name]);
     const expand = async (
@@ -188,8 +236,9 @@ export async function handleGetIncludesList(
       // A class has sections, not program includes: its metadata lists them
       // by `includeType` (definitions, implementations, macros, testclasses,
       // main), with no name of their own.
-      const meta = textOf(
-        await withTimeout(
+      const meta = await sourceOf(
+        `class ${parent.name}`,
+        withTimeout(
           utils.readObjectMetadata('class', parent.name),
           `reading class ${parent.name}`,
         ),
@@ -222,8 +271,9 @@ export async function handleGetIncludesList(
     } else {
       const rootSource =
         parent.kind === 'PROG/P'
-          ? textOf(
-              await withTimeout(
+          ? await sourceOf(
+              `program ${parent.name}`,
+              withTimeout(
                 utils.readObjectSource('program', parent.name),
                 `reading program ${parent.name}`,
               ),
@@ -244,6 +294,9 @@ export async function handleGetIncludesList(
               object_name: parent.name,
               object_type: parent.kind,
               tree,
+              // Only when there is something to say: a caller reading a tree
+              // needs to know it is short, and why.
+              ...(unreadable.length > 0 ? { unreadable } : {}),
             },
             null,
             2,

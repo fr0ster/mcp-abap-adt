@@ -1,5 +1,10 @@
 import { handleGetIncludesList } from '../../handlers/include/readonly/handleGetIncludesList';
-import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import {
+  fakeClientOf,
+  okResponse,
+  reading,
+  refusedResponse,
+} from '../helpers/fakeClient';
 
 /**
  * GetIncludesList builds the include tree itself, from pieces adt-clients
@@ -113,5 +118,68 @@ describe('GetIncludesList', () => {
       'implementations',
       'main',
     ]);
+  });
+
+  /**
+   * An include this user may not read is not an include that names nothing.
+   *
+   * `textOf` answered `''` for every failure, so a refusal arrived as "no
+   * nested includes" and the tree came back short with nothing saying so. ADT
+   * separates the two itself — a missing resource is
+   * `ExceptionResourceNotFound` over `404`, a refusal is its own exception —
+   * and these two cases pin that both ways round.
+   */
+  it('reports an include it could not read, beside the tree rather than instead of it', async () => {
+    fakeClient = fakeClientOf({
+      readObjectSource: async () =>
+        source('REPORT zprog.\nINCLUDE zsecret.\nINCLUDE zopen.\n'),
+      getInclude: async (name: unknown) =>
+        String(name) === 'ZSECRET'
+          ? refusedResponse('You are not authorized to display ZSECRET', {
+              adtType: 'ExceptionResourceNoAccess',
+            })
+          : source('DATA a TYPE i.'),
+      fetchNodeStructure: async () =>
+        okResponse({ objects: [], childNodes: [] }),
+    });
+
+    const answered = body(
+      await handleGetIncludesList(context as any, {
+        object_name: 'ZPROG',
+        object_type: 'PROG/P',
+      }),
+    );
+
+    // The tree still holds both includes — the refusal is about what is under
+    // ZSECRET, not about whether the program names it.
+    expect(names(answered.tree)).toEqual(['ZSECRET', 'ZOPEN']);
+    expect(answered.unreadable).toEqual([
+      {
+        name: 'ZSECRET',
+        message: 'You are not authorized to display ZSECRET',
+      },
+    ]);
+  });
+
+  it('says nothing about an include that is simply not there', async () => {
+    fakeClient = fakeClientOf({
+      readObjectSource: async () => source('REPORT zprog.\nINCLUDE zgone.\n'),
+      getInclude: async () =>
+        refusedResponse('Resource does not exist', {
+          adtType: 'ExceptionResourceNotFound',
+        }),
+      fetchNodeStructure: async () =>
+        okResponse({ objects: [], childNodes: [] }),
+    });
+
+    const answered = body(
+      await handleGetIncludesList(context as any, {
+        object_name: 'ZPROG',
+        object_type: 'PROG/P',
+      }),
+    );
+
+    expect(names(answered.tree)).toEqual(['ZGONE']);
+    expect(answered.unreadable).toBeUndefined();
   });
 });

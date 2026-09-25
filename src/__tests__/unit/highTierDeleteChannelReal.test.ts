@@ -121,6 +121,19 @@ function deletionSuccessXml(objectName: string): string {
   );
 }
 
+/** The deletion check's answer, as E19 sent it (2026-09-26): deletable, or
+ * refused with the reason in `del:message`. */
+function deletionCheckXml(objectName: string, refusal?: string): string {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
+    `<del:object del:externalStrongReferences="0" del:externalWeakReferences="0" del:isDeletable="${refusal ? 'false' : 'true'}" adtcore:name="${objectName}" xmlns:adtcore="http://www.sap.com/adt/core">` +
+    (refusal
+      ? `<del:message del:priority="0" del:type="E"><del:text>${refusal}</del:text></del:message>`
+      : '') +
+    '</del:object></del:checkResponse>'
+  );
+}
+
 /** Whether the exact `adtcore:uri="{uri}"` attribute appears in the given
  * request's body, case-insensitively. Deliberately the *whole* URI, not a
  * substring: the object's type is the path prefix in front of its name
@@ -282,9 +295,12 @@ const deletionServiceCases: DeletionCase[] = [
 ];
 
 describe.each(deletionServiceCases)('$name', ({ expectedUri, run }) => {
-  it(`reaches /sap/bc/adt/deletion/delete, POSTs a request naming adtcore:uri="${expectedUri}", and takes no lock`, async () => {
+  const objectName = expectedUri.split('/').pop() as string;
+
+  it(`checks, then reaches /sap/bc/adt/deletion/delete, POSTs a request naming adtcore:uri="${expectedUri}", and takes no lock`, async () => {
     const conn = recordingConnection([
-      { data: deletionSuccessXml(expectedUri.split('/').pop() as string) },
+      { data: deletionCheckXml(objectName) },
+      { data: deletionSuccessXml(objectName) },
     ]);
 
     const result: any = await run(conn);
@@ -305,6 +321,31 @@ describe.each(deletionServiceCases)('$name', ({ expectedUri, run }) => {
     expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
       false,
     );
+    // The check went first, for the same object.
+    const checkAt = conn.requests.findIndex(
+      (r) =>
+        r.url.includes('/sap/bc/adt/deletion/check') &&
+        carriesUri(r, expectedUri),
+    );
+    const deleteAt = conn.requests.findIndex((r) =>
+      r.url.includes('/sap/bc/adt/deletion/delete'),
+    );
+    expect(checkAt).toBeGreaterThanOrEqual(0);
+    expect(checkAt).toBeLessThan(deleteAt);
+  });
+
+  it("answers the check's refusal and never sends the delete", async () => {
+    const conn = recordingConnection([
+      { data: deletionCheckXml(objectName, 'Object does not exist') },
+    ]);
+
+    const result: any = await run(conn);
+
+    expect(result?.isError).toBe(true);
+    expect(result.content[0].text).toContain('Object does not exist');
+    expect(
+      requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
+    ).toHaveLength(0);
   });
 });
 
@@ -404,6 +445,31 @@ describe.each([
     });
   },
 );
+
+describe('DeleteMetadataExtension: the deletion check first', () => {
+  it("answers the check's refusal and never sends the DELETE", async () => {
+    const conn = recordingConnection([
+      {
+        data: deletionCheckXml(
+          'ZI_DDLX_DEL_X',
+          '2 strong and 0 weak external references',
+        ),
+      },
+    ]);
+
+    const result: any = await handleDeleteMetadataExtension(ctx(conn) as any, {
+      metadata_extension_name: 'ZI_DDLX_DEL_X',
+    });
+
+    expect(result?.isError).toBe(true);
+    expect(requestsTo(conn.requests, 'POST', '/deletion/check')).toHaveLength(
+      1,
+    );
+    expect(
+      requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources'),
+    ).toHaveLength(0);
+  });
+});
 
 describe('DeleteMessageClassMessage: a PUT of the parent class, the message moved to deletedmessages', () => {
   it("PUTs the class for the caller's class name, moving the caller's msgno into <mc:deletedmessages>", async () => {

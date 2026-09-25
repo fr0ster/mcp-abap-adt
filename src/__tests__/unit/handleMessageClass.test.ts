@@ -13,6 +13,7 @@ const mockMc = {
   read: jest.fn(),
   readMetadata: jest.fn(),
   update: jest.fn(),
+  checkDeletion: jest.fn(),
   delete: jest.fn(),
 };
 const mockMsg = {
@@ -127,6 +128,14 @@ describe('Message Class (MSAG) CRUD tools', () => {
       'xmlns:adtcore="http://www.sap.com/adt/core">' +
       '<del:object del:isDeleted="true" adtcore:name="ZMY_MSGS"/>' +
       '</del:deletionResult>';
+    const checkDoc =
+      '<del:checkResponse xmlns:del="http://www.sap.com/adt/deletion" ' +
+      'xmlns:adtcore="http://www.sap.com/adt/core">' +
+      '<del:object del:isDeletable="true" adtcore:name="ZMY_MSGS"/>' +
+      '</del:checkResponse>';
+    mockMc.checkDeletion.mockResolvedValue(
+      okResponse(reading(parseStructure(checkDoc), checkDoc, 200)),
+    );
     mockMc.delete.mockResolvedValue(
       okResponse(reading(parseStructure(deletionDoc), deletionDoc, 200)),
     );
@@ -137,6 +146,10 @@ describe('Message Class (MSAG) CRUD tools', () => {
     });
 
     expect(result.isError).toBe(false);
+    expect(mockMc.checkDeletion).toHaveBeenCalledWith(
+      { name: 'ZMY_MSGS', transportRequest: 'E19K900001' },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
     expect(mockMc.delete).toHaveBeenCalledWith(
       { name: 'ZMY_MSGS', transportRequest: 'E19K900001' },
       expect.objectContaining({ analyse: expect.any(Function) }),

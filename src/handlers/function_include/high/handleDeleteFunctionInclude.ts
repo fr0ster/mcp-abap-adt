@@ -12,10 +12,10 @@
  */
 
 import { functionIncludeDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -76,16 +76,16 @@ export async function handleDeleteFunctionInclude(
   return answer(
     { tool: 'DeleteFunctionInclude', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getFunctionInclude(resultsFor(functionIncludeDocuments))
-        .delete(
-          {
-            functionGroupName,
-            includeName,
-            transportRequest: transport_request,
-          },
-          { analyse: analyseDeletion },
+      deleteIfDeletable(
+        createAdtClient(connection, logger).getFunctionInclude(
+          resultsFor(functionIncludeDocuments),
         ),
+        {
+          functionGroupName,
+          includeName,
+          transportRequest: transport_request,
+        },
+      ),
     project(detail, terseDeletion),
   );
 }

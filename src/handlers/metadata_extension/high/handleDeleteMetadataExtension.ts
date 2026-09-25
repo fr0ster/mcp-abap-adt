@@ -32,6 +32,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -83,12 +84,13 @@ export async function handleDeleteMetadataExtension(
   return answer(
     { tool: 'DeleteMetadataExtension', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .delete(
-          { name, transportRequest: transport_request },
-          { analyse: analyseException },
+      deleteIfDeletable(
+        createAdtClient(connection, logger).getMetadataExtension(
+          resultsFor(metadataExtensionDocuments),
         ),
+        { name, transportRequest: transport_request },
+        analyseException,
+      ),
     project(detail, terseWrite),
   );
 }

@@ -182,4 +182,54 @@ describe('GetIncludesList', () => {
     expect(names(answered.tree)).toEqual(['ZGONE']);
     expect(answered.unreadable).toBeUndefined();
   });
+
+  /**
+   * A cycle and a duplicate are different defects, and one `visited` set called
+   * both a cycle.
+   *
+   * **In ABAP the second one is not a diamond.** An include is inserted
+   * textually into one global scope, so including the same one from two places
+   * duplicates every declaration it makes and the object cannot be activated.
+   * The tree reports it as `duplicate` — the code is invalid, and saying
+   * `cyclic` would name the wrong thing — while a genuine cycle, an include
+   * that reaches itself, stays `cyclic`.
+   */
+  it('calls a second inclusion a duplicate, and an include that reaches itself cyclic', async () => {
+    const sources: Record<string, string> = {
+      ZA: 'INCLUDE zc.',
+      ZB: 'INCLUDE zc.',
+      ZC: 'DATA a TYPE i.',
+      ZLOOP: 'INCLUDE zloop.',
+    };
+    fakeClient = fakeClientOf({
+      readObjectSource: async () =>
+        source('REPORT zprog.\nINCLUDE za.\nINCLUDE zb.\nINCLUDE zloop.\n'),
+      getInclude: async (name: unknown) => source(sources[String(name)] ?? ''),
+      fetchNodeStructure: async () =>
+        okResponse({ objects: [], childNodes: [] }),
+    });
+
+    const answered = body(
+      await handleGetIncludesList(context as any, {
+        object_name: 'ZPROG',
+        object_type: 'PROG/P',
+      }),
+    );
+
+    const [za, zb, zloop] = answered.tree.children;
+    expect(za.name).toBe('ZA');
+    expect(za.children).toEqual([{ name: 'ZC', children: [] }]);
+
+    // ZB names ZC too, which is what SAP refuses to activate — reported, and
+    // not expanded a second time.
+    expect(zb.children).toEqual([
+      { name: 'ZC', children: [], duplicate: true },
+    ]);
+    expect(zb.children[0].cyclic).toBeUndefined();
+
+    // A real cycle keeps its own name.
+    expect(zloop.children).toEqual([
+      { name: 'ZLOOP', children: [], cyclic: true },
+    ]);
+  });
 });

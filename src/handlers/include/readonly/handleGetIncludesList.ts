@@ -40,7 +40,19 @@ interface IncludeNode {
   name: string;
   type?: string;
   children: IncludeNode[];
+  /** This include appears inside itself — a real cycle, and not expanded. */
   cyclic?: boolean;
+  /**
+   * This include was already reached elsewhere in the tree.
+   *
+   * **In ABAP that is not a diamond, it is invalid source.** An include is a
+   * textual insertion into one global scope, so including the same one twice
+   * duplicates every declaration it makes and the object cannot be activated —
+   * whatever the tree looks like, that code does not run. It is reported rather
+   * than expanded: expanding it would describe a shape that cannot exist, and
+   * calling it `cyclic` would name the wrong defect.
+   */
+  duplicate?: boolean;
   truncated?: boolean;
 }
 
@@ -207,23 +219,38 @@ export async function handleGetIncludesList(
     const readInclude = async (name: string) =>
       sourceOf(name, withTimeout(utils.getInclude(name), `reading ${name}`));
 
-    const visited = new Set<string>([parent.name]);
+    // Two different things, and one `visited` set was calling both a cycle.
+    //
+    // `ancestors` is the path from the root to here: a name in it is a genuine
+    // cycle — the include includes itself, directly or through others.
+    //
+    // `seen` is everything the walk has reached anywhere. A second occurrence
+    // there is a DUPLICATE, not a cycle and not a legitimate diamond: an
+    // include is inserted textually into one global scope, so including the
+    // same one twice duplicates its declarations and the object will not
+    // activate. Either way it is not expanded; the difference is which defect
+    // the answer names.
+    const seen = new Set<string>([parent.name]);
     const expand = async (
       names: string[],
       depth: number,
+      ancestors: Set<string>,
     ): Promise<IncludeNode[]> => {
       const children: IncludeNode[] = [];
       for (const name of names) {
         const node: IncludeNode = { name, children: [] };
-        if (visited.has(name)) {
+        if (ancestors.has(name)) {
           node.cyclic = true;
+        } else if (seen.has(name)) {
+          node.duplicate = true;
         } else if (depth >= MAX_INCLUDE_DEPTH) {
           node.truncated = true;
         } else {
-          visited.add(name);
+          seen.add(name);
           node.children = await expand(
             includeStatementsOf(await readInclude(name)),
             depth + 1,
+            new Set([...ancestors, name]),
           );
         }
         children.push(node);
@@ -267,6 +294,7 @@ export async function handleGetIncludesList(
       children = await expand(
         all.filter((name) => !nested.has(name)),
         0,
+        new Set([parent.name]),
       );
     } else {
       const rootSource =
@@ -279,7 +307,11 @@ export async function handleGetIncludesList(
               ),
             )
           : await readInclude(parent.name);
-      children = await expand(includeStatementsOf(rootSource), 0);
+      children = await expand(
+        includeStatementsOf(rootSource),
+        0,
+        new Set([parent.name]),
+      );
     }
 
     const tree: IncludeNode = { name: parent.name, children };

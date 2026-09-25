@@ -105,6 +105,13 @@ describe('the MCP tool surface', () => {
       // also serves `system_messages` and `gateway_errors` — two more feed
       // types compact could not reach — so `feed_type` (default 'dumps') was
       // added instead of new tool names.
+      //
+      // **Fourth exception: `CreateTransportTask` gained `task_type`.** A task
+      // `newtask` creates is Unclassified, and on premise the first
+      // `addobject` onto it is refused (`SCTS_ADT_MSG 009` / TK127, measured
+      // on E19 2026-09-25) until `changetasktype` gives it a type. The tool
+      // now types the task itself, `S` by default; the parameter is how a
+      // caller asks for Repair (`R`) or leaves it Unclassified (`X`).
       expect({ tool, lost: had.filter((p) => !has.includes(p)) }).toEqual({
         tool,
         lost: [],
@@ -117,6 +124,7 @@ describe('the MCP tool surface', () => {
         'compact/HandlerProfileRun': ['profiling'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
+        'high/CreateTransportTask': ['task_type'],
       };
       expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
         tool,

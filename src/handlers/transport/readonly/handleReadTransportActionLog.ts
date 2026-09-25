@@ -43,15 +43,33 @@ interface ReadTransportActionLogArgs {
   detail?: 'terse' | 'full' | 'raw';
 }
 
-/** One `log:entry`, as `structured` parses it. */
+/**
+ * The text of one `log:entry`, as `structured` parses it.
+ *
+ * **On premise the text is element content, not an attribute.** Measured on
+ * 2026-09-25: every entry arrives as
+ * `<log:message><log:messageText key="TK(188)">…</log:messageText></log:message>`,
+ * which `structured` parses to `log:message → log:messageText → #text`.
+ * Reading only `log:text` answered `count: 0` for a log that held six
+ * entries. The `log:text` spellings stay for the shape this was first
+ * written against.
+ */
+const textOf = (entry: any): string => {
+  const message = entry?.['log:message']?.['log:messageText'];
+  const text =
+    (typeof message === 'object' ? message?.['#text'] : message) ??
+    entry?.['@']?.['log:text'] ??
+    entry?.['log:text'] ??
+    '';
+  return String(text);
+};
+
 const entriesOf = (value: unknown): { text: string }[] => {
   const log = (value as Record<string, any>)?.['log:log'] ?? value;
   const raw = (log as Record<string, any>)?.['log:entry'];
   const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
   return list
-    .map((entry: any) => ({
-      text: String(entry?.['@']?.['log:text'] ?? entry?.['log:text'] ?? ''),
-    }))
+    .map((entry: any) => ({ text: textOf(entry) }))
     .filter((entry: { text: string }) => entry.text !== '');
 };
 

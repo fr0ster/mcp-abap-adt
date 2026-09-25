@@ -199,6 +199,81 @@ function resolvePackageName(sharedConfig: any): string {
   return config?.environment?.default_package || 'ZLOCAL';
 }
 
+/**
+ * The source as ABAP reads it: case and whitespace count only inside literals.
+ *
+ * SAP does not hand back the text it was given. A table comes back with a
+ * blank line after `{` and before `}`; a function module comes back with its
+ * signature pretty-printed — lower-cased names, its own indentation, blank
+ * lines after the signature (E19, 2026-09-26). Outside '…', `…` and |…| none
+ * of that changes the program, so it is folded away; the literals are kept
+ * exactly, so a changed text in one still counts as a change.
+ */
+const normalizedSource = (source: string): string =>
+  source
+    .replace(/\r\n?/g, '\n')
+    .split(/('(?:[^'\n]|'')*'|`[^`\n]*`|\|[^|\n]*\|)/)
+    .map((part, index) =>
+      index % 2 === 1 ? part : part.replace(/\s+/g, ' ').toLowerCase(),
+    )
+    .join('')
+    .trim();
+
+/**
+ * Whether the object's ACTIVE source already is the configured one.
+ *
+ * A shared object is written only when it differs. Writing an unchanged
+ * source still leaves an inactive version behind until the group activation
+ * runs, and any activation that then misses leaves a shared object inactive —
+ * which is how the two shared BDEFs were found inactive on E19 (2026-09-26).
+ * Activation itself is not skipped: every shared object is still activated
+ * and confirmed active below. An object that cannot be read counts as
+ * different, so it is written.
+ */
+async function sameActiveSource(
+  client: AdtClient,
+  kind: string,
+  name: string,
+  source: string,
+  group?: string,
+): Promise<boolean> {
+  const c = client as any;
+  const readers: Record<string, () => Promise<any>> = {
+    table: () => c.getTable().read({ tableName: name }, 'active'),
+    structure: () => c.getStructure().read({ structureName: name }, 'active'),
+    ddl: () => c.getDdl().read({ ddlName: name }, 'active'),
+    bdef: () => c.getBehaviorDefinition().read({ name }, 'active'),
+    srvd: () =>
+      c.getServiceDefinition().read({ serviceDefinitionName: name }, 'active'),
+    class: () => c.getClass().read({ className: name }, 'active'),
+    interface: () => c.getInterface().read({ interfaceName: name }, 'active'),
+    program: () => c.getProgram().read({ programName: name }, 'active'),
+    ddlx: () => c.getMetadataExtension().read({ name }, 'active'),
+    functionModule: () =>
+      c
+        .getFunctionModule()
+        .read({ functionModuleName: name, functionGroupName: group }, 'active'),
+  };
+  try {
+    const answer = await readers[kind]?.();
+    if (!answer?.ok) return false;
+    const value = answer.getResult().value;
+    const text =
+      typeof value === 'string'
+        ? value
+        : String(value?.value ?? value?.raw ?? '');
+    const same = normalizedSource(text) === normalizedSource(source);
+    if (same) {
+      testsLogger?.info?.(
+        `${kind} ${name}: active source unchanged — not rewritten`,
+      );
+    }
+    return same;
+  } catch {
+    return false;
+  }
+}
+
 describe('Admin: Setup shared dependencies', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
@@ -287,7 +362,10 @@ describe('Admin: Setup shared dependencies', () => {
             }
 
             // Always update source code to ensure it matches config
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(client, 'table', item.name, item.source))
+            ) {
               try {
                 await writeSource(
                   handleUpdateTable(
@@ -416,7 +494,15 @@ describe('Admin: Setup shared dependencies', () => {
 
             // Apply the real DDL source, then activate immediately so that a
             // later base structure can reference this one via `include`.
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(
+                client,
+                'structure',
+                item.name,
+                item.source,
+              ))
+            ) {
               await writeSource(
                 handleUpdateStructure(
                   { connection, logger: undefined } as any,
@@ -486,7 +572,10 @@ describe('Admin: Setup shared dependencies', () => {
               testsLogger?.info?.(`Created view ${item.name}`);
             }
 
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(client, 'ddl', item.name, item.source))
+            ) {
               try {
                 await writeSource(
                   handleUpdateDdl(
@@ -603,7 +692,10 @@ describe('Admin: Setup shared dependencies', () => {
               testsLogger?.info?.(`Created behavior definition ${item.name}`);
             }
 
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(client, 'bdef', item.name, item.source))
+            ) {
               try {
                 await writeSource(
                   handleUpdateBehaviorDefinition(
@@ -718,7 +810,10 @@ describe('Admin: Setup shared dependencies', () => {
               });
             }
 
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(client, 'class', item.name, item.source))
+            ) {
               await writeSource(
                 handleUpdateClass(
                   { connection, logger: undefined } as any,
@@ -888,7 +983,16 @@ describe('Admin: Setup shared dependencies', () => {
             }
 
             // Update source code if provided
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(
+                client,
+                'functionModule',
+                item.name,
+                item.source,
+                item.group,
+              ))
+            ) {
               try {
                 const lockResponse = await client.getFunctionModule().lock({
                   functionModuleName: item.name,
@@ -1018,7 +1122,10 @@ describe('Admin: Setup shared dependencies', () => {
               testsLogger?.info?.(`Created service definition ${item.name}`);
             }
 
-            if (item.source) {
+            if (
+              item.source &&
+              !(await sameActiveSource(client, 'srvd', item.name, item.source))
+            ) {
               try {
                 await writeSource(
                   handleUpdateServiceDefinition(
@@ -1246,7 +1353,24 @@ describe('Admin: Setup shared dependencies', () => {
                 status: 'created',
               });
             }
-            if (kind.update && item.source) {
+            const readKind = {
+              'INTF/OI': 'interface',
+              'PROG/P': 'program',
+              'DDLX/EX': 'ddlx',
+            }[kind.typeCode];
+            if (
+              kind.update &&
+              item.source &&
+              !(
+                readKind &&
+                (await sameActiveSource(
+                  client,
+                  readKind,
+                  item.name,
+                  item.source,
+                ))
+              )
+            ) {
               const updated = await kind.update(item);
               if (updated?.isError) {
                 throw new Error(

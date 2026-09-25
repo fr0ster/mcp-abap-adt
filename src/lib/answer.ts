@@ -8,7 +8,7 @@
  *
  * See docs/superpowers/specs/2026-09-08-result-error-strategies-design.md.
  */
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
 

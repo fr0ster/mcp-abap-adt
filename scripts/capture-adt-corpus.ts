@@ -902,7 +902,16 @@ async function main(): Promise<void> {
     if (!lockHandle) return;
     heldLocks.delete(className);
     try {
-      await client.getClass().unlock({ className }, lockHandle);
+      // `unlock` answers `IAdtResponse<void>` and does not throw when the
+      // server refuses, so the answer has to be read: a dropped one leaves the
+      // object locked with nothing said, and the handle is gone by then.
+      const released = await client.getClass().unlock({ className }, lockHandle);
+      if (!released.ok) {
+        console.error(
+          `  WARNING: ${className} was NOT unlocked — ${released.getError().message}. ` +
+            'The handle is gone; the object stays locked until the session ends.',
+        );
+      }
     } catch (error) {
       console.error(
         `  WARNING: ${className} could not be unlocked — ${(error as Error).message}. ` +
@@ -1094,15 +1103,29 @@ async function main(): Promise<void> {
       } catch {
         // Expected: nothing to delete on a clean run.
       }
-      await client.getClass().create(
-        {
-          className: SCRATCH_CLASS_NAME,
-          packageName: devPackage,
-          description: 'answer-adapter corpus scratch (safe to delete)',
-        },
-        { sourceCode: MINIMAL_VALID_SOURCE, activateOnCreate: false },
-      );
+      // **Two requests, because a create carries no body.** `create` posts the
+      // metadata skeleton and nothing else — `IAdtCreateOptions` is the write
+      // options with `source?: never` — so the source is written by an
+      // `update` under a lock of its own. This used to pass
+      // `{ sourceCode, activateOnCreate: false }` to `create`: the first field
+      // moved to `options.source` on the write in `interfaces-adt@9` and the
+      // second no longer exists anywhere in adt-clients, so the class was
+      // being created as ADT's empty skeleton and the log line below said
+      // otherwise.
+      await client.getClass().create({
+        className: SCRATCH_CLASS_NAME,
+        packageName: devPackage,
+        description: 'answer-adapter corpus scratch (safe to delete)',
+      });
       scratchClassCreated = true;
+      await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
+        await client
+          .getClass()
+          .update(
+            { className: SCRATCH_CLASS_NAME },
+            { lockHandle, source: MINIMAL_VALID_SOURCE },
+          );
+      });
       console.log('  created (inactive, valid source, not yet activated)');
 
       // Deliberately held across three cases — lock, refuse a second lock,
@@ -1132,7 +1155,7 @@ async function main(): Promise<void> {
           { className: SCRATCH_CLASS_NAME },
           {
             lockHandle: 'ZZ_INVALID_LOCK_HANDLE_0001',
-            sourceCode: MINIMAL_VALID_SOURCE,
+            source: MINIMAL_VALID_SOURCE,
           },
         );
       });
@@ -1143,7 +1166,7 @@ async function main(): Promise<void> {
         await client
           .getClass()
           .check(
-            { className: SCRATCH_CLASS_NAME, sourceCode: BROKEN_SOURCE },
+            { className: SCRATCH_CLASS_NAME, source: BROKEN_SOURCE },
             'inactive',
           );
       });
@@ -1151,12 +1174,12 @@ async function main(): Promise<void> {
       track('setup: persist broken source into the scratch class');
       await withLock(SCRATCH_CLASS_NAME, async (lockHandle) => {
         // A raw PUT never syntax-checks; it saves whatever bytes it is given.
-        // `sourceCode` is an option, not config — config.sourceCode is check's.
+        // The body is `options.source`; `config.source` is `check`'s alone.
         await client
           .getClass()
           .update(
             { className: SCRATCH_CLASS_NAME },
-            { lockHandle, sourceCode: BROKEN_SOURCE },
+            { lockHandle, source: BROKEN_SOURCE },
           );
       });
       console.log('  broken source saved as the inactive version, unlocked');
@@ -1185,7 +1208,7 @@ async function main(): Promise<void> {
           .getClass()
           .update(
             { className: SCRATCH_CLASS_NAME },
-            { lockHandle, sourceCode: MINIMAL_VALID_SOURCE },
+            { lockHandle, source: MINIMAL_VALID_SOURCE },
           );
       });
 
@@ -1256,14 +1279,16 @@ async function main(): Promise<void> {
       // so nothing recorded what a successful write actually answers.
       await withCase('update-source-success', async () => {
         await withLock(CREATE_CLASS_NAME, async (lockHandle) => {
-          // `sourceCode` goes in OPTIONS, not the config. adt-clients 18 made
-          // `config.sourceCode` belong to `check` alone, and an update that
-          // puts it in the config is told "Source code is required for update".
+          // The body goes in OPTIONS, as `source`. adt-clients 18 made the
+          // config's copy belong to `check` alone, and an update that puts the
+          // body there is told "Source code is required for update";
+          // `interfaces-adt@9` then renamed the option from `sourceCode` to
+          // `source` and merged every other body field into it.
           await client.getClass().update(
             { className: CREATE_CLASS_NAME },
             {
               lockHandle,
-              sourceCode:
+              source:
                 MINIMAL_VALID_SOURCE.split(SCRATCH_CLASS_NAME).join(
                   CREATE_CLASS_NAME,
                 ),
@@ -1273,12 +1298,14 @@ async function main(): Promise<void> {
       });
 
       await withCase('create-domain', async () => {
+        // `datatype` and `length` are not on `IDomainConfig` since
+        // `interfaces-adt@9`: a domain's fields travel in its document, which
+        // an `update` writes through `options.source`. The create posts the
+        // skeleton, and that is what this case captures.
         await client.getDomain().create({
           domainName: CREATE_DOMAIN_NAME,
           packageName: devPackage,
           description: 'corpus create capture (safe to delete)',
-          datatype: 'CHAR',
-          length: 10,
         });
       });
 
@@ -1325,7 +1352,7 @@ async function main(): Promise<void> {
           .getClass()
           .update(
             { className: UNIT_TEST_CLASS_NAME },
-            { lockHandle, sourceCode: UNIT_TEST_MAIN_SOURCE },
+            { lockHandle, source: UNIT_TEST_MAIN_SOURCE },
           );
       });
       await writeTestInclude(UNIT_TEST_PASSING);

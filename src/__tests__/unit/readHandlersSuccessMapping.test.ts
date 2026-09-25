@@ -162,28 +162,25 @@ describe('readonly handlers map a success into the right fields, not swapped', (
         'read-metadata-behavior-definition--01-behaviordefinitions-zmcpshriroot',
       ),
     },
-  ])('$name answers source_code from read and metadata from readMetadata, not swapped', async ({
-    handler,
-    args,
-    identity,
-    source,
-    metadata,
-  }) => {
-    fakeClient = fakeClientOf({
-      read: async () => okResponse(reading(source)),
-      readMetadata: async () => okResponse(reading(metadata)),
-    });
+  ])(
+    '$name answers source_code from read and metadata from readMetadata, not swapped',
+    async ({ handler, args, identity, source, metadata }) => {
+      fakeClient = fakeClientOf({
+        read: async () => okResponse(reading(source)),
+        readMetadata: async () => okResponse(reading(metadata)),
+      });
 
-    const result: any = await (handler as any)(context as any, args);
+      const result: any = await (handler as any)(context as any, args);
 
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.source_code).toBe(source);
-    expect(payload.metadata).toBe(metadata);
-    for (const [field, expected] of Object.entries(identity)) {
-      expect(payload[field]).toBe(expected);
-    }
-  });
+      expect(result.isError).toBe(false);
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.source_code).toBe(source);
+      expect(payload.metadata).toBe(metadata);
+      for (const [field, expected] of Object.entries(identity)) {
+        expect(payload[field]).toBe(expected);
+      }
+    },
+  );
 
   // Domain, DataElement, Package and FunctionGroup have no source resource
   // of their own — adt-clients 19 dropped `read` from their contracts
@@ -221,26 +218,24 @@ describe('readonly handlers map a success into the right fields, not swapped', (
         'read-metadata-function-group--01-groups-zmcpshrfgrp',
       ),
     },
-  ])('$name answers source_code and metadata from the single readMetadata call', async ({
-    handler,
-    args,
-    identity,
-    metadata,
-  }) => {
-    fakeClient = fakeClientOf({
-      readMetadata: async () => okResponse(reading(metadata)),
-    });
+  ])(
+    '$name answers source_code and metadata from the single readMetadata call',
+    async ({ handler, args, identity, metadata }) => {
+      fakeClient = fakeClientOf({
+        readMetadata: async () => okResponse(reading(metadata)),
+      });
 
-    const result: any = await (handler as any)(context as any, args);
+      const result: any = await (handler as any)(context as any, args);
 
-    expect(result.isError).toBe(false);
-    const payload = JSON.parse(result.content[0].text);
-    expect(payload.source_code).toBe(metadata);
-    expect(payload.metadata).toBe(metadata);
-    for (const [field, expected] of Object.entries(identity)) {
-      expect(payload[field]).toBe(expected);
-    }
-  });
+      expect(result.isError).toBe(false);
+      const payload = JSON.parse(result.content[0].text);
+      expect(payload.source_code).toBe(metadata);
+      expect(payload.metadata).toBe(metadata);
+      for (const [field, expected] of Object.entries(identity)) {
+        expect(payload[field]).toBe(expected);
+      }
+    },
+  );
 
   // ReadPackage is the one handler in the single-readMetadata-call group
   // where `version` is not inert: AdtPackage forwards it into the query

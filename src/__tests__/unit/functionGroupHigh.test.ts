@@ -9,8 +9,8 @@ import {
 /**
  * Two mutations `highTierWriteChannel.test.ts`'s shared table cannot see,
  * because it only ever checks `factory` and one field of the captured call —
- * never `options.lockHandle`, and never which patcher produced
- * `config.document`.
+ * never `options.lockHandle`, and never which patcher produced the document
+ * in `options.source`.
  */
 
 let fakeClient: unknown;
@@ -63,8 +63,8 @@ describe('UpdateFunctionGroup: what the shared wire-channel table does not check
       unlock: async () => okResponse(undefined),
       readMetadata: async () =>
         okResponse(reading(currentXml, currentXml, 200)),
-      updateMetadata: async (config: any) => {
-        patched = config.document;
+      updateMetadata: async (_config: any, options: any) => {
+        patched = options.source;
         return okResponse(reading(undefined, '', 200));
       },
     });

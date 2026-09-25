@@ -7,18 +7,20 @@
  * handler's, and every step of it carries its own `analyse` — the verdict on
  * each answer stays the strategy's.
  *
- * **The patched document goes in `config.document`, not `options.xmlContent`.**
- * `AdtDataElement.updateMetadata()`'s shipped body reads `config.document`
- * only and passes it straight to `updateDataElement(connection, {...},
- * config.document, options?.lockHandle)` as the PUT body — the fields beside
- * it in `config` (`packageName`, `description`, `typeKind`, …) describe a
- * create and are never read to build or merge a body on an update; only
+ * **The patched document goes in `options.source`.** `interfaces-adt@9`
+ * merged the old `config.document`/`options.sourceCode` split into one
+ * channel (decision 33) and took `document` off `IDataElementConfig`, so the
+ * old shape no longer compiles. `AdtDataElement.updateMetadata()` reads
+ * `options?.source` and passes it straight to `updateDataElement(connection,
+ * {...}, source, options?.lockHandle)` as the PUT body — the fields beside it
+ * in `config` (`packageName`, `description`, `typeKind`, …) describe a create
+ * and are never read to build or merge a body on an update; only
  * `data_element_name` and `transport_request` (for the write-query string)
- * reach the wire function at all. `options` declares no `xmlContent` field
- * either. Verified against the compiled `AdtDataElement.js` and
- * `core/dataElement/update.js`, not the declaration file — the exact mistake
+ * reach the wire function at all. Verified against `AdtDataElement.ts` and
+ * `core/dataElement/update.ts` in adt-clients 22 — the empty-write mistake
  * found four times in cluster 14 and once more in domain (fix round 3, task
- * 14) is the one this handler avoids by construction.
+ * 14) is the one this handler avoids by construction, and the contract now
+ * refuses it outright.
  *
  * **No corpus fixture exists for `GET /sap/bc/adt/ddic/dataelements/{name}`**
  * (the read half of this sequence) — the corpus has a data element `create`
@@ -186,12 +188,12 @@ export async function handleUpdateDataElement(
             {
               dataElementName,
               transportRequest,
-              document: patchDataElementXml(
+            },
+            {
+              source: patchDataElementXml(
                 extractXmlString(current, `data element ${dataElementName}`),
                 changes,
               ),
-            },
-            {
               lockHandle: lock_handle,
               analyse: analyseException,
             },

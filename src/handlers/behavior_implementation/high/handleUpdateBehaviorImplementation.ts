@@ -35,7 +35,7 @@
  * write instead.
  *
  * **The source goes in `options`, not `config`.** The shipped `update()`
- * reads `options?.sourceCode` only. Verified against
+ * reads `options?.source` only. Verified against
  * `AdtBehaviorImplementation.js`, not the declaration file.
  *
  * Activation is restored: `activate()` is on the same accessor (delegating
@@ -48,7 +48,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -140,7 +140,7 @@ export async function handleUpdateBehaviorImplementation(
           obj.update(
             { className, transportRequest: args.transport_request },
             {
-              sourceCode: args.implementation_code,
+              source: args.implementation_code,
               lockHandle,
               analyse: analyseException,
             },

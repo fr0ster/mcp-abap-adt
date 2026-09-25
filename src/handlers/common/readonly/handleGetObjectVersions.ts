@@ -6,7 +6,7 @@
  * opaque contentUri, to be passed to GetObjectVersionSource). Closes #30.
  */
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {

@@ -4,8 +4,8 @@
  * Uses AdtClient.getDdl().check from @mcp-abap-adt/adt-clients 19.
  *
  * `ddl_source`, unlike most families in this migration, is not a dead
- * parameter: the shipped `AdtDdl.check()` passes `config.ddlSource` straight
- * into `checkDdl(connection, name, version, config.ddlSource)`, so a caller
+ * parameter: the shipped `AdtDdl.check()` passes `config.source` straight
+ * into `checkDdl(connection, name, version, config.source)`, so a caller
  * validating unsaved code still reaches the server with it. Verified against
  * `AdtDdl.js`, not the declaration file.
  */
@@ -102,7 +102,7 @@ export async function handleCheckDdl(
     () =>
       createAdtClient(connection, logger)
         .getDdl(resultsFor(ddlDocuments))
-        .check({ ddlName, ddlSource: ddl_source }, checkVersion, {
+        .check({ ddlName, source: ddl_source }, checkVersion, {
           analyse: analyseException,
         }),
     project(detail, terseCheck),

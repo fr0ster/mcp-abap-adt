@@ -328,15 +328,15 @@ describe('UnlockDomainLow', () => {
 });
 
 describe('UpdateDomainLow', () => {
-  // Fix round 3, task 14 (domain is not this cluster's family, but the
-  // defect found here is the exact mirror of the one this task fixed
-  // across class/interface/behavior_definition/behavior_implementation:
-  // `AdtDomain.updateMetadata()`'s shipped body reads `config.document`
-  // only ("config.document is what gets written") and never
-  // `options.xmlContent` — that field exists on `IAdtOperationOptions` but
-  // nothing in `updateDomain()`'s call chain reads it. Verified against
-  // `AdtDomain.js` and `core/domain/update.js`.
-  it('passes the patched document via config.document, and no stray xmlContent survives in options', async () => {
+  // Fix round 3, task 14 found this as `config.document` vs
+  // `options.xmlContent`; `interfaces-adt@9` ended that split. There is one
+  // body channel now — `options.source` — and `document` is gone from
+  // `IDomainConfig` altogether, so a config that still carried it would not
+  // compile. What still needs asserting is the same thing: the patched
+  // document reaches the member, and the config carries the object's name
+  // and nothing that looks like a body. Verified against
+  // `AdtDomain.updateMetadata()`, which reads `options?.source` only.
+  it('passes the patched document via options.source, and the config names the object only', async () => {
     const currentXml =
       '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
     let updateCall: { config: any; options: any } | undefined;
@@ -356,19 +356,19 @@ describe('UpdateDomainLow', () => {
 
     expect(result.isError).toBe(false);
 
-    // The request the member actually builds from this: config carries the
-    // whole patched document, nothing beside it; options carries the lock
-    // handle and the strategy, and nothing that looks like a body.
+    // The request the member actually builds from this: options carries the
+    // whole patched document beside the lock handle and the strategy; config
+    // names the object and nothing else.
     expect(updateCall?.config).toEqual({
       domainName: 'ZD',
-      document: expect.stringContaining('adtcore:description="after"'),
     });
     expect(updateCall?.options).toEqual({
+      source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'h',
       analyse: analyseException,
     });
     expect(
-      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+      (updateCall?.config as { document?: unknown })?.document,
     ).toBeUndefined();
   });
 

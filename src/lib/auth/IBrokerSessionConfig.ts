@@ -10,7 +10,7 @@
  * - jwt auth + serviceKeyPath: serviceKeyStore + sessionStore + tokenProvider
  */
 
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 /**
  * Connection configuration from any source (.env, service key, headers)

@@ -13,8 +13,8 @@
  *
  * **The source goes in `options` for `update`, `config` for `check`.** See
  * `UpdateInterfaceLow` for `update` — the shipped `AdtInterface.update()`
- * reads `options?.sourceCode` only; `AdtInterface.check()` reads
- * `config.sourceCode`.
+ * reads `options?.source` only; `AdtInterface.check()` reads
+ * `config.source`.
  */
 
 import { interfaceDocuments } from '@mcp-abap-adt/adt-clients';
@@ -22,7 +22,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -105,7 +105,7 @@ export async function handleUpdateInterface(
             obj.update(
               { interfaceName, transportRequest: args.transport_request },
               {
-                sourceCode: args.source_code,
+                source: args.source_code,
                 lockHandle,
                 analyse: analyseException,
               },
@@ -116,7 +116,7 @@ export async function handleUpdateInterface(
             ? sequence(
                 () =>
                   obj.check(
-                    { interfaceName, sourceCode: args.source_code },
+                    { interfaceName, source: args.source_code },
                     'inactive',
                     { analyse: analyseException },
                   ),

@@ -70,6 +70,53 @@ Values: `'onprem'` | `'cloud'` | `'legacy'`. If omitted, tool is available every
 
 When checking whether an installed npm package contains specific code, always search inside `node_modules/` directly (e.g., `grep -r "pattern" node_modules/@scope/package/`). VS Code search and ripgrep skip `node_modules` by default due to `.gitignore`, which leads to false "not found" conclusions. The code may be there — you're just not looking in the right place.
 
+## Dependencies
+
+**The rule over this whole section: on runtime and toolchain versions we follow
+SAP.** Not the newest release, not what the developer's machine happens to run —
+what SAP builds and runs against. Two cases are settled below; a third that looks
+like them is decided the same way.
+
+### Node follows what SAP BTP actually runs
+
+`engines.node` is `>=22`, the CI and release matrices are **22 and 24**, and
+`@types/node` is `^22`.
+
+SAP BTP Cloud Foundry supports Node **22** and **24**; 20 reached end of life on
+2026-04-30 and was removed, so restaging a Node 20 app fails. Odd-numbered
+releases (21, 23, 25) are not on the platform at all, and `@sap/cds` 10.1.0,
+`@sap/cds-compiler` 7.1.0 and `@cap-js/cds-typer` 0.41.1 all declare
+`engines.node >=22`.
+
+`@types/node` tracks the **oldest** runtime we claim to support, not the newest
+available: types a major or two ahead describe API that is not there on 22, and
+the compiler would wave it through. `^22` was measured clean across
+`tsconfig.json`, `tsconfig.test.json`, `server/tsconfig.json` and the full suite.
+
+A newer Node on a development machine is fine; nothing here may require it.
+
+### The TypeScript major follows SAP
+
+Stay on `typescript@^6.x`. Take 6.x patches and minors; leave 7 alone until the
+CAP toolchain moves, and treat it as a decision already made rather than an
+upgrade waiting to happen. Measured 2026-09-24:
+
+- `@sap/cds` 10.1.0, `@sap/cds-dk` 10.1.0, `@sap/cds-compiler` 7.1.0,
+  `@cap-js/cds-typer` 0.41.1 and `@cap-js/cds-types` 0.19.0 declare no
+  `typescript` peer at all, and CAP's docs name no version — `cds watch` runs
+  `cds-tsx`, which transpiles without type checking. But cds-typer and cds-types
+  both devDepend on `typescript ^6.0.3`, so 6 is what SAP tests.
+- `ts-jest` caps it: the latest, 29.4.13, declares
+  `peerDependencies.typescript: ">=4.3 <7"`, and every suite here runs through
+  it. `.npmrc` sets `legacy-peer-deps=true`, so npm would install the conflict
+  silently rather than refuse it.
+- cloud-llm-hub type-checks against this project's `.d.ts` on TypeScript 6 with
+  `moduleResolution: node`.
+
+The cheap signal, if the question ever comes back:
+`npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
+deciding condition, not ts-jest.
+
 ## Plans and Specs
 
 Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.

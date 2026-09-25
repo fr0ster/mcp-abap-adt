@@ -1,4 +1,4 @@
-import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import {
   answerRead,

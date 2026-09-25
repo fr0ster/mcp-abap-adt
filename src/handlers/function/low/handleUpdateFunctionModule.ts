@@ -3,8 +3,8 @@
  *
  * Uses AdtClient.getFunctionModule().update from @mcp-abap-adt/adt-clients 19.
  *
- * **The source goes through `options.sourceCode`.** `AdtFunctionModule.update()`'s
- * shipped body reads `const source = options?.sourceCode;` only, and passes
+ * **The source goes through `options.source`.** `AdtFunctionModule.update()`'s
+ * shipped body reads `const source = options?.source;` only, and passes
  * `config.transportRequest` straight through. This handler writes through
  * `options` only, the one channel every sibling family in this cluster
  * shares. Verified against `AdtFunctionModule.js`.
@@ -141,7 +141,7 @@ export async function handleUpdateFunctionModule(
             transportRequest: transport_request,
           },
           {
-            sourceCode: source_code,
+            source: source_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

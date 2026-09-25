@@ -14,7 +14,7 @@
  *
  * **The source goes in `options`, not `config`.** See
  * `UpdateBehaviorDefinitionLow` — the shipped `AdtBehaviorDefinition.update()`
- * reads `options?.sourceCode` only.
+ * reads `options?.source` only.
  */
 
 import { behaviorDefinitionDocuments } from '@mcp-abap-adt/adt-clients';
@@ -22,7 +22,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -103,7 +103,7 @@ export async function handleUpdateBehaviorDefinition(
         obj.update(
           { name, transportRequest: args.transport_request },
           {
-            sourceCode: args.source_code,
+            source: args.source_code,
             lockHandle,
             analyse: analyseException,
           },

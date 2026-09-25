@@ -106,7 +106,7 @@ export async function handleUpdateClassTestClasses(
       createAdtClient(connection, logger)
         .getLocalTestClass(resultsFor(classDocuments))
         .update(
-          { className, testClassCode: test_class_source },
+          { className, source: test_class_source },
           { lockHandle: lock_handle, analyse: analyseException },
         ),
     project(detail, terseWrite),

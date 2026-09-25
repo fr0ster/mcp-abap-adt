@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/core",
-  "version": "11.0.0",
+  "version": "12.0.0",
   "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
@@ -92,12 +92,12 @@
     "docker:rebuild:headerless": "npm run docker:down:headerless && npm run docker:build:headerless && npm run docker:up:headerless"
   },
   "dependencies": {
-    "@mcp-abap-adt/lib": "^11.0.0",
     "@mcp-abap-adt/auth-broker": "^2.0.0",
-    "@mcp-abap-adt/interfaces": "^44.0.0",
-    "@mcp-abap-adt/logger": "^0.3.1",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.0",
+    "@mcp-abap-adt/lib": "^12.0.0",
+    "@mcp-abap-adt/logger": "^0.4.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
-    "dotenv": "^17.4.0",
+    "dotenv": "^18.0.3",
     "express": "^5.1.0"
   },
   "jest": {

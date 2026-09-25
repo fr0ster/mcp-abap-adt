@@ -7,7 +7,7 @@ import {
   type SapConfig,
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -1871,8 +1871,16 @@ function debugLog(message: string): void {
   }
 }
 
-// Re-export header constants from interfaces package
-export * from '@mcp-abap-adt/interfaces';
+// **No contract re-export here, and it is deliberate.** This line used to be
+// `export * from '@mcp-abap-adt/interfaces'`, described as re-exporting the
+// header constants. Those constants live in `@mcp-abap-adt/interfaces-network`
+// since the contract split, and measured before removing it: nothing in this
+// repository imported one through here, and the one consumer that uses them —
+// cloud-llm-hub — imports them from the contract package directly. A star
+// re-export also decides for a consumer WHICH version of the contract they
+// compile against, which is the coupling the split was made to end.
+//
+// A named re-export can be added here the day something actually needs one.
 export type { IAdtSystemContext } from './systemContext.js';
 // Re-export safe system context accessors for consumers (no HTTP, no connection mutation)
 export { getSystemContext, setSystemContext } from './systemContext.js';

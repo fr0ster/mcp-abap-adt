@@ -36,7 +36,7 @@
  * task's own writes.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
@@ -487,30 +487,34 @@ const cases: ChannelCase[] = [
 ];
 
 describe('every write in task 20 and task 23 lands where its shipped member sends it (real client)', () => {
-  it.each(
-    cases,
-  )('$name reaches $urlContains and carries the marker', async (c) => {
-    // Bounded well under the 60-character SAP ADT description limit
-    // (`limitDescription`, confirmed in `core/class/create.js` and its
-    // structure/table siblings) — a truncated marker would silently pass by
-    // matching a prefix of itself.
-    const marker =
-      `MARKER_${c.name.replace(/[^A-Z0-9]/gi, '_').toUpperCase()}`.slice(0, 40);
-    const conn = recordingConnection(c.seedAnswers as any);
+  it.each(cases)(
+    '$name reaches $urlContains and carries the marker',
+    async (c) => {
+      // Bounded well under the 60-character SAP ADT description limit
+      // (`limitDescription`, confirmed in `core/class/create.js` and its
+      // structure/table siblings) — a truncated marker would silently pass by
+      // matching a prefix of itself.
+      const marker =
+        `MARKER_${c.name.replace(/[^A-Z0-9]/gi, '_').toUpperCase()}`.slice(
+          0,
+          40,
+        );
+      const conn = recordingConnection(c.seedAnswers as any);
 
-    const result: any = await c.run(marker, conn);
+      const result: any = await c.run(marker, conn);
 
-    expect(result?.isError).toBe(false);
+      expect(result?.isError).toBe(false);
 
-    const hit = landedIn(conn.requests, marker);
-    expect(hit.length).toBeGreaterThan(0);
-    expect(hit.some((r) => r.method === c.method)).toBe(true);
-    expect(
-      hit.some((r) =>
-        r.url.toLowerCase().includes(c.urlContains.toLowerCase()),
-      ),
-    ).toBe(true);
+      const hit = landedIn(conn.requests, marker);
+      expect(hit.length).toBeGreaterThan(0);
+      expect(hit.some((r) => r.method === c.method)).toBe(true);
+      expect(
+        hit.some((r) =>
+          r.url.toLowerCase().includes(c.urlContains.toLowerCase()),
+        ),
+      ).toBe(true);
 
-    c.extraChecks?.(marker, conn.requests);
-  });
+      c.extraChecks?.(marker, conn.requests);
+    },
+  );
 });

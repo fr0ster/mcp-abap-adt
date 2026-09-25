@@ -8,11 +8,13 @@ This document provides a comprehensive architectural description of the **mcp-ab
 
 ### 1.1 Interface-Only Communication (IOC)
 
-All inter-package communication occurs exclusively through TypeScript interfaces defined in `@mcp-abap-adt/interfaces`. No package imports concrete implementations from another package. This is not a guideline -- it is an enforced architectural invariant.
+All inter-package communication occurs exclusively through TypeScript interfaces, and each interface is imported from the package that declares it. No package imports concrete implementations from another package. This is not a guideline -- it is an enforced architectural invariant.
+
+The contract used to be one package, `@mcp-abap-adt/interfaces`. It was split into `interfaces-adt`, `interfaces-auth`, `interfaces-auth-sap`, `interfaces-network` and `interfaces-utils`, and the umbrella that re-exported them is deleted -- npm serves its last release, 51.0.0, and nothing further ships there. An umbrella decides for every consumer which version of each contract they compile against, which is the coupling the split ends.
 
 ```typescript
-// Correct -- depends on interface only
-import type { ISessionStore } from '@mcp-abap-adt/interfaces';
+// Correct -- depends on interface only, from the package that declares it
+import type { ISessionStore } from '@mcp-abap-adt/interfaces-auth-sap';
 
 // Prohibited -- creates concrete coupling
 import { AbapSessionStore } from '@mcp-abap-adt/auth-stores';
@@ -32,7 +34,7 @@ Each package owns exactly one responsibility:
 
 | Concern | Package |
 |:---|:---|
-| Interface contracts | `@mcp-abap-adt/interfaces` |
+| Interface contracts | `@mcp-abap-adt/interfaces-adt`, `-auth`, `-auth-sap`, `-network`, `-utils` |
 | Logging abstraction | `@mcp-abap-adt/logger` |
 | Header validation | `@mcp-abap-adt/header-validator` |
 | Credential storage | `@mcp-abap-adt/auth-stores` |
@@ -52,12 +54,12 @@ Every public function and method operates against well-defined input/output type
 
 ## 2. Component Catalogue
 
-### 2.1 @mcp-abap-adt/interfaces
+### 2.1 The contract packages
 
 | Attribute | Value |
 |:---|:---|
-| **Responsibility** | Single source of truth for all TypeScript interfaces, types, enums, and error codes |
-| **Dependencies** | None (base package) |
+| **Responsibility** | Source of truth for all TypeScript interfaces, types, enums and error codes, one package per domain: `interfaces-adt` (ADT objects and the connection contract), `interfaces-auth` (tokens and providers), `interfaces-auth-sap` (SAP configuration, service keys, session stores), `interfaces-network` (HTTP frame and header names), `interfaces-utils` (logging, XML shapes) |
+| **Dependencies** | `interfaces-adt` on `-network`; `-auth-sap` on `-auth`; the rest have none |
 | **Replaceable** | N/A -- defines contracts, not implementations |
 | **Runtime role** | Type-only at runtime (compile-time contracts) |
 
@@ -94,7 +96,7 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 | **Default implementations** | `DefaultLogger` (console-based), `PinoLogger` (structured, with fallback) |
 | **Replaceable** | Yes -- any `ILogger` implementation accepted |
 | **Runtime role** | Injected into all components that produce diagnostic output |
-| **Dependencies** | `@mcp-abap-adt/interfaces`; `pino` as optional peer dependency |
+| **Dependencies** | `@mcp-abap-adt/interfaces-utils`; `pino` and `pino-pretty` as peer dependencies |
 
 `PinoLogger` dynamically loads `pino` at runtime. If pino is not installed, it silently falls back to `DefaultLogger`. Both implementations respect the `AUTH_LOG_LEVEL` environment variable and redact sensitive fields (passwords, tokens, authorization headers).
 
@@ -108,7 +110,7 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 | **Public interface** | `IHeaderValidationResult`, `IValidatedAuthConfig` |
 | **Replaceable** | Yes |
 | **Runtime role** | Used by HTTP/SSE transport servers to extract auth parameters from request headers |
-| **Dependencies** | `@mcp-abap-adt/interfaces` |
+| **Dependencies** | the contract packages it names (`interfaces-network`, `-auth`, `-auth-sap`) |
 
 Supports prioritized authentication methods:
 
@@ -131,7 +133,7 @@ Supports prioritized authentication methods:
 | **Default implementations** | `AbapServiceKeyStore`, `XsuaaServiceKeyStore`, `AbapSessionStore`, `XsuaaSessionStore` |
 | **Replaceable** | Yes -- consumers can provide any `IServiceKeyStore` / `ISessionStore` |
 | **Runtime role** | Supplies credentials and persists tokens between sessions |
-| **Dependencies** | `@mcp-abap-adt/interfaces`, `dotenv` |
+| **Dependencies** | `@mcp-abap-adt/interfaces-auth-sap`, `dotenv` |
 
 Service key stores read `{destination}.json` files from a configurable directory. Session stores persist authorization and connection configurations per destination. ABAP and XSUAA variants differ in JSON structure parsing, not in interface contract.
 
@@ -145,7 +147,7 @@ Service key stores read `{destination}.json` files from a configurable directory
 | **Public interface** | `AuthBroker` class, `ITokenRefresher` factory |
 | **Replaceable** | Yes -- any object satisfying the same method signatures |
 | **Runtime role** | Central authentication coordinator; creates `ITokenRefresher` for injection into connections |
-| **Dependencies** | `@mcp-abap-adt/interfaces` |
+| **Dependencies** | the contract packages it names (`interfaces-network`, `-auth`, `-auth-sap`) |
 
 **Token acquisition flow** (multi-step with fallback):
 
@@ -178,7 +180,7 @@ It also produces `ITokenRefresher` instances that are injected into `JwtAbapConn
 | **Default implementations** | `AuthorizationCodeProvider`, `ClientCredentialsProvider`, `DeviceFlowProvider`, `OidcBrowserProvider`, `OidcDeviceFlowProvider`, `OidcPasswordProvider`, `OidcTokenExchangeProvider`, `Saml2BearerProvider`, `Saml2PureProvider` |
 | **Replaceable** | Yes -- any `ITokenProvider` implementation |
 | **Runtime role** | Injected into `AuthBroker` to perform specific OAuth2/OIDC/SAML flows |
-| **Dependencies** | `@mcp-abap-adt/interfaces`, `axios`, `express`, `open` |
+| **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
 All providers extend `BaseTokenProvider` which manages token caching, expiration tracking, and the `getTokens()` lifecycle. Each provider implements a specific grant type:
 
@@ -205,7 +207,7 @@ All providers extend `BaseTokenProvider` which manages token caching, expiration
 | **Default implementations** | `BaseAbapConnection` (Basic auth), `JwtAbapConnection` (JWT/BTP), `SamlAbapConnection` (SAML) |
 | **Replaceable** | Yes -- any `IAbapConnection` implementation |
 | **Runtime role** | Executes HTTP requests against SAP ADT endpoints |
-| **Dependencies** | `@mcp-abap-adt/interfaces`, `axios` |
+| **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios` |
 
 **Factory function:**
 
@@ -234,7 +236,7 @@ Automatically selects the correct implementation based on `config.authType` (`ba
 | **Default implementation** | `AdtClient` (factory), 22+ object-type handlers |
 | **Replaceable** | Yes -- via interface |
 | **Runtime role** | Called by MCP tool handlers to perform SAP operations |
-| **Dependencies** | `@mcp-abap-adt/interfaces`, `@mcp-abap-adt/logger`, `fast-xml-parser` |
+| **Dependencies** | `@mcp-abap-adt/interfaces-adt`, `-auth`, `-network`, `-utils`, `@mcp-abap-adt/logger`, `fast-xml-parser` |
 
 **AdtClient** is a factory that creates typed object handlers:
 
@@ -358,7 +360,7 @@ All transports extend `BaseMcpServer` which handles handler registration, connec
 | **Architectural relationship** | Fully independent -- can proxy to ANY MCP server, not just mcp-abap-adt |
 | **Runtime role** | Intercepts requests, obtains JWT via XSUAA, forwards authenticated requests |
 | **Transport modes** | `stdio`, `streamable-http`, `sse` |
-| **Dependencies** | `@mcp-abap-adt/auth-broker`, `@mcp-abap-adt/auth-providers`, `@mcp-abap-adt/auth-stores`, `@mcp-abap-adt/interfaces`, `@modelcontextprotocol/sdk`, `axios` |
+| **Dependencies** | `@mcp-abap-adt/auth-broker`, `@mcp-abap-adt/auth-providers`, `@mcp-abap-adt/auth-stores`, `@mcp-abap-adt/interfaces-adt`, `-auth`, `-auth-sap`, `-utils`, `@modelcontextprotocol/sdk`, `axios` |
 
 The proxy is **not** part of the main server's runtime. It is a standalone utility for scenarios where MCP clients (Cline, Copilot, Cursor) cannot perform BTP authentication directly.
 
@@ -572,7 +574,7 @@ registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 
 ### 5.5 Architectural Guarantees
 
-- **Interface stability** -- `@mcp-abap-adt/interfaces` follows semver; breaking changes require major version bumps
+- **Interface stability** -- every contract package follows semver; breaking changes require major version bumps, and a consumer takes them one domain at a time rather than inheriting every package's history through an umbrella
 - **No hidden state** -- components do not share global mutable state (except the explicit `AuthBrokerRegistry` global for cross-package token refresh)
 - **Typed errors** -- all error conditions use typed error code constants, enabling programmatic error handling
 - **Operation auditability** -- `IAdtObjectState` accumulates every operation result, providing full trace of create/update/delete chains
@@ -585,7 +587,7 @@ registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 
 **Recommended entry path:**
 
-1. Start with `@mcp-abap-adt/interfaces` -- read `IAdtObject<TConfig, TState>` to understand the CRUD contract
+1. Start with `@mcp-abap-adt/interfaces-adt` -- read `IAdtObject<TConfig, TState>` to understand the CRUD contract
 2. Examine one object type in `@mcp-abap-adt/adt-clients` (e.g., `src/core/program/`) to see the operation chain pattern
 3. Look at the corresponding handler in `mcp-abap-adt/src/handlers/program/` to understand how MCP tool calls map to ADT operations
 4. Study `@mcp-abap-adt/connection` to understand how HTTP requests reach SAP
@@ -689,7 +691,7 @@ For troubleshooting:
 ## Appendix: Dependency Hierarchy
 
 ```
-@mcp-abap-adt/interfaces (base -- no dependencies)
+@mcp-abap-adt/interfaces-adt, -auth, -auth-sap, -network, -utils (the contracts)
 │
 ├── @mcp-abap-adt/logger
 │

@@ -7,12 +7,13 @@
  * unlock} from @mcp-abap-adt/adt-clients 19, via `withLock` — the lock is
  * held for the read-modify-write in its body, released on every path out.
  *
- * **The patched document goes in `config.document`, not a raw PUT this
+ * **The patched document goes in `options.source`, not a raw PUT this
  * handler built itself.** The pre-migration handler issued its own
  * `connection.makeAdtRequest` PUT against the functions/groups endpoint with
  * a hand-built URL and content type; `AdtFunctionGroup.updateMetadata()`
- * reads `config.document` and does that request itself now. Verified against
- * the compiled `AdtFunctionGroup.js`, not the declaration file.
+ * reads the body — `config.document` then, `options?.source` since
+ * `interfaces-adt@9` merged the channels — and does that request itself now.
+ * Verified against `AdtFunctionGroup.ts` in adt-clients 22.
  *
  * The patch itself is `patchFunctionGroupXml` (`functionGroupPatch.ts`),
  * ported field-for-field from `v18.0.2`'s own patcher — description only, a
@@ -21,7 +22,7 @@
 
 import { functionGroupDocuments } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -106,15 +107,18 @@ export async function handleUpdateFunctionGroup(
                 {
                   functionGroupName,
                   transportRequest: args.transport_request,
-                  document: patchFunctionGroupXml(
+                },
+                {
+                  source: patchFunctionGroupXml(
                     extractXmlString(
                       current.raw,
                       `function group ${functionGroupName}`,
                     ),
                     { description: args.description },
                   ),
+                  lockHandle,
+                  analyse: analyseException,
                 },
-                { lockHandle, analyse: analyseException },
               ),
           ),
         (lockHandle) => obj.unlock({ functionGroupName }, lockHandle),

@@ -4,13 +4,13 @@
  * Uses AdtClient.getMetadataExtension().update from @mcp-abap-adt/adt-clients 19.
  *
  * **The source goes in `options`, not `config`.** The pre-migration (v18)
- * handler put `sourceCode` inside the config object passed as the first
- * argument — `update({ name, sourceCode }, { lockHandle })`. The shipped
- * `AdtMetadataExtension.update()` reads `options?.sourceCode` only, and says
- * so in its own comment: "This used to fall back to `config.sourceCode` —
+ * handler put `source` inside the config object passed as the first
+ * argument — `update({ name, source }, { lockHandle })`. The shipped
+ * `AdtMetadataExtension.update()` reads `options?.source` only, and says
+ * so in its own comment: "This used to fall back to `config.source` —
  * two channels for one value, where the contract documents one.
- * `config.sourceCode` is `check`'s alone now". `IMetadataExtensionConfig`
- * still declares a `sourceCode` field, so the old shape still compiled —
+ * `config.source` is `check`'s alone now". `IMetadataExtensionConfig`
+ * still declares a `source` field, so the old shape still compiled —
  * this is the exact empty-write shape cluster 14 found in four handlers,
  * and it recurs here in the family that removed the fallback outright.
  * Verified against `AdtMetadataExtension.js`, not the declaration file.
@@ -110,7 +110,7 @@ export async function handleUpdateMetadataExtension(
         .update(
           { name: ddlxName },
           {
-            sourceCode: source_code,
+            source: source_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

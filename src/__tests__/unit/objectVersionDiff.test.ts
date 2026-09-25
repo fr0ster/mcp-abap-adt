@@ -18,7 +18,7 @@ jest.mock('../../lib/clients', () => ({
   }),
 }));
 
-import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces';
+import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
 import { handleGetObjectVersionDiff } from '../../handlers/common/readonly/handleGetObjectVersionDiff';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';

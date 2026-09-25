@@ -8,7 +8,7 @@
  * 'active' : 'inactive'`, so an omitted status checks the inactive version —
  * the same shipped default `CheckDomainLow`/`CheckTableLow` rely on. Unlike
  * those two, `checkProgram(connection, config.programName, version,
- * config.sourceCode, contentType)` DOES read a fourth argument for an
+ * config.source, contentType)` DOES read a fourth argument for an
  * unsaved source, but no `source_code` parameter existed on this tool before
  * this migration, so nothing is forwarded there either. Verified against
  * `AdtProgram.js`, not the declaration file.

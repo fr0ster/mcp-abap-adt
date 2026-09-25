@@ -1,4 +1,4 @@
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 /**
  * Session management helpers for low-level handler integration tests
  *
@@ -14,11 +14,11 @@ import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import type {
-  IAbapConnection,
   IServiceKeyStore,
   ISessionStore,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-auth-sap';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { generateSessionId } from '../../../lib/sessionUtils';
 import { getPlatformStoresAsync } from '../../../lib/stores';

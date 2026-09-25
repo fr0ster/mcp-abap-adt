@@ -6,7 +6,7 @@ import {
   unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import type { IResultStrategy } from '@mcp-abap-adt/interfaces';
+import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import type { AdtReading } from '../../lib/strategies/reading';
 import {

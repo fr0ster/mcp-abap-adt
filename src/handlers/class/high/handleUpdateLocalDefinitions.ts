@@ -10,7 +10,7 @@
  * other way to obtain.
  *
  * **The source goes in `options`, not `config`.** The shipped `update()`
- * reads `options?.sourceCode ?? config.definitionsCode`. Verified against
+ * reads `options?.source ?? config.definitionsCode`. Verified against
  * `AdtLocalDefinitions.js`.
  */
 
@@ -19,7 +19,7 @@ import {
   analyseActivation,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -101,7 +101,7 @@ export async function handleUpdateLocalDefinitions(
           obj.update(
             { className, transportRequest: args.transport_request },
             {
-              sourceCode: args.definitions_code,
+              source: args.definitions_code,
               lockHandle,
               analyse: analyseException,
             },

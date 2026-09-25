@@ -11,7 +11,7 @@ import type {
   IAdtError,
   IAdtResponse,
   IAdtVersionable,
-} from '@mcp-abap-adt/interfaces';
+} from '@mcp-abap-adt/interfaces-adt';
 import { createTwoFilesPatch } from 'diff';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';

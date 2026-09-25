@@ -10,7 +10,7 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtVersionable } from '@mcp-abap-adt/interfaces';
+import type { IAdtVersionable } from '@mcp-abap-adt/interfaces-adt';
 
 /** object_type values supported for version history (same set as LockObject). */
 // Only object types whose adt-clients handler actually implements version

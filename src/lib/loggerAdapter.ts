@@ -2,7 +2,7 @@
  * Logger adapter that wraps the server logger to implement ILogger interface
  * from @mcp-abap-adt/interfaces package
  */
-import type { ILogger } from '@mcp-abap-adt/interfaces';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { logger } from './logger';
 
 /**

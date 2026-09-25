@@ -18,6 +18,20 @@
 import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { asItCame } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
+import { handleCreateDataElement } from '../../../handlers/data_element/high/handleCreateDataElement';
+import { handleUpdateDdl } from '../../../handlers/ddl/high/handleUpdateDdl';
+import { handleCreateMetadataExtension } from '../../../handlers/ddlx/high/handleCreateMetadataExtension';
+import { handleUpdateMetadataExtension } from '../../../handlers/ddlx/high/handleUpdateMetadataExtension';
+import { handleCreateDomain } from '../../../handlers/domain/high/handleCreateDomain';
+import { handleCreateInterface } from '../../../handlers/interface/high/handleCreateInterface';
+import { handleUpdateInterface } from '../../../handlers/interface/high/handleUpdateInterface';
+import { handleCreateProgram } from '../../../handlers/program/high/handleCreateProgram';
+import { handleUpdateProgram } from '../../../handlers/program/high/handleUpdateProgram';
+import { handleSearchObject } from '../../../handlers/search/readonly/handleSearchObject';
+import { handleUpdateServiceDefinition } from '../../../handlers/service_definition/high/handleUpdateServiceDefinition';
+import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
+import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,
@@ -31,6 +45,7 @@ import {
   loadTestConfig,
 } from '../../integration/helpers/configHelpers';
 import { createTestLogger } from '../../integration/helpers/loggerHelpers';
+import { stillInactive } from '../../integration/helpers/rapFixtures';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
 import { ensureSharedPackage } from '../../integration/helpers/sharedObjects';
 
@@ -88,12 +103,93 @@ const TYPE_CODES: Record<string, string> = {
   function_groups: 'FUGR/F',
   function_modules: 'FUGR/FF',
   service_definitions: 'SRVD/SRV',
+  domains: 'DOMA/DD',
+  data_elements: 'DTEL/DE',
+  interfaces: 'INTF/OI',
+  programs: 'PROG/P',
+  metadata_extensions: 'DDLX/EX',
 };
 
+/**
+ * Shared objects are local and ride on no request. Only a transport named in
+ * `shared_dependencies` itself is used; `environment.default_transport` is the
+ * TEST objects' request, and borrowing it here scattered shared objects over
+ * CTS requests.
+ */
 function resolveTransportRequest(sharedConfig: any): string | undefined {
-  if (sharedConfig?.transport_request) return sharedConfig.transport_request;
-  const config = loadTestConfig();
-  return config?.environment?.default_transport || undefined;
+  return sharedConfig?.transport_request || undefined;
+}
+
+/**
+ * The client, with every write made to answer for itself.
+ *
+ * `create`, `update` and `activate` answer an IAdtResponse; a refusal is
+ * `ok: false`, not a throw. This script only ever caught throws, so a refused
+ * write logged "Updated … source" and went on — on E19 (2026-09-25) that left
+ * ZMCP_SHR_STRU with ADT's generated stub, ZMCP_SHR_SRVD01 empty and
+ * ZMCP_SHR_I_ROOT with the stub behaviour, all "updated". Reads are left
+ * alone: a read that answers `ok: false` is how an absent object is found.
+ */
+/**
+ * Write a source through a high-level Update handler, which locks, writes
+ * and unlocks. The bare `update()` this used to call sends no lock handle, and
+ * SAP refuses every such write — `400`, "Parameter lockHandle could not be
+ * found." (SADT_RESOURCE 017, E19 2026-09-25) — which is how ADT's generated
+ * stubs stayed in ZMCP_SHR_STRU, ZMCP_SHR_SRVD01 and ZMCP_SHR_I_ROOT while
+ * this script logged them "updated". A handler answers `isError` rather than
+ * throwing; this makes it throw, so the existing catch records the failure.
+ */
+async function writeSource(answer: Promise<any>): Promise<void> {
+  const answered = await answer;
+  if (answered?.isError) {
+    const text = (answered.content ?? [])
+      .map((c: any) => c.text)
+      .join('')
+      .substring(0, 800);
+    throw new Error(text || 'the write was refused');
+  }
+}
+
+function strictClient(client: AdtClient): AdtClient {
+  const WRITES = new Set(['create', 'update', 'activate']);
+  return new Proxy(client, {
+    get(target, prop, receiver) {
+      const member = Reflect.get(target, prop, receiver);
+      if (
+        typeof member !== 'function' ||
+        typeof prop !== 'string' ||
+        !prop.startsWith('get') ||
+        prop === 'getUtils'
+      ) {
+        return typeof member === 'function' ? member.bind(target) : member;
+      }
+      return (...args: unknown[]) => {
+        const object = member.apply(target, args);
+        return new Proxy(object, {
+          get(o, name, r) {
+            const fn = Reflect.get(o, name, r);
+            if (typeof fn !== 'function' || !WRITES.has(String(name))) {
+              return typeof fn === 'function' ? fn.bind(o) : fn;
+            }
+            return async (...callArgs: unknown[]) => {
+              const answer = await fn.apply(o, callArgs);
+              if (answer && answer.ok === false) {
+                const error = answer.getError?.();
+                throw new Error(
+                  `${prop.slice(3)}.${String(name)} refused: ${error?.message ?? 'no message'}${
+                    error?.messages?.length
+                      ? ` — ${error.messages.map((m: any) => m.text).join('; ')}`
+                      : ''
+                  }`,
+                );
+              }
+              return answer;
+            };
+          },
+        });
+      };
+    },
+  }) as AdtClient;
 }
 
 function resolvePackageName(sharedConfig: any): string {
@@ -113,7 +209,7 @@ describe('Admin: Setup shared dependencies', () => {
       connection = result.connection;
       await resolveSystemContext(connection);
       const systemCtx = getSystemContext();
-      client = createAdtClient(connection);
+      client = strictClient(createAdtClient(connection));
       hasConfig = true;
     } catch (error: any) {
       testsLogger?.warn?.(
@@ -192,19 +288,26 @@ describe('Admin: Setup shared dependencies', () => {
             // Always update source code to ensure it matches config
             if (item.source) {
               try {
-                await client.getTable().update(
-                  {
-                    tableName: item.name,
-                    source: item.source,
-                    transportRequest,
-                  },
-                  { source: item.source },
+                await writeSource(
+                  handleUpdateTable(
+                    { connection, logger: undefined } as any,
+                    {
+                      table_name: item.name,
+                      ddl_code: item.source,
+                      activate: false,
+                    } as any,
+                  ),
                 );
                 testsLogger?.info?.(`Updated table ${item.name} source`);
               } catch (updateError: any) {
-                testsLogger?.warn?.(
-                  `Update table ${item.name} source failed (will still activate): ${updateError.message}`,
+                testsLogger?.error?.(
+                  `Update table ${item.name} source failed: ${updateError.message}`,
                 );
+                results.push({
+                  type: 'tables',
+                  name: item.name,
+                  status: `FAILED: source not written: ${updateError.message}`,
+                });
               }
             }
 
@@ -313,13 +416,15 @@ describe('Admin: Setup shared dependencies', () => {
             // Apply the real DDL source, then activate immediately so that a
             // later base structure can reference this one via `include`.
             if (item.source) {
-              await client.getStructure().update(
-                {
-                  structureName: item.name,
-                  source: item.source,
-                  transportRequest,
-                },
-                { source: item.source },
+              await writeSource(
+                handleUpdateStructure(
+                  { connection, logger: undefined } as any,
+                  {
+                    structure_name: item.name,
+                    ddl_code: item.source,
+                    activate: false,
+                  } as any,
+                ),
               );
               testsLogger?.info?.(`Updated structure ${item.name} source`);
             }
@@ -382,13 +487,15 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (item.source) {
               try {
-                await client.getDdl().update(
-                  {
-                    ddlName: item.name,
-                    source: item.source,
-                    transportRequest,
-                  },
-                  { source: item.source },
+                await writeSource(
+                  handleUpdateDdl(
+                    { connection, logger: undefined } as any,
+                    {
+                      ddl_name: item.name,
+                      ddl_source: item.source,
+                      activate: false,
+                    } as any,
+                  ),
                 );
                 testsLogger?.info?.(`Updated view ${item.name} source`);
               } catch (updateError: any) {
@@ -406,9 +513,14 @@ describe('Admin: Setup shared dependencies', () => {
                     `Force-saved source for view ${item.name}`,
                   );
                 } catch (forceSaveError: any) {
-                  testsLogger?.warn?.(
+                  testsLogger?.error?.(
                     `Force-save view ${item.name} also failed: ${forceSaveError.message}`,
                   );
+                  results.push({
+                    type: 'views',
+                    name: item.name,
+                    status: `FAILED: source not written: ${forceSaveError.message}`,
+                  });
                 }
               }
             }
@@ -492,21 +604,28 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (item.source) {
               try {
-                await client.getBehaviorDefinition().update(
-                  {
-                    name: item.name,
-                    source: item.source,
-                    transportRequest,
-                  },
-                  { source: item.source },
+                await writeSource(
+                  handleUpdateBehaviorDefinition(
+                    { connection, logger: undefined } as any,
+                    {
+                      name: item.name,
+                      source_code: item.source,
+                      activate: false,
+                    } as any,
+                  ),
                 );
                 testsLogger?.info?.(
                   `Updated behavior definition ${item.name} source`,
                 );
               } catch (updateError: any) {
-                testsLogger?.warn?.(
+                testsLogger?.error?.(
                   `Update BDEF ${item.name} source failed: ${updateError.message}`,
                 );
+                results.push({
+                  type: 'behavior_definitions',
+                  name: item.name,
+                  status: `FAILED: source not written: ${updateError.message}`,
+                });
               }
             }
 
@@ -795,9 +914,14 @@ describe('Admin: Setup shared dependencies', () => {
                   }
                 }
               } catch (updateError: any) {
-                testsLogger?.warn?.(
+                testsLogger?.error?.(
                   `Update function module ${item.name} source failed: ${updateError.message}`,
                 );
+                results.push({
+                  type: 'function_modules',
+                  name: item.name,
+                  status: `FAILED: source not written: ${updateError.message}`,
+                });
               }
             }
 
@@ -881,21 +1005,28 @@ describe('Admin: Setup shared dependencies', () => {
 
             if (item.source) {
               try {
-                await client.getServiceDefinition().update(
-                  {
-                    serviceDefinitionName: item.name,
-                    source: item.source,
-                    transportRequest,
-                  },
-                  { source: item.source },
+                await writeSource(
+                  handleUpdateServiceDefinition(
+                    { connection, logger: undefined } as any,
+                    {
+                      service_definition_name: item.name,
+                      source_code: item.source,
+                      activate: false,
+                    } as any,
+                  ),
                 );
                 testsLogger?.info?.(
                   `Updated service definition ${item.name} source`,
                 );
               } catch (updateError: any) {
-                testsLogger?.warn?.(
+                testsLogger?.error?.(
                   `Update service definition ${item.name} source failed: ${updateError.message}`,
                 );
+                results.push({
+                  type: 'service_definitions',
+                  name: item.name,
+                  status: `FAILED: source not written: ${updateError.message}`,
+                });
               }
             }
 
@@ -937,6 +1068,192 @@ describe('Admin: Setup shared dependencies', () => {
                 status: `FAILED: ${msg}`,
               });
             }
+          }
+        }
+      }
+
+      // --- Domains, data elements, interfaces, programs, metadata extensions ---
+      //
+      // Created through this repository's own handlers — the paths their
+      // integration suites prove on this system — with `activate: false`;
+      // the group activation below activates them with everything else. A
+      // handler answers `isError` rather than throwing, and that answer is
+      // what decides here: an `isError` is a failure, never a log line.
+      const handlerCtx = { connection, logger: undefined } as any;
+      const answerText = (a: any) =>
+        (a?.content ?? []).map((c: any) => c.text).join('');
+      const existsBySearch = async (name: string, typeCode: string) => {
+        const found = await handleSearchObject(handlerCtx, {
+          object_name: name,
+          maxResults: 10,
+        });
+        return answerText(found)
+          .split(/\r?\n/)
+          .some((line: string) =>
+            line.toUpperCase().startsWith(`${name.toUpperCase()}\t${typeCode}`),
+          );
+      };
+      const viaHandlers: Array<{
+        section: string;
+        label: string;
+        typeCode: string;
+        create: (item: any) => Promise<any[]>;
+        /** Writes the configured source; runs for an existing object too. */
+        update?: (item: any) => Promise<any>;
+      }> = [
+        {
+          section: 'domains',
+          label: 'domain',
+          typeCode: 'DOMA/DD',
+          create: async (item) => [
+            await handleCreateDomain(handlerCtx, {
+              domain_name: item.name,
+              description: item.description || 'Shared test domain',
+              package_name: packageName,
+              datatype: item.datatype || 'CHAR',
+              length: item.length ?? 10,
+              decimals: item.decimals ?? 0,
+              // Active at once: CreateDataElement activates what it creates,
+              // and refuses "No active domain … available" (DO 315) for a
+              // data element whose domain is still inactive.
+              activate: true,
+            } as any),
+          ],
+        },
+        {
+          section: 'data_elements',
+          label: 'data element',
+          typeCode: 'DTEL/DE',
+          create: async (item) => [
+            await handleCreateDataElement(handlerCtx, {
+              data_element_name: item.name,
+              description: item.description || 'Shared test data element',
+              package_name: packageName,
+              type_kind: item.type_kind || 'domain',
+              type_name: item.type_name,
+              data_type: item.data_type,
+              length: item.length,
+              decimals: item.decimals,
+              short_label: item.short_label,
+              medium_label: item.medium_label,
+              long_label: item.long_label,
+              heading_label: item.heading_label,
+            } as any),
+          ],
+        },
+        {
+          section: 'interfaces',
+          label: 'interface',
+          typeCode: 'INTF/OI',
+          create: async (item) => [
+            await handleCreateInterface(handlerCtx, {
+              interface_name: item.name,
+              description: item.description || 'Shared test interface',
+              package_name: packageName,
+            } as any),
+          ],
+          update: (item) =>
+            handleUpdateInterface(handlerCtx, {
+              interface_name: item.name,
+              source_code: item.source,
+              activate: false,
+            } as any),
+        },
+        {
+          section: 'programs',
+          label: 'program',
+          typeCode: 'PROG/P',
+          create: async (item) => [
+            await handleCreateProgram(handlerCtx, {
+              program_name: item.name,
+              description: item.description || 'Shared test program',
+              package_name: packageName,
+            } as any),
+          ],
+          update: (item) =>
+            handleUpdateProgram(handlerCtx, {
+              program_name: item.name,
+              source_code: item.source,
+              activate: false,
+            } as any),
+        },
+        {
+          section: 'metadata_extensions',
+          label: 'metadata extension',
+          typeCode: 'DDLX/EX',
+          create: async (item) => [
+            await handleCreateMetadataExtension(handlerCtx, {
+              name: item.name,
+              description: item.description || 'Shared test metadata extension',
+              package_name: packageName,
+              activate: false,
+            } as any),
+          ],
+          update: (item) =>
+            handleUpdateMetadataExtension(handlerCtx, {
+              name: item.name,
+              source_code: item.source,
+              activate: false,
+            } as any),
+        },
+      ];
+      for (const kind of viaHandlers) {
+        const items: any[] = sharedConfig[kind.section] || [];
+        if (items.length === 0) continue;
+        testsLogger?.info?.(
+          `Creating ${kind.label}s (${items.length}) without activation...`,
+        );
+        for (const item of items) {
+          if (!isTestAvailableForSystem(item.available_in)) {
+            testsLogger?.info?.(
+              `Skipping ${kind.label} ${item.name} (not available for ${loadTestConfig()?.environment?.system_type})`,
+            );
+            continue;
+          }
+          try {
+            if (await existsBySearch(item.name, kind.typeCode)) {
+              testsLogger?.info?.(`${kind.label} ${item.name} already exists`);
+              results.push({
+                type: kind.section,
+                name: item.name,
+                status: 'existed',
+              });
+            } else {
+              for (const answered of await kind.create(item)) {
+                if (answered?.isError) {
+                  throw new Error(answerText(answered).substring(0, 800));
+                }
+              }
+              testsLogger?.info?.(`Created ${kind.label} ${item.name}`);
+              results.push({
+                type: kind.section,
+                name: item.name,
+                status: 'created',
+              });
+            }
+            if (kind.update && item.source) {
+              const updated = await kind.update(item);
+              if (updated?.isError) {
+                throw new Error(
+                  `source not written: ${answerText(updated).substring(0, 800)}`,
+                );
+              }
+              testsLogger?.info?.(`Updated ${kind.label} ${item.name} source`);
+            }
+            toActivate.push({
+              name: item.name.toUpperCase(),
+              type: kind.typeCode,
+            });
+          } catch (error: any) {
+            const msg = error instanceof Error ? error.message : String(error);
+            testsLogger?.error?.(
+              `Failed to create ${kind.label} ${item.name}: ${msg}`,
+            );
+            results.push({
+              type: kind.section,
+              name: item.name,
+              status: `FAILED: ${msg}`,
+            });
           }
         }
       }
@@ -1088,6 +1405,38 @@ describe('Admin: Setup shared dependencies', () => {
               'Fallback activation completed successfully (batched group-activate)',
             );
           }
+        }
+      }
+
+      // 4. Confirm from the system. The activation answer says what the
+      // server stated; only GetInactiveObjects says what is true, and
+      // activation is asynchronous. "Group activation completed
+      // successfully" was logged over four inactive objects on E19.
+      if (toActivate.length > 0) {
+        let inactive: string[] = [];
+        for (let attempt = 1; attempt <= 8; attempt++) {
+          inactive = await stillInactive(
+            { connection, logger: undefined } as any,
+            toActivate,
+          );
+          if (inactive.length === 0) break;
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        if (inactive.length > 0) {
+          testsLogger?.error?.(
+            `Still inactive after activation: ${inactive.join(', ')}`,
+          );
+          for (const name of inactive) {
+            results.push({
+              type: 'activation',
+              name,
+              status: 'FAILED: still inactive after activation',
+            });
+          }
+        } else {
+          testsLogger?.info?.(
+            `Confirmed active: all ${toActivate.length} object(s)`,
+          );
         }
       }
 

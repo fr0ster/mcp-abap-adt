@@ -259,6 +259,10 @@ describe('Package Low-Level Handlers Integration', () => {
                 packageObj.updateMetadata(
                   {
                     packageName: objectName,
+                    // A package on a request is written under that request:
+                    // without it the PUT carries no corrNr and an on-premise
+                    // system refuses it (400, E19 2026-09-25).
+                    ...(transportRequest && { transportRequest }),
                   },
                   {
                     source: patchPackageXml(

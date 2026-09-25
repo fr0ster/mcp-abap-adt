@@ -256,6 +256,18 @@ shared_dependencies:
         }
 
   structures:
+    # Shared structure the high-level check tests read (check_structure_high).
+    - name: "ZMCP_SHR_STRUCT"
+      description: "Shared structure for check tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared structure for check tests'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        define structure zmcp_shr_struct {
+          fld1 : abap.char(10);
+          fld2 : abap.int4;
+        }
+
     # Include structure MUST come first: the base structure embeds it via `include`,
     # so it must already exist and be active before the base is created/activated.
     - name: "ZMCP_SHR_STRU_INC"
@@ -282,6 +294,21 @@ shared_dependencies:
         }
 
   views:
+    # Shared root view the high-level check tests read (check_ddl_high,
+    # check_bdef_high), with its own behaviour definition below.
+    - name: "ZI_MCP_SHR_ROOT"
+      description: "Shared root view for check tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared root view for check tests'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define root view entity ZI_MCP_SHR_ROOT
+          as select from zmcp_shr_rtabl
+        {
+          key fld1 as Fld1,
+          fld2 as Fld2
+        }
+
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared root CDS view entity"
       available_in: ["onprem", "cloud"]
@@ -322,6 +349,7 @@ shared_dependencies:
       source: |
         @EndUserText.label : 'Shared consumption projection'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
+        @Metadata.allowExtensions : true
         define root view entity ZMCP_SHR_C_ROOT
           provider contract transactional_query
           as projection on ZMCP_SHR_I_ROOT
@@ -356,6 +384,26 @@ shared_dependencies:
         }
 
   behavior_definitions:
+    # Behaviour definition of ZI_MCP_SHR_ROOT for check_bdef_high. Managed
+    # without an implementation class: nothing here needs one.
+    - name: "ZI_MCP_SHR_ROOT"
+      description: "Shared BDEF for check tests"
+      available_in: ["onprem", "cloud"]
+      root_entity: "ZI_MCP_SHR_ROOT"
+      implementation_type: "Managed"
+      source: |
+        managed;
+
+        define behavior for ZI_MCP_SHR_ROOT
+        persistent table zmcp_shr_rtabl
+        lock master
+        {
+          create;
+          update;
+          delete;
+          field ( readonly ) Fld1;
+        }
+
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared BDEF for BehaviorDefinition and BehaviorImplementation tests"
       available_in: ["onprem", "cloud"]
@@ -389,6 +437,9 @@ shared_dependencies:
         }
 
   classes:
+    - name: "ZCL_MCP_SHARED_CLS"
+      description: "Shared class for check tests"
+      available_in: ["onprem", "cloud", "legacy"]
     - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
       available_in: ["onprem", "cloud"]
@@ -439,6 +490,59 @@ shared_dependencies:
         define service ZMCP_SHR_SRVD01 {
           expose ZMCP_SHR_C_ROOT as View1;
         }
+
+  # The objects the high-level check tests read (check_*_high, check_existing)
+  # that no other shared section provides.
+  domains:
+    - name: "ZMCP_SHR_DOMAIN"
+      description: "Shared domain for check tests"
+      available_in: ["onprem", "cloud"]
+      datatype: "CHAR"
+      length: 10
+      decimals: 0
+
+  data_elements:
+    - name: "ZMCP_SHR_DTEL"
+      description: "Shared data element for check tests"
+      available_in: ["onprem", "cloud"]
+      type_kind: "domain"
+      type_name: "ZMCP_SHR_DOMAIN"
+      short_label: "Shared"
+      medium_label: "Shared DTEL"
+      long_label: "Shared data element"
+      heading_label: "Shared data element"
+
+  interfaces:
+    - name: "ZIF_MCP_SHARED"
+      description: "Shared interface for check tests"
+      available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        INTERFACE zif_mcp_shared PUBLIC.
+          METHODS get_value RETURNING VALUE(rv_value) TYPE string.
+        ENDINTERFACE.
+
+  programs:
+    - name: "ZMCP_SHR_PROG"
+      description: "Shared program for check tests"
+      available_in: ["onprem", "legacy"]
+      source: |
+        REPORT zmcp_shr_prog.
+        WRITE / 'shared'.
+
+  # Layer #CUSTOMER, so it never collides with a test's own #CORE extension of
+  # the same entity (create_metadata_extension).
+  metadata_extensions:
+    - name: "ZC_MCP_SHR_DDLX"
+      description: "Shared metadata extension for check tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @Metadata.layer: #CUSTOMER
+        annotate entity ZMCP_SHR_C_ROOT with
+        {
+          @EndUserText.label: 'Shared field 1'
+          Fld1;
+        }
+
 
 # Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
@@ -1871,7 +1975,7 @@ search_source_readonly:
       params:
         # Package scanned by the test. Should match shared_dependencies.package so
         # the seeded objects (Z_MCP_BLD_SHR_FM etc.) are inside it.
-        scan_package: "ZADT_BLD_PKG03"
+        scan_package: "ZMCP_SHARED"   # must equal shared_dependencies.package
         # Substring known to be present in shared FM source ("Echo:" appears in Z_MCP_BLD_SHR_FM).
         known_query: "Echo:"
         # Second AND-substring known to co-occur with known_query on the same line.

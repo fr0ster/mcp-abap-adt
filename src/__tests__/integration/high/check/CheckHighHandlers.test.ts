@@ -56,32 +56,6 @@ function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
 }
 
 /**
- * Assert a check that ran and had something to say.
- *
- * **A check tool's findings are its answer.** This used to require
- * `isError: true`, because the handlers carried the shipped `analyseCheck`,
- * which reads a `chkrun:checkMessage` of type `E` as a refusal. That turned a
- * check doing its job into a call that failed — a regression against the
- * pre-migration handlers, which answered `return_response` every time with
- * `success` inside and the findings beside it. The handlers carry
- * `analyseException` now: what genuinely failed refuses, what was found is
- * reported.
- */
-function assertCheckFindings(
-  response: { isError: boolean; content: Array<{ text: string }> },
-  expected: RegExp,
-): any {
-  expect(response.isError).toBe(false);
-  const data = JSON.parse(response.content[0].text);
-  expect(data.ran).toBe(true);
-  expect(data.messages?.length).toBeGreaterThan(0);
-  expect(data.messages.map((m: { text: string }) => m.text).join('; ')).toMatch(
-    expected,
-  );
-  return data;
-}
-
-/**
  * Assert a check that never ran, and said why.
  *
  * `status="notProcessed"` with the reason in `statusText`. A check that did
@@ -790,21 +764,22 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          // The check runs — `status="processed"`, `statusText="Object
-          // SAPLZMCP_BLD_SHR_FGR ... has been checked"` — and reports one
-          // error against the group's main source:
-          // `MESSAGE(G46)`, "The REPORT/PROGRAM statement is missing, or the
-          // program type is INCLUDE." A function group's main program IS an
-          // include, so this is what SAP says about a function group, not
-          // about this one being broken (measured 2026-09-16).
-          //
-          // Which is the whole point: a check that ran and found something
-          // is a check that worked. The finding is the answer, and this
-          // asserts it is reported rather than raised.
-          const data = assertCheckFindings(response, /REPORT\/PROGRAM/i);
+          // An active, healthy function group checks clean. This used to
+          // demand `MESSAGE(G46)` — "The REPORT/PROGRAM statement is missing,
+          // or the program type is INCLUDE." — as what SAP says about any
+          // function group (measured 2026-09-16). It is what SAP says about a
+          // group that was never activated, whose main program has not been
+          // generated yet: once the shared group was activated (E19,
+          // 2026-09-25) the same check answered no message at all, and the
+          // test failed on a correct answer. A shared object is active by
+          // definition, so this asserts the answer's shape, as CheckTable
+          // does, and not a finding the shared object must not have.
+          expect(response.isError).toBe(false);
+          const data = parseHandlerResponse(response);
+          assertNormalizedCheckResponse(data, objectName);
 
           logger?.success(
-            `✅ check: ${objectName} — ${data.status_text} (${data.messages.length} message(s))`,
+            `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
           );
         });
       },

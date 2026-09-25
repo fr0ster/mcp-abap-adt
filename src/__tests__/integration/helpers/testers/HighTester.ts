@@ -73,13 +73,6 @@ export class HighTester extends LambdaTester {
 
         logger?.info?.(`   • cleanup: delete ${objectName}`);
         try {
-          // Force-release DDIC lock if object is locked
-          try {
-            await this.forceReleaseLock(connection, objectName, logger);
-          } catch {
-            // Ignore — object may not exist or check not applicable
-          }
-
           if (isHardModeEnabled()) {
             const entity = resolveEntityFromHandlerName(
               (this as any).handlerName || '',
@@ -205,17 +198,6 @@ export class HighTester extends LambdaTester {
 
       // High handlers manage locks internally — if handler crashed mid-operation,
       // force-release DDIC lock so cleanup can delete the object
-      try {
-        if (this.context.objectName && this.context.connection) {
-          await this.forceReleaseLock(
-            this.context.connection,
-            this.context.objectName,
-            this.context.logger,
-          );
-        }
-      } catch {
-        // Ignore — best effort
-      }
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
@@ -271,18 +253,6 @@ export class HighTester extends LambdaTester {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
         this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
         return;
-      }
-
-      try {
-        if (this.context.objectName && this.context.connection) {
-          await this.forceReleaseLock(
-            this.context.connection,
-            this.context.objectName,
-            this.context.logger,
-          );
-        }
-      } catch {
-        // Ignore — best effort
       }
 
       this.context.logger?.error(`❌ Test failed: ${error.message}`);

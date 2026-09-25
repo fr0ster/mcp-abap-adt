@@ -1,8 +1,17 @@
 /**
  * Combined integration tests for BehaviorDefinition + BehaviorImplementation Low-Level Handlers
  *
+ * **Every object here belongs to this suite.** The root and child view
+ * entities, the behavior definition and the implementation class are created
+ * under `ZMCP_BLD_I_*` and deleted in cleanup; the tables underneath are shared
+ * and only read from. A BDEF has to carry its root entity's name, so defining
+ * one over a shared entity would mean creating and deleting an object under a
+ * `ZMCP_SHR_*` name — which is how one run left an ENQUEUE lock on
+ * `ZMCP_SHR_I_BDFL` that nothing in ADT could release.
+ *
  * BDEF must exist before BIMPL can be created, so both are tested in a single
  * test with guaranteed ordering:
+ *   0. Views:  Validate names -> Create both -> write sources -> activate both
  *   1. BDEF:  Validate -> Create -> Lock -> Update -> Unlock (no activate yet)
  *   2. BIMPL: Validate -> CreateClass -> CheckClass -> LockBimpl -> Update(AdtClient) -> UnlockClass
  *   3. Group-activate BDEF + BIMPL class together (avoids activation warnings)
@@ -31,6 +40,13 @@ import { handleActivateObject } from '../../../../handlers/common/low/handleActi
 import { createAdtClient } from '../../../../lib/clients';
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import {
+  activateAndConfirm,
+  assertNameAvailable,
+  createView,
+  deleteView,
+  type ViewFixture,
+} from '../../helpers/rapFixtures';
 import { ensureSharedObjects } from '../../helpers/sharedObjects';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
@@ -57,9 +73,19 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
       async (context: LambdaTesterContext) => {
         await ensureSharedObjects(context.connection);
       },
-      // Cleanup lambda: delete BIMPL class first, then BDEF
+      // Cleanup lambda: delete BIMPL class first, then BDEF.
+      //
+      // **A refusal here is reported, not swallowed.** Both deletes used to log
+      // a warning and return, so `LambdaTester` — which decides by whether this
+      // lambda threw — ended a refused delete with
+      // `✅ Cleanup completed successfully`. That is how an object left locked
+      // and undeleted read as a clean run. Everything is still attempted; the
+      // refusals are collected and thrown at the end, which makes
+      // `LambdaTester` say `Object left in SAP system` and leaves the suite's
+      // own verdict alone.
       async (context: LambdaTesterContext) => {
         const { connection, objectName, transportRequest } = context;
+        const leftBehind: string[] = [];
 
         const bimplTestCase = getEnabledTestCase(
           'create_behavior_implementation_low',
@@ -95,7 +121,8 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
           } catch (e: any) {
             const msg = e?.message || String(e);
             if (!msg.includes('not found') && !msg.includes('404')) {
-              testLogger?.warn?.(`Failed to delete BIMPL class: ${msg}`);
+              testLogger?.error?.(`Failed to delete BIMPL class: ${msg}`);
+              leftBehind.push(`BIMPL class ${bimplClassName}: ${msg}`);
             }
           }
         }
@@ -125,19 +152,51 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
               },
             );
             if (deleteResponse.isError) {
-              testLogger?.warn?.(
-                `Delete BDEF returned error: ${JSON.stringify(deleteResponse.content)?.substring(0, 300)}`,
+              const detail = JSON.stringify(deleteResponse.content)?.substring(
+                0,
+                300,
               );
+              // A BDEF the run never got as far as creating is not a leftover.
+              if (/does not exist|not found|404/i.test(detail)) {
+                testLogger?.info?.(`BDEF ${objectName} was not there`);
+              } else {
+                testLogger?.error?.(`Delete BDEF returned error: ${detail}`);
+                leftBehind.push(`BDEF ${objectName}: ${detail}`);
+              }
             } else {
               testLogger?.info?.(`Deleted BDEF ${objectName}`);
             }
           } catch (e: any) {
             const msg = e?.message || String(e);
-            testLogger?.warn?.(`Delete BDEF exception: ${msg}`);
+            testLogger?.error?.(`Delete BDEF exception: ${msg}`);
+            leftBehind.push(`BDEF ${objectName}: ${msg}`);
           }
 
           // Wait after delete — SAP needs time to finalize deletion in transport
           await delay(context.getOperationDelay('delete') || 5000);
+        }
+
+        // 3. Delete the view this suite created.
+        const cleanupParams = context.params ?? {};
+        if (cleanupParams.root_view_name) {
+          leftBehind.push(
+            ...(await deleteView(
+              createHandlerContext({ connection, logger: testLogger }),
+              {
+                name: cleanupParams.root_view_name,
+                description: `Root view for ${objectName}`,
+                source: cleanupParams.root_view_source,
+              },
+              transportRequest,
+              testLogger,
+            )),
+          );
+        }
+
+        if (leftBehind.length > 0) {
+          throw new Error(
+            `cleanup did not remove ${leftBehind.length} object(s): ${leftBehind.join('; ')}`,
+          );
         }
       },
     );
@@ -175,6 +234,23 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         });
 
         // ═══════════════════════════════════════════════════════════
+        // Part 0: the views this BDEF is defined over — ours, not shared
+        // ═══════════════════════════════════════════════════════════
+
+        const rootView: ViewFixture = {
+          name: params.root_view_name,
+          description: `Root view for ${objectName}`,
+          source: params.root_view_source,
+        };
+        await createView(
+          handlerCtx,
+          rootView,
+          packageName,
+          transportRequest,
+          testLogger,
+        );
+
+        // ═══════════════════════════════════════════════════════════
         // Part 1: BDEF — Validate → Create → Lock → Update → Unlock
         // ═══════════════════════════════════════════════════════════
 
@@ -203,7 +279,16 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             `Validate BDEF failed: ${extractErrorMessage(validateBdefResponse)}`,
           );
         }
-        testLogger?.info?.(`   + BDEF validated`);
+        // **Answering is not the same as being free.** `terseValidation` reports
+        // `admissible: false` with the server's reason when the name is taken,
+        // and this used to be read as a pass: the run went on to a create that
+        // was refused three steps later, where the message reads like something
+        // else entirely.
+        await assertNameAvailable(
+          `BDEF ${objectName}`,
+          async () => validateBdefResponse,
+        );
+        testLogger?.info?.(`   + BDEF validated, and the name is free`);
 
         // Create BDEF
         testLogger?.info?.(`   * create BDEF: ${objectName}`);
@@ -262,11 +347,27 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         }
         const bdefLockData = parseHandlerResponse(bdefLockResponse);
         const bdefLockHandle = extractLockHandle(bdefLockData);
+        // **The session id is half of the lock.** `UnlockBehaviorDefinitionLow`
+        // declares `session_id` required and refuses an empty one, and the ADT
+        // lock is bound to the ABAP session that took it — a handle alone
+        // cannot release it. This test used to pass `session_id: ''`, so every
+        // run left an ENQUEUE lock on the object and the next run of this same
+        // suite was refused with `403 ExceptionResourceNoAccess`, *"User … is
+        // currently editing …"*. Measured on BTP ABAP 2026-09-24.
+        const bdefSessionId = String(
+          (bdefLockData as { session_id?: unknown })?.session_id ?? '',
+        );
+        if (!bdefSessionId) {
+          throw new Error(
+            'Lock BDEF answered no session_id, so the lock it took cannot be released — unlock requires it. Refusing to write under a lock this test would then orphan.',
+          );
+        }
         testLogger?.info?.(`   + BDEF locked`);
 
         await delay(context.getOperationDelay('lock'));
 
         // Update + Unlock BDEF (guarantee unlock even if update fails)
+        let bdefUnlockFailure: string | undefined;
         try {
           testLogger?.info?.(`   * update BDEF: ${objectName}`);
           const updateBdefResponse = await tester.invokeToolOrHandler(
@@ -301,30 +402,57 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
               {
                 name: objectName,
                 lock_handle: bdefLockHandle,
-                session_id: '',
+                session_id: bdefSessionId,
               },
               async () =>
                 handleUnlockBehaviorDefinition(handlerCtx, {
                   name: objectName,
                   lock_handle: bdefLockHandle,
-                  session_id: '',
+                  session_id: bdefSessionId,
                 }),
             );
             if (unlockResponse.isError) {
-              testLogger?.warn?.(
-                `Unlock BDEF failed: ${extractErrorMessage(unlockResponse)}`,
+              bdefUnlockFailure = extractErrorMessage(unlockResponse);
+              testLogger?.error?.(
+                `Unlock BDEF failed: ${bdefUnlockFailure}. The lock is still held.`,
               );
             } else {
               testLogger?.info?.(`   + BDEF unlocked`);
             }
           } catch (unlockError: any) {
-            testLogger?.warn?.(
-              `Unlock BDEF exception: ${unlockError?.message}`,
+            bdefUnlockFailure = unlockError?.message || String(unlockError);
+            testLogger?.error?.(
+              `Unlock BDEF exception: ${bdefUnlockFailure}. The lock is still held.`,
             );
           }
         }
 
+        // **A lock this test fails to release has to fail this test.** It was a
+        // warning, and a warning is invisible to a green run: the suite passed
+        // and the NEXT run of it was refused at the lock. The throw goes after
+        // the `finally` on purpose, so a failed update keeps its own error and
+        // this one only speaks when the write itself went through.
+        if (bdefUnlockFailure) {
+          throw new Error(
+            `BDEF ${objectName} was left locked: ${bdefUnlockFailure}`,
+          );
+        }
+
         await delay(context.getOperationDelay('unlock'));
+
+        // **The BDEF is activated here, before the class exists.** The BIMPL
+        // validation below asks ADT to generate against the behavior definition
+        // and refuses while there is no active version of it — measured:
+        // `400 BehaviorImplementationGenerationError`, *"An active version of
+        // Behavior Definition … does not exist"*. The suite used to leave the
+        // activation to the end and treat that refusal as a reason to `return`,
+        // so every run stopped after Part 1 and still reported success.
+        testLogger?.info?.(`   * activate BDEF: ${objectName}`);
+        await activateAndConfirm(
+          handlerCtx,
+          [{ name: objectName, type: 'BDEF/BDO' }],
+          testLogger,
+        );
 
         // ═══════════════════════════════════════════════════════════════
         // Part 2: BIMPL — Validate → Create → Check → Lock → Update → Unlock
@@ -367,14 +495,20 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             }),
         );
 
+        // **No silent skip.** This used to log the refusal and `return`, which
+        // ended the test after Part 1 with a pass — the BIMPL half and the group
+        // activation never ran, and nothing said so. If the validation refuses,
+        // the suite has nothing to stand on and says it.
         if (validateResponse.isError) {
-          const errorMsg = extractErrorMessage(validateResponse);
-          testLogger?.info?.(
-            `Validation error for ${className}: ${errorMsg}, skipping BIMPL`,
+          throw new Error(
+            `Validate BIMPL ${className} failed: ${extractErrorMessage(validateResponse)}`,
           );
-          return;
         }
-        testLogger?.info?.(`   + BIMPL validated`);
+        await assertNameAvailable(
+          `BIMPL class ${className}`,
+          async () => validateResponse,
+        );
+        testLogger?.info?.(`   + BIMPL validated, and the name is free`);
 
         // Create class
         testLogger?.info?.(`   * create class: ${className}`);
@@ -445,6 +579,7 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         }
         const lockData = parseHandlerResponse(lockResponse);
         const lockHandle = extractLockHandle(lockData);
+        let classUnlockFailure: string | undefined;
         testLogger?.info?.(`   + BIMPL locked`);
 
         await delay(context.getOperationDelay('lock'));
@@ -491,15 +626,27 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
                 }),
             );
             if (unlockResponse.isError) {
-              testLogger?.warn?.(
-                `Unlock failed: ${extractErrorMessage(unlockResponse)}`,
+              classUnlockFailure = extractErrorMessage(unlockResponse);
+              testLogger?.error?.(
+                `Unlock failed: ${classUnlockFailure}. The lock is still held.`,
               );
             } else {
               testLogger?.info?.(`   + class unlocked`);
             }
           } catch (unlockError: any) {
-            testLogger?.warn?.(`Unlock exception: ${unlockError?.message}`);
+            classUnlockFailure = unlockError?.message || String(unlockError);
+            testLogger?.error?.(
+              `Unlock exception: ${classUnlockFailure}. The lock is still held.`,
+            );
           }
+        }
+
+        // Same reason as the BDEF above: a lock left behind poisons the next run
+        // of this suite, and a warning does not say so.
+        if (classUnlockFailure) {
+          throw new Error(
+            `BIMPL class ${className} was left locked: ${classUnlockFailure}`,
+          );
         }
 
         await delay(context.getOperationDelay('unlock'));
@@ -508,24 +655,22 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
         // Part 3: Group-activate BDEF + BIMPL class together
         // ═══════════════════════════════════════════════════════════
 
+        // **The answer is not the outcome, and this step used to accept it as
+        // one.** For several objects the activation answers an
+        // `ioc:inactiveObjects` list rather than a verdict, so `isError: false`
+        // says nothing about either object having activated — and activation is
+        // asynchronous besides, so even a stated success can be ahead of the
+        // system. `activateAndConfirm` refuses an answer carrying error messages
+        // and then reads `GetInactiveObjects` until neither object is listed.
         testLogger?.info?.(`   * group activate: ${objectName} + ${className}`);
-        await tester.invokeToolOrHandler(
-          'ActivateObjectLow',
-          {
-            objects: [
-              { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-              { name: className.toUpperCase(), type: 'CLAS/OC' },
-            ],
-          },
-          async () =>
-            handleActivateObject(handlerCtx, {
-              objects: [
-                { name: objectName.toUpperCase(), type: 'BDEF/BDO' },
-                { name: className.toUpperCase(), type: 'CLAS/OC' },
-              ],
-            }),
+        await activateAndConfirm(
+          handlerCtx,
+          [
+            { name: objectName, type: 'BDEF/BDO' },
+            { name: className, type: 'CLAS/OC' },
+          ],
+          testLogger,
         );
-        testLogger?.info?.(`   + group activation completed`);
 
         testLogger?.info?.('Full BDEF+BIMPL low-level workflow completed');
       });

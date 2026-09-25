@@ -13,6 +13,7 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { resolveSystemContext } from '../../../../lib/systemContext';
 import {
   getCleanupAfter,
+  getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
   getSystemType,
@@ -53,6 +54,12 @@ export class LambdaTester {
   protected testParams: any = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
+  /**
+   * Set when the test body threw (a skip does not count). `cleanupAfter`
+   * reads it: a failed test keeps its objects for analysis — see
+   * `getCleanupAfterRun`.
+   */
+  protected testFailed = false;
   protected hardModeMcp: {
     client: any;
     toolNames: Set<string>;
@@ -376,9 +383,16 @@ export class LambdaTester {
       return;
     }
 
-    // Check YAML parameters first (global skip_cleanup, test case skip_cleanup, cleanup_after flags)
-    const shouldCleanup = getCleanupAfter(this.testCase);
-    if (!shouldCleanup) {
+    // A failed test keeps what it created, so the objects themselves can say
+    // why it failed. Every lock was already released by the test's own
+    // finally/unlock steps; only the delete is withheld.
+    if (!getCleanupAfterRun(this.testCase, this.testFailed)) {
+      if (this.testFailed) {
+        this.context.logger?.warn?.(
+          '🔎 Test failed — cleanup skipped, its objects are kept for analysis. Delete them once analysed, or set test_settings.cleanup_on_failure: true to have them deleted anyway.',
+        );
+        return;
+      }
       this.context.logger?.info?.(
         'ℹ️ Cleanup skipped: disabled in YAML config (skip_cleanup=true or cleanup_after=false)',
       );
@@ -598,6 +612,7 @@ export class LambdaTester {
       );
     }
 
+    this.testFailed = false;
     try {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers
@@ -610,9 +625,10 @@ export class LambdaTester {
         return; // Don't throw, just skip the test
       }
 
+      this.testFailed = true;
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
-      // Note: Cleanup will still run via afterEach() hook, which Jest guarantees to execute
-      // even when test fails. This ensures cleanup runs regardless of test outcome.
+      // afterEach() still runs, and cleanupAfter() sees testFailed: the
+      // objects stay for analysis, and nothing but the delete is skipped.
       throw error;
     }
   }

@@ -46,6 +46,9 @@ test_settings:
   retry_on_failure: false
   max_retries: 1
   cleanup_after_test: false
+  # A failed test keeps the objects it created, so their state can say why it
+  # failed; locks are released either way. true deletes them regardless.
+  cleanup_on_failure: false
   # Timeouts for different operations (in milliseconds)
   timeouts:
     default: 120000

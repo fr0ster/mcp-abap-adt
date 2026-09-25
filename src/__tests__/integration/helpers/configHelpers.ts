@@ -590,6 +590,27 @@ export function getCleanupAfter(testCase?: any): boolean {
 }
 
 /**
+ * Whether to delete what a test created, now that it has run.
+ *
+ * **A failed test keeps its objects.** Deleting them takes away the one thing
+ * that says why it failed — the object's own state, source and activation log
+ * — and leaves only the message. So after a failure nothing is deleted unless
+ * `test_settings.cleanup_on_failure: true` asks for it; the next run's
+ * pre-cleanup removes what is left. Locks are another matter: a test releases
+ * every lock it took whether it passed or failed, and that release never
+ * depends on this answer.
+ *
+ * @param testCase - Test case object, as for {@link getCleanupAfter}
+ * @param failed - Whether the test that just ran failed
+ */
+export function getCleanupAfterRun(testCase: any, failed: boolean): boolean {
+  if (failed && loadTestConfig().test_settings?.cleanup_on_failure !== true) {
+    return false;
+  }
+  return getCleanupAfter(testCase);
+}
+
+/**
  * Check if current connection is cloud (JWT auth) or on-premise (basic auth).
  * Programs/FunctionGroups are not available on cloud, so tests should be skipped.
  *

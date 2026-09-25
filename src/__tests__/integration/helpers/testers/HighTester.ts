@@ -142,6 +142,7 @@ export class HighTester extends LambdaTester {
       throw new Error('Workflow functions not provided');
     }
 
+    this.testFailed = false;
     if (isHardModeEnabled()) {
       await this.runInHardMode();
       return;
@@ -199,6 +200,7 @@ export class HighTester extends LambdaTester {
       // High handlers manage locks internally — if handler crashed mid-operation,
       // force-release DDIC lock so cleanup can delete the object
 
+      this.testFailed = true;
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
     }
@@ -255,6 +257,7 @@ export class HighTester extends LambdaTester {
         return;
       }
 
+      this.testFailed = true;
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
     }

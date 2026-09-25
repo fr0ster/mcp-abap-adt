@@ -154,6 +154,7 @@ export class LowTester extends LambdaTester {
       throw new Error('Workflow functions not provided');
     }
 
+    this.testFailed = false;
     if (isHardModeEnabled()) {
       await this.runInHardMode();
       return;
@@ -249,6 +250,7 @@ export class LowTester extends LambdaTester {
         return;
       }
 
+      this.testFailed = true;
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
     }
@@ -389,6 +391,7 @@ export class LowTester extends LambdaTester {
         return;
       }
 
+      this.testFailed = true;
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
       throw error;
     }

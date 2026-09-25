@@ -23,6 +23,7 @@ import { handleUpdateFunctionInclude } from '../../../../handlers/function_inclu
 import { handleReadFunctionInclude } from '../../../../handlers/function_include/readonly/handleReadFunctionInclude';
 import {
   getCleanupAfter,
+  getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
   getSystemType,
@@ -142,6 +143,7 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
 
       let created = false;
 
+      let passed = false;
       try {
         // Step 1: CreateFunctionInclude
         testLogger?.info(
@@ -271,9 +273,11 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
           );
         }
         testLogger?.info(`✅ Read-back: Verified include ${includeName}`);
+        passed = true;
       } finally {
         // Step 4: DeleteFunctionInclude (cleanup)
-        const shouldCleanup = getCleanupAfter(testCase);
+        // A failed run keeps its objects for analysis (getCleanupAfterRun).
+        const shouldCleanup = getCleanupAfterRun(testCase, !passed);
         if (created && shouldCleanup) {
           try {
             await delay(2000);

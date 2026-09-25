@@ -395,32 +395,6 @@ export class LambdaTester {
       );
     }
 
-    // **Release the lock before trying to delete anything.** A suite that
-    // created an object and then failed before its unlock leaves a real SAP
-    // ENQUEUE lock behind — EU510, *"is currently being edited"* — and every
-    // later run of that suite is refused at its own lock, while the delete in
-    // this cleanup is refused with *"You are already editing"*. The whole
-    // mechanism for this was already here, `forceReleaseLock` below, written
-    // for exactly this and called from nowhere: measured 2026-09-24, zero
-    // callers in the repository. One run of the BDEF suite was enough to lock
-    // `ZMCP_SHR_I_BDFL` out for every run after it.
-    //
-    // Never throws: cleanup tidying up must not replace the failure that
-    // brought us here.
-    if (this.context.objectName) {
-      try {
-        await this.forceReleaseLock(
-          this.context.connection,
-          this.context.objectName,
-          this.context.logger,
-        );
-      } catch (error: any) {
-        this.context.logger?.warn?.(
-          `could not release a lock on ${this.context.objectName}: ${error?.message || String(error)}`,
-        );
-      }
-    }
-
     // Execute cleanup lambda (errors are caught and logged, but don't fail the cleanup process)
     // TODO: Legacy systems may report a delete error (false negative) even though the object
     // is actually deleted successfully. Do not treat cleanup errors on legacy as real failures.
@@ -707,89 +681,20 @@ export class LambdaTester {
   }
 
   /**
-   * Resolve ADT URI for an object based on handler name.
-   */
-  protected resolveObjectUri(objectName: string): string | null {
-    const name = encodeURIComponent(objectName.toLowerCase());
-    const handlerName = this.handlerName || '';
-    if (handlerName.includes('table')) return `/sap/bc/adt/ddic/tables/${name}`;
-    if (handlerName.includes('ddl') || handlerName.includes('view'))
-      return `/sap/bc/adt/ddic/ddl/sources/${name}`;
-    if (handlerName.includes('structure'))
-      return `/sap/bc/adt/ddic/structures/${name}`;
-    if (handlerName.includes('data_element'))
-      return `/sap/bc/adt/ddic/dataelements/${name}`;
-    if (handlerName.includes('domain'))
-      return `/sap/bc/adt/ddic/domains/${name}`;
-    if (handlerName.includes('metadata_extension'))
-      return `/sap/bc/adt/ddic/ddlx/sources/${name}`;
-    if (handlerName.includes('interface'))
-      return `/sap/bc/adt/oo/interfaces/${name}`;
-    if (handlerName.includes('class')) return `/sap/bc/adt/oo/classes/${name}`;
-    if (handlerName.includes('behavior_definition'))
-      return `/sap/bc/adt/bo/behaviordefinitions/${name}`;
-    if (handlerName.includes('service_definition'))
-      return `/sap/bc/adt/ddic/srvd/sources/${name}`;
-    return null;
-  }
-
-  /**
-   * Force-release a DDIC lock on an object if one is held.
-   * `/sap/bc/adt/deletion/check` detects it; `ddic/ddlock/locks` drops it.
+   * **No ADT endpoint is addressed from this repository.** What used to sit
+   * here — `resolveObjectUri` and `forceReleaseLock`, a `deletion/check` and a
+   * `ddic/ddlock/locks` built by hand — is gone: every endpoint belongs to
+   * `@mcp-abap-adt/adt-clients`, and a test helper reaching past it addresses a
+   * URL nobody else maintains. It had no callers for as long as it existed, and
+   * measured on BTP ABAP on 2026-09-24 the release half could not have worked:
+   * `/sap/bc/adt/ddic/ddlock/locks` answers `404 — Resource does not exist`
+   * there.
    *
-   * **Detection works; the release does not, at least not here.** Measured
-   * against BTP ABAP on 2026-09-24 with a behavior definition left locked by an
-   * earlier run: `deletion/check` answered `isDeletable="false"` with
-   * `<del:lockUser>` naming the holder, and `ddic/ddlock/locks` answered
-   * **404 — `Resource /sap/bc/adt/ddic/ddlock/locks does not exist`**. The
-   * endpoint is absent from that system altogether, not merely unsuitable for a
-   * BDEF. It is left wired because it costs one request and on-premise systems
-   * do serve it; it is not something a suite may rely on.
-   *
-   * Nothing else releases such a lock from outside its session either — all
-   * measured the same day, and `scripts/probe-object-lock.ts` is what measures
-   * it: a stateful `?_action=LOCK&accessMode=MODIFY` answers `403` EU510, the
-   * same with `&force=true` answers `403` unchanged, and `?_action=UNLOCK`
-   * without a handle answers `200` with an empty body and leaves the lock
-   * exactly where it was. So the protection that works is not orphaning the
-   * lock in the first place, which is why a suite's unlock must fail the suite
-   * rather than warn.
+   * Asking whether an object is locked is a member — `checkDeletion` on the
+   * object's own accessor, which answers `isDeletable` with the holder in
+   * `lockUser`. Releasing another session's lock is not a member, and not
+   * something ADT offers us: the protection that works is a suite never
+   * orphaning its lock, which is what the unlock discipline in these suites is
+   * for.
    */
-  protected async forceReleaseLock(
-    connection: any,
-    objectName: string,
-    logger?: any,
-  ): Promise<void> {
-    const objectUri = this.resolveObjectUri(objectName);
-    if (!objectUri) return;
-
-    const checkResponse = await connection.makeAdtRequest({
-      url: '/sap/bc/adt/deletion/check',
-      method: 'POST',
-      timeout: 30000,
-      data: `<?xml version="1.0" encoding="UTF-8"?><del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core"><del:object adtcore:uri="${objectUri}"/></del:checkRequest>`,
-      headers: {
-        Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
-        'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
-      },
-    });
-    const responseText =
-      typeof checkResponse.data === 'string' ? checkResponse.data : '';
-    const isLocked =
-      responseText.includes('isDeletable="false"') &&
-      responseText.includes('lockUser');
-    if (isLocked) {
-      logger?.debug?.(
-        `🔒 Object ${objectName} is locked, releasing DDIC lock...`,
-      );
-      await connection.makeAdtRequest({
-        url: `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeURIComponent(objectName)}`,
-        method: 'POST',
-        timeout: 30000,
-        data: '',
-        headers: {},
-      });
-      logger?.debug?.(`🔓 Released DDIC lock for ${objectName}`);
-    }
-  }
 }

@@ -83,13 +83,6 @@ export class LowTester extends LambdaTester {
         if (!objectName) return;
 
         try {
-          // Step 1: Force-release DDIC lock if object is locked
-          try {
-            await this.forceReleaseLock(connection, objectName, logger);
-          } catch {
-            // Ignore — object may not exist or check not applicable
-          }
-
           // Step 2: Delete the object
           if (isHardModeEnabled()) {
             const entity = resolveEntityFromHandlerName(
@@ -342,20 +335,17 @@ export class LowTester extends LambdaTester {
             );
             logger?.info(`🔓 Unlocked ${this.context.objectName}`);
           } catch (unlockError: any) {
-            logger?.warn?.(
-              `⚠️ Unlock failed, forcing DDIC lock release: ${unlockError.message}`,
+            // **Nothing here can release it, and pretending otherwise was the
+            // problem.** Releasing a lock this session no longer holds needs an
+            // ADT endpoint, and endpoints belong to
+            // `@mcp-abap-adt/adt-clients`; the call that used to stand here
+            // built one by hand, and on BTP ABAP that URL does not even exist.
+            // So this says plainly what is true: the object stays locked, and
+            // the next run of this suite will be refused at its own lock until
+            // the session holding it is gone.
+            logger?.error?.(
+              `⚠️ Unlock failed for ${this.context.objectName}: ${unlockError.message}. The object stays LOCKED — nothing here can release a lock this session does not hold.`,
             );
-            try {
-              await this.forceReleaseLock(
-                this.context.connection,
-                this.context.objectName!,
-                logger,
-              );
-            } catch {
-              logger?.error?.(
-                `Force lock release also failed for ${this.context.objectName}`,
-              );
-            }
           }
         }
       } else {
@@ -420,20 +410,13 @@ export class LowTester extends LambdaTester {
       await this.workflowFunctions.unlock(handlerContext, unlockArgs);
       logger?.info(`🔓 Unlocked ${context.objectName}`);
     } catch (unlockError: any) {
-      logger?.warn?.(
-        `⚠️ Unlock failed, forcing DDIC lock release: ${unlockError.message}`,
+      // See the note on the other unlock path: a lock this session does not
+      // hold cannot be released from here, and saying so is more use than a
+      // hand-built request to an endpoint this repository has no business
+      // addressing.
+      logger?.error?.(
+        `⚠️ Unlock failed for ${context.objectName}: ${unlockError.message}. The object stays LOCKED.`,
       );
-      try {
-        await this.forceReleaseLock(
-          context.connection,
-          context.objectName!,
-          logger,
-        );
-      } catch {
-        logger?.error?.(
-          `Force lock release also failed for ${context.objectName}`,
-        );
-      }
     }
   }
 

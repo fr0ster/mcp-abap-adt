@@ -317,6 +317,60 @@ describe('CreateTransportTask', () => {
     expect(answered.task_type).toBe('S');
   });
 
+  /**
+   * A refused typing has to survive `detail`, and in the terse fields alone it
+   * did not: `project()` calls the terse projection for `terse` only, so at
+   * `full` the answer was the parsed creation document and at `raw` the
+   * document itself — a task left Unclassified read as a clean creation in
+   * both, and the next `AddTransportObject` onto it is refused with TK127.
+   */
+  it('says the task is still Unclassified at every detail, not only terse', async () => {
+    const refused = () =>
+      fakeClientOf({
+        createTask: () =>
+          okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+        changeTaskType: () =>
+          refusedResponse(
+            'You can only change the type of tasks in workbench requests',
+          ),
+      });
+
+    fakeClient = refused();
+    const terse = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+      }),
+    );
+    expect(terse.task_type).toBe('X');
+    expect(terse.task_type_error).toContain('workbench requests');
+    expect(terse.cleanup.message).toContain('TK127');
+
+    fakeClient = refused();
+    const full = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        detail: 'full',
+      }),
+    );
+    expect(full.cleanup.message).toContain('still Unclassified');
+    expect(full.cleanup.message).toContain('workbench requests');
+
+    fakeClient = refused();
+    const raw = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        detail: 'raw',
+      }),
+    );
+    // A raw answer is a string, so `answer()` gives it somewhere to put the
+    // note: `{ result, cleanup }`.
+    expect(raw.cleanup.message).toContain('still Unclassified');
+    expect(raw.result).toBeDefined();
+  });
+
   it('types the task as asked, and leaves it alone when asked for X', async () => {
     const typed: unknown[][] = [];
     fakeClient = fakeClientOf({

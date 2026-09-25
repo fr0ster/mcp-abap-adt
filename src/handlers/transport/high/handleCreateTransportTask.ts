@@ -165,6 +165,29 @@ export async function handleCreateTransportTask(
         typed = changed.ok
           ? { type: taskType }
           : { type: 'X', error: changed.getError().message };
+        if (!changed.ok) {
+          // **The refusal has to survive `detail`, and in the terse fields it
+          // did not.** `project()` calls the terse projection for `terse` only:
+          // at `full` it answers the parsed document and at `raw` the document
+          // itself, so a task left Unclassified looked like a clean creation in
+          // both — and the next `AddTransportObject` onto it is refused with
+          // TK127. `answer()` attaches a `cleanup` carrier to whatever the
+          // projection produced, in every mode, a raw string included (it
+          // becomes `{ result, cleanup }`). That is the channel `withLock`
+          // already uses for a release that failed after a write that landed:
+          // the call succeeded, and something the caller must act on did not.
+          const failure = changed.getError();
+          const result = created.ok ? created.getResult() : undefined;
+          return {
+            ok: created.ok,
+            getResult: () => result,
+            getError: () => failure,
+            cleanup: {
+              message: `the task was created but changetasktype to ${taskType} was refused, so it is still Unclassified and AddTransportObject onto it will be refused (TK127): ${failure.message}`,
+              origin: failure.origin,
+            },
+          } as unknown as typeof created;
+        }
       }
       return created;
     },

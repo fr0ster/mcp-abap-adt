@@ -985,8 +985,14 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             );
           }
           if (!dumpId) {
-            logger?.warn?.(
-              '⚠️ No runtime dumps on this system — RuntimeListFeeds answered, but with no entries; RuntimeGetDumpById was not exercised.',
+            // **A skip, said as one.** There is nothing to read on a system
+            // with no dumps, and that is not a defect of the tools — but
+            // `RuntimeGetDumpById` was not exercised either, and a bare
+            // `return` reports that as a pass. `testSkip` is the channel this
+            // repository has for exactly this: it prints `⏭️`, so the run says
+            // what it did not do instead of implying it did.
+            logger?.testSkip?.(
+              'Skipping test: no runtime dumps on this system — RuntimeListFeeds answered with no entries, so RuntimeGetDumpById was not exercised',
             );
             return;
           }

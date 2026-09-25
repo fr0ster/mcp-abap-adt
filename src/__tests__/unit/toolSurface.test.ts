@@ -138,6 +138,12 @@ describe('the MCP tool surface', () => {
         'low/UpdateInterfaceLow': ['transport_request'],
         'low/UpdateStructureLow': ['transport_request'],
         'low/UpdateProgramLow': ['transport_request'],
+        // The eighth of the same family, found while reviewing the other
+        // seven: `core/package/update.ts` appends `&corrNr=` when a transport
+        // is given and `IPackageConfig` declares `transportRequest`, but the
+        // schema never offered one — so a transportable package could not be
+        // updated through this tool at all.
+        'low/UpdatePackageLow': ['transport_request'],
       };
       expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
         tool,

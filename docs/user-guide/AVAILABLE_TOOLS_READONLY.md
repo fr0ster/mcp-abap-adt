@@ -1057,4 +1057,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-22*
+*Last updated: 2026-09-25*

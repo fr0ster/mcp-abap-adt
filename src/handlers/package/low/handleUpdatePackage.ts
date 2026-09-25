@@ -19,8 +19,16 @@
  * `recordChanges`) describes a create and is never read to build or merge a
  * body on an update; only `package_name` (for the URL path) and
  * `transport_request` (the write-query string) reach the wire function at
- * all. Verified against the compiled `AdtPackage.js` and
- * `core/package/update.js`, not the declaration file.
+ * all. Verified against `AdtPackage.ts` and `core/package/update.ts`.
+ *
+ * **And `transport_request` was named in that sentence while the schema never
+ * offered it.** `core/package/update.ts` appends `&corrNr=` when a transport is
+ * given, and `IPackageConfig` declares `transportRequest`, so a transportable
+ * package could not be updated through this tool at all: the on-premise answer
+ * is `SADT_RESOURCE 017`, *"Parameter corrNr could not be found."* — the same
+ * refusal the seven low-tier writes in this branch were fixed for. It is a
+ * parameter now, and it travels in the config, which is where the wire function
+ * reads it.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -58,6 +66,11 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'New description for the package.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       lock_handle: {
         type: 'string',
         description:
@@ -93,6 +106,7 @@ interface UpdatePackageArgs {
   super_package: string;
   updated_description: string;
   lock_handle: string;
+  transport_request?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -112,6 +126,7 @@ export async function handleUpdatePackage(
       super_package,
       updated_description,
       lock_handle,
+      transport_request,
       session_id,
       session_state,
     } = args as UpdatePackageArgs;
@@ -152,6 +167,9 @@ export async function handleUpdatePackage(
           client.getPackage().updateMetadata(
             {
               packageName,
+              ...(transport_request && {
+                transportRequest: transport_request,
+              }),
             },
             {
               source: patchPackageXml(

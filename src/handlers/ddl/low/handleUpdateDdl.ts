@@ -3,9 +3,9 @@
  *
  * Uses AdtClient.getDdl().update from @mcp-abap-adt/adt-clients 19.
  *
- * **The source goes through `options.sourceCode`.** Unlike `AdtInterface` or
+ * **The source goes through `options.source`.** Unlike `AdtInterface` or
  * `AdtMetadataExtension`, `AdtDdl.update()`'s shipped body does keep a
- * fallback — `const source = options?.sourceCode || config.ddlSource` — but
+ * fallback — `const source = options?.source || config.source` — but
  * this handler writes through `options` only, the one channel every sibling
  * family in this cluster shares, and never puts a source string on `config`.
  * Verified against `AdtDdl.js`, not the declaration file.
@@ -106,7 +106,7 @@ export async function handleUpdateDdl(
         .update(
           { ddlName },
           {
-            sourceCode: ddl_source,
+            source: ddl_source,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

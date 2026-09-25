@@ -4,10 +4,10 @@
  * Uses AdtClient.getInterface().update from @mcp-abap-adt/adt-clients 19.
  *
  * **The source goes in `options`, not `config`.** `IInterfaceConfig` still
- * declares a `sourceCode` field, so `update({ interfaceName, sourceCode },
+ * declares a `source` field, so `update({ interfaceName, source },
  * ...)` compiles either way — but the shipped `AdtInterface.update()` reads
- * `options?.sourceCode` only (its own comment: "This used to fall back to
- * `config.sourceCode` — two channels for one value, where the contract
+ * `options?.source` only (its own comment: "This used to fall back to
+ * `config.source` — two channels for one value, where the contract
  * documents one"). A `.d.ts` comment is not evidence for where a value
  * lands; the compiled JavaScript is. Verified against `AdtInterface.js`, not
  * the declaration file.
@@ -113,7 +113,7 @@ export async function handleUpdateInterface(
         .update(
           { interfaceName },
           {
-            sourceCode: source_code,
+            source: source_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

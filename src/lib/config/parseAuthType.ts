@@ -1,4 +1,4 @@
-import type { SapAuthType } from '@mcp-abap-adt/interfaces';
+import type { SapAuthType } from '@mcp-abap-adt/interfaces-auth-sap';
 
 /** Resolve SAP auth type from env. SAP_JWT_TOKEN forces jwt; SAP_AUTH_TYPE is explicit; default basic. */
 export function parseAuthType(

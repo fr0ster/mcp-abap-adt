@@ -1,5 +1,5 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
-import type { AtcObjectType } from '@mcp-abap-adt/interfaces';
+import type { AtcObjectType } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { answering } from '../../../lib/strategies/atcRun';

@@ -7,10 +7,13 @@
  * handler's, and every step of it carries its own `analyse` — the verdict on
  * each answer stays the strategy's.
  *
- * **The patched document goes in `config.document`, not `options.xmlContent`.**
- * `AdtPackage.updateMetadata()`'s shipped body reads `config.document` only
- * and passes it straight to `updatePackage(connection, {...}, config.document,
- * options?.lockHandle)` as the PUT body — every other field it builds into
+ * **The patched document goes in `options.source`.** `interfaces-adt@9`
+ * merged the old `config.document`/`options.sourceCode` split into one
+ * channel (decision 33) and took `document` off `IPackageConfig`, so the old
+ * shape no longer compiles. `AdtPackage.updateMetadata()` reads
+ * `options?.source` and passes it straight to `updatePackage(connection,
+ * {...}, source, options?.lockHandle)` as the PUT body — every other field it
+ * builds into
  * that `fields` object (`superPackage`, `softwareComponent`,
  * `transportLayer`, `description`, `packageType`, `responsible`,
  * `recordChanges`) describes a create and is never read to build or merge a
@@ -149,12 +152,12 @@ export async function handleUpdatePackage(
           client.getPackage().updateMetadata(
             {
               packageName,
-              document: patchPackageXml(
+            },
+            {
+              source: patchPackageXml(
                 extractXmlString(current, `package ${packageName}`),
                 { description: updated_description },
               ),
-            },
-            {
               lockHandle: lock_handle,
               analyse: analyseException,
             },

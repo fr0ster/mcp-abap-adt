@@ -41,7 +41,7 @@
  * table controls anyway) — keep both.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
 import { handleDeleteBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleDeleteBehaviorImplementation';
 import { handleDeleteClass } from '../../handlers/class/high/handleDeleteClass';
@@ -383,24 +383,27 @@ describe.each([
     handleDeleteMetadataExtensionLow,
     { name: 'ZI_DDLX_DEL_LOW_X' },
   ],
-] as const)('%s: a plain DELETE on its own URL, not the deletion service', (_toolName, handler, args) => {
-  it("DELETEs /ddic/ddlx/sources/{name} for the caller's name, and takes no lock", async () => {
-    const conn = recordingConnection();
-    const objectName =
-      'name' in args ? args.name : args.metadata_extension_name;
+] as const)(
+  '%s: a plain DELETE on its own URL, not the deletion service',
+  (_toolName, handler, args) => {
+    it("DELETEs /ddic/ddlx/sources/{name} for the caller's name, and takes no lock", async () => {
+      const conn = recordingConnection();
+      const objectName =
+        'name' in args ? args.name : args.metadata_extension_name;
 
-    const result: any = await (handler as any)(ctx(conn) as any, args);
+      const result: any = await (handler as any)(ctx(conn) as any, args);
 
-    expect(result?.isError).toBe(false);
+      expect(result?.isError).toBe(false);
 
-    const hits = requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources');
-    expect(hits.length).toBeGreaterThan(0);
-    expect(hits.some((r) => carries(r, objectName))).toBe(true);
-    expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
-      false,
-    );
-  });
-});
+      const hits = requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources');
+      expect(hits.length).toBeGreaterThan(0);
+      expect(hits.some((r) => carries(r, objectName))).toBe(true);
+      expect(conn.requests.some((r) => r.url.includes('_action=LOCK'))).toBe(
+        false,
+      );
+    });
+  },
+);
 
 describe('DeleteMessageClassMessage: a PUT of the parent class, the message moved to deletedmessages', () => {
   it("PUTs the class for the caller's class name, moving the caller's msgno into <mc:deletedmessages>", async () => {

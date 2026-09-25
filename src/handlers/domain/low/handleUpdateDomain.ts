@@ -7,19 +7,20 @@
  * every step of it carries its own `analyse` — the verdict on each answer stays
  * the strategy's.
  *
- * **The patched document goes in `config.document`, not `options.xmlContent`.**
- * `AdtDomain.updateMetadata()`'s shipped body reads `config.document` only
- * ("`config.document` is what gets written. The fields beside it describe a
- * create; on an update nothing here merges them into a document, because
- * nothing is read to merge them into.") and passes it straight to
- * `updateDomain(connection, {...}, config.document, options?.lockHandle)` as
- * the PUT body. `options` declares an `xmlContent` field
- * (`IAdtOperationOptions.xmlContent`) that this member never reads — nothing
- * in the low-level `updateDomain()` call reaches into `options` for a body.
- * With the patched document in `options.xmlContent`, this issued a PUT with
- * `data: undefined` against a replace-semantics endpoint and answered
- * whatever status came back as success. Verified against the compiled
- * `AdtDomain.js` and `core/domain/update.js`, not the declaration file.
+ * **The patched document goes in `options.source`.** There used to be two
+ * channels and a trap between them: `config.document` for an XML metadata
+ * body, `options.sourceCode` for ABAP text, and an `options.xmlContent` the
+ * options type declared while no member read it — a document put there issued
+ * a PUT with `data: undefined` against a replace-semantics endpoint and
+ * answered whatever status came back as success. `interfaces-adt@9` merged the
+ * channels into one `options.source` (decision 33) and took `document` off
+ * `IDomainConfig`, so the old shape no longer compiles.
+ * `AdtDomain.updateMetadata()` reads `options?.source` and passes it straight
+ * to `updateDomain(connection, {...}, source, options?.lockHandle)` as the PUT
+ * body; the fields beside it in the config describe a create, and on an update
+ * nothing merges them into a document because nothing is read to merge them
+ * into. Verified against `AdtDomain.ts` and `core/domain/update.ts` in
+ * adt-clients 22.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
@@ -143,12 +144,12 @@ export async function handleUpdateDomain(
             {
               domainName,
               transportRequest,
-              document: patchDomainXml(
+            },
+            {
+              source: patchDomainXml(
                 extractXmlString(current, `domain ${domainName}`),
                 properties,
               ),
-            },
-            {
               lockHandle: lock_handle,
               analyse: analyseException,
             },

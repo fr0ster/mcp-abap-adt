@@ -1,4 +1,4 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { return_answer } from '../../lib/answer';
 
 function success<T>(value: T): IAdtResponse<T, IAdtError> {

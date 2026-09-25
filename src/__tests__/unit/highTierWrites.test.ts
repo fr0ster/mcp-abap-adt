@@ -270,47 +270,56 @@ describe('high-tier updates that still have a lock to take: they take it themsel
     ],
   ];
 
-  it.each(
-    lockingCases,
-  )('%s reports a refused write as an error, and releases the lock it took', async (_n, handler, args) => {
-    const unlock = jest.fn(async () => okResponse(undefined));
-    const update = async () =>
-      refusedResponse('Object is locked by another user');
-    fakeClient = fakeClientOf({
-      lock: async () => okResponse('handle-1'),
-      update,
-      updateMetadata: update,
-      unlock,
-    });
-    const result: any = await (handler as any)(context as any, args);
-    expect(unlock).toHaveBeenCalledTimes(1);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Object is locked by another user',
-    );
-  });
+  it.each(lockingCases)(
+    '%s reports a refused write as an error, and releases the lock it took',
+    async (_n, handler, args) => {
+      const unlock = jest.fn(async () => okResponse(undefined));
+      const update = async () =>
+        refusedResponse('Object is locked by another user');
+      fakeClient = fakeClientOf({
+        lock: async () => okResponse('handle-1'),
+        update,
+        updateMetadata: update,
+        unlock,
+      });
+      const result: any = await (handler as any)(context as any, args);
+      expect(unlock).toHaveBeenCalledTimes(1);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe(
+        'Object is locked by another user',
+      );
+    },
+  );
 
-  it.each(
-    lockingCases,
-  )('%s locks, writes under that handle, and unlocks — the caller supplies none of it', async (_n, handler, args, lockConfig) => {
-    const lock = jest.fn(async () => okResponse('handle-1'));
-    const unlock = jest.fn(async () => okResponse(undefined));
-    const update = jest.fn(async () => okResponse(reading(undefined, '', 200)));
-    fakeClient = fakeClientOf({ lock, update, updateMetadata: update, unlock });
+  it.each(lockingCases)(
+    '%s locks, writes under that handle, and unlocks — the caller supplies none of it',
+    async (_n, handler, args, lockConfig) => {
+      const lock = jest.fn(async () => okResponse('handle-1'));
+      const unlock = jest.fn(async () => okResponse(undefined));
+      const update = jest.fn(async () =>
+        okResponse(reading(undefined, '', 200)),
+      );
+      fakeClient = fakeClientOf({
+        lock,
+        update,
+        updateMetadata: update,
+        unlock,
+      });
 
-    const result: any = await (handler as any)(context as any, args);
+      const result: any = await (handler as any)(context as any, args);
 
-    expect(result.isError).toBe(false);
-    expect(lock).toHaveBeenCalledWith(lockConfig);
-    expect(update).toHaveBeenCalledWith(
-      expect.anything(),
-      expect.objectContaining({
-        lockHandle: 'handle-1',
-        analyse: analyseException,
-      }),
-    );
-    expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1');
-  });
+      expect(result.isError).toBe(false);
+      expect(lock).toHaveBeenCalledWith(lockConfig);
+      expect(update).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          lockHandle: 'handle-1',
+          analyse: analyseException,
+        }),
+      );
+      expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1');
+    },
+  );
 });
 
 describe('UpdateMessageClassMessage: no lock to take, and none is asked for', () => {

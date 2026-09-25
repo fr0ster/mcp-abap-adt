@@ -64,12 +64,13 @@ describe('object metadata differs by family', () => {
     expect(fixtures.length).toBeGreaterThanOrEqual(8);
   });
 
-  it.each(
-    fixtures.map((f) => [f.family, f] as const),
-  )('%s answers 200 with a body', (_family, f) => {
-    expect(f.sidecar.response.status).toBe(200);
-    expect(f.body.length).toBeGreaterThan(0);
-  });
+  it.each(fixtures.map((f) => [f.family, f] as const))(
+    '%s answers 200 with a body',
+    (_family, f) => {
+      expect(f.sidecar.response.status).toBe(200);
+      expect(f.body.length).toBeGreaterThan(0);
+    },
+  );
 
   it('every family negotiates its own media type', () => {
     const types = fixtures.map((f) => mediaType(f.sidecar));

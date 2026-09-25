@@ -20,18 +20,19 @@ const context = {
  * Fix round 3, task 14, carried forward by task 19's `withLock` migration.
  * `handleUpdateDomain.ts` (high) carried the exact mirror of the defect
  * task 14 fixed across class/interface/behavior_definition/
- * behavior_implementation: `AdtDomain.updateMetadata()`'s shipped body reads
- * `config.document` only and never `options.xmlContent` — verified against
- * `AdtDomain.js` and `core/domain/update.js`. This file pins that one
- * request shape, now through the `withLock`-held read-modify-write-check
- * task 19 introduced.
+ * behavior_implementation, back when a metadata body went in
+ * `config.document` and an ABAP body in `options.sourceCode`.
+ * `interfaces-adt@9` merged both into `options.source`, so this file pins the
+ * one request shape the member reads today — `AdtDomain.updateMetadata()`
+ * reads `options?.source` and nothing else — through the `withLock`-held
+ * read-modify-write-check task 19 introduced.
  *
  * `config.packageName` is deliberately absent from the expectation below:
  * the shipped `updateDomain()` wire function never reads it (see the
  * handler's own doc comment), so it is not sent.
  */
 describe('UpdateDomain (high) — updateMetadata request shape', () => {
-  it('passes the patched document via config.document, and no stray xmlContent survives in options', async () => {
+  it('passes the patched document via options.source, and the config names the object only', async () => {
     const currentXml =
       '<?xml version="1.0" encoding="UTF-8"?><doma:domain xmlns:doma="http://www.sap.com/dictionary/domain" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZD" adtcore:description="before"/>';
     let updateCall: { config: any; options: any } | undefined;
@@ -62,14 +63,14 @@ describe('UpdateDomain (high) — updateMetadata request shape', () => {
     expect(updateCall?.config).toEqual({
       domainName: 'ZD',
       transportRequest: undefined,
-      document: expect.stringContaining('adtcore:description="after"'),
     });
     expect(updateCall?.options).toEqual({
+      source: expect.stringContaining('adtcore:description="after"'),
       lockHandle: 'LOCK123',
       analyse: analyseException,
     });
     expect(
-      (updateCall?.options as { xmlContent?: unknown })?.xmlContent,
+      (updateCall?.config as { document?: unknown })?.document,
     ).toBeUndefined();
   });
 });

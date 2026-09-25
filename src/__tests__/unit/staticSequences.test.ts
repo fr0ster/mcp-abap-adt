@@ -130,15 +130,18 @@ describe('SHAPE 1 — a rename, still one call', () => {
       },
       'update',
     ],
-  ])('%s calls the member that replaced it and surfaces its refusal', async (_n, handler, args, member) => {
-    fakeClient = fakeClientOf({
-      [member as string]: async () => refusedResponse('Refused'),
-    });
-    const result: any = await (handler as any)(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe('Refused');
-    expect(result.content[0].text).not.toContain('step');
-  });
+  ])(
+    '%s calls the member that replaced it and surfaces its refusal',
+    async (_n, handler, args, member) => {
+      fakeClient = fakeClientOf({
+        [member as string]: async () => refusedResponse('Refused'),
+      });
+      const result: any = await (handler as any)(context as any, args);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe('Refused');
+      expect(result.content[0].text).not.toContain('step');
+    },
+  );
 
   it('ValidateServiceBinding passes analyseException, not analyseException', async () => {
     const seen: unknown[] = [];
@@ -232,21 +235,25 @@ describe('ListFunctionModules/ListFunctionGroupIncludes ask for the right child 
   it.each([
     ['ListFunctionModules', handleListFunctionModules],
     ['ListFunctionGroupIncludes', handleListFunctionGroupIncludes],
-  ])('%s tells a nonexistent function group apart from an empty one — refuses on readMetadata, before the walk', async (_n, handler) => {
-    const walk = jest.fn();
-    fakeClient = fakeClientOf({
-      readMetadata: async () => refusedResponse('Function group ZFG not found'),
-      fetchNodeStructure: walk,
-    });
-    const result: any = await (handler as any)(context as any, {
-      function_group_name: 'ZFG',
-    });
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Function group ZFG not found',
-    );
-    expect(walk).not.toHaveBeenCalled();
-  });
+  ])(
+    '%s tells a nonexistent function group apart from an empty one — refuses on readMetadata, before the walk',
+    async (_n, handler) => {
+      const walk = jest.fn();
+      fakeClient = fakeClientOf({
+        readMetadata: async () =>
+          refusedResponse('Function group ZFG not found'),
+        fetchNodeStructure: walk,
+      });
+      const result: any = await (handler as any)(context as any, {
+        function_group_name: 'ZFG',
+      });
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe(
+        'Function group ZFG not found',
+      );
+      expect(walk).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('SHAPE 2 — the lib files: no MCP result, and no removed member', () => {
@@ -289,43 +296,45 @@ describe('SHAPE 3 — the two program-profiling handlers: two calls where there 
     ],
   ] as const;
 
-  it.each(
-    profiling,
-  )('%s passes the scheduled id to the profiler run', async (_n, handler, args) => {
-    const order: string[] = [];
-    let passed: unknown;
-    programExecutor = {
-      scheduleTrace: async () => {
-        order.push('schedule');
-        return okResponse(PROGRAM_REQUEST);
-      },
-      runWithProfiler: async (_target: unknown, options: any) => {
-        order.push('run');
-        passed = options?.profilerId;
-        return okResponse('program output');
-      },
-    };
-    const result: any = await (handler as any)(context as any, args);
-    expect(order).toEqual(['schedule', 'run']);
-    expect(passed).toBe(PROGRAM_REQUEST);
-    expect(result.isError).toBe(false);
-  });
+  it.each(profiling)(
+    '%s passes the scheduled id to the profiler run',
+    async (_n, handler, args) => {
+      const order: string[] = [];
+      let passed: unknown;
+      programExecutor = {
+        scheduleTrace: async () => {
+          order.push('schedule');
+          return okResponse(PROGRAM_REQUEST);
+        },
+        runWithProfiler: async (_target: unknown, options: any) => {
+          order.push('run');
+          passed = options?.profilerId;
+          return okResponse('program output');
+        },
+      };
+      const result: any = await (handler as any)(context as any, args);
+      expect(order).toEqual(['schedule', 'run']);
+      expect(passed).toBe(PROGRAM_REQUEST);
+      expect(result.isError).toBe(false);
+    },
+  );
 
-  it.each(
-    profiling,
-  )('%s stops at the first refused step', async (_n, handler, args) => {
-    const run = jest.fn();
-    programExecutor = {
-      scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
-      runWithProfiler: run,
-    };
-    const result: any = await (handler as any)(context as any, args);
-    expect(result.isError).toBe(true);
-    expect(JSON.parse(result.content[0].text).message).toBe(
-      'Trace scheduling refused',
-    );
-    expect(run).not.toHaveBeenCalled();
-  });
+  it.each(profiling)(
+    '%s stops at the first refused step',
+    async (_n, handler, args) => {
+      const run = jest.fn();
+      programExecutor = {
+        scheduleTrace: async () => refusedResponse('Trace scheduling refused'),
+        runWithProfiler: run,
+      };
+      const result: any = await (handler as any)(context as any, args);
+      expect(result.isError).toBe(true);
+      expect(JSON.parse(result.content[0].text).message).toBe(
+        'Trace scheduling refused',
+      );
+      expect(run).not.toHaveBeenCalled();
+    },
+  );
 });
 
 describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the composite shape', () => {

@@ -8,7 +8,7 @@
  * what is.
  */
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces';
+import type { IAdtOperationOptions } from '@mcp-abap-adt/interfaces-adt';
 
 declare const client: AdtClient;
 

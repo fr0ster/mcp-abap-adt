@@ -362,21 +362,24 @@ describe('RuntimeListFeeds', () => {
         to: undefined,
       },
     ],
-  ] as const)('feed_type %s calls feeds.%s', async (feedType, member, _options) => {
-    const spy = jest.fn(async () => okResponse([{ id: '1' }]));
-    feeds = { [member]: spy };
+  ] as const)(
+    'feed_type %s calls feeds.%s',
+    async (feedType, member, _options) => {
+      const spy = jest.fn(async () => okResponse([{ id: '1' }]));
+      feeds = { [member]: spy };
 
-    const result: any = await handleRuntimeListFeeds(
-      context as any,
-      {
-        feed_type: feedType,
-      } as any,
-    );
-    const body = JSON.parse(result.content[0].text);
+      const result: any = await handleRuntimeListFeeds(
+        context as any,
+        {
+          feed_type: feedType,
+        } as any,
+      );
+      const body = JSON.parse(result.content[0].text);
 
-    expect(spy).toHaveBeenCalledTimes(1);
-    expect(body.count).toBe(1);
-  });
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(body.count).toBe(1);
+    },
+  );
 
   it('feed_type variants refuses locally and never calls the library — an unmeasured category must not become a silent request', async () => {
     const variants = jest.fn(async () => okResponse([]));

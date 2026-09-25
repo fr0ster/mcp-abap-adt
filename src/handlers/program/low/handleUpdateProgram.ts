@@ -3,10 +3,10 @@
  *
  * Uses AdtClient.getProgram().update from @mcp-abap-adt/adt-clients 19.
  *
- * **The source goes through `options.sourceCode`.** `AdtProgram.update()`'s
- * shipped body reads `const source = options?.sourceCode;` only — the
- * `config.sourceCode` fallback other members used to have is gone, and
- * `config.sourceCode` is `check()`'s alone now (an unsaved source to check,
+ * **The source goes through `options.source`.** `AdtProgram.update()`'s
+ * shipped body reads `const source = options?.source;` only — the
+ * `config.source` fallback other members used to have is gone, and
+ * `config.source` is `check()`'s alone now (an unsaved source to check,
  * not one to write). This handler writes through `options` only, the one
  * channel every sibling family in this cluster shares. No `transport_request`
  * parameter existed on this tool before this migration, so none is forwarded
@@ -121,7 +121,7 @@ export async function handleUpdateProgram(
         .update(
           { programName },
           {
-            sourceCode: source_code,
+            source: source_code,
             lockHandle: lock_handle,
             analyse: analyseException,
           },

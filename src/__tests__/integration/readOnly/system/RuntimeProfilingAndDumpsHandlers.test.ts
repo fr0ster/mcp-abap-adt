@@ -131,12 +131,11 @@ ENDCLASS.
 
 CLASS ${className} IMPLEMENTATION.
   METHOD if_oo_adt_classrun~main.
-    " Do measurable CPU work so the runtime profiler has time to arm and
-    " actually captures a trace — a trivial single-statement body finishes
-    " before tracing engages, so no trace file is ever written (the trace
-    " then never resolves no matter how long we poll).
+    " A little measurable work, not much: with the trace size limit
+    " actually sent (see definedOnly) a short run traces fine, and two
+    " million iterations only made the trace larger.
     DATA lv_x TYPE i.
-    DO 2000000 TIMES.
+    DO 20000 TIMES.
       lv_x = sy-index MOD 100.
     ENDDO.
     out->write( lv_x ).

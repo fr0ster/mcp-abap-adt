@@ -11,6 +11,7 @@
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
+import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { pair } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
@@ -86,22 +87,24 @@ export async function handleRuntimeRunProgramWithProfiling(
     () =>
       pair(
         () =>
-          programExecutor.scheduleTrace({
-            description: args.description,
-            allProceduralUnits: args.all_procedural_units,
-            allMiscAbapStatements: args.all_misc_abap_statements,
-            allInternalTableEvents: args.all_internal_table_events,
-            allDynproEvents: args.all_dynpro_events,
-            aggregate: args.aggregate,
-            explicitOnOff: args.explicit_on_off,
-            withRfcTracing: args.with_rfc_tracing,
-            allSystemKernelEvents: args.all_system_kernel_events,
-            sqlTrace: args.sql_trace,
-            allDbEvents: args.all_db_events,
-            maxSizeForTraceFile: args.max_size_for_trace_file,
-            amdpTrace: args.amdp_trace,
-            maxTimeForTracing: args.max_time_for_tracing,
-          }),
+          programExecutor.scheduleTrace(
+            definedOnly({
+              description: args.description,
+              allProceduralUnits: args.all_procedural_units,
+              allMiscAbapStatements: args.all_misc_abap_statements,
+              allInternalTableEvents: args.all_internal_table_events,
+              allDynproEvents: args.all_dynpro_events,
+              aggregate: args.aggregate,
+              explicitOnOff: args.explicit_on_off,
+              withRfcTracing: args.with_rfc_tracing,
+              allSystemKernelEvents: args.all_system_kernel_events,
+              sqlTrace: args.sql_trace,
+              allDbEvents: args.all_db_events,
+              maxSizeForTraceFile: args.max_size_for_trace_file,
+              amdpTrace: args.amdp_trace,
+              maxTimeForTracing: args.max_time_for_tracing,
+            }),
+          ),
         (profilerId: string) =>
           programExecutor.runWithProfiler({ programName }, { profilerId }),
       ),

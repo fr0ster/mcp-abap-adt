@@ -12,6 +12,7 @@
 
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { answer } from '../../../lib/answer';
+import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
 import { terseProfilingRun } from '../../../lib/strategies/runProjections';
@@ -119,7 +120,7 @@ export async function handleRuntimeRunClassWithProfiling(
       ? Math.trunc(args.trace_retry_delay_ms)
       : 2000;
 
-  const profilerParameters = {
+  const profilerParameters = definedOnly({
     description: args.description,
     allProceduralUnits: args.all_procedural_units,
     allMiscAbapStatements: args.all_misc_abap_statements,
@@ -134,7 +135,7 @@ export async function handleRuntimeRunClassWithProfiling(
     maxSizeForTraceFile: args.max_size_for_trace_file,
     amdpTrace: args.amdp_trace,
     maxTimeForTracing: args.max_time_for_tracing,
-  };
+  });
 
   const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
 

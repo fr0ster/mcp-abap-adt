@@ -110,6 +110,8 @@ export async function handleGetObjectStructure(
       }
       return response;
     },
-    project(detail, (value) => treeText(value)),
+    project(detail, (value) =>
+      treeText(value, { objecttype: object_type, objectname: object_name }),
+    ),
   );
 }

@@ -80,8 +80,8 @@ export const TOOL_DEFINITION = {
       node_id: {
         type: 'string',
         description:
-          'Optional node ID (default: "0000" for root). Use to fetch child nodes.',
-        default: '0000',
+          'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: E19 answers it with an empty body.',
+        default: '000000',
       },
       with_short_descriptions: {
         type: 'boolean',
@@ -183,7 +183,7 @@ export async function handleGetNodeStructure(
           client
             .getUtils({ ...ourUtils, node: rawNodeStructureXml })
             .fetchNodeStructure(parent_type, parent_name, {
-              nodeId: node_id || '0000',
+              nodeId: node_id || '000000',
               withShortDescriptions: with_short_descriptions !== false,
             }),
         async (rawXml) => {

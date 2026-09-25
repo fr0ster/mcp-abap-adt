@@ -36,12 +36,16 @@ interface FlatObjectStructureNode {
   nodeid: string;
   parentid?: string;
   objecttype: string;
-  objectname: string;
+  objectname?: string;
+  description?: string;
+  isfolder: boolean;
 }
 
 interface ObjectStructureTreeNode {
   objecttype: string;
-  objectname: string;
+  objectname?: string;
+  description?: string;
+  isfolder: boolean;
   children: ObjectStructureTreeNode[];
 }
 
@@ -65,30 +69,69 @@ function flatNodesOf(value: unknown): FlatObjectStructureNode[] {
       parentid: a.parentid,
       objecttype: a.objecttype,
       objectname: a.objectname,
+      description: a.description,
+      isfolder: a.isfolder === 'true',
     };
   });
 }
 
+/**
+ * **SAP does not send the object itself.** For a class on E19
+ * (2026-09-25) the folders carry `parentid="000001"` and no node `000001`
+ * arrives, so without the object asked for they each came out as a root of
+ * their own. A node whose parent was named but not sent hangs under `root`
+ * when one is given; a node naming no parent is a root as before.
+ */
 function buildNestedTree(
   flatNodes: FlatObjectStructureNode[],
+  root?: { objecttype: string; objectname: string },
 ): ObjectStructureTreeNode[] {
   const nodeMap: Record<string, ObjectStructureTreeNode> = {};
   flatNodes.forEach((node) => {
     nodeMap[node.nodeid] = {
       objecttype: node.objecttype,
       objectname: node.objectname,
+      description: node.description,
+      isfolder: node.isfolder,
       children: [],
     };
   });
   const roots: ObjectStructureTreeNode[] = [];
+  const synthetic: ObjectStructureTreeNode | undefined = root
+    ? { ...root, isfolder: false, children: [] }
+    : undefined;
   flatNodes.forEach((node) => {
     if (node.parentid && nodeMap[node.parentid]) {
       nodeMap[node.parentid].children.push(nodeMap[node.nodeid]);
+    } else if (node.parentid && synthetic) {
+      synthetic.children.push(nodeMap[node.nodeid]);
     } else {
       roots.push(nodeMap[node.nodeid]);
     }
   });
+  if (synthetic && synthetic.children.length > 0) roots.unshift(synthetic);
   return roots;
+}
+
+/**
+ * What a node is called. `objectname` names the ADT object that OWNS the
+ * node — the class itself for an attribute, the method include
+ * (`CL_X========CM001`) for a method — so it is the label only when there is
+ * nothing better. The component's own name is `description`, and a folder
+ * has only that. An include owner is kept in parentheses, since it is where
+ * the code lives; the class as owner of its own attribute says nothing.
+ */
+function labelOf(node: ObjectStructureTreeNode): string {
+  if (node.isfolder) return `${node.objecttype} [${node.description ?? ''}]`;
+  const name = node.description || node.objectname || '';
+  const owner =
+    node.objectname &&
+    node.description &&
+    node.objectname !== node.description &&
+    node.objectname.includes('=')
+      ? ` (${node.objectname})`
+      : '';
+  return `${node.objecttype}: ${name}${owner}`;
 }
 
 function serializeTree(
@@ -97,7 +140,7 @@ function serializeTree(
 ): string {
   let result = '';
   for (const node of tree) {
-    result += `${indent}- ${node.objecttype}: ${node.objectname}\n`;
+    result += `${indent}- ${labelOf(node)}\n`;
     if (node.children && node.children.length > 0) {
       result += serializeTree(node.children, `${indent}  `);
     }
@@ -140,11 +183,14 @@ export function assertObjectStructurePresent(value: unknown): void {
  * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
  * document through the same `ourUtils.objectStructure` (`structured`) reading.
  */
-export function treeText(value: unknown): string {
+export function treeText(
+  value: unknown,
+  root?: { objecttype: string; objectname: string },
+): string {
   assertObjectStructurePresent(value);
   const nodes = flatNodesOf(value);
   if (nodes.length === 0) return 'No nodes found in object structure response.';
-  return `tree:\n${serializeTree(buildNestedTree(nodes))}`;
+  return `tree:\n${serializeTree(buildNestedTree(nodes, root))}`;
 }
 
 export async function handleGetObjectStructure(
@@ -187,6 +233,8 @@ export async function handleGetObjectStructure(
       }
       return response;
     },
-    project(detail, (value) => treeText(value)),
+    project(detail, (value) =>
+      treeText(value, { objecttype: objectType, objectname: objectName }),
+    ),
   );
 }

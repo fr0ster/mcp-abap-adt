@@ -2662,7 +2662,9 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZP_X',
-      { nodeId: '0000', withShortDescriptions: true },
+      // The root is `000000`: `0000` answers 200 with an empty body on E19
+      // (2026-09-25), which read as an empty package.
+      { nodeId: '000000', withShortDescriptions: true },
     ]);
   });
 
@@ -2871,6 +2873,46 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe(
       'tree:\n- DEVC/K: ZP_X\n  - CLAS/OC: ZCL_X\n',
+    );
+  });
+
+  /**
+   * The shape E19 answers for a class (CLAS/OC CL_ABAP_CHAR_UTILITIES,
+   * 2026-09-25), cut down: folders carry `isfolder="true"`, a `description`
+   * and no `objectname`; components carry their own name in `description`
+   * while `objectname` names the OWNER — the class for an attribute, the
+   * method include for a method. And the folders' parent, `000001`, is never
+   * sent. Labelling by `objectname` printed every node as the class and every
+   * folder as `undefined`, each folder a root of its own.
+   */
+  it('GetObjectStructure labels a node by its description, marks folders, and hangs orphans under the object asked for', async () => {
+    const reading = structured({
+      data:
+        '<projectexplorer:objectstructure xmlns:projectexplorer="http://www.sap.com/adt/projectexplorer">' +
+        '<projectexplorer:node nodeid="000002" parentid="000001" isfolder="true" description="Attributes" objecttype="CLAS/OA"/>' +
+        '<projectexplorer:node nodeid="000003" parentid="000002" isfolder="false" description="CR_LF" objecttype="CLAS/OA" objectname="CL_X"/>' +
+        '<projectexplorer:node nodeid="000021" parentid="000001" isfolder="true" description="Methods" objecttype="CLAS/OM"/>' +
+        '<projectexplorer:node nodeid="000022" parentid="000021" isfolder="false" description="M1" objecttype="CLAS/OM" objectname="CL_X========CM001"/>' +
+        '</projectexplorer:objectstructure>',
+      status: 200,
+    } as any);
+    fakeClient = fakeClientOf({
+      getObjectStructure: async () => okResponse(reading),
+    });
+
+    const result: any = await handleGetObjectStructureLow(context as any, {
+      object_type: 'CLAS/OC',
+      object_name: 'CL_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(result.content[0].text).toBe(
+      'tree:\n' +
+        '- CLAS/OC: CL_X\n' +
+        '  - CLAS/OA [Attributes]\n' +
+        '    - CLAS/OA: CR_LF\n' +
+        '  - CLAS/OM [Methods]\n' +
+        '    - CLAS/OM: M1 (CL_X========CM001)\n',
     );
   });
 

@@ -111,40 +111,6 @@ function toPositiveInt(value: unknown, fallback: number): number {
   return Math.trunc(parsed);
 }
 
-function extractTraceIdsFromPayload(payload: unknown): string[] {
-  const ids = new Set<string>();
-  const raw = typeof payload === 'string' ? payload : JSON.stringify(payload);
-  const regex = /\/runtime\/traces\/abaptraces\/([A-F0-9]{32})/gi;
-  let match: RegExpExecArray | null = regex.exec(raw);
-  while (match) {
-    ids.add(match[1].toUpperCase());
-    match = regex.exec(raw);
-  }
-  return [...ids];
-}
-
-function buildRunnableClassSource(className: string): string {
-  return `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    " A little measurable work, not much: with the trace size limit
-    " actually sent (see definedOnly) a short run traces fine, and two
-    " million iterations only made the trace larger.
-    DATA lv_x TYPE i.
-    DO 20000 TIMES.
-      lv_x = sy-index MOD 100.
-    ENDDO.
-    out->write( lv_x ).
-    out->write( |MCP runtime class profiling ${className}| ).
-  ENDMETHOD.
-ENDCLASS.
-`;
-}
-
 function buildDumpClassSource(className: string): string {
   return `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
@@ -160,12 +126,6 @@ CLASS ${className} IMPLEMENTATION.
     out->write( |${className} result: ${'${'} lv_res }| ).
   ENDMETHOD.
 ENDCLASS.
-`;
-}
-
-function buildRunnableProgramSource(programName: string): string {
-  return `REPORT ${programName}.
-WRITE: / 'MCP runtime program profiling ${programName}'.
 `;
 }
 
@@ -272,107 +232,6 @@ async function deleteClassIfExists(
   }
 }
 
-async function createRunnableProgram(
-  context: LambdaTesterContext,
-  programName: string,
-  source: string,
-  invokeTool?: (
-    toolName: string,
-    args: Record<string, unknown>,
-    directCall: () => Promise<any>,
-  ) => Promise<any>,
-): Promise<void> {
-  if (invokeTool) {
-    const createResponse = await invokeTool(
-      'CreateProgram',
-      {
-        program_name: programName,
-        package_name: context.packageName,
-        transport_request: context.transportRequest,
-        description: `MCP runtime test ${programName}`.slice(0, 60),
-        source_code: source,
-        activate: true,
-      },
-      async () => {
-        throw new Error(
-          'Direct CreateProgram call is not available in hard mode',
-        );
-      },
-    );
-    if (createResponse?.isError) {
-      throw new Error(extractHandlerErrorText(createResponse));
-    }
-    return;
-  }
-
-  const client = createAdtClient(context.connection, context.logger);
-  await client.getProgram().create({
-    programName,
-    packageName: context.packageName,
-    transportRequest: context.transportRequest,
-    description: `MCP runtime test ${programName}`.slice(0, 60),
-  });
-  // adt-clients 19 has no `activateOnUpdate` convenience — see
-  // createRunnableClass above for the same shape.
-  const obj = client.getProgram();
-  const written = await withLock(
-    () => obj.lock({ programName }),
-    (lockHandle) =>
-      obj.update(
-        { programName, transportRequest: context.transportRequest },
-        { source, lockHandle },
-      ),
-    (lockHandle) => obj.unlock({ programName }, lockHandle),
-  );
-  if (written.ok) {
-    await obj.activate({ programName });
-  }
-}
-
-async function deleteProgramIfExists(
-  context: LambdaTesterContext,
-  programName?: string,
-  invokeTool?: (
-    toolName: string,
-    args: Record<string, unknown>,
-    directCall: () => Promise<any>,
-  ) => Promise<any>,
-): Promise<void> {
-  if (!programName) {
-    return;
-  }
-  try {
-    if (invokeTool) {
-      const deleteResponse = await invokeTool(
-        'DeleteProgram',
-        {
-          program_name: programName,
-          transport_request: context.transportRequest,
-        },
-        async () => {
-          throw new Error(
-            'Direct DeleteProgram call is not available in hard mode',
-          );
-        },
-      );
-      if (deleteResponse?.isError) {
-        throw new Error(extractHandlerErrorText(deleteResponse));
-      }
-      return;
-    }
-
-    const client = createAdtClient(context.connection, context.logger);
-    await client.getProgram().delete({
-      programName,
-      transportRequest: context.transportRequest,
-    });
-  } catch (error: any) {
-    context.logger?.warn(
-      `Cleanup program ${programName} failed: ${error?.message}`,
-    );
-  }
-}
-
 describe('Runtime Profiling and Dumps Handlers Integration', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('runtime-readonly');
@@ -401,155 +260,75 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
     });
   });
 
+  /**
+   * The profiled runs use the SHARED class and program — nothing is created or
+   * deleted, and running an object changes nothing. A run's criterion is the
+   * trace id it produced. SAP writes a trace asynchronously, so an id is not
+   * yet a readable trace; reading belongs to the test after these, on a trace
+   * `shared:setup` brought to "Finished" and recorded in `trace_id_or_uri`.
+   *
+   * These used to create a class and a program of their own each run. The
+   * class was never activated in soft mode, so its run traced nothing; the
+   * program was deleted while its trace was still being written. Neither
+   * needed to be new.
+   */
+  const listTraces = async (
+    context: LambdaTesterContext,
+  ): Promise<Array<{ id: string; objectName?: string }>> => {
+    const listed = await tester.invokeToolOrHandler(
+      'RuntimeListProfilerTraceFiles',
+      {},
+      async () =>
+        handleRuntimeListProfilerTraceFiles(
+          createHandlerContext({ connection: context.connection, logger }),
+        ),
+    );
+    expect(listed.isError).toBe(false);
+    return parseTextPayload(listed).entries ?? [];
+  };
+
   it(
-    'should create class, run with profiling, and read/analyze created trace',
+    'runs the shared class under the profiler and gets the id of its trace',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        if (!context.packageName) {
-          throw new Error(
-            'SKIP: package is not configured (default_package or package_name)',
-          );
+        const className = String(context.params?.profiled_class_name ?? '');
+        if (!className) {
+          throw new Error('profiled_class_name is not configured');
         }
-
-        const className = createName(
-          normalizeNamePrefix(
-            context.params?.profiled_class_prefix,
-            'ZADT_RTCLS',
-          ),
+        const args = {
+          class_name: className,
+          description: `MCP_RUNTIME_CLASS_${Date.now()}`,
+          max_trace_attempts:
+            toPositiveInt(context.params?.profiled_run_max_trace_attempts, 0) ||
+            undefined,
+          trace_retry_delay_ms:
+            toPositiveInt(
+              context.params?.profiled_run_trace_retry_delay_ms,
+              0,
+            ) || undefined,
+        };
+        const run = await tester.invokeToolOrHandler(
+          'RuntimeRunClassWithProfiling',
+          args,
+          async () =>
+            handleRuntimeRunClassWithProfiling(
+              createHandlerContext({ connection: context.connection, logger }),
+              args,
+            ),
         );
-        const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
-          directCall: () => Promise<any>,
-        ) => tester.invokeToolOrHandler(toolName, args, directCall);
-
-        try {
-          await createRunnableClass(
-            context,
-            className,
-            buildRunnableClassSource(className),
-            tester.isHardMode() ? invoke : undefined,
-          );
-
-          const profiledRunArgs = {
-            class_name: className,
-            description: `MCP_RUNTIME_CLASS_${Date.now()}`,
-            all_procedural_units: true,
-            sql_trace: true,
-            all_db_events: true,
-            max_time_for_tracing: 1800,
-            max_trace_attempts:
-              toPositiveInt(
-                context.params?.profiled_run_max_trace_attempts,
-                0,
-              ) || undefined,
-            trace_retry_delay_ms:
-              toPositiveInt(
-                context.params?.profiled_run_trace_retry_delay_ms,
-                0,
-              ) || undefined,
-          };
-          const profiledRun = await invoke(
-            'RuntimeRunClassWithProfiling',
-            profiledRunArgs,
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection: context.connection,
-                logger,
-              });
-              return handleRuntimeRunClassWithProfiling(
-                handlerContext,
-                profiledRunArgs,
-              );
-            },
-          );
-
-          expect(profiledRun.isError).toBe(false);
-          const runData = parseTextPayload(profiledRun);
-          expect(runData.success).toBe(true);
-
-          // adt-clients 19: a run only schedules and executes — finding the
-          // trace it produced is a feed search bounded by
-          // max_trace_attempts/trace_retry_delay_ms (newTrace.ts), and an
-          // exhausted search is `success: true` with no trace id, not a
-          // failure: "SAP writes it asynchronously and it may arrive a week
-          // later. Nothing refused anything, so there is nothing to report
-          // as a failure." (newTrace.ts). The old contract's guarantee that
-          // a run answers its own trace id is gone — recorded by Task 24 —
-          // so this no longer hard-asserts `trace_id`; it is tolerated
-          // missing the same way the program variant below already tolerates
-          // it via its own polling loop.
-          if (!runData.trace_id) {
-            logger?.warn(
-              'Class profiling trace not found within the polling budget — skipping trace read',
-            );
-          } else {
-            const traceId = String(runData.trace_id).toUpperCase();
-            createdTraceIds.add(traceId);
-
-            const traceData = await invoke(
-              'RuntimeGetProfilerTraceData',
-              {
-                trace_id_or_uri: traceId,
-                view: 'hitlist',
-                with_system_events: false,
-              },
-              async () => {
-                const handlerContext = createHandlerContext({
-                  connection: context.connection,
-                  logger,
-                });
-                return handleRuntimeGetProfilerTraceData(handlerContext, {
-                  trace_id_or_uri: traceId,
-                  view: 'hitlist',
-                  with_system_events: false,
-                });
-              },
-            );
-            expect(traceData.isError).toBe(false);
-            const tracePayload = parseTextPayload(traceData);
-            expect(tracePayload.success).toBe(true);
-
-            const analyze = await invoke(
-              'RuntimeAnalyzeProfilerTrace',
-              {
-                trace_id_or_uri: traceId,
-                view: 'hitlist',
-                top: 5,
-                with_system_events: false,
-              },
-              async () => {
-                const handlerContext = createHandlerContext({
-                  connection: context.connection,
-                  logger,
-                });
-                return handleRuntimeAnalyzeProfilerTrace(handlerContext, {
-                  trace_id_or_uri: traceId,
-                  view: 'hitlist',
-                  top: 5,
-                  with_system_events: false,
-                });
-              },
-            );
-            expect(analyze.isError).toBe(false);
-            const analyzePayload = parseTextPayload(analyze);
-            expect(analyzePayload.success).toBe(true);
-            expect(analyzePayload.summary).toBeDefined();
-          }
-        } finally {
-          await deleteClassIfExists(
-            context,
-            className,
-            tester.isHardMode() ? invoke : undefined,
-          );
-        }
+        expect(run.isError).toBe(false);
+        const data = parseTextPayload(run);
+        expect(data.success).toBe(true);
+        expect(data.trace_id).toBeTruthy();
+        createdTraceIds.add(String(data.trace_id).toUpperCase());
+        logger?.info(`class ${className} traced: ${data.trace_id}`);
       });
     },
     getTimeout('long'),
   );
 
   it(
-    'should create program, run with profiling, and read/analyze created trace (on-prem)',
+    'runs the shared program under the profiler and gets the id of its trace (on-prem)',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         if (context.isCloudSystem) {
@@ -557,186 +336,155 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             'SKIP: programs are not available on cloud systems (expected on-prem only)',
           );
         }
-        if (!context.packageName) {
-          throw new Error(
-            'SKIP: package is not configured (default_package or package_name)',
-          );
+        const programName = String(
+          context.params?.profiled_program_name ?? '',
+        ).toUpperCase();
+        if (!programName) {
+          throw new Error('profiled_program_name is not configured');
         }
 
-        const programName = createName(
-          normalizeNamePrefix(
-            context.params?.profiled_program_prefix,
-            'ZADT_RTPRG',
-          ),
+        // A program run answers no trace id, so the id is the one trace in the
+        // list that is new since the run and belongs to this program.
+        const before = new Set((await listTraces(context)).map((t) => t.id));
+        const args = {
+          program_name: programName,
+          description: `MCP_RUNTIME_PROGRAM_${Date.now()}`,
+        };
+        const run = await tester.invokeToolOrHandler(
+          'RuntimeRunProgramWithProfiling',
+          args,
+          async () =>
+            handleRuntimeRunProgramWithProfiling(
+              createHandlerContext({ connection: context.connection, logger }),
+              args,
+            ),
         );
-        const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
-          directCall: () => Promise<any>,
-        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+        expect(run.isError).toBe(false);
+        const data = parseTextPayload(run);
+        expect(data.success).toBe(true);
+        expect(data.profiler_id).toBeDefined();
 
-        try {
-          await createRunnableProgram(
-            context,
-            programName,
-            buildRunnableProgramSource(programName),
-            tester.isHardMode() ? invoke : undefined,
-          );
-
-          const profiledRun = await invoke(
-            'RuntimeRunProgramWithProfiling',
-            {
-              program_name: programName,
-              description: `MCP_RUNTIME_PROGRAM_${Date.now()}`,
-              all_procedural_units: true,
-              sql_trace: true,
-              all_db_events: true,
-              max_time_for_tracing: 1800,
-            },
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection: context.connection,
-                logger,
-              });
-              return handleRuntimeRunProgramWithProfiling(handlerContext, {
-                program_name: programName,
-                description: `MCP_RUNTIME_PROGRAM_${Date.now()}`,
-                all_procedural_units: true,
-                sql_trace: true,
-                all_db_events: true,
-                max_time_for_tracing: 1800,
-              });
-            },
-          );
-
-          // Program execution is fire-and-forget — trace is written asynchronously.
-          // We only verify the run itself succeeded and returned a profilerId.
-          expect(profiledRun.isError).toBe(false);
-          const runData = parseTextPayload(profiledRun);
-          expect(runData.success).toBe(true);
-          expect(runData.profiler_id).toBeDefined();
-
-          // Poll for the trace file to appear (SAP writes it asynchronously)
-          let traceId: string | undefined;
-          for (let attempt = 0; attempt < 5; attempt++) {
-            await delay(3000);
-            const listResponse = await invoke(
-              'RuntimeListProfilerTraceFiles',
-              {},
-              async () => {
-                const handlerContext = createHandlerContext({
-                  connection: context.connection,
-                  logger,
-                });
-                return handleRuntimeListProfilerTraceFiles(handlerContext);
-              },
-            );
-            if (!listResponse.isError) {
-              const listData = parseTextPayload(listResponse);
-              const traces: any[] = listData.traces ?? listData.items ?? [];
-              const found = traces.find(
-                (t: any) =>
-                  t.profiler_id === runData.profiler_id ||
-                  t.profilerId === runData.profiler_id,
-              );
-              if (found) {
-                traceId = String(
-                  found.trace_id ?? found.traceId ?? found.id ?? '',
-                ).toUpperCase();
-                break;
-              }
-            }
-          }
-
-          if (!traceId) {
-            logger?.warn(
-              'Program profiling trace not found after polling — skipping trace read',
-            );
-          } else {
-            createdTraceIds.add(traceId);
-            const traceData = await invoke(
-              'RuntimeGetProfilerTraceData',
-              {
-                trace_id_or_uri: traceId,
-                view: 'hitlist',
-                with_system_events: false,
-              },
-              async () => {
-                const handlerContext = createHandlerContext({
-                  connection: context.connection,
-                  logger,
-                });
-                return handleRuntimeGetProfilerTraceData(handlerContext, {
-                  trace_id_or_uri: traceId!,
-                  view: 'hitlist',
-                  with_system_events: false,
-                });
-              },
-            );
-            expect(traceData.isError).toBe(false);
-            const tracePayload = parseTextPayload(traceData);
-            expect(tracePayload.success).toBe(true);
-          }
-        } finally {
-          await deleteProgramIfExists(
-            context,
-            programName,
-            tester.isHardMode() ? invoke : undefined,
-          );
+        const attempts = toPositiveInt(context.params?.trace_feed_retries, 6);
+        const waitMs = Math.max(
+          100,
+          toPositiveInt(context.params?.trace_feed_retry_delay_ms, 1000),
+        );
+        let traceId: string | undefined;
+        for (let attempt = 1; attempt <= attempts && !traceId; attempt += 1) {
+          traceId = (await listTraces(context)).find(
+            (t) =>
+              !before.has(t.id) &&
+              String(t.objectName ?? '')
+                .toUpperCase()
+                .startsWith(programName),
+          )?.id;
+          if (!traceId && attempt < attempts) await delay(waitMs);
         }
+        expect(traceId).toBeTruthy();
+        createdTraceIds.add(String(traceId).toUpperCase());
+        logger?.info(`program ${programName} traced: ${traceId}`);
       });
     },
     getTimeout('long'),
   );
 
   it(
-    'should list profiler traces and include at least one trace created in this test run',
+    'reads and analyses a finished trace taken from the trace list',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        // A trace is readable once it is written — "Finished" in the list of
+        // traces; an id alone is not. So the trace to read comes from the
+        // list: one of this run's if it has finished already, otherwise the
+        // newest finished trace of the shared profiling objects, otherwise
+        // any finished trace. `trace_id_or_uri`, when set, overrides.
+        const configured = String(context.params?.trace_id_or_uri ?? '').trim();
+        let traceId = configured;
+        if (!traceId) {
+          const owners = [
+            context.params?.profiled_program_name,
+            context.params?.profiled_class_name,
+          ]
+            .filter(Boolean)
+            .map((n) => String(n).toUpperCase());
+          const finished = (
+            (await listTraces(context)) as Array<{
+              id: string;
+              objectName?: string;
+              recordedAt?: string;
+              state?: { value?: string };
+            }>
+          )
+            .filter((t) => t.state?.value === 'R')
+            .sort((a, b) =>
+              String(b.recordedAt ?? '').localeCompare(
+                String(a.recordedAt ?? ''),
+              ),
+            );
+          traceId =
+            finished.find((t) => createdTraceIds.has(t.id.toUpperCase()))?.id ??
+            finished.find((t) =>
+              owners.some((o) =>
+                String(t.objectName ?? '')
+                  .toUpperCase()
+                  .startsWith(o),
+              ),
+            )?.id ??
+            finished[0]?.id ??
+            '';
+        }
+        if (!traceId) {
+          throw new Error(
+            'no finished trace in the trace list to read — the profiled runs above wrote none',
+          );
+        }
+        logger?.info(`reading trace ${traceId}`);
+        const readArgs = {
+          trace_id_or_uri: traceId,
+          view: 'hitlist' as const,
+          with_system_events: false,
+        };
+        const read = await tester.invokeToolOrHandler(
+          'RuntimeGetProfilerTraceData',
+          readArgs,
+          async () =>
+            handleRuntimeGetProfilerTraceData(
+              createHandlerContext({ connection: context.connection, logger }),
+              readArgs,
+            ),
+        );
+        expect(read.isError).toBe(false);
+        expect(parseTextPayload(read).success).toBe(true);
+
+        const analyzeArgs = { ...readArgs, top: 5 };
+        const analyze = await tester.invokeToolOrHandler(
+          'RuntimeAnalyzeProfilerTrace',
+          analyzeArgs,
+          async () =>
+            handleRuntimeAnalyzeProfilerTrace(
+              createHandlerContext({ connection: context.connection, logger }),
+              analyzeArgs,
+            ),
+        );
+        expect(analyze.isError).toBe(false);
+        const analysed = parseTextPayload(analyze);
+        expect(analysed.success).toBe(true);
+        expect(analysed.summary).toBeDefined();
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'lists the traces this run produced',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
         if (createdTraceIds.size === 0) {
-          throw new Error('SKIP: no trace IDs were created by profiling tests');
+          throw new Error('SKIP: no trace IDs were produced by the runs above');
         }
-
-        const invoke = async (
-          toolName: string,
-          args: Record<string, unknown>,
-          directCall: () => Promise<any>,
-        ) => tester.invokeToolOrHandler(toolName, args, directCall);
-        const maxAttempts = toPositiveInt(
-          context.params?.trace_feed_retries,
-          6,
+        const listed = (await listTraces(context)).map((t) =>
+          t.id.toUpperCase(),
         );
-        const retryDelayMs = Math.max(
-          100,
-          toPositiveInt(context.params?.trace_feed_retry_delay_ms, 1000),
-        );
-
-        let found = false;
-        for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-          const result = await invoke(
-            'RuntimeListProfilerTraceFiles',
-            {},
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection: context.connection,
-                logger,
-              });
-              return handleRuntimeListProfilerTraceFiles(handlerContext);
-            },
-          );
-          expect(result.isError).toBe(false);
-          const data = parseTextPayload(result);
-          const traceIds = extractTraceIdsFromPayload(data.payload);
-          found = traceIds.some((id) => createdTraceIds.has(id.toUpperCase()));
-          if (found) {
-            break;
-          }
-          if (attempt < maxAttempts) {
-            await delay(retryDelayMs);
-          }
-        }
-
-        expect(found).toBe(true);
+        for (const id of createdTraceIds) expect(listed).toContain(id);
       });
     },
     getTimeout('long'),

@@ -19,6 +19,7 @@ import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { asItCame } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
+import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
 import { handleCreateDataElement } from '../../../handlers/data_element/high/handleCreateDataElement';
 import { handleUpdateDdl } from '../../../handlers/ddl/high/handleUpdateDdl';
 import { handleCreateMetadataExtension } from '../../../handlers/ddlx/high/handleCreateMetadataExtension';
@@ -715,6 +716,20 @@ describe('Admin: Setup shared dependencies', () => {
                 name: item.name,
                 status: 'created',
               });
+            }
+
+            if (item.source) {
+              await writeSource(
+                handleUpdateClass(
+                  { connection, logger: undefined } as any,
+                  {
+                    class_name: item.name,
+                    source_code: item.source,
+                    activate: false,
+                  } as any,
+                ),
+              );
+              testsLogger?.info?.(`Updated class ${item.name} source`);
             }
 
             toActivate.push({

@@ -437,6 +437,26 @@ shared_dependencies:
         }
 
   classes:
+    # Run under the profiler by the runtime suite. Running it changes nothing,
+    # so it can be shared.
+    - name: "ZMCP_SHR_PROF_CLS"
+      description: "Shared class for profiler runs"
+      available_in: ["onprem", "cloud"]
+      source: |
+        CLASS zmcp_shr_prof_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zmcp_shr_prof_cls IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_x TYPE i.
+            DO 20000 TIMES.
+              lv_x = sy-index MOD 100.
+            ENDDO.
+            out->write( lv_x ).
+          ENDMETHOD.
+        ENDCLASS.
     - name: "ZCL_MCP_SHARED_CLS"
       description: "Shared class for check tests"
       available_in: ["onprem", "cloud", "legacy"]
@@ -522,6 +542,17 @@ shared_dependencies:
         ENDINTERFACE.
 
   programs:
+    # Run under the profiler by the runtime suite (on-prem).
+    - name: "ZMCP_SHR_PROF_PROG"
+      description: "Shared program for profiler runs"
+      available_in: ["onprem", "legacy"]
+      source: |
+        REPORT zmcp_shr_prof_prog.
+        DATA lv_x TYPE i.
+        DO 20000 TIMES.
+          lv_x = sy-index MOD 100.
+        ENDDO.
+        WRITE / lv_x.
     - name: "ZMCP_SHR_PROG"
       description: "Shared program for check tests"
       available_in: ["onprem", "legacy"]
@@ -1911,15 +1942,11 @@ runtime_readonly_handlers:
       available_in: ["onprem", "cloud"]
       description: "Runtime profiling and dumps handlers integration tests"
       params:
-        # Class for profiled execution (must support ADT classrun endpoint)
-        profiled_class_name: "ZMCP_BLD_CLSLOC_H1"
-        # Prefix for temporary class created by profiling test
-        profiled_class_prefix: "ZMCP_RTCLS"
-        # On-prem only: executable report for RuntimeRunProgramWithProfiling
-        profiled_program_name: "ZMCP_BLD_PROG023"
-        # Prefix for temporary program created by profiling test (on-prem only)
-        profiled_program_prefix: "ZMCP_RTPRG"
-        # Optional fallback trace id/uri when feed parsing does not provide one
+        # The shared objects run under the profiler (shared_dependencies).
+        profiled_class_name: "ZMCP_SHR_PROF_CLS"
+        profiled_program_name: "ZMCP_SHR_PROF_PROG"   # on-prem only
+        # Optional: a trace to read. Empty — the read/analyse test takes a
+        # finished trace from the trace list.
         trace_id_or_uri: ""
         # Retries for trace files feed lookup (trace can appear with delay)
         trace_feed_retries: 6

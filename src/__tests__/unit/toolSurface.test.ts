@@ -113,6 +113,12 @@ describe('the MCP tool surface', () => {
       // now types the task itself, `S` by default; the parameter is how a
       // caller asks for Repair (`R`) or leaves it Unclassified (`X`).
       //
+      // **Sixth exception: CheckDomain and CheckDataElement gained `version`.**
+      // They could only ask about the inactive version, and an object that
+      // is only active has none: SAP answered "Error while importing object
+      // … from the database" for the shared domain and data element (E19,
+      // 2026-09-25). Every other DDIC check already took a version.
+      //
       // **Fifth exception: seven low-tier writes gained `transport_request`.**
       // They had none, so a caller's request number was dropped and the write
       // went out without `corrNr` — refused on premise with "Parameter corrNr
@@ -138,6 +144,10 @@ describe('the MCP tool surface', () => {
         'low/UpdateInterfaceLow': ['transport_request'],
         'low/UpdateStructureLow': ['transport_request'],
         'low/UpdateProgramLow': ['transport_request'],
+        'high/CheckDomain': ['version'],
+        'low/CheckDomainLow': ['version'],
+        'high/CheckDataElement': ['version'],
+        'low/CheckDataElementLow': ['version'],
         // The eighth of the same family, found while reviewing the other
         // seven: `core/package/update.ts` appends `&corrNr=` when a transport
         // is given and `IPackageConfig` declares `transportRequest`, but the

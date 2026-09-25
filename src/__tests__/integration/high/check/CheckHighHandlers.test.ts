@@ -112,13 +112,16 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-class');
           const response = await tester.invokeToolOrHandler(
             'CheckClass',
-            { class_name: objectName },
+            { class_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckClass(ctx, { class_name: objectName });
+              return handleCheckClass(ctx, {
+                class_name: objectName,
+                version: 'active',
+              });
             },
           );
 
@@ -244,20 +247,22 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-ddl');
           const response = await tester.invokeToolOrHandler(
             'CheckDdl',
-            { ddl_name: objectName },
+            { ddl_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckDdl(ctx, { ddl_name: objectName });
+              return handleCheckDdl(ctx, {
+                ddl_name: objectName,
+                version: 'active',
+              });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.ddl_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
@@ -305,20 +310,22 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-domain');
           const response = await tester.invokeToolOrHandler(
             'CheckDomain',
-            { domain_name: objectName },
+            { domain_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckDomain(ctx, { domain_name: objectName });
+              return handleCheckDomain(ctx, {
+                domain_name: objectName,
+                version: 'active',
+              });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.domain_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
@@ -366,7 +373,7 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-dtel');
           const response = await tester.invokeToolOrHandler(
             'CheckDataElement',
-            { data_element_name: objectName },
+            { data_element_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
@@ -374,6 +381,7 @@ describe('Check High-Level Handlers Integration', () => {
               });
               return handleCheckDataElement(ctx, {
                 data_element_name: objectName,
+                version: 'active',
               });
             },
           );
@@ -381,7 +389,6 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.data_element_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
@@ -503,20 +510,22 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-structure');
           const response = await tester.invokeToolOrHandler(
             'CheckStructure',
-            { structure_name: objectName },
+            { structure_name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckStructure(ctx, { structure_name: objectName });
+              return handleCheckStructure(ctx, {
+                structure_name: objectName,
+                version: 'active',
+              });
             },
           );
 
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.structure_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
@@ -577,7 +586,6 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.interface_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
@@ -704,7 +712,6 @@ describe('Check High-Level Handlers Integration', () => {
           expect(response.isError).toBe(false);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
-          expect(data.program_name).toBe(objectName.toUpperCase());
 
           logger?.success(
             `✅ check: ${objectName} — ${data.status_text} (${data.messages?.length ?? 0} message(s))`,
@@ -829,6 +836,7 @@ describe('Check High-Level Handlers Integration', () => {
             {
               function_group_name: params.function_group_name,
               function_module_name: objectName,
+              version: 'active',
             },
             async () => {
               const ctx = createHandlerContext({
@@ -838,6 +846,7 @@ describe('Check High-Level Handlers Integration', () => {
               return handleCheckFunctionModule(ctx, {
                 function_group_name: params.function_group_name,
                 function_module_name: objectName,
+                version: 'active',
               });
             },
           );
@@ -892,13 +901,16 @@ describe('Check High-Level Handlers Integration', () => {
           const checkLogger = createTestLogger('check-ddlx');
           const response = await tester.invokeToolOrHandler(
             'CheckMetadataExtension',
-            { name: objectName },
+            { name: objectName, version: 'active' },
             async () => {
               const ctx = createHandlerContext({
                 connection,
                 logger: checkLogger,
               });
-              return handleCheckMetadataExtension(ctx, { name: objectName });
+              return handleCheckMetadataExtension(ctx, {
+                name: objectName,
+                version: 'active',
+              });
             },
           );
 

@@ -116,6 +116,7 @@ import {
 } from '../../handlers/ddlx/low/handleUnlockMetadataExtension';
 import { handleUpdateMetadataExtension } from '../../handlers/ddlx/low/handleUpdateMetadataExtension';
 import { handleValidateMetadataExtension } from '../../handlers/ddlx/low/handleValidateMetadataExtension';
+import { handleCheckDomain as handleCheckDomainLowForVersion } from '../../handlers/domain/low/handleCheckDomain';
 import { handleActivateFunctionGroup } from '../../handlers/function/low/handleActivateFunctionGroup';
 import { handleActivateFunctionModule } from '../../handlers/function/low/handleActivateFunctionModule';
 import { handleCheckFunctionGroup } from '../../handlers/function/low/handleCheckFunctionGroup';
@@ -2255,6 +2256,41 @@ describe('data_element', () => {
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
     expect(call?.args[1]).toBeUndefined();
+  });
+
+  /**
+   * An object that is only active has no inactive version, and a check of
+   * the inactive one is answered "Error while importing object … from the
+   * database" (E19, ZMCP_SHR_DOMAIN / ZMCP_SHR_DTEL, 2026-09-25). `version`
+   * is how a caller asks about the active one.
+   */
+  it('CheckDataElementLow passes version through to the check member', async () => {
+    await handleCheckDataElement(
+      context as any,
+      {
+        data_element_name: 'ZDT_X',
+        version: 'active',
+      } as any,
+    );
+    expect(callTo('check')?.args[1]).toBe('active');
+  });
+
+  it('CheckDomainLow passes version through to the check member, and leaves it undefined when not given', async () => {
+    await handleCheckDomainLowForVersion(
+      context as any,
+      {
+        domain_name: 'ZDM_X',
+        version: 'active',
+      } as any,
+    );
+    expect(callTo('check')?.args[1]).toBe('active');
+    await handleCheckDomainLowForVersion(
+      context as any,
+      {
+        domain_name: 'ZDM_X',
+      } as any,
+    );
+    expect(callTo('check')?.args[1]).toBeUndefined();
   });
 
   it('CheckDataElementLow reads the real check-success-verdict fixture through terseCheck — pinning the projection, not only the analyse', async () => {

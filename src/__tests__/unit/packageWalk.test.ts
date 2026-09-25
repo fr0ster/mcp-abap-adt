@@ -140,3 +140,114 @@ describe('the node reading', () => {
     expect(nodeLevel({ data: '' })).toEqual({ objects: [], childNodes: [] });
   });
 });
+
+/**
+ * The library's own reading of a node structure, as `getUtils()` without
+ * `ourUtils` answers it — measured on E19, 2026-09-25:
+ * `{objects: [{objectType, objectName, techName, objectUri}],
+ *   childNodes: [{objectType, nodeId: '000035'}]}`.
+ *
+ * `levelOf` used to pass anything with `childNodes` through as our
+ * `NodeLevel`, so `name`/`type` came out undefined: GetPackageContents
+ * answered rows of `{packageName, isPackage: false}` and GetPackageTree
+ * nameless children, and `include_subpackages` never recursed.
+ */
+describe("the library's own reading is mapped, never passed through as ours", () => {
+  const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
+
+  it('names the objects and types the child nodes', async () => {
+    const source: NodeStructureSource = {
+      async fetchNodeStructure(_t, _n, options) {
+        if (!options?.nodeId || options.nodeId === '000000') {
+          return ok({
+            objects: [],
+            childNodes: [{ objectType: 'TABL/DT', nodeId: '000035' }],
+          });
+        }
+        return ok({
+          objects: [
+            {
+              objectType: 'TABL/DT',
+              objectName: 'ZMCP_SHR_RTABL',
+              techName: 'ZMCP_SHR_RTABL',
+              objectUri: '/sap/bc/adt/ddic/tables/zmcp_shr_rtabl',
+            },
+          ],
+          childNodes: [],
+        });
+      },
+    };
+
+    const walked = await walkPackage(source, 'TEST_MCP_SHR_PKG', {});
+    const items = assembleList('TEST_MCP_SHR_PKG', walked);
+    expect(JSON.stringify(items)).toContain('ZMCP_SHR_RTABL');
+    expect(JSON.stringify(items)).toContain('TABL/DT');
+  });
+});
+
+/**
+ * A subpackage's objects belong under the subpackage, not under the root.
+ * `walkPackage` answered one flat list with no owner, so `assembleTree` hung
+ * everything off the root and left every subpackage `children: []` (E19,
+ * TEST_MCP with include_subpackages, 2026-09-25), and `assembleList` gave a
+ * subpackage's objects the ROOT as their `packageName`.
+ */
+describe('subpackages keep their own objects', () => {
+  const ok = (value: unknown) => ({ ok: true, getResult: () => ({ value }) });
+  const levels: Record<string, Record<string, unknown>> = {
+    'P|root': {
+      objects: [],
+      childNodes: [
+        { type: 'DEVC/K', nodeId: '1' },
+        { type: 'TABL/DT', nodeId: '2' },
+      ],
+    },
+    'P|1': { objects: [{ name: 'SUB', type: 'DEVC/K' }], childNodes: [] },
+    'P|2': { objects: [{ name: 'T1', type: 'TABL/DT' }], childNodes: [] },
+    'SUB|root': { objects: [], childNodes: [{ type: 'TABL/DT', nodeId: '2' }] },
+    'SUB|2': { objects: [{ name: 'T2', type: 'TABL/DT' }], childNodes: [] },
+  };
+  const source: NodeStructureSource = {
+    async fetchNodeStructure(_t, name, options) {
+      return ok(
+        levels[`${name}|${options?.nodeId ?? 'root'}`] ?? {
+          objects: [],
+          childNodes: [],
+        },
+      );
+    },
+  };
+
+  it('nests them in the tree', async () => {
+    const walked = await walkPackage(source, 'P', { includeSubpackages: true });
+    const tree = assembleTree('P', walked);
+    const names = (n: { children?: Array<{ name: string }> }) =>
+      (n.children ?? []).map((c) => c.name).sort();
+    expect(names(tree)).toEqual(['SUB', 'T1']);
+    const sub = (tree.children ?? []).find((c) => c.name === 'SUB') as any;
+    expect(names(sub)).toEqual(['T2']);
+  });
+
+  it('names the package each listed object is in', async () => {
+    const walked = await walkPackage(source, 'P', { includeSubpackages: true });
+    const t2 = assembleList('P', walked).find((i) => i.name === 'T2');
+    expect(t2?.packageName).toBe('SUB');
+  });
+});
+
+/**
+ * SAP puts a message where an object should be when a node cannot be loaded —
+ * E19, TEST_AC_SHR's VIEW/DV node, 2026-09-25: OBJECT_NAME "Error loading
+ * node:", no OBJECT_TYPE, the explanation in TECH_NAME. It is not an object,
+ * and listing it as one put a nameless-typed row in GetPackageTree.
+ */
+describe('a node-load message is not an object', () => {
+  it('drops an entry with no object type', () => {
+    const data =
+      '<asx:abap xmlns:asx="http://www.sap.com/abapxml"><asx:values><DATA><TREE_CONTENT>' +
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE>VIEW/DV</OBJECT_TYPE><OBJECT_NAME>ZV_REAL</OBJECT_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+      '<SEU_ADT_REPOSITORY_OBJ_NODE><OBJECT_TYPE/><OBJECT_NAME>Error loading node:</OBJECT_NAME><TECH_NAME>The API state can be edited...</TECH_NAME></SEU_ADT_REPOSITORY_OBJ_NODE>' +
+      '</TREE_CONTENT></DATA></asx:values></asx:abap>';
+    expect(nodeLevel({ data }).objects.map((o) => o.name)).toEqual(['ZV_REAL']);
+  });
+});

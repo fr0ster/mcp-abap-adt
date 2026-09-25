@@ -8,6 +8,7 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -82,7 +83,7 @@ export async function handleGetPackageTree(
     );
 
     const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+    const utils = client.getUtils(ourUtils);
 
     // Verify package exists before building tree (fixes #38).
     // `IPackageContract` has no `.read()` — a package is a container with no
@@ -119,7 +120,7 @@ export async function handleGetPackageTree(
     // See mcp-abap-adt-clients#141.
     const packageTree = assembleTree(
       packageName,
-      await walkPackage(utils as never, packageName, {
+      await walkPackage(utils, packageName, {
         includeSubpackages,
         maxDepth,
         includeDescriptions,

@@ -52,7 +52,7 @@ export interface EnhancementImplementation {
  */
 export interface EnhancementResponse {
   object_name: string;
-  object_type: 'program' | 'include' | 'class';
+  object_type: 'program' | 'include' | 'class' | 'function_group';
   context?: string;
   enhancements: EnhancementImplementation[];
   detailed?: boolean;
@@ -125,6 +125,23 @@ export function parseEnhancementsFromXml(
         enhancement.type = enhTypeMatch[1];
       }
 
+      // The implementation a source sits in names it. Every source nests in
+      // `enh:enhancementImplementations adtcore:name="…"`, so the nearest one
+      // opened before this source is its own — the patterns above searched
+      // the whole preceding document and took its FIRST name, which named
+      // all five of SAPMV45A's implementations after the first (E19,
+      // 2026-09-25). They stay as the fallback for a document without it.
+      const owners = beforeSource.match(
+        /<enh:enhancementImplementations\b[^>]*>/g,
+      );
+      const owner = owners?.[owners.length - 1];
+      if (owner) {
+        const ownerName = owner.match(/adtcore:name="([^"]*)"/)?.[1];
+        const ownerType = owner.match(/adtcore:type="([^"]*)"/)?.[1];
+        if (ownerName) enhancement.name = ownerName;
+        if (ownerType) enhancement.type = ownerType;
+      }
+
       // Extract and decode the base64 source code
       const base64Source = match[1];
       if (base64Source) {
@@ -157,132 +174,133 @@ export function parseEnhancementsFromXml(
 }
 
 /**
- * Determines if an object is a program, include, or class and returns appropriate URL path
- * @param objectName - Name of the object
- * @param manualProgramContext - Optional manual program context for includes
- * @returns Object with type, basePath, and context (if needed)
+ * Where the enhancements of an object live, and what kind of object it is.
+ *
+ * **The caller's `object_type` decides; guessing is the fallback.** This
+ * used to ignore it and probe class → program → include. A function group's
+ * main program `SAPL<fg>` is none of those addressable things — on E19
+ * (2026-09-25) all three URIs answered 404 — so the tool failed outright.
+ * Its enhancements are the group's, at `/functions/groups/<fg>/source/main`,
+ * which answers 200. Each probe that remains is its own try, and its Accept
+ * header goes where headers go (the seventh argument), not into the body.
  */
 async function determineObjectTypeAndPath(
   connection: AbapConnection,
   objectName: string,
   manualProgramContext?: string,
+  requestedType?: string,
 ): Promise<{
-  type: 'program' | 'include' | 'class';
+  type: 'program' | 'include' | 'class' | 'function_group';
   basePath: string;
   context?: string;
 }> {
-  try {
-    // First try as a class
-    const classUrl = `/sap/bc/adt/oo/classes/${encodeSapObjectName(objectName)}`;
+  const name = objectName.toUpperCase();
+  const enc = encodeSapObjectName(name);
+  const kind = (requestedType ?? '').trim().toUpperCase();
+
+  const classPath = {
+    type: 'class' as const,
+    basePath: `/sap/bc/adt/oo/classes/${enc}/source/main/enhancements/elements`,
+  };
+  const programPath = {
+    type: 'program' as const,
+    basePath: `/sap/bc/adt/programs/programs/${enc}/source/main/enhancements/elements`,
+  };
+  const groupPath = (group: string) => ({
+    type: 'function_group' as const,
+    basePath: `/sap/bc/adt/functions/groups/${encodeSapObjectName(group.toLowerCase())}/source/main/enhancements/elements`,
+  });
+  // `SAPL<fg>` is the group's main program: address the group.
+  const saplGroup =
+    name.startsWith('SAPL') && name.length > 4 ? name.slice(4) : undefined;
+
+  const probe = async (url: string, accept: string) => {
     try {
       const response = await makeAdtRequestWithTimeout(
         connection,
-        classUrl,
+        url,
         'GET',
         'csrf',
-        {
-          Accept: 'application/vnd.sap.adt.oo.classes.v4+xml',
-        },
+        undefined,
+        undefined,
+        { Accept: accept },
       );
-
-      if (response.status === 200) {
-        logger?.info(`${objectName} is a class`);
-        return {
-          type: 'class',
-          basePath: `/sap/bc/adt/oo/classes/${encodeSapObjectName(objectName)}/source/main/enhancements/elements`,
-        };
-      }
-    } catch (_classError) {
-      // If class request fails, try as program
-      logger?.info(`${objectName} is not a class, trying as program...`);
+      return response.status === 200 ? response : undefined;
+    } catch {
+      return undefined;
     }
+  };
 
-    // Try as a program
-    const programUrl = `/sap/bc/adt/programs/programs/${encodeSapObjectName(objectName)}`;
-    try {
-      const response = await makeAdtRequestWithTimeout(
-        connection,
-        programUrl,
-        'GET',
-        'csrf',
-        {
-          Accept: 'application/vnd.sap.adt.programs.v3+xml',
-        },
+  const asInclude = async () => {
+    const response = await probe(
+      `/sap/bc/adt/programs/includes/${enc}`,
+      'application/vnd.sap.adt.programs.includes.v2+xml',
+    );
+    if (!response) return undefined;
+    let context: string | undefined;
+    if (manualProgramContext) {
+      context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
+    } else {
+      context = String(response.data ?? '').match(
+        /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
+      )?.[1];
+    }
+    if (!context) {
+      throw new EnhancementInputError(
+        `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`,
       );
-
-      if (response.status === 200) {
-        logger?.info(`${objectName} is a program`);
-        return {
-          type: 'program',
-          basePath: `/sap/bc/adt/programs/programs/${encodeSapObjectName(objectName)}/source/main/enhancements/elements`,
-        };
-      }
-    } catch (_programError) {
-      // If program request fails, try as include
-      logger?.info(`${objectName} is not a program, trying as include...`);
     }
+    return {
+      type: 'include' as const,
+      basePath: `/sap/bc/adt/programs/includes/${enc}/source/main/enhancements/elements`,
+      context,
+    };
+  };
 
-    // Try as include
-    const includeUrl = `/sap/bc/adt/programs/includes/${encodeSapObjectName(objectName)}`;
-    const response = await makeAdtRequestWithTimeout(
-      connection,
-      includeUrl,
-      'GET',
-      'csrf',
-      {
-        Accept: 'application/vnd.sap.adt.programs.includes.v2+xml',
-      },
-    );
-
-    if (response.status === 200) {
-      logger?.info(`${objectName} is an include`);
-
-      let context: string;
-
-      // Use manual program context if provided
-      if (manualProgramContext) {
-        context = `/sap/bc/adt/programs/programs/${manualProgramContext}`;
-        logger?.info(
-          `Using manual program context for include ${objectName}: ${context}`,
-        );
-      } else {
-        // Auto-determine context from metadata
-        const xmlData = response.data;
-        const contextMatch = xmlData.match(
-          /include:contextRef[^>]+adtcore:uri="([^"]+)"/,
-        );
-
-        if (contextMatch?.[1]) {
-          context = contextMatch[1];
-          logger?.info(
-            `Found auto-determined context for include ${objectName}: ${context}`,
-          );
-        } else {
-          throw new EnhancementInputError(
-            `Could not determine parent program context for include: ${objectName}. No contextRef found in metadata. Consider providing the 'program' parameter manually.`,
-          );
-        }
-      }
-
-      return {
-        type: 'include',
-        basePath: `/sap/bc/adt/programs/includes/${encodeSapObjectName(objectName)}/source/main/enhancements/elements`,
-        context: context,
-      };
-    }
-
-    throw new EnhancementInputError(
-      `Could not determine object type for: ${objectName}. Object is neither a valid class, program, nor include.`,
-    );
-  } catch (error) {
-    if (error instanceof EnhancementInputError) {
-      throw error;
-    }
-    logger?.error(`Failed to determine object type for ${objectName}:`, error);
-    throw new EnhancementInputError(
-      `Failed to determine object type for: ${objectName}. ${error instanceof Error ? error.message : String(error)}`,
-    );
+  // The type the caller named, taken at its word.
+  if (kind === 'CLASS' || kind === 'CLAS' || kind === 'CLAS/OC') {
+    return classPath;
   }
+  if (
+    kind === 'FUNCTION_GROUP' ||
+    kind === 'FUNCTIONGROUP' ||
+    kind === 'FUGR' ||
+    kind === 'FUGR/F'
+  ) {
+    return groupPath(saplGroup ?? name);
+  }
+  if (kind === 'PROGRAM' || kind === 'PROG' || kind === 'PROG/P') {
+    return saplGroup ? groupPath(saplGroup) : programPath;
+  }
+  if (kind === 'INCLUDE' || kind === 'PROG/I') {
+    const include = await asInclude();
+    if (include) return include;
+    throw new EnhancementInputError(`Include ${objectName} could not be read.`);
+  }
+
+  // No usable type: find out, one independent probe at a time.
+  if (saplGroup) return groupPath(saplGroup);
+  if (
+    await probe(
+      `/sap/bc/adt/oo/classes/${enc}`,
+      'application/vnd.sap.adt.oo.classes.v4+xml',
+    )
+  ) {
+    return classPath;
+  }
+  if (
+    await probe(
+      `/sap/bc/adt/programs/programs/${enc}`,
+      'application/vnd.sap.adt.programs.v3+xml',
+    )
+  ) {
+    return programPath;
+  }
+  const include = await asInclude();
+  if (include) return include;
+  throw new EnhancementInputError(
+    `Could not determine object type for: ${objectName}. Object is neither a valid class, program, include, nor a function group's main program.`,
+  );
 }
 
 /**
@@ -294,7 +312,7 @@ async function determineObjectTypeAndPath(
 async function getIncludesListInternal(
   context: HandlerContext,
   objectName: string,
-  objectType: 'program' | 'include' | 'class',
+  objectType: 'program' | 'include' | 'class' | 'function_group',
 ): Promise<string[]> {
   const { connection, logger } = context;
   try {
@@ -306,9 +324,14 @@ async function getIncludesListInternal(
       return [];
     }
 
-    // For includes, we need to determine the parent program
-    const parentName = objectName.toUpperCase();
-    const parentType = 'PROG/P';
+    // A function group's main program is walked as the group.
+    const upper = objectName.toUpperCase();
+    const isGroup =
+      objectType === 'function_group' ||
+      (upper.startsWith('SAPL') && upper.length > 4);
+    const parentName =
+      isGroup && upper.startsWith('SAPL') ? upper.slice(4) : upper;
+    const parentType = isGroup ? 'FUGR/F' : 'PROG/P';
 
     if (objectType === 'include') {
       logger?.warn(
@@ -353,7 +376,9 @@ async function getIncludesListInternal(
     // Step 2: Find the includes (PROG/I) node id among the type folders.
     const includesNode = rootResponse
       .getResult()
-      .value.childNodes.find((info) => info.type === 'PROG/I');
+      // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
+      // with PROG/I objects under it — E19, 2026-09-25).
+      .value.childNodes.find((info) => /\/I$/.test(info.type));
 
     if (!includesNode) {
       logger?.info(`No includes node found for ${objectType} '${objectName}'`);
@@ -387,12 +412,7 @@ async function getIncludesListInternal(
     // Step 4: Names of the objects under that node — de-duplicated, matching
     // the pre-migration parser's `[...new Set(...)]`.
     const includeNames = [
-      ...new Set(
-        includesResponse
-          .getResult()
-          .value.objects.filter((o) => o.type === 'PROG/I')
-          .map((o) => o.name),
-      ),
+      ...new Set(includesResponse.getResult().value.objects.map((o) => o.name)),
     ];
 
     logger?.info(
@@ -418,6 +438,7 @@ async function getEnhancementsForSingleObject(
   connection: AbapConnection,
   objectName: string,
   manualProgramContext?: string,
+  requestedType?: string,
 ): Promise<EnhancementResponse> {
   logger?.info(
     `Getting enhancements for single object: ${objectName}`,
@@ -431,6 +452,7 @@ async function getEnhancementsForSingleObject(
     connection,
     objectName,
     manualProgramContext,
+    requestedType,
   );
 
   // Build URL based on object type
@@ -444,12 +466,18 @@ async function getEnhancementsForSingleObject(
 
   logger?.info(`Final enhancement URL: ${url}`);
 
+  // Name the object in a failure: with the type taken from the caller there
+  // is no probe in front of this request to have said which object it was.
   const response = await makeAdtRequestWithTimeout(
     connection,
     url,
     'GET',
     'default',
-  );
+  ).catch((error: unknown) => {
+    throw new EnhancementInputError(
+      `Failed to retrieve enhancements for ${objectName}: ${error instanceof Error ? error.message : String(error)}`,
+    );
+  });
 
   if (response.status === 200 && response.data) {
     // Parse the XML to extract enhancement implementations
@@ -574,6 +602,7 @@ export async function handleGetEnhancements(
       connection,
       objectName,
       manualProgram,
+      args.object_type,
     );
 
     if (!includeNested) {
@@ -640,6 +669,7 @@ export async function handleGetEnhancements(
             connection,
             includeName,
             manualProgram,
+            'include',
           );
 
           const includeEnhancements = await createPromiseWithTimeout(

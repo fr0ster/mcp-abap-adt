@@ -5588,7 +5588,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetNodeStructure.ts`
 
 **Parameters:**
-- `node_id` (string, optional (default: 0000" for root). Use to fetch child nodes.)) - Optional node ID (default: "0000" for root). Use to fetch child nodes.
+- `node_id` (string, optional (default: 000000)) - Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: E19 answers it with an empty body.
 - `parent_name` (string, required) - Parent object name
 - `parent_type` (string, required) - Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.

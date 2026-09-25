@@ -55,6 +55,11 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'test_class_source', 'lock_handle'],
@@ -71,6 +76,7 @@ interface UpdateClassTestClassesArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -106,7 +112,13 @@ export async function handleUpdateClassTestClasses(
       createAdtClient(connection, logger)
         .getLocalTestClass(resultsFor(classDocuments))
         .update(
-          { className, source: test_class_source },
+          {
+            className,
+            source: test_class_source,
+            ...(args.transport_request && {
+              transportRequest: args.transport_request,
+            }),
+          },
           { lockHandle: lock_handle, analyse: analyseException },
         ),
     project(detail, terseWrite),

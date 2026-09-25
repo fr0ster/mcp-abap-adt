@@ -72,6 +72,7 @@ import {
 } from '../../handlers/class/low/handleUnlockClass';
 import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { handleUpdateClass } from '../../handlers/class/low/handleUpdateClass';
+import { handleUpdateClassTestClasses } from '../../handlers/class/low/handleUpdateClassTestClasses';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
 import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
 import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
@@ -3263,4 +3264,142 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
     expect(result.isError).toBe(true);
     expect(result.content[0].text).not.toContain('"success": true');
   });
+});
+
+/**
+ * The seven low-tier writes that had no `transport_request` at all. A caller
+ * passing one had it dropped on the floor, the write went out without
+ * `corrNr`, and an on-premise system refused it — measured on E19,
+ * 2026-09-25, for a view in a transportable package: `400
+ * ExceptionParameterNotFound`, "Parameter corrNr could not be found."
+ * (SADT_RESOURCE 017). Every one of these members reads
+ * `config.transportRequest` and puts it on the URL; the handler only has to
+ * hand it over.
+ */
+describe('low-tier writes carry transport_request to config.transportRequest', () => {
+  const cases: [
+    string,
+    string,
+    () => Promise<unknown>,
+    Record<string, unknown>,
+  ][] = [
+    [
+      'UpdateClassLow',
+      'getClass',
+      () =>
+        handleUpdateClass(
+          context as any,
+          {
+            class_name: 'ZCL_X',
+            source_code: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { className: 'ZCL_X' },
+    ],
+    [
+      'UpdateClassTestClassesLow',
+      'getLocalTestClass',
+      () =>
+        handleUpdateClassTestClasses(
+          context as any,
+          {
+            class_name: 'ZCL_X',
+            test_class_source: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { className: 'ZCL_X' },
+    ],
+    [
+      'UpdateDdlLow',
+      'getDdl',
+      () =>
+        handleUpdateDdl(
+          context as any,
+          {
+            ddl_name: 'ZVW_X',
+            ddl_source: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { ddlName: 'ZVW_X' },
+    ],
+    [
+      'UpdateMetadataExtensionLow',
+      'getMetadataExtension',
+      () =>
+        handleUpdateMetadataExtension(
+          context as any,
+          {
+            name: 'ZDDLX_X',
+            source_code: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { name: 'ZDDLX_X' },
+    ],
+    [
+      'UpdateInterfaceLow',
+      'getInterface',
+      () =>
+        handleUpdateInterface(
+          context as any,
+          {
+            interface_name: 'ZIF_X',
+            source_code: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { interfaceName: 'ZIF_X' },
+    ],
+    [
+      'UpdateStructureLow',
+      'getStructure',
+      () =>
+        handleUpdateStructure(
+          context as any,
+          {
+            structure_name: 'ZST_X',
+            ddl_code: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { structureName: 'ZST_X' },
+    ],
+    [
+      'UpdateProgramLow',
+      'getProgram',
+      () =>
+        handleUpdateProgram(
+          context as any,
+          {
+            program_name: 'ZPROG_X',
+            source_code: 'x',
+            lock_handle: 'h',
+            transport_request: 'E19K900001',
+          } as any,
+        ),
+      { programName: 'ZPROG_X' },
+    ],
+  ];
+
+  it.each(cases)(
+    '%s puts transport_request on config as transportRequest',
+    async (_tool, factory, run, key) => {
+      await run();
+      const call = callTo('update');
+      expect(call?.factory).toBe(factory);
+      expect(call?.args[0]).toMatchObject({
+        ...key,
+        transportRequest: 'E19K900001',
+      });
+    },
+  );
 });

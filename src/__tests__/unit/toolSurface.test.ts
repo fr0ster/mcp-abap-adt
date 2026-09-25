@@ -112,6 +112,12 @@ describe('the MCP tool surface', () => {
       // on E19 2026-09-25) until `changetasktype` gives it a type. The tool
       // now types the task itself, `S` by default; the parameter is how a
       // caller asks for Repair (`R`) or leaves it Unclassified (`X`).
+      //
+      // **Fifth exception: seven low-tier writes gained `transport_request`.**
+      // They had none, so a caller's request number was dropped and the write
+      // went out without `corrNr` — refused on premise with "Parameter corrNr
+      // could not be found." (SADT_RESOURCE 017, E19 2026-09-25). Every other
+      // low-tier write already carried it.
       expect({ tool, lost: had.filter((p) => !has.includes(p)) }).toEqual({
         tool,
         lost: [],
@@ -125,6 +131,13 @@ describe('the MCP tool surface', () => {
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
         'high/CreateTransportTask': ['task_type'],
+        'low/UpdateClassLow': ['transport_request'],
+        'low/UpdateClassTestClassesLow': ['transport_request'],
+        'low/UpdateDdlLow': ['transport_request'],
+        'low/UpdateMetadataExtensionLow': ['transport_request'],
+        'low/UpdateInterfaceLow': ['transport_request'],
+        'low/UpdateStructureLow': ['transport_request'],
+        'low/UpdateProgramLow': ['transport_request'],
       };
       expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
         tool,

@@ -1,77 +1,77 @@
 /**
- * Releasing a lock a test left behind.
+ * What a standalone suite needs to know about locks and about the system it
+ * runs on — asked through `@mcp-abap-adt/adt-clients`, never through a URL.
  *
- * **Why a test needs this at all.** A freshly created Workbench object is
- * left under a real SAP ENQUEUE lock — SAP says so itself, `EU510`, "This
- * object is currently being edited" — the same lock SE80 and Eclipse hold
- * while an editing session is open. A lock → write → unlock cycle closes it;
- * a test that creates an object and then fails on the next assertion never
- * gets there, and the lock outlives the process. SM12 by hand is the
- * alternative, and it was needed more than once while the transport-object
- * suite was being written.
+ * **No ADT endpoint is addressed from this repository.** An earlier version of
+ * this file built `/sap/bc/adt/deletion/check`,
+ * `/sap/bc/adt/ddic/ddlock/locks` and
+ * `/sap/bc/adt/core/http/systeminformation` by hand, and kept a table of object
+ * URIs to feed them. Every one of those has a member: `checkDeletion` on the
+ * object's own accessor, and `getSystemInformation`. The URI table is gone with
+ * the requests that needed it.
  *
- * `LambdaTester` already does this for the suites built on it, as a
- * `protected` member that resolves the object's URI from the handler's NAME.
- * A standalone suite has no handler name, so the two requests live here
- * taking the URI directly — the same `deletion/check` to ask whether a lock
- * is held, and the same `ddic/ddlock/locks` to drop it.
+ * **And the release is gone, not ported.** Releasing a lock held by another
+ * session is not a member because ADT offers us nothing that does it — measured
+ * on BTP ABAP, 2026-09-24: `ddic/ddlock/locks` answers `404`, that resource does
+ * not exist on the system; a stateful `LOCK` with or without `force=true`
+ * answers `403` EU510; an `UNLOCK` without a handle answers `200` and changes
+ * nothing. So a suite cannot clean up after orphaning a lock, which is why it
+ * must not orphan one: lock, write, unlock, and fail loudly if the unlock is
+ * refused.
+ *
+ * What is left here is the part that is useful and honest: say whether an object
+ * is locked and by whom, so a refused delete in cleanup reads as what it is.
  */
 
-/** ADT addresses for the object kinds a standalone suite creates. */
-export const OBJECT_URIS = {
-  program: (name: string) =>
-    `/sap/bc/adt/programs/programs/${name.toLowerCase()}`,
-  class: (name: string) => `/sap/bc/adt/oo/classes/${name.toLowerCase()}`,
+import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import { createAdtClient } from '../../../lib/clients';
+
+/** The accessors whose objects these suites create, and their config key. */
+const FAMILY = {
+  program: { accessor: 'getProgram', key: 'programName' },
+  class: { accessor: 'getClass', key: 'className' },
 } as const;
 
-/**
- * Drop the lock on an object if one is held. Never throws: this runs in
- * cleanup, where a failure to tidy up must not replace the failure that
- * brought us here.
- */
-export async function releaseObjectLockIfHeld(
-  connection: any,
-  objectUri: string,
-  objectName: string,
-  logger?: any,
-): Promise<boolean> {
-  try {
-    const checked = await connection.makeAdtRequest({
-      url: '/sap/bc/adt/deletion/check',
-      method: 'POST',
-      timeout: 30000,
-      data:
-        '<?xml version="1.0" encoding="UTF-8"?>' +
-        '<del:checkRequest xmlns:del="http://www.sap.com/adt/deletion" xmlns:adtcore="http://www.sap.com/adt/core">' +
-        `<del:object adtcore:uri="${objectUri}"/></del:checkRequest>`,
-      headers: {
-        Accept: 'application/vnd.sap.adt.deletion.check.response.v1+xml',
-        'Content-Type': 'application/vnd.sap.adt.deletion.check.request.v1+xml',
-      },
-    });
-    const answer = typeof checked.data === 'string' ? checked.data : '';
-    // Both halves matter: `isDeletable="false"` alone can mean the object is
-    // simply not deletable by this user, and `lockUser` is what says a lock
-    // is the reason.
-    const held =
-      answer.includes('isDeletable="false"') && answer.includes('lockUser');
-    if (!held) return false;
+export type LockableFamily = keyof typeof FAMILY;
 
-    logger?.warn?.(`🔒 ${objectName} is locked — releasing before cleanup`);
-    await connection.makeAdtRequest({
-      url: `/sap/bc/adt/ddic/ddlock/locks?lockAction=DELETE&name=${encodeURIComponent(objectName)}`,
-      method: 'POST',
-      timeout: 30000,
-      data: '',
-      headers: {},
-    });
-    logger?.warn?.(`🔓 released the lock on ${objectName}`);
-    return true;
-  } catch (error: any) {
-    logger?.warn?.(
-      `could not release the lock on ${objectName}: ${error?.message ?? error}`,
+/**
+ * Report whether an object is locked, and by whom. Never throws: this runs in
+ * cleanup, where a failure to look must not replace the failure that brought us
+ * here.
+ *
+ * Returns the holder's name when the object is locked, `undefined` otherwise —
+ * including when the object does not exist, which is what a quiet answer means
+ * after a delete has already succeeded.
+ */
+export async function lockHolderOf(
+  connection: unknown,
+  family: LockableFamily,
+  objectName: string,
+  logger?: { warn?: (message: string) => void; debug?: (m: string) => void },
+): Promise<string | undefined> {
+  const shape = FAMILY[family];
+  try {
+    const client = createAdtClient(connection as never) as unknown as Record<
+      string,
+      () => { checkDeletion: (config: unknown) => Promise<unknown> }
+    >;
+    const answer = (await client[shape.accessor]().checkDeletion({
+      [shape.key]: objectName,
+    })) as { ok: boolean; getResult?: () => { value: unknown } };
+    if (!answer.ok) return undefined;
+    const body = String(answer.getResult?.().value ?? '');
+    const holder = body.match(/<del:lockUser>([^<]+)<\/del:lockUser>/)?.[1];
+    if (holder) {
+      logger?.warn?.(
+        `🔒 ${objectName} is locked by ${holder} — a delete aimed at it will be refused, and nothing here can release it`,
+      );
+    }
+    return holder;
+  } catch (error: unknown) {
+    logger?.debug?.(
+      `could not ask about a lock on ${objectName}: ${(error as Error)?.message ?? error}`,
     );
-    return false;
+    return undefined;
   }
 }
 
@@ -91,35 +91,23 @@ export function sapIsConfigured(): boolean {
 /**
  * Who the current session is, according to the system.
  *
- * `/sap/bc/adt/core/http/systeminformation` is a cloud endpoint: on-premise
- * there is nothing there and this answers `undefined`, which is the shape a
- * caller wants — the configured `SAP_USERNAME` is the on-premise answer and
- * should win anyway. It exists because a JWT session has no such variable,
+ * `getSystemInformation` is the member for it, and it is a cloud answer: on
+ * premise there is nothing behind it and this answers `undefined`, which is the
+ * shape a caller wants — the configured `SAP_USERNAME` is the on-premise answer
+ * and should win anyway. It exists because a JWT session has no such variable,
  * and a suite that needs an owner was skipping invisibly without one.
  */
 export async function systemUserName(
-  connection: any,
-  logger?: any,
+  connection: unknown,
+  logger?: { debug?: (message: string) => void },
 ): Promise<string | undefined> {
   try {
-    const answered = await connection.makeAdtRequest({
-      url: '/sap/bc/adt/core/http/systeminformation',
-      method: 'GET',
-      timeout: 30000,
-      headers: {
-        Accept: 'application/vnd.sap.adt.core.http.systeminformation.v1+json',
-      },
-      params: { _: Date.now() },
-    });
-    const data =
-      typeof answered.data === 'string'
-        ? JSON.parse(answered.data)
-        : answered.data;
-    const name = String(data?.userName ?? '').trim();
+    const info = await getSystemInformation(connection as never);
+    const name = String(info?.userName ?? '').trim();
     return name === '' ? undefined : name;
-  } catch (error: any) {
+  } catch (error: unknown) {
     logger?.debug?.(
-      `systeminformation did not answer: ${error?.message ?? error}`,
+      `getSystemInformation did not answer: ${(error as Error)?.message ?? error}`,
     );
     return undefined;
   }

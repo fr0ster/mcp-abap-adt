@@ -119,8 +119,7 @@ import {
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import {
-  OBJECT_URIS,
-  releaseObjectLockIfHeld,
+  lockHolderOf,
   sapIsConfigured,
   systemUserName,
 } from '../../helpers/objectLocks';
@@ -244,15 +243,13 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
     if (programName) {
       try {
-        // Release before deleting, the way `LowTester`'s own cleanup does:
-        // a delete aimed at a locked object is refused, and that refusal was
-        // being logged and accepted — the object stayed, and so did the lock.
-        await releaseObjectLockIfHeld(
-          connection,
-          OBJECT_URIS.program(programName),
-          programName,
-          logger,
-        );
+        // Say whether it is locked before aiming a delete at it: a delete on a
+        // locked object is refused, and the refusal used to be logged and
+        // accepted, so the object stayed and so did the lock. Releasing it is
+        // not something this repository can do — there is no member for it and
+        // ADT offers nothing that works from outside the holding session — so
+        // this names the holder and the delete below reports its own refusal.
+        await lockHolderOf(connection, 'program', programName, logger);
         const ctx = createHandlerContext({ connection, logger });
         const deleteResponse = await handleDeleteProgram(ctx, {
           program_name: programName,
@@ -549,12 +546,10 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
           `Step 8: action log has ${logData.count} entr${logData.count === 1 ? 'y' : 'ies'}`,
         );
       } finally {
-        await releaseObjectLockIfHeld(
-          connection,
-          OBJECT_URIS.program(programName),
-          programName,
-          logger,
-        );
+        // The suite locks and unlocks its own object, so a lock here means
+        // something went wrong earlier — name the holder rather than pretend it
+        // can be cleared.
+        await lockHolderOf(connection, 'program', programName, logger);
       }
     },
     getTimeout('long'),

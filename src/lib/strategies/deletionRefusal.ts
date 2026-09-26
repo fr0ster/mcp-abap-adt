@@ -75,14 +75,21 @@ function textOf(node: unknown): string {
   return '';
 }
 
-/** SAP's letters; the abort kinds count as errors. */
+/**
+ * SAP's letters; the abort kinds count as errors.
+ *
+ * **An empty type stays empty — it is not an error.** A CDS view's delete
+ * answered `isDeleted="true"` with `<del:message del:type=""><del:text>S::000`
+ * and a link to its deletion log (E19, 2026-09-26). Read as `E`, that
+ * successful delete came back as a refusal. Only `E`, `A` and `X` refuse.
+ */
 function severity(raw: unknown): string {
   const letter = String(raw ?? '')
     .trim()
     .toUpperCase()
     .charAt(0);
   if (letter === 'A' || letter === 'X') return 'E';
-  return letter || 'E';
+  return letter;
 }
 
 /** The T100 key out of the message's long-text link, when it has one. */

@@ -41,7 +41,19 @@ const CHECK_DELETABLE = `<del:checkResponse ${NS}><del:object del:isDeletable="t
 
 const CHECK_REFUSED_BY_REFERENCES = `<del:checkResponse ${NS}><del:object del:externalStrongReferences="5" del:externalWeakReferences="3" del:isDeletable="false" adtcore:name="ZMCP_SHR_RTABL"/></del:checkResponse>`;
 
+/** Delete of a CDS view: deleted, with an untyped message pointing at its log. */
+const DDLS_DELETED_UNTYPED_MESSAGE =
+  `<?xml version="1.0" encoding="utf-8"?><del:deletionResult ${NS}>` +
+  '<del:object del:isDeleted="true" adtcore:type="DDLS/DF" adtcore:name="ZMCP_BLD_VIEW_L1">' +
+  '<del:message del:priority="0" del:type=""><del:text>S::000</del:text>' +
+  '<atom:link href="/sap/bc/adt/messageclass//messages/000/longtext?language=E" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/>' +
+  '</del:message></del:object></del:deletionResult>';
+
 describe('readDeletionRefusal (consumer strategy)', () => {
+  it('an untyped message on a deleted object is no refusal', () => {
+    expect(readDeletionRefusal(DDLS_DELETED_UNTYPED_MESSAGE)).toBeNull();
+  });
+
   it('keeps every message SAP sent, not the reference-count fallback', () => {
     expect(readDeletionRefusal(SRVB_CHECK_TWO_MESSAGES)).toEqual({
       message: 'ADT refuses to delete ZMCP_BLD_SRVB01',

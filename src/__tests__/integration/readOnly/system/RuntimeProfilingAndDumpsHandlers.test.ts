@@ -4,7 +4,7 @@
  * Scenarios:
  * - Create temporary class, run with profiling, read/analyze resulting trace
  * - Create temporary program, run with profiling, read/analyze resulting trace (on-prem only)
- * - Create temporary class with division by zero, run, then read/analyze runtime dump
+ * - Run the shared class ZMCP_SHR_DUMP_CLS (division by zero), then read/analyze the dump it made
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
@@ -15,8 +15,6 @@ import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/han
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeRunClassWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
-import { createAdtClient } from '../../../../lib/clients';
-import { withLock } from '../../../../lib/strategies/withLock';
 import { getTimeout } from '../../helpers/configHelpers';
 import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { createTestLogger } from '../../helpers/loggerHelpers';
@@ -86,150 +84,12 @@ function extractHandlerErrorText(result: any): string {
   }
 }
 
-function createName(prefix: string): string {
-  const stamp = Date.now().toString(36).toUpperCase();
-  const random = Math.random().toString(36).slice(2, 6).toUpperCase();
-  return `${prefix}${stamp}${random}`.slice(0, 30);
-}
-
-function normalizeNamePrefix(value: unknown, fallback: string): string {
-  if (typeof value !== 'string') {
-    return fallback;
-  }
-  const normalized = value
-    .toUpperCase()
-    .replace(/[^A-Z0-9_]/g, '')
-    .trim();
-  return normalized || fallback;
-}
-
 function toPositiveInt(value: unknown, fallback: number): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed <= 0) {
     return fallback;
   }
   return Math.trunc(parsed);
-}
-
-function buildDumpClassSource(className: string): string {
-  return `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
-  PUBLIC SECTION.
-    INTERFACES if_oo_adt_classrun.
-ENDCLASS.
-
-CLASS ${className} IMPLEMENTATION.
-  METHOD if_oo_adt_classrun~main.
-    DATA lv_num TYPE i VALUE 1.
-    DATA lv_den TYPE i VALUE 0.
-    DATA lv_res TYPE i.
-    lv_res = lv_num / lv_den.
-    out->write( |${className} result: ${'${'} lv_res }| ).
-  ENDMETHOD.
-ENDCLASS.
-`;
-}
-
-async function createRunnableClass(
-  context: LambdaTesterContext,
-  className: string,
-  source: string,
-  invokeTool?: (
-    toolName: string,
-    args: Record<string, unknown>,
-    directCall: () => Promise<any>,
-  ) => Promise<any>,
-  options?: { activate?: boolean },
-): Promise<void> {
-  if (invokeTool) {
-    const createResponse = await invokeTool(
-      'CreateClass',
-      {
-        class_name: className,
-        package_name: context.packageName,
-        transport_request: context.transportRequest,
-        description: `MCP runtime test ${className}`.slice(0, 60),
-        source_code: source,
-        activate: true,
-      },
-      async () => {
-        throw new Error(
-          'Direct CreateClass call is not available in hard mode',
-        );
-      },
-    );
-    if (createResponse?.isError) {
-      throw new Error(extractHandlerErrorText(createResponse));
-    }
-    return;
-  }
-
-  const client = createAdtClient(context.connection, context.logger);
-  await client.getClass().create({
-    className,
-    packageName: context.packageName,
-    transportRequest: context.transportRequest,
-    description: `MCP runtime test ${className}`.slice(0, 60),
-  });
-  // adt-clients 19 has no `activateOnUpdate` convenience — the source goes
-  // through `options.source` under a caller-held lock (see
-  // UpdateClassLow), and activation is its own call after unlock.
-  const obj = client.getClass();
-  const written = await withLock(
-    () => obj.lock({ className }),
-    (lockHandle) =>
-      obj.update(
-        { className, transportRequest: context.transportRequest },
-        { source, lockHandle },
-      ),
-    (lockHandle) => obj.unlock({ className }, lockHandle),
-  );
-  if (written.ok && options?.activate === true) {
-    await obj.activate({ className });
-  }
-}
-
-async function deleteClassIfExists(
-  context: LambdaTesterContext,
-  className?: string,
-  invokeTool?: (
-    toolName: string,
-    args: Record<string, unknown>,
-    directCall: () => Promise<any>,
-  ) => Promise<any>,
-): Promise<void> {
-  if (!className) {
-    return;
-  }
-  try {
-    if (invokeTool) {
-      const deleteResponse = await invokeTool(
-        'DeleteClass',
-        {
-          class_name: className,
-          transport_request: context.transportRequest,
-        },
-        async () => {
-          throw new Error(
-            'Direct DeleteClass call is not available in hard mode',
-          );
-        },
-      );
-      if (deleteResponse?.isError) {
-        throw new Error(extractHandlerErrorText(deleteResponse));
-      }
-      return;
-    }
-
-    const client = createAdtClient(context.connection, context.logger);
-    await client.getClass().delete({
-      className,
-      transportRequest: context.transportRequest,
-    });
-  } catch (error: any) {
-    context.logger?.warn(
-      `Cleanup class ${className} failed: ${error?.message}`,
-    );
-  }
 }
 
 describe('Runtime Profiling and Dumps Handlers Integration', () => {
@@ -512,9 +372,18 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
         }
 
-        const dumpClassName = createName(
-          normalizeNamePrefix(context.params?.dump_class_prefix, 'ZADT_RTDMP'),
-        );
+        // The shared dumping class (shared_dependencies.classes). Nothing is
+        // created or deleted: running it changes nothing. It used to be a new
+        // class each run, created and activated here — and its own dump never
+        // showed up in the feed, so the test read someone else's.
+        const dumpClassName = String(
+          context.params?.dump_class_name ?? '',
+        ).toUpperCase();
+        if (!dumpClassName) {
+          throw new Error(
+            'dump_class_name is not configured — the shared dumping class, created by shared:setup',
+          );
+        }
 
         // In soft mode the MCP tool layer is bypassed; always call the handler
         // directly via the directCall argument so context.connection is used.
@@ -530,20 +399,25 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         // so the main connection's feed read still finds it.
         const { connection: triggerConnection } =
           await createTestConnectionAndSession();
-        const triggerContext: LambdaTesterContext = {
-          ...context,
-          connection: triggerConnection,
-        };
 
         try {
-          // create + ACTIVATE the division-by-zero class on the trigger
-          // connection (active so the forced run actually executes and dumps).
-          await createRunnableClass(
-            triggerContext,
-            dumpClassName,
-            buildDumpClassSource(dumpClassName),
-            undefined,
-            { activate: true },
+          // What the feed already shows, before the run. The class name is the
+          // same every run, so a dump naming it proves nothing on its own —
+          // this run's dump is a new one that names it.
+          const dumpsUserBefore = context.params?.dumps_user || undefined;
+          const beforeRun = await handleRuntimeListFeeds(
+            createHandlerContext({ connection: context.connection, logger }),
+            {
+              feed_type: 'dumps',
+              user: dumpsUserBefore,
+              max_results: toPositiveInt(context.params?.dump_feed_top, 50),
+            },
+          );
+          expect(beforeRun.isError).toBe(false);
+          const seenBefore = new Set(
+            extractDumpCandidatesFromFeedEntries(
+              parseTextPayload(beforeRun).entries ?? [],
+            ).map((c) => c.id),
           );
 
           // Forced run on the trigger connection → HTTP 500 → real dump.
@@ -590,7 +464,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
           // The exception this run's own class dumps with — a cheap
           // pre-filter on the feed's free `title` field, so a poll with no
-          // matching entry costs zero detail fetches. `buildDumpClassSource`
+          // matching entry costs zero detail fetches. The shared dump class
           // divides an I by 0, which ADT titles this exact way; a caller
           // dumping some other way sets `params.dump_title_filter`.
           const dumpTitleFilter = (
@@ -664,12 +538,13 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             // of dump for free; content, from the one candidate actually
             // worth opening, decides which run made it.
             // See `candidatesWorthOpening`: the title is a saving, not a gate.
+            const fresh = candidates.filter((c) => !seenBefore.has(c.id));
             const { chosen: worthOpening, narrowed } = candidatesWorthOpening(
-              candidates,
+              fresh,
               dumpTitleFilter,
               maxCandidatesPerPoll,
             );
-            if (!narrowed && candidates.length > 0) {
+            if (!narrowed && fresh.length > 0) {
               logger?.info?.(
                 `no feed entry matched "${dumpTitleFilter}" — opening the ${worthOpening.length} newest instead, since the title is language-dependent`,
               );
@@ -778,9 +653,9 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(dumpData.dump_id).toBe(dumpId);
           expect(dumpData.view).toBe(dumpView);
 
-          // Bind a self-generated dump to THIS run: its content must reference
-          // the uniquely-named class we just dumped, so taking the newest feed
-          // entry cannot pass on an unrelated pre-existing dump. Skip this bind
+          // Bind a self-generated dump to THIS run: it was not in the feed
+          // before the run, and its content names the class we ran, so taking
+          // the newest feed entry cannot pass on an unrelated dump. Skip this bind
           // only for the explicit `params.dump_id` read-only path, where the
           // dump is a pre-existing one unrelated to dumpClassName.
           if (generatedDumpId) {
@@ -821,7 +696,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           expect(analyzeData.summary).toBeDefined();
           expect(analyzeData.payload).toBeUndefined();
         } finally {
-          await deleteClassIfExists(context, dumpClassName, undefined);
+          // The shared class stays; the trigger connection is dropped above.
         }
       });
     },

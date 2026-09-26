@@ -34,6 +34,7 @@ import { handleUpdateServiceDefinition } from '../../../handlers/service_definit
 import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import { createAdtClient } from '../../../lib/clients';
+import { withLock } from '../../../lib/strategies/withLock';
 import {
   getSystemContext,
   resolveSystemContext,
@@ -109,6 +110,7 @@ const TYPE_CODES: Record<string, string> = {
   interfaces: 'INTF/OI',
   programs: 'PROG/P',
   metadata_extensions: 'DDLX/EX',
+  append_structures: 'TABL/DS',
 };
 
 /**
@@ -249,6 +251,8 @@ async function sameActiveSource(
     interface: () => c.getInterface().read({ interfaceName: name }, 'active'),
     program: () => c.getProgram().read({ programName: name }, 'active'),
     ddlx: () => c.getMetadataExtension().read({ name }, 'active'),
+    append: () =>
+      c.getAppendStructure().read({ appendStructureName: name }, 'active'),
     functionModule: () =>
       c
         .getFunctionModule()
@@ -1318,6 +1322,44 @@ describe('Admin: Setup shared dependencies', () => {
               activate: false,
             } as any),
         },
+        {
+          // No handler in this project creates an append structure; the
+          // client does, the way the structure handlers use it: a metadata
+          // create naming the base structure, then the `extend type` source
+          // under a lock. The base must be active first — the structures
+          // above are activated one by one as they are written.
+          section: 'append_structures',
+          label: 'append structure',
+          typeCode: 'TABL/DS',
+          create: async (item) => {
+            await client.getAppendStructure().create({
+              appendStructureName: item.name,
+              baseObject: item.base_structure,
+              packageName,
+              description: item.description || 'Shared append structure',
+            });
+            return [];
+          },
+          update: async (item) => {
+            const obj = client.getAppendStructure();
+            const written = await withLock(
+              () => obj.lock({ appendStructureName: item.name }),
+              (lockHandle) =>
+                obj.update(
+                  { appendStructureName: item.name },
+                  { source: item.source, lockHandle },
+                ),
+              (lockHandle) =>
+                obj.unlock({ appendStructureName: item.name }, lockHandle),
+            );
+            return written.ok
+              ? { isError: false }
+              : {
+                  isError: true,
+                  content: [{ type: 'text', text: written.getError().message }],
+                };
+          },
+        },
       ];
       for (const kind of viaHandlers) {
         const items: any[] = sharedConfig[kind.section] || [];
@@ -1357,6 +1399,7 @@ describe('Admin: Setup shared dependencies', () => {
               'INTF/OI': 'interface',
               'PROG/P': 'program',
               'DDLX/EX': 'ddlx',
+              'TABL/DS': 'append',
             }[kind.typeCode];
             if (
               kind.update &&
@@ -1544,6 +1587,31 @@ describe('Admin: Setup shared dependencies', () => {
               'Fallback activation completed successfully (batched group-activate)',
             );
           }
+        }
+      }
+
+      // 3b. Behaviour definitions, one by one. The group activation cannot
+      // activate a BDEF: adt-clients' `buildObjectUri` addresses BDEF/BDO as
+      // `/sap/bc/adt/ddic/bdef/sources/<name>`, which SAP ignores — the run
+      // answers `activationExecuted="false"` and the BDEF keeps its old
+      // active version (E19, 2026-09-26: ZI_MCP_SHR_ROOT stayed un-strict
+      // after two setups that logged success). The BDEF's own `activate()`
+      // uses `/sap/bc/adt/bo/behaviordefinitions/<name>` and works.
+      // fr0ster/mcp-abap-adt-clients#173.
+      for (const target of toActivate.filter((t) => t.type === 'BDEF/BDO')) {
+        try {
+          await client.getBehaviorDefinition().activate({ name: target.name });
+          testsLogger?.info?.(`Activated behavior definition ${target.name}`);
+        } catch (error: any) {
+          const msg = error instanceof Error ? error.message : String(error);
+          testsLogger?.error?.(
+            `Failed to activate behavior definition ${target.name}: ${msg}`,
+          );
+          results.push({
+            type: 'activation',
+            name: target.name,
+            status: `FAILED: ${msg}`,
+          });
         }
       }
 

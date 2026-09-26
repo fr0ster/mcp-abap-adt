@@ -293,6 +293,24 @@ shared_dependencies:
           base_b : abap.numc(4);
         }
 
+  # Append structures (TABL/DS `extend type`), created after the structures
+  # above are active. ZMCP_SHR_STRU_APP extends ZMCP_SHR_STRU, for
+  # GetStructuresList's append (enhancement) reading. The enhancement category
+  # annotation is required: without it the source is refused with
+  # SBD_MESSAGES 007 "Can't save due to errors in source" (E19, 2026-09-26).
+  append_structures:
+    - name: "ZMCP_SHR_STRU_APP"
+      base_structure: "ZMCP_SHR_STRU"
+      description: "Shared append of ZMCP_SHR_STRU"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared append of ZMCP_SHR_STRU'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        extend type zmcp_shr_stru with zmcp_shr_stru_app {
+          zzapp_a : abap.char(10);
+          zzapp_b : abap.int4;
+        }
+
   views:
     # Shared root view the high-level check tests read (check_ddl_high,
     # check_bdef_high), with its own behaviour definition below.
@@ -385,7 +403,10 @@ shared_dependencies:
 
   behavior_definitions:
     # Behaviour definition of ZI_MCP_SHR_ROOT for check_bdef_high. Managed
-    # without an implementation class: nothing here needs one.
+    # without an implementation class: nothing here needs one. Strict, so the
+    # check answers clean — without it SAP warns W BDL339 "should be flagged
+    # as strict". `authorization master ( none )` is what strict ( 2 ) takes
+    # with no behaviour pool (checked on E19, 2026-09-26: no message at all).
     - name: "ZI_MCP_SHR_ROOT"
       description: "Shared BDEF for check tests"
       available_in: ["onprem", "cloud"]
@@ -393,10 +414,12 @@ shared_dependencies:
       implementation_type: "Managed"
       source: |
         managed;
+        strict ( 2 );
 
         define behavior for ZI_MCP_SHR_ROOT
         persistent table zmcp_shr_rtabl
         lock master
+        authorization master ( none )
         {
           create;
           update;
@@ -455,6 +478,26 @@ shared_dependencies:
               lv_x = sy-index MOD 100.
             ENDDO.
             out->write( lv_x ).
+          ENDMETHOD.
+        ENDCLASS.
+    # Run by the runtime suite to produce a dump: division by zero. Running it
+    # changes nothing, so it can be shared.
+    - name: "ZMCP_SHR_DUMP_CLS"
+      description: "Shared class that dumps when run"
+      available_in: ["onprem", "cloud"]
+      source: |
+        CLASS zmcp_shr_dump_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zmcp_shr_dump_cls IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_num TYPE i VALUE 1.
+            DATA lv_den TYPE i VALUE 0.
+            DATA lv_res TYPE i.
+            lv_res = lv_num / lv_den.
+            out->write( lv_res ).
           ENDMETHOD.
         ENDCLASS.
     - name: "ZCL_MCP_SHARED_CLS"
@@ -1962,8 +2005,9 @@ runtime_readonly_handlers:
         dumps_user: ""
         # Number of dump IDs to read from feed
         dumps_read_limit: 5
-        # Prefix for temporary class that forces runtime dump (division by zero)
-        dump_class_prefix: "ZMCP_RTDMP"
+        # Shared class that dumps (division by zero) when run. The test runs it
+        # and looks for a dump that was not in the feed before the run.
+        dump_class_name: "ZMCP_SHR_DUMP_CLS"
         # Retries for dump feed lookup after forced failure
         dump_feed_retries: 8
         dump_feed_retry_delay_ms: 1500
@@ -2275,10 +2319,10 @@ get_structures_list_readonly:
       params:
         structure_name: "ZMCP_SHR_STRU"
         expected_include: "ZMCP_SHR_STRU_INC"
-        # Extension (append) structure that `extend type ZMCP_SHR_STRU with …`.
-        # Created out-of-band (adt-clients cannot create `extend type` objects);
-        # leave empty to skip the append assertion on systems without it.
-        expected_append: "ZOK_S_APPEND"
+        # Append structure that `extend type ZMCP_SHR_STRU with …` — the shared
+        # ZMCP_SHR_STRU_APP (shared_dependencies.append_structures). Empty
+        # skips the append assertion.
+        expected_append: "ZMCP_SHR_STRU_APP"
 
 # FunctionInclude high-level lifecycle (own group -> create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.

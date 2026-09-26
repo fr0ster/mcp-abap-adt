@@ -2280,7 +2280,7 @@ get_structures_list_readonly:
         # leave empty to skip the append assertion on systems without it.
         expected_append: "ZOK_S_APPEND"
 
-# FunctionInclude high-level lifecycle (create -> update -> read -> delete)
+# FunctionInclude high-level lifecycle (own group -> create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.
 function_include_high:
   test_cases:
@@ -2289,8 +2289,11 @@ function_include_high:
       available_in: ["onprem", "cloud", "legacy"]
       description: "Create, update, read-back and delete a custom function group include"
       params:
-        function_group_name: "ZMCP_SHR_FGRP"
-        include_name: "LZMCP_SHR_FGRPCUS"
+        # The test's own group (a test object on the test request), never the
+        # shared ZMCP_SHR_FGRP: an include changes its group's main program.
+        function_group_name: "ZMCP_BLD_FGR_INC"
+        function_group_description: "FG for the function include test"
+        include_name: "LZMCP_BLD_FGR_INCCUS"
         description: "Custom include for high-level lifecycle tests"
         # transport_request: ""  # uncomment / set for transportable packages
         update_source_code: |

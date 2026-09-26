@@ -2,13 +2,22 @@
  * Integration tests for FunctionInclude high-level handlers
  *
  * Lifecycle:
- *   CreateFunctionInclude (custom letter-suffix include)
+ *   CreateFunctionGroup   (the test's own group)
+ *   -> CreateFunctionInclude (custom letter-suffix include)
  *   -> UpdateFunctionInclude (set source)
  *   -> ReadFunctionInclude   (verify source round-trips)
- *   -> DeleteFunctionInclude (cleanup)
+ *   -> DeleteFunctionInclude, DeleteFunctionGroup (cleanup)
  *
- * Uses a LETTER-suffix include name (NOT numeric) inside the shared FUGR
- * (ZMCP_SHR_FGRP) so the ADT backend allows deletion.
+ * **Its own function group, never the shared one.** Creating an include adds
+ * an `INCLUDE` line to the group's main program SAPL<group>, and deleting it
+ * takes the line out again — a change to the group. Run inside the shared
+ * ZMCP_SHR_FGRP it left SAPLZMCP_SHR_FGRP inactive after every run (E19,
+ * 2026-09-26), and put the shared group on the test request. The group here
+ * is a test object: created in the test package on the test request, and
+ * deleted with the include.
+ *
+ * Uses a LETTER-suffix include name (NOT numeric) so the ADT backend allows
+ * deletion.
  *
  * Config-driven: skips cleanly when no SAP connection / test case disabled /
  * wrong system type.
@@ -17,6 +26,8 @@
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
+import { handleCreateFunctionGroup } from '../../../../handlers/function/high/handleCreateFunctionGroup';
+import { handleDeleteFunctionGroup } from '../../../../handlers/function_group/high/handleDeleteFunctionGroup';
 import { handleCreateFunctionInclude } from '../../../../handlers/function_include/high/handleCreateFunctionInclude';
 import { handleDeleteFunctionInclude } from '../../../../handlers/function_include/high/handleDeleteFunctionInclude';
 import { handleUpdateFunctionInclude } from '../../../../handlers/function_include/high/handleUpdateFunctionInclude';
@@ -29,6 +40,7 @@ import {
   getSystemType,
   getTimeout,
   isTestAvailableForSystem,
+  resolvePackageName,
   resolveTransportRequest,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
@@ -112,6 +124,10 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       const description =
         testCase.params.description || 'Custom include for lifecycle test';
       const transportRequest = resolveTransportRequest(testCase);
+      const packageName = resolvePackageName(testCase);
+      const groupDescription =
+        testCase.params.function_group_description ||
+        'FG for the function include test';
 
       if (!testCase.params.update_source_code) {
         throw new Error(
@@ -141,10 +157,42 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
         }
       };
 
+      let groupCreated = false;
       let created = false;
 
       let passed = false;
       try {
+        // Step 0: the test's own function group
+        testLogger?.info(
+          `📦 High Create: Creating function group ${functionGroupName} in ${packageName} (transport: ${transportRequest || '(local)'})...`,
+        );
+        const groupArgs = {
+          function_group_name: functionGroupName,
+          description: groupDescription,
+          package_name: packageName,
+          transport_request: transportRequest,
+          activate: true,
+        };
+        const groupResponse = await invoke(
+          'CreateFunctionGroup',
+          groupArgs,
+          () =>
+            handleCreateFunctionGroup(
+              { connection: connection!, logger: testLogger },
+              groupArgs,
+            ),
+        );
+        if (groupResponse.isError) {
+          throw new Error(
+            `CreateFunctionGroup failed: ${groupResponse.content[0]?.text || 'Unknown error'}`,
+          );
+        }
+        groupCreated = true;
+        testLogger?.info(
+          `✅ High Create: Created function group ${functionGroupName}`,
+        );
+        await delay(getOperationDelay('create', testCase));
+
         // Step 1: CreateFunctionInclude
         testLogger?.info(
           `📦 High Create: Creating include ${includeName} in ${functionGroupName} (transport: ${transportRequest || '(local)'})...`,
@@ -178,12 +226,6 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
           ) {
             testLogger?.warn(
               `⚠️  Skipping test: No authorization to create function include: ${errorMsg}`,
-            );
-            return;
-          }
-          if (errorLower.includes('not found') || errorMsg.includes('404')) {
-            testLogger?.info(
-              `⏭️  Skipping test: Shared function group not found (run shared:setup first): ${errorMsg}`,
             );
             return;
           }
@@ -316,6 +358,36 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
         } else if (created) {
           testLogger?.info(
             `⚠️ Cleanup skipped (cleanup_after=false) - object left for analysis: ${includeName}`,
+          );
+        }
+
+        // The group goes after its include.
+        if (groupCreated && shouldCleanup) {
+          const deleteGroupArgs = {
+            function_group_name: functionGroupName,
+            transport_request: transportRequest,
+          };
+          const deleteGroupResponse = await invoke(
+            'DeleteFunctionGroup',
+            deleteGroupArgs,
+            () =>
+              handleDeleteFunctionGroup(
+                { connection: connection!, logger: testLogger },
+                deleteGroupArgs,
+              ),
+          );
+          if (deleteGroupResponse.isError) {
+            testLogger?.warn(
+              `⚠️  Failed to delete function group ${functionGroupName}: ${deleteGroupResponse.content[0]?.text || 'Unknown error'}`,
+            );
+          } else {
+            testLogger?.info(
+              `🧹 Cleaned up test function group: ${functionGroupName}`,
+            );
+          }
+        } else if (groupCreated) {
+          testLogger?.info(
+            `⚠️ Cleanup skipped - object left for analysis: ${functionGroupName}`,
           );
         }
       }

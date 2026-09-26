@@ -2,7 +2,16 @@
  * Integration tests for Package Low-Level Handlers
  *
  * Tests the complete workflow using handler functions:
- * ValidatePackageLow → CreatePackageLow → DeletePackageLow
+ * ValidatePackageLow → CreatePackageLow → (LockPackageLow → UpdatePackageLow →
+ * UnlockPackageLow) twice → DeletePackageLow
+ *
+ * Every call goes on the tester's one connection, as it does in the server. A
+ * package created or updated in an ABAP session cannot be changed again by
+ * that session — PAK/058, `CL_PACKAGE`'s instance buffer
+ * (docs/installation/RFC_SETUP.md). Over RFC, where one connection is one
+ * session, the handlers take care of it (lib/packageSessions.ts): the create
+ * and each lock → update → unlock chain run in sessions of their own. Two
+ * updates in a row are what shows it — the second was refused before.
  *
  * Enable debug logs:
  *   DEBUG_ADT_TESTS=true       - Test execution logs
@@ -14,12 +23,10 @@
 
 import { handleCreatePackage } from '../../../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
+import { handleLockPackage } from '../../../../handlers/package/low/handleLockPackage';
+import { handleUnlockPackage } from '../../../../handlers/package/low/handleUnlockPackage';
+import { handleUpdatePackage } from '../../../../handlers/package/low/handleUpdatePackage';
 import { handleValidatePackage } from '../../../../handlers/package/low/handleValidatePackage';
-import { createAdtClient } from '../../../../lib/clients';
-import { patchPackageXml } from '../../../../lib/strategies/packagePatch';
-import { sequence } from '../../../../lib/strategies/sequence';
-import { withLock } from '../../../../lib/strategies/withLock';
-import { extractXmlString } from '../../../../lib/strategies/xmlPatch';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
@@ -239,47 +246,79 @@ describe('Package Low-Level Handlers Integration', () => {
         const createDelay = context.getOperationDelay('create');
         await delay(createDelay);
 
-        // Step 3: Update description. adt-clients 19: a package has no
-        // source, only its own document (`updateMetadata`, not `update` —
-        // IAdtCapabilities.ts), it takes the whole document rather than
-        // merging (handleUpdatePackage.ts's own doc comment), and the lock
-        // is the caller's — taken and released here since this test calls
-        // the client directly rather than through LockPackage/UpdatePackage.
+        // Step 3: Update description twice, through the tools, on the one
+        // connection. The second update is the one PAK/058 used to refuse:
+        // the first update's save leaves the package changeable in its
+        // session's buffer.
         const updatedDescription =
           params.updated_description || `${description} (UPDATED)`;
-        logger?.info(`   • update description: ${objectName}`);
-        const adtClient = createAdtClient(connection);
-        const packageObj = adtClient.getPackage();
-        const written = await withLock(
-          () => packageObj.lock({ packageName: objectName }),
-          (lockHandle) =>
-            sequence(
-              () => packageObj.readMetadata({ packageName: objectName }),
-              (current) =>
-                packageObj.updateMetadata(
-                  {
-                    packageName: objectName,
-                    // A package on a request is written under that request:
-                    // without it the PUT carries no corrNr and an on-premise
-                    // system refuses it (400, E19 2026-09-25).
-                    ...(transportRequest && { transportRequest }),
-                  },
-                  {
-                    source: patchPackageXml(
-                      extractXmlString(current, `package ${objectName}`),
-                      { description: updatedDescription },
-                    ),
-                    lockHandle,
-                  },
-                ),
-            ),
-          (lockHandle) =>
-            packageObj.unlock({ packageName: objectName }, lockHandle),
-        );
-        if (!written.ok) {
-          throw new Error(`Update failed: ${written.getError().message}`);
+        for (const round of [1, 2]) {
+          const roundDescription = `${updatedDescription} ${round}`;
+          logger?.info(`   • update description (${round}): ${objectName}`);
+          const toolLogger = createTestLogger('package-low-update');
+          const ctx = createHandlerContext({ connection, logger: toolLogger });
+
+          const lockResponse = await tester.invokeToolOrHandler(
+            'LockPackageLow',
+            { package_name: objectName, super_package: superPackage },
+            async () =>
+              handleLockPackage(ctx, {
+                package_name: objectName,
+                super_package: superPackage,
+              }),
+          );
+          if (lockResponse.isError) {
+            throw new Error(
+              `Lock (${round}) failed: ${extractErrorMessage(lockResponse)}`,
+            );
+          }
+          const lockData = parseHandlerResponse(lockResponse);
+          const lockHandle: string = lockData.lock_handle;
+          expect(lockHandle).toBeTruthy();
+
+          let updateError: string | undefined;
+          try {
+            const updateArgs = {
+              package_name: objectName,
+              super_package: superPackage,
+              updated_description: roundDescription,
+              lock_handle: lockHandle,
+              ...(transportRequest && { transport_request: transportRequest }),
+            };
+            const updateResponse = await tester.invokeToolOrHandler(
+              'UpdatePackageLow',
+              updateArgs,
+              async () => handleUpdatePackage(ctx, updateArgs as any),
+            );
+            if (updateResponse.isError) {
+              updateError = extractErrorMessage(updateResponse);
+            }
+          } finally {
+            // Always released, whatever the update answered.
+            const unlockArgs = {
+              package_name: objectName,
+              super_package: superPackage,
+              lock_handle: lockHandle,
+              session_id: lockData.session_id || 'package-low',
+            };
+            const unlockResponse = await tester.invokeToolOrHandler(
+              'UnlockPackageLow',
+              unlockArgs,
+              async () => handleUnlockPackage(ctx, unlockArgs),
+            );
+            if (unlockResponse.isError) {
+              logger?.warn(
+                `Unlock (${round}) failed: ${extractErrorMessage(unlockResponse)}`,
+              );
+            }
+          }
+          if (updateError) {
+            throw new Error(`Update (${round}) failed: ${updateError}`);
+          }
+          logger?.success(
+            `✅ update description (${round}): ${objectName} completed`,
+          );
         }
-        logger?.success(`✅ update description: ${objectName} completed`);
       });
     },
     getTimeout('long'),

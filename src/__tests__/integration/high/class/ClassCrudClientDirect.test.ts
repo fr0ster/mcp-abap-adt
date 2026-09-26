@@ -36,6 +36,7 @@ import {
   resolveTransportRequest,
 } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { trackConnection } from '../../helpers/openConnections';
 import { createDiagnosticsTracker } from '../../helpers/persistenceHelpers';
 import { DEBUG_TESTS, debugLog, delay } from '../../helpers/testHelpers';
 
@@ -113,7 +114,9 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         };
 
         // Create connection directly (same as in adt-clients tests)
-        connection = createAbapConnection(config, connectionLogger);
+        connection = trackConnection(
+          createAbapConnection(config, connectionLogger),
+        );
 
         // Check refresh token availability before connecting
         const connectionWithRefresh = connection as any;

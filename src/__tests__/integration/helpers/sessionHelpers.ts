@@ -38,6 +38,7 @@ import {
   loadTestEnv,
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
+import { trackConnection } from './openConnections';
 import { extractSessionState } from './testHelpers';
 
 /**
@@ -244,7 +245,9 @@ async function createConnectionViaBroker(
       // Only pass connection logger if DEBUG_CONNECTION is set
       const connectionLogger = createConnectionLogger();
       const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
-      return createAbapConnection(config, connectionLoggerWithCsrf);
+      return trackConnection(
+        createAbapConnection(config, connectionLoggerWithCsrf),
+      );
     }
   } catch (error: any) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {
@@ -307,7 +310,9 @@ export async function createTestConnectionAndSession(): Promise<{
       const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
 
       // Create connection directly (fallback when AuthBroker is not available)
-      connection = createAbapConnection(config, connectionLoggerWithCsrf);
+      connection = trackConnection(
+        createAbapConnection(config, connectionLoggerWithCsrf),
+      );
       connectionSource = 'env';
     }
 

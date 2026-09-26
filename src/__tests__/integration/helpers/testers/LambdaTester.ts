@@ -60,6 +60,8 @@ export class LambdaTester {
    * `getCleanupAfterRun`.
    */
   protected testFailed = false;
+  /** A test that skipped itself created nothing, so nothing is deleted. */
+  protected testSkipped = false;
   protected hardModeMcp: {
     client: any;
     toolNames: Set<string>;
@@ -383,6 +385,16 @@ export class LambdaTester {
       return;
     }
 
+    // `SKIP:` is thrown before a test creates anything (read-only suites, and
+    // the package suite over RFC). Deleting after it only asked SAP to delete
+    // an object nobody made — "Package … has no TDEVC record".
+    if (this.testSkipped) {
+      this.context.logger?.info?.(
+        'ℹ️ Cleanup skipped: the test skipped itself and created nothing',
+      );
+      return;
+    }
+
     // A failed test keeps what it created, so the objects themselves can say
     // why it failed. Every lock was already released by the test's own
     // finally/unlock steps; only the delete is withheld.
@@ -591,6 +603,7 @@ export class LambdaTester {
     }
 
     this.testFailed = false;
+    this.testSkipped = false;
     try {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers
@@ -600,6 +613,7 @@ export class LambdaTester {
       if (error.message?.startsWith('SKIP:')) {
         const skipReason = error.message.replace(/^SKIP:\s*/, '');
         this.context.logger?.testSkip(`Skipping test: ${skipReason}`);
+        this.testSkipped = true;
         return; // Don't throw, just skip the test
       }
 

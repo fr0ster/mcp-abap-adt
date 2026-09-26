@@ -46,6 +46,9 @@ test_settings:
   retry_on_failure: false
   max_retries: 1
   cleanup_after_test: false
+  # A failed test keeps the objects it created, so their state can say why it
+  # failed; locks are released either way. true deletes them regardless.
+  cleanup_on_failure: false
   # Timeouts for different operations (in milliseconds)
   timeouts:
     default: 120000
@@ -253,6 +256,18 @@ shared_dependencies:
         }
 
   structures:
+    # Shared structure the high-level check tests read (check_structure_high).
+    - name: "ZMCP_SHR_STRUCT"
+      description: "Shared structure for check tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared structure for check tests'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        define structure zmcp_shr_struct {
+          fld1 : abap.char(10);
+          fld2 : abap.int4;
+        }
+
     # Include structure MUST come first: the base structure embeds it via `include`,
     # so it must already exist and be active before the base is created/activated.
     - name: "ZMCP_SHR_STRU_INC"
@@ -278,7 +293,40 @@ shared_dependencies:
           base_b : abap.numc(4);
         }
 
+  # Append structures (TABL/DS `extend type`), created after the structures
+  # above are active. ZMCP_SHR_STRU_APP extends ZMCP_SHR_STRU, for
+  # GetStructuresList's append (enhancement) reading. The enhancement category
+  # annotation is required: without it the source is refused with
+  # SBD_MESSAGES 007 "Can't save due to errors in source" (E19, 2026-09-26).
+  append_structures:
+    - name: "ZMCP_SHR_STRU_APP"
+      base_structure: "ZMCP_SHR_STRU"
+      description: "Shared append of ZMCP_SHR_STRU"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared append of ZMCP_SHR_STRU'
+        @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
+        extend type zmcp_shr_stru with zmcp_shr_stru_app {
+          zzapp_a : abap.char(10);
+          zzapp_b : abap.int4;
+        }
+
   views:
+    # Shared root view the high-level check tests read (check_ddl_high,
+    # check_bdef_high), with its own behaviour definition below.
+    - name: "ZI_MCP_SHR_ROOT"
+      description: "Shared root view for check tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @EndUserText.label : 'Shared root view for check tests'
+        @AccessControl.authorizationCheck : #NOT_REQUIRED
+        define root view entity ZI_MCP_SHR_ROOT
+          as select from zmcp_shr_rtabl
+        {
+          key fld1 as Fld1,
+          fld2 as Fld2
+        }
+
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared root CDS view entity"
       available_in: ["onprem", "cloud"]
@@ -319,6 +367,7 @@ shared_dependencies:
       source: |
         @EndUserText.label : 'Shared consumption projection'
         @AccessControl.authorizationCheck : #NOT_REQUIRED
+        @Metadata.allowExtensions : true
         define root view entity ZMCP_SHR_C_ROOT
           provider contract transactional_query
           as projection on ZMCP_SHR_I_ROOT
@@ -353,6 +402,31 @@ shared_dependencies:
         }
 
   behavior_definitions:
+    # Behaviour definition of ZI_MCP_SHR_ROOT for check_bdef_high. Managed
+    # without an implementation class: nothing here needs one. Strict, so the
+    # check answers clean — without it SAP warns W BDL339 "should be flagged
+    # as strict". `authorization master ( none )` is what strict ( 2 ) takes
+    # with no behaviour pool (checked on E19, 2026-09-26: no message at all).
+    - name: "ZI_MCP_SHR_ROOT"
+      description: "Shared BDEF for check tests"
+      available_in: ["onprem", "cloud"]
+      root_entity: "ZI_MCP_SHR_ROOT"
+      implementation_type: "Managed"
+      source: |
+        managed;
+        strict ( 2 );
+
+        define behavior for ZI_MCP_SHR_ROOT
+        persistent table zmcp_shr_rtabl
+        lock master
+        authorization master ( none )
+        {
+          create;
+          update;
+          delete;
+          field ( readonly ) Fld1;
+        }
+
     - name: "ZMCP_SHR_I_ROOT"
       description: "Shared BDEF for BehaviorDefinition and BehaviorImplementation tests"
       available_in: ["onprem", "cloud"]
@@ -386,12 +460,76 @@ shared_dependencies:
         }
 
   classes:
+    # Run under the profiler by the runtime suite. Running it changes nothing,
+    # so it can be shared.
+    - name: "ZMCP_SHR_PROF_CLS"
+      description: "Shared class for profiler runs"
+      available_in: ["onprem", "cloud"]
+      source: |
+        CLASS zmcp_shr_prof_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zmcp_shr_prof_cls IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_x TYPE i.
+            DO 20000 TIMES.
+              lv_x = sy-index MOD 100.
+            ENDDO.
+            out->write( lv_x ).
+          ENDMETHOD.
+        ENDCLASS.
+    # Run by the runtime suite to produce a dump: division by zero. Running it
+    # changes nothing, so it can be shared.
+    - name: "ZMCP_SHR_DUMP_CLS"
+      description: "Shared class that dumps when run"
+      available_in: ["onprem", "cloud"]
+      source: |
+        CLASS zmcp_shr_dump_cls DEFINITION PUBLIC FINAL CREATE PUBLIC.
+          PUBLIC SECTION.
+            INTERFACES if_oo_adt_classrun.
+        ENDCLASS.
+
+        CLASS zmcp_shr_dump_cls IMPLEMENTATION.
+          METHOD if_oo_adt_classrun~main.
+            DATA lv_num TYPE i VALUE 1.
+            DATA lv_den TYPE i VALUE 0.
+            DATA lv_res TYPE i.
+            lv_res = lv_num / lv_den.
+            out->write( lv_res ).
+          ENDMETHOD.
+        ENDCLASS.
+    - name: "ZCL_MCP_SHARED_CLS"
+      description: "Shared class for check tests"
+      available_in: ["onprem", "cloud", "legacy"]
     - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
       available_in: ["onprem", "cloud"]
+    # Shared container class with its ABAP Unit test class, for the tests that
+    # only run unit tests (the high-level RunUnitTest/GetUnitTest suite).
+    # Running tests changes nothing. The low-level suite, which locks and
+    # writes the test-classes include, has its own class (class_unit_test).
     - name: "ZMCP_BLD_CLSUT_L1"
       description: "Shared container class for unit test integration tests"
       available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        CLASS zmcp_bld_clsut_l1 DEFINITION PUBLIC FINAL CREATE PUBLIC.
+        ENDCLASS.
+
+        CLASS zmcp_bld_clsut_l1 IMPLEMENTATION.
+        ENDCLASS.
+      test_classes: |
+        CLASS ltc_zmcp_bld_clsut_l1 DEFINITION FINAL
+          FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+          PRIVATE SECTION.
+            METHODS test_method FOR TESTING.
+        ENDCLASS.
+        CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
+          METHOD test_method.
+            cl_abap_unit_assert=>assert_true( abap_true ).
+          ENDMETHOD.
+        ENDCLASS.
 
   function_groups:
     - name: "ZMCP_BLD_SHR_FGR"
@@ -436,6 +574,70 @@ shared_dependencies:
         define service ZMCP_SHR_SRVD01 {
           expose ZMCP_SHR_C_ROOT as View1;
         }
+
+  # The objects the high-level check tests read (check_*_high, check_existing)
+  # that no other shared section provides.
+  domains:
+    - name: "ZMCP_SHR_DOMAIN"
+      description: "Shared domain for check tests"
+      available_in: ["onprem", "cloud"]
+      datatype: "CHAR"
+      length: 10
+      decimals: 0
+
+  data_elements:
+    - name: "ZMCP_SHR_DTEL"
+      description: "Shared data element for check tests"
+      available_in: ["onprem", "cloud"]
+      type_kind: "domain"
+      type_name: "ZMCP_SHR_DOMAIN"
+      short_label: "Shared"
+      medium_label: "Shared DTEL"
+      long_label: "Shared data element"
+      heading_label: "Shared data element"
+
+  interfaces:
+    - name: "ZIF_MCP_SHARED"
+      description: "Shared interface for check tests"
+      available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        INTERFACE zif_mcp_shared PUBLIC.
+          METHODS get_value RETURNING VALUE(rv_value) TYPE string.
+        ENDINTERFACE.
+
+  programs:
+    # Run under the profiler by the runtime suite (on-prem).
+    - name: "ZMCP_SHR_PROF_PROG"
+      description: "Shared program for profiler runs"
+      available_in: ["onprem", "legacy"]
+      source: |
+        REPORT zmcp_shr_prof_prog.
+        DATA lv_x TYPE i.
+        DO 20000 TIMES.
+          lv_x = sy-index MOD 100.
+        ENDDO.
+        WRITE / lv_x.
+    - name: "ZMCP_SHR_PROG"
+      description: "Shared program for check tests"
+      available_in: ["onprem", "legacy"]
+      source: |
+        REPORT zmcp_shr_prog.
+        WRITE / 'shared'.
+
+  # Layer #CUSTOMER, so it never collides with a test's own #CORE extension of
+  # the same entity (create_metadata_extension).
+  metadata_extensions:
+    - name: "ZC_MCP_SHR_DDLX"
+      description: "Shared metadata extension for check tests"
+      available_in: ["onprem", "cloud"]
+      source: |
+        @Metadata.layer: #CUSTOMER
+        annotate entity ZMCP_SHR_C_ROOT with
+        {
+          @EndUserText.label: 'Shared field 1'
+          Fld1;
+        }
+
 
 # Legacy shared_objects (kept for backward compatibility with unit_test_class)
 shared_objects:
@@ -630,6 +832,10 @@ create_behavior_implementation:
             ENDMETHOD.
 
           ENDCLASS.
+        # Differs from implementation_code so the update is a real one. No
+        # `create FOR MODIFY`: ZMCP_BLD_I_BDEF is managed, and SAP refuses the
+        # class with "the implementation type CREATE is superfluous" (E19,
+        # 2026-09-26) — the framework creates.
         update_implementation_code: |
           CLASS lhc_ZMCP_BLD_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
@@ -640,21 +846,15 @@ create_behavior_implementation:
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
                 IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdef RESULT result.
 
-              METHODS create FOR MODIFY
-                IMPORTING entities FOR CREATE zmcp_bld_i_bdef.
-
           ENDCLASS.
 
           CLASS lhc_ZMCP_BLD_I_BDEF IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
+              " updated by the integration test
             ENDMETHOD.
 
             METHOD get_global_authorizations.
-            ENDMETHOD.
-
-            METHOD create.
-              " Implementation for create operation
             ENDMETHOD.
 
           ENDCLASS.
@@ -1514,104 +1714,6 @@ create_transported_object:
 
 # Standard SAP objects registry for read-only tests
 
-# View (View)
-create_ddl:
-  test_cases:
-    - name: "builder_view"
-      enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
-      description: "View reserved for ViewBuilder tests"
-      params:
-        # package_name: "ZMCP_BLD_PKG01"
-        table_name: "ZMCP_VIEW_TBL02"
-        ddl_name: "ZMCP_BLD_VIEW_H1"
-        description: "ViewBuilder workflow view"
-        transport_request: ""
-        table_source: |
-          @EndUserText.label: 'Builder view test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table zadt_view_tbl02 {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-            value      : abap.dec(10,2);
-            created_at : abap.dats;
-          }
-        ddl_source: |
-          @EndUserText.label: 'Builder view on custom table'
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define view entity ZMCP_BLD_VIEW_H1
-          as select from zadt_view_tbl02
-          {
-            key id,
-            name,
-            value,
-            created_at
-          }
-
-    - name: "cds_unit_test"
-      enabled: true
-      available_in: ["onprem", "cloud"]
-      description: "CDS view with ABAP Unit verification"
-      params:
-        # package_name: "ZMCP_BLD_PKG01"
-        table_name: "ZMCP_CDS_TBL02"
-        ddl_name: "ZMCP_BLD_CDSV_H1"
-        description: "ViewBuilder CDS unit test view"
-        transport_request: ""
-        table_source: |
-          @EndUserText.label: 'Builder CDS test table'
-          @AbapCatalog.enhancement.category : #NOT_EXTENSIBLE
-          @AbapCatalog.tableCategory : #TRANSPARENT
-          @AbapCatalog.deliveryClass : #A
-          @AbapCatalog.dataMaintenance : #RESTRICTED
-          define table zadt_cds_tbl02 {
-            key client : abap.clnt not null;
-            key id     : abap.char(10) not null;
-            name       : abap.char(50);
-            value      : abap.dec(10,2);
-            created_at : abap.dats;
-          }
-        ddl_source: |
-          @EndUserText.label: 'Builder CDS sample view'
-          @AccessControl.authorizationCheck: #NOT_REQUIRED
-          define view entity ZMCP_BLD_CDSV_H1
-            as select from zadt_cds_tbl02
-          {
-            key id,
-            name,
-            value,
-            created_at
-          }
-        cds_unit_test:
-          class_name: "ZMCP_BLD_CDSUT_H1"
-          test_class_name: "LTC_ZMCP_BLD_CDSV_H1"
-          description: "CDS unit test class"
-          transport_request: ""
-          unit_test_options:
-            title: "LTC_ZMCP_BLD_CDSV_H1"
-            context: "ViewBuilder CDS Unit"
-            scope:
-              own_tests: true
-              foreign_tests: false
-              add_foreign_tests_as_preview: true
-            risk_level:
-              harmless: true
-              dangerous: true
-              critical: true
-            duration:
-              short: true
-              medium: true
-              long: true
-          unit_test_status:
-            with_long_polling: true
-          unit_test_result:
-            with_navigation_uris: false
-            format: "abapunit"
-
 # Create Function Group
 
 # View (View - Low-Level)
@@ -1821,23 +1923,26 @@ class_unit_test:
       available_in: ["onprem", "cloud", "legacy"]
       description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
       params:
-        # Container class that contains the test class (from shared_dependencies)
-        container_class_name: "ZMCP_BLD_CLSUT_L1"
+        # Low-level suite: its own container class — a test object, created in
+        # the test package on the test request and deleted after — because it
+        # locks and writes the test-classes include. Never the shared one.
+        container_class_name: "ZMCP_BLD_CLSUT_LOW"
         # Test class name inside the container class's testclasses include
-        test_class_name: "LTC_ZMCP_BLD_CLSUT_L1"
+        test_class_name: "LTC_ZMCP_BLD_CLSUT_LOW"
         # Optional: test class source code (if not provided, default test class will be used)
         test_class_source: |
-          CLASS ltc_zmcp_bld_clsut_l1 DEFINITION FINAL
+          CLASS ltc_zmcp_bld_clsut_low DEFINITION FINAL
             FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
             PRIVATE SECTION.
               METHODS test_method FOR TESTING.
           ENDCLASS.
-          CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
+          CLASS ltc_zmcp_bld_clsut_low IMPLEMENTATION.
             METHOD test_method.
               cl_abap_unit_assert=>assert_true( abap_true ).
             ENDMETHOD.
           ENDCLASS.
-        # For high-level handlers (RunUnitTest, GetUnitTest)
+        # For high-level handlers (RunUnitTest, GetUnitTest): they only run
+        # tests, so the shared class and its test class (shared:setup)
         test_class:
           container_class: "ZMCP_BLD_CLSUT_L1"
           name: "LTC_ZMCP_BLD_CLSUT_L1"
@@ -1854,7 +1959,9 @@ list_transports_readonly:
       enabled: true
       available_in: ["onprem", "cloud", "legacy"]
       description: "ListTransports handler read-only tests"
-      params:
+      # `params: {}`, not an empty `params:` — YAML reads the latter as null,
+      # and the tester fails to start ("Cannot read properties of null").
+      params: {}
         # user: "DEVELOPER"              # Optional: SAP user name (defaults to current session user)
         # modifiable_only: true           # Optional: only modifiable transports (default: true)
 
@@ -1868,7 +1975,7 @@ search_source_readonly:
       params:
         # Package scanned by the test. Should match shared_dependencies.package so
         # the seeded objects (Z_MCP_BLD_SHR_FM etc.) are inside it.
-        scan_package: "ZADT_BLD_PKG03"
+        scan_package: "ZMCP_SHARED"   # must equal shared_dependencies.package
         # Substring known to be present in shared FM source ("Echo:" appears in Z_MCP_BLD_SHR_FM).
         known_query: "Echo:"
         # Second AND-substring known to co-occur with known_query on the same line.
@@ -1900,15 +2007,11 @@ runtime_readonly_handlers:
       available_in: ["onprem", "cloud"]
       description: "Runtime profiling and dumps handlers integration tests"
       params:
-        # Class for profiled execution (must support ADT classrun endpoint)
-        profiled_class_name: "ZMCP_BLD_CLSLOC_H1"
-        # Prefix for temporary class created by profiling test
-        profiled_class_prefix: "ZMCP_RTCLS"
-        # On-prem only: executable report for RuntimeRunProgramWithProfiling
-        profiled_program_name: "ZMCP_BLD_PROG023"
-        # Prefix for temporary program created by profiling test (on-prem only)
-        profiled_program_prefix: "ZMCP_RTPRG"
-        # Optional fallback trace id/uri when feed parsing does not provide one
+        # The shared objects run under the profiler (shared_dependencies).
+        profiled_class_name: "ZMCP_SHR_PROF_CLS"
+        profiled_program_name: "ZMCP_SHR_PROF_PROG"   # on-prem only
+        # Optional: a trace to read. Empty — the read/analyse test takes a
+        # finished trace from the trace list.
         trace_id_or_uri: ""
         # Retries for trace files feed lookup (trace can appear with delay)
         trace_feed_retries: 6
@@ -1924,8 +2027,9 @@ runtime_readonly_handlers:
         dumps_user: ""
         # Number of dump IDs to read from feed
         dumps_read_limit: 5
-        # Prefix for temporary class that forces runtime dump (division by zero)
-        dump_class_prefix: "ZMCP_RTDMP"
+        # Shared class that dumps (division by zero) when run. The test runs it
+        # and looks for a dump that was not in the feed before the run.
+        dump_class_name: "ZMCP_SHR_DUMP_CLS"
         # Retries for dump feed lookup after forced failure
         dump_feed_retries: 8
         dump_feed_retry_delay_ms: 1500
@@ -2062,6 +2166,27 @@ check_class_high:
       description: "Check an existing ABAP class for syntax errors"
       params:
         class_name: "ZCL_MCP_SHARED_CLS"
+    # A class of the test's own with a misspelt keyword (DAAT for DATA): it is
+    # created on the test request, saved inactive, and its check must answer
+    # the error as a finding (isError: false). Never a shared object.
+    - name: "check_findings"
+      enabled: true
+      available_in: ["onprem", "cloud"]
+      description: "Check answers a keyword error as a finding"
+      params:
+        class_name: "ZMCP_BLD_CHK_ERR"
+        description: "Check findings test class"
+        source_code: |
+          CLASS zmcp_bld_chk_err DEFINITION PUBLIC FINAL CREATE PUBLIC.
+            PUBLIC SECTION.
+              METHODS run.
+          ENDCLASS.
+
+          CLASS zmcp_bld_chk_err IMPLEMENTATION.
+            METHOD run.
+              DAAT lv_value TYPE i.
+            ENDMETHOD.
+          ENDCLASS.
 
 # CheckBehaviorDefinition
 check_bdef_high:
@@ -2216,12 +2341,12 @@ get_structures_list_readonly:
       params:
         structure_name: "ZMCP_SHR_STRU"
         expected_include: "ZMCP_SHR_STRU_INC"
-        # Extension (append) structure that `extend type ZMCP_SHR_STRU with …`.
-        # Created out-of-band (adt-clients cannot create `extend type` objects);
-        # leave empty to skip the append assertion on systems without it.
-        expected_append: "ZOK_S_APPEND"
+        # Append structure that `extend type ZMCP_SHR_STRU with …` — the shared
+        # ZMCP_SHR_STRU_APP (shared_dependencies.append_structures). Empty
+        # skips the append assertion.
+        expected_append: "ZMCP_SHR_STRU_APP"
 
-# FunctionInclude high-level lifecycle (create -> update -> read -> delete)
+# FunctionInclude high-level lifecycle (own group -> create -> update -> read -> delete)
 # Uses a LETTER-suffix include name (not numeric) so ADT can delete it.
 function_include_high:
   test_cases:
@@ -2230,8 +2355,11 @@ function_include_high:
       available_in: ["onprem", "cloud", "legacy"]
       description: "Create, update, read-back and delete a custom function group include"
       params:
-        function_group_name: "ZMCP_SHR_FGRP"
-        include_name: "LZMCP_SHR_FGRPCUS"
+        # The test's own group (a test object on the test request), never the
+        # shared ZMCP_SHR_FGRP: an include changes its group's main program.
+        function_group_name: "ZMCP_BLD_FGR_INC"
+        function_group_description: "FG for the function include test"
+        include_name: "LZMCP_BLD_FGR_INCCUS"
         description: "Custom include for high-level lifecycle tests"
         # transport_request: ""  # uncomment / set for transportable packages
         update_source_code: |

@@ -19,7 +19,7 @@
  * or from the process context always wins.
  */
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
 import { getEffectiveSystemContext } from './systemContext';

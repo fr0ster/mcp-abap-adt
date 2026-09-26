@@ -8,7 +8,7 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,

@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -59,9 +60,8 @@ export async function handleGetUnitTestResult(
   // result. This tool has no status of its own to poll (`with_long_polling`
   // is not in its surface), so — per the fix ruling — it polls status first
   // via `pollUntilFinished` rather than guessing what `getResult` answers on
-  // an unfinished run (uncaptured in the corpus). `getResult`'s options
-  // (`IUnitTestResultOptions`) carry no `analyse` field, confirmed against
-  // the shipped `AdtUnitTest.d.ts`.
+  // an unfinished run (uncaptured in the corpus). `getResult` takes
+  // `analyseException` since adt-clients 23.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
   const detail = detailOf(args);
 
@@ -69,10 +69,14 @@ export async function handleGetUnitTestResult(
     { tool: 'GetUnitTestResult', detail },
     () =>
       pollUntilFinished(
-        (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
+        (id, withLongPolling) =>
+          unitTest.getStatus(id, withLongPolling, {
+            analyse: analyseException,
+          }),
         run_id,
         () =>
           unitTest.getResult(run_id, {
+            analyse: analyseException,
             withNavigationUris: with_navigation_uris,
             format,
           }),

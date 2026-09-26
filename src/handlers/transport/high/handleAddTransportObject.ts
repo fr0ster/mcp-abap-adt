@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
       transport_number: {
         type: 'string',
         description:
-          'The TASK number to attach the object to, e.g. E19K905943.',
+          'The TASK to attach the object to, e.g. E19K905943 — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.',
       },
       object_name: {
         type: 'string',

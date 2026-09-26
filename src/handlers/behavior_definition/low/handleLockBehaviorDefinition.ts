@@ -3,8 +3,9 @@
  *
  * Uses AdtClient.getBehaviorDefinition().lock from @mcp-abap-adt/adt-clients 19.
  *
- * `lock()` accepts no options at all — not even `analyse` — so there is no
- * strategy to inject here. Its answer is the lock handle itself, and the
+ * `lock()` takes `analyseLock`: adt-clients 23 answers `''` for a 2xx that
+ * names no handle and leaves the verdict to the caller; `analyseLock` refuses
+ * it, with SAP's answer as `raw_body` (see `lib/strategies/lockAnswer.ts`). Its answer is the lock handle itself, and the
  * projection is the envelope the tool already returned: nothing about `lock`
  * varies with `detail`, so the parameter is not added to this tool's surface.
  */
@@ -12,6 +13,7 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -78,7 +80,7 @@ export async function handleLockBehaviorDefinition(
     () =>
       createAdtClient(connection, logger)
         .getBehaviorDefinition()
-        .lock({ name: bdefName }),
+        .lock({ name: bdefName }, { analyse: analyseLock }),
     (lockHandle: string) => ({
       success: true,
       name: bdefName,

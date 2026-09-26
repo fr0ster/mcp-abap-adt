@@ -467,7 +467,7 @@ describe('the members that accept an analyse strategy, which one is deliberately
     expect(seen.last?.analyse).toBe(analyseException);
   });
 
-  it('ReadMessageClassMessage carries NO analyse into getMessageClassMessage().read, deliberately, so the shipped default OBJECT_NOT_FOUND check stands', async () => {
+  it('ReadMessageClassMessage carries its msgno check into getMessageClassMessage().read — adt-clients 23 applies none of its own', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
@@ -477,18 +477,21 @@ describe('the members that accept an analyse strategy, which one is deliberately
     });
 
     expect(seen.countOf('read')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(false);
-    expect(seen.last?.analyse).toBeUndefined();
+    expect(seen.last?.carriedAnalyse).toBe(true);
+    // `analyseMessageClassMessage(msgno)` builds a strategy per message.
+    expect(typeof seen.last?.analyse).toBe('function');
+    expect(seen.last?.analyse).not.toBe(analyseException);
   });
 
-  it('SearchObject does NOT carry an analyse into search — none was given, matching the signature', async () => {
+  it('SearchObject carries analyseException into search — interfaces-adt 11 gave every util member one', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
 
     expect(seen.countOf('search')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(false);
+    expect(seen.last?.carriedAnalyse).toBe(true);
+    expect(seen.last?.analyse).toBe(analyseException);
   });
 });
 
@@ -838,7 +841,7 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     factory: string;
     member: string;
     identity: Record<string, unknown>;
-    hasAnalyse: boolean;
+    hasAnalyse: boolean | 'own';
   }> = [
     {
       name: 'GetClass',
@@ -937,10 +940,9 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
       factory: 'getMessageClassMessage',
       member: 'read',
       identity: { className: 'ZMC', msgno: '001' },
-      // Deliberately none — the shipped default OBJECT_NOT_FOUND check
-      // would be replaced by any strategy this handler supplied (see the
-      // "members that accept an analyse strategy" describe block above).
-      hasAnalyse: false,
+      // Its own strategy — `analyseMessageClassMessage(msgno)`, the msgno
+      // check adt-clients 22 applied inside the member.
+      hasAnalyse: 'own',
     },
     {
       name: 'GetFunctionGroup',
@@ -1045,8 +1047,10 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
       const call = seen.calls.filter((c) => c.member === member).at(-1);
       expect(call?.factory).toBe(factory);
       expect(call?.args[0]).toEqual(identity);
-      expect(call?.carriedAnalyse).toBe(hasAnalyse);
-      if (hasAnalyse) expect(call?.analyse).toBe(analyseException);
+      expect(call?.carriedAnalyse).toBe(hasAnalyse !== false);
+      if (hasAnalyse === true) expect(call?.analyse).toBe(analyseException);
+      // A strategy of the call's own — `analyseMessageClassMessage(msgno)`.
+      if (hasAnalyse === 'own') expect(typeof call?.analyse).toBe('function');
     },
   );
 
@@ -1061,7 +1065,8 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
       .at(-1);
     expect(call?.factory).toBe('getServiceBinding');
     expect(call?.args).toEqual([]);
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('GetUnitTestStatus calls getUnitTest().getStatus(run_id, with_long_polling)', async () => {
@@ -1073,7 +1078,8 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
     expect(call?.factory).toBe('getUnitTest');
     expect(call?.args).toEqual(['r1', true]);
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
   });
 
   it('GetCdsUnitTestStatus calls getCdsUnitTest().getStatus(run_id, with_long_polling)', async () => {
@@ -1085,7 +1091,8 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
     expect(call?.factory).toBe('getCdsUnitTest');
     expect(call?.args).toEqual(['r1', true]);
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
   });
 });
 
@@ -1267,8 +1274,11 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     expect(getStatus).toHaveBeenCalledWith(
       'FA53C505DD7B1FD1ABB8599833A05D44',
       true,
+      { analyse: analyseException },
     );
-    expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44');
+    expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44', {
+      analyse: analyseException,
+    });
     // Read AFTER invoking the handler — `factory` is a getter on the
     // double, and destructuring it eagerly captures `undefined` (the value
     // before any factory was ever accessed).
@@ -1403,8 +1413,12 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     // Read AFTER invoking the handler — see the comment on the analogous
     // assertion in `GetUnitTest`'s own test above.
     expect(double.factory).toBe('getCdsUnitTest');
-    expect(getStatus).toHaveBeenCalledWith('r1', true);
-    expect(getResult).toHaveBeenCalledWith('r1');
+    expect(getStatus).toHaveBeenCalledWith('r1', true, {
+      analyse: analyseException,
+    });
+    expect(getResult).toHaveBeenCalledWith('r1', {
+      analyse: analyseException,
+    });
   });
 
   it('GetCdsUnitTest answers finished:false and never calls getResult when the (synthetic) run has not finished', async () => {

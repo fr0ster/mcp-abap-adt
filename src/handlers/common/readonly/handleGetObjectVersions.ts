@@ -15,6 +15,7 @@ import {
   return_response,
 } from '../../../lib/utils';
 import {
+  readVersions,
   resolveVersionedObject,
   VERSIONED_OBJECT_TYPES,
 } from './resolveVersionedObject';
@@ -94,7 +95,7 @@ export async function handleGetObjectVersions(
     }
 
     try {
-      const versions = await resolved.obj.getVersions(resolved.config);
+      const versions = await readVersions(resolved);
       return return_response({
         data: JSON.stringify(
           {

@@ -7,16 +7,17 @@
  * a `del:message` alongside it) — `analyseDeletion` reads that rather than the
  * HTTP status, which is why this handler never inspects `response.status`
  * itself. No lock is taken: a held lock is what makes ADT refuse a deletion,
- * so acquiring one here would be self-defeating, and adt-clients 19 removed
- * the pre-check (`assertDeletable`) that `delete()` used to run internally —
- * there is nothing left for this handler to compose in front of the call.
+ * so acquiring one here would be self-defeating. adt-clients 19 removed the
+ * pre-check (`assertDeletable`) that `delete()` used to run internally, so
+ * `deleteIfDeletable` runs `checkDeletion` first and sends the delete only
+ * when the check allows it.
  */
 
 import { domainDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -37,7 +38,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       ...DETAIL_PROPERTY,
     },
@@ -68,12 +69,12 @@ export async function handleDeleteDomain(
   return answer(
     { tool: 'DeleteDomain', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDomain(resultsFor(domainDocuments))
-        .delete(
-          { domainName, transportRequest: transport_request },
-          { analyse: analyseDeletion },
+      deleteIfDeletable(
+        createAdtClient(connection, logger).getDomain(
+          resultsFor(domainDocuments),
         ),
+        { domainName, transportRequest: transport_request },
+      ),
     project(detail, terseDeletion),
   );
 }

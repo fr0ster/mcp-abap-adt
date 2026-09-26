@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -46,9 +47,8 @@ export async function handleGetCdsUnitTestStatus(
   if (!run_id) return return_error(new Error('run_id is required'));
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getStatus` unchanged
-  // — same v18-convenience departure and same "no options object at all,
-  // so no `analyse`" as `GetUnitTestStatus` (confirmed against the shipped
-  // `AdtUnitTest.d.ts`/`AdtCdsUnitTest.d.ts`).
+  // — same v18-convenience departure as `GetUnitTestStatus`, and the same
+  // `analyseException` in its options since adt-clients 23.
   const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
     ourUnitTest,
   );
@@ -65,7 +65,10 @@ export async function handleGetCdsUnitTestStatus(
 
   return answer(
     { tool: 'GetCdsUnitTestStatus', detail },
-    () => cdsUnitTest.getStatus(run_id, with_long_polling),
+    () =>
+      cdsUnitTest.getStatus(run_id, with_long_polling, {
+        analyse: analyseException,
+      }),
     project(detail, terseRunStatus),
   );
 }

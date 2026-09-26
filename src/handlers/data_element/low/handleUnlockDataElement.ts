@@ -3,13 +3,14 @@
  *
  * Uses AdtClient.getDataElement().unlock from @mcp-abap-adt/adt-clients 19.
  *
- * `unlock()` accepts no options either — no `analyse`, and its success value
- * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * `unlock()` takes `analyseException` too (adt-clients 23), and its success
+ * value is SAP's reply, read by nothing. There is no `AdtReading` to read a status off (unlock does not go
  * through the result-set strategies at all), so the synthetic 200 below is a
  * stand-in for "the call answered ok" rather than a status read off the wire —
  * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -87,7 +88,9 @@ export async function handleUnlockDataElement(
     () =>
       createAdtClient(connection, logger)
         .getDataElement()
-        .unlock({ dataElementName }, lock_handle),
+        .unlock({ dataElementName }, lock_handle, {
+          analyse: analyseException,
+        }),
     (value) => terseWrite(value, 200),
   );
 }

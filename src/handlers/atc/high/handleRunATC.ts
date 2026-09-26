@@ -1,8 +1,9 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AtcObjectType } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { answering } from '../../../lib/strategies/atcRun';
+import { ourAtc } from '../../../lib/strategies/resultSets';
 import { succeededWith } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 
@@ -138,7 +139,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
     );
   }
 
-  const atc = new AdtRuntimeClient(connection, logger).getAtc();
+  const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
   const wait = args.wait === true;
 
   return answer(
@@ -149,19 +150,28 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
       // with the run from step three. Written out, each step's own failure is
       // still the answer, untouched, which is the rule `sequence` exists to
       // keep.
-      const variant = await answering(async () =>
-        args.check_variant?.trim()
-          ? (args.check_variant.trim() as string)
-          : atc.resolveCheckVariant(),
-      );
-      if (!variant.ok) return variant as never;
-      const checkVariant = variant.getResult().value;
+      // adt-clients 23: both answer `IAdtResponse` rather than a bare string
+      // (MIGRATION-23 §9), so SAP's refusal is the answer as it came.
+      const given = args.check_variant?.trim();
+      let checkVariant: string;
+      if (given) {
+        checkVariant = given;
+      } else {
+        const variant = await atc.resolveCheckVariant({
+          analyse: analyseException,
+        });
+        if (!variant.ok) return variant as never;
+        checkVariant = variant.getResult().value;
+      }
 
-      const worklist = await answering(() => atc.createWorklist(checkVariant));
+      const worklist = await atc.createWorklist(checkVariant, {
+        analyse: analyseException,
+      });
       if (!worklist.ok) return worklist as never;
       const worklistId = worklist.getResult().value;
 
       const run = await atc.startRun(worklistId, target, {
+        analyse: analyseException,
         wait,
         maximumVerdicts,
       });

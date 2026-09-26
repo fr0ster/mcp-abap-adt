@@ -17,15 +17,14 @@ import {
   analyseException,
   type IAdtMessageFailure,
 } from '@mcp-abap-adt/adt-strategies';
-import type {
-  IAbapConnection,
-  IAdtResponse,
-} from '@mcp-abap-adt/interfaces-adt';
+import type { IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { createAdtClient } from '../../../../lib/clients';
 import { createAbapConnection } from '../../../../lib/connectionFactory';
 import {
   getCleanupAfter,
+  getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
   getSapConfigFromEnv,
@@ -271,24 +270,13 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         },
       );
 
-      // Pre-cleanup: delete leftover object from previous test run if it
-      // exists. adt-clients 19: a refusal is `ok: false`, not a throw
-      // (IAdtCapabilities.ts) — "doesn't exist" is the expected refusal on a
-      // clean run, so it is silently not-ok rather than caught.
-      try {
-        const preCleanup = await client
-          .getClass()
-          .delete({ className, transportRequest });
-        if (preCleanup.ok) {
-          testLogger?.info(`🧹 Pre-cleanup: deleted leftover ${className}`);
-        }
-      } catch {
-        // A genuine connection-level throw — still tolerated here.
-      }
+      // No delete before the test: validation says whether the name can be
+      // used, and why not.
 
       // Track creation state for cleanup
       let classCreated = false;
 
+      let failed = false;
       try {
         // Step 1: Validate (exactly as in adt-clients)
         debugLog('VALIDATE', `Starting validation for ${className}`, {
@@ -502,6 +490,7 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
           error: errorMessage,
           stack: error.stack?.substring(0, 500),
         });
+        failed = true;
         testLogger?.error(`❌ AdtClient direct test failed: ${errorMessage}`);
         throw error;
       } finally {
@@ -524,7 +513,8 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
 
         if (className) {
           try {
-            const shouldCleanup = getCleanupAfter(testCase);
+            // A failed run keeps its class for analysis (getCleanupAfterRun).
+            const shouldCleanup = getCleanupAfterRun(testCase, failed);
 
             if (shouldCleanup && classCreated) {
               const deleteResponse = await handleDeleteClass(

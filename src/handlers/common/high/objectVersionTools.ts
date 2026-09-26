@@ -28,7 +28,11 @@ import {
   return_response,
 } from '../../../lib/utils';
 import { buildVersionDiff } from '../readonly/handleGetObjectVersionDiff';
-import { resolveVersionedObject } from '../readonly/resolveVersionedObject';
+import {
+  readVersionSource,
+  readVersions,
+  resolveVersionedObject,
+} from '../readonly/resolveVersionedObject';
 
 /** Handler signature before context injection (the group wraps with withContext). */
 type RawHandler = (context: HandlerContext, args: any) => Promise<any>;
@@ -187,7 +191,7 @@ function buildVersionsTool(row: VersionedTypeRow): ObjectVersionToolEntry {
       }
 
       try {
-        const versions = await resolved.obj.getVersions(resolved.config);
+        const versions = await readVersions(resolved);
         return return_response({
           data: JSON.stringify(
             {
@@ -261,7 +265,7 @@ function buildVersionSourceTool(row: VersionedTypeRow): ObjectVersionToolEntry {
       }
 
       try {
-        const source = await resolved.obj.getVersionSource(String(content_uri));
+        const source = await readVersionSource(resolved, String(content_uri));
         return return_response({
           data: JSON.stringify({ success: true, content_uri, source }, null, 2),
         } as AxiosResponse);

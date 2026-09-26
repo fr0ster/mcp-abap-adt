@@ -41,6 +41,12 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['domain_name'],
@@ -55,6 +61,7 @@ interface CheckDomainArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  version?: 'active' | 'inactive';
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -83,7 +90,7 @@ export async function handleCheckDomain(
         .getDomain(resultsFor(domainDocuments))
         // `status` left undefined: the shipped default checks the inactive
         // version, which is what a caller wants right after a write.
-        .check({ domainName }, undefined, { analyse: analyseException }),
+        .check({ domainName }, args.version, { analyse: analyseException }),
     project(detail, terseCheck),
   );
 }

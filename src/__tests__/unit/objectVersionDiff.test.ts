@@ -64,10 +64,12 @@ describe('version diff tools (#30)', () => {
     expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
       1,
       '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
       2,
       '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00002',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
 
     const data = payload(result);
@@ -116,10 +118,12 @@ describe('version diff tools (#30)', () => {
     expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
       1,
       '/cls?version=00001',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(mockClassGetVersionSource).toHaveBeenNthCalledWith(
       2,
       '/cls?version=00002',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     const data = payload(result);
     expect(data.identical).toBe(false);

@@ -3,7 +3,12 @@ import { handleCreateTransportTask } from '../../handlers/transport/high/handleC
 import { handleRemoveTransportObject } from '../../handlers/transport/high/handleRemoveTransportObject';
 import { handleReadTransportActionLog } from '../../handlers/transport/readonly/handleReadTransportActionLog';
 import { handleReadTransportObjects } from '../../handlers/transport/readonly/handleReadTransportObjects';
-import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+import {
+  fakeClientOf,
+  okResponse,
+  reading,
+  refusedResponse,
+} from '../helpers/fakeClient';
 
 /**
  * The five tools that answer fr0ster/mcp-abap-adt#221.
@@ -282,6 +287,170 @@ describe('CreateTransportTask', () => {
     expect(answered.note).toMatch(/no task number/);
   });
 
+  /**
+   * Measured on premise, 2026-09-25: a task `newtask` creates is
+   * `Unclassified`, and `addobject` onto it is refused with `SCTS_ADT_MSG 009`
+   * / TK127 — "Changes to objects are only allowed in correction/repair". The
+   * same call after `changetasktype S` answers 200. So a task this tool hands
+   * back is typed already, or it is a task nothing can be attached to.
+   */
+  it('types the new task Development/Correction, so objects can be attached to it', async () => {
+    const typed: unknown[][] = [];
+    fakeClient = fakeClientOf({
+      createTask: () =>
+        okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+      changeTaskType: (...given: unknown[]) => {
+        typed.push(given);
+        return okResponse(reading('<tm:root/>'));
+      },
+    });
+
+    const answered = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+      }),
+    );
+
+    expect(typed).toHaveLength(1);
+    expect(typed[0].slice(0, 2)).toEqual(['E19K907073', 'S']);
+    expect(answered.task_type).toBe('S');
+  });
+
+  /**
+   * A refused typing has to survive `detail`, and in the terse fields alone it
+   * did not: `project()` calls the terse projection for `terse` only, so at
+   * `full` the answer was the parsed creation document and at `raw` the
+   * document itself — a task left Unclassified read as a clean creation in
+   * both, and the next `AddTransportObject` onto it is refused with TK127.
+   */
+  it('says the task is still Unclassified at every detail, not only terse', async () => {
+    const refused = () =>
+      fakeClientOf({
+        createTask: () =>
+          okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+        changeTaskType: () =>
+          refusedResponse(
+            'You can only change the type of tasks in workbench requests',
+          ),
+      });
+
+    fakeClient = refused();
+    const terse = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+      }),
+    );
+    expect(terse.task_type).toBe('X');
+    expect(terse.task_type_error).toContain('workbench requests');
+    expect(terse.cleanup.message).toContain('TK127');
+
+    fakeClient = refused();
+    const full = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        detail: 'full',
+      }),
+    );
+    expect(full.cleanup.message).toContain('still Unclassified');
+    expect(full.cleanup.message).toContain('workbench requests');
+
+    fakeClient = refused();
+    const raw = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        detail: 'raw',
+      }),
+    );
+    // A raw answer is a string, so `answer()` gives it somewhere to put the
+    // note: `{ result, cleanup }`.
+    expect(raw.cleanup.message).toContain('still Unclassified');
+    expect(raw.result).toBeDefined();
+  });
+
+  it('types the task as asked, and leaves it alone when asked for X', async () => {
+    const typed: unknown[][] = [];
+    fakeClient = fakeClientOf({
+      createTask: () =>
+        okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+      changeTaskType: (...given: unknown[]) => {
+        typed.push(given);
+        return okResponse(reading('<tm:root/>'));
+      },
+    });
+
+    const repair = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        task_type: 'R',
+      }),
+    );
+    const unclassified = body(
+      await handleCreateTransportTask(context as any, {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        task_type: 'X',
+      }),
+    );
+
+    expect(typed.map((call) => call[1])).toEqual(['R']);
+    expect(repair.task_type).toBe('R');
+    expect(unclassified.task_type).toBe('X');
+  });
+
+  /**
+   * The task exists by then, so a refused typing is not a failed creation —
+   * but the caller must hear that the task is still Unclassified, because the
+   * next AddTransportObject will be refused for exactly that reason.
+   */
+  it('still answers the task when typing it is refused, and says it is unclassified', async () => {
+    fakeClient = fakeClientOf({
+      createTask: () =>
+        okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+      changeTaskType: () => refusedResponse('Specified task type is unknown'),
+    });
+
+    const result = await handleCreateTransportTask(context as any, {
+      transport_number: 'E19K905941',
+      target_user: 'DEVELOPER',
+    });
+    const answered = body(result);
+
+    expect(result.isError).toBe(false);
+    expect(answered.task_number).toBe('E19K907073');
+    expect(answered.task_type).toBe('X');
+    expect(answered.task_type_error).toMatch(/unknown/);
+    expect(answered.note).toMatch(/AddTransportObject/);
+  });
+
+  it('refuses a task type that is not S, R or X before calling the server', async () => {
+    let created = false;
+    fakeClient = fakeClientOf({
+      createTask: () => {
+        created = true;
+        return okResponse(
+          reading({ '@': { 'tm:number': 'E19K907073' } } as never),
+        );
+      },
+    });
+
+    const result = await handleCreateTransportTask(
+      context as any,
+      {
+        transport_number: 'E19K905941',
+        target_user: 'DEVELOPER',
+        task_type: 'K',
+      } as never,
+    );
+
+    expect(result.isError).toBe(true);
+    expect(created).toBe(false);
+  });
+
   it('refuses to call the server without a target user', async () => {
     fakeClient = fakeClientOf({
       createTask: () => okResponse(reading('<tm:root/>')),
@@ -326,5 +495,59 @@ describe('ReadTransportActionLog', () => {
 
     expect(answered.count).toBe(1);
     expect(answered.entries[0]).toMatch(/deleted following object/);
+  });
+
+  /**
+   * The shape an on-premise system answers, measured 2026-09-25 on E19: the
+   * text is the content of `log:message/log:messageText`, with the T100 key
+   * beside it as an attribute — no `log:text` anywhere. Reading only
+   * `log:text` answered `count: 0` for a log that held six entries.
+   */
+  it('reads the on-premise shape, where the text is log:message/log:messageText', async () => {
+    const entry = (id: string, key: string, text: string) => ({
+      'log:message': {
+        'log:messageText': { '#text': text, '@': { language: '', key } },
+      },
+      '@': { id, severity: 'information' },
+    });
+    fakeClient = fakeClientOf({
+      readActionLog: () =>
+        okResponse(
+          reading({
+            'log:log': {
+              'log:type': 'LOG_TYPE_ACT_DDIC',
+              'log:entry': [
+                entry(
+                  '000001',
+                  'TK(185)',
+                  '25.09.2026 10:52:18 OKYSLYTSIA has created the new request/task',
+                ),
+                entry(
+                  '000002',
+                  'TK(098)',
+                  '25.09.2026 10:52:18 task type changed to S',
+                ),
+                entry(
+                  '000003',
+                  'TK(188)',
+                  '25.09.2026 10:52:20 OKYSLYTSIA deleted following object R3TR PROG ZMCP_BLD_TPXLME',
+                ),
+              ],
+            },
+          } as never),
+        ),
+    });
+
+    const answered = body(
+      await handleReadTransportActionLog(context as any, {
+        transport_number: 'E19K907299',
+      }),
+    );
+
+    expect(answered.count).toBe(3);
+    expect(answered.entries[1]).toBe(
+      '25.09.2026 10:52:18 task type changed to S',
+    );
+    expect(answered.entries[2]).toMatch(/deleted following object R3TR PROG/);
   });
 });

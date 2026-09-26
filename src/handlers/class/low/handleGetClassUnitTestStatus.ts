@@ -49,6 +49,7 @@
  * lie this migration's one rule exists to prevent, not a fix.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -125,11 +126,14 @@ export async function handleGetClassUnitTestStatus(
 
     logger?.info(`Fetching ABAP Unit status for run ${run_id}`);
 
-    const unitTest = client.getUnitTest() as any;
+    const unitTest = client.getUnitTest();
 
     return await answer(
       { tool: 'GetClassUnitTestStatusLow', detail: 'terse' },
-      () => unitTest.getStatus(run_id, with_long_polling),
+      () =>
+        unitTest.getStatus(run_id, with_long_polling, {
+          analyse: analyseException,
+        }),
       (value: string) => value,
     );
   } catch (error: any) {

@@ -1,4 +1,4 @@
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -73,14 +73,17 @@ export async function handleGetSqlQuery(
 
   logger?.info(`Executing SQL query (rows=${rowNumber})`);
 
-  // `getSqlQuery(params)` takes no options object at all — no `analyse` to
-  // pass, matching the brief.
+  // `getSqlQuery(params, options?)` takes `analyseException` since
+  // adt-clients 23.
   return answer(
     { tool: 'GetSqlQuery', detail },
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber }),
+        .getSqlQuery(
+          { sql_query: sqlQuery, row_number: rowNumber },
+          { analyse: analyseException },
+        ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;

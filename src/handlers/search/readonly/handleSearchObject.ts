@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { ISearchObjectsParams } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -128,7 +129,7 @@ export async function handleSearchObject(
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .search(searchParams),
+        .search(searchParams, { analyse: analyseException }),
     project(detail, (value) => objectReferenceLines(value)),
   );
 }

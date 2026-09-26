@@ -60,6 +60,11 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['interface_name', 'source_code', 'lock_handle'],
@@ -76,6 +81,7 @@ interface UpdateInterfaceArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -111,7 +117,12 @@ export async function handleUpdateInterface(
       createAdtClient(connection, logger)
         .getInterface(resultsFor(interfaceDocuments))
         .update(
-          { interfaceName },
+          {
+            interfaceName,
+            ...(args.transport_request && {
+              transportRequest: args.transport_request,
+            }),
+          },
           {
             source: source_code,
             lockHandle: lock_handle,

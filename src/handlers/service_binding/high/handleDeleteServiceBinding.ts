@@ -19,10 +19,10 @@
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -43,7 +43,8 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description: 'Optional transport request for deletion transport flow.',
+        description:
+          'Optional transport request for deletion transport flow. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       response_format: {
         type: 'string',
@@ -82,12 +83,12 @@ export async function handleDeleteServiceBinding(
   return answer(
     { tool: 'DeleteServiceBinding', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getServiceBinding(resultsFor(serviceDocuments))
-        .delete(
-          { bindingName, transportRequest: transport_request },
-          { analyse: analyseDeletion },
+      deleteIfDeletable(
+        createAdtClient(connection, logger).getServiceBinding(
+          resultsFor(serviceDocuments),
         ),
+        { bindingName, transportRequest: transport_request },
+      ),
     project(detail, terseDeletion),
   );
 }

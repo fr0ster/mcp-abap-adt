@@ -68,6 +68,7 @@ import { handleCreateTable } from '../../handlers/table/high/handleCreateTable';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
+import { analyseLock } from '../../lib/strategies/lockAnswer';
 import {
   fakeClientOf,
   okResponse,
@@ -270,6 +271,13 @@ describe('high-tier updates that still have a lock to take: they take it themsel
     ],
   ];
 
+  // UpdateMessageClass reads the class first (read, edit, write — MIGRATION-23
+  // §7); every other case never calls it.
+  const classDocument =
+    '<mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="old desc"/>';
+  const readMetadata = async () =>
+    okResponse(reading(classDocument, classDocument, 200));
+
   it.each(lockingCases)(
     '%s reports a refused write as an error, and releases the lock it took',
     async (_n, handler, args) => {
@@ -277,6 +285,7 @@ describe('high-tier updates that still have a lock to take: they take it themsel
       const update = async () =>
         refusedResponse('Object is locked by another user');
       fakeClient = fakeClientOf({
+        readMetadata,
         lock: async () => okResponse('handle-1'),
         update,
         updateMetadata: update,
@@ -300,6 +309,7 @@ describe('high-tier updates that still have a lock to take: they take it themsel
         okResponse(reading(undefined, '', 200)),
       );
       fakeClient = fakeClientOf({
+        readMetadata,
         lock,
         update,
         updateMetadata: update,
@@ -309,7 +319,13 @@ describe('high-tier updates that still have a lock to take: they take it themsel
       const result: any = await (handler as any)(context as any, args);
 
       expect(result.isError).toBe(false);
-      expect(lock).toHaveBeenCalledWith(lockConfig);
+      expect(lock).toHaveBeenCalledWith(
+        lockConfig,
+        expect.objectContaining({ analyse: analyseLock }),
+      );
+      const withAnalyse = expect.objectContaining({
+        analyse: analyseException,
+      });
       expect(update).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -317,7 +333,7 @@ describe('high-tier updates that still have a lock to take: they take it themsel
           analyse: analyseException,
         }),
       );
-      expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1');
+      expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1', withAnalyse);
     },
   );
 });

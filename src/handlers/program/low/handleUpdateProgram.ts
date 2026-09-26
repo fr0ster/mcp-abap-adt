@@ -8,10 +8,12 @@
  * `config.source` fallback other members used to have is gone, and
  * `config.source` is `check()`'s alone now (an unsaved source to check,
  * not one to write). This handler writes through `options` only, the one
- * channel every sibling family in this cluster shares. No `transport_request`
- * parameter existed on this tool before this migration, so none is forwarded
- * to `config.transportRequest` either. Verified against `AdtProgram.js`, not
- * the declaration file.
+ * channel every sibling family in this cluster shares. `transport_request`
+ * goes to `config.transportRequest`, which `uploadProgramSource` puts on the
+ * URL as `corrNr` — without it a write into a transportable package is
+ * refused on premise ("Parameter corrNr could not be found.", E19
+ * 2026-09-25, measured on a view; the same member shape here). Verified
+ * against `AdtProgram.js`, not the declaration file.
  */
 
 import { programDocuments } from '@mcp-abap-adt/adt-clients';
@@ -65,6 +67,11 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['program_name', 'source_code', 'lock_handle'],
@@ -81,6 +88,7 @@ interface UpdateProgramArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -119,7 +127,12 @@ export async function handleUpdateProgram(
       createAdtClient(connection, logger)
         .getProgram(resultsFor(programDocuments))
         .update(
-          { programName },
+          {
+            programName,
+            ...(args.transport_request && {
+              transportRequest: args.transport_request,
+            }),
+          },
           {
             source: source_code,
             lockHandle: lock_handle,

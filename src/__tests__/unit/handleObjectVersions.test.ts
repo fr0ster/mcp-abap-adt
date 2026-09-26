@@ -22,6 +22,7 @@ jest.mock('../../lib/clients', () => ({
 
 import { handleGetObjectVersionSource } from '../../handlers/common/readonly/handleGetObjectVersionSource';
 import { handleGetObjectVersions } from '../../handlers/common/readonly/handleGetObjectVersions';
+import { okResponse } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -58,7 +59,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
         contentUri: '/sap/bc/adt/...;version=00001',
       },
     ];
-    mockClassGetVersions.mockResolvedValue(versions);
+    mockClassGetVersions.mockResolvedValue(okResponse(versions));
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
@@ -67,9 +68,12 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
 
     expect(result.isError).toBe(false);
     expect(mockGetClass).toHaveBeenCalled();
-    expect(mockClassGetVersions).toHaveBeenCalledWith({
-      className: 'ZCL_MY_CLASS',
-    });
+    expect(mockClassGetVersions).toHaveBeenCalledWith(
+      {
+        className: 'ZCL_MY_CLASS',
+      },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
     const data = payload(result);
     expect(data.success).toBe(true);
     expect(data.object_type).toBe('class');
@@ -89,7 +93,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
         contentUri: '/sap/bc/adt/...;version=00002',
       },
     ];
-    mockClassGetVersions.mockResolvedValue(versions);
+    mockClassGetVersions.mockResolvedValue(okResponse(versions));
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'class',
@@ -103,7 +107,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
   });
 
   it('dispatches a table to getTable().getVersions with tableName', async () => {
-    mockTableGetVersions.mockResolvedValue([]);
+    mockTableGetVersions.mockResolvedValue(okResponse([]));
 
     const result = await handleGetObjectVersions(ctx, {
       object_type: 'table',
@@ -112,14 +116,19 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
 
     expect(result.isError).toBe(false);
     expect(mockGetTable).toHaveBeenCalled();
-    expect(mockTableGetVersions).toHaveBeenCalledWith({
-      tableName: 'ZMY_TABLE',
-    });
+    expect(mockTableGetVersions).toHaveBeenCalledWith(
+      {
+        tableName: 'ZMY_TABLE',
+      },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
     expect(payload(result).versions).toEqual([]);
   });
 
   it('forwards content_uri to getVersionSource', async () => {
-    mockClassGetVersionSource.mockResolvedValue('CLASS zcl_x DEFINITION.');
+    mockClassGetVersionSource.mockResolvedValue(
+      okResponse('CLASS zcl_x DEFINITION.'),
+    );
 
     const result = await handleGetObjectVersionSource(ctx, {
       object_type: 'class',
@@ -129,6 +138,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
     expect(result.isError).toBe(false);
     expect(mockClassGetVersionSource).toHaveBeenCalledWith(
       '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     const data = payload(result);
     expect(data.success).toBe(true);

@@ -277,7 +277,7 @@ Preferred dedicated compact tools and minimal payloads:
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
 - `tests` (array, optional) - Container/test class pairs (for UNIT_TEST create).
-- `transport_request` (string, optional) - Transport request id (if required by system).
+- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 - `value_table` (string, optional) - Foreign key value table.
 
 ---
@@ -306,7 +306,7 @@ Preferred dedicated compact tools and minimal payloads:
 - `service_definition_name` (string, optional) - Service definition name.
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
-- `transport_request` (string, optional) - Transport request id (if required by system).
+- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -576,7 +576,7 @@ Preferred dedicated compact tools and minimal payloads:
 - `table_name` (string, optional) - Table name.
 - `test_class_code` (string, optional) - Updated source for the local test class.
 - `test_class_source` (string, optional) - Updated local test class source (CDS_UNIT_TEST update).
-- `transport_request` (string, optional) - Transport request id (if required by system).
+- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 - `value_table` (string, optional) - Foreign key value table.
 
 ---
@@ -602,4 +602,4 @@ Preferred dedicated compact tools and minimal payloads:
 
 ---
 
-*Last updated: 2026-09-22*
+*Last updated: 2026-09-25*

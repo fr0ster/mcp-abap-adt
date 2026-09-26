@@ -20,6 +20,7 @@
  */
 
 import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
 import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
 import { handleActivateClassTestClasses } from '../../../../handlers/class/low/handleActivateClassTestClasses';
 import { handleGetClassUnitTestResult } from '../../../../handlers/class/low/handleGetClassUnitTestResult';
@@ -60,9 +61,15 @@ describe('Class Unit Test Handlers Integration', () => {
           packageName,
           transportRequest,
         } = context;
-        if (!objectName || !params?.container_class_name) return;
+        // The suite's own container class — a test object, never the shared
+        // one: this suite locks and writes the test-classes include, and a
+        // test does not change a shared object. Created here on the test
+        // request and deleted by the cleanup below.
+        if (!params?.container_class_name) return;
 
-        const containerClassName = objectName;
+        const containerClassName = String(
+          objectName || params.container_class_name,
+        ).toUpperCase();
         testLogger?.info(
           `   • creating container class: ${containerClassName}`,
         );
@@ -86,9 +93,10 @@ describe('Class Unit Test Handlers Integration', () => {
           },
         );
         if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          testLogger?.warn(
-            `Container class creation failed (may already exist): ${errorMsg}`,
+          // Nothing deletes a leftover before the run: a name already taken is
+          // reported, and the object stays for someone to look at.
+          throw new Error(
+            `Container class ${containerClassName} could not be created: ${extractErrorMessage(createResponse)}`,
           );
         } else {
           testLogger?.success(
@@ -124,9 +132,36 @@ describe('Class Unit Test Handlers Integration', () => {
           );
         }
       },
-      // Cleanup lambda — shared class, don't delete
-      async (_context: LambdaTesterContext) => {
-        // Container class is a shared object — not deleted between tests
+      // The suite's own class goes with the suite.
+      async (context: LambdaTesterContext) => {
+        const { connection, params, objectName, transportRequest } = context;
+        const containerClassName = String(
+          objectName || params?.container_class_name || '',
+        ).toUpperCase();
+        if (!containerClassName) return;
+        const deleted = await tester.invokeToolOrHandler(
+          'DeleteClass',
+          {
+            class_name: containerClassName,
+            ...(transportRequest && { transport_request: transportRequest }),
+          },
+          async () =>
+            handleDeleteClass(
+              createHandlerContext({ connection, logger: testLogger }),
+              {
+                class_name: containerClassName,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
+              },
+            ),
+        );
+        if (deleted.isError) {
+          throw new Error(
+            `Container class ${containerClassName} was not deleted: ${extractErrorMessage(deleted)}`,
+          );
+        }
+        testLogger?.info(`🧹 Deleted container class ${containerClassName}`);
       },
     );
   }, getTimeout('long'));
@@ -147,10 +182,12 @@ describe('Class Unit Test Handlers Integration', () => {
     'should execute full workflow: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, objectName } = context;
+        const { connection, params, objectName, transportRequest } = context;
 
         // Use objectName (suffixed by LambdaTester) as container class
-        const containerClassName = objectName || params.container_class_name;
+        const containerClassName = String(
+          objectName || params.container_class_name,
+        ).toUpperCase();
         const testClassName = params.test_class_name;
 
         if (!containerClassName || !testClassName) {
@@ -220,6 +257,7 @@ ENDCLASS.`;
               class_name: containerClassName,
               test_class_source: testClassSource,
               lock_handle: testClassesLockHandle!,
+              ...(transportRequest && { transport_request: transportRequest }),
             },
             async () => {
               const updateCtx = createHandlerContext({
@@ -230,6 +268,9 @@ ENDCLASS.`;
                 class_name: containerClassName,
                 test_class_source: testClassSource,
                 lock_handle: testClassesLockHandle!,
+                ...(transportRequest && {
+                  transport_request: transportRequest,
+                }),
               });
             },
           );

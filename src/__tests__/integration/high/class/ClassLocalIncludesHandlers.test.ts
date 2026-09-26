@@ -552,6 +552,7 @@ END-OF-DEFINITION.`;
           {
             class_name: className,
             activate_on_delete: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const deleteTestClassCtx = createHandlerContext({
@@ -561,13 +562,13 @@ END-OF-DEFINITION.`;
             return handleDeleteLocalTestClass(deleteTestClassCtx, {
               class_name: className,
               activate_on_delete: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
-        // Delete may fail if test class doesn't exist, which is OK
         if (deleteTestClassResponse.isError) {
           logger?.warn(
-            `Delete LocalTestClass failed (may not exist): ${extractErrorMessage(deleteTestClassResponse)}`,
+            `Delete LocalTestClass failed: ${extractErrorMessage(deleteTestClassResponse)}`,
           );
         }
 
@@ -578,6 +579,7 @@ END-OF-DEFINITION.`;
           {
             class_name: className,
             activate_on_delete: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const deleteLocalTypesCtx = createHandlerContext({
@@ -587,12 +589,13 @@ END-OF-DEFINITION.`;
             return handleDeleteLocalTypes(deleteLocalTypesCtx, {
               class_name: className,
               activate_on_delete: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
         if (deleteLocalTypesResponse.isError) {
           logger?.warn(
-            `Delete LocalTypes failed (may not exist): ${extractErrorMessage(deleteLocalTypesResponse)}`,
+            `Delete LocalTypes failed: ${extractErrorMessage(deleteLocalTypesResponse)}`,
           );
         }
 
@@ -603,6 +606,7 @@ END-OF-DEFINITION.`;
           {
             class_name: className,
             activate_on_delete: false,
+            ...(transportRequest && { transport_request: transportRequest }),
           },
           async () => {
             const deleteLocalDefsCtx = createHandlerContext({
@@ -612,12 +616,13 @@ END-OF-DEFINITION.`;
             return handleDeleteLocalDefinitions(deleteLocalDefsCtx, {
               class_name: className,
               activate_on_delete: false,
+              ...(transportRequest && { transport_request: transportRequest }),
             });
           },
         );
         if (deleteLocalDefsResponse.isError) {
           logger?.warn(
-            `Delete LocalDefinitions failed (may not exist): ${extractErrorMessage(deleteLocalDefsResponse)}`,
+            `Delete LocalDefinitions failed: ${extractErrorMessage(deleteLocalDefsResponse)}`,
           );
         }
 

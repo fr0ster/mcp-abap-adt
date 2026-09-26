@@ -2,6 +2,7 @@
  * Handler for retrieving ADT object structure and returning a compact tree.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -36,12 +37,16 @@ interface FlatObjectStructureNode {
   nodeid: string;
   parentid?: string;
   objecttype: string;
-  objectname: string;
+  objectname?: string;
+  description?: string;
+  isfolder: boolean;
 }
 
 interface ObjectStructureTreeNode {
   objecttype: string;
-  objectname: string;
+  objectname?: string;
+  description?: string;
+  isfolder: boolean;
   children: ObjectStructureTreeNode[];
 }
 
@@ -65,30 +70,69 @@ function flatNodesOf(value: unknown): FlatObjectStructureNode[] {
       parentid: a.parentid,
       objecttype: a.objecttype,
       objectname: a.objectname,
+      description: a.description,
+      isfolder: a.isfolder === 'true',
     };
   });
 }
 
+/**
+ * **SAP does not send the object itself.** For a class on E19
+ * (2026-09-25) the folders carry `parentid="000001"` and no node `000001`
+ * arrives, so without the object asked for they each came out as a root of
+ * their own. A node whose parent was named but not sent hangs under `root`
+ * when one is given; a node naming no parent is a root as before.
+ */
 function buildNestedTree(
   flatNodes: FlatObjectStructureNode[],
+  root?: { objecttype: string; objectname: string },
 ): ObjectStructureTreeNode[] {
   const nodeMap: Record<string, ObjectStructureTreeNode> = {};
   flatNodes.forEach((node) => {
     nodeMap[node.nodeid] = {
       objecttype: node.objecttype,
       objectname: node.objectname,
+      description: node.description,
+      isfolder: node.isfolder,
       children: [],
     };
   });
   const roots: ObjectStructureTreeNode[] = [];
+  const synthetic: ObjectStructureTreeNode | undefined = root
+    ? { ...root, isfolder: false, children: [] }
+    : undefined;
   flatNodes.forEach((node) => {
     if (node.parentid && nodeMap[node.parentid]) {
       nodeMap[node.parentid].children.push(nodeMap[node.nodeid]);
+    } else if (node.parentid && synthetic) {
+      synthetic.children.push(nodeMap[node.nodeid]);
     } else {
       roots.push(nodeMap[node.nodeid]);
     }
   });
+  if (synthetic && synthetic.children.length > 0) roots.unshift(synthetic);
   return roots;
+}
+
+/**
+ * What a node is called. `objectname` names the ADT object that OWNS the
+ * node — the class itself for an attribute, the method include
+ * (`CL_X========CM001`) for a method — so it is the label only when there is
+ * nothing better. The component's own name is `description`, and a folder
+ * has only that. An include owner is kept in parentheses, since it is where
+ * the code lives; the class as owner of its own attribute says nothing.
+ */
+function labelOf(node: ObjectStructureTreeNode): string {
+  if (node.isfolder) return `${node.objecttype} [${node.description ?? ''}]`;
+  const name = node.description || node.objectname || '';
+  const owner =
+    node.objectname &&
+    node.description &&
+    node.objectname !== node.description &&
+    node.objectname.includes('=')
+      ? ` (${node.objectname})`
+      : '';
+  return `${node.objecttype}: ${name}${owner}`;
 }
 
 function serializeTree(
@@ -97,7 +141,7 @@ function serializeTree(
 ): string {
   let result = '';
   for (const node of tree) {
-    result += `${indent}- ${node.objecttype}: ${node.objectname}\n`;
+    result += `${indent}- ${labelOf(node)}\n`;
     if (node.children && node.children.length > 0) {
       result += serializeTree(node.children, `${indent}  `);
     }
@@ -107,9 +151,9 @@ function serializeTree(
 
 /**
  * The same masking `GetNodeStructureLow` guards against, over a different
- * document. `getObjectStructure(objectType, objectName)` takes no `options`
- * at all — no `analyse` — so nothing downstream of this reading can ever
- * turn a content-free answer into a refusal. An **absent root**
+ * document. `getObjectStructure` takes `analyseException`, which reads an
+ * `exc:exception` and nothing else — so nothing downstream of this reading
+ * turns a content-free answer into a refusal. An **absent root**
  * (`value['projectexplorer:objectstructure']` is `undefined` — what a
  * zero-byte body, or a document this reading does not recognise, both parse
  * to) is not the same claim as "this object has no substructure": the second
@@ -129,7 +173,7 @@ export function assertObjectStructurePresent(value: unknown): void {
   )?.['projectexplorer:objectstructure'];
   if (root === undefined || root === null) {
     throw new Error(
-      'No object structure document was returned for this object — getObjectStructure carries no analyse, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',
+      'No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',
     );
   }
 }
@@ -140,11 +184,14 @@ export function assertObjectStructurePresent(value: unknown): void {
  * `serializeTree` — both tools read the same `projectexplorer:objectstructure`
  * document through the same `ourUtils.objectStructure` (`structured`) reading.
  */
-export function treeText(value: unknown): string {
+export function treeText(
+  value: unknown,
+  root?: { objecttype: string; objectname: string },
+): string {
   assertObjectStructurePresent(value);
   const nodes = flatNodesOf(value);
   if (nodes.length === 0) return 'No nodes found in object structure response.';
-  return `tree:\n${serializeTree(buildNestedTree(nodes))}`;
+  return `tree:\n${serializeTree(buildNestedTree(nodes, root))}`;
 }
 
 export async function handleGetObjectStructure(
@@ -171,8 +218,8 @@ export async function handleGetObjectStructure(
   logger?.info(`Fetching object structure for ${objectType}/${objectName}`);
   const detail = detailOf(args);
 
-  // `getObjectStructure(objectType, objectName)` takes no options object at
-  // all — no `analyse` to pass, matching the brief. The presence check runs
+  // `getObjectStructure` takes `analyseException` (adt-clients 23), which
+  // reads only an exception document. The presence check runs
   // here, inside the call, only for `terse` — `raw`/`full` always answer the
   // document exactly as it arrived, indeterminate or not, the same invariant
   // every other `detail: 'raw'` in this migration keeps.
@@ -181,12 +228,16 @@ export async function handleGetObjectStructure(
     async () => {
       const response = await createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getObjectStructure(objectType, objectName);
+        .getObjectStructure(objectType, objectName, {
+          analyse: analyseException,
+        });
       if (detail === 'terse' && response.ok) {
         assertObjectStructurePresent(response.getResult().value.value);
       }
       return response;
     },
-    project(detail, (value) => treeText(value)),
+    project(detail, (value) =>
+      treeText(value, { objecttype: objectType, objectname: objectName }),
+    ),
   );
 }

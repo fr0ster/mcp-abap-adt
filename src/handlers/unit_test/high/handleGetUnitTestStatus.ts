@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -69,7 +70,10 @@ export async function handleGetUnitTestStatus(
 
   return answer(
     { tool: 'GetUnitTestStatus', detail },
-    () => unitTest.getStatus(run_id, with_long_polling),
+    () =>
+      unitTest.getStatus(run_id, with_long_polling, {
+        analyse: analyseException,
+      }),
     project(detail, terseRunStatus),
   );
 }

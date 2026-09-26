@@ -182,6 +182,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `name` (string, required) - BehaviorDefinition name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -199,7 +200,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -211,7 +212,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -254,7 +255,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete behavior definition source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages).
+- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -292,7 +293,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -386,7 +387,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `superclass` (string, optional) - Superclass name (optional).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -398,7 +399,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -509,6 +510,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001). Class must already exist.
 - `lock_handle` (string, required) - Lock handle from LockClass operation. Required for update operation.
 - `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -524,6 +526,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `test_class_source` (string, required) - Complete ABAP Unit test class source code.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -584,7 +587,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
 - `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
-- `transport_request` (string, optional) - Transport request number
+- `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -663,6 +666,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `data_element_name` (string, required) - DataElement name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
 
 ---
 
@@ -681,7 +685,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 - `type_kind` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type kind ('E'/'domain', 'P'/'predefinedAbapType', etc.).
 - `type_name` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type name (domain, data element, or class name depending on type_kind).
 
@@ -695,7 +699,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - DataElement name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -800,7 +804,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -812,7 +816,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -855,6 +859,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -916,7 +921,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional for local objects.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -928,7 +933,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -971,6 +976,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete metadata extension source code.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -1015,6 +1021,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `domain_name` (string, required) - Domain name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
 
 ---
 
@@ -1030,7 +1037,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1042,7 +1049,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1143,6 +1150,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1173,7 +1181,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1190,7 +1198,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Accepted for compatibility; not sent to the server. A function module lives inside its function group's package — the shipped create endpoint takes no package of its own.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1202,7 +1210,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1215,7 +1223,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
 - `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1288,7 +1296,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP function module source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects locked in a request.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects locked in a request. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1348,6 +1356,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `interface_name` (string, required) - Interface name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1363,7 +1372,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1375,7 +1384,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1418,6 +1427,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP interface source code.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -1470,7 +1480,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `software_component` (string, optional) - Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).
 - `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
 - `transport_layer` (string, optional) - Transport layer (e.g., ZDEV). Required for transportable packages.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1484,7 +1494,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `connection_config` (object, optional) - Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 - `package_name` (string, required) - Package name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1529,6 +1539,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, required) - Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 - `updated_description` (string, required) - New description for the package.
 
 ---
@@ -1573,6 +1584,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
+- `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
@@ -1590,7 +1602,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `program_type` (string, optional) - Program type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1602,7 +1614,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1645,6 +1657,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP program source code.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -1740,7 +1753,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
 - `structure_type` (string, optional) - Accepted for compatibility; not forwarded to the create request. (These values name ABAP program subtypes — a DDIC structure has no structure-type concept of its own.)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1752,7 +1765,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1795,6 +1808,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
 
@@ -1823,7 +1837,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetNodeStructure.ts`
 
 **Parameters:**
-- `node_id` (string, optional (default: 0000" for root). Use to fetch child nodes.)) - Optional node ID (default: "0000" for root). Use to fetch child nodes.
+- `node_id` (string, optional (default: 000000)) - Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: E19 answers it with an empty body.
 - `parent_name` (string, required) - Parent object name
 - `parent_type` (string, required) - Parent object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K")
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -1904,7 +1918,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `table_name` (string, required) - Table name (e.g., ZT_TEST_001). Must follow SAP naming conventions.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1916,7 +1930,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1959,7 +1973,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `table_name` (string, required) - Table name (e.g., ZOK_T_TEST_0001). Table must already exist.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport.
+- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1993,4 +2007,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-22*
+*Last updated: 2026-09-25*

@@ -13,6 +13,7 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { resolveSystemContext } from '../../../../lib/systemContext';
 import {
   getCleanupAfter,
+  getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
   getSystemType,
@@ -53,6 +54,12 @@ export class LambdaTester {
   protected testParams: any = null;
   protected context: LambdaTesterContext | undefined;
   protected cleanupAfterLambda: TLambda | null = null;
+  /**
+   * Set when the test body threw (a skip does not count). `cleanupAfter`
+   * reads it: a failed test keeps its objects for analysis — see
+   * `getCleanupAfterRun`.
+   */
+  protected testFailed = false;
   protected hardModeMcp: {
     client: any;
     toolNames: Set<string>;
@@ -376,9 +383,16 @@ export class LambdaTester {
       return;
     }
 
-    // Check YAML parameters first (global skip_cleanup, test case skip_cleanup, cleanup_after flags)
-    const shouldCleanup = getCleanupAfter(this.testCase);
-    if (!shouldCleanup) {
+    // A failed test keeps what it created, so the objects themselves can say
+    // why it failed. Every lock was already released by the test's own
+    // finally/unlock steps; only the delete is withheld.
+    if (!getCleanupAfterRun(this.testCase, this.testFailed)) {
+      if (this.testFailed) {
+        this.context.logger?.warn?.(
+          '🔎 Test failed — cleanup skipped, its objects are kept for analysis. Delete them once analysed, or set test_settings.cleanup_on_failure: true to have them deleted anyway.',
+        );
+        return;
+      }
       this.context.logger?.info?.(
         'ℹ️ Cleanup skipped: disabled in YAML config (skip_cleanup=true or cleanup_after=false)',
       );
@@ -455,7 +469,6 @@ export class LambdaTester {
   /**
    * Lifecycle: beforeEach
    * Prepares test case for each test
-   * Performs pre-cleanup if enabled (removes leftover objects from previous failed tests)
    * @param lambda - Lambda to execute before each test
    */
   async beforeEach(lambda: TLambda): Promise<void> {
@@ -463,31 +476,10 @@ export class LambdaTester {
       throw new Error('Context not initialized');
     }
 
-    // Pre-cleanup: Remove leftover objects from previous failed tests
-    // This ensures tests start with a clean state even if previous test failed
-    const shouldCleanup = getCleanupAfter(this.testCase);
-    if (shouldCleanup && this.cleanupAfterLambda) {
-      try {
-        this.context.logger?.debug?.(
-          '🧹 Running pre-cleanup (removing leftover objects)...',
-        );
-        await this.cleanupAfterLambda(this.context);
-        this.context.logger?.debug?.('✅ Pre-cleanup completed');
-        // Wait for SAP to propagate the deletion before starting the test
-        const cleanupDelay = this.context.getOperationDelay('cleanup');
-        if (cleanupDelay > 0) {
-          this.context.logger?.debug?.(
-            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
-          );
-          await delay(cleanupDelay);
-        }
-      } catch (error: any) {
-        // Pre-cleanup errors are non-fatal - object might not exist
-        this.context.logger?.debug?.(
-          `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
-        );
-      }
-    }
+    // No delete before a test. The name check before create says whether the
+    // name can be used, and why not; deleting first only adds requests that
+    // fail on their own (an object gone but still in the object directory of
+    // an open request). Cleaning up after itself is the test's job.
 
     await lambda(this.context);
   }
@@ -598,6 +590,7 @@ export class LambdaTester {
       );
     }
 
+    this.testFailed = false;
     try {
       // Execute test function (lambda) with context
       // Lambda decides what messages to log and whether to pass logger to handlers
@@ -610,9 +603,10 @@ export class LambdaTester {
         return; // Don't throw, just skip the test
       }
 
+      this.testFailed = true;
       this.context.logger?.error(`❌ Test failed: ${error.message}`);
-      // Note: Cleanup will still run via afterEach() hook, which Jest guarantees to execute
-      // even when test fails. This ensures cleanup runs regardless of test outcome.
+      // afterEach() still runs, and cleanupAfter() sees testFailed: the
+      // objects stay for analysis, and nothing but the delete is skipped.
       throw error;
     }
   }
@@ -622,7 +616,7 @@ export class LambdaTester {
   }
 
   getConnection():
-    | import('@mcp-abap-adt/interfaces-adt').IAbapConnection
+    | import('@mcp-abap-adt/interfaces-adt-connection').IAbapConnection
     | null {
     return this.context?.connection ?? null;
   }

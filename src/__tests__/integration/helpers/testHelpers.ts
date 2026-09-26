@@ -3,7 +3,7 @@
  * Provides utilities for parsing responses, managing sessions, etc.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { AxiosError } from 'axios';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';

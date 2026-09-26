@@ -1,5 +1,7 @@
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { fetchFunctionGroupChildren } from '../../../lib/strategies/functionGroupChildren';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'GetIncludesList',
@@ -34,158 +36,119 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-/**
- * Parses XML response to extract includes information
- * @param xmlData XML response data
- * @returns Array of include objects with name and node_id
- */
-function parseIncludesFromXml(
-  xmlData: string,
-): Array<{ name: string; node_id: string; label: string }> {
-  const includes: Array<{ name: string; node_id: string; label: string }> = [];
-
-  try {
-    // Simple regex-based parsing for XML
-    // Look for OBJECT_TYPE entries that contain "PROG/I" (includes)
-    const objectTypeRegex =
-      /<SEU_ADT_OBJECT_TYPE_INFO>(.*?)<\/SEU_ADT_OBJECT_TYPE_INFO>/gs;
-    const matches = xmlData.match(objectTypeRegex);
-
-    if (matches) {
-      for (const match of matches) {
-        // Check if this is an include type
-        if (match.includes('<OBJECT_TYPE>PROG/I</OBJECT_TYPE>')) {
-          const nodeIdMatch = match.match(/<NODE_ID>(\d+)<\/NODE_ID>/);
-          const labelMatch = match.match(
-            /<OBJECT_TYPE_LABEL>(.*?)<\/OBJECT_TYPE_LABEL>/,
-          );
-
-          if (nodeIdMatch && labelMatch) {
-            includes.push({
-              name: 'PROG/I',
-              node_id: nodeIdMatch[1],
-              label: labelMatch[1],
-            });
-          }
-        }
-      }
-    }
-  } catch (_error) {
-    // console.warn('Error parsing XML for includes:', error);
-  }
-
-  return includes;
-}
-
-/**
- * Parses XML response to extract actual include names from node structure
- * @param xmlData XML response data
- * @returns Array of include names
- */
-function parseIncludeNamesFromXml(xmlData: string): string[] {
-  const includeNames: string[] = [];
-
-  try {
-    // Look for SEU_ADT_REPOSITORY_OBJ_NODE entries with OBJECT_TYPE PROG/I
-    const nodeRegex =
-      /<SEU_ADT_REPOSITORY_OBJ_NODE>(.*?)<\/SEU_ADT_REPOSITORY_OBJ_NODE>/gs;
-    const nodeMatches = xmlData.match(nodeRegex);
-
-    if (nodeMatches) {
-      for (const nodeMatch of nodeMatches) {
-        // Check if this node is for includes (PROG/I)
-        if (nodeMatch.includes('<OBJECT_TYPE>PROG/I</OBJECT_TYPE>')) {
-          // Extract the object name
-          const nameMatch = nodeMatch.match(
-            /<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/,
-          );
-          if (nameMatch?.[1].trim()) {
-            const includeName = nameMatch[1].trim();
-            // Decode URL-encoded names if needed
-            const decodedName = decodeURIComponent(includeName);
-            includeNames.push(decodedName);
-          }
-        }
-      }
-    }
-
-    // If no nodes found, try alternative parsing for OBJECT_NAME tags
-    if (includeNames.length === 0) {
-      const objectNameRegex = /<OBJECT_NAME>([^<]+)<\/OBJECT_NAME>/g;
-      let match: RegExpExecArray | null = objectNameRegex.exec(xmlData);
-      while (match !== null) {
-        const name = match[1].trim();
-        if (name && name.length > 0) {
-          const decodedName = decodeURIComponent(name);
-          includeNames.push(decodedName);
-        }
-        match = objectNameRegex.exec(xmlData);
-      }
-    }
-  } catch (_error) {
-    // console.warn('Error parsing XML for include names:', error);
-  }
-
-  return [...new Set(includeNames)]; // Remove duplicates
-}
-
 interface IncludeNode {
   name: string;
+  type?: string;
   children: IncludeNode[];
+  /** This include appears inside itself — a real cycle, and not expanded. */
   cyclic?: boolean;
+  /**
+   * This include was already reached elsewhere in the tree.
+   *
+   * **In ABAP that is not a diamond, it is invalid source.** An include is a
+   * textual insertion into one global scope, so including the same one twice
+   * duplicates every declaration it makes and the object cannot be activated —
+   * whatever the tree looks like, that code does not run. It is reported rather
+   * than expanded: expanding it would describe a shape that cannot exist, and
+   * calling it `cyclic` would name the wrong defect.
+   */
+  duplicate?: boolean;
   truncated?: boolean;
 }
 
 const MAX_INCLUDE_DEPTH = 20;
 
+type ParentKind = 'PROG/P' | 'PROG/I' | 'FUGR/F' | 'CLAS/OC';
+
 /**
- * Discovers the direct child includes of a single object via its ADT node
- * structure. Returns an empty array when the object has no includes node.
+ * What the caller asked for, in the four kinds this tool walks. A function
+ * group's main program `SAPL<fg>` is not readable as a program — on E19 its
+ * program and include URIs both answer 404 — so it is walked as the group.
  */
-async function discoverIncludeNames(
-  utils: any,
-  parentType: string,
-  parentName: string,
-  requestTimeout: number,
-): Promise<string[]> {
-  const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> =>
-    Promise.race([
-      p,
-      new Promise<never>((_, reject) =>
-        setTimeout(
-          () =>
-            reject(
-              new Error(
-                `Timeout after ${requestTimeout}ms while ${what} for ${parentName}`,
-              ),
-            ),
-          requestTimeout,
-        ),
-      ),
-    ]);
+function resolveParent(
+  objectType: string,
+  objectName: string,
+): { kind: ParentKind; name: string } | undefined {
+  const t = objectType.trim().toUpperCase();
+  const name = objectName.trim().toUpperCase();
+  const kind: ParentKind | undefined =
+    t === 'PROG/P' || t === 'PROGRAM'
+      ? 'PROG/P'
+      : t === 'PROG/I' || t === 'INCLUDE'
+        ? 'PROG/I'
+        : t === 'FUGR' ||
+            t === 'FUGR/F' ||
+            t === 'FUNCTION_GROUP' ||
+            t === 'FUNCTIONGROUP'
+          ? 'FUGR/F'
+          : t === 'CLAS/OC' || t === 'CLAS' || t === 'CLASS'
+            ? 'CLAS/OC'
+            : undefined;
+  if (!kind) return undefined;
+  if (kind === 'PROG/P' && name.startsWith('SAPL') && name.length > 4) {
+    return { kind: 'FUGR/F', name: name.slice(4) };
+  }
+  return { kind, name };
+}
 
-  // Step 1: root node structure to find the includes node id.
-  const rootResponse = (await withTimeout(
-    utils.fetchNodeStructure(parentType, parentName, '000000', true),
-    'fetching root node structure',
-  )) as { data: string };
+/**
+ * The includes a piece of ABAP source names, in order. A full-line comment
+ * (`*`) and a trailing one (`"`) are not code; `INCLUDE STRUCTURE` and
+ * `INCLUDE TYPE` embed a type, not a program include.
+ */
+export function includeStatementsOf(source: string): string[] {
+  const found: string[] = [];
+  for (const rawLine of source.split(/\r?\n/)) {
+    if (rawLine.startsWith('*')) continue;
+    const line = rawLine.replace(/".*$/, '');
+    const m = line.match(/^\s*INCLUDE\s+([A-Z0-9_/]+)\s*(?:IF\s+FOUND\s*)?\./i);
+    if (!m) continue;
+    const name = m[1].toUpperCase();
+    if (name === 'STRUCTURE' || name === 'TYPE') continue;
+    if (!found.includes(name)) found.push(name);
+  }
+  return found;
+}
 
-  const includesInfo = parseIncludesFromXml(rootResponse.data);
-  const includesNode = includesInfo.find((info) => info.name === 'PROG/I');
-  if (!includesNode) return [];
+/** The text inside a source reading — a string, or `{value, raw}`. */
+function textOf(response: any): string {
+  const v = response?.getResult?.().value;
+  if (typeof v === 'string') return v;
+  return String(v?.value ?? v?.raw ?? '');
+}
 
-  // Step 2: include list under that node.
-  const includesResponse = (await withTimeout(
-    utils.fetchNodeStructure(
-      parentType,
-      parentName,
-      includesNode.node_id,
-      true,
-    ),
-    'fetching includes list',
-  )) as { data: string };
+/**
+ * Why a source produced no text: it is not there, or the server refused to give
+ * it.
+ *
+ * **These were the same thing, and that is a defect.** `textOf` used to answer
+ * `''` for any failure, so an include this user may not read — or a server
+ * error — arrived as "this include names no others", and the tree came back
+ * short with nothing saying so. ADT distinguishes the two itself: a missing
+ * resource is `ExceptionResourceNotFound` over `404`, and a refusal is its own
+ * exception (`ExceptionResourceNoAccess` for a lock or an authorization), which
+ * is exactly the case that used to disappear.
+ *
+ * `absent` keeps the old behaviour where it was right: not that kind of object,
+ * or an include that is not there, so the walk goes on. `refused` is collected
+ * and travels in the answer beside the tree — the same shape `withLock` uses for
+ * a release that failed after a write that landed: what was found, plus what
+ * could not be read, never one instead of the other.
+ */
+type SourceRead =
+  | { kind: 'text'; text: string }
+  | { kind: 'absent' }
+  | { kind: 'refused'; message: string };
 
-  return parseIncludeNamesFromXml(includesResponse.data);
+function readSource(response: any): SourceRead {
+  if (response?.ok) return { kind: 'text', text: textOf(response) };
+  const error = response?.getError?.() ?? {};
+  const absent =
+    error?.response?.status === 404 ||
+    error?.adtType === 'ExceptionResourceNotFound';
+  return absent
+    ? { kind: 'absent' }
+    : { kind: 'refused', message: String(error?.message ?? 'no answer') };
 }
 
 export async function handleGetIncludesList(
@@ -209,61 +172,149 @@ export async function handleGetIncludesList(
       return return_error('Parameter "object_type" (string) is required.');
     }
 
-    // Default timeout: 30 seconds
+    const parent = resolveParent(object_type, object_name);
+    if (!parent) {
+      return return_error(
+        `Unsupported object_type "${object_type}": use PROG/P, PROG/I, FUGR or CLAS/OC.`,
+      );
+    }
+
+    // Default timeout: 30 seconds per request
     const requestTimeout =
       timeout && typeof timeout === 'number' ? timeout : 30000;
-
-    const parentName = object_name.toUpperCase();
-    const parentType = object_type;
+    const withTimeout = <T>(p: Promise<T>, what: string): Promise<T> =>
+      Promise.race([
+        p,
+        new Promise<never>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(`Timeout after ${requestTimeout}ms while ${what}`),
+              ),
+            requestTimeout,
+          ),
+        ),
+      ]);
 
     logger?.info(
-      `Starting includes tree discovery for ${parentName} (${parentType})`,
+      `Starting includes tree discovery for ${parent.name} (${parent.kind})`,
     );
 
-    const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+    const utils = createAdtClient(connection, logger).getUtils(ourUtils) as any;
 
-    const visited = new Set<string>([parentName]);
+    /** What could not be read, and why — reported beside the tree. */
+    const unreadable: { name: string; message: string }[] = [];
+    const sourceOf = async (
+      what: string,
+      read: Promise<unknown>,
+    ): Promise<string> => {
+      const answer = await readSource(await read);
+      if (answer.kind === 'text') return answer.text;
+      if (answer.kind === 'refused') {
+        logger?.warn?.(`could not read ${what}: ${answer.message}`);
+        unreadable.push({ name: what, message: answer.message });
+      }
+      return '';
+    };
+    const readInclude = async (name: string) =>
+      sourceOf(name, withTimeout(utils.getInclude(name), `reading ${name}`));
 
-    const buildChildren = async (
-      ownerType: string,
-      ownerName: string,
+    // Two different things, and one `visited` set was calling both a cycle.
+    //
+    // `ancestors` is the path from the root to here: a name in it is a genuine
+    // cycle — the include includes itself, directly or through others.
+    //
+    // `seen` is everything the walk has reached anywhere. A second occurrence
+    // there is a DUPLICATE, not a cycle and not a legitimate diamond: an
+    // include is inserted textually into one global scope, so including the
+    // same one twice duplicates its declarations and the object will not
+    // activate. Either way it is not expanded; the difference is which defect
+    // the answer names.
+    const seen = new Set<string>([parent.name]);
+    const expand = async (
+      names: string[],
       depth: number,
+      ancestors: Set<string>,
     ): Promise<IncludeNode[]> => {
-      const names = await discoverIncludeNames(
-        utils,
-        ownerType,
-        ownerName,
-        requestTimeout,
-      );
       const children: IncludeNode[] = [];
-      for (const rawName of names) {
-        const name = rawName.toUpperCase();
+      for (const name of names) {
         const node: IncludeNode = { name, children: [] };
-
-        if (visited.has(name)) {
+        if (ancestors.has(name)) {
           node.cyclic = true;
-          children.push(node);
-          continue;
-        }
-        if (depth >= MAX_INCLUDE_DEPTH) {
+        } else if (seen.has(name)) {
+          node.duplicate = true;
+        } else if (depth >= MAX_INCLUDE_DEPTH) {
           node.truncated = true;
-          children.push(node);
-          continue;
+        } else {
+          seen.add(name);
+          node.children = await expand(
+            includeStatementsOf(await readInclude(name)),
+            depth + 1,
+            new Set([...ancestors, name]),
+          );
         }
-        visited.add(name);
-
-        // Recurse into the include as a PROG/I.
-        node.children = await buildChildren('PROG/I', name, depth + 1);
         children.push(node);
       }
       return children;
     };
 
-    const tree: IncludeNode = {
-      name: parentName,
-      children: await buildChildren(parentType, parentName, 0),
-    };
+    let children: IncludeNode[];
+    if (parent.kind === 'CLAS/OC') {
+      // A class has sections, not program includes: its metadata lists them
+      // by `includeType` (definitions, implementations, macros, testclasses,
+      // main), with no name of their own.
+      const meta = await sourceOf(
+        `class ${parent.name}`,
+        withTimeout(
+          utils.readObjectMetadata('class', parent.name),
+          `reading class ${parent.name}`,
+        ),
+      );
+      children = [...meta.matchAll(/class:includeType="([^"]+)"/g)].map(
+        (m) => ({ name: m[1], type: 'CLAS/I', children: [] }),
+      );
+    } else if (parent.kind === 'FUGR/F') {
+      // The group's main program cannot be read, so which includes it names
+      // directly is worked out from the rest: every include of the group,
+      // less those another include of the group names.
+      const listed = await withTimeout(
+        fetchFunctionGroupChildren(utils, parent.name, 'FUGR/I'),
+        `listing the includes of ${parent.name}`,
+      );
+      if (!listed.ok) throw new Error(listed.getError().message);
+      const all: string[] = listed
+        .getResult()
+        .value.map((o: { name: string }) => o.name.toUpperCase());
+      const nested = new Set<string>();
+      for (const name of all) {
+        for (const inc of includeStatementsOf(await readInclude(name))) {
+          nested.add(inc);
+        }
+      }
+      children = await expand(
+        all.filter((name) => !nested.has(name)),
+        0,
+        new Set([parent.name]),
+      );
+    } else {
+      const rootSource =
+        parent.kind === 'PROG/P'
+          ? await sourceOf(
+              `program ${parent.name}`,
+              withTimeout(
+                utils.readObjectSource('program', parent.name),
+                `reading program ${parent.name}`,
+              ),
+            )
+          : await readInclude(parent.name);
+      children = await expand(
+        includeStatementsOf(rootSource),
+        0,
+        new Set([parent.name]),
+      );
+    }
+
+    const tree: IncludeNode = { name: parent.name, children };
 
     return {
       isError: false,
@@ -272,9 +323,12 @@ export async function handleGetIncludesList(
           type: 'text',
           text: JSON.stringify(
             {
-              object_name: parentName,
-              object_type: parentType,
+              object_name: parent.name,
+              object_type: parent.kind,
               tree,
+              // Only when there is something to say: a caller reading a tree
+              // needs to know it is short, and why.
+              ...(unreadable.length > 0 ? { unreadable } : {}),
             },
             null,
             2,

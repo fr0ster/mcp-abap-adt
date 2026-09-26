@@ -63,6 +63,11 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['name', 'source_code', 'lock_handle'],
@@ -79,6 +84,7 @@ interface UpdateMetadataExtensionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -108,7 +114,12 @@ export async function handleUpdateMetadataExtension(
       createAdtClient(connection, logger)
         .getMetadataExtension(resultsFor(metadataExtensionDocuments))
         .update(
-          { name: ddlxName },
+          {
+            name: ddlxName,
+            ...(args.transport_request && {
+              transportRequest: args.transport_request,
+            }),
+          },
           {
             source: source_code,
             lockHandle: lock_handle,

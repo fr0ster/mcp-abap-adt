@@ -78,6 +78,17 @@ export async function withLock<H, T>(
   const acquired = await acquire();
   if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
   const handle = acquired.getResult().value;
+  // A backstop. Every lock here is given `analyseLock`, which refuses a 2xx
+  // naming no handle with SAP's answer beside it (adt-clients 23 answers `''`
+  // there and leaves the verdict to the caller, MIGRATION-23 §5). A lock
+  // called without it would still stop here rather than write under an empty
+  // handle. There is no handle to release.
+  if ((handle as unknown) === '') {
+    return failure<T>({
+      message: 'SAP answered the lock request without a lock handle',
+      origin: 'refusal',
+    } as IAdtError);
+  }
 
   // Deliberately a catch rather than a `finally`. A `finally` lets the original
   // exception out as soon as the block ends, so a release that ALSO failed has

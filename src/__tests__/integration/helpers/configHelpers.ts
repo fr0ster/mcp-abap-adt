@@ -595,8 +595,9 @@ export function getCleanupAfter(testCase?: any): boolean {
  * **A failed test keeps its objects.** Deleting them takes away the one thing
  * that says why it failed — the object's own state, source and activation log
  * — and leaves only the message. So after a failure nothing is deleted unless
- * `test_settings.cleanup_on_failure: true` asks for it; the next run's
- * pre-cleanup removes what is left. Locks are another matter: a test releases
+ * `test_settings.cleanup_on_failure: true` asks for it. Nothing deletes it
+ * before the next run either: that run's name validation reports the name as
+ * taken, and the object stays until someone has looked at it. Locks are another matter: a test releases
  * every lock it took whether it passed or failed, and that release never
  * depends on this answer.
  *

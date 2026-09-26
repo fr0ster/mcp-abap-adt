@@ -272,20 +272,8 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         },
       );
 
-      // Pre-cleanup: delete leftover object from previous test run if it
-      // exists. adt-clients 19: a refusal is `ok: false`, not a throw
-      // (IAdtCapabilities.ts) — "doesn't exist" is the expected refusal on a
-      // clean run, so it is silently not-ok rather than caught.
-      try {
-        const preCleanup = await client
-          .getClass()
-          .delete({ className, transportRequest });
-        if (preCleanup.ok) {
-          testLogger?.info(`🧹 Pre-cleanup: deleted leftover ${className}`);
-        }
-      } catch {
-        // A genuine connection-level throw — still tolerated here.
-      }
+      // No delete before the test: validation says whether the name can be
+      // used, and why not.
 
       // Track creation state for cleanup
       let classCreated = false;

@@ -486,30 +486,10 @@ export class HighTester extends LambdaTester {
   }
 
   async beforeEach(): Promise<void> {
-    // Pre-cleanup: Remove leftover objects from previous failed tests
-    const shouldCleanup = getCleanupAfter(this.testCase);
-    if (shouldCleanup && this.cleanupAfterLambda && this.context) {
-      try {
-        this.context.logger?.debug?.(
-          '🧹 Running pre-cleanup (removing leftover objects)...',
-        );
-        await this.cleanupAfterLambda(this.context);
-        this.context.logger?.debug?.('✅ Pre-cleanup completed');
-        // Wait for SAP to propagate the deletion before starting the test
-        const cleanupDelay = this.context.getOperationDelay('cleanup');
-        if (cleanupDelay > 0) {
-          this.context.logger?.debug?.(
-            `⏳ Waiting ${cleanupDelay}ms for SAP to propagate cleanup...`,
-          );
-          await delay(cleanupDelay);
-        }
-      } catch (error: any) {
-        // Pre-cleanup errors are non-fatal - object might not exist
-        this.context.logger?.debug?.(
-          `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
-        );
-      }
-    }
+    // No delete before a test. The name check before create says whether the
+    // name can be used, and why not; deleting first only adds requests that
+    // fail on their own (an object gone but still in the object directory of
+    // an open request). Cleaning up after itself is the test's job.
   }
 
   async afterEach(): Promise<void> {

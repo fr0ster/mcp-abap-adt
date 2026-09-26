@@ -1,5 +1,7 @@
 /**
- * The consumer's deletion reading, against answers E19 sent on 2026-09-26
+ * The deletion reading — adt-strategies' since 0.5.0 (#172), re-exported by
+ * `deletionRefusal.ts` beside this consumer's `absentPerCheck` — against
+ * answers E19 sent on 2026-09-26
  * (integration run 8), trimmed to the elements the reading looks at.
  */
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
@@ -49,13 +51,13 @@ const DDLS_DELETED_UNTYPED_MESSAGE =
   '<atom:link href="/sap/bc/adt/messageclass//messages/000/longtext?language=E" rel="http://www.sap.com/adt/relations/longtext" type="text/html" xmlns:atom="http://www.w3.org/2005/Atom"/>' +
   '</del:message></del:object></del:deletionResult>';
 
-describe('readDeletionRefusal (consumer strategy)', () => {
+describe('readDeletionRefusal (adt-strategies, re-exported)', () => {
   it('an untyped message on a deleted object is no refusal', () => {
     expect(readDeletionRefusal(DDLS_DELETED_UNTYPED_MESSAGE)).toBeNull();
   });
 
   it('keeps every message SAP sent, not the reference-count fallback', () => {
-    expect(readDeletionRefusal(SRVB_CHECK_TWO_MESSAGES)).toEqual({
+    expect(readDeletionRefusal(SRVB_CHECK_TWO_MESSAGES)).toMatchObject({
       message: 'ADT refuses to delete ZMCP_BLD_SRVB01',
       messages: [
         { type: 'W', text: 'ZMCP_BLD_SRVB01: ZMCP_BLD_SRVB01 does not exist' },
@@ -69,7 +71,7 @@ describe('readDeletionRefusal (consumer strategy)', () => {
   });
 
   it('refuses only the object not deleted, with its own message', () => {
-    expect(readDeletionRefusal(TABL_DELETE_TWO_OBJECTS)).toEqual({
+    expect(readDeletionRefusal(TABL_DELETE_TWO_OBJECTS)).toMatchObject({
       message: 'ADT refuses to delete ZMCP_BLD_TAB_H1',
       messages: [
         {
@@ -118,7 +120,7 @@ describe('readDeletionRefusal (consumer strategy)', () => {
   });
 });
 
-describe('analyseDeletion (consumer strategy)', () => {
+describe('analyseDeletion (adt-strategies, re-exported)', () => {
   it('turns a 200 refusal into a failure that names the request', () => {
     const failure: any = analyseDeletion(ADT_NO_FAILURE, {
       data: SRVB_CHECK_TWO_MESSAGES,

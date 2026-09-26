@@ -1,4 +1,36 @@
-import { unitTestDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  atcDocuments,
+  classExecutorDocuments,
+  feedDocuments,
+  profilerDocuments,
+  programExecutorDocuments,
+  unitTestDocuments,
+  utilDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import {
+  asItCame,
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+  objectVersions,
+  profilerDbAccesses,
+  profilerHitList,
+  profilerStatements,
+  profilerTraceEntries,
+  traceSchedulingProfilerId,
+  traceSchedulingRequests,
+  traceSchedulingTypes,
+  unitTestRunId,
+  utilActivationRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { nodeLevel } from './packageWalk';
 import { statusOnly, structured, verbatim } from './reading';
@@ -137,6 +169,64 @@ export const READING_BY_SLOT = {
   // `tm:type` on the creating call is ignored, and CTS also assigns a type on
   // its own when the first object lands.
   taskTypeChanged: structured,
+
+  // Arrived with adt-clients 23.0.0 in every versionable type's set. The
+  // library stopped reading them (MIGRATION-23 §4): `versions` is the feed as
+  // it came unless a reading is given, so the list is `objectVersions`'
+  // (`IObjectVersion[]`, what `getVersions` answered in 22.x), and a version's
+  // source is the text as it came — `asItCame`, the 22.x default. Without
+  // them `resultsFor` threw for every versionable type's set, which is nearly
+  // every handler here.
+  versions: objectVersions,
+  versionSource: asItCame,
+
+  // Arrived with adt-clients 23.0.0, when the runtime, executor, abapGit and
+  // feature-toggle implementations took result sets. What the tools read
+  // through them is not these: `ourAtc`, `ourProfiler`, `ourFeeds`,
+  // `ourClassExecutor` and `ourProgramExecutor` below carry the readings
+  // adt-strategies ships for them. The table names a generic reading per slot
+  // so that a `resultsFor` over one of those sets gets something rather than
+  // a throw — `structured` for a document, `verbatim` for a bare text id, and
+  // `statusOnly` where the answer is a header and an empty body.
+  checkVariant: structured,
+  worklist: verbatim,
+  startedRun: structured,
+  waitingRun: structured,
+  runStatus: structured,
+  findings: structured,
+  checkFailures: structured,
+  executionLog: structured,
+  hitlist: structured,
+  statements: structured,
+  dbAccesses: structured,
+  requests: structured,
+  scheduled: statusOnly,
+  feeds: structured,
+  variants: structured,
+  entries: structured,
+  systemMessages: structured,
+  gatewayErrors: structured,
+  gatewayErrorDetail: structured,
+  dump: verbatim,
+  error: structured,
+  message: structured,
+  object: structured,
+  graph: structured,
+  trace: structured,
+  records: structured,
+  recordContent: structured,
+  activations: structured,
+  state: structured,
+  directory: structured,
+  linked: structured,
+  pulled: structured,
+  unlinked: structured,
+  repos: structured,
+  errorLog: structured,
+  externalRepo: structured,
+  switched: structured,
+  runtimeState: structured,
+  checkState: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**
@@ -204,6 +294,10 @@ export function resultsFor<
  */
 export const ourUtils = {
   ...resultsFor(utilDocuments, ['activation']),
+  // adt-clients 23 ships the document for `activation`; the run id is a
+  // reading now, and `utilActivationRunId` is the one that looks at the
+  // `Location` header (MIGRATION-23 §4).
+  activation: utilActivationRunId,
   node: nodeLevel,
   // `query` for the same reason as `node`: the generic `structured` parse has
   // never carried `dataPreview:columns` or `dataPreview:data` in its
@@ -229,4 +323,73 @@ export const ourUtils = {
  * `unitTestDocuments` without a keep-list, would silently discard the run id
  * again.
  */
-export const ourUnitTest = resultsFor(unitTestDocuments, ['run']);
+export const ourUnitTest = {
+  ...resultsFor(unitTestDocuments, ['run']),
+  // adt-clients 23 ships the document for `run`; the id is in a header, and
+  // `unitTestRunId` reads it (MIGRATION-23 §6).
+  run: unitTestRunId,
+};
+
+/**
+ * The ATC set with the readings adt-clients 22 applied by default and 23 moved
+ * to adt-strategies (MIGRATION-23 §9): the system's check variant and the
+ * worklist id as text, a started run's id, a waited run's finding stats, and a
+ * run's status. `findings` stays the document — `parseAtcWorklist` reads it.
+ */
+export const ourAtc = {
+  ...atcDocuments,
+  checkVariant: atcSystemCheckVariant,
+  worklist: atcWorklistId,
+  startedRun: atcStartedRun,
+  waitingRun: atcWaitingRun,
+  runStatus: atcRunStatus,
+};
+
+/**
+ * The profiler set with the readings adt-clients 22 applied by default
+ * (MIGRATION-23 §9): the trace list as entries, and each trace view parsed.
+ * `newTraceAfter` compares entries by id and `recordedAt`; the trace tools
+ * answer the parsed views.
+ */
+export const ourProfiler = {
+  ...profilerDocuments,
+  list: profilerTraceEntries,
+  hitlist: profilerHitList,
+  statements: profilerStatements,
+  dbAccesses: profilerDbAccesses,
+};
+
+/**
+ * The executors' trace scheduling, read as in adt-clients 22: `scheduleTrace`
+ * answers the profiler id that `runWithProfiler` takes (MIGRATION-23 §9).
+ * `run` stays the output text it always was.
+ */
+const traceScheduling = {
+  types: traceSchedulingTypes,
+  requests: traceSchedulingRequests,
+  scheduled: traceSchedulingProfilerId,
+};
+export const ourClassExecutor = {
+  ...classExecutorDocuments,
+  ...traceScheduling,
+};
+export const ourProgramExecutor = {
+  ...programExecutorDocuments,
+  ...traceScheduling,
+};
+
+/**
+ * The feed set with the readings adt-clients 22 applied by default
+ * (MIGRATION-23 §9). `RuntimeListFeeds`' variants are not `feedVariants`:
+ * on E19 `/feeds/variants` answers an empty body, and the variants are read
+ * out of the feed list instead (`feedVariantsOf`).
+ */
+export const ourFeeds = {
+  ...feedDocuments,
+  feeds: feedDescriptors,
+  variants: feedVariants,
+  entries: feedEntries,
+  systemMessages: feedSystemMessages,
+  gatewayErrors: feedGatewayErrors,
+  gatewayErrorDetail: feedGatewayErrorDetail,
+};

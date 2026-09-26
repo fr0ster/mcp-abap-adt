@@ -38,10 +38,15 @@
  */
 
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
+import {
+  ourClassExecutor,
+  ourProfiler,
+} from '../../../lib/strategies/resultSets';
 import { terseClassRun } from '../../../lib/strategies/runProjections';
 import { sequence, succeededWith } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
@@ -139,14 +144,14 @@ export async function handleRuntimeRunClass(
 
   const className = args.class_name.trim().toUpperCase();
   const executor = new AdtExecutor(connection, logger);
-  const classExecutor = executor.getClassExecutor();
+  const classExecutor = executor.getClassExecutor(ourClassExecutor);
 
   if (!args.profile) {
     // No `AdtRuntimeClient`, no profiler feed touched — a plain run does not
     // search for a trace it never asked for.
     return answer(
       { tool: 'RuntimeRunClass', detail: 'terse' },
-      () => classExecutor.run({ className }),
+      () => classExecutor.run({ className }, { analyse: analyseException }),
       (output: string) => terseClassRun({ className, output }),
     );
   }
@@ -181,14 +186,16 @@ export async function handleRuntimeRunClass(
     maxTimeForTracing: args.max_time_for_tracing,
   });
 
-  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
+    ourProfiler,
+  );
 
   return answer(
     { tool: 'RuntimeRunClass', detail: 'terse' },
     async () => {
       // 1. The snapshot. A refused feed read is a refusal, not an empty feed —
       // reported as-is, before scheduling or running anything.
-      const snapshot = await profiler.list();
+      const snapshot = await profiler.list({ analyse: analyseException });
       if (!snapshot.ok) return snapshot;
       const before = new Set(
         snapshot.getResult().value.map((entry) => entry.id),
@@ -199,12 +206,16 @@ export async function handleRuntimeRunClass(
       // cannot reach back into a finished sequence.
       let profilerId = '';
       const ran = await sequence(
-        () => classExecutor.scheduleTrace(profilerParameters),
+        () =>
+          classExecutor.scheduleTrace({
+            ...profilerParameters,
+            analyse: analyseException,
+          }),
         (id: string) => {
           profilerId = id;
           return classExecutor.runWithProfiler(
             { className },
-            { profilerId: id },
+            { analyse: analyseException, profilerId: id },
           );
         },
       );

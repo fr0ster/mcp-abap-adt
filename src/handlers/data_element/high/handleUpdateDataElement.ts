@@ -45,6 +45,7 @@ import {
   patchDataElementXml,
 } from '../../../lib/strategies/dataElementPatch';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -218,7 +219,7 @@ export async function handleUpdateDataElement(
       );
 
       const written = await withLock(
-        () => obj.lock({ dataElementName }),
+        () => obj.lock({ dataElementName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -249,7 +250,10 @@ export async function handleUpdateDataElement(
                 analyse: analyseException,
               }),
           ),
-        (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ dataElementName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok) {

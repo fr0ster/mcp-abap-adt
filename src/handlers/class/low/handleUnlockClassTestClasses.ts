@@ -4,30 +4,43 @@
  * Uses AdtClient.getClass().unlockTestClasses from @mcp-abap-adt/adt-clients 19.
  *
  * `unlockTestClasses()` is not part of the `IAdtLockable` shape every other
- * family's `unlock()` implements — it takes a config and a lock handle and
- * answers a bare `IAdtWireResponse`, not an `IAdtResponse`. There is therefore
- * no `analyse` to inject (the member has no `options` parameter at all) and
- * no reading to route through `answer()`: this stays a direct call, the same
- * shape the pre-19 code already used.
- *
- * The `as any` stays, for a structural reason rather than a typing gap the
- * package left open: `AdtClient.getClass()` is typed to return
- * `IClassContract<R>`, which is `IAdtCreatable & IAdtReadable & … &
- * IAdtLockable & …` — the CRUD surface every family shares.
- * `unlockTestClasses` exists on the concrete `AdtClass` class but was never
- * added to that shared contract, so there is no public type through which
- * `getClass()` can reach it. Casting past `IClassContract` is the only way
- * this repository has to call it through the client facade at all.
+ * family's `unlock()` implements, and since adt-clients 23 it answers an
+ * `IAdtResponse`, taking `analyse` like every member. A refused unlock is
+ * reported as one; before, the envelope went unread and every unlock answered
+ * success.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+
+/**
+ * The two test-include members, typed. `lockTestClasses`/`unlockTestClasses`
+ * are on the concrete `AdtClass` and not on `IClassContract`, which is what
+ * `getClass()` is typed to return, so a cast is still needed to reach them.
+ * It names what they answer, not `any`: under `any` the change in
+ * adt-clients 23 — both answer `IAdtResponse` now, not a bare handle — went
+ * unseen, and the whole envelope was handed on as the lock handle
+ * (`lockHandle=[object Object]`, SAP 423, E19 2026-09-26).
+ */
+interface TestClassesLocking {
+  lockTestClasses(
+    config: { className: string },
+    options: { analyse: IAnalyse<IAdtError> },
+  ): Promise<IAdtResponse<string, IAdtError>>;
+  unlockTestClasses(
+    config: { className: string },
+    lockHandle: string,
+    options: { analyse: IAnalyse<IAdtError> },
+  ): Promise<IAdtResponse<unknown, IAdtError>>;
+}
 
 export const TOOL_DEFINITION = {
   name: 'UnlockClassTestClassesLow',
@@ -95,35 +108,25 @@ export async function handleUnlockClassTestClasses(
     const className = class_name.toUpperCase();
     logger?.info(`Starting test classes unlock for: ${className}`);
 
-    try {
-      const classClient = createAdtClient(connection, logger).getClass() as any;
-      await classClient.unlockTestClasses({ className }, lock_handle);
+    const classClient = createAdtClient(
+      connection,
+      logger,
+    ).getClass() as unknown as TestClassesLocking;
 
-      logger?.info(`✅ UnlockClassTestClasses completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            session_id: session_id || null,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Test classes for ${className} unlocked successfully.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error unlocking test classes for ${className}: ${error?.message || error}`,
-      );
-      const reason =
-        error?.response?.status === 404
-          ? `Class ${className} or the provided lock handle was not found.`
-          : error?.message || String(error);
-      return return_error(new Error(reason));
-    }
+    return answer(
+      { tool: 'UnlockClassTestClassesLow', detail: 'terse' },
+      () =>
+        classClient.unlockTestClasses({ className }, lock_handle, {
+          analyse: analyseException,
+        }),
+      () => ({
+        success: true,
+        class_name: className,
+        session_id: session_id || null,
+        session_state: null, // Session state management is now handled by auth-broker,
+        message: `Test classes for ${className} unlocked successfully.`,
+      }),
+    );
   } catch (error: any) {
     return return_error(error);
   }

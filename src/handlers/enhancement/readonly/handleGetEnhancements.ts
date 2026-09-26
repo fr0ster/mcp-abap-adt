@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -389,6 +390,7 @@ async function getIncludesListInternal(
     // Step 1: Get root node structure to find the includes node (with timeout)
     const rootResponse = await Promise.race([
       utils.fetchNodeStructure(parentType, parentName, {
+        analyse: analyseException,
         nodeId: '000000', // Root node
         withShortDescriptions: true,
       }),
@@ -427,6 +429,7 @@ async function getIncludesListInternal(
     // Step 3: Get includes list using the found node ID (with timeout)
     const includesResponse = await Promise.race([
       utils.fetchNodeStructure(parentType, parentName, {
+        analyse: analyseException,
         nodeId: includesNode.nodeId,
         withShortDescriptions: true,
       }),

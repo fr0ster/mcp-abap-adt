@@ -616,7 +616,7 @@ export class LambdaTester {
   }
 
   getConnection():
-    | import('@mcp-abap-adt/interfaces-adt').IAbapConnection
+    | import('@mcp-abap-adt/interfaces-adt-connection').IAbapConnection
     | null {
     return this.context?.connection ?? null;
   }

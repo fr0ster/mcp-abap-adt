@@ -233,13 +233,16 @@ export async function handleCreateServiceBinding(
         return activated as IAdtResponse<AdtReading<unknown>, IAdtError>;
       }
 
-      const generated = await obj.generateServiceBinding({
-        serviceType,
-        bindingName: serviceBindingName,
-        serviceName,
-        serviceVersion,
-        serviceDefinitionName,
-      });
+      const generated = await obj.generateServiceBinding(
+        {
+          serviceType,
+          bindingName: serviceBindingName,
+          serviceName,
+          serviceVersion,
+          serviceDefinitionName,
+        },
+        { analyse: analyseException },
+      );
       if (!generated.ok) {
         return generated as unknown as IAdtResponse<
           AdtReading<unknown>,

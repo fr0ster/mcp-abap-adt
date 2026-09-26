@@ -25,6 +25,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -92,7 +93,7 @@ export async function handleUpdateDdl(
       );
 
       const written = await withLock(
-        () => obj.lock({ ddlName }),
+        () => obj.lock({ ddlName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
@@ -115,7 +116,8 @@ export async function handleUpdateDdl(
               )
             : update();
         },
-        (lockHandle) => obj.unlock({ ddlName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ ddlName }, lockHandle, { analyse: analyseException }),
       );
       if (!written.ok || !shouldActivate) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;

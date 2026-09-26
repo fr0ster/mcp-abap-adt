@@ -247,6 +247,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
     expect(mockMsg.read).toHaveBeenCalledWith(
       { className: 'ZMY_MSGS', msgno: '001' },
       undefined,
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(payload(result).metadata).toBe(classDocument);
   });

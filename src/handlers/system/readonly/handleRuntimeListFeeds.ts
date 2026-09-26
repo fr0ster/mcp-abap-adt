@@ -1,7 +1,9 @@
 import { AdtRuntimeClient, FeedRepository } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { feedVariantsOf } from '../../../lib/strategies/feedVariants';
+import { ourFeeds } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -64,7 +66,7 @@ export async function handleRuntimeListFeeds(
   args: RuntimeListFeedsArgs,
 ) {
   const { connection, logger } = context;
-  const feeds = new AdtRuntimeClient(connection, logger).getFeeds();
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const feedType = args?.feed_type ?? 'descriptors';
 
   const queryOptions = {
@@ -93,7 +95,11 @@ export async function handleRuntimeListFeeds(
 
   switch (feedType) {
     case 'descriptors':
-      return answer(ctx, () => feeds.list(), project);
+      return answer(
+        ctx,
+        () => feeds.list({ analyse: analyseException }),
+        project,
+      );
     case 'variants':
       // On premise each feed's query variants come inside the feed list —
       // `feed:queryVariants` in every `atom:entry` of `GET /sap/bc/adt/feeds`
@@ -110,17 +116,32 @@ export async function handleRuntimeListFeeds(
             connection,
             logger as never,
             {
+              ...ourFeeds,
               feeds: feedVariantsOf,
             } as never,
-          ).list() as never,
+          ).list({ analyse: analyseException }) as never,
         project,
       );
     case 'dumps':
-      return answer(ctx, () => feeds.dumps(queryOptions), project);
+      return answer(
+        ctx,
+        () => feeds.dumps({ ...queryOptions, analyse: analyseException }),
+        project,
+      );
     case 'system_messages':
-      return answer(ctx, () => feeds.systemMessages(queryOptions), project);
+      return answer(
+        ctx,
+        () =>
+          feeds.systemMessages({ ...queryOptions, analyse: analyseException }),
+        project,
+      );
     case 'gateway_errors':
-      return answer(ctx, () => feeds.gatewayErrors(queryOptions), project);
+      return answer(
+        ctx,
+        () =>
+          feeds.gatewayErrors({ ...queryOptions, analyse: analyseException }),
+        project,
+      );
     default: {
       const exhaustive: never = feedType;
       return return_error(

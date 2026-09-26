@@ -7,6 +7,7 @@
  * red — see the task's fix-round-1 report for the reintroduction log.
  */
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetPackageTree } from '../../handlers/system/high/handleGetPackageTree';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeCreateProfilerTraceParameters } from '../../handlers/system/readonly/handleRuntimeCreateProfilerTraceParameters';
@@ -103,7 +104,10 @@ describe('RuntimeGetDumpById', () => {
       } as any,
     );
 
-    expect(getById).toHaveBeenCalledWith('DUMP-1', { view: 'formatted' });
+    expect(getById).toHaveBeenCalledWith('DUMP-1', {
+      view: 'formatted',
+      analyse: analyseException,
+    });
   });
 });
 
@@ -122,6 +126,7 @@ describe('RuntimeGetProfilerTraceData', () => {
 
     expect(read).toHaveBeenCalledWith('trace-1', 'hitlist', {
       withSystemEvents: true,
+      analyse: analyseException,
     });
   });
 
@@ -142,6 +147,7 @@ describe('RuntimeGetProfilerTraceData', () => {
       withDetails: true,
       autoDrillDownThreshold: 5,
       withSystemEvents: undefined,
+      analyse: analyseException,
     });
   });
 
@@ -156,6 +162,7 @@ describe('RuntimeGetProfilerTraceData', () => {
 
     expect(read).toHaveBeenCalledWith('trace-1', 'dbAccesses', {
       withSystemEvents: undefined,
+      analyse: analyseException,
     });
   });
 });
@@ -284,6 +291,7 @@ describe('RuntimeCreateProfilerTraceParameters', () => {
       maxSizeForTraceFile: 1000,
       amdpTrace: false,
       maxTimeForTracing: 60,
+      analyse: analyseException,
     });
     expect(body.profiler_id).toBe('request-uri-1');
   });

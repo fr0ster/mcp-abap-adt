@@ -145,36 +145,18 @@ it('no handler decides a refusal for itself', () => {
  * review — this list exists so a reviewer sees the four together, and so a
  * fifth one cannot join silently.
  */
+// Empty since adt-clients 23 / adt-strategies 0.5.0. The four entries this
+// list carried each withheld a strategy to keep a verdict the member applied
+// on its own — UpdateServiceBinding's publication refusal, the message-class
+// message read's msgno check — or skipped one as not worth it
+// (GetPackageTree's readMetadata). 23 applies no verdict of its own, and each
+// of those verdicts is a strategy passed with the call now
+// (`analysePublication`, `analyseMessageClassMessage(msgno)`).
 const ANALYSE_EXCEPTIONS: ReadonlyArray<{
   file: string;
   call: string;
   reason: string;
-}> = [
-  {
-    file: 'src/handlers/system/high/handleGetPackageTree.ts',
-    call: 'client.getPackage().readMetadata',
-    reason:
-      'a judgement call, not a necessity, and weaker in kind than the other three exceptions here. `AdtPackage.readMetadata` ships no default strategy of its own to protect — passing `analyseException` would only ENRICH the message on refusal, not replace a tailored verdict with a worse one. Skipped anyway (task 25 review) because this call is a plain existence check: the default error contract already answers ok:false, and only that boolean is read here, so the enrichment was judged not worth adding.',
-  },
-  {
-    file: 'src/handlers/service_binding/high/handleUpdateServiceBinding.ts',
-    call: 'obj.update',
-    reason:
-      "AdtServiceBinding.update()'s own default `analyse` is the exported `publicationRefusal`, read from the job's own <SEVERITY> — already the tailored verdict this endpoint needs. Passing `analyseException` would REPLACE it (the member reads `options?.analyse ?? defaultCheck`, not both), with a strategy that inspects the wrong element.",
-  },
-  {
-    file: 'src/handlers/message_class/readonly/handleReadMessageClassMessage.ts',
-    call: '.getMessageClassMessage()\n        .read',
-    reason:
-      'AdtMessageClassMessage.read is one of two read-shaped members in the whole distribution that ship their own default strategy: it parses the class document and refuses OBJECT_NOT_FOUND when msgno is absent. Task 18 review round 1 found that passing `{ analyse: analyseException }` REPLACES that check rather than composing with it, letting a request for a nonexistent message answer success:true with the unrelated whole-class document.',
-  },
-  {
-    file: 'src/handlers/message_class/high/handleGetMessageClassMessage.ts',
-    call: '.getMessageClassMessage()\n        .read',
-    reason:
-      "Same member, same reasoning as ReadMessageClassMessage's exception above — this tool's own default msgno-presence check would be replaced, not composed with, by passing analyseException here.",
-  },
-];
+}> = [];
 
 /**
  * Resolved by the compiler, not matched by a regex over the text.

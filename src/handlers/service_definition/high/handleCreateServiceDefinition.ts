@@ -32,6 +32,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -145,7 +146,7 @@ export async function handleCreateServiceDefinition(
       let written = created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       if (args.source_code) {
         written = await withLock(
-          () => obj.lock({ serviceDefinitionName }),
+          () => obj.lock({ serviceDefinitionName }, { analyse: analyseLock }),
           (lockHandle) =>
             obj.update(
               {
@@ -158,7 +159,10 @@ export async function handleCreateServiceDefinition(
                 analyse: analyseException,
               },
             ),
-          (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),
+          (lockHandle) =>
+            obj.unlock({ serviceDefinitionName }, lockHandle, {
+              analyse: analyseException,
+            }),
         );
       }
 

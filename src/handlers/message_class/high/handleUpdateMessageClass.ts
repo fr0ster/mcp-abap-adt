@@ -17,9 +17,12 @@
  * declares `IAdtMetadataUpdatable`, whose method is `updateMetadata`; there
  * is no plain `update` on this factory.
  *
- * **`description` goes in `config`, not `options`.** Verified against
- * `AdtMessageClass.js`'s `updateMetadata()`: `updateMessageClass(connection,
- * name, options?.lockHandle, config.description, config.transportRequest)`.
+ * **Read, edit, write.** Since adt-clients 23 `updateMetadata` is one PUT of
+ * the document in `options.source` (MIGRATION-23 §7). In 22 it read the
+ * class itself and patched `config.description` into it; passed that way now,
+ * the description is dropped and the PUT carries no document. So this handler
+ * reads the class, sets the first `adtcore:description` — the class's own;
+ * every message carries one too — and writes the whole document back.
  */
 
 import { messageClassDocuments } from '@mcp-abap-adt/adt-clients';
@@ -28,9 +31,11 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
+import { patchXmlAttribute } from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -85,23 +90,31 @@ export async function handleUpdateMessageClass(
 
   return answer(
     { tool: 'UpdateMessageClass', detail },
-    () => {
+    async () => {
       const obj = createAdtClient(connection, logger).getMessageClass(
         resultsFor(messageClassDocuments),
       );
 
+      const current = await obj.readMetadata(
+        { name },
+        { analyse: analyseException },
+      );
+      if (!current.ok) return current as never;
+      const edited = patchXmlAttribute(
+        String(current.getResult().value.raw),
+        'adtcore:description',
+        args.description,
+      );
+
       return withLock(
-        () => obj.lock({ name }),
+        () => obj.lock({ name }, { analyse: analyseLock }),
         (lockHandle) =>
           obj.updateMetadata(
-            {
-              name,
-              description: args.description,
-              transportRequest: args.transport_request,
-            },
-            { lockHandle, analyse: analyseException },
+            { name, transportRequest: args.transport_request },
+            { source: edited, lockHandle, analyse: analyseException },
           ),
-        (lockHandle) => obj.unlock({ name }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ name }, lockHandle, { analyse: analyseException }),
       );
     },
     project(detail, terseWrite),

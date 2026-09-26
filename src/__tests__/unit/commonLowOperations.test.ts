@@ -10,6 +10,7 @@ import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
+import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
@@ -425,7 +426,7 @@ describe('ActivateObjectLow', () => {
     expect(call.args[0]).toEqual({ className: 'ZCL_X' });
   });
 
-  it('more than one object falls back to activateObjectsGroup — no analyse to carry, by the library surface, not by choice', async () => {
+  it('more than one object falls back to activateObjectsGroup, carrying analyseException since interfaces-adt 10 gave it one', async () => {
     fakeClient = seen.client;
     await handleActivateObject(context as any, {
       objects: [
@@ -436,7 +437,7 @@ describe('ActivateObjectLow', () => {
     expect(seen.calls).toHaveLength(1);
     const call = seen.calls[0];
     expect(call.member).toBe('activateObjectsGroup');
-    expect(call.carriedAnalyse).toBe(false);
+    expect(call.carriedAnalyse).toBe(true);
   });
 
   it('a single object of an unmapped type also falls back to the group member', async () => {
@@ -515,15 +516,15 @@ describe('LockObjectLow', () => {
     expect(payload.lock_handle).toBe(handle);
   });
 
-  it('LockObject passes no analyse, because lock() accepts none', async () => {
+  it('LockObject passes analyseLock', async () => {
     fakeClient = seen.client;
     await handleLockObject(context as any, {
       object_type: 'class',
       object_name: 'ZCL_X',
     });
     const call = seen.calls.filter((c) => c.member === 'lock').at(-1);
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseLock);
   });
 
   it('requires super_package for package locking, and uppercases it when present', async () => {
@@ -582,7 +583,7 @@ describe('UnlockObjectLow', () => {
     expect(result.content[0].text).toBe('SUCCESS');
   });
 
-  it('UnlockObject passes no analyse, because unlock() accepts none, and forwards the lock handle', async () => {
+  it('UnlockObject passes analyseException, and forwards the lock handle', async () => {
     fakeClient = seen.client;
     await handleUnlockObject(context as any, {
       object_type: 'class',
@@ -591,8 +592,8 @@ describe('UnlockObjectLow', () => {
       session_id: 's',
     });
     const call = seen.calls.filter((c) => c.member === 'unlock').at(-1);
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args).toEqual([{ className: 'ZCL_X' }, 'h']);
   });
 

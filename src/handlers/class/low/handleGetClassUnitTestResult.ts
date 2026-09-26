@@ -45,6 +45,7 @@
  * choose a level of until the carve-out above is closed.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -125,7 +126,7 @@ export async function handleGetClassUnitTestResult(
 
     logger?.info(`Fetching ABAP Unit result for run ${run_id}`);
 
-    const unitTest = client.getUnitTest() as any;
+    const unitTest = client.getUnitTest();
 
     return await answer(
       { tool: 'GetClassUnitTestResultLow', detail: 'terse' },
@@ -133,6 +134,7 @@ export async function handleGetClassUnitTestResult(
         unitTest.getResult(run_id, {
           withNavigationUris: with_navigation_uris,
           format,
+          analyse: analyseException,
         }),
       (value: string) => value,
     );

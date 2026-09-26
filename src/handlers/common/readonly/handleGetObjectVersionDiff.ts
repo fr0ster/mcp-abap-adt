@@ -7,6 +7,7 @@
  * createTwoFilesPatch. Closes #30.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtResponse,
@@ -107,8 +108,8 @@ export async function buildVersionDiff(
   contentUriTo: string,
 ): Promise<VersionDiffResult> {
   const [respFrom, respTo] = await Promise.all([
-    obj.getVersionSource(contentUriFrom),
-    obj.getVersionSource(contentUriTo),
+    obj.getVersionSource(contentUriFrom, { analyse: analyseException }),
+    obj.getVersionSource(contentUriTo, { analyse: analyseException }),
   ]);
 
   const rawFrom = unwrapVersionSource(respFrom);
@@ -198,8 +199,14 @@ export async function handleGetObjectVersionDiff(
       { tool: 'GetObjectVersionDiff', detail: 'terse' },
       () =>
         pair(
-          () => resolved.obj.getVersionSource(content_uri_from),
-          () => resolved.obj.getVersionSource(content_uri_to),
+          () =>
+            resolved.obj.getVersionSource(content_uri_from, {
+              analyse: analyseException,
+            }),
+          () =>
+            resolved.obj.getVersionSource(content_uri_to, {
+              analyse: analyseException,
+            }),
         ),
       ([srcFrom, srcTo]: [string, string]) => {
         const result = diffSources(

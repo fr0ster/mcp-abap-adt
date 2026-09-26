@@ -29,6 +29,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -99,7 +100,7 @@ export async function handleUpdateStructure(
       );
 
       const written = await withLock(
-        () => obj.lock({ structureName }),
+        () => obj.lock({ structureName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
@@ -124,7 +125,10 @@ export async function handleUpdateStructure(
               )
             : update();
         },
-        (lockHandle) => obj.unlock({ structureName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ structureName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok || !shouldActivate) {

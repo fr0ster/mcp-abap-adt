@@ -44,6 +44,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -181,7 +182,7 @@ export async function handleUpdateDomain(
       );
 
       const written = await withLock(
-        () => obj.lock({ domainName }),
+        () => obj.lock({ domainName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -216,7 +217,8 @@ export async function handleUpdateDomain(
                 analyse: analyseException,
               }),
           ),
-        (lockHandle) => obj.unlock({ domainName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ domainName }, lockHandle, { analyse: analyseException }),
       );
 
       if (!written.ok) {

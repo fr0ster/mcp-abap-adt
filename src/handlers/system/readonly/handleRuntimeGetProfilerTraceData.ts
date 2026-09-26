@@ -1,6 +1,8 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -60,7 +62,9 @@ export async function handleRuntimeGetProfilerTraceData(
     return return_error(new Error('Parameter "trace_id_or_uri" is required'));
   }
 
-  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
+    ourProfiler,
+  );
   const view = args.view;
   const traceIdOrUri = args.trace_id_or_uri;
 
@@ -96,6 +100,7 @@ export async function handleRuntimeGetProfilerTraceData(
       ctx,
       () =>
         profiler.read(traceIdOrUri, 'hitlist', {
+          analyse: analyseException,
           withSystemEvents: args.with_system_events,
         }),
       project,
@@ -106,6 +111,7 @@ export async function handleRuntimeGetProfilerTraceData(
       ctx,
       () =>
         profiler.read(traceIdOrUri, 'statements', {
+          analyse: analyseException,
           id: args.id,
           withDetails: args.with_details,
           autoDrillDownThreshold: args.auto_drill_down_threshold,
@@ -118,6 +124,7 @@ export async function handleRuntimeGetProfilerTraceData(
     ctx,
     () =>
       profiler.read(traceIdOrUri, 'dbAccesses', {
+        analyse: analyseException,
         withSystemEvents: args.with_system_events,
       }),
     project,

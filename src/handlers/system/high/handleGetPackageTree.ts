@@ -5,6 +5,7 @@
  * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
@@ -102,7 +103,9 @@ export async function handleGetPackageTree(
     // status/code to branch on the way the old 404 check did, so rather than
     // guess a code this has not measured, the message says only what is
     // true of every case: the read did not produce a document.
-    const readResult = await client.getPackage().readMetadata({ packageName });
+    const readResult = await client
+      .getPackage()
+      .readMetadata({ packageName }, { analyse: analyseException });
     if (!readResult.ok) {
       return return_error(
         new Error(

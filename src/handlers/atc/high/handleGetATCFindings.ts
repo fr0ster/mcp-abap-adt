@@ -1,8 +1,10 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { parseAtcWorklist } from '../../../lib/strategies/atcFindings';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -50,12 +52,12 @@ export async function handleGetATCFindings(
     );
   }
 
-  const atc = new AdtRuntimeClient(connection, logger).getAtc();
+  const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
   const detail = detailOf(args);
 
   return answer(
     { tool: 'GetATCFindings', detail },
-    () => atc.getFindings(worklistId),
+    () => atc.getFindings(worklistId, { analyse: analyseException }),
     (document) => {
       // `raw` is the document, which is the whole point of having the level:
       // a caller chasing a check id, an exemption or a quickfix needs the

@@ -11,10 +11,15 @@
  */
 
 import { AdtExecutor, AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { newTraceAfter } from '../../../lib/strategies/newTrace';
+import {
+  ourClassExecutor,
+  ourProfiler,
+} from '../../../lib/strategies/resultSets';
 import { terseProfilingRun } from '../../../lib/strategies/runProjections';
 import { sequence, succeededWith } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
@@ -105,7 +110,7 @@ export async function handleRuntimeRunClassWithProfiling(
 
   const className = args.class_name.trim().toUpperCase();
   const executor = new AdtExecutor(connection, logger);
-  const classExecutor = executor.getClassExecutor();
+  const classExecutor = executor.getClassExecutor(ourClassExecutor);
 
   const maxTraceAttempts =
     typeof args.max_trace_attempts === 'number' &&
@@ -137,12 +142,14 @@ export async function handleRuntimeRunClassWithProfiling(
     maxTimeForTracing: args.max_time_for_tracing,
   });
 
-  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
+    ourProfiler,
+  );
 
   return answer(
     { tool: 'RuntimeRunClassWithProfiling', detail: 'terse' },
     async () => {
-      const snapshot = await profiler.list();
+      const snapshot = await profiler.list({ analyse: analyseException });
       if (!snapshot.ok) return snapshot;
       const before = new Set(
         snapshot.getResult().value.map((entry) => entry.id),
@@ -150,12 +157,16 @@ export async function handleRuntimeRunClassWithProfiling(
 
       let profilerId = '';
       const ran = await sequence(
-        () => classExecutor.scheduleTrace(profilerParameters),
+        () =>
+          classExecutor.scheduleTrace({
+            ...profilerParameters,
+            analyse: analyseException,
+          }),
         (id: string) => {
           profilerId = id;
           return classExecutor.runWithProfiler(
             { className },
-            { profilerId: id },
+            { analyse: analyseException, profilerId: id },
           );
         },
       );

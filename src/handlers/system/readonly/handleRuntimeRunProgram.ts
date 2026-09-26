@@ -26,9 +26,11 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourProgramExecutor } from '../../../lib/strategies/resultSets';
 import { pair } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 
@@ -103,12 +105,12 @@ export async function handleRuntimeRunProgram(
 
   const programName = args.program_name.trim().toUpperCase();
   const executor = new AdtExecutor(connection, logger);
-  const programExecutor = executor.getProgramExecutor();
+  const programExecutor = executor.getProgramExecutor(ourProgramExecutor);
 
   if (!args.profile) {
     return answer(
       { tool: 'RuntimeRunProgram', detail: 'terse' },
-      () => programExecutor.run({ programName }),
+      () => programExecutor.run({ programName }, { analyse: analyseException }),
       (output: string) => ({
         success: true,
         program_name: programName,
@@ -122,8 +124,8 @@ export async function handleRuntimeRunProgram(
     () =>
       pair(
         () =>
-          programExecutor.scheduleTrace(
-            definedOnly({
+          programExecutor.scheduleTrace({
+            ...definedOnly({
               description: args.description,
               allProceduralUnits: args.all_procedural_units,
               allMiscAbapStatements: args.all_misc_abap_statements,
@@ -139,9 +141,13 @@ export async function handleRuntimeRunProgram(
               amdpTrace: args.amdp_trace,
               maxTimeForTracing: args.max_time_for_tracing,
             }),
-          ),
+            analyse: analyseException,
+          }),
         (profilerId: string) =>
-          programExecutor.runWithProfiler({ programName }, { profilerId }),
+          programExecutor.runWithProfiler(
+            { programName },
+            { analyse: analyseException, profilerId },
+          ),
       ),
     ([profilerId, output]: [string, string]) => ({
       success: true,

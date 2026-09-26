@@ -9,10 +9,8 @@ import type { AdtReading } from './reading';
  * Depending on the three members structurally, not on `AdtUtils` itself —
  * the same boundary `packageWalk.ts`'s `NodeStructureSource` draws — keeps
  * this testable without a client and honest about what it actually calls.
- * Neither `getWhereUsedScope` nor `getWhereUsed` accepts an `options`
- * argument at all in adt-clients 19 (confirmed against `AdtUtils.d.ts`), so
- * there is no `analyse` to inject here — their verdict is the library's own,
- * the same absence the node-structure members in this migration share.
+ * Both members take `options.analyse` since adt-clients 23; this interface
+ * names only what the where-used flow passes, and no strategy is part of it.
  */
 export interface WhereUsedSource {
   getWhereUsedScope(params: {

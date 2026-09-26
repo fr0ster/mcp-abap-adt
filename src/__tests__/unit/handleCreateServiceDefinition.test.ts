@@ -84,7 +84,10 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
 
     expect((result as any).isError).toBe(false);
     expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockLock).toHaveBeenCalledWith({ serviceDefinitionName: 'ZSD' });
+    expect(mockLock).toHaveBeenCalledWith(
+      { serviceDefinitionName: 'ZSD' },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
     expect(mockUpdate).toHaveBeenCalledWith(
       { serviceDefinitionName: 'ZSD', transportRequest: undefined },
       expect.objectContaining({
@@ -96,6 +99,7 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
     expect(mockUnlock).toHaveBeenCalledWith(
       { serviceDefinitionName: 'ZSD' },
       'LOCK1',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(order).toEqual(['create', 'lock', 'update', 'unlock', 'activate']);
   });

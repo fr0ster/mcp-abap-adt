@@ -27,6 +27,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -112,9 +113,10 @@ export async function handleUpdateBehaviorDefinition(
       const written = args.lock_handle
         ? await update(args.lock_handle)
         : await withLock(
-            () => obj.lock({ name }),
+            () => obj.lock({ name }, { analyse: analyseLock }),
             update,
-            (lockHandle) => obj.unlock({ name }, lockHandle),
+            (lockHandle) =>
+              obj.unlock({ name }, lockHandle, { analyse: analyseException }),
           );
 
       if (!written.ok) {

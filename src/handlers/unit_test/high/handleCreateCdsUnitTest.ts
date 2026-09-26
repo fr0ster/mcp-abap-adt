@@ -26,10 +26,9 @@
  * set.
  *
  * Workflow: checkCdsTestDoubles -> create. No lock: the test-doubles check is
- * a plain GET-shaped request (`checkCdsTestDoubles(cdsViewName)` takes no
- * lock, no `options`, and ships its own `testDoublesVerdict` reading — there
- * is no `analyse` to inject), and `create()` is a bare POST of the class
- * shell.
+ * a plain GET-shaped request (`checkCdsTestDoubles(cdsViewName, options)`
+ * takes no lock; its verdict is `analyseCdsTestDoubles`, which adt-clients 22
+ * applied on its own), and `create()` is a bare POST of the class shell.
  *
  * `cds_view_name` is real work here, not a dead parameter: it is what the
  * test-doubles check is about, asked first because a view the doubles
@@ -40,7 +39,10 @@
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseCdsTestDoubles,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -126,7 +128,12 @@ export async function handleCreateCdsUnitTest(
       const classObj = client.getClass(resultsFor(classDocuments));
 
       return sequence(
-        () => cdsUnitTest.checkCdsTestDoubles(cdsViewName),
+        // The test-doubles verdict adt-clients 22 applied on its own
+        // (MIGRATION-23 §3).
+        () =>
+          cdsUnitTest.checkCdsTestDoubles(cdsViewName, {
+            analyse: analyseCdsTestDoubles,
+          }),
         () =>
           classObj.create(
             {

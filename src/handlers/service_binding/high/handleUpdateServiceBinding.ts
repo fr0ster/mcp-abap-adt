@@ -79,6 +79,10 @@
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
+  analyseException,
+  analysePublication,
+} from '@mcp-abap-adt/adt-strategies';
+import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
 } from '@mcp-abap-adt/interfaces-adt';
@@ -86,6 +90,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
@@ -209,13 +214,22 @@ export async function handleUpdateServiceBinding(
         resultsFor(serviceDocuments),
       );
       return withLock(
-        () => obj.lock({ bindingName }),
+        () => obj.lock({ bindingName }, { analyse: analyseLock }),
         (lockHandle) =>
           obj.update(
             { bindingName, desiredPublicationState, serviceType },
-            { lockHandle, timeout: PUBLISH_TIMEOUT_MS },
+            // adt-clients 23 no longer reads SAP's publication refusal on its
+            // own (MIGRATION-23 §3); `analysePublication` is that verdict.
+            {
+              lockHandle,
+              timeout: PUBLISH_TIMEOUT_MS,
+              analyse: analysePublication,
+            },
           ),
-        (lockHandle) => obj.unlock({ bindingName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ bindingName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
     },
     project(detail, terseWrite),

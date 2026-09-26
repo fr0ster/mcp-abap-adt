@@ -183,6 +183,7 @@ export async function handleGetNodeStructure(
           client
             .getUtils({ ...ourUtils, node: rawNodeStructureXml })
             .fetchNodeStructure(parent_type, parent_name, {
+              analyse: analyseException,
               nodeId: node_id || '000000',
               withShortDescriptions: with_short_descriptions !== false,
             }),

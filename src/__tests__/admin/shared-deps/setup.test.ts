@@ -17,7 +17,7 @@
 
 import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
 import { asItCame } from '@mcp-abap-adt/adt-strategies';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
 import { handleCreateDataElement } from '../../../handlers/data_element/high/handleCreateDataElement';
@@ -1587,31 +1587,6 @@ describe('Admin: Setup shared dependencies', () => {
               'Fallback activation completed successfully (batched group-activate)',
             );
           }
-        }
-      }
-
-      // 3b. Behaviour definitions, one by one. The group activation cannot
-      // activate a BDEF: adt-clients' `buildObjectUri` addresses BDEF/BDO as
-      // `/sap/bc/adt/ddic/bdef/sources/<name>`, which SAP ignores — the run
-      // answers `activationExecuted="false"` and the BDEF keeps its old
-      // active version (E19, 2026-09-26: ZI_MCP_SHR_ROOT stayed un-strict
-      // after two setups that logged success). The BDEF's own `activate()`
-      // uses `/sap/bc/adt/bo/behaviordefinitions/<name>` and works.
-      // fr0ster/mcp-abap-adt-clients#173.
-      for (const target of toActivate.filter((t) => t.type === 'BDEF/BDO')) {
-        try {
-          await client.getBehaviorDefinition().activate({ name: target.name });
-          testsLogger?.info?.(`Activated behavior definition ${target.name}`);
-        } catch (error: any) {
-          const msg = error instanceof Error ? error.message : String(error);
-          testsLogger?.error?.(
-            `Failed to activate behavior definition ${target.name}: ${msg}`,
-          );
-          results.push({
-            type: 'activation',
-            name: target.name,
-            status: `FAILED: ${msg}`,
-          });
         }
       }
 

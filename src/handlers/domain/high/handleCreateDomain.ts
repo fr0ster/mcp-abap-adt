@@ -38,6 +38,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { patchDomainXml } from '../../../lib/strategies/domainPatch';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -217,7 +218,7 @@ export async function handleCreateDomain(
           ),
         () =>
           withLock(
-            () => obj.lock({ domainName }),
+            () => obj.lock({ domainName }, { analyse: analyseLock }),
             (
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
@@ -253,7 +254,10 @@ export async function handleCreateDomain(
                     },
                   ),
               ),
-            (lockHandle) => obj.unlock({ domainName }, lockHandle),
+            (lockHandle) =>
+              obj.unlock({ domainName }, lockHandle, {
+                analyse: analyseException,
+              }),
           ),
         // Best-effort: wait for the write to be visible, right before the
         // first call that reads it back — this is the call most likely to

@@ -36,7 +36,7 @@
  * task's own writes.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
@@ -284,6 +284,13 @@ const cases: ChannelCase[] = [
     name: 'UpdateMessageClass',
     method: 'PUT',
     urlContains: '/sap/bc/adt/messageclass/zmc',
+    // Read, edit, write (adt-clients 23): the class document is read first,
+    // and the PUT carries it with the new description.
+    seedAnswers: [
+      {
+        data: '<mc:messageClass xmlns:mc="http://www.sap.com/adt/MessageClass" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="old"/>',
+      },
+    ],
     run: (marker, connection) =>
       handleUpdateMessageClass(ctx(connection) as any, {
         message_class_name: 'ZMC',

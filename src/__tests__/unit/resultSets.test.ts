@@ -6,6 +6,10 @@ import {
   unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import {
+  unitTestRunId,
+  utilActivationRunId,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import type { AdtReading } from '../../lib/strategies/reading';
@@ -94,8 +98,15 @@ describe('the slot table', () => {
     expect(resultsFor(utilDocuments, ['activation']).activation).toBe(
       utilDocuments.activation,
     );
-    expect(ourUtils.activation).toBe(utilDocuments.activation);
-    expect(ourUnitTest.run).toBe(unitTestDocuments.run);
+  });
+
+  it('reads the run ids with the adt-strategies readings, not the shipped document', () => {
+    // adt-clients 23 ships the document for both slots (MIGRATION-23 §4, §6);
+    // the ids are in a header, which these two readings look at.
+    expect(ourUtils.activation).toBe(utilActivationRunId);
+    expect(ourUnitTest.run).toBe(unitTestRunId);
+    expect(ourUtils.activation).not.toBe(utilDocuments.activation);
+    expect(ourUnitTest.run).not.toBe(unitTestDocuments.run);
   });
 
   it('reads the unit-test run id out of the Location header, not the empty body', () => {
@@ -142,9 +153,9 @@ describe('the slot table', () => {
     // `ourUtils.activation` to a variable typed as the table's default shape
     // would fail to compile if `resultsFor` widened a kept slot back to it.
     const keptActivation: IResultStrategy<string> = ourUtils.activation;
-    expect(keptActivation).toBe(utilDocuments.activation);
+    expect(keptActivation).toBe(utilActivationRunId);
 
     const keptRun: IResultStrategy<string> = ourUnitTest.run;
-    expect(keptRun).toBe(unitTestDocuments.run);
+    expect(keptRun).toBe(unitTestRunId);
   });
 });

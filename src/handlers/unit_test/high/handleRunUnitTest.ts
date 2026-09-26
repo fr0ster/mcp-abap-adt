@@ -6,10 +6,11 @@
  *
  * Byte-identical logic to `handleCreateUnitTest.ts` under a different tool
  * name — see that file's header for why `run(tests, options)` replaces the
- * pre-migration `create({ tests, options })` call and why no `analyse` is
- * passed.
+ * pre-migration `create({ tests, options })` call. The start's verdict is
+ * `analyseUnitTestStart`, which adt-clients 22 applied on its own.
  */
 
+import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -145,6 +146,9 @@ export async function handleRunUnitTest(
     { tool: 'RunUnitTest', detail: 'terse' },
     () =>
       unitTest.run(formattedTests, {
+        // A run SAP did not start is a failure: adt-clients 23 no longer
+        // judges that itself (MIGRATION-23 §3).
+        analyse: analyseUnitTestStart,
         title,
         context: contextStr,
         scope: scope

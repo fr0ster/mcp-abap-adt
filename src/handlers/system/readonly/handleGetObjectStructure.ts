@@ -2,6 +2,7 @@
  * Handler for retrieving ADT object structure and returning a compact tree.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -150,9 +151,9 @@ function serializeTree(
 
 /**
  * The same masking `GetNodeStructureLow` guards against, over a different
- * document. `getObjectStructure(objectType, objectName)` takes no `options`
- * at all — no `analyse` — so nothing downstream of this reading can ever
- * turn a content-free answer into a refusal. An **absent root**
+ * document. `getObjectStructure` takes `analyseException`, which reads an
+ * `exc:exception` and nothing else — so nothing downstream of this reading
+ * turns a content-free answer into a refusal. An **absent root**
  * (`value['projectexplorer:objectstructure']` is `undefined` — what a
  * zero-byte body, or a document this reading does not recognise, both parse
  * to) is not the same claim as "this object has no substructure": the second
@@ -172,7 +173,7 @@ export function assertObjectStructurePresent(value: unknown): void {
   )?.['projectexplorer:objectstructure'];
   if (root === undefined || root === null) {
     throw new Error(
-      'No object structure document was returned for this object — getObjectStructure carries no analyse, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',
+      'No object structure document was returned for this object — the answer carries no exception to read, so an absent projectexplorer:objectstructure root cannot be told apart from "this object has no substructure" here. Verify the object exists before trusting an empty answer.',
     );
   }
 }
@@ -217,8 +218,8 @@ export async function handleGetObjectStructure(
   logger?.info(`Fetching object structure for ${objectType}/${objectName}`);
   const detail = detailOf(args);
 
-  // `getObjectStructure(objectType, objectName)` takes no options object at
-  // all — no `analyse` to pass, matching the brief. The presence check runs
+  // `getObjectStructure` takes `analyseException` (adt-clients 23), which
+  // reads only an exception document. The presence check runs
   // here, inside the call, only for `terse` — `raw`/`full` always answer the
   // document exactly as it arrived, indeterminate or not, the same invariant
   // every other `detail: 'raw'` in this migration keeps.
@@ -227,7 +228,9 @@ export async function handleGetObjectStructure(
     async () => {
       const response = await createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getObjectStructure(objectType, objectName);
+        .getObjectStructure(objectType, objectName, {
+          analyse: analyseException,
+        });
       if (detail === 'terse' && response.ok) {
         assertObjectStructurePresent(response.getResult().value.value);
       }

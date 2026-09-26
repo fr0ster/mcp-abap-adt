@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -59,9 +60,12 @@ export async function handleGetCdsUnitTest(
     { tool: 'GetCdsUnitTest', detail },
     () =>
       pollUntilFinished(
-        (id, withLongPolling) => cdsUnitTest.getStatus(id, withLongPolling),
+        (id, withLongPolling) =>
+          cdsUnitTest.getStatus(id, withLongPolling, {
+            analyse: analyseException,
+          }),
         run_id,
-        () => cdsUnitTest.getResult(run_id),
+        () => cdsUnitTest.getResult(run_id, { analyse: analyseException }),
       ),
     // Task 28 fix round 1 — same finding, same fix as `GetUnitTest`: both
     // readings behind this answer are `structured`, and `detail` was owed.

@@ -7,7 +7,7 @@ import {
   type SapConfig,
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';

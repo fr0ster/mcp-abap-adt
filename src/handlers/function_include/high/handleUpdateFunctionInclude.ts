@@ -33,6 +33,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -120,7 +121,11 @@ export async function handleUpdateFunctionInclude(
       );
 
       const written = await withLock(
-        () => obj.lock({ functionGroupName, includeName }),
+        () =>
+          obj.lock(
+            { functionGroupName, includeName },
+            { analyse: analyseLock },
+          ),
         (lockHandle) =>
           obj.update(
             {
@@ -135,7 +140,9 @@ export async function handleUpdateFunctionInclude(
             },
           ),
         (lockHandle) =>
-          obj.unlock({ functionGroupName, includeName }, lockHandle),
+          obj.unlock({ functionGroupName, includeName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok || !shouldActivate) {

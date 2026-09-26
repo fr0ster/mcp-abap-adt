@@ -2,6 +2,7 @@
  * Handler for retrieving all valid ADT object types.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -64,14 +65,14 @@ export async function handleGetAdtTypes(
   const { connection, logger } = context;
   const detail = detailOf(args);
 
-  // `getAllTypes(maxItemCount?, name?, data?)` takes no options object at
-  // all — no `analyse` to pass, matching the brief.
+  // `getAllTypes(maxItemCount?, name?, data?, options?)` takes
+  // `analyseException` since adt-clients 23.
   return answer(
     { tool: 'GetAdtTypes', detail },
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getAllTypes(999, '*', 'usedByProvider'),
+        .getAllTypes(999, '*', 'usedByProvider', { analyse: analyseException }),
     project(detail, (value) => extractNamedItems(value)),
   );
 }

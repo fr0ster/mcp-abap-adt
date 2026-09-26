@@ -28,6 +28,7 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { patchFunctionGroupXml } from '../../../lib/strategies/functionGroupPatch';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -94,7 +95,7 @@ export async function handleUpdateFunctionGroup(
       );
 
       return withLock(
-        () => obj.lock({ functionGroupName }),
+        () => obj.lock({ functionGroupName }, { analyse: analyseLock }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -121,7 +122,10 @@ export async function handleUpdateFunctionGroup(
                 },
               ),
           ),
-        (lockHandle) => obj.unlock({ functionGroupName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ functionGroupName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
     },
     project(detail, terseWrite),

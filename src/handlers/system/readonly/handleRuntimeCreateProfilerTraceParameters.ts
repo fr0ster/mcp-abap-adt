@@ -20,9 +20,11 @@
  * `scheduleTrace`, not because this is somehow a class-scoped trace.
  */
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { definedOnly } from '../../../lib/definedOnly';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourClassExecutor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -82,13 +84,15 @@ export async function handleRuntimeCreateProfilerTraceParameters(
     return return_error(new Error('Parameter "description" is required'));
   }
 
-  const classExecutor = new AdtExecutor(connection, logger).getClassExecutor();
+  const classExecutor = new AdtExecutor(connection, logger).getClassExecutor(
+    ourClassExecutor,
+  );
 
   return answer(
     { tool: 'RuntimeCreateProfilerTraceParameters', detail: 'terse' },
     () =>
-      classExecutor.scheduleTrace(
-        definedOnly({
+      classExecutor.scheduleTrace({
+        ...definedOnly({
           description: args.description,
           allMiscAbapStatements: args.all_misc_abap_statements,
           allProceduralUnits: args.all_procedural_units,
@@ -104,7 +108,8 @@ export async function handleRuntimeCreateProfilerTraceParameters(
           amdpTrace: args.amdp_trace,
           maxTimeForTracing: args.max_time_for_tracing,
         }),
-      ),
+        analyse: analyseException,
+      }),
     (profilerId) => ({
       success: true,
       profiler_id: profilerId,

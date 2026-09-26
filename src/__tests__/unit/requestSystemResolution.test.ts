@@ -13,7 +13,7 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 }));
 
 import { AdtClient, getSystemInformation } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../handlers/interfaces';

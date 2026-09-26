@@ -15,6 +15,7 @@ import {
   return_response,
 } from '../../../lib/utils';
 import {
+  readVersionSource,
   resolveVersionedObject,
   VERSIONED_OBJECT_TYPES,
 } from './resolveVersionedObject';
@@ -80,7 +81,7 @@ export async function handleGetObjectVersionSource(
     }
 
     try {
-      const source = await resolved.obj.getVersionSource(content_uri);
+      const source = await readVersionSource(resolved, content_uri);
       return return_response({
         data: JSON.stringify({ success: true, content_uri, source }, null, 2),
       } as AxiosResponse);

@@ -60,6 +60,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -202,7 +203,7 @@ export async function handleCreateBehaviorImplementation(
       // source belongs in options, not config — AdtBehaviorImplementation
       // .update() reads options?.source only (see the module doc comment).
       return withLock(
-        () => client.lock({ className }),
+        () => client.lock({ className }, { analyse: analyseLock }),
         (lockHandle) =>
           client.update(
             {
@@ -216,7 +217,10 @@ export async function handleCreateBehaviorImplementation(
               analyse: analyseException,
             },
           ),
-        (lockHandle) => client.unlock({ className }, lockHandle),
+        (lockHandle) =>
+          client.unlock({ className }, lockHandle, {
+            analyse: analyseException,
+          }),
       ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
     },
     project(detail, terseWrite),

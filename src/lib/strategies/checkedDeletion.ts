@@ -15,6 +15,9 @@
  * references" for a table still used by the shared CDS views; `analyseDeletion`
  * reads both as refusals.
  *
+ * A check that permits the delete but says the object "does not exist" ends
+ * it too, without an error: the answer is the check's, the delete is not sent.
+ *
  * `deleteAnalyse` is the delete's own reading: the deletion service answers a
  * `del:deletionResult` (`analyseDeletion`), while an object deleted by a
  * DELETE on its own URL — the metadata extension — answers an empty 2xx.
@@ -25,7 +28,7 @@ import type {
   IAdtResponse,
   IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
-import { analyseDeletion } from './deletionRefusal';
+import { absentPerCheck, analyseDeletion } from './deletionRefusal';
 
 export interface CheckedDeletable<C, V> {
   checkDeletion(
@@ -47,5 +50,14 @@ export async function deleteIfDeletable<C, V>(
     analyse: analyseDeletion,
   });
   if (!check.ok) return check as unknown as IAdtResponse<V, IAdtError>;
+  // Permitted, but not there: nothing to delete, so no delete is sent. The
+  // check's answer is the result — `terseDeletion` reads it as `deleted:
+  // false` with the warning. See `absentPerCheck`.
+  const reading = (
+    check.getResult() as { value?: { raw?: unknown } } | undefined
+  )?.value;
+  if (absentPerCheck(reading?.raw)) {
+    return check as unknown as IAdtResponse<V, IAdtError>;
+  }
   return object.delete(config, { analyse: deleteAnalyse });
 }

@@ -34,7 +34,11 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseWrite } from '../../../lib/strategies/projections';
+import {
+  project,
+  terseDeletion,
+  terseWrite,
+} from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -91,6 +95,12 @@ export async function handleDeleteMetadataExtension(
         { name, transportRequest: transport_request },
         analyseException,
       ),
-    project(detail, terseWrite),
+    // The check's answer, when the object was not there and no DELETE was
+    // sent, is a deletion document; the DELETE's own answer is an empty 2xx.
+    project(detail, (value: any, status) =>
+      value?.['del:checkResponse']
+        ? terseDeletion(value, status)
+        : terseWrite(value, status),
+    ),
   );
 }

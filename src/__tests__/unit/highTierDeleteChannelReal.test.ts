@@ -123,6 +123,17 @@ function deletionSuccessXml(objectName: string): string {
 
 /** The deletion check's answer, as E19 sent it (2026-09-26): deletable, or
  * refused with the reason in `del:message`. */
+/** A check that permits the delete of an object that is not there — E19,
+ * 2026-09-26, for an object whose directory entry waits on an open request. */
+function absentCheckXml(objectName: string): string {
+  return (
+    '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
+    `<del:object del:externalStrongReferences="0" del:externalWeakReferences="0" del:isDeletable="true" adtcore:name="${objectName}" xmlns:adtcore="http://www.sap.com/adt/core">` +
+    `<del:message del:priority="0" del:type="W"><del:text>${objectName} does not exist</del:text></del:message>` +
+    '</del:object></del:checkResponse>'
+  );
+}
+
 function deletionCheckXml(objectName: string, refusal?: string): string {
   return (
     '<?xml version="1.0" encoding="utf-8"?><del:checkResponse xmlns:del="http://www.sap.com/adt/deletion">' +
@@ -334,6 +345,22 @@ describe.each(deletionServiceCases)('$name', ({ expectedUri, run }) => {
     expect(checkAt).toBeLessThan(deleteAt);
   });
 
+  it('sends no delete when the check says the object does not exist, and is no error', async () => {
+    const conn = recordingConnection([{ data: absentCheckXml(objectName) }]);
+
+    const result: any = await run(conn);
+
+    expect(result?.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      deleted: false,
+      object: objectName,
+      message: { type: 'W', text: `${objectName} does not exist` },
+    });
+    expect(
+      requestsTo(conn.requests, 'POST', '/sap/bc/adt/deletion/delete'),
+    ).toHaveLength(0);
+  });
+
   it("answers the check's refusal and never sends the delete", async () => {
     const conn = recordingConnection([
       { data: deletionCheckXml(objectName, 'Object does not exist') },
@@ -465,6 +492,27 @@ describe('DeleteMetadataExtension: the deletion check first', () => {
     expect(requestsTo(conn.requests, 'POST', '/deletion/check')).toHaveLength(
       1,
     );
+    expect(
+      requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources'),
+    ).toHaveLength(0);
+  });
+});
+
+describe('DeleteMetadataExtension: nothing to delete', () => {
+  it('sends no DELETE when the check says the object does not exist', async () => {
+    const conn = recordingConnection([
+      { data: absentCheckXml('ZI_DDLX_DEL_X') },
+    ]);
+
+    const result: any = await handleDeleteMetadataExtension(ctx(conn) as any, {
+      metadata_extension_name: 'ZI_DDLX_DEL_X',
+    });
+
+    expect(result?.isError).toBe(false);
+    expect(JSON.parse(result.content[0].text)).toMatchObject({
+      deleted: false,
+      object: 'ZI_DDLX_DEL_X',
+    });
     expect(
       requestsTo(conn.requests, 'DELETE', '/ddic/ddlx/sources'),
     ).toHaveLength(0);

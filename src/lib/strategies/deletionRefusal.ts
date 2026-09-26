@@ -165,6 +165,43 @@ export function readDeletionRefusal(document: unknown): DeletionRefusal | null {
   };
 }
 
+/**
+ * The check's word that the object is not there, when it still permits the
+ * delete.
+ *
+ * An object deleted earlier whose object-directory entry waits on an open
+ * request is "deletable" to the check — E19, 2026-09-26: `isDeletable="true"`
+ * with W "ZMCP_BLD_I_BDEF does not exist", while a GET of it answered 404.
+ * The delete sent after it fails on its own: SWB_TOOL 029 "Error while
+ * deleting object … from the database" for a BDEF or a metadata extension,
+ * W "Release transport … to remove the object directory entry" for the rest.
+ * So there is nothing to delete, and the delete is not sent.
+ *
+ * Read from the text: the message carries no T100 key to match on. The text
+ * is SAP's English one; a logon language that words it otherwise is not
+ * recognised here, and the delete is then sent as before.
+ */
+export function absentPerCheck(document: unknown): DeletionMessage | null {
+  if (typeof document !== 'string' || document.trim() === '') return null;
+  let parsed: Record<string, any>;
+  try {
+    parsed = parser.parse(document);
+  } catch {
+    return null;
+  }
+  for (const object of asArray<Record<string, any>>(
+    parsed?.checkResponse?.object,
+  )) {
+    for (const message of asArray<Record<string, any>>(object?.message)) {
+      const text = textOf(message?.text);
+      if (/\bdoes not exist\b/i.test(text)) {
+        return { type: severity(message?.['@type']), text };
+      }
+    }
+  }
+  return null;
+}
+
 export const analyseDeletion: IAnalyse<IAdtError> = (verdict, answer) => {
   if (verdict !== ADT_NO_FAILURE) {
     return defaultAnalyseDeletion(verdict, answer) as IAdtError | AdtNoFailure;

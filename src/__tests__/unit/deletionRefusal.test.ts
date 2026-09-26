@@ -4,6 +4,7 @@
  */
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
 import {
+  absentPerCheck,
   analyseDeletion,
   readDeletionRefusal,
 } from '../../lib/strategies/deletionRefusal';
@@ -127,5 +128,24 @@ describe('analyseDeletion (consumer strategy)', () => {
         status: 200,
       } as any),
     ).toBe(ADT_NO_FAILURE);
+  });
+});
+
+describe('absentPerCheck', () => {
+  it('reads the W "does not exist" on a permitted object', () => {
+    const permittedButAbsent =
+      `<del:checkResponse ${NS}><del:object del:isDeletable="true" adtcore:name="ZMCP_BLD_I_BDEF">` +
+      '<del:message del:priority="0" del:type="W"><del:text>ZMCP_BLD_I_BDEF does not exist</del:text></del:message>' +
+      '</del:object></del:checkResponse>';
+    expect(absentPerCheck(permittedButAbsent)).toEqual({
+      type: 'W',
+      text: 'ZMCP_BLD_I_BDEF does not exist',
+    });
+  });
+
+  it('is null for a plain permitted check, and for a delete answer', () => {
+    expect(absentPerCheck(CHECK_DELETABLE)).toBeNull();
+    expect(absentPerCheck(TABL_DELETE_TWO_OBJECTS)).toBeNull();
+    expect(absentPerCheck(undefined)).toBeNull();
   });
 });

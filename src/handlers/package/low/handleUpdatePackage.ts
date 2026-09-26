@@ -32,8 +32,10 @@
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
@@ -48,7 +50,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.',
+    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -144,7 +146,12 @@ export async function handleUpdatePackage(
       );
     }
 
-    const client = createAdtClient(connection, logger);
+    // The lock lives in a session of its own (LockPackageLow); the update has
+    // to run in that session, where the handle is valid.
+    const client = createAdtClient(
+      connectionHoldingPackageLock(connection, lock_handle),
+      logger,
+    );
     const packageName = package_name.toUpperCase();
 
     logger?.info(`Starting package update: ${packageName}`);
@@ -182,10 +189,16 @@ export async function handleUpdatePackage(
           ),
       );
 
+      // A refusal goes out through `answer()`, with what SAP said (T100,
+      // exception type, raw body). It used to be flattened to the transport's
+      // own "Request failed with status code 400", which named no reason.
       if (!written.ok) {
-        const failure = written.getError();
-        logger?.error(`UpdatePackage refused: ${failure.message}`);
-        return return_error(new Error(failure.message));
+        logger?.error(`UpdatePackage refused: ${written.getError().message}`);
+        return answer(
+          { tool: 'UpdatePackageLow', detail: 'terse' },
+          async () => written,
+          () => undefined,
+        );
       }
 
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);

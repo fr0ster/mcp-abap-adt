@@ -5249,7 +5249,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletepackagelow-low-level-package"></a>
 #### DeletePackageLow (Low-Level / Package)
-**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
 
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
 
@@ -5263,7 +5263,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="lockpackagelow-low-level-package"></a>
 #### LockPackageLow (Low-Level / Package)
-**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description.
+**Description:** [low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description. Always unlock. A package can be saved only once per ABAP session (SAP answers PAK/058 "Package … is already locked" otherwise). Over RFC, where every call shares one session, the lock is taken in an ABAP session of its own, kept under the returned lock_handle for UpdatePackageLow and UnlockPackageLow, and closed by UnlockPackageLow. Over HTTP the connection keeps the stateful context of the lock to the lock and unlock requests, so the update runs outside it.
 
 **Source:** `src/handlers/package/low/handleLockPackage.ts`
 
@@ -5292,7 +5292,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatepackagelow-low-level-package"></a>
 #### UpdatePackageLow (Low-Level / Package)
-**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.
+**Description:** [low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.
 
 **Source:** `src/handlers/package/low/handleUpdatePackage.ts`
 
@@ -5770,4 +5770,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-25*
+*Last updated: 2026-09-26*

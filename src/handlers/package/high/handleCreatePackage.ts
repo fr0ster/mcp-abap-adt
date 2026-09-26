@@ -30,6 +30,7 @@ import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -137,24 +138,28 @@ export async function handleCreatePackage(
 
   return answer(
     { tool: 'CreatePackage', detail },
+    // Over RFC in an ABAP session of its own: the session that saves a package
+    // cannot change it again (PAK/058, lib/packageSessions.ts).
     () =>
-      createAdtClient(connection, logger)
-        .getPackage(resultsFor(packageDocuments))
-        .create(
-          {
-            packageName,
-            superPackage: args.super_package.toUpperCase(),
-            description: args.description || packageName,
-            packageType: args.package_type,
-            softwareComponent: args.software_component,
-            transportLayer: args.transport_layer,
-            transportRequest: args.transport_request,
-            recordChanges: args.record_changes,
-            applicationComponent: args.application_component,
-            masterLanguage: args.master_language,
-          },
-          { analyse: analyseException },
-        ),
+      inOwnSessionOverRfc(connection, logger, 'CreatePackage', (own) =>
+        createAdtClient(own, logger)
+          .getPackage(resultsFor(packageDocuments))
+          .create(
+            {
+              packageName,
+              superPackage: args.super_package.toUpperCase(),
+              description: args.description || packageName,
+              packageType: args.package_type,
+              softwareComponent: args.software_component,
+              transportLayer: args.transport_layer,
+              transportRequest: args.transport_request,
+              recordChanges: args.record_changes,
+              applicationComponent: args.application_component,
+              masterLanguage: args.master_language,
+            },
+            { analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

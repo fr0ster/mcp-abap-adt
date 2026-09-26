@@ -18,8 +18,11 @@ import { packageDocuments } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
-import { createAbapConnection } from '../../../lib/connectionFactory';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  closeQuietly,
+  openFreshConnection,
+} from '../../../lib/packageSessions';
 import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
@@ -30,7 +33,7 @@ export const TOOL_DEFINITION = {
   name: 'DeletePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -86,55 +89,54 @@ export async function handleDeletePackage(
   const packageName = package_name.toUpperCase();
   const detail = detailOf(args);
 
-  // A package this session has just updated cannot be deleted by this same
-  // session (`AdtPackage.delete()`'s own doc comment measures this: PAK/058
-  // "package is already locked" even after a clean UNLOCK). A fresh
-  // connection is the one way around it, and that choice belongs here, not
-  // inside the strategy call.
+  // A package this session has created or updated cannot be deleted by this
+  // same session: PAK/058 "Package … is already locked", even after a clean
+  // UNLOCK. It is `CL_PACKAGE`'s static instance buffer, left `requested` by
+  // the save, which `CL_PAK_ADT_PERSIST~DELETE` meets in `set_changeable`
+  // (docs/installation/RFC_SETUP.md). A fresh connection is a fresh ABAP
+  // session and the one way around it; that choice belongs here, not inside
+  // the strategy call. The connection opened here is closed here: over RFC it
+  // is an ABAP session that would otherwise stay open.
   let deleteConnection = connection;
   if (force_new_connection) {
-    const connectionConfig =
-      connection_config ||
-      (connection as any).getConfig?.() ||
-      (connection as any).config;
-    if (!connectionConfig) {
-      logger?.warn(
-        `DeletePackage requested fresh connection, but connection config is unavailable; falling back to existing connection for ${packageName}`,
+    try {
+      deleteConnection = await openFreshConnection(
+        connection,
+        logger,
+        connection_config ??
+          (connection as { getConfig?: () => unknown }).getConfig?.() ??
+          (connection as { config?: unknown }).config,
       );
-    } else {
-      try {
-        deleteConnection = createAbapConnection(
-          connectionConfig,
-          logger || null,
-        );
-        // RFC connections require explicit connect() — createAbapConnection does not connect automatically
-        const deleteConnectionAny = deleteConnection as any;
-        if (typeof deleteConnectionAny.connect === 'function') {
-          await deleteConnectionAny.connect();
-        }
-        logger?.info(
-          `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
-        );
-      } catch (createError: any) {
-        logger?.warn(
-          `DeletePackage failed to create fresh connection for ${packageName}, falling back to existing connection: ${
-            createError?.message || createError
-          }`,
-        );
-        deleteConnection = connection;
-      }
+      logger?.info(
+        `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
+      );
+    } catch (createError) {
+      logger?.warn(
+        `DeletePackage failed to create fresh connection for ${packageName}, falling back to existing connection: ${
+          createError instanceof Error
+            ? createError.message
+            : String(createError)
+        }`,
+      );
+      deleteConnection = connection;
     }
   }
 
-  return answer(
-    { tool: 'DeletePackageLow', detail },
-    () =>
-      createAdtClient(deleteConnection, logger)
-        .getPackage(resultsFor(packageDocuments))
-        .delete(
-          { packageName, transportRequest: transport_request },
-          { analyse: analyseDeletion },
-        ),
-    project(detail, terseDeletion),
-  );
+  try {
+    return await answer(
+      { tool: 'DeletePackageLow', detail },
+      () =>
+        createAdtClient(deleteConnection, logger)
+          .getPackage(resultsFor(packageDocuments))
+          .delete(
+            { packageName, transportRequest: transport_request },
+            { analyse: analyseDeletion },
+          ),
+      project(detail, terseDeletion),
+    );
+  } finally {
+    if (deleteConnection !== connection) {
+      await closeQuietly(deleteConnection, logger, 'DeletePackage');
+    }
+  }
 }

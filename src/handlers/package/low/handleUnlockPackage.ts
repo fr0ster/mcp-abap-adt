@@ -14,6 +14,10 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  connectionHoldingPackageLock,
+  releasePackageLockSession,
+} from '../../../lib/packageSessions';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
@@ -98,12 +102,22 @@ export async function handleUnlockPackage(
 
   const packageName = package_name.toUpperCase();
 
-  return answer(
-    { tool: 'UnlockPackageLow', detail: 'terse' },
-    () =>
-      createAdtClient(connection, logger)
-        .getPackage()
-        .unlock({ packageName }, lock_handle, { analyse: analyseException }),
-    (value) => terseWrite(value, 200),
-  );
+  // The lock lives in a session of its own (LockPackageLow): unlocked there,
+  // then that session is closed whatever the unlock answered — a
+  // closed session releases its enqueue too.
+  try {
+    return await answer(
+      { tool: 'UnlockPackageLow', detail: 'terse' },
+      () =>
+        createAdtClient(
+          connectionHoldingPackageLock(connection, lock_handle),
+          logger,
+        )
+          .getPackage()
+          .unlock({ packageName }, lock_handle, { analyse: analyseException }),
+      (value) => terseWrite(value, 200),
+    );
+  } finally {
+    await releasePackageLockSession(lock_handle, logger);
+  }
 }

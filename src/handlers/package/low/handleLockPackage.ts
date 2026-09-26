@@ -13,6 +13,7 @@
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { connectionForPackageLock } from '../../../lib/packageSessions';
 import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
@@ -20,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'LockPackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description.',
+    '[low-level] Lock an ABAP package for modification. Returns lock handle that must be used in subsequent update/unlock operations with the same session_id. super_package is required by this schema but not read by the lock endpoint — see its own parameter description. Always unlock. A package can be saved only once per ABAP session (SAP answers PAK/058 "Package … is already locked" otherwise). Over RFC, where every call shares one session, the lock is taken in an ABAP session of its own, kept under the returned lock_handle for UpdatePackageLow and UnlockPackageLow, and closed by UnlockPackageLow. Over HTTP the connection keeps the stateful context of the lock to the lock and unlock requests, so the update runs outside it.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -84,12 +85,26 @@ export async function handleLockPackage(
   const packageName = package_name.toUpperCase();
   const superPackage = super_package.toUpperCase();
 
+  // The lock is taken in an ABAP session of its own and kept under its handle,
+  // for UpdatePackageLow and UnlockPackageLow to find: a package can be saved
+  // only once per session (PAK/058, lib/packageSessions.ts), on RFC and HTTP.
+  const lockOn = await connectionForPackageLock(connection, logger);
+
   return answer(
     { tool: 'LockPackageLow', detail: 'terse' },
-    () =>
-      createAdtClient(connection, logger)
-        .getPackage()
-        .lock({ packageName }, { analyse: analyseLock }),
+    async () => {
+      try {
+        const locked = await createAdtClient(lockOn.connection, logger)
+          .getPackage()
+          .lock({ packageName }, { analyse: analyseLock });
+        if (locked.ok) lockOn.keep(locked.getResult().value);
+        else await lockOn.drop();
+        return locked;
+      } catch (error) {
+        await lockOn.drop();
+        throw error;
+      }
+    },
     (lockHandle: string) => ({
       success: true,
       package_name: packageName,

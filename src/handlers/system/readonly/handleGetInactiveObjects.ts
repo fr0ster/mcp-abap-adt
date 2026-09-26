@@ -45,14 +45,24 @@ function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
       ? [entriesRaw]
       : [];
   const objects: InactiveObjectRef[] = [];
+  const asArray = (v: any): any[] =>
+    Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
+  // `ioc:object` comes back as an array too — `structured` forces
+  // `object` to one. Read as a single element it gave no `ioc:ref`, and
+  // every entry was dropped: this tool answered "count: 0" over an
+  // inactive BDEF on E19 (2026-09-26), and so did every caller relying on
+  // it to confirm an activation.
   for (const entry of entries) {
-    const ref = entry?.['ioc:object']?.['ioc:ref'];
-    if (!ref) continue;
-    const a = ref['@'] ?? {};
-    objects.push({
-      type: a['adtcore:type'] ?? '',
-      name: a['adtcore:name'] ?? '',
-    });
+    for (const object of asArray(entry?.['ioc:object'])) {
+      for (const ref of asArray(object?.['ioc:ref'])) {
+        const a = ref?.['@'] ?? {};
+        if (!a['adtcore:name']) continue;
+        objects.push({
+          type: a['adtcore:type'] ?? '',
+          name: a['adtcore:name'] ?? '',
+        });
+      }
+    }
   }
   return objects;
 }

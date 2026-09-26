@@ -15,12 +15,12 @@
  */
 
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { analyseDeletion } from '../../../lib/strategies/deletionRefusal';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';

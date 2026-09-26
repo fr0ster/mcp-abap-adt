@@ -1,6 +1,5 @@
 import {
   analyseActivation,
-  analyseDeletion,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateObject } from '../../handlers/common/low/handleActivateObject';
@@ -10,6 +9,7 @@ import { handleLockObject } from '../../handlers/common/low/handleLockObject';
 import { handleUnlockObject } from '../../handlers/common/low/handleUnlockObject';
 import { handleValidateObject } from '../../handlers/common/low/handleValidateObject';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
+import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { structured } from '../../lib/strategies/reading';
 import {
   fakeClientOf,

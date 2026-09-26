@@ -19,12 +19,13 @@
  * `del:deletionResult` (`analyseDeletion`), while an object deleted by a
  * DELETE on its own URL — the metadata extension — answers an empty 2xx.
  */
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+
 import type {
   IAdtError,
   IAdtResponse,
   IAnalyse,
 } from '@mcp-abap-adt/interfaces-adt';
+import { analyseDeletion } from './deletionRefusal';
 
 export interface CheckedDeletable<C, V> {
   checkDeletion(

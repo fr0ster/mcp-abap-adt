@@ -31,10 +31,7 @@
  * `analyseDeletion`) are proven the same way, for the same reason.
  */
 
-import {
-  analyseDeletion,
-  analyseException,
-} from '@mcp-abap-adt/adt-strategies';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCheckBehaviorDefinition } from '../../handlers/behavior_definition/high/handleCheckBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
 import { handleDeleteBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleDeleteBehaviorImplementation';
@@ -72,6 +69,7 @@ import { handleCheckTable } from '../../handlers/table/high/handleCheckTable';
 import { handleDeleteTable } from '../../handlers/table/high/handleDeleteTable';
 import { handleDeleteCdsUnitTest } from '../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { corpusBody } from '../../lib/adtCorpus';
+import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { parseStructure } from '../../lib/strategies/reading';
 import {
   fakeClientOf,

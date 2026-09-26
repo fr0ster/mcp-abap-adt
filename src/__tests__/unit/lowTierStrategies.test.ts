@@ -34,7 +34,6 @@
  */
 import {
   analyseActivation,
-  analyseDeletion,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
@@ -219,6 +218,7 @@ import { handleUpdateTable } from '../../handlers/table/low/handleUpdateTable';
 import { handleValidateTable } from '../../handlers/table/low/handleValidateTable';
 import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
 import { corpusBody } from '../../lib/adtCorpus';
+import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import { sessionContext } from '../../lib/utils';
 import {

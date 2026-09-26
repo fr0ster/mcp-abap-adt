@@ -1,6 +1,5 @@
 import {
   analyseActivation,
-  analyseDeletion,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
 import { handleActivateDomain } from '../../handlers/domain/low/handleActivateDomain';
@@ -12,6 +11,7 @@ import { handleUnlockDomain } from '../../handlers/domain/low/handleUnlockDomain
 import { handleUpdateDomain } from '../../handlers/domain/low/handleUpdateDomain';
 import { handleValidateDomain } from '../../handlers/domain/low/handleValidateDomain';
 import { corpusBody } from '../../lib/adtCorpus';
+import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { structured, verbatim } from '../../lib/strategies/reading';
 import {
   fakeClientOf,

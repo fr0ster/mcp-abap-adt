@@ -20,6 +20,7 @@ import { asItCame } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
+import { handleUpdateLocalTestClass } from '../../../handlers/class/high/handleUpdateLocalTestClass';
 import { handleCreateDataElement } from '../../../handlers/data_element/high/handleCreateDataElement';
 import { handleUpdateDdl } from '../../../handlers/ddl/high/handleUpdateDdl';
 import { handleCreateMetadataExtension } from '../../../handlers/ddlx/high/handleCreateMetadataExtension';
@@ -248,6 +249,8 @@ async function sameActiveSource(
     srvd: () =>
       c.getServiceDefinition().read({ serviceDefinitionName: name }, 'active'),
     class: () => c.getClass().read({ className: name }, 'active'),
+    testClasses: () =>
+      c.getLocalTestClass().read({ className: name }, 'active'),
     interface: () => c.getInterface().read({ interfaceName: name }, 'active'),
     program: () => c.getProgram().read({ programName: name }, 'active'),
     ddlx: () => c.getMetadataExtension().read({ name }, 'active'),
@@ -829,6 +832,31 @@ describe('Admin: Setup shared dependencies', () => {
                 ),
               );
               testsLogger?.info?.(`Updated class ${item.name} source`);
+            }
+
+            // The class's ABAP Unit test classes, where the configuration
+            // gives them (the shared unit-test container). They activate
+            // with the class.
+            if (
+              item.test_classes &&
+              !(await sameActiveSource(
+                client,
+                'testClasses',
+                item.name,
+                item.test_classes,
+              ))
+            ) {
+              await writeSource(
+                handleUpdateLocalTestClass(
+                  { connection, logger: undefined } as any,
+                  {
+                    class_name: item.name,
+                    test_class_code: item.test_classes,
+                    activate_on_update: false,
+                  } as any,
+                ),
+              );
+              testsLogger?.info?.(`Updated class ${item.name} test classes`);
             }
 
             toActivate.push({

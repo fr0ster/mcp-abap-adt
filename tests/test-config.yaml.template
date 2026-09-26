@@ -506,9 +506,30 @@ shared_dependencies:
     - name: "ZBP_MCP_SHR_I_ROOT"
       description: "Shared BDEF implementation class for ZMCP_SHR_I_ROOT"
       available_in: ["onprem", "cloud"]
+    # Shared container class with its ABAP Unit test class, for the tests that
+    # only run unit tests (the high-level RunUnitTest/GetUnitTest suite).
+    # Running tests changes nothing. The low-level suite, which locks and
+    # writes the test-classes include, has its own class (class_unit_test).
     - name: "ZMCP_BLD_CLSUT_L1"
       description: "Shared container class for unit test integration tests"
       available_in: ["onprem", "cloud", "legacy"]
+      source: |
+        CLASS zmcp_bld_clsut_l1 DEFINITION PUBLIC FINAL CREATE PUBLIC.
+        ENDCLASS.
+
+        CLASS zmcp_bld_clsut_l1 IMPLEMENTATION.
+        ENDCLASS.
+      test_classes: |
+        CLASS ltc_zmcp_bld_clsut_l1 DEFINITION FINAL
+          FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+          PRIVATE SECTION.
+            METHODS test_method FOR TESTING.
+        ENDCLASS.
+        CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
+          METHOD test_method.
+            cl_abap_unit_assert=>assert_true( abap_true ).
+          ENDMETHOD.
+        ENDCLASS.
 
   function_groups:
     - name: "ZMCP_BLD_SHR_FGR"
@@ -811,6 +832,10 @@ create_behavior_implementation:
             ENDMETHOD.
 
           ENDCLASS.
+        # Differs from implementation_code so the update is a real one. No
+        # `create FOR MODIFY`: ZMCP_BLD_I_BDEF is managed, and SAP refuses the
+        # class with "the implementation type CREATE is superfluous" (E19,
+        # 2026-09-26) — the framework creates.
         update_implementation_code: |
           CLASS lhc_ZMCP_BLD_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
             PRIVATE SECTION.
@@ -821,21 +846,15 @@ create_behavior_implementation:
               METHODS get_global_authorizations FOR GLOBAL AUTHORIZATION
                 IMPORTING REQUEST requested_authorizations FOR zmcp_bld_i_bdef RESULT result.
 
-              METHODS create FOR MODIFY
-                IMPORTING entities FOR CREATE zmcp_bld_i_bdef.
-
           ENDCLASS.
 
           CLASS lhc_ZMCP_BLD_I_BDEF IMPLEMENTATION.
 
             METHOD get_instance_authorizations.
+              " updated by the integration test
             ENDMETHOD.
 
             METHOD get_global_authorizations.
-            ENDMETHOD.
-
-            METHOD create.
-              " Implementation for create operation
             ENDMETHOD.
 
           ENDCLASS.
@@ -1904,23 +1923,26 @@ class_unit_test:
       available_in: ["onprem", "cloud", "legacy"]
       description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
       params:
-        # Container class that contains the test class (from shared_dependencies)
-        container_class_name: "ZMCP_BLD_CLSUT_L1"
+        # Low-level suite: its own container class — a test object, created in
+        # the test package on the test request and deleted after — because it
+        # locks and writes the test-classes include. Never the shared one.
+        container_class_name: "ZMCP_BLD_CLSUT_LOW"
         # Test class name inside the container class's testclasses include
-        test_class_name: "LTC_ZMCP_BLD_CLSUT_L1"
+        test_class_name: "LTC_ZMCP_BLD_CLSUT_LOW"
         # Optional: test class source code (if not provided, default test class will be used)
         test_class_source: |
-          CLASS ltc_zmcp_bld_clsut_l1 DEFINITION FINAL
+          CLASS ltc_zmcp_bld_clsut_low DEFINITION FINAL
             FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
             PRIVATE SECTION.
               METHODS test_method FOR TESTING.
           ENDCLASS.
-          CLASS ltc_zmcp_bld_clsut_l1 IMPLEMENTATION.
+          CLASS ltc_zmcp_bld_clsut_low IMPLEMENTATION.
             METHOD test_method.
               cl_abap_unit_assert=>assert_true( abap_true ).
             ENDMETHOD.
           ENDCLASS.
-        # For high-level handlers (RunUnitTest, GetUnitTest)
+        # For high-level handlers (RunUnitTest, GetUnitTest): they only run
+        # tests, so the shared class and its test class (shared:setup)
         test_class:
           container_class: "ZMCP_BLD_CLSUT_L1"
           name: "LTC_ZMCP_BLD_CLSUT_L1"

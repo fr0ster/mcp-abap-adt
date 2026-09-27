@@ -2135,6 +2135,24 @@ get_table_contents:
         max_rows: 100
 
 # SQL Query (Read-Only)
+run_atc:
+  test_cases:
+    - name: "default_variant"
+      enabled: true
+      description: "RunATC over a shared class with the DEFAULT check variant, then its status and findings"
+      params:
+        # A shared object: ATC reads it and changes nothing. On E19 the DEFAULT
+        # variant finds 3 in it (priorities 2 and 3, SLIN among them).
+        object_name: "ZMCP_SHR_FGRP"
+        object_type: "function_group"
+        check_variant: "DEFAULT"
+        max_findings: 100
+        # At least this many findings, so the per-finding checks run. What a
+        # variant finds is the system's: set 0 where DEFAULT finds nothing.
+        min_findings: 1
+        poll_interval_ms: 3000
+        poll_timeout_ms: 120000
+
 get_sql_query:
   test_cases:
     - name: "simple_select"

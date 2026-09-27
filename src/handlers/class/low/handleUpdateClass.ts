@@ -46,6 +46,11 @@ export const TOOL_DEFINITION = {
         description:
           'Lock handle from LockClass operation. Required for update operation.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['class_name', 'source_code', 'lock_handle'],
@@ -56,6 +61,7 @@ interface UpdateClassArgs {
   class_name: string;
   source_code: string;
   lock_handle: string;
+  transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -81,7 +87,12 @@ export async function handleUpdateClass(
       createAdtClient(connection, logger)
         .getClass(resultsFor(classDocuments))
         .update(
-          { className },
+          {
+            className,
+            ...(args.transport_request && {
+              transportRequest: args.transport_request,
+            }),
+          },
           {
             source: source_code,
             lockHandle: lock_handle,

@@ -25,6 +25,7 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { inOwnSessionOverRfc } from '../../../lib/packageSessions';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -70,7 +71,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages.',
+          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       record_changes: {
         type: 'boolean',
@@ -156,23 +157,27 @@ export async function handleCreatePackage(
 
   return answer(
     { tool: 'CreatePackageLow', detail },
+    // Over RFC in an ABAP session of its own: the session that saves a package
+    // cannot change it again (PAK/058, lib/packageSessions.ts).
     () =>
-      createAdtClient(connection, logger)
-        .getPackage(resultsFor(packageDocuments))
-        .create(
-          {
-            packageName,
-            superPackage,
-            description,
-            packageType: package_type,
-            softwareComponent: software_component,
-            transportLayer: transport_layer,
-            transportRequest: transport_request,
-            recordChanges: record_changes,
-            applicationComponent: application_component,
-          },
-          { analyse: analyseException },
-        ),
+      inOwnSessionOverRfc(connection, logger, 'CreatePackageLow', (own) =>
+        createAdtClient(own, logger)
+          .getPackage(resultsFor(packageDocuments))
+          .create(
+            {
+              packageName,
+              superPackage,
+              description,
+              packageType: package_type,
+              softwareComponent: software_component,
+              transportLayer: transport_layer,
+              transportRequest: transport_request,
+              recordChanges: record_changes,
+              applicationComponent: application_component,
+            },
+            { analyse: analyseException },
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

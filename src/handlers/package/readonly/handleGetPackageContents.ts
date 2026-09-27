@@ -2,6 +2,7 @@ import * as z from 'zod';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { assembleList, walkPackage } from '../../../lib/strategies/packageWalk';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -46,7 +47,7 @@ export async function handleGetPackageContents(
     }
 
     const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+    const utils = client.getUtils(ourUtils);
 
     // Walked here rather than in the client, for the reason given in
     // handleGetPackageTree and in mcp-abap-adt-clients#141: a member that makes
@@ -56,7 +57,7 @@ export async function handleGetPackageContents(
     const packageName = args.package_name.toUpperCase();
     const items = assembleList(
       packageName,
-      await walkPackage(utils as never, packageName, {
+      await walkPackage(utils, packageName, {
         includeSubpackages: args.include_subpackages,
         maxDepth: args.max_depth,
         includeDescriptions: args.include_descriptions,

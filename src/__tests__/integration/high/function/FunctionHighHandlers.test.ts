@@ -26,6 +26,7 @@ import { handleDeleteFunctionModule } from '../../../../handlers/function/low/ha
 import { handleGetSession } from '../../../../handlers/system/readonly/handleGetSession';
 import {
   getCleanupAfter,
+  getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
   getSystemType,
@@ -176,6 +177,7 @@ describe('Function High-Level Handlers Integration', () => {
         }
       };
 
+      let passed = false;
       try {
         // Step 1: CreateFunctionGroup (High-Level)
         // High-level handler does validation internally, but we check the result
@@ -342,9 +344,11 @@ describe('Function High-Level Handlers Integration', () => {
         );
 
         await delay(getOperationDelay('update', testCase));
+        passed = true;
       } finally {
         // Cleanup: Optionally delete test function module first, then function group
-        const shouldCleanup = getCleanupAfter(testCase);
+        // A failed run keeps its objects for analysis (getCleanupAfterRun).
+        const shouldCleanup = getCleanupAfterRun(testCase, !passed);
 
         if (session && functionModuleName && functionGroupName) {
           try {

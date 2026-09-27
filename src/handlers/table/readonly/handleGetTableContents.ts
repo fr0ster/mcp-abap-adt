@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -61,16 +62,19 @@ export async function handleGetTableContents(
   // ("SELECT * FROM ${tableName}") already assumed was being run.
   const sqlQuery = `SELECT * FROM ${tableName}`;
 
-  // `getTableContents(params)` takes no options object at all — no `analyse`
-  // to pass, matching the brief.
+  // `getTableContents(params, options?)` takes `analyseException` since
+  // adt-clients 23.
   return answer(
     { tool: 'GetTableContents', detail },
     () =>
-      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents({
-        table_name: tableName,
-        max_rows: maxRows,
-        sql_query: sqlQuery,
-      }),
+      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
+        {
+          table_name: tableName,
+          max_rows: maxRows,
+          sql_query: sqlQuery,
+        },
+        { analyse: analyseException },
+      ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;

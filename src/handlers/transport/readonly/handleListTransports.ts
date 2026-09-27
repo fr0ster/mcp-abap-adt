@@ -6,7 +6,10 @@
  */
 
 import { transportDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  transportSearchConfigurations,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { TRANSPORT_SEARCH_CONFIGURATIONS_URL } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
@@ -236,18 +239,16 @@ export async function handleListTransports(
   return answer(
     { tool: 'ListTransports', detail },
     async () => {
-      // `searchConfigurations` is kept at the shipped reading rather than
-      // given one of ours. The three readings this repository injects —
-      // verbatim, structured, statusOnly — all answer a document or a status,
-      // and what this member is for is the addressable list the package
-      // already parses: `uri`, `etag`, and the configuration's own
-      // attributes. Keeping it is what `ourUtils` and `ourUnitTest` do for
-      // the same reason. It is also not optional: the slot arrived with
-      // 19.1.0, and `resultsFor` refuses a slot it has no reading for rather
-      // than guessing one.
-      const request = createAdtClient(connection, logger).getRequest(
-        resultsFor(transportDocuments, ['searchConfigurations']),
-      );
+      // `searchConfigurations` answers the addressable list — `uri`, `etag`,
+      // and the configuration's own attributes — through
+      // `transportSearchConfigurations`. None of verbatim, structured or
+      // statusOnly gives that shape. adt-clients 22 applied this reading by
+      // default and it was kept as shipped; 23 ships the document and the
+      // reading lives in adt-strategies (MIGRATION-23 §4).
+      const request = createAdtClient(connection, logger).getRequest({
+        ...resultsFor(transportDocuments),
+        searchConfigurations: transportSearchConfigurations,
+      });
 
       const answered = await request.searchConfigurations({
         analyse: analyseException,
@@ -274,7 +275,10 @@ export async function handleListTransports(
 
       const readings: AdtReading<unknown>[] = [];
       for (const configuration of running) {
-        const listed = await request.list({ configUri: configuration.uri });
+        const listed = await request.list({
+          analyse: analyseException,
+          configUri: configuration.uri,
+        });
         // The failing search's own answer, untouched — the rule `sequence()`
         // follows, for the same reason: a sentence composed here would stand
         // beside the strategy's own account of the same refusal.

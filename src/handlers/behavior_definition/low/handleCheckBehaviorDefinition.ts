@@ -41,6 +41,12 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['name'],
@@ -55,6 +61,7 @@ interface CheckBehaviorDefinitionArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  version?: 'active' | 'inactive';
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -83,7 +90,7 @@ export async function handleCheckBehaviorDefinition(
         .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
         // `status` left undefined: the shipped default checks the inactive
         // version, which is what a caller wants right after a write.
-        .check({ name: bdefName }, undefined, { analyse: analyseException }),
+        .check({ name: bdefName }, args.version, { analyse: analyseException }),
     project(detail, terseCheck),
   );
 }

@@ -1,6 +1,8 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourFeeds } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListSystemMessages',
@@ -43,7 +45,7 @@ export async function handleRuntimeListSystemMessages(
   args: RuntimeListSystemMessagesArgs,
 ) {
   const { connection, logger } = context;
-  const feeds = new AdtRuntimeClient(connection, logger).getFeeds();
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
 
   // `systemMessages()` answers `IAdtResponse<ISystemMessageEntry[]>` as of
   // adt-clients 19, not a bare array — the same parsed entries as before,
@@ -52,6 +54,7 @@ export async function handleRuntimeListSystemMessages(
     { tool: 'RuntimeListSystemMessages', detail: 'terse' },
     () =>
       feeds.systemMessages({
+        analyse: analyseException,
         user: args?.user,
         maxResults: args?.max_results,
         from: args?.from,

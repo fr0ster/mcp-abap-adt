@@ -1,4 +1,5 @@
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { utilDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException, utilSearchHits } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
 
@@ -75,7 +76,9 @@ export function createPackagePatternResolver(
   ctx: HandlerContext,
 ): SearchObjectsFn {
   const client = createAdtClient(ctx.connection, ctx.logger);
-  const utils = client.getUtils();
+  // adt-clients 23 ships the search document as it came; the parsed hits
+  // are `utilSearchHits` from adt-strategies (MIGRATION-23 §4).
+  const utils = client.getUtils({ ...utilDocuments, search: utilSearchHits });
   return async ({ query, objectType, maxResults }) => {
     const response = await utils.search(
       { query, objectType, maxResults },

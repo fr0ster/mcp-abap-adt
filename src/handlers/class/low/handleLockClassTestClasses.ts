@@ -4,30 +4,43 @@
  * Uses AdtClient.getClass().lockTestClasses from @mcp-abap-adt/adt-clients 19.
  *
  * `lockTestClasses()` is not part of the `IAdtLockable` shape every other
- * family's `lock()` implements — it takes only a config and answers a bare
- * `string`, not an `IAdtResponse`. There is therefore no `analyse` to inject
- * (the member has no `options` parameter at all) and no reading to route
- * through `answer()`: this stays a direct call, the same shape the pre-19
- * code already used.
- *
- * The `as any` stays, for a structural reason rather than a typing gap the
- * package left open: `AdtClient.getClass()` is typed to return
- * `IClassContract<R>`, which is `IAdtCreatable & IAdtReadable & … &
- * IAdtLockable & …` — the CRUD surface every family shares. `lockTestClasses`
- * exists on the concrete `AdtClass` class but was never added to that shared
- * contract, so there is no public type through which `getClass()` can reach
- * it. Casting past `IClassContract` is the only way this repository has to
- * call it through the client facade at all.
+ * family's `lock()` implements, and since adt-clients 23 it answers an
+ * `IAdtResponse` with the handle, taking `analyse` like every member. Its
+ * verdict is `analyseLock`: a 2xx naming no handle is a refusal, with SAP's
+ * answer beside it.
  */
 
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import {
-  type AxiosResponse,
-  restoreSessionInConnection,
-  return_error,
-  return_response,
-} from '../../../lib/utils';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
+import { restoreSessionInConnection, return_error } from '../../../lib/utils';
+
+/**
+ * The two test-include members, typed. `lockTestClasses`/`unlockTestClasses`
+ * are on the concrete `AdtClass` and not on `IClassContract`, which is what
+ * `getClass()` is typed to return, so a cast is still needed to reach them.
+ * It names what they answer, not `any`: under `any` the change in
+ * adt-clients 23 — both answer `IAdtResponse` now, not a bare handle — went
+ * unseen, and the whole envelope was handed on as the lock handle
+ * (`lockHandle=[object Object]`, SAP 423, E19 2026-09-26).
+ */
+interface TestClassesLocking {
+  lockTestClasses(
+    config: { className: string },
+    options: { analyse: IAnalyse<IAdtError> },
+  ): Promise<IAdtResponse<string, IAdtError>>;
+  unlockTestClasses(
+    config: { className: string },
+    lockHandle: string,
+    options: { analyse: IAnalyse<IAdtError> },
+  ): Promise<IAdtResponse<unknown, IAdtError>>;
+}
 
 export const TOOL_DEFINITION = {
   name: 'LockClassTestClassesLow',
@@ -90,44 +103,24 @@ export async function handleLockClassTestClasses(
     const className = class_name.toUpperCase();
     logger?.info(`Starting test classes lock for: ${className}`);
 
-    try {
-      const classClient = createAdtClient(connection, logger).getClass() as any;
-      const lockHandle = await classClient.lockTestClasses({ className });
+    const classClient = createAdtClient(
+      connection,
+      logger,
+    ).getClass() as unknown as TestClassesLocking;
 
-      if (!lockHandle) {
-        throw new Error(
-          `Lock did not return a test classes lock handle for class ${className}`,
-        );
-      }
-
-      logger?.info(`✅ LockClassTestClasses completed: ${className}`);
-
-      return return_response({
-        data: JSON.stringify(
-          {
-            success: true,
-            class_name: className,
-            session_id: session_id || null,
-            test_classes_lock_handle: lockHandle,
-            session_state: null, // Session state management is now handled by auth-broker,
-            message: `Test classes for ${className} locked successfully. Use this test_classes_lock_handle for update/unlock operations.`,
-          },
-          null,
-          2,
-        ),
-      } as AxiosResponse);
-    } catch (error: any) {
-      logger?.error(
-        `Error locking test classes for ${className}: ${error?.message || error}`,
-      );
-      const reason =
-        error?.response?.status === 404
-          ? `Class ${className} not found.`
-          : error?.response?.status === 409
-            ? `Test classes for ${className} are already locked by another user.`
-            : error?.message || String(error);
-      return return_error(new Error(reason));
-    }
+    return answer(
+      { tool: 'LockClassTestClassesLow', detail: 'terse' },
+      () =>
+        classClient.lockTestClasses({ className }, { analyse: analyseLock }),
+      (lockHandle: string) => ({
+        success: true,
+        class_name: className,
+        session_id: session_id || null,
+        test_classes_lock_handle: lockHandle,
+        session_state: null, // Session state management is now handled by auth-broker,
+        message: `Test classes for ${className} locked successfully. Use this test_classes_lock_handle for update/unlock operations.`,
+      }),
+    );
   } catch (error: any) {
     return return_error(error);
   }

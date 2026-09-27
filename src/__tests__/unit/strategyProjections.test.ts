@@ -139,11 +139,13 @@ describe('deletion', () => {
     expect(terse.message.text).toContain('already editing');
   });
 
-  it('the check step answers deletable, not deleted', () => {
+  // A delete tool answers the check's document only when it sent no delete
+  // (the check said the object is not there), so it says so.
+  it('the check step answers deletable, and not deleted', () => {
     const r = readingOf('deletion-check-allows--01-deletion-check');
     const terse = terseDeletion(r.value as never, r.status) as any;
     expect(terse.deletable).toBe(true);
-    expect(terse.deleted).toBeUndefined();
+    expect(terse.deleted).toBe(false);
   });
 });
 

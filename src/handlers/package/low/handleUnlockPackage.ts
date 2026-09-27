@@ -3,16 +3,21 @@
  *
  * Uses AdtClient.getPackage().unlock from @mcp-abap-adt/adt-clients 19.
  *
- * `unlock()` accepts no options either — no `analyse`, and its success value
- * is `void`. There is no `AdtReading` to read a status off (unlock does not go
+ * `unlock()` takes `analyseException` too (adt-clients 23), and its success
+ * value is SAP's reply, read by nothing. There is no `AdtReading` to read a status off (unlock does not go
  * through the result-set strategies at all), so the synthetic 200 below is a
  * stand-in for "the call answered ok" rather than a status read off the wire —
  * `answer()` only reaches this projection once `ok` is already `true`.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  connectionHoldingPackageLock,
+  releasePackageLockSession,
+} from '../../../lib/packageSessions';
 import { terseWrite } from '../../../lib/strategies/projections';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
@@ -97,12 +102,22 @@ export async function handleUnlockPackage(
 
   const packageName = package_name.toUpperCase();
 
-  return answer(
-    { tool: 'UnlockPackageLow', detail: 'terse' },
-    () =>
-      createAdtClient(connection, logger)
-        .getPackage()
-        .unlock({ packageName }, lock_handle),
-    (value) => terseWrite(value, 200),
-  );
+  // The lock lives in a session of its own (LockPackageLow): unlocked there,
+  // then that session is closed whatever the unlock answered — a
+  // closed session releases its enqueue too.
+  try {
+    return await answer(
+      { tool: 'UnlockPackageLow', detail: 'terse' },
+      () =>
+        createAdtClient(
+          connectionHoldingPackageLock(connection, lock_handle),
+          logger,
+        )
+          .getPackage()
+          .unlock({ packageName }, lock_handle, { analyse: analyseException }),
+      (value) => terseWrite(value, 200),
+    );
+  } finally {
+    await releasePackageLockSession(lock_handle, logger);
+  }
 }

@@ -5,9 +5,11 @@
  * walking the repository one node level at a time. See lib/strategies/packageWalk.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { assembleTree, walkPackage } from '../../../lib/strategies/packageWalk';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { return_error, return_response } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -82,7 +84,7 @@ export async function handleGetPackageTree(
     );
 
     const client = createAdtClient(connection, logger);
-    const utils = client.getUtils();
+    const utils = client.getUtils(ourUtils);
 
     // Verify package exists before building tree (fixes #38).
     // `IPackageContract` has no `.read()` — a package is a container with no
@@ -101,7 +103,9 @@ export async function handleGetPackageTree(
     // status/code to branch on the way the old 404 check did, so rather than
     // guess a code this has not measured, the message says only what is
     // true of every case: the read did not produce a document.
-    const readResult = await client.getPackage().readMetadata({ packageName });
+    const readResult = await client
+      .getPackage()
+      .readMetadata({ packageName }, { analyse: analyseException });
     if (!readResult.ok) {
       return return_error(
         new Error(
@@ -119,7 +123,7 @@ export async function handleGetPackageTree(
     // See mcp-abap-adt-clients#141.
     const packageTree = assembleTree(
       packageName,
-      await walkPackage(utils as never, packageName, {
+      await walkPackage(utils, packageName, {
         includeSubpackages,
         maxDepth,
         includeDescriptions,

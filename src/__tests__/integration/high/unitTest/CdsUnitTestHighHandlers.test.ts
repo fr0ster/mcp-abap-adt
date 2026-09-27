@@ -6,6 +6,7 @@
  */
 
 import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
+import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
 import { handleCreateCdsUnitTest } from '../../../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleDeleteCdsUnitTest } from '../../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
 import { handleGetCdsUnitTestResult } from '../../../../handlers/unit_test/high/handleGetCdsUnitTestResult';
@@ -191,6 +192,27 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         expect(createResponse.content[0]?.text).toBe('SUCCESS');
 
         testLogger?.success(`create cds unit test: ${className} done`);
+
+        // Step 1b: activate the class, as adt-clients' CdsUnitTest suite does
+        // (create → activate → read). A class just created has no version to
+        // read yet: over RFC — one ABAP session for the run — the read in the
+        // creating session answered 400 SADT_RESOURCE 007 "wrong input data"
+        // (E19, 2026-09-26). HTTP happened to answer a generated shell.
+        testLogger?.info(`   • activate cds unit test class: ${className}`);
+        const activateResponse = await tester.invokeToolOrHandler(
+          'ActivateClassLow',
+          { class_name: className },
+          async () =>
+            handleActivateClass(
+              createHandlerContext({ connection, logger: testLogger }),
+              { class_name: className },
+            ),
+        );
+        if (activateResponse.isError) {
+          throw new Error(
+            `ActivateClass failed: ${extractErrorMessage(activateResponse)}`,
+          );
+        }
 
         // Step 2: Read CDS unit test class (via GetClass)
         testLogger?.info(`   • read cds unit test class: ${className}`);

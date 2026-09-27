@@ -19,13 +19,23 @@
  * `recordChanges`) describes a create and is never read to build or merge a
  * body on an update; only `package_name` (for the URL path) and
  * `transport_request` (the write-query string) reach the wire function at
- * all. Verified against the compiled `AdtPackage.js` and
- * `core/package/update.js`, not the declaration file.
+ * all. Verified against `AdtPackage.ts` and `core/package/update.ts`.
+ *
+ * **And `transport_request` was named in that sentence while the schema never
+ * offered it.** `core/package/update.ts` appends `&corrNr=` when a transport is
+ * given, and `IPackageConfig` declares `transportRequest`, so a transportable
+ * package could not be updated through this tool at all: the on-premise answer
+ * is `SADT_RESOURCE 017`, *"Parameter corrNr could not be found."* — the same
+ * refusal the seven low-tier writes in this branch were fixed for. It is a
+ * parameter now, and it travels in the config, which is where the wire function
+ * reads it.
  */
 
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { connectionHoldingPackageLock } from '../../../lib/packageSessions';
 import { patchPackageXml } from '../../../lib/strategies/packagePatch';
 import { sequence } from '../../../lib/strategies/sequence';
 import { extractXmlString } from '../../../lib/strategies/xmlPatch';
@@ -40,7 +50,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdatePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description.',
+    '[low-level] Update description of an existing ABAP package. Requires lock_handle from LockPackage. super_package is required by this schema but not read by the update endpoint — see its own parameter description. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). Over RFC this runs in the session LockPackageLow opened for this lock_handle; over HTTP it runs outside the stateful context of the lock. Call UnlockPackageLow afterwards, whatever this answers.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -57,6 +67,11 @@ export const TOOL_DEFINITION = {
       updated_description: {
         type: 'string',
         description: 'New description for the package.',
+      },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
       },
       lock_handle: {
         type: 'string',
@@ -93,6 +108,7 @@ interface UpdatePackageArgs {
   super_package: string;
   updated_description: string;
   lock_handle: string;
+  transport_request?: string;
   session_id?: string;
   session_state?: {
     cookies?: string;
@@ -112,6 +128,7 @@ export async function handleUpdatePackage(
       super_package,
       updated_description,
       lock_handle,
+      transport_request,
       session_id,
       session_state,
     } = args as UpdatePackageArgs;
@@ -129,7 +146,12 @@ export async function handleUpdatePackage(
       );
     }
 
-    const client = createAdtClient(connection, logger);
+    // The lock lives in a session of its own (LockPackageLow); the update has
+    // to run in that session, where the handle is valid.
+    const client = createAdtClient(
+      connectionHoldingPackageLock(connection, lock_handle),
+      logger,
+    );
     const packageName = package_name.toUpperCase();
 
     logger?.info(`Starting package update: ${packageName}`);
@@ -152,6 +174,9 @@ export async function handleUpdatePackage(
           client.getPackage().updateMetadata(
             {
               packageName,
+              ...(transport_request && {
+                transportRequest: transport_request,
+              }),
             },
             {
               source: patchPackageXml(
@@ -164,10 +189,16 @@ export async function handleUpdatePackage(
           ),
       );
 
+      // A refusal goes out through `answer()`, with what SAP said (T100,
+      // exception type, raw body). It used to be flattened to the transport's
+      // own "Request failed with status code 400", which named no reason.
       if (!written.ok) {
-        const failure = written.getError();
-        logger?.error(`UpdatePackage refused: ${failure.message}`);
-        return return_error(new Error(failure.message));
+        logger?.error(`UpdatePackage refused: ${written.getError().message}`);
+        return answer(
+          { tool: 'UpdatePackageLow', detail: 'terse' },
+          async () => written,
+          () => undefined,
+        );
       }
 
       logger?.info(`✅ UpdatePackage completed: ${packageName}`);

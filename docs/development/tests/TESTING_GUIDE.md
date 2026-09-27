@@ -114,3 +114,4 @@ DEBUG_ADT_TESTS=true npm test -- --testPathPatterns=view
 2. **Connection errors** — check `.env` credentials and SAP system availability.
 3. **Timeout errors** — increase `test_settings.timeout` in `test-config.yaml`.
 4. **"Resource is not locked"** — session management issue, retry or check stateful session support.
+5. **`PAK/058` "Package … is already locked"** on a package update or delete — the package was already saved in the same ABAP session: over RFC every call shares one, over HTTP every stateful lock → update → unlock does. A package can be saved only once per session; it is `CL_PACKAGE`'s instance buffer, not an enqueue lock. The package tools open a session of their own for this; see [RFC_SETUP.md](../../installation/RFC_SETUP.md#known-limitation-a-package-cannot-be-changed-by-the-session-that-created-or-changed-it).

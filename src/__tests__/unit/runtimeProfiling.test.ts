@@ -462,3 +462,35 @@ it.each([
     );
   },
 );
+
+// A profiler option the caller did not give must not reach adt-clients as a
+// key holding `undefined`: the client merges `{ ...DEFAULTS, ...options }`,
+// and an undefined key there REPLACES the default. maxSizeForTraceFile lost
+// its 30720 that way and left the parameters document altogether; E19
+// (2026-09-25) then recorded every trace in state "Size violation". With the
+// size given, the same run finished.
+it.each(handlers)(
+  '%s sends only the profiler options it was given',
+  async (_n, handler, args) => {
+    let options: Record<string, unknown> | undefined;
+    classExecutor = {
+      scheduleTrace: async (given: Record<string, unknown>) => {
+        options = given;
+        return okResponse(PROFILER_REQUEST);
+      },
+      runWithProfiler: async () => okResponse('done'),
+    };
+    profiler = { list: async () => okResponse([]) };
+    await (handler as any)(context as any, {
+      ...args,
+      max_trace_attempts: 1,
+      trace_retry_delay_ms: 0,
+    });
+    expect(options).toBeDefined();
+    const undefinedKeys = Object.entries(options ?? {})
+      .filter(([, value]) => value === undefined)
+      .map(([key]) => key);
+    expect(undefinedKeys).toEqual([]);
+    expect(options).not.toHaveProperty('maxSizeForTraceFile');
+  },
+);

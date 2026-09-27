@@ -251,7 +251,7 @@ export interface ActivationTarget {
  * activation projection tells a caller to make: the activation document says
  * what the server stated, and only a read of the system says what is true.
  */
-async function stillInactive(
+export async function stillInactive(
   context: HandlerContext,
   targets: ActivationTarget[],
 ): Promise<string[]> {

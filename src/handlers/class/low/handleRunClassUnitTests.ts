@@ -14,6 +14,12 @@
  * migrated.
  */
 
+import { unitTestDocuments, wireItself } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseUnitTestStart,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -208,25 +214,24 @@ export async function handleRunClassUnitTests(
     );
 
     try {
-      const unitTest = client.getUnitTest() as any;
-      // `run()` answers an `IAdtResponse`, not the run id directly — treating
-      // the envelope itself as the id (the pre-fix shape here) serialises an
-      // object with only an `ok` field (its methods are not JSON), and
-      // `!envelope` never fires because both a success and a refusal
-      // envelope are truthy objects. That is the false-success shape this
-      // migration exists to remove, on the tool that starts the run.
-      const runAnswer = await unitTest.run(formattedTests, options);
-      const runResponse = unitTest.getStatusResponse?.();
-
-      if (!runAnswer?.ok) {
-        const failure = runAnswer?.getError?.();
-        throw new Error(
-          failure?.message ??
-            'Failed to obtain ABAP Unit run identifier from SAP response headers',
-        );
+      // The start's answer as it came (`wireItself`): the run id is in a
+      // header, and so are the status and location this tool reports.
+      // adt-clients 23 dropped `getStatusResponse()` and ships the document
+      // for `run`; this used to read both through `as any`, and would have
+      // answered the document as the id and `null` for the rest.
+      const unitTest = client.getUnitTest({
+        ...unitTestDocuments,
+        run: wireItself,
+      });
+      const runAnswer = await unitTest.run(formattedTests, {
+        ...options,
+        analyse: analyseUnitTestStart,
+      });
+      if (!runAnswer.ok) {
+        throw new Error(runAnswer.getError().message);
       }
-
-      const runId = runAnswer.getResult().value;
+      const runResponse = runAnswer.getResult().value as IAdtWireResponse;
+      const runId = unitTestRunId(runResponse);
       if (!runId) {
         throw new Error(
           'Failed to obtain ABAP Unit run identifier from SAP response headers',

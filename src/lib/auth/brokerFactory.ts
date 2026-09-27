@@ -11,7 +11,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
+import {
+  AuthorizationCodeProvider,
+  browserCallbackStrategy,
+} from '@mcp-abap-adt/auth-providers';
 import {
   AbapServiceKeyStore,
   AbapSessionStore,
@@ -22,7 +25,7 @@ import {
   SafeBtpSessionStore,
 } from '@mcp-abap-adt/auth-stores';
 import type {
-  ITokenProvider,
+  IRefreshableTokenProvider,
   ITokenResult,
 } from '@mcp-abap-adt/interfaces-auth';
 import type {
@@ -607,9 +610,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       {
         serviceKeyStore: hasServiceKeyStore ? serviceKeyStore : undefined,
         sessionStore,
-        tokenProvider,
-      } as any,
-      this.config.browser || 'system',
+        provider: tokenProvider,
+      },
       brokerLogger,
     );
 
@@ -672,9 +674,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       {
         serviceKeyStore: undefined, // No service key store for --env mode
         sessionStore,
-        tokenProvider,
-      } as any,
-      this.config.browser || 'system',
+        provider: tokenProvider,
+      },
       brokerLogger,
     );
 
@@ -815,7 +816,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     sessionStore: ISessionStore,
     serviceKeyStore: IServiceKeyStore | undefined,
     logger: ILogger | undefined,
-  ): Promise<ITokenProvider> {
+  ): Promise<IRefreshableTokenProvider> {
     // Use providerLogger only if DEBUG_PROVIDER is set, otherwise undefined (no logging)
     const providerLogger = this.config.providerLogger;
     let authConfig: IAuthorizationConfig | null = null;
@@ -851,13 +852,12 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     }
 
     if (!authConfig) {
-      return this.wrapLegacyTokenProvider({
-        getTokens: async (): Promise<ITokenResult> => {
-          throw new Error(
-            `Authorization config is required for destination "${destination}". Provide a service key or session with UAA credentials.`,
-          );
-        },
-      });
+      const missing = async (): Promise<ITokenResult> => {
+        throw new Error(
+          `Authorization config is required for destination "${destination}". Provide a service key or session with UAA credentials.`,
+        );
+      };
+      return { getTokens: missing, refreshTokens: missing };
     }
 
     const providerConfig = {
@@ -866,57 +866,34 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       clientSecret: authConfig.uaaClientSecret,
       refreshToken: authConfig.refreshToken,
       accessToken: connConfig?.authorizationToken,
-      browser: this.config.browser || 'system',
-      redirectPort: this.config.browserAuthPort,
+      // How a browser login is conducted — which browser, which callback port —
+      // is the provider's authorization strategy since auth-providers 2.0.0.
+      // `browser` and `redirectPort` in the provider config were removed there
+      // and have been ignored since: no browser opened (the strategy's default
+      // is 'none') and the callback bound 61001 whatever --browser-auth-port
+      // said. The port is passed only when one was configured.
+      authorization: browserCallbackStrategy({
+        browser: this.config.browser || 'system',
+        ...(this.config.browserAuthPort
+          ? { port: this.config.browserAuthPort }
+          : {}),
+      }),
       logger: providerLogger,
     };
 
     // For mcp-abap-adt, AuthorizationCodeProvider is the only provider used
     // Both 'abap' and 'btp' store types use AuthorizationCodeProvider
     if (storeType === 'btp' || storeType === 'abap') {
-      return this.wrapLegacyTokenProvider(
-        new AuthorizationCodeProvider(providerConfig),
-      );
+      // auth-providers 4.2 providers implement IRefreshableTokenProvider,
+      // which auth-broker 3 requires: `refreshToken()` asks for a new token
+      // rather than the cached one the server just refused.
+      return new AuthorizationCodeProvider(providerConfig);
     }
 
     // This should never happen, but throw error for safety
     throw new Error(
       `Unsupported store type "${storeType}" for destination "${destination}". Only 'abap' and 'btp' are supported.`,
     );
-  }
-
-  private wrapLegacyTokenProvider(
-    tokenProvider: ITokenProvider,
-  ): ITokenProvider & {
-    getConnectionConfig?: (
-      _authConfig: unknown,
-      _options?: unknown,
-    ) => Promise<{
-      connectionConfig: { authorizationToken?: string };
-      refreshToken?: string;
-    }>;
-  } {
-    if (typeof tokenProvider.getTokens !== 'function') {
-      throw new Error('AuthBrokerFactory: tokenProvider.getTokens is required');
-    }
-    if (typeof (tokenProvider as any).getConnectionConfig === 'function') {
-      return tokenProvider as any;
-    }
-
-    const getTokens = tokenProvider.getTokens.bind(tokenProvider);
-
-    return {
-      getTokens,
-      getConnectionConfig: async () => {
-        const tokenResult = await getTokens();
-        return {
-          connectionConfig: {
-            authorizationToken: tokenResult.authorizationToken,
-          },
-          refreshToken: tokenResult.refreshToken,
-        };
-      },
-    };
   }
 
   /**

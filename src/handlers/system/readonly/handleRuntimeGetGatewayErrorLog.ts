@@ -1,6 +1,8 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourFeeds } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeGetGatewayErrorLog',
@@ -49,7 +51,7 @@ export async function handleRuntimeGetGatewayErrorLog(
   args: RuntimeGetGatewayErrorLogArgs,
 ) {
   const { connection, logger } = context;
-  const feeds = new AdtRuntimeClient(connection, logger).getFeeds();
+  const feeds = new AdtRuntimeClient(connection, logger).getFeeds(ourFeeds);
   const errorUrl = args?.error_url;
 
   // `gatewayErrorDetail()`/`gatewayErrors()` both answer `IAdtResponse<T>`
@@ -70,7 +72,7 @@ export async function handleRuntimeGetGatewayErrorLog(
   if (errorUrl) {
     return answer(
       ctx,
-      () => feeds.gatewayErrorDetail(errorUrl),
+      () => feeds.gatewayErrorDetail(errorUrl, { analyse: analyseException }),
       (error) => ({ success: true, mode: 'detail', error }),
     );
   }
@@ -79,6 +81,7 @@ export async function handleRuntimeGetGatewayErrorLog(
     ctx,
     () =>
       feeds.gatewayErrors({
+        analyse: analyseException,
         user: args?.user,
         maxResults: args?.max_results,
         from: args?.from,

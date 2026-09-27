@@ -35,6 +35,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'BehaviorDefinition name (e.g., ZI_MY_BDEF).',
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.',
+      },
     },
     required: ['name'],
   },
@@ -42,7 +48,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckBehaviorDefinition(
   context: HandlerContext,
-  args: { name: string },
+  args: { name: string; version?: 'active' | 'inactive' },
 ) {
   const result = await handleCheckBdefLow(context, args);
   return normalizeCheckResponse(result, args.name?.toUpperCase());

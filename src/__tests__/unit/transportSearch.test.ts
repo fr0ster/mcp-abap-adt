@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleListTransports } from '../../handlers/transport/readonly/handleListTransports';
 import { corpusBody } from '../../lib/adtCorpus';
 import { parseStructure } from '../../lib/strategies/reading';
@@ -49,7 +50,7 @@ describe('ListTransports asks for the saved search rather than assuming one', ()
     const result: any = await handleListTransports(context as any, {});
 
     expect(result.isError).toBe(false);
-    expect(asked).toEqual([{ configUri: REAL_URI }]);
+    expect(asked).toEqual([{ configUri: REAL_URI, analyse: analyseException }]);
   });
 
   it('has no saved search to run, and says which endpoint answered none', async () => {
@@ -101,7 +102,10 @@ describe('ListTransports asks for the saved search rather than assuming one', ()
     const result: any = await handleListTransports(context as any, {});
 
     expect(result.isError).toBe(false);
-    expect(asked).toEqual([{ configUri: REAL_URI }, { configUri: second }]);
+    expect(asked).toEqual([
+      { configUri: REAL_URI, analyse: analyseException },
+      { configUri: second, analyse: analyseException },
+    ]);
 
     const payload = JSON.parse(result.content[0].text);
     expect(payload.searched_configurations).toEqual([REAL_URI, second]);

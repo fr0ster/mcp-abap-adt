@@ -46,6 +46,12 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['function_group_name'],
@@ -60,6 +66,7 @@ interface CheckFunctionGroupArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  version?: 'active' | 'inactive';
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -89,7 +96,9 @@ export async function handleCheckFunctionGroup(
         // `status` left undefined: the shipped default checks the inactive
         // version, and there is no `version` parameter on this tool to say
         // otherwise.
-        .check({ functionGroupName }, undefined, { analyse: analyseException }),
+        .check({ functionGroupName }, args.version, {
+          analyse: analyseException,
+        }),
     project(detail, terseCheck),
   );
 }

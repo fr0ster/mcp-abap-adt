@@ -41,6 +41,12 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['data_element_name'],
@@ -55,6 +61,7 @@ interface CheckDataElementArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  version?: 'active' | 'inactive';
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -85,7 +92,9 @@ export async function handleCheckDataElement(
         // version, which is what a caller wants right after a write —
         // `AdtDataElement.check`'s own `status === 'active' ? 'active' :
         // 'inactive'` reduces an undefined status to 'inactive'.
-        .check({ dataElementName }, undefined, { analyse: analyseException }),
+        .check({ dataElementName }, args.version, {
+          analyse: analyseException,
+        }),
     project(detail, terseCheck),
   );
 }

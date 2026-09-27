@@ -138,34 +138,12 @@ describe('Transported Object CRUD (GitHub #11)', () => {
 
       await delay(getOperationDelay('create'));
 
-      // Step 2: Read the class (high-level GetClass)
-      logger?.info('Step 2: Reading class via GetClass');
-      const getCtx = createHandlerContext({ connection, logger });
-      const getResponse = await handleGetClass(getCtx, {
-        class_name: className,
-      });
-
-      expect(getResponse.isError).toBe(false);
-      const getData = parseHandlerResponse(getResponse);
-      expect(getData.success).toBe(true);
-      logger?.success('Step 2: GetClass succeeded');
-
-      // Step 3: Read with metadata (readonly ReadClass)
-      logger?.info('Step 3: Reading class via ReadClass (source + metadata)');
-      const readCtx = createHandlerContext({ connection, logger });
-      const readResponse = await handleReadClass(readCtx, {
-        class_name: className,
-      });
-
-      expect(readResponse.isError).toBe(false);
-      const readData = parseHandlerResponse(readResponse);
-      expect(readData.success).toBe(true);
-      expect(readData.source_code).toBeDefined();
-      expect(readData.metadata).toBeDefined();
-      logger?.success('Step 3: ReadClass with metadata succeeded');
-
-      // Step 4: Update the class source code (the critical operation — GitHub #11)
-      logger?.info(`Step 4: Updating class source (TR: ${transportRequest})`);
+      // Step 2: Update the class source code (the critical operation — GitHub #11).
+      // Before the reads, as adt-clients' class suite does: a class just
+      // created has no version to read yet. Over RFC — one ABAP session for the
+      // run — a read in the creating session answered 400 SADT_RESOURCE 007
+      // "wrong input data" (E19, 2026-09-26); after the first write it reads.
+      logger?.info(`Step 2: Updating class source (TR: ${transportRequest})`);
       const updateCtx = createHandlerContext({ connection, logger });
       const newSource = `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.
   PUBLIC SECTION.
@@ -178,17 +156,51 @@ CLASS ${className} IMPLEMENTATION.
   ENDMETHOD.
 ENDCLASS.`;
 
+      // Activated, so the reads below see what was written: UpdateClass
+      // leaves the source inactive unless asked, and the active version of a
+      // class never activated is the generated shell.
       const updateResponse = await handleUpdateClass(updateCtx, {
         class_name: className,
         source_code: newSource,
         transport_request: transportRequest,
+        activate: true,
       });
 
       expect(updateResponse.isError).toBe(false);
       // UpdateClass's terse projection is `terseWrite` too — same literal
       // "SUCCESS" text, no `success` field (projections.ts `terseWrite`).
       expect(updateResponse.content[0]?.text).toBe('SUCCESS');
-      logger?.success('Step 4: UpdateClass in transport succeeded');
+      logger?.success('Step 2: UpdateClass in transport succeeded');
+
+      // Step 3: Read the class (high-level GetClass)
+      logger?.info('Step 3: Reading class via GetClass');
+      const getCtx = createHandlerContext({ connection, logger });
+      const getResponse = await handleGetClass(getCtx, {
+        class_name: className,
+      });
+
+      expect(getResponse.isError).toBe(false);
+      const getData = parseHandlerResponse(getResponse);
+      expect(getData.success).toBe(true);
+      // The source the update wrote, not the shell the create made.
+      expect(String(getData.source_code)).toContain(
+        'Updated by MCP transport CRUD test',
+      );
+      logger?.success('Step 3: GetClass succeeded');
+
+      // Step 4: Read with metadata (readonly ReadClass)
+      logger?.info('Step 4: Reading class via ReadClass (source + metadata)');
+      const readCtx = createHandlerContext({ connection, logger });
+      const readResponse = await handleReadClass(readCtx, {
+        class_name: className,
+      });
+
+      expect(readResponse.isError).toBe(false);
+      const readData = parseHandlerResponse(readResponse);
+      expect(readData.success).toBe(true);
+      expect(readData.source_code).toBeDefined();
+      expect(readData.metadata).toBeDefined();
+      logger?.success('Step 4: ReadClass with metadata succeeded');
 
       // Step 5: Delete the class
       logger?.info(`Step 5: Deleting class ${className}`);

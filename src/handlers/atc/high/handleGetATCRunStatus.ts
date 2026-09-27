@@ -1,6 +1,8 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourAtc } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 /**
@@ -57,11 +59,11 @@ export async function handleGetATCRunStatus(
     );
   }
 
-  const atc = new AdtRuntimeClient(connection, logger).getAtc();
+  const atc = new AdtRuntimeClient(connection, logger).getAtc(ourAtc);
 
   return answer(
     { tool: 'GetATCRunStatus', detail: 'terse' },
-    () => atc.getRunStatus(runId),
+    () => atc.getRunStatus(runId, { analyse: analyseException }),
     (status) => ({
       success: true,
       run_id: runId,

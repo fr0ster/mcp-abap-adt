@@ -17,6 +17,7 @@
  * way `handleGetObjectsByType.ts` does for its own unrelated member.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -108,10 +109,13 @@ export async function handleGetWhereUsed(
   // searched, anything else is an explicit error — so we return only what
   // was asked for, never extra.
   if (typedArgs.enable_only_types && typedArgs.enable_only_types.length > 0) {
-    const scopeResponse = await utils.getWhereUsedScope({
-      object_name: typedArgs.object_name,
-      object_type: typedArgs.object_type,
-    });
+    const scopeResponse = await utils.getWhereUsedScope(
+      {
+        object_name: typedArgs.object_name,
+        object_type: typedArgs.object_type,
+      },
+      { analyse: analyseException },
+    );
     if (!scopeResponse.ok) {
       return return_error(scopeResponse.getError().message);
     }

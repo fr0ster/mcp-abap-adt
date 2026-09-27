@@ -59,6 +59,11 @@ export const TOOL_DEFINITION = {
           cookie_store: { type: 'object' },
         },
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['ddl_name', 'ddl_source', 'lock_handle'],
@@ -75,6 +80,7 @@ interface UpdateDdlArgs {
     csrf_token?: string;
     cookie_store?: Record<string, string>;
   };
+  transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -104,7 +110,12 @@ export async function handleUpdateDdl(
       createAdtClient(connection, logger)
         .getDdl(resultsFor(ddlDocuments))
         .update(
-          { ddlName },
+          {
+            ddlName,
+            ...(args.transport_request && {
+              transportRequest: args.transport_request,
+            }),
+          },
           {
             source: ddl_source,
             lockHandle: lock_handle,

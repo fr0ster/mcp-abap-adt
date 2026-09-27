@@ -35,6 +35,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Data element name (e.g., ZDE_MY_ELEMENT).',
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.',
+      },
     },
     required: ['data_element_name'],
   },
@@ -42,7 +48,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckDataElement(
   context: HandlerContext,
-  args: { data_element_name: string },
+  args: { data_element_name: string; version?: 'active' | 'inactive' },
 ) {
   const result = await handleCheckDataElementLow(context, args);
   return normalizeCheckResponse(result, args.data_element_name?.toUpperCase());

@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
       transport_number: {
         type: 'string',
         description:
-          'Transport request or task number, e.g. E19K905942. A task is itself a request resource and reads the same way.',
+          'Transport REQUEST or TASK number, e.g. E19K905942. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.',
       },
       ...DETAIL_PROPERTY,
     },

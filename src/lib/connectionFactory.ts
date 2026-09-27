@@ -30,7 +30,7 @@ import {
   type SapConfig,
   TokenAuthProvider,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ITokenRefresher } from '@mcp-abap-adt/interfaces-auth';
 
 export type AbapSystemKind = 'onprem' | 'cloud';

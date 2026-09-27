@@ -4,9 +4,9 @@
  * A dispatcher: one branch runs per call, over the same family clients every
  * low-level LockX handler in this migration uses.
  *
- * `lock()` accepts no options at all — not even `analyse` — so there is no
- * strategy to inject in any branch below, the same as every single-family
- * LockXLow handler. Its answer is the lock handle itself, and the projection
+ * `lock()` takes `analyseLock` in every branch below, as every single-family
+ * LockXLow handler does: a 2xx naming no handle is a refusal, with SAP's
+ * answer beside it (`lib/strategies/lockAnswer.ts`). Its answer is the lock handle itself, and the projection
  * is the envelope the tool already returned: nothing about `lock` varies with
  * `detail`, so the parameter is not added to this tool's surface.
  */
@@ -30,6 +30,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { generateSessionId } from '../../../lib/sessionUtils';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
@@ -174,59 +175,65 @@ export async function handleLockObject(
         case 'class':
           return client
             .getClass(resultsFor(classDocuments))
-            .lock({ className: objectName });
+            .lock({ className: objectName }, { analyse: analyseLock });
         case 'program':
           return client
             .getProgram(resultsFor(programDocuments))
-            .lock({ programName: objectName });
+            .lock({ programName: objectName }, { analyse: analyseLock });
         case 'interface':
           return client
             .getInterface(resultsFor(interfaceDocuments))
-            .lock({ interfaceName: objectName });
+            .lock({ interfaceName: objectName }, { analyse: analyseLock });
         case 'function_group':
           return client
             .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .lock({ functionGroupName: objectName });
+            .lock({ functionGroupName: objectName }, { analyse: analyseLock });
         case 'function_module':
           return client
             .getFunctionModule(resultsFor(functionModuleDocuments))
-            .lock({
-              functionGroupName: functionGroupName as string,
-              functionModuleName: functionModuleName as string,
-            });
+            .lock(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: functionModuleName as string,
+              },
+              { analyse: analyseLock },
+            );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))
-            .lock({ tableName: objectName });
+            .lock({ tableName: objectName }, { analyse: analyseLock });
         case 'structure':
           return client
             .getStructure(resultsFor(structureDocuments))
-            .lock({ structureName: objectName });
+            .lock({ structureName: objectName }, { analyse: analyseLock });
         case 'ddl':
           return client
             .getDdl(resultsFor(ddlDocuments))
-            .lock({ ddlName: objectName });
+            .lock({ ddlName: objectName }, { analyse: analyseLock });
         case 'domain':
           return client
             .getDomain(resultsFor(domainDocuments))
-            .lock({ domainName: objectName });
+            .lock({ domainName: objectName }, { analyse: analyseLock });
         case 'data_element':
           return client
             .getDataElement(resultsFor(dataElementDocuments))
-            .lock({ dataElementName: objectName });
+            .lock({ dataElementName: objectName }, { analyse: analyseLock });
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-            .lock({ name: objectName });
+            .lock({ name: objectName }, { analyse: analyseLock });
         case 'metadata_extension':
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-            .lock({ name: objectName });
+            .lock({ name: objectName }, { analyse: analyseLock });
         case 'package':
-          return client.getPackage(resultsFor(packageDocuments)).lock({
-            packageName: objectName,
-            superPackage: (super_package as string).toUpperCase(),
-          });
+          return client.getPackage(resultsFor(packageDocuments)).lock(
+            {
+              packageName: objectName,
+              superPackage: (super_package as string).toUpperCase(),
+            },
+            { analyse: analyseLock },
+          );
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);

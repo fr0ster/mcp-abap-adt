@@ -149,6 +149,23 @@ export function throwingClient(message: string) {
  * empty reading: a recorder exists to record, and a member whose value nobody
  * reads should not need one stated.
  */
+/**
+ * The call's own arguments, without the strategy.
+ *
+ * Since interfaces-adt 10/11 every member takes `options.analyse`, and where a
+ * member had no options it is a new last parameter. The strategy is recorded
+ * apart (`analyse`, `carriedAnalyse`), so `args` stays what the caller asked
+ * for: `analyse` is taken out of the last argument, and a last argument that
+ * held nothing else is dropped.
+ */
+function ownArguments(args: unknown[], carriedAnalyse: boolean): unknown[] {
+  if (!carriedAnalyse) return args;
+  const { analyse: _analyse, ...rest } = args.at(-1) as Record<string, unknown>;
+  return Object.keys(rest).length === 0
+    ? args.slice(0, -1)
+    : [...args.slice(0, -1), rest];
+}
+
 export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
   const calls: Array<{
     member: string;
@@ -173,7 +190,7 @@ export function recordAnalyse(answers: Record<string, () => unknown> = {}) {
               factory,
               analyse: carriedAnalyse ? (lastArg as any).analyse : undefined,
               carriedAnalyse,
-              args,
+              args: ownArguments(args, carriedAnalyse),
             });
             const supplied = answers[member];
             return okResponse(

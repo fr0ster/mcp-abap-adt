@@ -1,4 +1,5 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
@@ -129,7 +130,7 @@ export async function handleRuntimeGetDumpById(
   // envelope carries no transport state to read them from any more.
   return answer(
     { tool: 'RuntimeGetDumpById', detail: 'terse' },
-    () => dumps.getById(dumpId, { view }),
+    () => dumps.getById(dumpId, { analyse: analyseException, view }),
     (raw) => {
       const parsedPayload = parseRuntimePayloadToJson(raw);
       const result: Record<string, unknown> = {

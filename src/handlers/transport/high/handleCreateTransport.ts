@@ -16,11 +16,12 @@
  * `create.js`'s own XML, not proven against a captured response.
  */
 
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
 import {
-  parseCreatedTransport,
-  transportDocuments,
-} from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+  analyseException,
+  transportCreated,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -84,7 +85,9 @@ export async function handleCreateTransport(
   const detail = detailOf(args);
 
   const terseCreatedTransport: Terse<string> = (value) => {
-    const created = parseCreatedTransport(value);
+    const created = // adt-clients 23 moved the reading to adt-strategies as a strategy over
+      // the answer; the body is all it reads.
+      transportCreated({ data: value } as IAdtWireResponse);
     return {
       success: true,
       transport_number: created.transportNumber,

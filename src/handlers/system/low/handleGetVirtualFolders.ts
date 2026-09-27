@@ -2,9 +2,8 @@
  * GetVirtualFolders Handler - Low-level handler for virtual folders
  *
  * Uses AdtClient.getUtils().getVirtualFoldersContents from
- * @mcp-abap-adt/adt-clients 19. `getVirtualFoldersContents(params)` takes no
- * `options` at all — no `analyse` — so there is nothing to inject beyond the
- * result set.
+ * @mcp-abap-adt/adt-clients 19. `getVirtualFoldersContents(params, options?)`
+ * takes `analyseException` since adt-clients 23.
  *
  * `folders` is one of the 300-odd slots `resultSets.ts` maps to `structured`
  * (unlike `node`, which `ourUtils` overrides with the tree-flattening
@@ -17,6 +16,7 @@
  * document would be exactly the mistake the corpus exists to prevent.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -102,13 +102,16 @@ export async function handleGetVirtualFolders(
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getVirtualFoldersContents({
-          objectSearchPattern: args.object_search_pattern || '*',
-          preselection: args.preselection,
-          facetOrder: args.facet_order || ['package', 'group', 'type'],
-          withVersions: args.with_versions,
-          ignoreShortDescriptions: args.ignore_short_descriptions,
-        }),
+        .getVirtualFoldersContents(
+          {
+            objectSearchPattern: args.object_search_pattern || '*',
+            preselection: args.preselection,
+            facetOrder: args.facet_order || ['package', 'group', 'type'],
+            withVersions: args.with_versions,
+            ignoreShortDescriptions: args.ignore_short_descriptions,
+          },
+          { analyse: analyseException },
+        ),
     project(detail, (value) => value),
   );
 }

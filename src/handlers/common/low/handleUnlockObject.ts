@@ -4,8 +4,8 @@
  * A dispatcher: one branch runs per call, over the same family clients every
  * low-level UnlockX handler in this migration uses.
  *
- * `unlock()` accepts no options either — no `analyse`, and its success value
- * is `void`. There is no `AdtReading` to read a status off (unlock does not
+ * `unlock()` takes `analyseException` too (adt-clients 23), and its success
+ * value is SAP's reply, read by nothing. There is no `AdtReading` to read a status off (unlock does not
  * go through the result-set strategies at all), so the synthetic 200 below is
  * a stand-in for "the call answered ok" rather than a status read off the
  * wire — `answer()` only reaches this projection once `ok` is already `true`.
@@ -26,6 +26,7 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -172,19 +173,27 @@ export async function handleUnlockObject(
         case 'class':
           return client
             .getClass(resultsFor(classDocuments))
-            .unlock({ className: objectName }, lock_handle);
+            .unlock({ className: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'program':
           return client
             .getProgram(resultsFor(programDocuments))
-            .unlock({ programName: objectName }, lock_handle);
+            .unlock({ programName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'interface':
           return client
             .getInterface(resultsFor(interfaceDocuments))
-            .unlock({ interfaceName: objectName }, lock_handle);
+            .unlock({ interfaceName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'function_group':
           return client
             .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .unlock({ functionGroupName: objectName }, lock_handle);
+            .unlock({ functionGroupName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'function_module':
           return client
             .getFunctionModule(resultsFor(functionModuleDocuments))
@@ -194,39 +203,56 @@ export async function handleUnlockObject(
                 functionModuleName: functionModuleName as string,
               },
               lock_handle,
+              { analyse: analyseException },
             );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))
-            .unlock({ tableName: objectName }, lock_handle);
+            .unlock({ tableName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'structure':
           return client
             .getStructure(resultsFor(structureDocuments))
-            .unlock({ structureName: objectName }, lock_handle);
+            .unlock({ structureName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'ddl':
           return client
             .getDdl(resultsFor(ddlDocuments))
-            .unlock({ ddlName: objectName }, lock_handle);
+            .unlock({ ddlName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'domain':
           return client
             .getDomain(resultsFor(domainDocuments))
-            .unlock({ domainName: objectName }, lock_handle);
+            .unlock({ domainName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'data_element':
           return client
             .getDataElement(resultsFor(dataElementDocuments))
-            .unlock({ dataElementName: objectName }, lock_handle);
+            .unlock({ dataElementName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'package':
           return client
             .getPackage(resultsFor(packageDocuments))
-            .unlock({ packageName: objectName }, lock_handle);
+            .unlock({ packageName: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-            .unlock({ name: objectName }, lock_handle);
+            .unlock({ name: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         case 'metadata_extension':
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-            .unlock({ name: objectName }, lock_handle);
+            .unlock({ name: objectName }, lock_handle, {
+              analyse: analyseException,
+            });
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);

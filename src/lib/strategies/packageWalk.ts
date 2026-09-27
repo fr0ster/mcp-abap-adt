@@ -57,7 +57,10 @@ export function nodeLevel(answer: unknown): NodeLevel {
         techName: textOf(n?.TECH_NAME) || undefined,
         uri: textOf(n?.OBJECT_URI) || undefined,
       }))
-      .filter((o) => o.name),
+      // Every object has a type. An entry without one is SAP's message for
+      // a node it could not load ("Error loading node:", E19 2026-09-25),
+      // not an object.
+      .filter((o) => o.name && o.type),
     childNodes: asArray(data?.OBJECT_TYPES?.SEU_ADT_OBJECT_TYPE_INFO)
       .map((t: any) => ({
         type: textOf(t?.OBJECT_TYPE),
@@ -66,6 +69,46 @@ export function nodeLevel(answer: unknown): NodeLevel {
         // live, but sending what ADT itself sends keeps the wire comparable
         // with the fixtures and with a trace.
         nodeId: String(Number(textOf(t?.NODE_ID))),
+      }))
+      .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
+  };
+}
+
+/** Ours: objects carry `name`, child nodes carry `type`. */
+function isOurLevel(value: object): value is NodeLevel {
+  const v = value as { objects?: unknown[]; childNodes?: unknown[] };
+  const first = (v.objects ?? [])[0] ?? (v.childNodes ?? [])[0];
+  return (
+    first === undefined ||
+    (typeof first === 'object' &&
+      first !== null &&
+      ('name' in first || 'type' in first))
+  );
+}
+
+/**
+ * The library's own `nodeContents` reading, in our shape. It carries no
+ * description — a caller wanting one passes `ourUtils` — but names, types,
+ * tech names and URIs are all there.
+ */
+function fromLibraryLevel(value: object): NodeLevel {
+  const v = value as {
+    objects?: Array<Record<string, unknown>>;
+    childNodes?: Array<Record<string, unknown>>;
+  };
+  return {
+    objects: (v.objects ?? [])
+      .map((o) => ({
+        name: String(o.objectName ?? ''),
+        type: String(o.objectType ?? ''),
+        techName: o.techName ? String(o.techName) : undefined,
+        uri: o.objectUri ? String(o.objectUri) : undefined,
+      }))
+      .filter((o) => o.name && o.type),
+    childNodes: (v.childNodes ?? [])
+      .map((c) => ({
+        type: String(c.objectType ?? ''),
+        nodeId: String(Number(c.nodeId)),
       }))
       .filter((c) => c.nodeId && c.nodeId !== 'NaN'),
   };
@@ -81,14 +124,13 @@ function levelOf(answer: unknown): NodeLevel {
   if (typeof a?.getResult === 'function') {
     if (a.ok === false) return { objects: [], childNodes: [] };
     const value = a.getResult().value;
-    // The injected reading may already be ours, or the shipped one over the
-    // wire; both are handled rather than assumed.
-    if (
-      value &&
-      typeof value === 'object' &&
-      'childNodes' in (value as object)
-    ) {
-      return value as NodeLevel;
+    // The injected reading may be ours, the library's own, or the raw wire;
+    // each is recognised by what it carries, never assumed. Having
+    // `childNodes` is NOT enough to be ours: the library's reading has them
+    // too, keyed `objectType`/`objectName`, and passing it through as ours
+    // answered nameless, typeless rows (E19, 2026-09-25).
+    if (value && typeof value === 'object' && 'childNodes' in value) {
+      return isOurLevel(value) ? value : fromLibraryLevel(value);
     }
     return nodeLevel({ data: value });
   }
@@ -291,7 +333,7 @@ export async function walkPackage(
   options: WalkOptions = {},
   depth = 1,
   seen: Set<string> = new Set(),
-): Promise<Array<{ name: string; type: string; description?: string }>> {
+): Promise<WalkedItem[]> {
   const pkg = packageName.toUpperCase();
   if (seen.has(pkg)) return [];
   seen.add(pkg);
@@ -301,7 +343,10 @@ export async function walkPackage(
     await utils.fetchNodeStructure('DEVC/K', pkg, { withShortDescriptions }),
   );
 
-  const found = [...root.objects];
+  const found: WalkedItem[] = root.objects.map((o) => ({
+    ...o,
+    packageName: pkg,
+  }));
   for (const child of root.childNodes) {
     const level = levelOf(
       await utils.fetchNodeStructure('DEVC/K', pkg, {
@@ -309,7 +354,7 @@ export async function walkPackage(
         withShortDescriptions,
       }),
     );
-    found.push(...level.objects);
+    found.push(...level.objects.map((o) => ({ ...o, packageName: pkg })));
   }
 
   if (!options.includeSubpackages) return found;
@@ -326,10 +371,22 @@ export async function walkPackage(
   return out;
 }
 
+/**
+ * One object the walk found, with the package it was found IN. The owner is
+ * what lets the list name the right package and the tree nest a
+ * subpackage's objects under it rather than under the root.
+ */
+export type WalkedItem = {
+  name: string;
+  type: string;
+  description?: string;
+  packageName?: string;
+};
+
 /** The flat listing. */
 export function assembleList(
   packageName: string,
-  objects: Array<{ name: string; type: string; description?: string }>,
+  objects: WalkedItem[],
 ): PackageItem[] {
   return objects.map((o) => {
     const kind = kindOf(o.type);
@@ -338,7 +395,7 @@ export function assembleList(
       type: o.type,
       ...(kind ? { kind } : {}),
       ...(o.description ? { description: o.description } : {}),
-      packageName: packageName.toUpperCase(),
+      packageName: (o.packageName ?? packageName).toUpperCase(),
       isPackage: kind === 'package',
     };
   });
@@ -347,9 +404,20 @@ export function assembleList(
 /** The tree. Same walk, assembled the other way. */
 export function assembleTree(
   packageName: string,
-  objects: Array<{ name: string; type: string; description?: string }>,
+  objects: WalkedItem[],
 ): PackageNode {
-  const children: PackageNode[] = objects.map((o) => {
+  const rootName = packageName.toUpperCase();
+  // Each object under the package it was found in. An object with no owner
+  // recorded (a caller's own list) goes under the root, as it always did.
+  const byOwner = new Map<string, WalkedItem[]>();
+  for (const o of objects) {
+    const owner = (o.packageName ?? rootName).toUpperCase();
+    byOwner.set(owner, [...(byOwner.get(owner) ?? []), o]);
+  }
+  const seen = new Set<string>([rootName]);
+  const childrenOf = (owner: string): PackageNode[] =>
+    (byOwner.get(owner) ?? []).map((o) => nodeOf(o));
+  const nodeOf = (o: WalkedItem): PackageNode => {
     const kind = kindOf(o.type);
     const codeFormat = codeFormatOf(o.type);
     return {
@@ -365,18 +433,23 @@ export function assembleTree(
           : ('not-implemented' as const),
       // A leaf carries an empty array rather than no field. Present-and-empty
       // and absent are different answers to "what is below this", and a caller
-      // that tells them apart by `undefined` is guessing.
-      children: [],
+      // that tells them apart by `undefined` is guessing. A subpackage gets
+      // what was found in it; `seen` keeps a package that lists itself from
+      // recursing.
+      children:
+        kind === 'package' && !seen.has(o.name.toUpperCase())
+          ? (seen.add(o.name.toUpperCase()), childrenOf(o.name.toUpperCase()))
+          : [],
     };
-  });
+  };
 
   return {
-    name: packageName.toUpperCase(),
+    name: rootName,
     type: 'DEVC/K',
     kind: 'package',
     isPackage: true,
     codeFormat: 'xml',
     restoreStatus: 'ok',
-    children,
+    children: childrenOf(rootName),
   };
 }

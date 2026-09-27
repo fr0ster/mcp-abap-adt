@@ -32,8 +32,13 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { project, terseWrite } from '../../../lib/strategies/projections';
+import {
+  project,
+  terseDeletion,
+  terseWrite,
+} from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
@@ -52,7 +57,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       ...DETAIL_PROPERTY,
     },
@@ -83,12 +88,19 @@ export async function handleDeleteMetadataExtension(
   return answer(
     { tool: 'DeleteMetadataExtension', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-        .delete(
-          { name, transportRequest: transport_request },
-          { analyse: analyseException },
+      deleteIfDeletable(
+        createAdtClient(connection, logger).getMetadataExtension(
+          resultsFor(metadataExtensionDocuments),
         ),
-    project(detail, terseWrite),
+        { name, transportRequest: transport_request },
+        analyseException,
+      ),
+    // The check's answer, when the object was not there and no DELETE was
+    // sent, is a deletion document; the DELETE's own answer is an empty 2xx.
+    project(detail, (value: any, status) =>
+      value?.['del:checkResponse']
+        ? terseDeletion(value, status)
+        : terseWrite(value, status),
+    ),
   );
 }

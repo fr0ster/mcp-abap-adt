@@ -1,3 +1,4 @@
+import { analyseMessageClassMessage } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -55,31 +56,20 @@ export async function handleGetMessageClassMessage(
   // `ReadMessageClassMessage` found. The caller gets the full document,
   // as that sibling tool already does, under this tool's own field name.
   //
-  // **No `analyse` is passed, deliberately.** `AdtMessageClassMessage.read`
-  // is one of only two read-shaped members in the whole distribution that
-  // ship their own default strategy (confirmed against the shipped
-  // `AdtMessageClassMessage.js`): when the wire answer carries no failure of
-  // its own, the default parses the class document and checks whether
-  // `msgno` is actually in it, refusing `OBJECT_NOT_FOUND` when it is not.
-  // A read-fix-round finding: passing `{ analyse: analyseException }` here —
-  // the original shape of this handler — REPLACES that check rather than
-  // adding to it, since the member reads `options?.analyse ?? defaultCheck`.
-  // `analyseException` only inspects an `exc:exception` element, which a
-  // missing-msgno answer never carries (ADT answers 200 with the whole class
-  // document), so the replaced strategy let a request for a message that
-  // does not exist answer `success: true` with the unrelated whole-class
-  // document under `message`, silently ignoring the `msgno` it echoed.
-  // `parseMessageClass`, which the shipped default uses to build that check,
-  // is an internal of the messageClass module and not part of this
-  // package's public surface (verified against `dist/index.d.ts`), so it
-  // cannot be composed with `analyseException` from here — passing nothing
-  // and letting the shipped default stand is the available fix.
+  // **`analyseMessageClassMessage(msgno)` is passed.** ADT answers a
+  // message read with the whole class document, 200, whether or not `msgno`
+  // is in it. adt-clients 22 checked that inside the member; 23 applies no
+  // verdict of its own, and the check is this strategy from adt-strategies
+  // (MIGRATION-23 §3) — without it a message that does not exist answers
+  // `success: true` with the unrelated class document.
   return answer(
     { tool: 'GetMessageClassMessage', detail: 'terse' },
     () =>
       createAdtClient(connection, logger)
         .getMessageClassMessage()
-        .read({ className, msgno }, undefined),
+        .read({ className, msgno }, undefined, {
+          analyse: analyseMessageClassMessage(msgno),
+        }),
     (document: string) => ({
       success: true,
       message_class_name: className,

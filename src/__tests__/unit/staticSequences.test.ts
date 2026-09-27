@@ -39,7 +39,10 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  analysePublication,
+} from '@mcp-abap-adt/adt-strategies';
 import { handleListFunctionGroupIncludes } from '../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
@@ -345,7 +348,7 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     service_name: 'ZSRV',
   };
 
-  it('locks before update and unlocks after with the SAME handle, passing the documented timeout but no analyse — the library default (publicationRefusal) is the tailored verdict', async () => {
+  it('locks before update and unlocks after with the SAME handle, passing the documented timeout and analysePublication — the publication verdict adt-clients 22 applied on its own', async () => {
     const order: string[] = [];
     const seen: Record<string, unknown> = {};
     fakeClient = fakeClientOf({
@@ -373,15 +376,16 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
       desiredPublicationState: 'published',
       serviceType: 'odatav4',
     });
-    // The lock handle and a timeout travel through options — but never a
-    // strategy. `classifyServiceBinding` is not called either: there was
-    // never a second member in the removed composite's replacement to call.
+    // The lock handle, a timeout and `analysePublication` travel through
+    // options: adt-clients 23 no longer reads SAP's publication refusal on its
+    // own. `classifyServiceBinding` is not called: there was never a second
+    // member in the removed composite's replacement to call.
     expect((seen.options as any).lockHandle).toBe('LOCK_HANDLE_1');
     // Against the documented worst case itself, not "anything past the
     // 120s default" — a value one second past the default would satisfy a
     // loose bound and still fall short of what the job is measured to take.
     expect((seen.options as any).timeout).toBe(PUBLISH_TIMEOUT_MS);
-    expect('analyse' in (seen.options as any)).toBe(false);
+    expect((seen.options as any).analyse).toBe(analysePublication);
     // The handle `unlock` releases is the one `lock` answered — a wrong or
     // constant handle would still pass every assertion above.
     expect(seen.unlockedWith).toBe('LOCK_HANDLE_1');

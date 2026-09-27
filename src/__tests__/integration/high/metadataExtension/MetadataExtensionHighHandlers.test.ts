@@ -130,7 +130,11 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
             description,
             package_name: packageName,
             ...(transportRequest && { transport_request: transportRequest }),
-            activate: true,
+            // Create is the empty object; activating it activates an empty
+            // DDLX, which SAP refuses — SDDIC_ADT_DDLX(804) "Malformed
+            // 'annotate' statement" at line 1 (E19, 2026-09-25). The source
+            // arrives with the update, which activates.
+            activate: false,
           },
           async () => {
             const createCtx = createHandlerContext({
@@ -142,7 +146,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
               description,
               package_name: packageName,
               transport_request: transportRequest,
-              activate: true,
+              activate: false,
             });
           },
         );
@@ -217,6 +221,9 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
         const updateLogger = createTestLogger('metadata-extension-high-update');
         const updatedSourceCode =
           params.update_source_code ||
+          // The config names the source it wants as `source_code`; the
+          // fallback below annotates an entity no system has.
+          params.source_code ||
           `@Metadata.layer: #CORE
 annotate view ZI_TEST_ENTITY with {
   @EndUserText.label: '${description} (updated)'

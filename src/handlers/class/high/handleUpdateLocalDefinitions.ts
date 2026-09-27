@@ -24,6 +24,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -49,7 +50,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable objects).',
+          'Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       activate_on_update: {
         type: 'boolean',
@@ -96,7 +97,7 @@ export async function handleUpdateLocalDefinitions(
       );
 
       const written = await withLock(
-        () => obj.lock({ className }),
+        () => obj.lock({ className }, { analyse: analyseLock }),
         (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
@@ -106,7 +107,8 @@ export async function handleUpdateLocalDefinitions(
               analyse: analyseException,
             },
           ),
-        (lockHandle) => obj.unlock({ className }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
 
       if (!written.ok || !shouldActivate) {

@@ -30,6 +30,7 @@ import { handleValidateFunctionGroup } from '../../../../handlers/function/low/h
 import { handleValidateFunctionModule } from '../../../../handlers/function/low/handleValidateFunctionModule';
 import {
   getCleanupAfter,
+  getCleanupAfterRun,
   getEnabledTestCase,
   getOperationDelay,
   getSystemType,
@@ -183,79 +184,8 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
         const packageName = resolvePackageName(testCase);
         const transportRequest = resolveTransportRequest(testCase);
 
-        // Pre-cleanup: Remove leftover objects from previous failed tests
-        // This ensures tests start with a clean state even if previous test failed
-        const shouldCleanup = getCleanupAfter(testCase);
-        if (shouldCleanup) {
-          try {
-            testLogger?.debug(
-              '🧹 Running pre-cleanup (removing leftover objects)...',
-            );
-
-            // Try to delete FM first (if exists)
-            try {
-              await invoke(
-                'DeleteFunctionModuleLow',
-                {
-                  function_module_name: functionModuleName,
-                  function_group_name: functionGroupName,
-                  transport_request: transportRequest,
-                },
-                () =>
-                  handleDeleteFunctionModule(
-                    { connection: connection!, logger: testLogger },
-                    {
-                      function_module_name: functionModuleName,
-                      function_group_name: functionGroupName,
-                      transport_request: transportRequest,
-                    },
-                  ),
-              );
-              testLogger?.debug(
-                `✅ Pre-cleanup: deleted leftover FM ${functionModuleName}`,
-              );
-            } catch (error: any) {
-              // FM might not exist - ignore
-              testLogger?.debug(
-                `⚠️ Pre-cleanup: FM ${functionModuleName} not found (ignored)`,
-              );
-            }
-
-            // Try to delete FUGR (if exists)
-            try {
-              await invoke(
-                'DeleteFunctionGroupLow',
-                {
-                  function_group_name: functionGroupName,
-                  transport_request: transportRequest,
-                },
-                () =>
-                  handleDeleteFunctionGroup(
-                    { connection: connection!, logger: testLogger },
-                    {
-                      function_group_name: functionGroupName,
-                      transport_request: transportRequest,
-                    },
-                  ),
-              );
-              testLogger?.debug(
-                `✅ Pre-cleanup: deleted leftover FUGR ${functionGroupName}`,
-              );
-            } catch (error: any) {
-              // FUGR might not exist - ignore
-              testLogger?.debug(
-                `⚠️ Pre-cleanup: FUGR ${functionGroupName} not found (ignored)`,
-              );
-            }
-
-            testLogger?.debug('✅ Pre-cleanup completed');
-          } catch (error: any) {
-            // Pre-cleanup errors are non-fatal - objects might not exist
-            testLogger?.debug(
-              `⚠️ Pre-cleanup warning (ignored): ${error?.message || String(error)}`,
-            );
-          }
-        }
+        // No delete before the test: validation says whether the names can
+        // be used, and why not.
 
         const functionGroupDescription =
           testCase.params.function_group_description || functionGroupName;
@@ -282,6 +212,7 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
         let fgLockSession: SessionInfo | null = null;
         let fmLockHandle: string | null = null;
         let fmLockSession: SessionInfo | null = null;
+        let failed = false;
 
         try {
           // ==================== PART 1: Function Group ====================
@@ -743,13 +674,16 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
           else if (errorMessage.includes('FM activate'))
             failedStep = 'FM-ACTIVATE';
 
+          failed = true;
           testLogger?.error(`❌ Test failed at ${failedStep}: ${errorMessage}`);
           throw error;
         } finally {
-          // Cleanup: Delete FM first, then FUGR
-          const shouldCleanup = getCleanupAfter(testCase);
+          // Locks are released whatever happened; the deletes (FM first, then
+          // FUGR) run only when the test passed — a failed test keeps its
+          // objects for analysis (see getCleanupAfterRun).
+          const shouldCleanup = getCleanupAfterRun(testCase, failed);
 
-          if (shouldCleanup && session) {
+          if (session) {
             // Unlock FM if still locked
             if (fmLockHandle && fmLockSession) {
               try {
@@ -780,42 +714,43 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             }
 
             // Delete FM
-            try {
-              await delay(2000);
-              const deleteFMResponse = await invoke(
-                'DeleteFunctionModuleLow',
-                {
-                  function_module_name: functionModuleName,
-                  function_group_name: functionGroupName,
-                  transport_request: transportRequest,
-                },
-                () =>
-                  handleDeleteFunctionModule(
-                    { connection: connection!, logger: testLogger },
-                    {
-                      function_module_name: functionModuleName,
-                      function_group_name: functionGroupName,
-                      transport_request: transportRequest,
-                    },
-                  ),
-              );
-
-              if (!deleteFMResponse.isError) {
-                testLogger?.info(
-                  `🧹 Cleaned up test function module: ${functionModuleName}`,
+            if (shouldCleanup)
+              try {
+                await delay(2000);
+                const deleteFMResponse = await invoke(
+                  'DeleteFunctionModuleLow',
+                  {
+                    function_module_name: functionModuleName,
+                    function_group_name: functionGroupName,
+                    transport_request: transportRequest,
+                  },
+                  () =>
+                    handleDeleteFunctionModule(
+                      { connection: connection!, logger: testLogger },
+                      {
+                        function_module_name: functionModuleName,
+                        function_group_name: functionGroupName,
+                        transport_request: transportRequest,
+                      },
+                    ),
                 );
-              } else {
-                const errorMsg =
-                  deleteFMResponse.content[0]?.text || 'Unknown error';
+
+                if (!deleteFMResponse.isError) {
+                  testLogger?.info(
+                    `🧹 Cleaned up test function module: ${functionModuleName}`,
+                  );
+                } else {
+                  const errorMsg =
+                    deleteFMResponse.content[0]?.text || 'Unknown error';
+                  testLogger?.error(
+                    `⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}. Object left in SAP system.`,
+                  );
+                }
+              } catch (cleanupError: any) {
                 testLogger?.error(
-                  `⚠️  Failed to delete function module ${functionModuleName}: ${errorMsg}. Object left in SAP system.`,
+                  `⚠️  Failed to cleanup function module ${functionModuleName}: ${cleanupError.message || cleanupError}. Object left in SAP system.`,
                 );
               }
-            } catch (cleanupError: any) {
-              testLogger?.error(
-                `⚠️  Failed to cleanup function module ${functionModuleName}: ${cleanupError.message || cleanupError}. Object left in SAP system.`,
-              );
-            }
 
             // Unlock FUGR if still locked
             if (fgLockHandle && fgLockSession) {
@@ -845,43 +780,47 @@ describe('Function Low-Level Handlers Integration (FUGR + FM)', () => {
             }
 
             // Delete FUGR
-            try {
-              await delay(2000);
-              const deleteFGResponse = await invoke(
-                'DeleteFunctionGroupLow',
-                {
-                  function_group_name: functionGroupName,
-                  transport_request: transportRequest,
-                },
-                () =>
-                  handleDeleteFunctionGroup(
-                    { connection: connection!, logger: testLogger },
-                    {
-                      function_group_name: functionGroupName,
-                      transport_request: transportRequest,
-                    },
-                  ),
-              );
-
-              if (!deleteFGResponse.isError) {
-                testLogger?.info(
-                  `🧹 Cleaned up test function group: ${functionGroupName}`,
+            if (shouldCleanup)
+              try {
+                await delay(2000);
+                const deleteFGResponse = await invoke(
+                  'DeleteFunctionGroupLow',
+                  {
+                    function_group_name: functionGroupName,
+                    transport_request: transportRequest,
+                  },
+                  () =>
+                    handleDeleteFunctionGroup(
+                      { connection: connection!, logger: testLogger },
+                      {
+                        function_group_name: functionGroupName,
+                        transport_request: transportRequest,
+                      },
+                    ),
                 );
-              } else {
-                const errorMsg =
-                  deleteFGResponse.content[0]?.text || 'Unknown error';
+
+                if (!deleteFGResponse.isError) {
+                  testLogger?.info(
+                    `🧹 Cleaned up test function group: ${functionGroupName}`,
+                  );
+                } else {
+                  const errorMsg =
+                    deleteFGResponse.content[0]?.text || 'Unknown error';
+                  testLogger?.error(
+                    `⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}. Object left in SAP system.`,
+                  );
+                }
+              } catch (cleanupError: any) {
                 testLogger?.error(
-                  `⚠️  Failed to delete function group ${functionGroupName}: ${errorMsg}. Object left in SAP system.`,
+                  `⚠️  Failed to cleanup function group ${functionGroupName}: ${cleanupError.message || cleanupError}. Object left in SAP system.`,
                 );
               }
-            } catch (cleanupError: any) {
-              testLogger?.error(
-                `⚠️  Failed to cleanup function group ${functionGroupName}: ${cleanupError.message || cleanupError}. Object left in SAP system.`,
-              );
-            }
-          } else {
+          }
+          if (!shouldCleanup) {
             testLogger?.info(
-              `⚠️ Cleanup skipped (cleanup_after=false) - objects left for analysis`,
+              failed
+                ? `🔎 Test failed — locks released, objects kept for analysis: ${functionModuleName}, ${functionGroupName}`
+                : `⚠️ Cleanup skipped (cleanup_after=false) - objects left for analysis`,
             );
           }
 

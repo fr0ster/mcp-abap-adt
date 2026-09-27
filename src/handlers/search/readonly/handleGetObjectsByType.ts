@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsByType',
   available_in: ['onprem', 'cloud'] as const,
@@ -167,9 +168,8 @@ export async function handleGetObjectsByType(
       : true;
   const parentName = parent_name.toUpperCase();
 
-  // `fetchNodeStructure(parentType, parentName, options?)` — no `analyse`:
-  // not named by the brief for this member, and `IGetNodeContentsOptions`
-  // carries no options field for one either.
+  // `fetchNodeStructure(parentType, parentName, options?)` takes
+  // `analyseException` in its options since adt-clients 23.
   //
   // Task 28: why this tool carries no `detail`. The node-level family's
   // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
@@ -183,6 +183,7 @@ export async function handleGetObjectsByType(
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
         .fetchNodeStructure(parent_type, parentName, {
+          analyse: analyseException,
           nodeId: node_id,
           withShortDescriptions: withDescriptions,
         }),

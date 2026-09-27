@@ -1,4 +1,5 @@
 import * as z from 'zod';
+import { isRfcConnection } from '../../../lib/connectionKind';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   type OrchestratorInput,
@@ -83,7 +84,9 @@ export const TOOL_DEFINITION = {
       .min(1)
       .max(16)
       .optional()
-      .describe('Parallel source fetches (default 8, max 16).'),
+      .describe(
+        'Parallel source fetches (default 8, max 16). Over an RFC connection the scan runs one fetch at a time: one RFC session answers one call at a time.',
+      ),
     version: z
       .enum(['active', 'inactive'])
       .optional()
@@ -103,13 +106,23 @@ export const TOOL_DEFINITION = {
 
 type SearchSourceArgs = OrchestratorInput;
 
+// Over RFC the scan runs one fetch at a time, whatever the caller asked for.
+// An RFC connection is one ABAP session, and one session answers one call at a
+// time. Fetched in parallel (the default concurrency is 8), sources were lost
+// without an error: on E19 (2026-09-26) a scan of the shared package read 4 of
+// its 13 sources and found nothing, where concurrency 1 read all 13 and found
+// both hits, as HTTP does.
+
 export async function handleSearchSource(
   context: HandlerContext,
   args: SearchSourceArgs,
 ) {
   const { logger } = context;
   try {
-    const result = await runSearchSourceWithContext(context, args);
+    const result = await runSearchSourceWithContext(
+      context,
+      isRfcConnection(context.connection) ? { ...args, concurrency: 1 } : args,
+    );
     return {
       isError: false,
       content: [

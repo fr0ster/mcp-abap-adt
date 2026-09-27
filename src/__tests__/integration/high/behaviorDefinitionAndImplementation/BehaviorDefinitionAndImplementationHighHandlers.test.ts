@@ -21,6 +21,7 @@ import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_de
 import { handleValidateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleValidateBehaviorDefinition';
 import { handleCreateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
+import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { handleActivateObject } from '../../../../handlers/common/low/handleActivateObject';
 import { getEnabledTestCase, getTimeout } from '../../helpers/configHelpers';
@@ -321,6 +322,32 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         testLogger?.info?.(`   + BIMPL created`);
 
         await delay(context.getOperationDelay('create'));
+
+        // ── Step 4b: the class's main source, which binds it to the BDEF.
+        // CreateBehaviorImplementation makes the class shell only (its own
+        // description says so): without `FOR BEHAVIOR OF` the class is no
+        // behaviour pool, and its handler class cannot compile — SAP cancelled
+        // the activation with "Local classes of CL_ABAP_BEHAVIOR_HANDLER can
+        // only be derived in … a global BEHAVIOR class" (E19, 2026-09-26),
+        // which GetInactiveObjects hid until it read its own list.
+        const mainSource =
+          bimplParams.main_source ||
+          `CLASS ${bimplClassName.toLowerCase()} DEFINITION PUBLIC ABSTRACT FINAL FOR BEHAVIOR OF ${behaviorDefinition.toLowerCase()}.
+ENDCLASS.
+
+CLASS ${bimplClassName.toLowerCase()} IMPLEMENTATION.
+ENDCLASS.
+`;
+        testLogger?.info?.(`   * write BIMPL main source: ${bimplClassName}`);
+        await mustSucceed(`Main source of ${bimplClassName}`, () =>
+          handleUpdateClass(handlerCtx, {
+            class_name: bimplClassName,
+            source_code: mainSource,
+            activate: false,
+            ...(transportRequest && { transport_request: transportRequest }),
+          } as any),
+        );
+        testLogger?.info?.(`   + BIMPL main source written`);
 
         // ── Step 5: Update BIMPL
         testLogger?.info?.(`   * update BIMPL: ${bimplClassName}`);

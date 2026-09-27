@@ -29,6 +29,7 @@ jest.mock('../../lib/clients', () => ({
 
 import { buildObjectVersionTools } from '../../handlers/common/high/objectVersionTools';
 import { HighLevelHandlersGroup } from '../../lib/handlers/groups/HighLevelHandlersGroup';
+import { okResponse } from '../helpers/fakeClient';
 
 const ctx = { connection: {}, logger: undefined } as any;
 
@@ -65,7 +66,7 @@ beforeEach(() => {
 describe('per-object high-level version tools (#30)', () => {
   it('GetClassVersions dispatches to getClass().getVersions({ className })', async () => {
     const versions = [{ versionId: '00001', contentUri: '/x;version=00001' }];
-    mockClassGetVersions.mockResolvedValue(versions);
+    mockClassGetVersions.mockResolvedValue(okResponse(versions));
 
     const result = await tool('GetClassVersions').handler(ctx, {
       class_name: 'zcl_my_class',
@@ -73,9 +74,12 @@ describe('per-object high-level version tools (#30)', () => {
 
     expect(result.isError).toBe(false);
     expect(mockGetClass).toHaveBeenCalled();
-    expect(mockClassGetVersions).toHaveBeenCalledWith({
-      className: 'ZCL_MY_CLASS',
-    });
+    expect(mockClassGetVersions).toHaveBeenCalledWith(
+      {
+        className: 'ZCL_MY_CLASS',
+      },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
     const data = payload(result);
     expect(data.success).toBe(true);
     expect(data.object_type).toBe('class');
@@ -84,7 +88,7 @@ describe('per-object high-level version tools (#30)', () => {
   });
 
   it('GetFunctionModuleVersions threads function_group_name through', async () => {
-    mockFmGetVersions.mockResolvedValue([]);
+    mockFmGetVersions.mockResolvedValue(okResponse([]));
 
     const result = await tool('GetFunctionModuleVersions').handler(ctx, {
       function_module_name: 'z_my_fm',
@@ -92,10 +96,13 @@ describe('per-object high-level version tools (#30)', () => {
     });
 
     expect(result.isError).toBe(false);
-    expect(mockFmGetVersions).toHaveBeenCalledWith({
-      functionGroupName: 'Z_MY_GRP',
-      functionModuleName: 'Z_MY_FM',
-    });
+    expect(mockFmGetVersions).toHaveBeenCalledWith(
+      {
+        functionGroupName: 'Z_MY_GRP',
+        functionModuleName: 'Z_MY_FM',
+      },
+      expect.objectContaining({ analyse: expect.any(Function) }),
+    );
   });
 
   it('GetFunctionModuleVersions errors without function_group_name', async () => {
@@ -107,7 +114,9 @@ describe('per-object high-level version tools (#30)', () => {
   });
 
   it('GetTableVersionSource forwards content_uri to getVersionSource', async () => {
-    mockTableGetVersionSource.mockResolvedValue('DEFINE TABLE zmy_table.');
+    mockTableGetVersionSource.mockResolvedValue(
+      okResponse('DEFINE TABLE zmy_table.'),
+    );
 
     const result = await tool('GetTableVersionSource').handler(ctx, {
       content_uri:
@@ -117,6 +126,7 @@ describe('per-object high-level version tools (#30)', () => {
     expect(result.isError).toBe(false);
     expect(mockTableGetVersionSource).toHaveBeenCalledWith(
       '/sap/bc/adt/ddic/tables/zmy_table/source/main?version=00001',
+      expect.objectContaining({ analyse: expect.any(Function) }),
     );
     const data = payload(result);
     expect(data.success).toBe(true);

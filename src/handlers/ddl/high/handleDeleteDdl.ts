@@ -8,10 +8,10 @@
  */
 
 import { ddlDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { deleteIfDeletable } from '../../../lib/strategies/checkedDeletion';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseDeletion } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -32,7 +32,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP).',
+          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       ...DETAIL_PROPERTY,
     },
@@ -63,12 +63,10 @@ export async function handleDeleteDdl(
   return answer(
     { tool: 'DeleteDdl', detail },
     () =>
-      createAdtClient(connection, logger)
-        .getDdl(resultsFor(ddlDocuments))
-        .delete(
-          { ddlName, transportRequest: transport_request },
-          { analyse: analyseDeletion },
-        ),
+      deleteIfDeletable(
+        createAdtClient(connection, logger).getDdl(resultsFor(ddlDocuments)),
+        { ddlName, transportRequest: transport_request },
+      ),
     project(detail, terseDeletion),
   );
 }

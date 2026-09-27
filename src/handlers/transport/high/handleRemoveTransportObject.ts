@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
       transport_number: {
         type: 'string',
         description:
-          'The TASK number holding the entry, e.g. E19K905943. Read it from ReadTransportObjects.',
+          'The TASK holding the entry, e.g. E19K905943 — read it from ReadTransportObjects. Not the request above it: a request displays its tasks\' entries and refuses to detach one, answering that the entry "does not exist in request/task".',
       },
       object_name: {
         type: 'string',

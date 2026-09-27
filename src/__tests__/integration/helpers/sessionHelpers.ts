@@ -12,9 +12,12 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
+import {
+  AuthorizationCodeProvider,
+  browserCallbackStrategy,
+} from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type {
   IServiceKeyStore,
   ISessionStore,
@@ -35,6 +38,7 @@ import {
   loadTestEnv,
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
+import { trackConnection } from './openConnections';
 import { extractSessionState } from './testHelpers';
 
 /**
@@ -67,35 +71,6 @@ let cachedBroker: {
   destination: string;
   serviceUrl: string;
 } | null = null;
-
-function wrapLegacyTokenProvider(
-  provider: AuthorizationCodeProvider,
-): AuthorizationCodeProvider & {
-  getConnectionConfig: (
-    _authConfig: unknown,
-    _options?: unknown,
-  ) => Promise<{
-    connectionConfig: { authorizationToken?: string };
-    refreshToken?: string;
-  }>;
-} {
-  if (typeof (provider as any).getConnectionConfig === 'function') {
-    return provider as any;
-  }
-
-  return {
-    getTokens: provider.getTokens.bind(provider),
-    getConnectionConfig: async () => {
-      const tokenResult = await provider.getTokens();
-      return {
-        connectionConfig: {
-          authorizationToken: tokenResult.authorizationToken,
-        },
-        refreshToken: tokenResult.refreshToken,
-      };
-    },
-  } as any;
-}
 
 export interface SessionInfo {
   session_id: string;
@@ -217,30 +192,25 @@ async function createConnectionViaBroker(
       const providerLogger = createProviderLogger();
       const brokerLogger = createBrokerLogger();
 
-      // `browser` is not part of AuthorizationCodeProviderConfig any more (the
-      // package now takes an `authorization` strategy instead) — carried as a
-      // typed variable rather than an inline literal, same as brokerFactory.ts's
-      // own providerConfig, so this still documents the intent without tripping
-      // the excess-property check on a fresh object literal.
+      // Which browser opens is the provider's `authorization` strategy since
+      // auth-providers 2.0.0; a `browser` field here was ignored, and the
+      // strategy's default is to open none.
       const providerConfig = {
         uaaUrl: authConfig.uaaUrl,
         clientId: authConfig.uaaClientId,
         clientSecret: authConfig.uaaClientSecret,
         refreshToken: authConfig.refreshToken,
         accessToken: sessionConnConfig?.authorizationToken,
-        browser: 'system',
+        authorization: browserCallbackStrategy({ browser: 'system' }),
         logger: providerLogger,
       };
-      const tokenProvider = wrapLegacyTokenProvider(
-        new AuthorizationCodeProvider(providerConfig),
-      );
+      const tokenProvider = new AuthorizationCodeProvider(providerConfig);
       authBroker = new AuthBroker(
         {
           serviceKeyStore,
           sessionStore,
-          tokenProvider,
+          provider: tokenProvider,
         },
-        'system',
         brokerLogger,
       );
 
@@ -275,7 +245,9 @@ async function createConnectionViaBroker(
       // Only pass connection logger if DEBUG_CONNECTION is set
       const connectionLogger = createConnectionLogger();
       const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
-      return createAbapConnection(config, connectionLoggerWithCsrf);
+      return trackConnection(
+        createAbapConnection(config, connectionLoggerWithCsrf),
+      );
     }
   } catch (error: any) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {
@@ -338,7 +310,9 @@ export async function createTestConnectionAndSession(): Promise<{
       const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
 
       // Create connection directly (fallback when AuthBroker is not available)
-      connection = createAbapConnection(config, connectionLoggerWithCsrf);
+      connection = trackConnection(
+        createAbapConnection(config, connectionLoggerWithCsrf),
+      );
       connectionSource = 'env';
     }
 

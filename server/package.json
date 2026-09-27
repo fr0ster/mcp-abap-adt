@@ -92,7 +92,7 @@
     "docker:rebuild:headerless": "npm run docker:down:headerless && npm run docker:build:headerless && npm run docker:up:headerless"
   },
   "dependencies": {
-    "@mcp-abap-adt/auth-broker": "^2.0.0",
+    "@mcp-abap-adt/auth-broker": "^3.0.0",
     "@mcp-abap-adt/interfaces-utils": "^1.1.0",
     "@mcp-abap-adt/lib": "^12.0.0",
     "@mcp-abap-adt/logger": "^0.4.0",

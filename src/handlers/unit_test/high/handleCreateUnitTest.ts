@@ -28,6 +28,7 @@
  * override). The verdict on whether a run started stays the library's.
  */
 
+import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -163,6 +164,9 @@ export async function handleCreateUnitTest(
     { tool: 'CreateUnitTest', detail: 'terse' },
     () =>
       unitTest.run(formattedTests, {
+        // A run SAP did not start is a failure: adt-clients 23 no longer
+        // judges that itself (MIGRATION-23 §3).
+        analyse: analyseUnitTestStart,
         title,
         context: contextStr,
         scope: scope

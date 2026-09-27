@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 export const TOOL_DEFINITION = {
   name: 'GetObjectsList',
   available_in: ['onprem', 'cloud'] as const,
@@ -89,6 +90,7 @@ async function collectValidObjects(
   visited.add(nodeId);
 
   const response = await utils.fetchNodeStructure(parentType, parentName, {
+    analyse: analyseException,
     nodeId,
     withShortDescriptions,
   });

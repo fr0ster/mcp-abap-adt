@@ -35,6 +35,12 @@ export const TOOL_DEFINITION = {
         type: 'string',
         description: 'Domain name (e.g., ZDM_MY_DOMAIN).',
       },
+      version: {
+        type: 'string',
+        enum: ['active', 'inactive'],
+        description:
+          'Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.',
+      },
     },
     required: ['domain_name'],
   },
@@ -42,7 +48,7 @@ export const TOOL_DEFINITION = {
 
 export async function handleCheckDomain(
   context: HandlerContext,
-  args: { domain_name: string },
+  args: { domain_name: string; version?: 'active' | 'inactive' },
 ) {
   const result = await handleCheckDomainLow(context, args);
   return normalizeCheckResponse(result, args.domain_name?.toUpperCase());

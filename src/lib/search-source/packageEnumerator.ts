@@ -5,6 +5,7 @@ import {
   type PackageItem,
   walkPackage,
 } from '../strategies/packageWalk';
+import { ourUtils } from '../strategies/resultSets';
 
 export type ScanObjectType = 'PROG' | 'FUGR' | 'CLAS';
 
@@ -105,11 +106,11 @@ export function createPackageContentsFetcher(
   ctx: HandlerContext,
 ): PackageContentsFetcher {
   const client = createAdtClient(ctx.connection, ctx.logger);
-  const utils = client.getUtils();
+  const utils = client.getUtils(ourUtils);
   return async (packageName, options) =>
     assembleList(
       packageName,
-      await walkPackage(utils as never, packageName, {
+      await walkPackage(utils, packageName, {
         includeSubpackages: options.includeSubpackages,
       }),
     );

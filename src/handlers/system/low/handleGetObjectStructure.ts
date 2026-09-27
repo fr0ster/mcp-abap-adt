@@ -2,8 +2,8 @@
  * GetObjectStructure Handler - Low-level handler for object structure
  *
  * Uses AdtClient.getUtils().getObjectStructure from @mcp-abap-adt/adt-clients
- * 19. `getObjectStructure(objectType, objectName)` takes no options object at
- * all — no `analyse` to pass. The tree-text projection is the same one
+ * 19. `getObjectStructure(objectType, objectName, options?)` takes
+ * `analyseException` since adt-clients 23. The tree-text projection is the same one
  * `GetObjectStructure` (read-only, `src/handlers/system/readonly/`) already
  * built and exports — both tools read the same `projectexplorer:
  * objectstructure` document through the same `ourUtils.objectStructure`
@@ -11,6 +11,7 @@
  * two things to keep in sync against one document shape.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -104,12 +105,16 @@ export async function handleGetObjectStructure(
     async () => {
       const response = await createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getObjectStructure(object_type, object_name);
+        .getObjectStructure(object_type, object_name, {
+          analyse: analyseException,
+        });
       if (detail === 'terse' && response.ok) {
         assertObjectStructurePresent(response.getResult().value.value);
       }
       return response;
     },
-    project(detail, (value) => treeText(value)),
+    project(detail, (value) =>
+      treeText(value, { objecttype: object_type, objectname: object_name }),
+    ),
   );
 }

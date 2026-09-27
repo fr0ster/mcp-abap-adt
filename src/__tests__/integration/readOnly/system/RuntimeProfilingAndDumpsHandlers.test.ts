@@ -8,6 +8,7 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
@@ -423,9 +424,12 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           // Forced run on the trigger connection → HTTP 500 → real dump.
           const triggerExecutor = new AdtExecutor(triggerConnection, logger);
           try {
-            await triggerExecutor
+            const ranClassExecutor = await triggerExecutor
               .getClassExecutor()
-              .run({ className: dumpClassName });
+              .run({ className: dumpClassName }, { analyse: analyseException });
+            if (!ranClassExecutor.ok) {
+              throw new Error(ranClassExecutor.getError().message);
+            }
           } catch (runError: any) {
             logger?.info(
               `Expected failing run for dump generation: ${runError?.message || String(runError)}`,

@@ -921,24 +921,6 @@ export async function makeAdtRequestWithTimeout(
   );
 }
 
-/**
- * Fetches node structure from SAP ADT repository
- * @deprecated Use getAdtClient().fetchNodeStructure() instead
- */
-export async function fetchNodeStructure(
-  _connection: IAbapConnection,
-  _parentName: string,
-  _parentTechName: string,
-  _parentType: string,
-  _nodeKey: string,
-  _withShortDescriptions: boolean = true,
-): Promise<AxiosResponse> {
-  // TODO: Add fetchNodeStructure to AdtClient
-  throw new Error('fetchNodeStructure not implemented in AdtClient yet');
-  // const { getAdtClient } = await import('./clients.js');
-  // return getAdtClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
-}
-
 export async function makeAdtRequest(
   connection: IAbapConnection,
   url: string,

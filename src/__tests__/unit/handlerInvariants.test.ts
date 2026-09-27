@@ -125,39 +125,22 @@ it('no handler decides a refusal for itself', () => {
 });
 
 /**
- * Every offender `analyseOmissions` names today, and why each is excused —
- * or isn't.
+ * **There are no excused offenders any more, and there is no list.**
  *
- * Running the check fresh against this tree (not assumed from an earlier
- * report) found six, not the four this list carries: two in
- * `handleGetStructuresList.ts` were genuine bugs, not exceptions, and are
- * fixed in this same commit rather than excused here — `extractSource` read
- * `.data`/`.readResult.data`, the pre-19 wire shape, which answers
- * `undefined` on both the success half (`{ ok: true, getResult() }`) and the
- * failure half (`{ ok: false, getError() }`) of the real contract. That made
- * `readDdl` fall through to the table endpoint for every structure, even
- * ones that would have read back fine — a functional bug, not a missing
- * strategy, and adding `analyse: analyseException` to both calls alongside
- * the `.ok`/`.getResult().value` fix was the actual repair.
+ * The four this list used to carry were one case: a member that shipped a
+ * tailored default `analyse` of its own, which passing `analyseException` would
+ * have REPLACED rather than composed with — `AdtServiceBinding.update`'s
+ * `publicationRefusal`, `AdtMessageClassMessage.read`'s msgno-presence check,
+ * `AdtUnitTest.run`'s `startedRun`, plus `AdtPackage.readMetadata` as a
+ * judgement call. adt-clients 23 ended that: every member reads
+ * `options?.analyse` with no `?? default` behind it, and all four readings moved
+ * into `@mcp-abap-adt/adt-strategies` under their own names. So the reason to
+ * pass nothing inverted into a reason to pass exactly those, at the very call
+ * sites that used to be excused.
  *
- * The remaining four are left as offenders on purpose, each already
- * reasoned about and documented at its own call site by an earlier task's
- * review — this list exists so a reviewer sees the four together, and so a
- * fifth one cannot join silently.
+ * The list is deleted rather than left empty: an empty array with a comment
+ * invites the next exception to be added quietly.
  */
-// Empty since adt-clients 23 / adt-strategies 0.5.0. The four entries this
-// list carried each withheld a strategy to keep a verdict the member applied
-// on its own — UpdateServiceBinding's publication refusal, the message-class
-// message read's msgno check — or skipped one as not worth it
-// (GetPackageTree's readMetadata). 23 applies no verdict of its own, and each
-// of those verdicts is a strategy passed with the call now
-// (`analysePublication`, `analyseMessageClassMessage(msgno)`).
-const ANALYSE_EXCEPTIONS: ReadonlyArray<{
-  file: string;
-  call: string;
-  reason: string;
-}> = [];
-
 /**
  * Resolved by the compiler, not matched by a regex over the text.
  *
@@ -175,24 +158,11 @@ it('every client call that accepts an analyse is given one', () => {
   // since Task 10. Here it runs over the whole tree, which is what the spec
   // makes a success criterion.
   const { offenders, inspected } = analyseOmissions(handlers);
+  // 513 call sites accept one under adt-clients 23, where 275 did under 19 — the
+  // release gave 79 more members an `analyse` and took every default away. The
+  // floor stays well under that count, because it guards against a run that
+  // resolved nothing, not against the number changing.
   expect(inspected).toBeGreaterThan(200);
 
-  const isExcused = (offender: string): boolean =>
-    ANALYSE_EXCEPTIONS.some(
-      (exc) =>
-        offender.startsWith(`${exc.file}:`) && offender.includes(exc.call),
-    );
-
-  expect(offenders.filter((o) => !isExcused(o))).toEqual([]);
-
-  // A named exception that no longer matches anything real is a stale entry
-  // hiding nothing — harmless on its own, but a sign this list has drifted
-  // from the code it describes. Each one must still be a live offender.
-  for (const exc of ANALYSE_EXCEPTIONS) {
-    expect(
-      offenders.some(
-        (o) => o.startsWith(`${exc.file}:`) && o.includes(exc.call),
-      ),
-    ).toBe(true);
-  }
+  expect(offenders).toEqual([]);
 });

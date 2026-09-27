@@ -13,6 +13,11 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { createAdtClient } from '../../../lib/clients';
@@ -82,7 +87,9 @@ export async function ensureSharedPackage(
   // Check if package exists. A package has no source, only its own document
   // (IAdtMetadataReadable, not IAdtReadable) — see IAdtCapabilities.ts.
   try {
-    const readResult = await client.getPackage().readMetadata({ packageName });
+    const readResult = await client
+      .getPackage()
+      .readMetadata({ packageName }, { analyse: analyseException });
     if (readResult.ok) {
       log?.info?.(`Shared package ${packageName} already exists`);
       _sharedPackageReady = true;
@@ -106,15 +113,26 @@ export async function ensureSharedPackage(
     const transportRequest = resolveTransportRequest(
       sharedConfig.transport_request,
     );
-    await client.getPackage().create({
-      packageName,
-      description: 'Shared test dependencies package',
-      superPackage: sharedConfig.super_package,
-      softwareComponent: sharedConfig.software_component || undefined,
-      transportLayer: sharedConfig.transport_layer || undefined,
-      packageType: 'development',
-      transportRequest,
-    });
+    // A refusal arrives in the answer, not as a throw: the `catch` below was
+    // written when `create()` threw. It is still the right home for a connection
+    // failure, and the "already exists" case it recognises now reaches it from
+    // here — but awaiting without reading logged "Created shared package" over a
+    // package that was never created.
+    const createdPackage = await client.getPackage().create(
+      {
+        packageName,
+        description: 'Shared test dependencies package',
+        superPackage: sharedConfig.super_package,
+        softwareComponent: sharedConfig.software_component || undefined,
+        transportLayer: sharedConfig.transport_layer || undefined,
+        packageType: 'development',
+        transportRequest,
+      },
+      { analyse: analyseException },
+    );
+    if (!createdPackage.ok) {
+      throw new Error(createdPackage.getError().message);
+    }
     log?.info?.(`Created shared package ${packageName}`);
   } catch (error: any) {
     if (
@@ -181,13 +199,19 @@ export async function ensureSharedDependency(
   let exists = false;
   try {
     if (type === 'tables') {
-      const result = await client.getTable().read({ tableName: name });
+      const result = await client
+        .getTable()
+        .read({ tableName: name }, undefined, { analyse: analyseException });
       exists = result.ok;
     } else if (type === 'views') {
-      const result = await client.getDdl().read({ ddlName: name });
+      const result = await client
+        .getDdl()
+        .read({ ddlName: name }, undefined, { analyse: analyseException });
       exists = result.ok;
     } else if (type === 'behavior_definitions') {
-      const result = await client.getBehaviorDefinition().read({ name });
+      const result = await client
+        .getBehaviorDefinition()
+        .read({ name }, undefined, { analyse: analyseException });
       exists = result.ok;
     }
   } catch {
@@ -210,85 +234,122 @@ export async function ensureSharedDependency(
     const activate = !options?.skipActivation;
 
     if (type === 'tables') {
-      const created = await client.getTable().create({
-        tableName: name,
-        packageName,
-        description: depConfig.description || 'Shared test table',
-        transportRequest,
-      });
+      const created = await client.getTable().create(
+        {
+          tableName: name,
+          packageName,
+          description: depConfig.description || 'Shared test table',
+          transportRequest,
+        },
+        { analyse: analyseException },
+      );
       if (!created.ok) throw new Error(created.getError().message);
 
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared table ${name}...`);
         const obj = client.getTable();
         const written = await withLock(
-          () => obj.lock({ tableName: name }),
+          () => obj.lock({ tableName: name }, { analyse: analyseException }),
           (lockHandle) =>
             obj.update(
               { tableName: name, transportRequest },
-              { source: depConfig.source, lockHandle },
+              {
+                source: depConfig.source,
+                lockHandle,
+                analyse: analyseException,
+              },
             ),
-          (lockHandle) => obj.unlock({ tableName: name }, lockHandle),
+          (lockHandle) =>
+            obj.unlock({ tableName: name }, lockHandle, {
+              analyse: analyseException,
+            }),
         );
         if (!written.ok) throw new Error(written.getError().message);
 
-        const activated = await obj.activate({ tableName: name });
+        const activated = await obj.activate(
+          { tableName: name },
+          { analyse: analyseActivation },
+        );
         if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared table ${name} activated`);
       }
     } else if (type === 'views') {
-      const created = await client.getDdl().create({
-        ddlName: name,
-        packageName,
-        description: depConfig.description || 'Shared test view',
-        transportRequest,
-      });
+      const created = await client.getDdl().create(
+        {
+          ddlName: name,
+          packageName,
+          description: depConfig.description || 'Shared test view',
+          transportRequest,
+        },
+        { analyse: analyseException },
+      );
       if (!created.ok) throw new Error(created.getError().message);
 
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared view ${name}...`);
         const obj = client.getDdl();
         const written = await withLock(
-          () => obj.lock({ ddlName: name }),
+          () => obj.lock({ ddlName: name }, { analyse: analyseException }),
           (lockHandle) =>
             obj.update(
               { ddlName: name, transportRequest },
-              { source: depConfig.source, lockHandle },
+              {
+                source: depConfig.source,
+                lockHandle,
+                analyse: analyseException,
+              },
             ),
-          (lockHandle) => obj.unlock({ ddlName: name }, lockHandle),
+          (lockHandle) =>
+            obj.unlock({ ddlName: name }, lockHandle, {
+              analyse: analyseException,
+            }),
         );
         if (!written.ok) throw new Error(written.getError().message);
 
-        const activated = await obj.activate({ ddlName: name });
+        const activated = await obj.activate(
+          { ddlName: name },
+          { analyse: analyseActivation },
+        );
         if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared view ${name} activated`);
       }
     } else if (type === 'behavior_definitions') {
-      const created = await client.getBehaviorDefinition().create({
-        name,
-        packageName,
-        rootEntity: depConfig.root_entity || name,
-        implementationType: depConfig.implementation_type || 'Managed',
-        description: depConfig.description || 'Shared test BDEF',
-        transportRequest,
-      });
+      const created = await client.getBehaviorDefinition().create(
+        {
+          name,
+          packageName,
+          rootEntity: depConfig.root_entity || name,
+          implementationType: depConfig.implementation_type || 'Managed',
+          description: depConfig.description || 'Shared test BDEF',
+          transportRequest,
+        },
+        { analyse: analyseException },
+      );
       if (!created.ok) throw new Error(created.getError().message);
 
       if (depConfig.source && activate) {
         log?.info?.(`Activating shared behavior definition ${name}...`);
         const obj = client.getBehaviorDefinition();
         const written = await withLock(
-          () => obj.lock({ name }),
+          () => obj.lock({ name }, { analyse: analyseException }),
           (lockHandle) =>
             obj.update(
               { name, transportRequest },
-              { source: depConfig.source, lockHandle },
+              {
+                source: depConfig.source,
+                lockHandle,
+                analyse: analyseException,
+              },
             ),
-          (lockHandle) => obj.unlock({ name }, lockHandle),
+          (lockHandle) =>
+            obj.unlock({ name }, lockHandle, { analyse: analyseException }),
         );
         if (!written.ok) throw new Error(written.getError().message);
 
-        const activated = await obj.activate({ name });
+        const activated = await obj.activate(
+          { name },
+          { analyse: analyseActivation },
+        );
         if (!activated.ok) throw new Error(activated.getError().message);
         log?.info?.(`Shared behavior definition ${name} activated`);
       }
@@ -314,26 +375,47 @@ export async function ensureSharedDependency(
 /** Try to delete an object; ignore 404 (already gone) */
 export async function safeDelete(
   label: string,
-  deleteFn: () => Promise<void>,
+  deleteFn: () => Promise<IAdtResponse<unknown, IAdtError> | void>,
   log?: ILogger,
 ): Promise<'deleted' | 'not_found' | 'failed'> {
+  // **A refused delete arrives in the answer.** This classified a thrown
+  // message, which is what a refusal was until adt-clients 23 — since then a
+  // delete ADT refused answers `ok: false` and throws nothing, so every call
+  // reported `'deleted'` and a teardown printed "Deleted" over objects still on
+  // the system, which the next setup would find in its way. The throw path stays
+  // for what still throws: a connection failure.
   try {
-    await deleteFn();
+    const answered = await deleteFn();
+    if (answered !== undefined && !answered.ok) {
+      return classifyDeleteFailure(label, answered.getError().message, log);
+    }
     log?.info?.(`Deleted ${label}`);
     return 'deleted';
   } catch (error: any) {
-    const msg = error instanceof Error ? error.message : String(error);
-    if (
-      msg.includes('404') ||
-      msg.includes('not found') ||
-      msg.includes('does not exist')
-    ) {
-      log?.info?.(`${label} — already gone (404)`);
-      return 'not_found';
-    }
-    log?.error?.(`Failed to delete ${label}: ${msg}`);
-    return 'failed';
+    return classifyDeleteFailure(
+      label,
+      error instanceof Error ? error.message : String(error),
+      log,
+    );
   }
+}
+
+/** An object that was never there is not a failed teardown. */
+function classifyDeleteFailure(
+  label: string,
+  msg: string,
+  log?: ILogger,
+): 'not_found' | 'failed' {
+  if (
+    msg.includes('404') ||
+    msg.includes('not found') ||
+    msg.includes('does not exist')
+  ) {
+    log?.info?.(`${label} — already gone (404)`);
+    return 'not_found';
+  }
+  log?.error?.(`Failed to delete ${label}: ${msg}`);
+  return 'failed';
 }
 
 /** Clear in-memory caches for shared dependencies */
@@ -394,19 +476,31 @@ export async function ensureSharedObjects(
   }> = [
     {
       type: 'tables',
-      readFn: (name) => client.getTable().read({ tableName: name }),
+      readFn: (name) =>
+        client
+          .getTable()
+          .read({ tableName: name }, undefined, { analyse: analyseException }),
     },
     {
       type: 'views',
-      readFn: (name) => client.getDdl().read({ ddlName: name }),
+      readFn: (name) =>
+        client
+          .getDdl()
+          .read({ ddlName: name }, undefined, { analyse: analyseException }),
     },
     {
       type: 'behavior_definitions',
-      readFn: (name) => client.getBehaviorDefinition().read({ name }),
+      readFn: (name) =>
+        client
+          .getBehaviorDefinition()
+          .read({ name }, undefined, { analyse: analyseException }),
     },
     {
       type: 'classes',
-      readFn: (name) => client.getClass().read({ className: name }),
+      readFn: (name) =>
+        client
+          .getClass()
+          .read({ className: name }, undefined, { analyse: analyseException }),
     },
   ];
 

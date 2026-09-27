@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -170,7 +171,9 @@ export function createSourceReaderDeps(
     // rather than relying on the outer `try/catch` — `safe()` still catches a
     // genuine throw (a connection failure), but a refusal is no longer one.
     async readProgram(programName, version) {
-      const r = await client.getProgram().read({ programName }, version);
+      const r = await client
+        .getProgram()
+        .read({ programName }, version, { analyse: analyseException });
       return r.ok ? r.getResult().value : null;
     },
     async readInclude(includeName) {
@@ -183,11 +186,15 @@ export function createSourceReaderDeps(
       return typeof r?.data === 'string' ? r.data : null;
     },
     async readClassMain(className, version) {
-      const r = await client.getClass().read({ className }, version);
+      const r = await client
+        .getClass()
+        .read({ className }, version, { analyse: analyseException });
       return r.ok ? r.getResult().value : null;
     },
     async fetchFugrStructure(fugrName) {
-      const r = await client.getUtils().getObjectStructure('FUGR/F', fugrName);
+      const r = await client
+        .getUtils()
+        .getObjectStructure('FUGR/F', fugrName, { analyse: analyseException });
       return r.ok ? parseFugrChildrenFromXml(r.getResult().value) : [];
     },
     async readFugrFm(fugrName, fmName) {

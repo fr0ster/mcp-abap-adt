@@ -102,6 +102,7 @@
  * Run: npm test -- --testPathPattern=TransportObjectToolsCrud
  */
 
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateProgram } from '../../../../handlers/program/high/handleCreateProgram';
 import { handleDeleteProgram } from '../../../../handlers/program/high/handleDeleteProgram';
 import { handleUpdateProgram } from '../../../../handlers/program/high/handleUpdateProgram';
@@ -329,7 +330,9 @@ describe('Transport object tools end to end (GitHub #221, PR227)', () => {
 
         const deleted = await createAdtClient(connection, logger)
           .getRequest()
-          .delete({ transportNumber: taskNumber } as any);
+          .delete({ transportNumber: taskNumber } as any, {
+            analyse: analyseDeletion,
+          });
         if (deleted.ok) {
           logger?.success(`Cleanup: task ${taskNumber} deleted`);
         } else {

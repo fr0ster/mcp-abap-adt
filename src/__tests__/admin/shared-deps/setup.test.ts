@@ -81,6 +81,22 @@ async function forceSaveViewSource(
     throw new Error(lockResponse.getError().message);
   }
   const lockHandle = lockResponse.getResult().value;
+
+  // **Both failures, raised together, write first.**
+  //
+  // A refused release arrives in the answer since adt-clients 23, so the
+  // `catch` that used to sit here saw nothing and a lock left on a SHARED view
+  // was accepted in silence — the failure mode that locked `ZMCP_SHR_I_BDFL`
+  // out of every later run, with nothing in ADT able to release an enqueue held
+  // by a dead session.
+  //
+  // Logging it is not enough either, and that was the first fix's mistake: when
+  // the write succeeded and the release did not, nothing failed at all and the
+  // setup went on to report a shared view as ready while it stayed locked. So
+  // both outcomes are collected and raised as one error — the write's own
+  // failure stays first, because it is the one a reader needs, and the
+  // unreleased lock is named after it rather than instead of it.
+  const failures: string[] = [];
   try {
     const updated = await client
       .getDdl()
@@ -89,30 +105,29 @@ async function forceSaveViewSource(
         { source: ddlSource, lockHandle, analyse: analyseException },
       );
     if (!updated.ok) {
-      throw new Error(updated.getError().message);
+      failures.push(`write refused: ${updated.getError().message}`);
     }
-  } finally {
-    try {
-      // **A refused release is reported, not ignored.** It arrives in the
-      // answer since adt-clients 23, so this `catch` saw nothing and a lock
-      // left on a SHARED view was accepted in silence — the failure mode that
-      // locked `ZMCP_SHR_I_BDFL` out of every later run, with nothing in ADT
-      // able to release an enqueue held by a dead session. Logged rather than
-      // thrown: this is a `finally`, and throwing here would replace the
-      // write's own failure, which is the one a reader needs first.
-      const released = await client
-        .getDdl()
-        .unlock({ ddlName: viewName }, lockHandle, {
-          analyse: analyseException,
-        });
-      if (!released.ok) {
-        testsLogger?.error?.(
-          `🔒 the lock was NOT released and stays on ${viewName}: ${released.getError().message}`,
-        );
-      }
-    } catch {
-      // ignore unlock errors
+  } catch (error: unknown) {
+    failures.push(`write threw: ${(error as Error)?.message ?? String(error)}`);
+  }
+  try {
+    const released = await client
+      .getDdl()
+      .unlock({ ddlName: viewName }, lockHandle, {
+        analyse: analyseException,
+      });
+    if (!released.ok) {
+      failures.push(
+        `🔒 the lock was NOT released and stays on ${viewName}: ${released.getError().message}`,
+      );
     }
+  } catch (error: unknown) {
+    failures.push(
+      `🔒 the lock was NOT released and stays on ${viewName}: ${(error as Error)?.message ?? String(error)}`,
+    );
+  }
+  if (failures.length > 0) {
+    throw new Error(`${viewName}: ${failures.join('; ')}`);
   }
 }
 
@@ -1132,6 +1147,10 @@ describe('Admin: Setup shared dependencies', () => {
                   throw new Error(lockResponse.getError().message);
                 }
                 const lockHandle = lockResponse.getResult().value;
+                // Both failures, raised together, write first — see
+                // `forceSaveViewSource` above for why logging the refused
+                // release is not enough.
+                const moduleFailures: string[] = [];
                 try {
                   const updated = await client.getFunctionModule().update(
                     {
@@ -1146,32 +1165,42 @@ describe('Admin: Setup shared dependencies', () => {
                     },
                   );
                   if (!updated.ok) {
-                    throw new Error(updated.getError().message);
+                    moduleFailures.push(
+                      `write refused: ${updated.getError().message}`,
+                    );
+                  } else {
+                    testsLogger?.info?.(
+                      `Updated function module ${item.name} source`,
+                    );
                   }
-                  testsLogger?.info?.(
-                    `Updated function module ${item.name} source`,
+                } catch (error: unknown) {
+                  moduleFailures.push(
+                    `write threw: ${(error as Error)?.message ?? String(error)}`,
                   );
-                } finally {
-                  try {
-                    // A refused release is reported, not ignored — see the view above.
-                    const releasedModule = await client
-                      .getFunctionModule()
-                      .unlock(
-                        {
-                          functionModuleName: item.name,
-                          functionGroupName: item.group,
-                        },
-                        lockHandle,
-                        { analyse: analyseException },
-                      );
-                    if (!releasedModule.ok) {
-                      testsLogger?.error?.(
-                        `🔒 the lock was NOT released and stays on function module ${item.name}: ${releasedModule.getError().message}`,
-                      );
-                    }
-                  } catch {
-                    // ignore unlock errors
+                }
+                try {
+                  const releasedModule = await client
+                    .getFunctionModule()
+                    .unlock(
+                      {
+                        functionModuleName: item.name,
+                        functionGroupName: item.group,
+                      },
+                      lockHandle,
+                      { analyse: analyseException },
+                    );
+                  if (!releasedModule.ok) {
+                    moduleFailures.push(
+                      `🔒 the lock was NOT released and stays on function module ${item.name}: ${releasedModule.getError().message}`,
+                    );
                   }
+                } catch (error: unknown) {
+                  moduleFailures.push(
+                    `🔒 the lock was NOT released and stays on function module ${item.name}: ${(error as Error)?.message ?? String(error)}`,
+                  );
+                }
+                if (moduleFailures.length > 0) {
+                  throw new Error(`${item.name}: ${moduleFailures.join('; ')}`);
                 }
               } catch (updateError: any) {
                 testsLogger?.error?.(

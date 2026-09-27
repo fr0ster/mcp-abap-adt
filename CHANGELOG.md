@@ -54,10 +54,18 @@ they arrived as success.
 - **The rest of the contract**: `interfaces-adt` 9 → 11, the new
   `interfaces-adt-connection` 1.0.0 (`IAbapConnection` and `IAdtWireResponse`
   moved there), `interfaces-network` 2.0.0 as a direct dependency,
-  `interfaces-auth` 1 → 2, `auth-broker` 2 → 3.0.3 (one options object, the token
+  `interfaces-auth` 1 → 2, `auth-broker` 2 → 3.0.4 (one options object, the token
   provider inside it as `provider`, and it requires `refreshTokens`),
   `auth-providers` 2 → 4.2.1, `auth-stores` 1.2.4, `connection` 9.2.1 → 9.4.2,
-  `adt-strategies` 0.6.0.
+  `adt-strategies` 0.6.0, `logger` 0.4.1.
+
+  The last two of those are packaging fixes in the family's own CLIs rather than
+  anything this project calls differently: `auth-broker` 3.0.4 made
+  `@mcp-abap-adt/logger` a runtime dependency, because `mcp-sso` imported it while
+  it was only a dev dependency and died on `Cannot find module` from an installed
+  tarball; `logger` 0.4.1 stopped printing `PinoLogger initialization error` at
+  import, building its `PinoLogger` on first call instead. Both are worth taking
+  here so this project's tree holds one copy of each at the fixed version.
 
 - **`sap-rfc-lite` ^0.1.0 → ^0.2.1 is load-bearing on RFC.** It is the range
   `connection` itself declares, and adt-clients' `ERRATA.md` says why: a package

@@ -15,11 +15,10 @@
  * Run:  npm run shared:setup
  */
 
-import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import {
   analyseActivation,
   analyseException,
-  asItCame,
 } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
@@ -39,12 +38,17 @@ import { handleUpdateServiceDefinition } from '../../../handlers/service_definit
 import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type ActivationRunSource,
+  awaitActivationRun,
+  isRefusal,
+} from '../../../lib/strategies/activationRun';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
   getSystemContext,
   resolveSystemContext,
 } from '../../../lib/systemContext';
-import { parseActivationResponse } from '../../../lib/utils';
 import {
   getSharedDependenciesConfig,
   getTimeout,
@@ -1656,29 +1660,33 @@ describe('Admin: Setup shared dependencies', () => {
             `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
           );
           try {
-            // adt-clients 19's shipped default for the `activation` slot is
-            // the run id, not the document — acceptance, not completion (see
-            // handleActivateObject.ts). This script wants the messages a
-            // group-activate answers, so it asks for the raw document back
-            // explicitly (utilResultSet.d.ts: "rawDocument is one argument
-            // away") rather than the run id neither loop here follows up on.
-            const response = await client
-              .getUtils({ ...utilDocuments, activation: asItCame })
-              .activateObjectsGroup(toActivate, true, {
-                analyse: analyseException,
-              });
-            if (!response.ok) {
-              throw new Error(response.getError().message);
+            // **The messages are in the run's results, not in the POST.**
+            // `/activation/runs` answers `202` with the id in `Location` and an
+            // empty body, so asking for that body and parsing it found zero
+            // messages and read like "no errors": this script logged "Group
+            // activation completed successfully" over eleven objects that stayed
+            // inactive, with not one SAP message to say why. The run id, then
+            // `getActivationRun` until it settles, then `getActivationResults`
+            // — see `lib/strategies/activationRun.ts`.
+            const utils = client.getUtils(ourUtils);
+            const started = await utils.activateObjectsGroup(toActivate, true, {
+              analyse: analyseException,
+            });
+            if (!started.ok) {
+              throw new Error(started.getError().message);
             }
-            const activationResult = parseActivationResponse(
-              response.getResult().value,
+            const outcome = await awaitActivationRun(
+              utils as unknown as ActivationRunSource,
+              started.getResult().value,
+              analyseException,
+            );
+            testsLogger?.info?.(
+              `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}, ${outcome.messages.length} message(s)`,
             );
 
-            const errors = activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            );
-            const warnings = activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
+            const errors = outcome.messages.filter(isRefusal);
+            const warnings = outcome.messages.filter((m) =>
+              /^[WI]$|^warning$/i.test(m.type),
             );
 
             if (errors.length > 0) {
@@ -1689,7 +1697,12 @@ describe('Admin: Setup shared dependencies', () => {
                 continue;
               }
               testsLogger?.error?.(
-                `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
+                `Group activation errors:\n${errors
+                  .map(
+                    (e) =>
+                      `  ${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
+                  )
+                  .join('\n')}`,
               );
             } else {
               testsLogger?.info?.('Group activation completed successfully');
@@ -1697,7 +1710,12 @@ describe('Admin: Setup shared dependencies', () => {
             }
             if (warnings.length > 0) {
               testsLogger?.warn?.(
-                `Group activation warnings:\n${warnings.map((w: any) => `  ${w.shortText || w.text}`).join('\n')}`,
+                `Group activation warnings:\n${warnings
+                  .map(
+                    (w) =>
+                      `  ${w.objectName ? `${w.objectName}: ` : ''}${w.text}`,
+                  )
+                  .join('\n')}`,
               );
             }
             break; // Success or final attempt — stop retrying
@@ -1747,21 +1765,30 @@ describe('Admin: Setup shared dependencies', () => {
                 }
               };
               try {
-                const resp = await client
-                  .getUtils({ ...utilDocuments, activation: asItCame })
-                  .activateObjectsGroup(chunk, true, {
-                    analyse: analyseException,
-                  });
+                // The same three requests as the bulk path above: a chunk is
+                // still an activation run, and its POST still answers only the
+                // id.
+                const utils = client.getUtils(ourUtils);
+                const resp = await utils.activateObjectsGroup(chunk, true, {
+                  analyse: analyseException,
+                });
                 if (!resp.ok) {
                   throw new Error(resp.getError().message);
                 }
-                const r = parseActivationResponse(resp.getResult().value);
-                const errs = r.messages.filter(
-                  (m) => m.type === 'error' || m.type === 'E',
+                const chunkOutcome = await awaitActivationRun(
+                  utils as unknown as ActivationRunSource,
+                  resp.getResult().value,
+                  analyseException,
                 );
+                const errs = chunkOutcome.messages.filter(isRefusal);
                 if (errs.length > 0) {
                   recordFailure(
-                    errs.map((e: any) => e.shortText || e.text).join('; '),
+                    errs
+                      .map(
+                        (e) =>
+                          `${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
+                      )
+                      .join('; '),
                   );
                 }
               } catch (e: any) {

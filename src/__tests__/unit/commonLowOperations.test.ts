@@ -15,6 +15,7 @@ import { structured } from '../../lib/strategies/reading';
 import {
   fakeClientOf,
   okResponse,
+  reading,
   recordAnalyse,
   refusedResponse,
 } from '../helpers/fakeClient';
@@ -426,7 +427,26 @@ describe('ActivateObjectLow', () => {
     expect(call.args[0]).toEqual({ className: 'ZCL_X' });
   });
 
-  it('more than one object falls back to activateObjectsGroup, carrying analyseException since interfaces-adt 10 gave it one', async () => {
+  /**
+   * A finished run and the results it produced. `/activation/runs` answers the
+   * id only, so a fake that stops there is the defect this sequence fixed.
+   */
+  const finishedRun = (results: string) =>
+    fakeClientOf({
+      activateObjectsGroup: async () => okResponse('E19-ACT-RUN-1'),
+      getActivationRun: async () =>
+        okResponse(
+          reading(
+            { 'runs:run': { '@': { 'runs:status': 'finished' } } },
+            '<runs:run runs:status="finished"/>',
+            200,
+          ),
+        ),
+      getActivationResults: async () =>
+        okResponse(reading(undefined, results, 200)),
+    });
+
+  it('more than one object goes to the group member, and then reads the run and its results', async () => {
     fakeClient = seen.client;
     await handleActivateObject(context as any, {
       objects: [
@@ -434,10 +454,18 @@ describe('ActivateObjectLow', () => {
         { name: 'zcl_x', type: 'CLAS/OC' },
       ],
     });
-    expect(seen.calls).toHaveLength(1);
-    const call = seen.calls[0];
-    expect(call.member).toBe('activateObjectsGroup');
-    expect(call.carriedAnalyse).toBe(true);
+    // Three requests, not one: the POST answers `202` with the id in
+    // `Location` and an empty body, so the verdict is in the run's results.
+    // `getActivationRun` repeats while the run has not settled, which the
+    // recording double never reports — only the sequence is pinned here.
+    const members = seen.calls.map((c) => c.member);
+    expect(members[0]).toBe('activateObjectsGroup');
+    expect(members).toContain('getActivationRun');
+    expect(members.at(-1)).toBe('getActivationResults');
+    for (const call of seen.calls) {
+      expect(call.factory).toBe('getUtils');
+      expect(call.carriedAnalyse).toBe(true);
+    }
   });
 
   it('a single object of an unmapped type also falls back to the group member', async () => {
@@ -445,14 +473,11 @@ describe('ActivateObjectLow', () => {
     await handleActivateObject(context as any, {
       objects: [{ name: 'zsb', type: 'SRVB/SVB' }],
     });
-    expect(seen.calls).toHaveLength(1);
     expect(seen.calls[0].member).toBe('activateObjectsGroup');
   });
 
-  it('the group fallback reads acceptance from the run id, not a hardcoded true', async () => {
-    fakeClient = fakeClientOf({
-      activateObjectsGroup: async () => okResponse('E19-ACT-RUN-1'),
-    });
+  it('the group path reads acceptance from the run id, not a hardcoded true', async () => {
+    fakeClient = finishedRun('<chkl:messages/>');
     const result: any = await handleActivateObject(context as any, {
       objects: [
         { name: 'zd', type: 'DOMA/DM' },
@@ -463,9 +488,48 @@ describe('ActivateObjectLow', () => {
     const payload = JSON.parse(result.content[0].text);
     expect(payload.accepted).toBe(true);
     expect(payload.run_id).toBe('E19-ACT-RUN-1');
-    // No verdict — acceptance is not completion. Explicitly null, not
-    // omitted, and not `true`.
-    expect(payload.activated).toBeNull();
+    expect(payload.run_status).toBe('finished');
+  });
+
+  it('a finished run with no error-severity message answers activated: true', async () => {
+    fakeClient = finishedRun('<chkl:messages/>');
+    const result: any = await handleActivateObject(context as any, {
+      objects: [
+        { name: 'zd', type: 'DOMA/DM' },
+        { name: 'zcl_x', type: 'CLAS/OC' },
+      ],
+    });
+    const payload = JSON.parse(result.content[0].text);
+    // The errata is explicit: only an error-severity message is a failure, and
+    // a run with nothing to do says nothing at all.
+    expect(payload.activated).toBe(true);
+    expect(payload.messages).toEqual([]);
+  });
+
+  it('a finished run carrying an error names the object and answers activated: false', async () => {
+    fakeClient = finishedRun(
+      '<chkl:messages><msg type="E" objName="ZIF_MCP_SHARED">' +
+        '<shortText><txt>Interface ZIF_MCP_SHARED is not active</txt></shortText>' +
+        '</msg></chkl:messages>',
+    );
+    const result: any = await handleActivateObject(context as any, {
+      objects: [
+        { name: 'zif_mcp_shared', type: 'INTF/OI' },
+        { name: 'zcl_x', type: 'CLAS/OC' },
+      ],
+    });
+    const payload = JSON.parse(result.content[0].text);
+    expect(payload.activated).toBe(false);
+    expect(payload.messages).toEqual([
+      {
+        type: 'E',
+        text: 'Interface ZIF_MCP_SHARED is not active',
+        objectName: 'ZIF_MCP_SHARED',
+      },
+    ]);
+    // The message a caller could not see before this sequence existed: the
+    // accept response carries none.
+    expect(payload.message).toContain('ZIF_MCP_SHARED');
   });
 
   it('an empty run id reads as not accepted, not as a silent success', async () => {

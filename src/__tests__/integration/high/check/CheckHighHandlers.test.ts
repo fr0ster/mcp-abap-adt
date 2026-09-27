@@ -50,6 +50,27 @@ import {
  * boolean survives on the success path. `check_result` is gone with the
  * envelope; its content is `status_text` plus `messages`.
  */
+/**
+ * A refusal says what it refused, in the failure message.
+ *
+ * `expect(response.isError).toBe(false)` prints `Expected: false / Received:
+ * true` and nothing else, so a refused check needed a second run with
+ * `DEBUG_HTTP_WIRE=true` before anyone could see why. Measured 2026-09-28:
+ * `CheckPackage` answered `isError: true` for the polygon's own package because
+ * a guard demanded `super_package` and refused before any request — invisible
+ * from this assertion, obvious from the payload. The handler's own envelope
+ * carries `message`, `origin` and `request`; printing it makes the failure
+ * self-explanatory.
+ */
+function expectAccepted(response: any, what: string): void {
+  if (response?.isError) {
+    throw new Error(
+      `${what} was refused: ${String(response?.content?.[0]?.text ?? '(no payload)').slice(0, 1200)}`,
+    );
+  }
+  expect(response.isError).toBe(false);
+}
+
 function assertNormalizedCheckResponse(data: any, expectedObjectName: string) {
   expect(data.object_name).toBe(expectedObjectName.toUpperCase());
   expect(data.ran).toBe(true);
@@ -116,7 +137,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -220,7 +241,7 @@ describe('Check High-Level Handlers Integration', () => {
           );
 
           // Reported, not raised: the finding is the answer.
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           expect(data.object_name).toBe(objectName.toUpperCase());
           expect(data.ran).toBe(true);
@@ -292,7 +313,7 @@ describe('Check High-Level Handlers Integration', () => {
           // about the inactive version — which an active behaviour
           // definition does not have ("Inactive version … does not exist").
           // It asks about the active one now, like every check here.
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -355,7 +376,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -418,7 +439,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -481,7 +502,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -555,7 +576,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -618,7 +639,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -681,7 +702,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -747,7 +768,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -810,7 +831,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -883,7 +904,7 @@ describe('Check High-Level Handlers Integration', () => {
           // test failed on a correct answer. A shared object is active by
           // definition, so this asserts the answer's shape, as CheckTable
           // does, and not a finding the shared object must not have.
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -953,7 +974,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 
@@ -1016,7 +1037,7 @@ describe('Check High-Level Handlers Integration', () => {
             },
           );
 
-          expect(response.isError).toBe(false);
+          expectAccepted(response, `check ${objectName}`);
           const data = parseHandlerResponse(response);
           assertNormalizedCheckResponse(data, objectName);
 

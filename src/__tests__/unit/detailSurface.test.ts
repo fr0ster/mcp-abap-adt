@@ -455,11 +455,12 @@ const DETAIL_WIRING_EXCEPTIONS: ReadonlyArray<{
 }> = [
   {
     file: 'src/handlers/common/low/handleActivateObject.ts',
-    line: 321,
+    line: 336,
     reason:
-      'the group-activation fallback: no AdtReading behind activateObjectsGroup, ' +
-      "so this second answer() call in the same handler hardcodes detail: 'terse' " +
-      "on purpose, documented on both the module and the tool's own detail description.",
+      'the group-activation path: what it answers is an activation run — the id, ' +
+      "runs:status and the results' messages — not an AdtReading, so this second " +
+      "answer() call in the same handler hardcodes detail: 'terse' on purpose, " +
+      "documented on both the module and the tool's own detail description.",
   },
 ];
 

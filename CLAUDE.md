@@ -185,6 +185,26 @@ measured the same thing from our side: a stateless read after a create on one RF
 connection answered `400 SADT_RESOURCE 007`, and a fresh connection answered
 `200`.
 
+## Seeing the wire
+
+`DEBUG_HTTP_WIRE=true` prints every HTTP exchange on stderr — method, URL,
+params, headers with their values redacted by name, and bodies clipped at
+`DEBUG_HTTP_BODY_CHARS` (default 2000, `0` for the size alone, `Infinity` for all
+of it). `DEBUG_RFC_WIRE` is its RFC twin.
+
+**Reach for it before writing a probe.** `DEBUG_CONNECTORS` and `DEBUG_ADT_LIBS`
+do NOT answer "what did we send and what came back": `@mcp-abap-adt/connection`
+logs the session, the CSRF token and the critical section and nothing about a
+request, and `logWire` is an RFC transport option the HTTP transports do not
+take. That gap cost a diagnostic cycle on 2026-09-28 — `CheckPackage` answered
+`isError: true` with no message and no request, and the cause (a guard refusing
+before the wire) was only visible after wrapping `makeAdtRequest` by hand.
+
+And when a suite reports `Expected: false / Received: true`, the payload is what
+is missing, not the wire: a handler's envelope carries `message`, `origin` and
+`request`. A test that asserts `isError` should raise that payload — see
+`CheckHighHandlers.test.ts`'s `expectAccepted`.
+
 ## Plans and Specs
 
 Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.

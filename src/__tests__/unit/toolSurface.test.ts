@@ -126,7 +126,27 @@ describe('the MCP tool surface', () => {
       // went out without `corrNr` — refused on premise with "Parameter corrNr
       // could not be found." (SADT_RESOURCE 017, E19 2026-09-25). Every other
       // low-tier write already carried it.
-      expect({ tool, lost: had.filter((p) => !has.includes(p)) }).toEqual({
+      // **One relaxation, and it is a relaxation rather than a loss.**
+      // `CheckPackage`/`CheckPackageLow` required `super_package` and never sent
+      // it: the guard refused the call before any request, so a package with no
+      // parent — `super_package: ""`, which is what a top-level package has —
+      // could not be checked at all. Measured on a BTP trial 2026-09-28: the
+      // suite's own `ZMCP_SHR_PKG` answered `isError: true` with nothing on the
+      // wire while the other nine check tools passed. The parameter is still
+      // accepted, so no caller's request becomes invalid; it only stopped being
+      // mandatory. `super_package*` therefore leaves and `super_package`
+      // arrives, which is this one pair and nothing else.
+      const MAY_RELAX_REQUIRED: Record<string, string> = {
+        'high/CheckPackage': 'super_package',
+        'low/CheckPackageLow': 'super_package',
+      };
+      const relaxed = MAY_RELAX_REQUIRED[tool];
+      expect({
+        tool,
+        lost: had.filter(
+          (p) => !has.includes(p) && p !== `${relaxed ?? '\u0000'}*`,
+        ),
+      }).toEqual({
         tool,
         lost: [],
       });
@@ -165,11 +185,16 @@ describe('the MCP tool surface', () => {
         // updated through this tool at all.
         'low/UpdatePackageLow': ['transport_request'],
       };
-      expect({ tool, added: has.filter((p) => !had.includes(p)) }).toEqual({
+      expect({
+        tool,
+        added: has.filter((p) => !had.includes(p) && p !== relaxed),
+      }).toEqual({
         tool,
         added: MAY_GAIN_VERSION.has(tool)
           ? ['version']
-          : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail']),
+          : relaxed !== undefined
+            ? []
+            : (EXTRA_ALLOWED_ADDITIONS[tool] ?? ['detail']),
       });
     }
   });

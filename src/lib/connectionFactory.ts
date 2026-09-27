@@ -179,6 +179,145 @@ function rfcWireOptions(): { logWire: boolean; maxLoggedBodyChars?: number } {
   };
 }
 
+/**
+ * Every HTTP exchange on stderr, when asked for it.
+ *
+ * **Why this exists here.** There is no HTTP wire log anywhere else:
+ * `@mcp-abap-adt/connection` logs the session, the CSRF token and the critical
+ * section, and nothing about a request — measured 2026-09-28 by reading
+ * `AbstractAbapConnection.js` and `HttpTransport.js`. `DEBUG_CONNECTORS` and
+ * `DEBUG_ADT_LIBS` therefore answer nothing when the question is *what did we
+ * send and what came back*, and `logWire` is an RFC transport option that the
+ * HTTP transports do not take.
+ *
+ * That cost a whole diagnostic cycle: `CheckPackage` answered `isError: true`
+ * for the polygon's own package with no message and no request, and the reason —
+ * a guard refusing before the wire — was only visible by writing a throwaway
+ * script that wrapped `makeAdtRequest` by hand. A switch belongs where the
+ * connection is built, so the next such failure is readable from a test log.
+ *
+ * **Redaction.** Header VALUES are replaced by name — `authorization`, any
+ * `cookie`, and anything containing `token`, `secret`, `password`, `credential`
+ * or `apikey` — which is the rule `@mcp-abap-adt/connection` 8.1.0 applies to
+ * the RFC wire. Bodies are printed as they are, clipped at
+ * `DEBUG_HTTP_BODY_CHARS` (default 2000, `0` for the size alone, `Infinity` for
+ * all of it): this is for a payload under suspicion, not for routine logging,
+ * and a body carrying a credential would be logged.
+ *
+ * stderr, for the reason `wireLogger` gives above: in stdio transport stdout
+ * carries JSON-RPC and nothing else.
+ */
+const REDACTED =
+  /^(authorization|cookie|set-cookie)$|token|secret|password|credential|apikey|api-key/i;
+
+function httpWireOptions(): { logWire: boolean; bodyChars: number } {
+  const asked =
+    process.env.DEBUG_HTTP_WIRE === 'true' ||
+    process.env.DEBUG_HTTP_WIRE === '1';
+  const ceiling = process.env.DEBUG_HTTP_BODY_CHARS;
+  const bodyChars =
+    ceiling === undefined || ceiling === ''
+      ? 2000
+      : ceiling === 'Infinity'
+        ? Number.POSITIVE_INFINITY
+        : Number(ceiling);
+  return {
+    logWire: asked,
+    bodyChars:
+      Number.isFinite(bodyChars) || bodyChars === Number.POSITIVE_INFINITY
+        ? bodyChars
+        : 2000,
+  };
+}
+
+function clip(value: unknown, ceiling: number): string {
+  const text = typeof value === 'string' ? value : JSON.stringify(value);
+  if (text === undefined || text === null) return '';
+  if (ceiling === 0) return `(${text.length} chars, not logged)`;
+  return text.length > ceiling
+    ? `${text.slice(0, ceiling)}… (${text.length} chars)`
+    : text;
+}
+
+function safeHeaders(headers: unknown): string {
+  if (headers === null || typeof headers !== 'object') return '';
+  const out: Record<string, unknown> = {};
+  for (const [name, value] of Object.entries(
+    headers as Record<string, unknown>,
+  )) {
+    out[name] = REDACTED.test(name) ? '[redacted]' : value;
+  }
+  return JSON.stringify(out);
+}
+
+/**
+ * Wrap `makeAdtRequest` so each exchange prints. Returns the connection
+ * untouched when the switch is off — no wrapper, no cost, no behaviour to
+ * explain in production.
+ */
+function withHttpWireLog<T>(connection: T): T {
+  const { logWire, bodyChars } = httpWireOptions();
+  if (!logWire) return connection;
+  const target = connection as unknown as {
+    makeAdtRequest: (options: Record<string, unknown>) => Promise<unknown>;
+  };
+  const original = target.makeAdtRequest.bind(target);
+  let n = 0;
+  target.makeAdtRequest = async (options) => {
+    n += 1;
+    const id = n;
+    process.stderr.write(
+      `[WIRE ${id}] ${String(options.method ?? '?')} ${String(options.url ?? '?')}\n`,
+    );
+    if (options.params !== undefined) {
+      process.stderr.write(
+        `[WIRE ${id}] params ${JSON.stringify(options.params)}\n`,
+      );
+    }
+    if (options.headers !== undefined) {
+      process.stderr.write(
+        `[WIRE ${id}] headers ${safeHeaders(options.headers)}\n`,
+      );
+    }
+    if (options.data !== undefined) {
+      process.stderr.write(
+        `[WIRE ${id}] body ${clip(options.data, bodyChars)}\n`,
+      );
+    }
+    try {
+      const answer = (await original(options)) as {
+        status?: number;
+        statusText?: string;
+        data?: unknown;
+      };
+      process.stderr.write(
+        `[WIRE ${id}] → ${String(answer?.status ?? '?')} ${String(answer?.statusText ?? '')}\n`,
+      );
+      if (answer?.data !== undefined) {
+        process.stderr.write(
+          `[WIRE ${id}] → body ${clip(answer.data, bodyChars)}\n`,
+        );
+      }
+      return answer;
+    } catch (error: unknown) {
+      const e = error as {
+        message?: string;
+        response?: { status?: number; data?: unknown };
+      };
+      process.stderr.write(
+        `[WIRE ${id}] → threw ${String(e?.response?.status ?? '')} ${String(e?.message ?? error)}\n`,
+      );
+      if (e?.response?.data !== undefined) {
+        process.stderr.write(
+          `[WIRE ${id}] → body ${clip(e.response.data, bodyChars)}\n`,
+        );
+      }
+      throw error;
+    }
+  };
+  return connection;
+}
+
 export function createAbapConnection(
   config: SapConfig,
   logger?: ILogger | null,
@@ -193,13 +332,15 @@ export function createAbapConnection(
     const credential = new TokenAuthProvider(
       tokenRefresher ?? config.jwtToken ?? '',
     );
-    return new AdtCloudConnector(
-      config,
-      credential,
-      new CloudHttpTransport(() => ({}), logger, transportOptions),
-      logger,
-      sessionId,
-    ) as unknown as IAbapConnection;
+    return withHttpWireLog(
+      new AdtCloudConnector(
+        config,
+        credential,
+        new CloudHttpTransport(() => ({}), logger, transportOptions),
+        logger,
+        sessionId,
+      ) as unknown as IAbapConnection,
+    );
   }
 
   const credential = onPremCredential(config);
@@ -223,11 +364,13 @@ export function createAbapConnection(
   // silently not happen.
   const agentOptions = () => credential.transportMaterial?.() ?? {};
 
-  return new AdtOnPremConnector(
-    config,
-    credential,
-    new OnPremHttpTransport(agentOptions, logger, transportOptions),
-    logger,
-    sessionId,
-  ) as unknown as IAbapConnection;
+  return withHttpWireLog(
+    new AdtOnPremConnector(
+      config,
+      credential,
+      new OnPremHttpTransport(agentOptions, logger, transportOptions),
+      logger,
+      sessionId,
+    ) as unknown as IAbapConnection,
+  );
 }

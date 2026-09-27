@@ -126,6 +126,48 @@ they arrived as success.
   refused release, the shape that left an enqueue on `ZMCP_SHR_I_BDFL` and locked
   every later run out; they report it by name now.
 
+- **A group activation is three requests, and only the third says what
+  happened.** `POST /activation/runs` answers `202` with the run id in
+  `Location` and an empty body — which parses to zero messages and reads exactly
+  like "no errors". So `shared:setup` logged *"Group activation completed
+  successfully"* over eleven objects that stayed inactive, with not one SAP
+  message to say why, and `ActivateObjectLow`'s group path answered
+  `activated: null` for every call. `lib/strategies/activationRun.ts` waits on
+  `getActivationRun` (long-polling, bounded) until `runs:status` settles and then
+  reads `getActivationResults`, where the `chkl:messages` are. The tool answers
+  `run_status`, `messages` and a real `activated` now — `null` only for a run that
+  has not settled — and the setup's retry is driven by the inactive list rather
+  than by the accept. Re-run on a BTP trial 2026-09-28: `runs:status finished,
+  8 message(s)`, all eight warnings (`Key must have the type Inverted Individual
+  on the database`), `Confirmed active: all 30 object(s)`.
+
+- **`CheckPackage`/`CheckPackageLow` required a `super_package` they never
+  sent.** The guard refused before any request, so a package with no parent —
+  `super_package: ""`, which is what a top-level package has — could not be
+  checked at all: measured on a BTP trial 2026-09-28, the suite's own
+  `ZMCP_SHR_PKG` answered `isError: true` with nothing on the wire while the
+  other nine check tools passed. The member takes
+  `check({ packageName }, status?, options?)`, and the parameter's own
+  description had said it does not reach the endpoint all along. It stays
+  accepted and is no longer required; the surface ratchet records the relaxation
+  rather than having its fixture edited.
+
+- **`DEBUG_HTTP_WIRE` — there was no HTTP wire log at all.**
+  `@mcp-abap-adt/connection` logs the session, the CSRF token and the critical
+  section and nothing about a request, and `logWire` is an RFC transport option
+  the HTTP transports do not take, so `DEBUG_CONNECTORS` answered nothing when
+  the question was *what did we send and what came back*. Finding the
+  `CheckPackage` cause needed a throwaway script that wrapped `makeAdtRequest` by
+  hand. The switch lives in `connectionFactory` now, symmetric with
+  `DEBUG_RFC_WIRE`: method, URL, params, headers with their values redacted by
+  name, and bodies clipped at `DEBUG_HTTP_BODY_CHARS`, on stderr.
+
+- **A refused check says what it refused.**
+  `expect(response.isError).toBe(false)` printed `Expected: false / Received:
+  true` and nothing else, so the `CheckPackage` refusal was invisible from the
+  suite; all fifteen assertions in that file raise the handler's own payload now.
+
+
 ### Removed
 
 - **`fetchNodeStructure` from `@mcp-abap-adt/lib/utils`** — a deprecated stub that

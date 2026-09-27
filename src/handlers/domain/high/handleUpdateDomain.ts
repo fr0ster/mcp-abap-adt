@@ -181,7 +181,7 @@ export async function handleUpdateDomain(
       );
 
       const written = await withLock(
-        () => obj.lock({ domainName }),
+        () => obj.lock({ domainName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -216,7 +216,8 @@ export async function handleUpdateDomain(
                 analyse: analyseException,
               }),
           ),
-        (lockHandle) => obj.unlock({ domainName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ domainName }, lockHandle, { analyse: analyseException }),
       );
 
       if (!written.ok) {

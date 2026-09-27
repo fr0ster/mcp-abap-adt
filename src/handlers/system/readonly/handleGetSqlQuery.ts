@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -73,14 +74,18 @@ export async function handleGetSqlQuery(
 
   logger?.info(`Executing SQL query (rows=${rowNumber})`);
 
-  // `getSqlQuery(params)` takes no options object at all — no `analyse` to
-  // pass, matching the brief.
+  // `getSqlQuery(params)` took no options object at all until adt-clients 23
+  // gave every member one — a refused query is read as a refusal now, not
+  // parsed as an empty result set.
   return answer(
     { tool: 'GetSqlQuery', detail },
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getSqlQuery({ sql_query: sqlQuery, row_number: rowNumber }),
+        .getSqlQuery(
+          { sql_query: sqlQuery, row_number: rowNumber },
+          { analyse: analyseException },
+        ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;

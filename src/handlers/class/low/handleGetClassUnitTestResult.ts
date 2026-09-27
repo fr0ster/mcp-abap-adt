@@ -45,6 +45,7 @@
  * choose a level of until the carve-out above is closed.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -133,6 +134,17 @@ export async function handleGetClassUnitTestResult(
         unitTest.getResult(run_id, {
           withNavigationUris: with_navigation_uris,
           format,
+          // `analyseException`, not `analyseUnitTest`, though the migration
+          // guide's example names the latter for `getResult`. `analyseUnitTest`
+          // reads `aunit:runResult` and refuses on the alerts of a method that
+          // failed — and a failing test is not an ADT-level refusal: measured
+          // against `unittest-run-passing--02-runs-*` and
+          // `refusal-unittest-run-failing--02-runs-*`, both answer
+          // `status="FINISHED"`, the failure living in `alerts` inside the
+          // result document (see `unit_test/shared/pollRun.ts`). This tool's job
+          // is to hand that document to the caller; refusing it would lose the
+          // report the caller asked for.
+          analyse: analyseException,
         }),
       (value: string) => value,
     );

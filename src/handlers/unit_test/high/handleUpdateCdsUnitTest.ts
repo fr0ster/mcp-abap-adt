@@ -106,7 +106,7 @@ export async function handleUpdateCdsUnitTest(
       );
 
       return withLock(
-        () => obj.lock({ className }),
+        () => obj.lock({ className }, { analyse: analyseException }),
         (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
@@ -116,7 +116,8 @@ export async function handleUpdateCdsUnitTest(
               analyse: analyseException,
             },
           ),
-        (lockHandle) => obj.unlock({ className }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
     },
     project(detail, terseWrite),

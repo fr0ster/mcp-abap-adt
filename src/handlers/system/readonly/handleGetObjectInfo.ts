@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -180,7 +181,7 @@ async function buildTree(
     const rootResponse = await utils.fetchNodeStructure(
       objectType,
       objectName,
-      { withShortDescriptions: true },
+      { withShortDescriptions: true, analyse: analyseException },
     );
     if (!rootResponse.ok) {
       return rootResponse as IAdtResponse<TreeNode, IAdtError>;
@@ -199,7 +200,11 @@ async function buildTree(
       const childResponse = await utils.fetchNodeStructure(
         objectType,
         objectName,
-        { nodeId: child.nodeId, withShortDescriptions: true },
+        {
+          nodeId: child.nodeId,
+          withShortDescriptions: true,
+          analyse: analyseException,
+        },
       );
       if (!childResponse.ok) {
         return childResponse as IAdtResponse<TreeNode, IAdtError>;

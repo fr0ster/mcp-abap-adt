@@ -17,9 +17,12 @@
  * — named fields instead of a parsed-XML blob shaped by whatever the feed
  * document happened to contain.
  */
+
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourProfiler } from '../../../lib/strategies/resultSets';
 
 export const TOOL_DEFINITION = {
   name: 'RuntimeListProfilerTraceFiles',
@@ -37,11 +40,13 @@ export async function handleRuntimeListProfilerTraceFiles(
   context: HandlerContext,
 ) {
   const { connection, logger } = context;
-  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
+    ourProfiler,
+  );
 
   return answer(
     { tool: 'RuntimeListProfilerTraceFiles', detail: 'terse' },
-    () => profiler.list(),
+    () => profiler.list({ analyse: analyseException }),
     (entries) => ({
       success: true,
       count: entries.length,

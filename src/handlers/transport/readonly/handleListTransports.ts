@@ -245,8 +245,12 @@ export async function handleListTransports(
       // the same reason. It is also not optional: the slot arrived with
       // 19.1.0, and `resultsFor` refuses a slot it has no reading for rather
       // than guessing one.
+      // No keep-list any more: in adt-clients 23 the shipped
+      // `searchConfigurations` answers the document, so the reading is named in
+      // `READING_BY_SLOT` — `transportSearchConfigurations`, the library's own —
+      // and `resultsFor` stamps it like every other slot.
       const request = createAdtClient(connection, logger).getRequest(
-        resultsFor(transportDocuments, ['searchConfigurations']),
+        resultsFor(transportDocuments),
       );
 
       const answered = await request.searchConfigurations({
@@ -274,7 +278,10 @@ export async function handleListTransports(
 
       const readings: AdtReading<unknown>[] = [];
       for (const configuration of running) {
-        const listed = await request.list({ configUri: configuration.uri });
+        const listed = await request.list({
+          configUri: configuration.uri,
+          analyse: analyseException,
+        });
         // The failing search's own answer, untouched — the rule `sequence()`
         // follows, for the same reason: a sentence composed here would stand
         // beside the strategy's own account of the same refusal.

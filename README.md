@@ -213,6 +213,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-13.0.md](docs/MIGRATION-13.0.md)** - What a consumer on the 12.x contract changes
 - **[docs/MIGRATION-12.0.md](docs/MIGRATION-12.0.md)** - What a consumer on the 11.x contract changes
 
 ## Dependencies
@@ -222,7 +223,9 @@ Two packages do the work:
 - **[@mcp-abap-adt/connection](https://www.npmjs.com/package/@mcp-abap-adt/connection)** – connection/auth/session layer
 - **[@mcp-abap-adt/adt-clients](https://www.npmjs.com/package/@mcp-abap-adt/adt-clients)** – Builder-first ADT clients
 
-and four packages declare the contracts both of them and this project are written against — `@mcp-abap-adt/interfaces-adt`, `-auth`, `-auth-sap` and `-utils`. They replace the single `@mcp-abap-adt/interfaces` umbrella, which is no longer published: a consumer naming a contract package directly gets one copy of it in the tree and takes its majors one domain at a time.
+and five packages declare the contracts both of them and this project are written against — `@mcp-abap-adt/interfaces-adt`, `-adt-connection` (where `IAbapConnection` and `IAdtWireResponse` live), `-auth`, `-auth-sap` and `-utils`. They replace the single `@mcp-abap-adt/interfaces` umbrella, which is no longer published: a consumer naming a contract package directly gets one copy of it in the tree and takes its majors one domain at a time.
+
+The verdict on an ADT answer is a strategy, not a default: since `adt-clients` 23 no member judges its own answer, and **[@mcp-abap-adt/adt-strategies](https://www.npmjs.com/package/@mcp-abap-adt/adt-strategies)** holds the readings this project passes to every call. That is what keeps a refusal ADT embeds in an HTTP `200` — an activation that did not activate, a delete that was refused — from reaching a caller as success.
 
 Everything above is installed by `npm install` and published to npm. `@mcp-abap-adt/sap-rfc-lite` is optional and only needed for the RFC transport, which also requires the SAP NW RFC SDK on the machine.
 
@@ -481,7 +484,8 @@ library never puts the server in your dependency tree.
 
 **The packages underneath are LGPL-3.0-only** — `@mcp-abap-adt/adt-clients`,
 `adt-strategies`, `connection`, `logger`, `auth-broker`, `auth-providers`,
-`auth-stores` and the contract packages `interfaces-adt`, `interfaces-auth`,
+`auth-stores` and the contract packages `interfaces-adt`,
+`interfaces-adt-connection`, `interfaces-network`, `interfaces-auth`,
 `interfaces-auth-sap` and `interfaces-utils` — and the library links them at
 runtime. It was four of them when this paragraph was written; the rule is the
 whole scope now, libraries LGPL and servers AGPL or GPL, and the MIT that a few

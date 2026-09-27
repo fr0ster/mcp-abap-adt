@@ -72,7 +72,7 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
-import { analyseActivation } from '@mcp-abap-adt/adt-strategies';
+import { analyseActivation, analyseAny } from '@mcp-abap-adt/adt-strategies';
 import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -319,7 +319,9 @@ export async function handleActivateObject(
     () =>
       client
         .getUtils(ourUtils)
-        .activateObjectsGroup(activationObjects, preaudit),
+        .activateObjectsGroup(activationObjects, preaudit, {
+          analyse: analyseAny,
+        }),
     (runId: string) => {
       // A run id is the only evidence this path has that anything was
       // accepted — `activationRunId` answers `''` when no `Location` header
@@ -343,10 +345,12 @@ export async function handleActivateObject(
             'afterwards; an object still listed there did not activate. Right after ' +
             'acceptance the run may still be in progress, so an immediate check can ' +
             'still show an object as inactive that goes on to activate a moment ' +
-            'later. Separately, a refusal embedded in this accept response is not ' +
-            'read as a failure on this path (activateObjectsGroup takes no analyse ' +
-            'strategy on modern or legacy systems; see issue #200, tracked for the ' +
-            'legacy contract specifically in issue #207).'
+            'later. A refusal this accept response states IS read as a failure ' +
+            'since adt-clients 23 gave activateObjectsGroup an analyse (this path ' +
+            'passes analyseAny, which dispatches on the root element because the ' +
+            'group answer is a checklist or an inactiveObjects list depending on ' +
+            'what was asked); a refusal it states in neither form is still not ' +
+            'reachable — see issue #200, and issue #207 for the legacy contract.'
           : `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
             'object(s) — no run id came back, so this handler has no evidence a run ' +
             'was queued at all. Prefer calling this tool one object at a time when ' +

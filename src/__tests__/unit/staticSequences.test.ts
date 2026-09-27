@@ -39,7 +39,10 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseException,
+  analysePublication,
+} from '@mcp-abap-adt/adt-strategies';
 import { handleListFunctionGroupIncludes } from '../../handlers/function_include/readonly/handleListFunctionGroupIncludes';
 import { handleListFunctionModules } from '../../handlers/function_include/readonly/handleListFunctionModules';
 import { handleCreateServiceBinding } from '../../handlers/service_binding/high/handleCreateServiceBinding';
@@ -143,7 +146,7 @@ describe('SHAPE 1 — a rename, still one call', () => {
     },
   );
 
-  it('ValidateServiceBinding passes analyseException, not analyseException', async () => {
+  it('ValidateServiceBinding passes analyseException, not analyseValidation', async () => {
     const seen: unknown[] = [];
     fakeClient = fakeClientOf({
       validate: async (_config: unknown, options: any) => {
@@ -163,7 +166,10 @@ describe('SHAPE 1 — a rename, still one call', () => {
     fakeClient = fakeClientOf({
       search: async (_c: unknown, o: any) => {
         seen.push(o?.analyse);
-        return okResponse([]);
+        // `ourUtils.search` wraps the library's `utilSearchHits` in our
+        // `reading()`, so the hits arrive in `value` with the document beside
+        // them — what the resolver reads as `getResult().value.value`.
+        return okResponse(reading([], '<objectReferences/>', 200));
       },
     });
     const fn = createPackagePatternResolver(context as any);
@@ -345,7 +351,7 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
     service_name: 'ZSRV',
   };
 
-  it('locks before update and unlocks after with the SAME handle, passing the documented timeout but no analyse — the library default (publicationRefusal) is the tailored verdict', async () => {
+  it('locks before update and unlocks after with the SAME handle, passing the documented timeout and the publication verdict the library no longer applies itself', async () => {
     const order: string[] = [];
     const seen: Record<string, unknown> = {};
     fakeClient = fakeClientOf({
@@ -373,15 +379,20 @@ describe('SHAPE 4a — UpdateServiceBinding: one call, no successor of the compo
       desiredPublicationState: 'published',
       serviceType: 'odatav4',
     });
-    // The lock handle and a timeout travel through options — but never a
-    // strategy. `classifyServiceBinding` is not called either: there was
-    // never a second member in the removed composite's replacement to call.
+    // The lock handle, a timeout and the strategy travel through options.
+    // `classifyServiceBinding` is not called either: there was never a second
+    // member in the removed composite's replacement to call.
     expect((seen.options as any).lockHandle).toBe('LOCK_HANDLE_1');
     // Against the documented worst case itself, not "anything past the
     // 120s default" — a value one second past the default would satisfy a
     // loose bound and still fall short of what the job is measured to take.
     expect((seen.options as any).timeout).toBe(PUBLISH_TIMEOUT_MS);
-    expect('analyse' in (seen.options as any)).toBe(false);
+    // `analysePublication` by identity, not merely "some strategy": the
+    // verdict this endpoint needs is `<SEVERITY>` in the job's own document,
+    // and it was the member's shipped default until adt-clients 23 stopped
+    // interpreting anything. `analyseException` here would inspect an element
+    // a refused publication does not carry.
+    expect((seen.options as any).analyse).toBe(analysePublication);
     // The handle `unlock` releases is the one `lock` answered — a wrong or
     // constant handle would still pass every assertion above.
     expect(seen.unlockedWith).toBe('LOCK_HANDLE_1');

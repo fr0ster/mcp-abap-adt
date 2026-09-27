@@ -1,4 +1,5 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
@@ -56,6 +57,7 @@ export async function handleRuntimeListSystemMessages(
         maxResults: args?.max_results,
         from: args?.from,
         to: args?.to,
+        analyse: analyseException,
       }),
     (messages) => ({
       success: true,

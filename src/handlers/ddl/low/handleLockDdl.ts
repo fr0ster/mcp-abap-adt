@@ -9,6 +9,7 @@
  * varies with `detail`, so the parameter is not added to this tool's surface.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -75,7 +76,10 @@ export async function handleLockDdl(
 
   return answer(
     { tool: 'LockDdlLow', detail: 'terse' },
-    () => createAdtClient(connection, logger).getDdl().lock({ ddlName }),
+    () =>
+      createAdtClient(connection, logger)
+        .getDdl()
+        .lock({ ddlName }, { analyse: analyseException }),
     (lockHandle: string) => ({
       success: true,
       ddl_name: ddlName,

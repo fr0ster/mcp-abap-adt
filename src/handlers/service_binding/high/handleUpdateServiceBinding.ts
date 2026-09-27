@@ -26,10 +26,10 @@
  * > invalid transition comes back as `SEVERITY` in the job's own document."
  *
  * `update()`'s body (`AdtService.js` line ~302) confirms this directly: one
- * `updateRequest` call, no second request before or after it, and its
- * default `analyse` is the exported `publicationRefusal` — read from the
- * job's own `<SEVERITY>`, not from HTTP status, and not overridden here
- * because it already is the tailored verdict this endpoint needs. The
+ * `updateRequest` call, no second request before or after it. The verdict it
+ * needs — `<SEVERITY>` in the job's own document, not the HTTP status — used
+ * to be its shipped default; since adt-clients 23 interprets nothing, the
+ * same reading is passed in from here as `analysePublication`. The
  * removed composite is therefore **one call**, not a sequence:
  * `classifyServiceBinding` (a GET against `/businessservices/release`,
  * confirmed in the same file) is a different endpoint entirely — nothing in
@@ -51,6 +51,17 @@
  * through `withLock` — the same combinator every other locked write in this
  * repository uses — releasing it on every path out of `update()`, refused
  * or not.
+ *
+ * **And the lock is read with `analysePublicationLock`, not
+ * `analyseException`.** A `403` on this LOCK is not a failure to stop for: it
+ * means an editing session holds the binding — an open Eclipse editor keeps
+ * its lock after the job finishes, until the editor closes — and the job is
+ * posted and answered the same either way, which is how Eclipse itself treats
+ * its own LOCK's `403`. The lock then comes back without a handle (`''`), so
+ * there is nothing to give back. That tolerance was the member's shipped
+ * default until adt-clients 23 stopped interpreting anything; reading this
+ * lock with `analyseException` instead would refuse the publication for a
+ * reason Eclipse ignores.
  *
  * **`service_name`/`service_version` stay on the tool surface but no longer
  * reach the wire.** `IServiceBindingPublicationConfig` doesn't carry them at
@@ -78,6 +89,11 @@
  */
 
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseException,
+  analysePublication,
+  analysePublicationLock,
+} from '@mcp-abap-adt/adt-strategies';
 import {
   SERVICE_BINDING_VARIANT_MAP,
   type ServiceBindingVariant,
@@ -209,13 +225,20 @@ export async function handleUpdateServiceBinding(
         resultsFor(serviceDocuments),
       );
       return withLock(
-        () => obj.lock({ bindingName }),
+        () => obj.lock({ bindingName }, { analyse: analysePublicationLock }),
         (lockHandle) =>
           obj.update(
             { bindingName, desiredPublicationState, serviceType },
-            { lockHandle, timeout: PUBLISH_TIMEOUT_MS },
+            {
+              lockHandle,
+              timeout: PUBLISH_TIMEOUT_MS,
+              analyse: analysePublication,
+            },
           ),
-        (lockHandle) => obj.unlock({ bindingName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ bindingName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
     },
     project(detail, terseWrite),

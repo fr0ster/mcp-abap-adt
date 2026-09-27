@@ -3,13 +3,17 @@
  *
  * Uses AdtClient.getStructure().unlock from @mcp-abap-adt/adt-clients 19.
  *
- * `unlock()` accepts no options either — no `analyse`, and its success value
- * is `void`. There is no `AdtReading` to read a status off (unlock does not go
- * through the result-set strategies at all), so the synthetic 200 below is a
- * stand-in for "the call answered ok" rather than a status read off the wire —
- * `answer()` only reaches this projection once `ok` is already `true`.
+ * `unlock()` takes an `analyse` since adt-clients 23 — every member does, and
+ * none of them interprets anything on its own any more — so a refused release
+ * is read here with `analyseException` rather than left to a default that no
+ * longer exists. Its success value is still `void`: there is no `AdtReading` to
+ * read a status off (unlock does not go through the result-set strategies at
+ * all), so the synthetic 200 below is a stand-in for "the call answered ok"
+ * rather than a status read off the wire — `answer()` only reaches this
+ * projection once `ok` is already `true`.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -87,7 +91,7 @@ export async function handleUnlockStructure(
     () =>
       createAdtClient(connection, logger)
         .getStructure()
-        .unlock({ structureName }, lock_handle),
+        .unlock({ structureName }, lock_handle, { analyse: analyseException }),
     (value) => terseWrite(value, 200),
   );
 }

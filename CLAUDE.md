@@ -106,7 +106,7 @@ upgrade waiting to happen. Measured 2026-09-24:
   `typescript` peer at all, and CAP's docs name no version — `cds watch` runs
   `cds-tsx`, which transpiles without type checking. But cds-typer and cds-types
   both devDepend on `typescript ^6.0.3`, so 6 is what SAP tests.
-- `ts-jest` caps it: the latest, 29.4.13, declares
+- `ts-jest` caps it: the latest, 29.4.14, declares
   `peerDependencies.typescript: ">=4.3 <7"`, and every suite here runs through
   it. `.npmrc` sets `legacy-peer-deps=true`, so npm would install the conflict
   silently rather than refuse it.
@@ -116,6 +116,54 @@ upgrade waiting to happen. Measured 2026-09-24:
 The cheap signal, if the question ever comes back:
 `npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
 deciding condition, not ts-jest.
+
+## Every client call carries an `analyse`
+
+`@mcp-abap-adt/adt-clients` 23 interprets nothing: every member reads
+`options?.analyse` and there is no `?? someDefault` behind it anywhere. So a call
+that passes no strategy has **no verdict** — whatever HTTP succeeded is a
+success, including the refusals ADT embeds in a `200`, which is the whole class
+of bug this repository has been closing since 8.10.0.
+
+Pass `analyseException` unless the refusal has a known shape, and then pass the
+named reading for it (`analyseActivation`, `analyseDeletion`, `analyseCheck`,
+`analyseValidation`, `analysePublication`, `analysePublicationLock`,
+`analyseMessageClassMessage(msgno)`, `analyseUnitTestStart`,
+`analyseCdsTestDoubles`, `analyseAny` for a form not known in advance — all from
+`@mcp-abap-adt/adt-strategies`).
+
+`src/__tests__/unit/handlerInvariants.test.ts` enforces it, from the type checker
+rather than a regex: it resolves every member call under `src/handlers/**`, keeps
+the ones whose options parameter declares an `analyse`, and fails on any that is
+not given one. There is no exception list, and one should not be reintroduced —
+the four that used to be excused were all members with a tailored default of
+their own, and 23 removed every such default.
+
+**Two traps this release walked into, both invisible to the compiler:**
+
+- **`as any` on a client accessor hides a changed contract.** Three handlers
+  reach `getUnitTest()`/`getClass()` through a cast; when `lockTestClasses`
+  stopped answering a bare string and `getStatusResponse()` disappeared, nothing
+  was reported and the handlers answered nonsense. Grep for `as any` before
+  trusting a green build after a client bump.
+- **A `const` options object gets no excess-property check.** `const cfg = {...};
+  new Thing(cfg)` accepts fields the type does not declare — which is how
+  `browser` and `redirectPort` kept being passed to a provider that had replaced
+  them with an `authorization` strategy, silently ignored. When a package's
+  options type changes, check the object's fields against it by hand.
+
+**Where the rule is not enforced yet:** `scripts/` — 56 calls in
+`capture-adt-corpus.ts` and its siblings pass no strategy. Left deliberately: the
+corpus is recorded by a wire interceptor on `makeAdtRequest`, so what a member
+does with the answer does not change the bytes captured, and those scripts' flow
+was written around members that threw. Fixing them is a change to which cases the
+capture aborts on, and belongs with the typecheck gate for `scripts/` and
+`tools/` (issue #234), not with a dependency bump.
+
+A test that asserts the arguments of such a call pins the strategy **by
+identity** (`expect(call?.analyse).toBe(analyseException)`), not merely that
+something was passed; for a strategy built per call — `analyseMessageClassMessage`
+— pin that it is *not* the generic one.
 
 ## Plans and Specs
 

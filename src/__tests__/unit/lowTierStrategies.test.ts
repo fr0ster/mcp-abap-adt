@@ -218,6 +218,7 @@ import { handleValidateTable } from '../../handlers/table/low/handleValidateTabl
 import { handleCreateTransport } from '../../handlers/transport/low/handleCreateTransport';
 import { corpusBody } from '../../lib/adtCorpus';
 import { structured, verbatim } from '../../lib/strategies/reading';
+import { ourTransport } from '../../lib/strategies/resultSets';
 import { sessionContext } from '../../lib/utils';
 import {
   fakeClientOf,
@@ -469,12 +470,12 @@ describe('class', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockClassLow passes no analyse and carries no detail parameter', async () => {
+  it('LockClassLow passes analyseException and carries no detail parameter', async () => {
     await handleLockClass(context as any, { class_name: 'ZCL_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getClass');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockClassToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -498,15 +499,15 @@ describe('class', () => {
     });
   });
 
-  it('UnlockClassLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockClassLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockClass(context as any, {
       class_name: 'ZCL_X',
       lock_handle: 'h',
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getClass');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in UnlockClassToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -540,11 +541,11 @@ describe('class', () => {
       expect(call?.factory).toBe('getClass');
     });
 
-    it('LockClassTestClasses and UnlockClassTestClasses pass no analyse — lockTestClasses/unlockTestClasses accept none', async () => {
+    it('LockClassTestClasses and UnlockClassTestClasses pass analyseException — since adt-clients 23 both answer an IAdtResponse and accept one', async () => {
       await handleLockClassTestClasses(context as any, { class_name: 'ZCL_X' });
       const lockCall = callTo('lockTestClasses');
-      expect(lockCall?.carriedAnalyse).toBe(false);
-      expect(lockCall?.analyse).toBeUndefined();
+      expect(lockCall?.carriedAnalyse).toBe(true);
+      expect(lockCall?.analyse).toBe(analyseException);
       expect(lockCall?.factory).toBe('getClass');
 
       await handleUnlockClassTestClasses(context as any, {
@@ -552,8 +553,8 @@ describe('class', () => {
         lock_handle: 'h',
       });
       const unlockCall = callTo('unlockTestClasses');
-      expect(unlockCall?.carriedAnalyse).toBe(false);
-      expect(unlockCall?.analyse).toBeUndefined();
+      expect(unlockCall?.carriedAnalyse).toBe(true);
+      expect(unlockCall?.analyse).toBe(analyseException);
       expect(unlockCall?.factory).toBe('getClass');
     });
   });
@@ -586,12 +587,12 @@ describe('interface', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockInterfaceLow passes no analyse and carries no detail parameter', async () => {
+  it('LockInterfaceLow passes analyseException and carries no detail parameter', async () => {
     await handleLockInterface(context as any, { interface_name: 'ZIF_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getInterface');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockInterfaceToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -631,7 +632,7 @@ describe('interface', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockInterfaceLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockInterfaceLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockInterface(context as any, {
       interface_name: 'ZIF_X',
       lock_handle: 'h',
@@ -639,8 +640,8 @@ describe('interface', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getInterface');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockInterfaceToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -700,12 +701,12 @@ describe('behavior_definition', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockBehaviorDefinitionLow passes no analyse and carries no detail parameter', async () => {
+  it('LockBehaviorDefinitionLow passes analyseException and carries no detail parameter', async () => {
     await handleLockBehaviorDefinition(context as any, { name: 'ZBDEF_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getBehaviorDefinition');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in LockBehaviorDefinitionToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -740,7 +741,7 @@ describe('behavior_definition', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockBehaviorDefinitionLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockBehaviorDefinitionLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockBehaviorDefinition(context as any, {
       name: 'ZBDEF_X',
       lock_handle: 'h',
@@ -748,8 +749,8 @@ describe('behavior_definition', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getBehaviorDefinition');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockBehaviorDefinitionToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -806,8 +807,8 @@ describe('behavior_implementation — declared over the class document set', () 
     });
     const lockCall = callTo('lock');
     expect(lockCall?.factory).toBe('getBehaviorImplementation');
-    expect(lockCall?.carriedAnalyse).toBe(false);
-    expect(lockCall?.analyse).toBeUndefined();
+    expect(lockCall?.carriedAnalyse).toBe(true);
+    expect(lockCall?.analyse).toBe(analyseException);
     expect(
       'detail' in
         LockBehaviorImplementationToolDefinition.inputSchema.properties,
@@ -991,12 +992,12 @@ describe('ddl', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockDdlLow passes no analyse and carries no detail parameter', async () => {
+  it('LockDdlLow passes analyseException and carries no detail parameter', async () => {
     await handleLockDdl(context as any, { ddl_name: 'ZVW_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getDdl');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockDdlToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1031,7 +1032,7 @@ describe('ddl', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockDdlLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockDdlLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockDdl(context as any, {
       ddl_name: 'ZVW_X',
       lock_handle: 'h',
@@ -1039,8 +1040,8 @@ describe('ddl', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getDdl');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in UnlockDdlToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1159,12 +1160,12 @@ describe('ddlx (metadataExtension)', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockMetadataExtensionLow passes no analyse and carries no detail parameter', async () => {
+  it('LockMetadataExtensionLow passes analyseException and carries no detail parameter', async () => {
     await handleLockMetadataExtension(context as any, { name: 'ZI_X_DDLX' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getMetadataExtension');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in LockMetadataExtensionToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -1199,7 +1200,7 @@ describe('ddlx (metadataExtension)', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockMetadataExtensionLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockMetadataExtensionLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockMetadataExtension(context as any, {
       name: 'ZI_X_DDLX',
       lock_handle: 'h',
@@ -1207,8 +1208,8 @@ describe('ddlx (metadataExtension)', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getMetadataExtension');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockMetadataExtensionToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -1331,12 +1332,12 @@ describe('structure', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockStructureLow passes no analyse and carries no detail parameter', async () => {
+  it('LockStructureLow passes analyseException and carries no detail parameter', async () => {
     await handleLockStructure(context as any, { structure_name: 'ZST_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getStructure');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockStructureToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1371,7 +1372,7 @@ describe('structure', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockStructureLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockStructureLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockStructure(context as any, {
       structure_name: 'ZST_X',
       lock_handle: 'h',
@@ -1379,8 +1380,8 @@ describe('structure', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getStructure');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockStructureToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -1489,12 +1490,12 @@ describe('table', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockTableLow passes no analyse and carries no detail parameter', async () => {
+  it('LockTableLow passes analyseException and carries no detail parameter', async () => {
     await handleLockTable(context as any, { table_name: 'ZT_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getTable');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockTableToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1529,7 +1530,7 @@ describe('table', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockTableLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockTableLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockTable(context as any, {
       table_name: 'ZT_X',
       lock_handle: 'h',
@@ -1537,8 +1538,8 @@ describe('table', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getTable');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in UnlockTableToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1663,12 +1664,12 @@ describe('program', () => {
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('LockProgramLow passes no analyse and carries no detail parameter', async () => {
+  it('LockProgramLow passes analyseException and carries no detail parameter', async () => {
     await handleLockProgram(context as any, { program_name: 'Z_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getProgram');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockProgramToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1703,7 +1704,7 @@ describe('program', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockProgramLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockProgramLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockProgram(context as any, {
       program_name: 'Z_X',
       lock_handle: 'h',
@@ -1711,8 +1712,8 @@ describe('program', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getProgram');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in UnlockProgramToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -1914,14 +1915,14 @@ describe('function (function group)', () => {
     expect(call?.analyse).toBe(analyseDeletion);
   });
 
-  it('LockFunctionGroupLow passes no analyse and carries no detail parameter', async () => {
+  it('LockFunctionGroupLow passes analyseException and carries no detail parameter', async () => {
     await handleLockFunctionGroup(context as any, {
       function_group_name: 'ZFG_X',
     });
     const call = callTo('lock');
     expect(call?.factory).toBe('getFunctionGroup');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in LockFunctionGroupToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -1956,7 +1957,7 @@ describe('function (function group)', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockFunctionGroupLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockFunctionGroupLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockFunctionGroup(context as any, {
       function_group_name: 'ZFG_X',
       lock_handle: 'h',
@@ -1964,8 +1965,8 @@ describe('function (function group)', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getFunctionGroup');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockFunctionGroupToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -2122,15 +2123,15 @@ describe('function (function module)', () => {
     expect(call?.analyse).toBe(analyseDeletion);
   });
 
-  it('LockFunctionModuleLow passes no analyse and carries no detail parameter', async () => {
+  it('LockFunctionModuleLow passes analyseException and carries no detail parameter', async () => {
     await handleLockFunctionModule(context as any, {
       function_module_name: 'ZFM_X',
       function_group_name: 'ZFG_X',
     });
     const call = callTo('lock');
     expect(call?.factory).toBe('getFunctionModule');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in LockFunctionModuleToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -2170,7 +2171,7 @@ describe('function (function module)', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockFunctionModuleLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockFunctionModuleLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockFunctionModule(context as any, {
       function_module_name: 'ZFM_X',
       function_group_name: 'ZFG_X',
@@ -2179,8 +2180,8 @@ describe('function (function module)', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getFunctionModule');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockFunctionModuleToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -2430,12 +2431,12 @@ describe('data_element', () => {
     expect(patched).toContain('<dtel:typeName>ZD_DOMAIN</dtel:typeName>');
   });
 
-  it('LockDataElementLow passes no analyse and carries no detail parameter', async () => {
+  it('LockDataElementLow passes analyseException and carries no detail parameter', async () => {
     await handleLockDataElement(context as any, { data_element_name: 'ZDT_X' });
     const call = callTo('lock');
     expect(call?.factory).toBe('getDataElement');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in LockDataElementToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -2470,7 +2471,7 @@ describe('data_element', () => {
     expect(payload.session_id).toBe('CONN_SESSION');
   });
 
-  it('UnlockDataElementLow passes no analyse and carries no detail parameter', async () => {
+  it('UnlockDataElementLow passes analyseException and carries no detail parameter', async () => {
     await handleUnlockDataElement(context as any, {
       data_element_name: 'ZDT_X',
       lock_handle: 'h',
@@ -2478,8 +2479,8 @@ describe('data_element', () => {
     });
     const call = callTo('unlock');
     expect(call?.factory).toBe('getDataElement');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(
       'detail' in UnlockDataElementToolDefinition.inputSchema.properties,
     ).toBe(false);
@@ -2642,7 +2643,7 @@ describe('service_definition — Activate only', () => {
   });
 });
 
-describe('system — three getUtils() reads, none of which accept an analyse', () => {
+describe('system — three getUtils() reads, each carrying a strategy since adt-clients 23', () => {
   // None of fetchNodeStructure/getObjectStructure/getVirtualFoldersContents
   // takes an `options` parameter at all in the shipped AdtUtils — verified
   // against the compiled AdtUtils.js, not the declaration file. This is why
@@ -2650,18 +2651,23 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
   // 0 inspected calls and exits non-zero for this family alone: the script's
   // own "check one signature by hand before believing this" is what these
   // three tests are.
-  it('GetNodeStructureLow reaches getUtils, carrying no analyse', async () => {
+  it('GetNodeStructureLow reaches getUtils, carrying analyseException', async () => {
     await handleGetNodeStructure(context as any, {
       parent_type: 'DEVC/K',
       parent_name: 'ZP_X',
     });
     const call = callTo('fetchNodeStructure');
     expect(call?.factory).toBe('getUtils');
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZP_X',
-      { nodeId: '0000', withShortDescriptions: true },
+      {
+        nodeId: '0000',
+        withShortDescriptions: true,
+        analyse: analyseException,
+      },
     ]);
   });
 
@@ -2825,14 +2831,15 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
     expect(calls).toEqual(['fetchNodeStructure']);
   });
 
-  it("GetVirtualFoldersLow reaches getUtils, carrying no analyse, forwarding the caller's facets and defaulting the rest", async () => {
+  it("GetVirtualFoldersLow reaches getUtils, carrying analyseException, forwarding the caller's facets and defaulting the rest", async () => {
     await handleGetVirtualFolders(context as any, {
       object_search_pattern: 'Z*',
       preselection: [{ facet: 'package', values: ['ZP_X'] }],
     });
     const call = callTo('getVirtualFoldersContents');
     expect(call?.factory).toBe('getUtils');
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect(call?.args[0]).toEqual({
       objectSearchPattern: 'Z*',
       preselection: [{ facet: 'package', values: ['ZP_X'] }],
@@ -2840,17 +2847,25 @@ describe('system — three getUtils() reads, none of which accept an analyse', (
       withVersions: undefined,
       ignoreShortDescriptions: undefined,
     });
+    // The strategy travels in an options argument of its own here, not folded
+    // into the facets: `getVirtualFoldersContents(params, options)`.
+    expect(call?.args[1]).toEqual({ analyse: analyseException });
   });
 
-  it('GetObjectStructureLow reaches getUtils, carrying no analyse', async () => {
+  it('GetObjectStructureLow reaches getUtils, carrying analyseException', async () => {
     await handleGetObjectStructureLow(context as any, {
       object_type: 'DEVC/K',
       object_name: 'ZP_X',
     });
     const call = callTo('getObjectStructure');
     expect(call?.factory).toBe('getUtils');
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.args).toEqual(['DEVC/K', 'ZP_X']);
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
+    expect(call?.args).toEqual([
+      'DEVC/K',
+      'ZP_X',
+      { analyse: analyseException },
+    ]);
   });
 
   it('GetObjectStructureLow reads the same tree-text projection GetObjectStructure (read-only) uses', async () => {
@@ -2990,7 +3005,7 @@ describe('package — no Activate tool (a package is a container, no activation)
     expect(result.content[0].text).toBe('SUCCESS');
   });
 
-  it('LockPackageLow passes no analyse, forwards no superPackage to the lock member, and carries no detail parameter', async () => {
+  it('LockPackageLow passes analyseException, forwards no superPackage to the lock member, and carries no detail parameter', async () => {
     await handleLockPackage(context as any, {
       package_name: 'ZP_X',
       super_package: 'ZP',
@@ -2998,8 +3013,8 @@ describe('package — no Activate tool (a package is a container, no activation)
     const call = callTo('lock');
     expect(call?.factory).toBe('getPackage');
     expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in LockPackageToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -3049,8 +3064,8 @@ describe('package — no Activate tool (a package is a container, no activation)
     const call = callTo('unlock');
     expect(call?.factory).toBe('getPackage');
     expect(call?.args[0]).toEqual({ packageName: 'ZP_X' });
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
     expect('detail' in UnlockPackageToolDefinition.inputSchema.properties).toBe(
       false,
     );
@@ -3210,16 +3225,19 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
     });
   });
 
-  it('CreateTransportLow parses the transport number out of the real verbatim document in its own projection — resultsFor(transportDocuments) plain, no keep-list; the number comes from parsing AdtReading.value, not from a kept shipped reading', async () => {
-    // `created` maps to `verbatim` here (the table's default), so the fake
-    // hands back the same shape the real `verbatim` reading would: the raw
-    // XML string as `value`, alongside `raw` and `status`. If a future
-    // change reverted to keeping `transportDocuments.created` as shipped,
-    // `value` would already be a `parseCreatedTransport`-shaped object with
-    // no `raw`/`status` beside it, and the `detail: 'raw'` test below would
-    // have nothing to answer — this is the pairing that tells the two
-    // designs apart.
-    const reading = verbatim({ data: createdTransportXml, status: 201 } as any);
+  it('CreateTransportLow reads the real document through ourTransport — the number comes from the library reading wrapped in ours, not from a parse the handler does itself', async () => {
+    // `ourTransport` overrides the shared `created` slot with
+    // `reading(transportCreated)`: the library's parse in `value`, the document
+    // in `raw`, the status beside both. So the fake hands back exactly what
+    // that reading answers, and the `detail: 'raw'` test below is the other
+    // half of the pairing — a bare shipped reading would leave it nothing to
+    // answer, and a `verbatim` one would leave the projection nothing to read.
+    // (`created` cannot be stamped in `READING_BY_SLOT`: every family's create
+    // shares that slot name.)
+    const reading = ourTransport.created({
+      data: createdTransportXml,
+      status: 201,
+    } as any);
     fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
 
     const result: any = await handleCreateTransport(context as any, {
@@ -3239,8 +3257,11 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
     });
   });
 
-  it('CreateTransportLow answers the raw document at detail: raw — only possible because created is verbatim, not a kept reading with no raw to give', async () => {
-    const reading = verbatim({ data: createdTransportXml, status: 201 } as any);
+  it('CreateTransportLow answers the raw document at detail: raw — only possible because our reading keeps the document beside the parse', async () => {
+    const reading = ourTransport.created({
+      data: createdTransportXml,
+      status: 201,
+    } as any);
     fakeClient = fakeClientOf({ create: async () => okResponse(reading) });
 
     const result: any = await handleCreateTransport(context as any, {

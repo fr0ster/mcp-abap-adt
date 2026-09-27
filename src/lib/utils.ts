@@ -7,7 +7,7 @@ import {
   type SapConfig,
   sapConfigSignature,
 } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { AxiosError, type AxiosResponse } from 'axios';
 import { applyCertKerberosFields } from './config/applyAuthFields.js';
 import { parseAuthType } from './config/parseAuthType.js';
@@ -919,24 +919,6 @@ export async function makeAdtRequestWithTimeout(
     params,
     headers,
   );
-}
-
-/**
- * Fetches node structure from SAP ADT repository
- * @deprecated Use getAdtClient().fetchNodeStructure() instead
- */
-export async function fetchNodeStructure(
-  _connection: IAbapConnection,
-  _parentName: string,
-  _parentTechName: string,
-  _parentType: string,
-  _nodeKey: string,
-  _withShortDescriptions: boolean = true,
-): Promise<AxiosResponse> {
-  // TODO: Add fetchNodeStructure to AdtClient
-  throw new Error('fetchNodeStructure not implemented in AdtClient yet');
-  // const { getAdtClient } = await import('./clients.js');
-  // return getAdtClient().fetchNodeStructure(parentName, parentTechName, parentType, nodeKey, withShortDescriptions);
 }
 
 export async function makeAdtRequest(

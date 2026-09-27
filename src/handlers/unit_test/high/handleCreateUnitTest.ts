@@ -20,14 +20,16 @@
  * handler already built — a rename, not a redesign, and the tool's frozen
  * `required: ['tests']` describes `run`'s own signature precisely.
  *
- * `run` takes no `options.analyse` — confirmed against the shipped
- * `AdtUnitTest.d.ts`/`.js`: `IClassUnitTestRunOptions` carries no operation
- * options, and `run()`'s body always judges the answer with its own
- * `startedRun` (an `ADT_NO_FAILURE` verdict flips to a refusal only when the
- * body/headers carry no run id at all — never something this handler could
- * override). The verdict on whether a run started stays the library's.
+ * **The verdict on whether a run started is passed in now.** `run()` used to
+ * judge its own answer with `startedRun`: a refusal only when the body and the
+ * headers carried no run id at all. adt-clients 23 interprets nothing, and that
+ * same reading moved to `@mcp-abap-adt/adt-strategies` as
+ * `analyseUnitTestStart` — so it is handed to the call here. Left out, a run
+ * that answered without saying which run it is would come back `success: true`
+ * with an empty `run_id`, and every later poll would be about nothing.
  */
 
+import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -174,6 +176,7 @@ export async function handleCreateUnitTest(
           : undefined,
         riskLevel: risk_level,
         duration,
+        analyse: analyseUnitTestStart,
       }),
     (runId: string) => ({
       success: true,

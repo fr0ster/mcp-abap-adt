@@ -6,6 +6,7 @@
  * getVersionSource(content_uri). Closes #30.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -80,7 +81,9 @@ export async function handleGetObjectVersionSource(
     }
 
     try {
-      const source = await resolved.obj.getVersionSource(content_uri);
+      const source = await resolved.obj.getVersionSource(content_uri, {
+        analyse: analyseException,
+      });
       return return_response({
         data: JSON.stringify({ success: true, content_uri, source }, null, 2),
       } as AxiosResponse);

@@ -9,6 +9,7 @@
  * varies with `detail`, so the parameter is not added to this tool's surface.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -78,7 +79,7 @@ export async function handleLockFunctionGroup(
     () =>
       createAdtClient(connection, logger)
         .getFunctionGroup()
-        .lock({ functionGroupName }),
+        .lock({ functionGroupName }, { analyse: analyseException }),
     (lockHandle: string) => ({
       success: true,
       function_group_name: functionGroupName,

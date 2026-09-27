@@ -19,6 +19,7 @@
  * being mocked is.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
 const mockStructRead = jest.fn();
@@ -78,6 +79,7 @@ describe('GetStructuresList append handling (#128)', () => {
     expect(result.isError).toBe(false);
     expect(mockGetWhereUsedScope).toHaveBeenCalledWith(
       expect.objectContaining({ object_name: 'ZS', object_type: 'structure' }),
+      { analyse: analyseException },
     );
     expect(mockModifyWhereUsedScope).toHaveBeenCalledWith(
       '<scope/>',
@@ -89,6 +91,7 @@ describe('GetStructuresList append handling (#128)', () => {
         object_type: 'structure',
         scopeXml: '<scope-modified/>',
       }),
+      { analyse: analyseException },
     );
     expect(payload(result).appends_unavailable).toBeUndefined();
   });

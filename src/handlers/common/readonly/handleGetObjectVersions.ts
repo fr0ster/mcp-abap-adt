@@ -6,6 +6,7 @@
  * opaque contentUri, to be passed to GetObjectVersionSource). Closes #30.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { AdtObjectErrorCodes } from '@mcp-abap-adt/interfaces-adt';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -94,7 +95,9 @@ export async function handleGetObjectVersions(
     }
 
     try {
-      const versions = await resolved.obj.getVersions(resolved.config);
+      const versions = await resolved.obj.getVersions(resolved.config, {
+        analyse: analyseException,
+      });
       return return_response({
         data: JSON.stringify(
           {

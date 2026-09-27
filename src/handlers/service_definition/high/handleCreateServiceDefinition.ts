@@ -145,7 +145,8 @@ export async function handleCreateServiceDefinition(
       let written = created as IAdtResponse<AdtReading<unknown>, IAdtError>;
       if (args.source_code) {
         written = await withLock(
-          () => obj.lock({ serviceDefinitionName }),
+          () =>
+            obj.lock({ serviceDefinitionName }, { analyse: analyseException }),
           (lockHandle) =>
             obj.update(
               {
@@ -158,7 +159,10 @@ export async function handleCreateServiceDefinition(
                 analyse: analyseException,
               },
             ),
-          (lockHandle) => obj.unlock({ serviceDefinitionName }, lockHandle),
+          (lockHandle) =>
+            obj.unlock({ serviceDefinitionName }, lockHandle, {
+              analyse: analyseException,
+            }),
         );
       }
 

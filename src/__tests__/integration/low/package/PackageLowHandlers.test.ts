@@ -12,6 +12,7 @@
  * Run: npm test -- --testPathPattern=integration/package
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCreatePackage } from '../../../../handlers/package/low/handleCreatePackage';
 import { handleDeletePackage } from '../../../../handlers/package/low/handleDeletePackage';
 import { handleValidatePackage } from '../../../../handlers/package/low/handleValidatePackage';
@@ -251,10 +252,18 @@ describe('Package Low-Level Handlers Integration', () => {
         const adtClient = createAdtClient(connection);
         const packageObj = adtClient.getPackage();
         const written = await withLock(
-          () => packageObj.lock({ packageName: objectName }),
+          () =>
+            packageObj.lock(
+              { packageName: objectName },
+              { analyse: analyseException },
+            ),
           (lockHandle) =>
             sequence(
-              () => packageObj.readMetadata({ packageName: objectName }),
+              () =>
+                packageObj.readMetadata(
+                  { packageName: objectName },
+                  { analyse: analyseException },
+                ),
               (current) =>
                 packageObj.updateMetadata(
                   {
@@ -266,11 +275,14 @@ describe('Package Low-Level Handlers Integration', () => {
                       { description: updatedDescription },
                     ),
                     lockHandle,
+                    analyse: analyseException,
                   },
                 ),
             ),
           (lockHandle) =>
-            packageObj.unlock({ packageName: objectName }, lockHandle),
+            packageObj.unlock({ packageName: objectName }, lockHandle, {
+              analyse: analyseException,
+            }),
         );
         if (!written.ok) {
           throw new Error(`Update failed: ${written.getError().message}`);

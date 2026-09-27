@@ -94,7 +94,7 @@ export async function handleUpdateFunctionGroup(
       );
 
       return withLock(
-        () => obj.lock({ functionGroupName }),
+        () => obj.lock({ functionGroupName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -121,7 +121,10 @@ export async function handleUpdateFunctionGroup(
                 },
               ),
           ),
-        (lockHandle) => obj.unlock({ functionGroupName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ functionGroupName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
     },
     project(detail, terseWrite),

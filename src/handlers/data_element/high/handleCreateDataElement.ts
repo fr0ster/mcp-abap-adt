@@ -232,7 +232,7 @@ export async function handleCreateDataElement(
           ),
         () =>
           withLock(
-            () => obj.lock({ dataElementName }),
+            () => obj.lock({ dataElementName }, { analyse: analyseException }),
             (
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
@@ -275,7 +275,10 @@ export async function handleCreateDataElement(
                     },
                   ),
               ),
-            (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
+            (lockHandle) =>
+              obj.unlock({ dataElementName }, lockHandle, {
+                analyse: analyseException,
+              }),
           ),
         // Best-effort: wait for the write to be visible, right before the
         // first call that reads it back — see `handleCreateDomain.ts` for

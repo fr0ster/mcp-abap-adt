@@ -30,7 +30,12 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence } from '../../../lib/strategies/sequence';
 import { withLock } from '../../../lib/strategies/withLock';
+import {
+  extractXmlString,
+  patchXmlAttribute,
+} from '../../../lib/strategies/xmlPatch';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -90,18 +95,47 @@ export async function handleUpdateMessageClass(
         resultsFor(messageClassDocuments),
       );
 
-      return withLock(
-        () => obj.lock({ name }),
-        (lockHandle) =>
-          obj.updateMetadata(
-            {
-              name,
-              description: args.description,
-              transportRequest: args.transport_request,
-            },
-            { lockHandle, analyse: analyseException },
+      // **Read, patch, write — because the member stopped doing the first two.**
+      // Until adt-clients 23 `updateMetadata` read the class itself and patched
+      // `config.description` into the document: a second request this library
+      // made in the caller's place. It is one PUT of the document it is given
+      // now, so the read and the edit are here, the way every other metadata
+      // write in this repository already does them.
+      //
+      // The first `adtcore:description` in that document is the class's own;
+      // each message inside carries one too, which is why this patches the
+      // first occurrence only.
+      return sequence(
+        () => obj.readMetadata({ name }, { analyse: analyseException }),
+        (current) =>
+          withLock(
+            () => obj.lock({ name }, { analyse: analyseException }),
+            (lockHandle) =>
+              obj.updateMetadata(
+                {
+                  name,
+                  ...(args.transport_request && {
+                    transportRequest: args.transport_request,
+                  }),
+                },
+                {
+                  source: patchXmlAttribute(
+                    // `.raw`, not the value: `obj` carries
+                    // `resultsFor(messageClassDocuments)`, so the read answers an
+                    // `AdtReading` whose `value` is the parse and whose `raw` is
+                    // the document — and a document is what is patched and sent
+                    // back.
+                    extractXmlString(current.raw, `message class ${name}`),
+                    'adtcore:description',
+                    args.description,
+                  ),
+                  lockHandle,
+                  analyse: analyseException,
+                },
+              ),
+            (lockHandle) =>
+              obj.unlock({ name }, lockHandle, { analyse: analyseException }),
           ),
-        (lockHandle) => obj.unlock({ name }, lockHandle),
       );
     },
     project(detail, terseWrite),

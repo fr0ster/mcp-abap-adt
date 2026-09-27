@@ -234,6 +234,10 @@ describe('Message Class (MSAG) CRUD tools', () => {
     expect(mockMsg.read).toHaveBeenCalledWith(
       { className: 'ZMY_MSGS', msgno: '001' },
       undefined,
+      // `analyseMessageClassMessage('001')`, built for the number asked about
+      // — identity is not assertable, so this pins that a strategy arrives and
+      // that it is not the generic one that used to drop the msgno check.
+      { analyse: expect.any(Function) },
     );
     expect(payload(result).metadata).toBe(classDocument);
   });

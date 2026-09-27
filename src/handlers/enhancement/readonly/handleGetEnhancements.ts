@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -329,6 +330,7 @@ async function getIncludesListInternal(
       utils.fetchNodeStructure(parentType, parentName, {
         nodeId: '000000', // Root node
         withShortDescriptions: true,
+        analyse: analyseException,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(
@@ -365,6 +367,7 @@ async function getIncludesListInternal(
       utils.fetchNodeStructure(parentType, parentName, {
         nodeId: includesNode.nodeId,
         withShortDescriptions: true,
+        analyse: analyseException,
       }),
       new Promise<never>((_, reject) =>
         setTimeout(

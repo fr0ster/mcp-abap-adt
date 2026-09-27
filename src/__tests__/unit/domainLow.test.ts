@@ -291,12 +291,12 @@ describe('LockDomainLow', () => {
     expect(payload.lock_handle).toBe(handle);
   });
 
-  it('LockDomain passes no analyse, because lock() accepts none', async () => {
+  it('LockDomain passes analyseException — lock() accepts one since adt-clients 23', async () => {
     fakeClient = seen.client;
     await handleLockDomain(context as any, { domain_name: 'ZD' });
     const call = seen.calls.filter((c) => c.member === 'lock').at(-1);
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
   });
 });
 
@@ -314,7 +314,7 @@ describe('UnlockDomainLow', () => {
     expect(result.content[0].text).toBe('SUCCESS');
   });
 
-  it('UnlockDomain passes no analyse, because unlock() accepts none', async () => {
+  it('UnlockDomain passes analyseException — unlock() accepts one since adt-clients 23', async () => {
     fakeClient = seen.client;
     await handleUnlockDomain(context as any, {
       domain_name: 'ZD',
@@ -322,8 +322,8 @@ describe('UnlockDomainLow', () => {
       session_id: 's',
     });
     const call = seen.calls.filter((c) => c.member === 'unlock').at(-1);
-    expect(call?.carriedAnalyse).toBe(false);
-    expect(call?.analyse).toBeUndefined();
+    expect(call?.carriedAnalyse).toBe(true);
+    expect(call?.analyse).toBe(analyseException);
   });
 });
 

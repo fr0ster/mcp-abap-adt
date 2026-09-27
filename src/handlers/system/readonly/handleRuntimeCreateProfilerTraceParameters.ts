@@ -19,7 +19,9 @@
  * so `getClassExecutor()` is used as the one available door to
  * `scheduleTrace`, not because this is somehow a class-scoped trace.
  */
+
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
@@ -101,6 +103,7 @@ export async function handleRuntimeCreateProfilerTraceParameters(
         maxSizeForTraceFile: args.max_size_for_trace_file,
         amdpTrace: args.amdp_trace,
         maxTimeForTracing: args.max_time_for_tracing,
+        analyse: analyseException,
       }),
     (profilerId) => ({
       success: true,

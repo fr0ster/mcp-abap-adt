@@ -33,6 +33,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import { objectsListCache } from '../../../lib/getObjectsListCache';
@@ -167,9 +168,9 @@ export async function handleGetObjectsByType(
       : true;
   const parentName = parent_name.toUpperCase();
 
-  // `fetchNodeStructure(parentType, parentName, options?)` — no `analyse`:
-  // not named by the brief for this member, and `IGetNodeContentsOptions`
-  // carries no options field for one either.
+  // `fetchNodeStructure(parentType, parentName, options?)` — the options
+  // object carries an `analyse` since adt-clients 23, where it carried none
+  // before, so the refusal reading goes in beside `nodeId`.
   //
   // Task 28: why this tool carries no `detail`. The node-level family's
   // shape (`ourUtils.node` / `nodeLevel`, `lib/strategies/packageWalk.ts`):
@@ -185,6 +186,7 @@ export async function handleGetObjectsByType(
         .fetchNodeStructure(parent_type, parentName, {
           nodeId: node_id,
           withShortDescriptions: withDescriptions,
+          analyse: analyseException,
         }),
     (level: NodeLevel) => {
       const { text, cached } = formatObjects(

@@ -15,6 +15,7 @@
  * text instead of the real document) and both "does not mask a refusal"
  * tests red (`isError: false` instead of `true`).
  */
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetClassUnitTestResult } from '../../handlers/class/low/handleGetClassUnitTestResult';
 import { handleGetClassUnitTestStatus } from '../../handlers/class/low/handleGetClassUnitTestStatus';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
@@ -51,6 +52,9 @@ describe('GetClassUnitTestResultLow', () => {
     expect(getResult).toHaveBeenCalledWith('run-1', {
       withNavigationUris: undefined,
       format: undefined,
+      // `analyseException`, not `analyseUnitTest`: a failing test is not an
+      // ADT-level refusal, and this tool hands the document back either way.
+      analyse: analyseException,
     });
   });
 
@@ -95,7 +99,9 @@ describe('GetClassUnitTestStatusLow', () => {
 
     expect(result.isError).toBe(false);
     expect(result.content[0].text).toBe('<aunit:runStatus/>');
-    expect(getStatus).toHaveBeenCalledWith('run-2', true);
+    expect(getStatus).toHaveBeenCalledWith('run-2', true, {
+      analyse: analyseException,
+    });
   });
 
   it('does not mask a refusal as success — the defect this fix round removed', async () => {

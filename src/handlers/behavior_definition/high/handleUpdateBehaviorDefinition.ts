@@ -112,9 +112,10 @@ export async function handleUpdateBehaviorDefinition(
       const written = args.lock_handle
         ? await update(args.lock_handle)
         : await withLock(
-            () => obj.lock({ name }),
+            () => obj.lock({ name }, { analyse: analyseException }),
             update,
-            (lockHandle) => obj.unlock({ name }, lockHandle),
+            (lockHandle) =>
+              obj.unlock({ name }, lockHandle, { analyse: analyseException }),
           );
 
       if (!written.ok) {

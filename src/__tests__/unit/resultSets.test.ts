@@ -6,6 +6,7 @@ import {
   unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import { unitTestRunId } from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { corpusBody, corpusSidecar } from '../../lib/adtCorpus';
 import type { AdtReading } from '../../lib/strategies/reading';
@@ -95,7 +96,12 @@ describe('the slot table', () => {
       utilDocuments.activation,
     );
     expect(ourUtils.activation).toBe(utilDocuments.activation);
-    expect(ourUnitTest.run).toBe(unitTestDocuments.run);
+    // `ourUnitTest.run` is no longer a kept slot: in adt-clients 23 the shipped
+    // `run` answers the document, and the run id ADT puts in a header is
+    // `unitTestRunId`'s to read. So this set stamps it like any other, and what
+    // the pin above proves — a keep-list keeps the shipped function — is shown
+    // by `activation` alone.
+    expect(ourUnitTest.run).not.toBe(unitTestDocuments.run);
   });
 
   it('reads the unit-test run id out of the Location header, not the empty body', () => {
@@ -144,7 +150,12 @@ describe('the slot table', () => {
     const keptActivation: IResultStrategy<string> = ourUtils.activation;
     expect(keptActivation).toBe(utilDocuments.activation);
 
-    const keptRun: IResultStrategy<string> = ourUnitTest.run;
-    expect(keptRun).toBe(unitTestDocuments.run);
+    // `run` used to be the second kept slot, for the same reason: the run id is
+    // in a header. adt-clients 23 gave that reading a name — `unitTestRunId` —
+    // and made the shipped default the document, so the set stamps it. It still
+    // types as a strategy answering a string, which is what the handlers take,
+    // and that assignment is the pin.
+    const stampedRun: IResultStrategy<string> = ourUnitTest.run;
+    expect(stampedRun).toBe(unitTestRunId);
   });
 });

@@ -145,7 +145,7 @@ describe('the MCP tool surface', () => {
    * The second deliberate move: three tools arrived.
    *
    * ATC was in `@mcp-abap-adt/adt-clients` 19 and exposed by nothing here —
-   * `AdtRuntimeClient.getAtc()` with the variant, the worklist, the run, its
+   * `AdtRuntimeClient.getAtc(ourAtc)` with the variant, the worklist, the run, its
    * status and its findings, and no `src/handlers/atc` to reach them. The
    * refreeze was checked rather than trusted: every existing row had to match
    * the old snapshot exactly, in `inputs` and in `available_in`, and the only

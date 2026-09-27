@@ -158,7 +158,9 @@ const tokenProvider = new AuthorizationCodeProvider({
   uaaUrl: 'https://auth.example.com',
   clientId: '...',
   clientSecret: '...',
-  browser: 'system',
+  // How the login is conducted is a strategy since auth-providers 4; `browser`
+  // and `redirectPort` are not fields of this config any more.
+  authorization: browserCallbackStrategy({ browser: 'system', port: 61001 }),
 });
 
 const authBrokerFactory = new AuthBrokerFactory(

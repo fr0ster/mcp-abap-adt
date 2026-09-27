@@ -6,10 +6,11 @@
  *
  * Byte-identical logic to `handleCreateUnitTest.ts` under a different tool
  * name — see that file's header for why `run(tests, options)` replaces the
- * pre-migration `create({ tests, options })` call and why no `analyse` is
- * passed.
+ * pre-migration `create({ tests, options })` call and why the strategy passed
+ * is `analyseUnitTestStart`.
  */
 
+import { analyseUnitTestStart } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -156,6 +157,7 @@ export async function handleRunUnitTest(
           : undefined,
         riskLevel: risk_level,
         duration,
+        analyse: analyseUnitTestStart,
       }),
     (runId: string) => ({
       success: true,

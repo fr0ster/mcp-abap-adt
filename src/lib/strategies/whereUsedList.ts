@@ -1,4 +1,9 @@
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type {
+  IAdtError,
+  IAdtResponse,
+  IAnalyse,
+} from '@mcp-abap-adt/interfaces-adt';
 import type { AdtReading } from './reading';
 
 /**
@@ -9,16 +14,21 @@ import type { AdtReading } from './reading';
  * Depending on the three members structurally, not on `AdtUtils` itself —
  * the same boundary `packageWalk.ts`'s `NodeStructureSource` draws — keeps
  * this testable without a client and honest about what it actually calls.
- * Neither `getWhereUsedScope` nor `getWhereUsed` accepts an `options`
- * argument at all in adt-clients 19 (confirmed against `AdtUtils.d.ts`), so
- * there is no `analyse` to inject here — their verdict is the library's own,
- * the same absence the node-structure members in this migration share.
+ * Neither `getWhereUsedScope` nor `getWhereUsed` accepted an `options` argument
+ * at all until adt-clients 23 gave every member one, and since that release no
+ * member judges its own answer — so both are called here with
+ * `analyseException`. The composite is where the verdict has to be asked for:
+ * the handler passes a strategy to the scope read it makes itself, and these
+ * two calls happen behind it.
  */
 export interface WhereUsedSource {
-  getWhereUsedScope(params: {
-    object_name: string;
-    object_type: string;
-  }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  getWhereUsedScope(
+    params: {
+      object_name: string;
+      object_type: string;
+    },
+    options?: { analyse?: IAnalyse<IAdtError> },
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
   /** Local — issues no request. */
   modifyWhereUsedScope(
     scopeXml: string,
@@ -29,11 +39,14 @@ export interface WhereUsedSource {
       disable?: string[];
     },
   ): string;
-  getWhereUsed(params: {
-    object_name: string;
-    object_type: string;
-    scopeXml?: string;
-  }): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
+  getWhereUsed(
+    params: {
+      object_name: string;
+      object_type: string;
+      scopeXml?: string;
+    },
+    options?: { analyse?: IAnalyse<IAdtError> },
+  ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
 }
 
 export interface WhereUsedReference {
@@ -168,10 +181,13 @@ export async function fetchWhereUsedReferences(
   let scopeXml: string | undefined;
 
   if (needsScope(params)) {
-    const scope = await utils.getWhereUsedScope({
-      object_name: params.object_name,
-      object_type: params.object_type,
-    });
+    const scope = await utils.getWhereUsedScope(
+      {
+        object_name: params.object_name,
+        object_type: params.object_type,
+      },
+      { analyse: analyseException },
+    );
     if (!scope.ok) {
       return scope as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
     }
@@ -183,11 +199,14 @@ export async function fetchWhereUsedReferences(
     });
   }
 
-  const result = await utils.getWhereUsed({
-    object_name: params.object_name,
-    object_type: params.object_type,
-    ...(scopeXml !== undefined ? { scopeXml } : {}),
-  });
+  const result = await utils.getWhereUsed(
+    {
+      object_name: params.object_name,
+      object_type: params.object_type,
+      ...(scopeXml !== undefined ? { scopeXml } : {}),
+    },
+    { analyse: analyseException },
+  );
   if (!result.ok) {
     return result as unknown as IAdtResponse<WhereUsedListResult, IAdtError>;
   }

@@ -11,7 +11,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
+import {
+  AuthorizationCodeProvider,
+  browserCallbackStrategy,
+} from '@mcp-abap-adt/auth-providers';
 import {
   AbapServiceKeyStore,
   AbapSessionStore,
@@ -607,9 +610,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       {
         serviceKeyStore: hasServiceKeyStore ? serviceKeyStore : undefined,
         sessionStore,
-        tokenProvider,
+        provider: tokenProvider,
       } as any,
-      this.config.browser || 'system',
       brokerLogger,
     );
 
@@ -672,9 +674,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       {
         serviceKeyStore: undefined, // No service key store for --env mode
         sessionStore,
-        tokenProvider,
+        provider: tokenProvider,
       } as any,
-      this.config.browser || 'system',
       brokerLogger,
     );
 
@@ -860,14 +861,33 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       });
     }
 
+    // **How the login is conducted is a strategy now, not two fields.**
+    // `AuthorizationCodeProviderConfig` carried `browser` and `redirectPort`
+    // until auth-providers 4; it carries `authorization?:
+    // IAuthorizationStrategy<string>` instead, and the two old fields are not in
+    // the type at all. Nothing in the compiler catches that: this object is a
+    // `const`, so TypeScript's excess-property check does not apply at the call
+    // below, and both fields would have been dropped on the floor — the browser
+    // choice ignored, and every callback landing on `DEFAULT_CALLBACK_PORT`
+    // (61001) rather than the port `--browser-auth-port` named and the IdP has
+    // registered.
+    //
+    // `browserCallbackStrategy` is the package's own transport under the new
+    // shape, and takes both settings by name. `port` is left out when no port was
+    // configured, because `undefined` and "absent" mean the same thing there but
+    // `port: 0` does not — it binds an ephemeral one.
     const providerConfig = {
       uaaUrl: authConfig.uaaUrl,
       clientId: authConfig.uaaClientId,
       clientSecret: authConfig.uaaClientSecret,
       refreshToken: authConfig.refreshToken,
       accessToken: connConfig?.authorizationToken,
-      browser: this.config.browser || 'system',
-      redirectPort: this.config.browserAuthPort,
+      authorization: browserCallbackStrategy({
+        browser: this.config.browser || 'system',
+        ...(this.config.browserAuthPort !== undefined
+          ? { port: this.config.browserAuthPort }
+          : {}),
+      }),
       logger: providerLogger,
     };
 

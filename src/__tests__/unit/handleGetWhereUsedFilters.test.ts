@@ -17,6 +17,7 @@
  * shape being mocked is.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { okResponse, reading } from '../helpers/fakeClient';
 
 // Scope offers these searchable types (real attr order: isDefault isSelected name).
@@ -82,6 +83,9 @@ describe('GetWhereUsed type-filter params', () => {
         object_type: 'table',
         scopeXml: '<scope-modified/>',
       }),
+      // The composite carries the strategy too: both members grew an options
+      // parameter in adt-clients 23, and the refusal has to be read somewhere.
+      { analyse: analyseException },
     );
   });
 

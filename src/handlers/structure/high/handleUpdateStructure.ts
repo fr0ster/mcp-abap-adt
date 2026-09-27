@@ -99,7 +99,7 @@ export async function handleUpdateStructure(
       );
 
       const written = await withLock(
-        () => obj.lock({ structureName }),
+        () => obj.lock({ structureName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
@@ -124,7 +124,10 @@ export async function handleUpdateStructure(
               )
             : update();
         },
-        (lockHandle) => obj.unlock({ structureName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ structureName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok || !shouldActivate) {

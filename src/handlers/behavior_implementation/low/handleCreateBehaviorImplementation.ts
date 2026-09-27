@@ -202,7 +202,7 @@ export async function handleCreateBehaviorImplementation(
       // source belongs in options, not config — AdtBehaviorImplementation
       // .update() reads options?.source only (see the module doc comment).
       return withLock(
-        () => client.lock({ className }),
+        () => client.lock({ className }, { analyse: analyseException }),
         (lockHandle) =>
           client.update(
             {
@@ -216,7 +216,10 @@ export async function handleCreateBehaviorImplementation(
               analyse: analyseException,
             },
           ),
-        (lockHandle) => client.unlock({ className }, lockHandle),
+        (lockHandle) =>
+          client.unlock({ className }, lockHandle, {
+            analyse: analyseException,
+          }),
       ) as Promise<IAdtResponse<AdtReading<unknown>, IAdtError>>;
     },
     project(detail, terseWrite),

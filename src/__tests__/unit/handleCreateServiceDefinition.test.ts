@@ -10,6 +10,7 @@
  * SAP-free via a mocked AdtClient.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { okResponse, reading, refusedResponse } from '../helpers/fakeClient';
 
 const mockCreate = jest.fn();
@@ -84,7 +85,10 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
 
     expect((result as any).isError).toBe(false);
     expect(mockCreate).toHaveBeenCalledTimes(1);
-    expect(mockLock).toHaveBeenCalledWith({ serviceDefinitionName: 'ZSD' });
+    expect(mockLock).toHaveBeenCalledWith(
+      { serviceDefinitionName: 'ZSD' },
+      { analyse: analyseException },
+    );
     expect(mockUpdate).toHaveBeenCalledWith(
       { serviceDefinitionName: 'ZSD', transportRequest: undefined },
       expect.objectContaining({
@@ -96,6 +100,7 @@ describe('CreateServiceDefinition — the body is written under a lock, before a
     expect(mockUnlock).toHaveBeenCalledWith(
       { serviceDefinitionName: 'ZSD' },
       'LOCK1',
+      { analyse: analyseException },
     );
     expect(order).toEqual(['create', 'lock', 'update', 'unlock', 'activate']);
   });

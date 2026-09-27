@@ -8,6 +8,11 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseDeletion,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetDumpById } from '../../../../handlers/system/readonly/handleRuntimeGetDumpById';
 import { handleRuntimeGetProfilerTraceData } from '../../../../handlers/system/readonly/handleRuntimeGetProfilerTraceData';
@@ -205,27 +210,40 @@ async function createRunnableClass(
   }
 
   const client = createAdtClient(context.connection, context.logger);
-  await client.getClass().create({
-    className,
-    packageName: context.packageName,
-    transportRequest: context.transportRequest,
-    description: `MCP runtime test ${className}`.slice(0, 60),
-  });
+  const createdClass = await client.getClass().create(
+    {
+      className,
+      packageName: context.packageName,
+      transportRequest: context.transportRequest,
+      description: `MCP runtime test ${className}`.slice(0, 60),
+    },
+    { analyse: analyseException },
+  );
+  if (!createdClass.ok) {
+    throw new Error(createdClass.getError().message);
+  }
   // adt-clients 19 has no `activateOnUpdate` convenience — the source goes
   // through `options.source` under a caller-held lock (see
   // UpdateClassLow), and activation is its own call after unlock.
   const obj = client.getClass();
   const written = await withLock(
-    () => obj.lock({ className }),
+    () => obj.lock({ className }, { analyse: analyseException }),
     (lockHandle) =>
       obj.update(
         { className, transportRequest: context.transportRequest },
-        { source, lockHandle },
+        { source, lockHandle, analyse: analyseException },
       ),
-    (lockHandle) => obj.unlock({ className }, lockHandle),
+    (lockHandle) =>
+      obj.unlock({ className }, lockHandle, { analyse: analyseException }),
   );
   if (written.ok && options?.activate === true) {
-    await obj.activate({ className });
+    const activated = await obj.activate(
+      { className },
+      { analyse: analyseActivation },
+    );
+    if (!activated.ok) {
+      throw new Error(activated.getError().message);
+    }
   }
 }
 
@@ -262,10 +280,16 @@ async function deleteClassIfExists(
     }
 
     const client = createAdtClient(context.connection, context.logger);
-    await client.getClass().delete({
-      className,
-      transportRequest: context.transportRequest,
-    });
+    const deletedClass = await client.getClass().delete(
+      {
+        className,
+        transportRequest: context.transportRequest,
+      },
+      { analyse: analyseDeletion },
+    );
+    if (!deletedClass.ok) {
+      throw new Error(deletedClass.getError().message);
+    }
   } catch (error: any) {
     context.logger?.warn(
       `Cleanup class ${className} failed: ${error?.message}`,
@@ -307,26 +331,39 @@ async function createRunnableProgram(
   }
 
   const client = createAdtClient(context.connection, context.logger);
-  await client.getProgram().create({
-    programName,
-    packageName: context.packageName,
-    transportRequest: context.transportRequest,
-    description: `MCP runtime test ${programName}`.slice(0, 60),
-  });
+  const createdProgram = await client.getProgram().create(
+    {
+      programName,
+      packageName: context.packageName,
+      transportRequest: context.transportRequest,
+      description: `MCP runtime test ${programName}`.slice(0, 60),
+    },
+    { analyse: analyseException },
+  );
+  if (!createdProgram.ok) {
+    throw new Error(createdProgram.getError().message);
+  }
   // adt-clients 19 has no `activateOnUpdate` convenience — see
   // createRunnableClass above for the same shape.
   const obj = client.getProgram();
   const written = await withLock(
-    () => obj.lock({ programName }),
+    () => obj.lock({ programName }, { analyse: analyseException }),
     (lockHandle) =>
       obj.update(
         { programName, transportRequest: context.transportRequest },
-        { source, lockHandle },
+        { source, lockHandle, analyse: analyseException },
       ),
-    (lockHandle) => obj.unlock({ programName }, lockHandle),
+    (lockHandle) =>
+      obj.unlock({ programName }, lockHandle, { analyse: analyseException }),
   );
   if (written.ok) {
-    await obj.activate({ programName });
+    const activated = await obj.activate(
+      { programName },
+      { analyse: analyseActivation },
+    );
+    if (!activated.ok) {
+      throw new Error(activated.getError().message);
+    }
   }
 }
 
@@ -363,10 +400,16 @@ async function deleteProgramIfExists(
     }
 
     const client = createAdtClient(context.connection, context.logger);
-    await client.getProgram().delete({
-      programName,
-      transportRequest: context.transportRequest,
-    });
+    const deleted = await client.getProgram().delete(
+      {
+        programName,
+        transportRequest: context.transportRequest,
+      },
+      { analyse: analyseDeletion },
+    );
+    if (!deleted.ok) {
+      throw new Error(deleted.getError().message);
+    }
   } catch (error: any) {
     context.logger?.warn(
       `Cleanup program ${programName} failed: ${error?.message}`,
@@ -802,9 +845,12 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           // Forced run on the trigger connection → HTTP 500 → real dump.
           const triggerExecutor = new AdtExecutor(triggerConnection, logger);
           try {
-            await triggerExecutor
+            const ran = await triggerExecutor
               .getClassExecutor()
-              .run({ className: dumpClassName });
+              .run({ className: dumpClassName }, { analyse: analyseException });
+            if (!ran.ok) {
+              throw new Error(ran.getError().message);
+            }
           } catch (runError: any) {
             logger?.info(
               `Expected failing run for dump generation: ${runError?.message || String(runError)}`,

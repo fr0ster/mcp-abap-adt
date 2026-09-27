@@ -36,7 +36,7 @@
  * task's own writes.
  */
 
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleCreateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleCreateBehaviorImplementation';
 import { handleUpdateBehaviorImplementation } from '../../handlers/behavior_implementation/high/handleUpdateBehaviorImplementation';
 import { handleCreateClass } from '../../handlers/class/high/handleCreateClass';
@@ -281,9 +281,20 @@ const cases: ChannelCase[] = [
       }),
   },
   {
+    // **The read comes first now.** Until adt-clients 23 `updateMetadata` read
+    // the class itself and patched the description into what it read; it is one
+    // PUT of the document it is given since, so the handler reads, patches and
+    // writes. The first answer therefore has to be a document: the default
+    // (200, empty body) is exactly what ADT answers for a not-yet-ready object,
+    // and `extractXmlString` refuses it by design.
     name: 'UpdateMessageClass',
     method: 'PUT',
     urlContains: '/sap/bc/adt/messageclass/zmc',
+    seedAnswers: [
+      {
+        data: '<?xml version="1.0" encoding="utf-8"?><msag:abapMessageClass xmlns:msag="http://www.sap.com/adt/msag" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZMC" adtcore:description="the description this write replaces"/>',
+      },
+    ],
     run: (marker, connection) =>
       handleUpdateMessageClass(ctx(connection) as any, {
         message_class_name: 'ZMC',

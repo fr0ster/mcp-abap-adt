@@ -4,11 +4,14 @@
  * Uses AdtClient.getClass().unlockTestClasses from @mcp-abap-adt/adt-clients 19.
  *
  * `unlockTestClasses()` is not part of the `IAdtLockable` shape every other
- * family's `unlock()` implements — it takes a config and a lock handle and
- * answers a bare `IAdtWireResponse`, not an `IAdtResponse`. There is therefore
- * no `analyse` to inject (the member has no `options` parameter at all) and
- * no reading to route through `answer()`: this stays a direct call, the same
- * shape the pre-19 code already used.
+ * family's `unlock()` implements, but since adt-clients 23 it answers the way
+ * `unlock` does: an `IAdtResponse`, with an `analyse` of its own.
+ *
+ * **So the answer is read, not merely awaited.** The call goes through an
+ * `as any` (see below), so nothing in the compiler noticed that a refused
+ * release stopped arriving as a throw. Awaiting and reporting success would
+ * leave the class locked with this tool saying it was released — the one
+ * outcome an unlock must never report.
  *
  * The `as any` stays, for a structural reason rather than a typing gap the
  * package left open: `AdtClient.getClass()` is typed to return
@@ -20,6 +23,7 @@
  * this repository has to call it through the client facade at all.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -97,7 +101,19 @@ export async function handleUnlockClassTestClasses(
 
     try {
       const classClient = createAdtClient(connection, logger).getClass() as any;
-      await classClient.unlockTestClasses({ className }, lock_handle);
+      const released = await classClient.unlockTestClasses(
+        { className },
+        lock_handle,
+        { analyse: analyseException },
+      );
+      if (!released?.ok) {
+        return return_error(
+          new Error(
+            released?.getError?.()?.message ??
+              `The test classes of ${className} were NOT released, and the answer carried no message.`,
+          ),
+        );
+      }
 
       logger?.info(`✅ UnlockClassTestClasses completed: ${className}`);
 

@@ -204,7 +204,11 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZPKG',
-      { nodeId: '000001', withShortDescriptions: true },
+      {
+        nodeId: '000001',
+        withShortDescriptions: true,
+        analyse: analyseException,
+      },
     ]);
   });
 
@@ -224,7 +228,11 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZPKG',
-      { nodeId: '000000', withShortDescriptions: true },
+      {
+        nodeId: '000000',
+        withShortDescriptions: true,
+        analyse: analyseException,
+      },
     ]);
   });
 
@@ -233,7 +241,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
     const call = seen.calls.filter((c) => c.member === 'search').at(-1);
-    expect(call?.args).toEqual([{ query: 'ZCL*', maxResults: 100 }]);
+    expect(call?.args).toEqual([
+      { query: 'ZCL*', maxResults: 100 },
+      { analyse: analyseException },
+    ]);
   });
 
   it('GetAdtTypes calls getAllTypes(999, "*", "usedByProvider")', async () => {
@@ -241,17 +252,22 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleGetAdtTypes(context as any, {});
     const call = seen.calls.filter((c) => c.member === 'getAllTypes').at(-1);
-    expect(call?.args).toEqual([999, '*', 'usedByProvider']);
+    expect(call?.args).toEqual([
+      999,
+      '*',
+      'usedByProvider',
+      { analyse: analyseException },
+    ]);
   });
 
-  it('GetInactiveObjects calls getInactiveObjects() with no arguments', async () => {
+  it('GetInactiveObjects calls getInactiveObjects({ analyse }) — the one argument the member grew in adt-clients 23', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
     await handleGetInactiveObjects(context as any, {});
     const call = seen.calls
       .filter((c) => c.member === 'getInactiveObjects')
       .at(-1);
-    expect(call?.args).toEqual([]);
+    expect(call?.args).toEqual([{ analyse: analyseException }]);
   });
 
   it('GetObjectInfo calls fetchNodeStructure(parent_type, parent_name, {withShortDescriptions}) — no node id at the root', async () => {
@@ -269,7 +285,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZPKG',
-      { withShortDescriptions: true },
+      { withShortDescriptions: true, analyse: analyseException },
     ]);
   });
 
@@ -283,7 +299,11 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     const call = seen.calls
       .filter((c) => c.member === 'getObjectStructure')
       .at(-1);
-    expect(call?.args).toEqual(['class', 'ZCL_X']);
+    expect(call?.args).toEqual([
+      'class',
+      'ZCL_X',
+      { analyse: analyseException },
+    ]);
   });
 
   it('GetSqlQuery calls getSqlQuery({sql_query, row_number})', async () => {
@@ -291,7 +311,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
     fakeClient = seen.client;
     await handleGetSqlQuery(context as any, { sql_query: 'SELECT 1' });
     const call = seen.calls.filter((c) => c.member === 'getSqlQuery').at(-1);
-    expect(call?.args).toEqual([{ sql_query: 'SELECT 1', row_number: 100 }]);
+    expect(call?.args).toEqual([
+      { sql_query: 'SELECT 1', row_number: 100 },
+      { analyse: analyseException },
+    ]);
   });
 
   it('GetTableContents calls getTableContents({table_name, max_rows, sql_query})', async () => {
@@ -303,6 +326,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       .at(-1);
     expect(call?.args).toEqual([
       { table_name: 'ZT', max_rows: 100, sql_query: 'SELECT * FROM ZT' },
+      { analyse: analyseException },
     ]);
   });
 
@@ -322,7 +346,7 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       'list',
     ]);
     expect(seen.calls.at(-1)?.args).toEqual([
-      { configUri: SEARCH_CONFIGURATION.uri },
+      { configUri: SEARCH_CONFIGURATION.uri, analyse: analyseException },
     ]);
   });
 
@@ -335,7 +359,10 @@ describe('readonlySingleCall handlers call the member the brief names, with the 
       content_uri_to: 'uri2',
     });
     const calls = seen.calls.filter((c) => c.member === 'getVersionSource');
-    expect(calls.map((c) => c.args)).toEqual([['uri1'], ['uri2']]);
+    expect(calls.map((c) => c.args)).toEqual([
+      ['uri1', { analyse: analyseException }],
+      ['uri2', { analyse: analyseException }],
+    ]);
   });
 });
 
@@ -424,36 +451,28 @@ describe('resolveVersionedObject', () => {
   });
 });
 
-describe('the members that accept an analyse strategy, which one is deliberately withheld, and the rest that never had one', () => {
-  // Verified against the installed declarations, not the brief's list:
-  // `AdtMessageClass.readMetadata` takes one and gets one; `AdtUtils.search`
-  // (the one member the brief itself names) does NOT when reached through
-  // the typed contract `getUtils(ourUtils)` hands back — see
-  // `handleSearchObject.ts`'s own comment — and none of `getObjectStructure`,
-  // `getAllTypes`, `getInactiveObjects`, `getSqlQuery`, `getTableContents`,
-  // `fetchNodeStructure`, `getRequest().list()` or `getVersionSource` take
-  // options at all. `scripts/check-analyse.ts` finds zero analyse-eligible
-  // calls in every directory this task touched except `message_class/readonly`
-  // (2, since fix round 1 — see below) and `table/readonly` (2, pre-existing)
-  // — quoted in the task report.
+describe('the members that accept an analyse strategy — which is all of them now, and which reading each gets', () => {
+  // Verified against the installed declarations, not against a brief. In
+  // adt-clients 23 every member takes an `analyse` and none applies a verdict
+  // of its own, so the question stopped being *whether* a call carries one and
+  // became *which* reading it carries. The members this block used to list as
+  // taking no options at all — `getObjectStructure`, `getAllTypes`,
+  // `getInactiveObjects`, `getSqlQuery`, `getTableContents`,
+  // `fetchNodeStructure`, `getRequest().list()`, `getVersionSource`,
+  // `AdtUtils.search` — all take one now, and the argument pins above are where
+  // that is asserted per call.
   //
-  // `AdtMessageClassMessage.read` is the one exception, and NOT because its
-  // signature refuses `analyse` — `IAdtOperationOptions<E>` is right there in
-  // its type. It is one of only two read-shaped members in the whole
-  // distribution that ship their own default strategy (confirmed against the
-  // shipped `AdtMessageClassMessage.js`): `options?.analyse ?? ((verdict,
-  // answer) => { ... checks whether msgno is actually in the parsed class
-  // document ...})`. Fix round 1, task 18 review: this file's original
-  // `{ analyse: analyseException }` REPLACED that check — `analyseException`
-  // only reads an `exc:exception` element, which a missing-msgno answer never
-  // carries (ADT answers 200 with the unrelated whole-class document) — so a
-  // request for a message that does not exist used to answer `success: true`
-  // with that document, silently ignoring the `msgno` it echoed.
-  // `parseMessageClass`, which the default's check is built from, is an
-  // internal of the messageClass module and not part of this package's
-  // public surface, so it cannot be composed with `analyseException` from
-  // here; passing nothing and letting the shipped default stand is the fix,
-  // in `ReadMessageClassMessage.ts` and `GetMessageClassMessage.ts` both.
+  // `AdtMessageClassMessage.read` was the one deliberate omission, for a reason
+  // that has inverted. It used to ship its own default: `options?.analyse ??
+  // ((verdict, answer) => { ... checks whether msgno is actually in the parsed
+  // class document ...})`, and passing `analyseException` REPLACED that check —
+  // `analyseException` only reads an `exc:exception` element, which a
+  // missing-msgno answer never carries, so a request for a message that does
+  // not exist answered `success: true` with the whole-class document. adt-clients
+  // 23 removed every such default and moved that same reading out to
+  // `@mcp-abap-adt/adt-strategies` as `analyseMessageClassMessage(msgno)`,
+  // built for the number asked about. So it is now passed, by name, and
+  // withholding it would leave the call with no verdict at all.
   it('ReadMessageClass hands getMessageClass().readMetadata its own analyse', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
@@ -467,7 +486,7 @@ describe('the members that accept an analyse strategy, which one is deliberately
     expect(seen.last?.analyse).toBe(analyseException);
   });
 
-  it('ReadMessageClassMessage carries NO analyse into getMessageClassMessage().read, deliberately, so the shipped default OBJECT_NOT_FOUND check stands', async () => {
+  it('ReadMessageClassMessage carries analyseMessageClassMessage(msgno) into getMessageClassMessage().read — the msgno check, now passed in', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
@@ -477,18 +496,23 @@ describe('the members that accept an analyse strategy, which one is deliberately
     });
 
     expect(seen.countOf('read')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(false);
-    expect(seen.last?.analyse).toBeUndefined();
+    expect(seen.last?.carriedAnalyse).toBe(true);
+    // Identity is not assertable — the strategy is built per call from the
+    // number — so this pins what distinguishes it: it is not the generic
+    // reading, which is what silently dropped the check before.
+    expect(seen.last?.analyse).not.toBe(analyseException);
+    expect(typeof seen.last?.analyse).toBe('function');
   });
 
-  it('SearchObject does NOT carry an analyse into search — none was given, matching the signature', async () => {
+  it('SearchObject carries analyseException into search — the member grew an options parameter', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
     await handleSearchObject(context as any, { object_name: 'ZCL*' });
 
     expect(seen.countOf('search')).toBe(1);
-    expect(seen.last?.carriedAnalyse).toBe(false);
+    expect(seen.last?.carriedAnalyse).toBe(true);
+    expect(seen.last?.analyse).toBe(analyseException);
   });
 });
 
@@ -839,6 +863,8 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     member: string;
     identity: Record<string, unknown>;
     hasAnalyse: boolean;
+    /** `'own'` for a member whose reading is not the shared `analyseException`. */
+    strategy?: 'own';
   }> = [
     {
       name: 'GetClass',
@@ -937,10 +963,12 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
       factory: 'getMessageClassMessage',
       member: 'read',
       identity: { className: 'ZMC', msgno: '001' },
-      // Deliberately none — the shipped default OBJECT_NOT_FOUND check
-      // would be replaced by any strategy this handler supplied (see the
-      // "members that accept an analyse strategy" describe block above).
-      hasAnalyse: false,
+      // One, but not the shared one: `analyseMessageClassMessage(msgno)`,
+      // built per call from the number asked about (see the "members that
+      // accept an analyse strategy" describe block above). `strategy: 'own'`
+      // says "carries one that is not `analyseException`".
+      hasAnalyse: true,
+      strategy: 'own' as const,
     },
     {
       name: 'GetFunctionGroup',
@@ -1036,7 +1064,15 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 
   it.each(rows)(
     "$name calls the right factory and member, with the caller's own identity, and its strategy exactly where the signature accepts one",
-    async ({ handler, args, factory, member, identity, hasAnalyse }) => {
+    async ({
+      handler,
+      args,
+      factory,
+      member,
+      identity,
+      hasAnalyse,
+      strategy,
+    }) => {
       const seen = recordAnalyse();
       fakeClient = seen.client;
 
@@ -1046,11 +1082,16 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
       expect(call?.factory).toBe(factory);
       expect(call?.args[0]).toEqual(identity);
       expect(call?.carriedAnalyse).toBe(hasAnalyse);
-      if (hasAnalyse) expect(call?.analyse).toBe(analyseException);
+      if (hasAnalyse && strategy === 'own') {
+        expect(call?.analyse).not.toBe(analyseException);
+        expect(typeof call?.analyse).toBe('function');
+      } else if (hasAnalyse) {
+        expect(call?.analyse).toBe(analyseException);
+      }
     },
   );
 
-  it('ListServiceBindingTypes calls getServiceBinding().getServiceBindingTypes() with no arguments at all', async () => {
+  it('ListServiceBindingTypes calls getServiceBinding().getServiceBindingTypes({ analyse }) — its one argument since adt-clients 23', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
@@ -1060,11 +1101,11 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
       .filter((c) => c.member === 'getServiceBindingTypes')
       .at(-1);
     expect(call?.factory).toBe('getServiceBinding');
-    expect(call?.args).toEqual([]);
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.args).toEqual([{ analyse: analyseException }]);
+    expect(call?.carriedAnalyse).toBe(true);
   });
 
-  it('GetUnitTestStatus calls getUnitTest().getStatus(run_id, with_long_polling)', async () => {
+  it('GetUnitTestStatus calls getUnitTest().getStatus(run_id, with_long_polling, { analyse })', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
@@ -1072,11 +1113,11 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
     expect(call?.factory).toBe('getUnitTest');
-    expect(call?.args).toEqual(['r1', true]);
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.args).toEqual(['r1', true, { analyse: analyseException }]);
+    expect(call?.carriedAnalyse).toBe(true);
   });
 
-  it('GetCdsUnitTestStatus calls getCdsUnitTest().getStatus(run_id, with_long_polling)', async () => {
+  it('GetCdsUnitTestStatus calls getCdsUnitTest().getStatus(run_id, with_long_polling, { analyse })', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
@@ -1084,8 +1125,8 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
     expect(call?.factory).toBe('getCdsUnitTest');
-    expect(call?.args).toEqual(['r1', true]);
-    expect(call?.carriedAnalyse).toBe(false);
+    expect(call?.args).toEqual(['r1', true, { analyse: analyseException }]);
+    expect(call?.carriedAnalyse).toBe(true);
   });
 });
 
@@ -1267,8 +1308,14 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     expect(getStatus).toHaveBeenCalledWith(
       'FA53C505DD7B1FD1ABB8599833A05D44',
       true,
+      { analyse: analyseException },
     );
-    expect(getResult).toHaveBeenCalledWith('FA53C505DD7B1FD1ABB8599833A05D44');
+    expect(getResult).toHaveBeenCalledWith(
+      'FA53C505DD7B1FD1ABB8599833A05D44',
+      // `analyseException`, not `analyseUnitTest`: a failing test is not an
+      // ADT-level refusal, and this tool answers the report either way.
+      { analyse: analyseException },
+    );
     // Read AFTER invoking the handler — `factory` is a getter on the
     // double, and destructuring it eagerly captures `undefined` (the value
     // before any factory was ever accessed).
@@ -1403,8 +1450,10 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     // Read AFTER invoking the handler — see the comment on the analogous
     // assertion in `GetUnitTest`'s own test above.
     expect(double.factory).toBe('getCdsUnitTest');
-    expect(getStatus).toHaveBeenCalledWith('r1', true);
-    expect(getResult).toHaveBeenCalledWith('r1');
+    expect(getStatus).toHaveBeenCalledWith('r1', true, {
+      analyse: analyseException,
+    });
+    expect(getResult).toHaveBeenCalledWith('r1', { analyse: analyseException });
   });
 
   it('GetCdsUnitTest answers finished:false and never calls getResult when the (synthetic) run has not finished', async () => {

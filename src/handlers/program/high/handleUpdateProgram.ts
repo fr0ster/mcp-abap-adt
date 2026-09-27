@@ -105,7 +105,7 @@ export async function handleUpdateProgram(
       );
 
       const written = await withLock(
-        () => obj.lock({ programName }),
+        () => obj.lock({ programName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
@@ -130,7 +130,10 @@ export async function handleUpdateProgram(
               )
             : update();
         },
-        (lockHandle) => obj.unlock({ programName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ programName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok || !shouldActivate) {

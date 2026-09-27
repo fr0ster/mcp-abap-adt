@@ -14,6 +14,7 @@
  * Run: npm test -- --testPathPattern=integration/serviceDefinition
  */
 
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateServiceDefinition } from '../../../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleUpdateServiceDefinition } from '../../../../handlers/service_definition/high/handleUpdateServiceDefinition';
 import { createAdtClient } from '../../../../lib/clients';
@@ -29,10 +30,21 @@ async function deleteServiceDefinitionWrapper(
 ): Promise<any> {
   try {
     const client = createAdtClient(context.connection);
-    await client.getServiceDefinition().delete({
-      serviceDefinitionName: args.service_definition_name,
-      transportRequest: args.transport_request,
-    });
+    // The answer is read: since adt-clients 23 a refused delete answers
+    // `ok: false` and throws nothing, so awaiting alone would have this wrapper
+    // report "deleted successfully" over a service definition still on the
+    // system — and `analyseDeletion` is what turns ADT's `del:isDeleted="false"`
+    // (answered with HTTP 200) into that refusal in the first place.
+    const deleted = await client.getServiceDefinition().delete(
+      {
+        serviceDefinitionName: args.service_definition_name,
+        transportRequest: args.transport_request,
+      },
+      { analyse: analyseDeletion },
+    );
+    if (!deleted.ok) {
+      throw new Error(deleted.getError().message);
+    }
     return {
       isError: false,
       content: [

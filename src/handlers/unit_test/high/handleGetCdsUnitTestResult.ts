@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -67,12 +68,16 @@ export async function handleGetCdsUnitTestResult(
     { tool: 'GetCdsUnitTestResult', detail },
     () =>
       pollUntilFinished(
-        (id, withLongPolling) => cdsUnitTest.getStatus(id, withLongPolling),
+        (id, withLongPolling) =>
+          cdsUnitTest.getStatus(id, withLongPolling, {
+            analyse: analyseException,
+          }),
         run_id,
         () =>
           cdsUnitTest.getResult(run_id, {
             withNavigationUris: with_navigation_uris,
             format,
+            analyse: analyseException,
           }),
       ),
     // Task 28 fix round 1 — same finding, same fix as `GetUnitTestResult`.

@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import * as z from 'zod';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -61,16 +62,21 @@ export async function handleGetTableContents(
   // ("SELECT * FROM ${tableName}") already assumed was being run.
   const sqlQuery = `SELECT * FROM ${tableName}`;
 
-  // `getTableContents(params)` takes no options object at all — no `analyse`
-  // to pass, matching the brief.
+  // `getTableContents(params)` took no options object at all until
+  // adt-clients 23 gave every member one; the strategy is passed now, so a
+  // refusal ADT embeds in a 200 is read as a refusal rather than parsed as
+  // rows.
   return answer(
     { tool: 'GetTableContents', detail },
     () =>
-      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents({
-        table_name: tableName,
-        max_rows: maxRows,
-        sql_query: sqlQuery,
-      }),
+      createAdtClient(connection, logger).getUtils(ourUtils).getTableContents(
+        {
+          table_name: tableName,
+          max_rows: maxRows,
+          sql_query: sqlQuery,
+        },
+        { analyse: analyseException },
+      ),
     (reading: AdtReading<SqlPreview>) => {
       if (detail === 'raw') return reading.raw;
       const preview = reading.value;

@@ -7,6 +7,94 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.0.0] - 2026-09-27
+
+Migration: [`docs/MIGRATION-13.0.md`](docs/MIGRATION-13.0.md).
+
+**No MCP tool changed** — not a name, not a parameter, not an answer shape. What
+changed is what a refusal does: several now arrive as refusals where they used to
+arrive as success.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` 22 → 23, and the release interprets nothing.**
+  Every member takes an `options.analyse`; no member applies a verdict of its
+  own; the readings four of them used to have built in now ship as named
+  strategies in `@mcp-abap-adt/adt-strategies`. 79 members grew the parameter in
+  the same release.
+
+  Here that took the call sites accepting an `analyse` from 275 to 526, of which
+  **188 were passing none** — every lock, every unlock, and most reads. All 188
+  pass one now. `handlerInvariants.test.ts` counts them from the type checker, so
+  a call added without one fails the build rather than failing quietly in front
+  of a user.
+
+  A call with no strategy has no verdict at all: whatever HTTP succeeded is a
+  success, including the refusals ADT embeds in a `200`. That is the class of
+  defect this repository has been closing since 8.10.0, and 23 moved the
+  responsibility for it from the library to us.
+
+- **The rest of the contract, with it**: `interfaces-adt` 9 → 11 and the new
+  `interfaces-adt-connection` 1.0.0 (which `IAbapConnection` and
+  `IAdtWireResponse` moved to), `interfaces-auth` 1 → 2, `auth-broker` 2 → 3
+  (one options object, the token provider inside it as `provider`),
+  `auth-providers` 2 → 4, `auth-stores` 1.0.4 → 1.2.4, `connection` 9.2.1 →
+  9.4.0, `adt-strategies` 0.4.0 → 0.6.0, `sap-rfc-lite` ^0.1.0 → ^0.2.0 (the
+  range `connection` itself declares — the old one installed a second copy).
+
+- **Third-party, in range**: `@modelcontextprotocol/sdk` 1.30.1, `axios` 1.20.0,
+  `express` 5.2.1, `fast-xml-parser` 5.11.1, `pino` 10.3.1, `zod` 4.6.5,
+  `dotenv` 18.0.4, `biome` 2.5.14, `jest` 30.5.2, `ts-jest` 29.4.14, `tsx`
+  4.23.15.
+
+  Not taken, and not an oversight: **`typescript` 7** and **`@types/node` 26**
+  (on versions we follow SAP — see the Dependencies section of `CLAUDE.md`;
+  `ts-jest` 29.4.14 still declares `peerDependencies.typescript: ">=4.3 <7"`),
+  and **`lint-staged` 17**, which demands `node >=22.22.1`, a patch level above
+  the floor this project declares.
+
+### Fixed
+
+- **`LockClassTestClassesLow` answered a response object as the lock handle.**
+  `lockTestClasses` answers an `IAdtResponse` in adt-clients 23 where it used to
+  answer the bare handle and throw; the call goes through an `as any`, so nothing
+  in the compiler noticed. The object is truthy, so the emptiness guard passed
+  it, and `test_classes_lock_handle` came back as a JSON dump of the envelope —
+  a handle no update could use. `UnlockClassTestClassesLow` had the other half:
+  a refused release, now arriving in the answer rather than as a throw, was
+  reported as success — the one thing an unlock must never say.
+
+- **`RunClassUnitTestsLow` stopped answering `status_code` and `location`.**
+  They came from `getStatusResponse()`, which 23 removed along with `getRunId`
+  and the rest of the remembered state. Called through an `as any` with `?.`, it
+  simply answered `undefined`. Both are read off the wire by a result strategy
+  now (`runIdWithWire`), so the tool answers what it always did.
+
+- **`--browser` and `--browser-auth-port` had stopped reaching the login.**
+  `AuthorizationCodeProviderConfig` carried `browser` and `redirectPort` until
+  auth-providers 4; it carries an `authorization` strategy instead, and the two
+  old fields are not in the type. TypeScript's excess-property check does not run
+  on a `const` passed to a constructor, so both were dropped on the floor: the
+  browser choice ignored, and every OAuth callback landing on the package default
+  (61001) rather than the port the IdP has registered. Both go through
+  `browserCallbackStrategy` now.
+
+- **`UpdateMessageClass` patched the parse instead of the document.** Its client
+  carries `resultsFor(messageClassDocuments)`, so the read answers an
+  `AdtReading` — `.raw` is the document, `.value` the parse — and the write was
+  built from the wrong one.
+
+### Removed
+
+- **`fetchNodeStructure` from `@mcp-abap-adt/lib/utils`.** A deprecated stub that
+  threw `fetchNodeStructure not implemented in AdtClient yet` on every call. The
+  member it waited for has existed for several majors:
+  `client.getUtils(results).fetchNodeStructure(parentType, parentName, options)`.
+
+- **`src/lib/strategies/atcRun.ts`.** Its `answering()` turned the `AdtSAPError`
+  that `resolveCheckVariant` and `createWorklist` threw back into a response.
+  Both answer an `IAdtResponse` in 23, so it had no callers left.
+
 ## [12.0.0] - 2026-09-24
 
 Migration: [`docs/MIGRATION-12.0.md`](docs/MIGRATION-12.0.md).

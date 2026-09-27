@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -48,9 +49,10 @@ export async function handleGetUnitTest(
   // reconstructs it (bounded status polling, only fetching the result once
   // the run is confirmed `FINISHED`) rather than fetching both blindly —
   // see `pollRun.ts`'s own comment for why a naive `pair()` was wrong here.
-  // Neither `getStatus` nor `getResult` takes an options object at all —
-  // confirmed against the shipped `AdtUnitTest.d.ts` — so no `analyse` is
-  // passed to either.
+  // Neither `getStatus` nor `getResult` took an options object until
+  // adt-clients 23 gave every member one, so both are handed
+  // `analyseException` now — a poll that was refused is not a run that has not
+  // finished, and this loop would otherwise go round until its bound.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
   const detail = detailOf(args);
 
@@ -58,9 +60,12 @@ export async function handleGetUnitTest(
     { tool: 'GetUnitTest', detail },
     () =>
       pollUntilFinished(
-        (id, withLongPolling) => unitTest.getStatus(id, withLongPolling),
+        (id, withLongPolling) =>
+          unitTest.getStatus(id, withLongPolling, {
+            analyse: analyseException,
+          }),
         run_id,
-        () => unitTest.getResult(run_id),
+        () => unitTest.getResult(run_id, { analyse: analyseException }),
       ),
     // Task 28 fix round 1: `status` and, once finished, `result` are both
     // `structured` `AdtReading`s (`getResult`'s slot is `structured` in

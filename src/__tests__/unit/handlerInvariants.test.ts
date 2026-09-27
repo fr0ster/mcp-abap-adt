@@ -125,57 +125,24 @@ it('no handler decides a refusal for itself', () => {
 });
 
 /**
- * Every offender `analyseOmissions` names today, and why each is excused —
- * or isn't.
+ * **There are no excused offenders any more, and there is no list.**
  *
- * Running the check fresh against this tree (not assumed from an earlier
- * report) found six, not the four this list carries: two in
- * `handleGetStructuresList.ts` were genuine bugs, not exceptions, and are
- * fixed in this same commit rather than excused here — `extractSource` read
- * `.data`/`.readResult.data`, the pre-19 wire shape, which answers
- * `undefined` on both the success half (`{ ok: true, getResult() }`) and the
- * failure half (`{ ok: false, getError() }`) of the real contract. That made
- * `readDdl` fall through to the table endpoint for every structure, even
- * ones that would have read back fine — a functional bug, not a missing
- * strategy, and adding `analyse: analyseException` to both calls alongside
- * the `.ok`/`.getResult().value` fix was the actual repair.
+ * The four this list used to carry were all one case: a member that shipped a
+ * tailored default `analyse` of its own, which passing `analyseException` would
+ * have REPLACED rather than composed with — `AdtServiceBinding.update`'s
+ * `publicationRefusal`, `AdtMessageClassMessage.read`'s msgno-presence check,
+ * `AdtUnitTest.run`'s `startedRun`, plus `AdtPackage.readMetadata` as a
+ * judgement call. adt-clients 23 ended that: every member reads
+ * `options?.analyse` with no `?? default` behind it, and all four readings moved
+ * into `@mcp-abap-adt/adt-strategies` under their own names. So the reason to
+ * pass nothing inverted into a reason to pass exactly those —
+ * `analysePublication`, `analyseMessageClassMessage(msgno)`,
+ * `analyseUnitTestStart` — at the very call sites that used to be excused, and
+ * an omission here is now an omission with no verdict behind it at all.
  *
- * The remaining four are left as offenders on purpose, each already
- * reasoned about and documented at its own call site by an earlier task's
- * review — this list exists so a reviewer sees the four together, and so a
- * fifth one cannot join silently.
+ * The list stays deleted rather than emptied: an empty array with a comment
+ * invites the next exception to be added quietly.
  */
-const ANALYSE_EXCEPTIONS: ReadonlyArray<{
-  file: string;
-  call: string;
-  reason: string;
-}> = [
-  {
-    file: 'src/handlers/system/high/handleGetPackageTree.ts',
-    call: 'client.getPackage().readMetadata',
-    reason:
-      'a judgement call, not a necessity, and weaker in kind than the other three exceptions here. `AdtPackage.readMetadata` ships no default strategy of its own to protect — passing `analyseException` would only ENRICH the message on refusal, not replace a tailored verdict with a worse one. Skipped anyway (task 25 review) because this call is a plain existence check: the default error contract already answers ok:false, and only that boolean is read here, so the enrichment was judged not worth adding.',
-  },
-  {
-    file: 'src/handlers/service_binding/high/handleUpdateServiceBinding.ts',
-    call: 'obj.update',
-    reason:
-      "AdtServiceBinding.update()'s own default `analyse` is the exported `publicationRefusal`, read from the job's own <SEVERITY> — already the tailored verdict this endpoint needs. Passing `analyseException` would REPLACE it (the member reads `options?.analyse ?? defaultCheck`, not both), with a strategy that inspects the wrong element.",
-  },
-  {
-    file: 'src/handlers/message_class/readonly/handleReadMessageClassMessage.ts',
-    call: '.getMessageClassMessage()\n        .read',
-    reason:
-      'AdtMessageClassMessage.read is one of two read-shaped members in the whole distribution that ship their own default strategy: it parses the class document and refuses OBJECT_NOT_FOUND when msgno is absent. Task 18 review round 1 found that passing `{ analyse: analyseException }` REPLACES that check rather than composing with it, letting a request for a nonexistent message answer success:true with the unrelated whole-class document.',
-  },
-  {
-    file: 'src/handlers/message_class/high/handleGetMessageClassMessage.ts',
-    call: '.getMessageClassMessage()\n        .read',
-    reason:
-      "Same member, same reasoning as ReadMessageClassMessage's exception above — this tool's own default msgno-presence check would be replaced, not composed with, by passing analyseException here.",
-  },
-];
-
 /**
  * Resolved by the compiler, not matched by a regex over the text.
  *
@@ -193,24 +160,11 @@ it('every client call that accepts an analyse is given one', () => {
   // since Task 10. Here it runs over the whole tree, which is what the spec
   // makes a success criterion.
   const { offenders, inspected } = analyseOmissions(handlers);
+  // 526 call sites accept one under adt-clients 23, where 275 did under 19 —
+  // the release gave 79 more members an `analyse` and took every default away.
+  // The floor stays well under that count, because it guards against a run that
+  // resolved nothing, not against the number changing.
   expect(inspected).toBeGreaterThan(200);
 
-  const isExcused = (offender: string): boolean =>
-    ANALYSE_EXCEPTIONS.some(
-      (exc) =>
-        offender.startsWith(`${exc.file}:`) && offender.includes(exc.call),
-    );
-
-  expect(offenders.filter((o) => !isExcused(o))).toEqual([]);
-
-  // A named exception that no longer matches anything real is a stale entry
-  // hiding nothing — harmless on its own, but a sign this list has drifted
-  // from the code it describes. Each one must still be a live offender.
-  for (const exc of ANALYSE_EXCEPTIONS) {
-    expect(
-      offenders.some(
-        (o) => o.startsWith(`${exc.file}:`) && o.includes(exc.call),
-      ),
-    ).toBe(true);
-  }
+  expect(offenders).toEqual([]);
 });

@@ -121,7 +121,11 @@ export async function handleUpdateFunctionModule(
       );
 
       const written = await withLock(
-        () => obj.lock({ functionModuleName, functionGroupName }),
+        () =>
+          obj.lock(
+            { functionModuleName, functionGroupName },
+            { analyse: analyseException },
+          ),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -143,7 +147,9 @@ export async function handleUpdateFunctionModule(
               }),
           ),
         (lockHandle) =>
-          obj.unlock({ functionModuleName, functionGroupName }, lockHandle),
+          obj.unlock({ functionModuleName, functionGroupName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok) {

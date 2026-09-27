@@ -99,7 +99,7 @@ export async function handleUpdateInterface(
       );
 
       const written = await withLock(
-        () => obj.lock({ interfaceName }),
+        () => obj.lock({ interfaceName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
@@ -124,7 +124,10 @@ export async function handleUpdateInterface(
               )
             : update();
         },
-        (lockHandle) => obj.unlock({ interfaceName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ interfaceName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok || !shouldActivate) {

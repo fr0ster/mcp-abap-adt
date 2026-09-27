@@ -26,6 +26,7 @@ import {
   structureDocuments,
   tableDocuments,
 } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -174,59 +175,71 @@ export async function handleLockObject(
         case 'class':
           return client
             .getClass(resultsFor(classDocuments))
-            .lock({ className: objectName });
+            .lock({ className: objectName }, { analyse: analyseException });
         case 'program':
           return client
             .getProgram(resultsFor(programDocuments))
-            .lock({ programName: objectName });
+            .lock({ programName: objectName }, { analyse: analyseException });
         case 'interface':
           return client
             .getInterface(resultsFor(interfaceDocuments))
-            .lock({ interfaceName: objectName });
+            .lock({ interfaceName: objectName }, { analyse: analyseException });
         case 'function_group':
           return client
             .getFunctionGroup(resultsFor(functionGroupDocuments))
-            .lock({ functionGroupName: objectName });
+            .lock(
+              { functionGroupName: objectName },
+              { analyse: analyseException },
+            );
         case 'function_module':
           return client
             .getFunctionModule(resultsFor(functionModuleDocuments))
-            .lock({
-              functionGroupName: functionGroupName as string,
-              functionModuleName: functionModuleName as string,
-            });
+            .lock(
+              {
+                functionGroupName: functionGroupName as string,
+                functionModuleName: functionModuleName as string,
+              },
+              { analyse: analyseException },
+            );
         case 'table':
           return client
             .getTable(resultsFor(tableDocuments))
-            .lock({ tableName: objectName });
+            .lock({ tableName: objectName }, { analyse: analyseException });
         case 'structure':
           return client
             .getStructure(resultsFor(structureDocuments))
-            .lock({ structureName: objectName });
+            .lock({ structureName: objectName }, { analyse: analyseException });
         case 'ddl':
           return client
             .getDdl(resultsFor(ddlDocuments))
-            .lock({ ddlName: objectName });
+            .lock({ ddlName: objectName }, { analyse: analyseException });
         case 'domain':
           return client
             .getDomain(resultsFor(domainDocuments))
-            .lock({ domainName: objectName });
+            .lock({ domainName: objectName }, { analyse: analyseException });
         case 'data_element':
           return client
             .getDataElement(resultsFor(dataElementDocuments))
-            .lock({ dataElementName: objectName });
+            .lock(
+              { dataElementName: objectName },
+              { analyse: analyseException },
+            );
         case 'behavior_definition':
           return client
             .getBehaviorDefinition(resultsFor(behaviorDefinitionDocuments))
-            .lock({ name: objectName });
+            .lock({ name: objectName }, { analyse: analyseException });
         case 'metadata_extension':
           return client
             .getMetadataExtension(resultsFor(metadataExtensionDocuments))
-            .lock({ name: objectName });
+            .lock({ name: objectName }, { analyse: analyseException });
         case 'package':
-          return client.getPackage(resultsFor(packageDocuments)).lock({
-            packageName: objectName,
-            superPackage: (super_package as string).toUpperCase(),
-          });
+          return client.getPackage(resultsFor(packageDocuments)).lock(
+            {
+              packageName: objectName,
+              superPackage: (super_package as string).toUpperCase(),
+            },
+            { analyse: analyseException },
+          );
         default:
           // Unreachable: objectType was already checked against VALID_TYPES.
           throw new Error(`Unsupported object_type: ${object_type}`);

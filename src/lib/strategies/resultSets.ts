@@ -1,7 +1,38 @@
-import { unitTestDocuments, utilDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  atcDocuments,
+  profilerDocuments,
+  transportDocuments,
+  unitTestDocuments,
+  utilDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import {
+  atcRunStatus,
+  atcStartedRun,
+  atcSystemCheckVariant,
+  atcWaitingRun,
+  atcWorklistId,
+  featureToggleCheckState,
+  featureToggleRuntimeState,
+  feedDescriptors,
+  feedEntries,
+  feedGatewayErrorDetail,
+  feedGatewayErrors,
+  feedSystemMessages,
+  feedVariants,
+  objectVersions,
+  profilerHitList,
+  profilerTraceEntries,
+  traceSchedulingProfilerId,
+  traceSchedulingRequests,
+  transportCreated,
+  transportSearchConfigurations,
+  transportTree,
+  unitTestRunId,
+  utilSearchHits,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IResultStrategy } from '@mcp-abap-adt/interfaces-adt';
 import { nodeLevel } from './packageWalk';
-import { statusOnly, structured, verbatim } from './reading';
+import { reading, statusOnly, structured, verbatim } from './reading';
 import { sqlPreview } from './sqlPreview';
 
 /**
@@ -77,7 +108,10 @@ export const READING_BY_SLOT = {
   publication: structured,
   odata: structured,
   bindingTypes: structured,
-  list: structured,
+  // Same reason: `ListTransports` walks `requests` and their tasks. In 22.x the
+  // member parsed the tree itself; in 23 that reading is `transportTree`, and it
+  // also took the saved-search `configUri` the listing now requires.
+  list: reading(transportTree),
   // Arrived with adt-clients 19.1.0, on `AdtRequest.searchConfigurations()`.
   // `structured` is the default any call site gets: the document parsed into
   // named structure, like its neighbour `list`. `ListTransports` is the one
@@ -86,8 +120,22 @@ export const READING_BY_SLOT = {
   // what it needs is the addressable list — `uri`, `etag`, attributes — that
   // the package already parses, and a `configUri` is not something to dig
   // back out of a generic parse.
-  searchConfigurations: structured,
-  search: structured,
+  // The shipped default became the document in adt-clients 23, and
+  // `ListTransports` consumes the shape — it needs each configuration's `uri` to
+  // run the search. The reading is the library's, bare: this one is read at the
+  // call site rather than projected through `answer()`.
+  searchConfigurations: transportSearchConfigurations,
+  // The library's own reading, wrapped so it keeps the document beside the
+  // parse: `answer()` and `project()` here take an `AdtReading`, and a bare
+  // library reading answers the shape alone — `detail: 'raw'` would have nothing
+  // to give. `reading(parse)` is that wrapper, and it is the seam where a
+  // strategy from adt-strategies becomes one of ours.
+  //
+  // The library's own reading, because our call sites consume the shape: a
+  // search answers `ISearchResult[]` and `packageResolver` maps `hit.name` over
+  // it. adt-clients 23 made every default the document, so a generic
+  // `structured` here would hand a parsed XML tree to code expecting hits.
+  search: reading(utilSearchHits),
   whereUsed: structured,
   whereUsedScope: structured,
   folders: structured,
@@ -137,6 +185,96 @@ export const READING_BY_SLOT = {
   // `tm:type` on the creating call is ignored, and CTS also assigns a type on
   // its own when the first object lands.
   taskTypeChanged: structured,
+
+  // Arrived with adt-clients 23.0.0, on every versionable type: `getVersions`
+  // and `getVersionSource`. `objectVersions` is the library's reading — the
+  // version list as `IObjectVersion[]`, which is what a caller asks a history
+  // for — and the source of one version is the document, like every other
+  // source in this table.
+  //
+  // The ratchet found these: 146 tests failed with `no reading declared for the
+  // slot "versions"`, which is `resultsFor` refusing to guess rather than
+  // handing a call site an unshaped answer.
+  versions: reading(objectVersions),
+  versionSource: verbatim,
+
+  // The feature toggle's three, from the same release. Its two states answer
+  // documents and the readings for them are the library's; `switched` is the
+  // echo of a toggle write, which says the request was taken and nothing about
+  // the runtime state — so `structured`, and a re-read is what settles it.
+  runtimeState: reading(featureToggleRuntimeState),
+  checkState: reading(featureToggleCheckState),
+  switched: structured,
+  // ── Arrived with adt-clients 23.0.0: fourteen shipped sets for the runtime,
+  // the executors and abapGit, whose members used to answer shapes from inside
+  // themselves. Each slot gets a reading here, which is what the ratchet in
+  // `resultSets.test.ts` asks for — a slot the library adds must arrive at this
+  // table, not at a call site as an unshaped answer.
+  //
+  // The library's own readings where adt-strategies has one for the shape a
+  // caller wants; `structured` where the tool reads fields out of a document we
+  // parse; `verbatim` where the answer IS the text (a dump, a log record, ABAP
+  // source).
+
+  // ATC. The five the guide names, plus the worklist's findings, which
+  // `GetATCFindings` parses with its own reading at the call site.
+  checkVariant: reading(atcSystemCheckVariant),
+  worklist: reading(atcWorklistId),
+  startedRun: reading(atcStartedRun),
+  waitingRun: reading(atcWaitingRun),
+  runStatus: reading(atcRunStatus),
+  findings: structured,
+  // The ATC log's two: both are documents a caller reads.
+  checkFailures: structured,
+  executionLog: structured,
+
+  // The profiler. `list` and `hitlist` have readings; the two analyses and the
+  // deletion answer documents.
+  hitlist: reading(profilerHitList),
+  statements: structured,
+  dbAccesses: structured,
+
+  // The feeds, all six with readings of their own.
+  feeds: reading(feedDescriptors),
+  variants: reading(feedVariants),
+  entries: reading(feedEntries),
+  systemMessages: reading(feedSystemMessages),
+  gatewayErrors: reading(feedGatewayErrors),
+  gatewayErrorDetail: reading(feedGatewayErrorDetail),
+
+  // The executors and trace scheduling share three slots; `run` is the
+  // execution itself, which answers whatever the program wrote.
+  requests: reading(traceSchedulingRequests),
+  scheduled: reading(traceSchedulingProfilerId),
+
+  // abapGit: four echoes of a write and two reads. The echoes are documents —
+  // a `200` from a link or a pull says the request was taken, and what the
+  // repository now looks like is a re-read.
+  linked: structured,
+  pulled: structured,
+  unlinked: structured,
+  repos: structured,
+  errorLog: structured,
+  externalRepo: structured,
+
+  // Runtime dumps: the feed is a list, one dump is the text of it.
+  dump: verbatim,
+
+  // The ST05 trace's two: whether tracing is on, and the trace directory.
+  state: structured,
+  directory: structured,
+
+  // The remaining documents: a cross trace's graph and records, a DDIC
+  // activation's graph, an application log's object and validation, a system
+  // message, a gateway error.
+  trace: structured,
+  records: structured,
+  recordContent: verbatim,
+  activations: structured,
+  graph: structured,
+  object: structured,
+  message: structured,
+  error: structured,
 } satisfies Record<string, IResultStrategy<unknown>>;
 
 /**
@@ -229,4 +367,63 @@ export const ourUtils = {
  * `unitTestDocuments` without a keep-list, would silently discard the run id
  * again.
  */
-export const ourUnitTest = resultsFor(unitTestDocuments, ['run']);
+export const ourUnitTest = {
+  ...resultsFor(unitTestDocuments),
+  // **The run id is a reading now, not a member's memory.** It was kept as
+  // shipped here because the id arrives in a header — `Location`,
+  // `Content-Location` or `sap-adt-location` — and no body carries it. In
+  // adt-clients 23 the shipped default became the document, so keeping it would
+  // answer an empty body; `unitTestRunId` is the reading that reads the header,
+  // and `getRunId()` is gone along with everything else the handler remembered.
+  // Bare, not wrapped: the two unit-test handlers take the id as the id — it is
+  // an intermediate step they pass to `getStatus`/`getResult`, never a reading
+  // they project, so there is no `detail` here for a document to answer.
+  run: unitTestRunId,
+};
+
+/**
+ * The ATC implementation's readings.
+ *
+ * **Every ATC member answered a shape and threw on anything else; in 23.0.0 they
+ * answer the document and judge nothing.** Our handlers read `runStatus`'s
+ * fields, the worklist id and the started run's id, so the shapes come back from
+ * the strategies that produce them — named here once instead of at each of the
+ * six call sites, which is what a result set is for.
+ */
+export const ourAtc = {
+  ...atcDocuments,
+  checkVariant: atcSystemCheckVariant,
+  worklist: atcWorklistId,
+  startedRun: atcStartedRun,
+  waitingRun: atcWaitingRun,
+  runStatus: atcRunStatus,
+};
+
+/**
+ * The profiler's readings.
+ *
+ * `list` is the one our runtime handlers walk — trace entries, newest first —
+ * and `hitlist` the one the analysis reads. The rest of the set stays as
+ * shipped: documents, which is what those tools pass through.
+ */
+export const ourProfiler = {
+  ...profilerDocuments,
+  list: profilerTraceEntries,
+  hitlist: profilerHitList,
+};
+
+/**
+ * The transport set, with the created request parsed.
+ *
+ * `created` is a slot name every create shares, so the parse cannot sit in
+ * `READING_BY_SLOT` — a DDIC create's `created` is its own document and a class
+ * create's is a status. `transportCreated` is the library's reading for this
+ * one: number, description, target system, owner, which is what both
+ * `CreateTransport` tiers project. In 22.x the handlers called the
+ * then-exported `parseCreatedTransport` on the raw string themselves; that
+ * export is gone, and a parse belongs to a reading.
+ */
+export const ourTransport = {
+  ...resultsFor(transportDocuments),
+  created: reading(transportCreated),
+};

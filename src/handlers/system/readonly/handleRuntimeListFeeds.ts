@@ -1,4 +1,5 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
@@ -92,7 +93,11 @@ export async function handleRuntimeListFeeds(
 
   switch (feedType) {
     case 'descriptors':
-      return answer(ctx, () => feeds.list(), project);
+      return answer(
+        ctx,
+        () => feeds.list({ analyse: analyseException }),
+        project,
+      );
     case 'variants':
       // `variants(category)` takes a required `category` as of adt-clients
       // 19 — ADT's own endpoint always required one (`GET
@@ -127,11 +132,25 @@ export async function handleRuntimeListFeeds(
         ),
       );
     case 'dumps':
-      return answer(ctx, () => feeds.dumps(queryOptions), project);
+      return answer(
+        ctx,
+        () => feeds.dumps({ ...queryOptions, analyse: analyseException }),
+        project,
+      );
     case 'system_messages':
-      return answer(ctx, () => feeds.systemMessages(queryOptions), project);
+      return answer(
+        ctx,
+        () =>
+          feeds.systemMessages({ ...queryOptions, analyse: analyseException }),
+        project,
+      );
     case 'gateway_errors':
-      return answer(ctx, () => feeds.gatewayErrors(queryOptions), project);
+      return answer(
+        ctx,
+        () =>
+          feeds.gatewayErrors({ ...queryOptions, analyse: analyseException }),
+        project,
+      );
     default: {
       const exhaustive: never = feedType;
       return return_error(

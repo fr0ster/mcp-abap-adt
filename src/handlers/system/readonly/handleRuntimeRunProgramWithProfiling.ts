@@ -10,6 +10,7 @@
  */
 
 import { AdtExecutor } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { pair } from '../../../lib/strategies/sequence';
@@ -101,9 +102,13 @@ export async function handleRuntimeRunProgramWithProfiling(
             maxSizeForTraceFile: args.max_size_for_trace_file,
             amdpTrace: args.amdp_trace,
             maxTimeForTracing: args.max_time_for_tracing,
+            analyse: analyseException,
           }),
         (profilerId: string) =>
-          programExecutor.runWithProfiler({ programName }, { profilerId }),
+          programExecutor.runWithProfiler(
+            { programName },
+            { profilerId, analyse: analyseException },
+          ),
       ),
     ([profilerId, output]: [string, string]) => ({
       success: true,

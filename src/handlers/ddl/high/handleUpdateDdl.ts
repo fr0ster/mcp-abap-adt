@@ -92,7 +92,7 @@ export async function handleUpdateDdl(
       );
 
       const written = await withLock(
-        () => obj.lock({ ddlName }),
+        () => obj.lock({ ddlName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
           const update = () =>
             obj.update(
@@ -115,7 +115,8 @@ export async function handleUpdateDdl(
               )
             : update();
         },
-        (lockHandle) => obj.unlock({ ddlName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ ddlName }, lockHandle, { analyse: analyseException }),
       );
       if (!written.ok || !shouldActivate) {
         return written as IAdtResponse<AdtReading<unknown>, IAdtError>;

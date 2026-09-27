@@ -26,10 +26,12 @@
  * set.
  *
  * Workflow: checkCdsTestDoubles -> create. No lock: the test-doubles check is
- * a plain GET-shaped request (`checkCdsTestDoubles(cdsViewName)` takes no
- * lock, no `options`, and ships its own `testDoublesVerdict` reading — there
- * is no `analyse` to inject), and `create()` is a bare POST of the class
- * shell.
+ * a plain GET-shaped request (`checkCdsTestDoubles(cdsViewName, options)` takes
+ * no lock), and `create()` is a bare POST of the class shell. The check's
+ * verdict — anything but `SEVERITY` `OK` refuses — used to be its own shipped
+ * `testDoublesVerdict`; since adt-clients 23 interprets nothing it is passed in
+ * as `analyseCdsTestDoubles`, the same reading under its name in
+ * `@mcp-abap-adt/adt-strategies`.
  *
  * `cds_view_name` is real work here, not a dead parameter: it is what the
  * test-doubles check is about, asked first because a view the doubles
@@ -40,7 +42,10 @@
  */
 
 import { classDocuments } from '@mcp-abap-adt/adt-clients';
-import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import {
+  analyseCdsTestDoubles,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -126,7 +131,15 @@ export async function handleCreateCdsUnitTest(
       const classObj = client.getClass(resultsFor(classDocuments));
 
       return sequence(
-        () => cdsUnitTest.checkCdsTestDoubles(cdsViewName),
+        () =>
+          // **The check no longer judges its own answer.** In adt-clients 23 it
+          // answers SAP's reply and nothing else; `analyseCdsTestDoubles` is the
+          // verdict it used to apply, passed rather than assumed — without it a
+          // refused test-doubles check reads as a success and the create runs
+          // anyway.
+          cdsUnitTest.checkCdsTestDoubles(cdsViewName, {
+            analyse: analyseCdsTestDoubles,
+          }),
         () =>
           classObj.create(
             {

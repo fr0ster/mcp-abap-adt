@@ -30,7 +30,7 @@
  */
 
 import * as crypto from 'node:crypto';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { AxiosResponse } from 'axios';
 import { makeAdtRequestWithTimeout } from './utils';
 

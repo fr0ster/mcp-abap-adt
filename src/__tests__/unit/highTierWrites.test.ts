@@ -278,6 +278,14 @@ describe('high-tier updates that still have a lock to take: they take it themsel
         refusedResponse('Object is locked by another user');
       fakeClient = fakeClientOf({
         lock: async () => okResponse('handle-1'),
+        // `UpdateMessageClass` reads the class before it writes it — since
+        // adt-clients 23 `updateMetadata` is one PUT of the document it is
+        // given, so the read and the patch are the handler's. The others
+        // ignore this member.
+        readMetadata: async () =>
+          okResponse(
+            reading({}, '<msg:messageClass adtcore:description="old"/>', 200),
+          ),
         update,
         updateMetadata: update,
         unlock,
@@ -301,6 +309,10 @@ describe('high-tier updates that still have a lock to take: they take it themsel
       );
       fakeClient = fakeClientOf({
         lock,
+        readMetadata: async () =>
+          okResponse(
+            reading({}, '<msg:messageClass adtcore:description="old"/>', 200),
+          ),
         update,
         updateMetadata: update,
         unlock,
@@ -309,7 +321,12 @@ describe('high-tier updates that still have a lock to take: they take it themsel
       const result: any = await (handler as any)(context as any, args);
 
       expect(result.isError).toBe(false);
-      expect(lock).toHaveBeenCalledWith(lockConfig);
+      // The lock and the release carry a strategy of their own since
+      // adt-clients 23: every member takes one and none judges its own answer,
+      // so a refused lock and a refused release are read here or nowhere.
+      expect(lock).toHaveBeenCalledWith(lockConfig, {
+        analyse: analyseException,
+      });
       expect(update).toHaveBeenCalledWith(
         expect.anything(),
         expect.objectContaining({
@@ -317,7 +334,9 @@ describe('high-tier updates that still have a lock to take: they take it themsel
           analyse: analyseException,
         }),
       );
-      expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1');
+      expect(unlock).toHaveBeenCalledWith(lockConfig, 'handle-1', {
+        analyse: analyseException,
+      });
     },
   );
 });

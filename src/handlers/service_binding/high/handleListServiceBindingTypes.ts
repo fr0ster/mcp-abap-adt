@@ -1,4 +1,5 @@
 import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -40,9 +41,9 @@ export async function handleListServiceBindingTypes(
     resultsFor(serviceDocuments),
   );
 
-  // `getServiceBindingTypes()` takes no arguments at all — no `analyse` to
-  // hand it, confirmed against the shipped `AdtServiceBinding.d.ts`
-  // signature (`getServiceBindingTypes(): Promise<IAdtResponse<...>>`).
+  // `getServiceBindingTypes()` took no arguments at all until adt-clients 23
+  // gave every member an options object, and the refusal reading is handed to
+  // it there now.
   // `bindingTypes` is `structured` in `READING_BY_SLOT`, which still
   // carries `.raw` beside its parse, so the payload keeps parsing the raw
   // body exactly as before.
@@ -60,7 +61,7 @@ export async function handleListServiceBindingTypes(
   // ask for the one this tool already has.
   return answer(
     { tool: 'ListServiceBindingTypes', detail: 'terse' },
-    () => obj.getServiceBindingTypes(),
+    () => obj.getServiceBindingTypes({ analyse: analyseException }),
     (reading: AdtReading<unknown>) => ({
       success: true,
       response_format: responseFormat,

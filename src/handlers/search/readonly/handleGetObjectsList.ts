@@ -27,6 +27,7 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
@@ -91,6 +92,7 @@ async function collectValidObjects(
   const response = await utils.fetchNodeStructure(parentType, parentName, {
     nodeId,
     withShortDescriptions,
+    analyse: analyseException,
   });
   if (!response.ok) return response as IAdtResponse<FlatObject[], IAdtError>;
 

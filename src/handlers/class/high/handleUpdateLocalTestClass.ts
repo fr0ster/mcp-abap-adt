@@ -112,7 +112,7 @@ export async function handleUpdateLocalTestClass(
       );
 
       const written = await withLock(
-        () => obj.lock({ className }),
+        () => obj.lock({ className }, { analyse: analyseException }),
         (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
@@ -122,7 +122,8 @@ export async function handleUpdateLocalTestClass(
               analyse: analyseException,
             },
           ),
-        (lockHandle) => obj.unlock({ className }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
 
       if (!written.ok || !shouldActivate) {

@@ -2,28 +2,30 @@ import {
   createPackagePatternResolver,
   resolvePackagePatterns,
 } from '../../../lib/search-source/packageResolver';
-import { okResponse } from '../../helpers/fakeClient';
+import { okResponse, reading } from '../../helpers/fakeClient';
 
 /**
- * `searchObjects` is gone in adt-clients 19 — `createPackagePatternResolver`
- * now calls `search(criteria, { analyse })` on the bare `client.getUtils()`
- * (no result set injected), which keeps the shipped `utilDocuments.search`
- * reading — already-parsed `ISearchResult[]` hits, `name` included — so
- * this mock answers that shape directly instead of raw `objectReference`
- * XML for the resolver to walk by hand (see `packageResolver.ts`'s own
- * comment on the `getUtils()`-with-no-result-set asymmetry).
+ * `searchObjects` is gone in adt-clients 19, and in 23 the shipped
+ * `utilDocuments.search` answers the document rather than parsed hits — so the
+ * resolver builds its utils with `ourUtils`, whose `search` slot is the
+ * library's `utilSearchHits` wrapped in our `reading()`. This mock answers that
+ * shape: the hits in `value`, the document beside them, which is what a call
+ * site reads as `getResult().value.value`.
  */
 jest.mock('../../../lib/clients', () => ({
   createAdtClient: (_conn: unknown, _logger: unknown) => ({
     getUtils: () => ({
       search: async ({ query }: { query: string }) =>
         okResponse(
-          query === 'EMPTY*'
-            ? []
-            : [
-                { name: 'ZFI', type: 'DEVC', description: '' },
-                { name: 'ZFI_BUDGET', type: 'DEVC', description: '' },
-              ],
+          reading(
+            query === 'EMPTY*'
+              ? []
+              : [
+                  { name: 'ZFI', type: 'DEVC', description: '' },
+                  { name: 'ZFI_BUDGET', type: 'DEVC', description: '' },
+                ],
+            '<objectReferences/>',
+          ),
         ),
     }),
   }),

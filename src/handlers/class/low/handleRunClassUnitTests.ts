@@ -12,8 +12,25 @@
  * no `tsc` error today only because nothing here resolves a signature that
  * names `IAdtResponse`'s type parameters explicitly, not because it is
  * migrated.
+ *
+ * **Two things adt-clients 23 took away, and where they come from now.**
+ * `run()` no longer judges its own answer, so `analyseUnitTestStart` — the same
+ * reading, under its own name in `@mcp-abap-adt/adt-strategies` — is passed
+ * here: an answer that names no run is a refusal, not a run with an empty id.
+ * And the client remembers nothing, so `getStatusResponse()` is gone with
+ * `getRunId`; because this call goes through an `as any`, its `?.` simply
+ * answered `undefined` and this tool's `status_code` and `location` would have
+ * quietly emptied. They are read off the wire by the result strategy below
+ * instead — the shape a caller gets is the shape the strategy answers, and
+ * this one answers the id with those two facts beside it.
  */
 
+import { unitTestDocuments } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseUnitTestStart,
+  unitTestRunId,
+} from '@mcp-abap-adt/adt-strategies';
+import type { IAdtWireResponse } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -22,6 +39,25 @@ import {
   return_error,
   return_response,
 } from '../../../lib/utils';
+
+/**
+ * The run id, with the two wire facts this tool has always answered beside it.
+ *
+ * `unitTestRunId` is the library's own reading of where the id lives — the
+ * `Location`, `Content-Location` or `sap-adt-location` header, or
+ * `aunit:run@uri` — and it is called rather than reimplemented. The status and
+ * the location are taken from the same answer, because the client no longer
+ * keeps a wire response to ask afterwards.
+ */
+const runIdWithWire = (answer: IAdtWireResponse) => ({
+  runId: unitTestRunId(answer) as unknown as string,
+  status: Number((answer as { status?: unknown }).status ?? 0),
+  location:
+    answer.headers?.location ??
+    answer.headers?.Location ??
+    (answer.headers?.['content-location'] as string | undefined) ??
+    null,
+});
 
 type ScopeOptions = {
   ownTests?: boolean;
@@ -208,15 +244,20 @@ export async function handleRunClassUnitTests(
     );
 
     try {
-      const unitTest = client.getUnitTest() as any;
+      const unitTest = client.getUnitTest({
+        ...unitTestDocuments,
+        run: runIdWithWire,
+      }) as any;
       // `run()` answers an `IAdtResponse`, not the run id directly — treating
       // the envelope itself as the id (the pre-fix shape here) serialises an
       // object with only an `ok` field (its methods are not JSON), and
       // `!envelope` never fires because both a success and a refusal
       // envelope are truthy objects. That is the false-success shape this
       // migration exists to remove, on the tool that starts the run.
-      const runAnswer = await unitTest.run(formattedTests, options);
-      const runResponse = unitTest.getStatusResponse?.();
+      const runAnswer = await unitTest.run(formattedTests, {
+        ...options,
+        analyse: analyseUnitTestStart,
+      });
 
       if (!runAnswer?.ok) {
         const failure = runAnswer?.getError?.();
@@ -226,7 +267,10 @@ export async function handleRunClassUnitTests(
         );
       }
 
-      const runId = runAnswer.getResult().value;
+      const started = runAnswer.getResult().value as ReturnType<
+        typeof runIdWithWire
+      >;
+      const runId = started.runId;
       if (!runId) {
         throw new Error(
           'Failed to obtain ABAP Unit run identifier from SAP response headers',
@@ -240,11 +284,8 @@ export async function handleRunClassUnitTests(
           {
             success: true,
             run_id: runId,
-            status_code: runResponse?.status,
-            location:
-              runResponse?.headers?.location ||
-              runResponse?.headers?.['content-location'] ||
-              null,
+            status_code: started.status,
+            location: started.location,
             session_id: session_id || null,
             session_state: null, // Session state management is now handled by auth-broker,
             message: `ABAP Unit run started. Use GetClassUnitTestStatusLow and GetClassUnitTestResultLow with run_id ${runId}.`,

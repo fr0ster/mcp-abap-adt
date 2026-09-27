@@ -120,7 +120,11 @@ export async function handleUpdateFunctionInclude(
       );
 
       const written = await withLock(
-        () => obj.lock({ functionGroupName, includeName }),
+        () =>
+          obj.lock(
+            { functionGroupName, includeName },
+            { analyse: analyseException },
+          ),
         (lockHandle) =>
           obj.update(
             {
@@ -135,7 +139,9 @@ export async function handleUpdateFunctionInclude(
             },
           ),
         (lockHandle) =>
-          obj.unlock({ functionGroupName, includeName }, lockHandle),
+          obj.unlock({ functionGroupName, includeName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok || !shouldActivate) {

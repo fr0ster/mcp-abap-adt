@@ -1,6 +1,8 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { ourProfiler } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -157,7 +159,9 @@ export async function handleRuntimeAnalyzeProfilerTrace(
   const view = args.view ?? 'hitlist';
   const traceIdOrUri = args.trace_id_or_uri;
   const top = args.top ?? 10;
-  const profiler = new AdtRuntimeClient(connection, logger).getProfiler();
+  const profiler = new AdtRuntimeClient(connection, logger).getProfiler(
+    ourProfiler,
+  );
 
   // Same view-reading change as `handleRuntimeGetProfilerTraceData.ts` (see
   // that file's header): `read(traceId, view, options)` over the three named
@@ -186,6 +190,7 @@ export async function handleRuntimeAnalyzeProfilerTrace(
       () =>
         profiler.read(traceIdOrUri, 'hitlist', {
           withSystemEvents: args.with_system_events,
+          analyse: analyseException,
         }),
       project,
     );
@@ -196,6 +201,7 @@ export async function handleRuntimeAnalyzeProfilerTrace(
       () =>
         profiler.read(traceIdOrUri, 'statements', {
           withSystemEvents: args.with_system_events,
+          analyse: analyseException,
         }),
       project,
     );
@@ -205,6 +211,7 @@ export async function handleRuntimeAnalyzeProfilerTrace(
     () =>
       profiler.read(traceIdOrUri, 'dbAccesses', {
         withSystemEvents: args.with_system_events,
+        analyse: analyseException,
       }),
     project,
   );

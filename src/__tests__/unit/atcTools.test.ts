@@ -1,4 +1,3 @@
-import { AdtSAPError } from '@mcp-abap-adt/adt-clients';
 import { handleGetATCFindings } from '../../handlers/atc/high/handleGetATCFindings';
 import { handleGetATCRunStatus } from '../../handlers/atc/high/handleGetATCRunStatus';
 import { handleRunATC } from '../../handlers/atc/high/handleRunATC';
@@ -12,10 +11,14 @@ import { okResponse, refusedResponse } from '../helpers/fakeClient';
  *
  * **The composite.** `AdtAtc` stopped being `IAdtRunnable` in 19.0.0 because
  * a run is three calls — the variant, a worklist, the run — and the client
- * refuses to choose the order. `RunATC` chooses it. Two of those three
- * members answer by throwing rather than by an `IAdtResponse`, so the
- * handler has to tell a refusal from SAP apart from a fault of its own; that
- * is what `answering()` in `atcRun.ts` does, and what the tests below pin.
+ * refuses to choose the order. `RunATC` chooses it, and the tests below pin
+ * that order and what each step's refusal does to the answer.
+ *
+ * Until adt-clients 22, two of the three members answered a bare string and
+ * **threw** `AdtSAPError` for SAP's refusal, so the handler had to tell that
+ * apart from a fault of its own — `answering()` in `atcRun.ts`, now deleted
+ * with the throws it caught. In 23 all three answer an `IAdtResponse` and a
+ * throw means the fault is on this side, which is what these mocks answer.
  *
  * **The reading.** `getFindings()` answers the worklist as ADT sent it, and
  * what a caller needs out of 18 KB is six lines. The parse is tested against
@@ -109,11 +112,11 @@ describe('RunATC composes the three calls', () => {
     atc = {
       resolveCheckVariant: async () => {
         calls.push('variant');
-        return 'ABAP_CLOUD_DEVELOPMENT_DEFAULT';
+        return okResponse('ABAP_CLOUD_DEVELOPMENT_DEFAULT');
       },
       createWorklist: async (variant: string) => {
         calls.push(`worklist:${variant}`);
-        return 'WL1';
+        return okResponse('WL1');
       },
       startRun: async (worklistId: string, target: any, options: any) => {
         calls.push(
@@ -148,7 +151,7 @@ describe('RunATC composes the three calls', () => {
     const asked = jest.fn();
     atc = {
       resolveCheckVariant: asked,
-      createWorklist: async () => 'WL1',
+      createWorklist: async () => okResponse('WL1'),
       startRun: async (worklistId: string) =>
         okResponse({ waited: true, worklistId, findingStats: '0,4,2' }),
     };
@@ -169,15 +172,16 @@ describe('RunATC composes the three calls', () => {
     expect(payload(result).run_id).toBeUndefined();
   });
 
-  it("reports SAP's refusal as a refusal, though the client threw it", async () => {
-    // `resolveCheckVariant` and `createWorklist` bypass the client's own
-    // `answering()`, so a 403 arrives as a thrown `AdtSAPError`. Left alone
-    // it would be rendered `client_threw` — this process blamed for what SAP
-    // decided.
+  it("reports SAP's refusal as a refusal, and stops before the worklist", async () => {
+    // A 403 arrives in the answer since adt-clients 23 — `analyseException`
+    // is what makes it one — and the handler returns that refusal untouched
+    // rather than rendering it `client_threw`, which would blame this process
+    // for what SAP decided.
+    const after = jest.fn();
     atc = {
-      resolveCheckVariant: async () => {
-        throw new AdtSAPError('Not authorized for ATC', 403 as never);
-      },
+      resolveCheckVariant: async () =>
+        refusedResponse('Not authorized for ATC'),
+      createWorklist: after,
     };
 
     const result: any = await handleRunATC(context as any, {
@@ -187,6 +191,7 @@ describe('RunATC composes the three calls', () => {
     expect(result.isError).toBe(true);
     expect(payload(result).origin).toBe('refusal');
     expect(payload(result).message).toContain('Not authorized for ATC');
+    expect(after).not.toHaveBeenCalled();
   });
 
   it('lets a fault of its own stay a throw', async () => {

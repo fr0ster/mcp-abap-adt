@@ -1,4 +1,4 @@
-import { compareRecordedAt } from '@mcp-abap-adt/adt-clients';
+import { compareRecordedAt } from '@mcp-abap-adt/adt-strategies';
 import type {
   IAdtError,
   IAdtResponse,

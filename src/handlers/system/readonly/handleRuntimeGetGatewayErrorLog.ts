@@ -1,4 +1,5 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 
@@ -70,7 +71,7 @@ export async function handleRuntimeGetGatewayErrorLog(
   if (errorUrl) {
     return answer(
       ctx,
-      () => feeds.gatewayErrorDetail(errorUrl),
+      () => feeds.gatewayErrorDetail(errorUrl, { analyse: analyseException }),
       (error) => ({ success: true, mode: 'detail', error }),
     );
   }
@@ -83,6 +84,7 @@ export async function handleRuntimeGetGatewayErrorLog(
         maxResults: args?.max_results,
         from: args?.from,
         to: args?.to,
+        analyse: analyseException,
       }),
     (errors) => ({ success: true, mode: 'list', count: errors.length, errors }),
   );

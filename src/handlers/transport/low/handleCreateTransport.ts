@@ -3,12 +3,12 @@
  *
  * Uses AdtClient.getRequest().create from @mcp-abap-adt/adt-clients 19.
  *
- * **`created` is NOT kept as shipped — `resultsFor(transportDocuments)`
+ * **`created` is NOT kept as shipped — `ourTransport`
  * plain, then the number is parsed out here.** The two-exception keep-list
  * (`ourUtils` keeping `utilDocuments.activation` and `unitTestDocuments.run`)
  * is for a reading that looks at something the table's three readings
  * literally cannot see: a `Location` **header**. `transportDocuments.created`
- * (the shipped `parseCreatedTransport`) reads the **body** — `tm:root`/
+ * (the shipped `transportCreated`) reads the **body** — `tm:root`/
  * `tm:request` — which is exactly what `verbatim` (the table's default for
  * the slot name `created`) already carries whole, as a string, in
  * `AdtReading.value`. Keeping the shipped reading here would have been a
@@ -25,21 +25,19 @@
  *
  * No corpus fixture for `/cts/transportrequests` POST exists — the README's
  * coverage table lists only the GET (an empty list, for `ListTransports`) —
- * so the document below is hand-built from the shipped `parseCreatedTransport`
+ * so the document below is hand-built from the shipped `transportCreated`
  * and `create.js`'s own XML, not proven against a captured response.
  */
 
-import {
-  parseCreatedTransport,
-  transportDocuments,
-} from '@mcp-abap-adt/adt-clients';
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import type { ICreatedTransport } from '@mcp-abap-adt/adt-strategies';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import { ourTransport } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -85,12 +83,14 @@ export async function handleCreateTransport(
   const detail = detailOf(args);
 
   // Parses the document `verbatim` (the table's default for `created`)
-  // already carries whole — `parseCreatedTransport` is the same reading
+  // already carries whole — `transportCreated` is the same reading
   // `transportDocuments.created` ships with, called here instead of kept
   // there. `description`/`transport_type` come from the caller's own
   // request, not the document, matching what the tool always answered.
-  const terseCreatedTransport: Terse<string> = (value) => {
-    const created = parseCreatedTransport(value);
+  // The `created` slot is `transportCreated` now, so the parse arrives here
+  // rather than being done here: this projection reads the shape and adds what
+  // only the caller's arguments know.
+  const terseCreatedTransport: Terse<ICreatedTransport> = (created) => {
     return {
       success: true,
       transport_number: created.transportNumber,
@@ -106,7 +106,7 @@ export async function handleCreateTransport(
     { tool: 'CreateTransportLow', detail },
     () =>
       createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
+        .getRequest(ourTransport)
         .create(
           {
             description,

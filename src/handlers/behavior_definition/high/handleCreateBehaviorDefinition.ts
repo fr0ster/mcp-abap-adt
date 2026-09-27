@@ -144,9 +144,10 @@ export async function handleCreateBehaviorDefinition(
       if (!created.ok) return created;
 
       const checked = await withLock(
-        () => obj.lock({ name }),
+        () => obj.lock({ name }, { analyse: analyseException }),
         () => obj.check({ name }, undefined, { analyse: analyseException }),
-        (lockHandle) => obj.unlock({ name }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ name }, lockHandle, { analyse: analyseException }),
       );
       if (!checked.ok) {
         return checked as IAdtResponse<AdtReading<unknown>, IAdtError>;

@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -47,9 +48,9 @@ export async function handleGetUnitTestStatus(
   // which no longer exists on `AdtUnitTest` in v19 — that config shape is
   // `IUnitTestConfig` (`className`, not `runId`) and belongs to reading the
   // tests' source, not a run. Polling a run is `getStatus(runId,
-  // withLongPolling?)`, which — confirmed against the shipped
-  // `AdtUnitTest.d.ts` — takes NO options object at all, so there is no
-  // `analyse` to hand it, unlike `read`/`readMetadata` on this same class.
+  // withLongPolling?)`, which took NO options object at all until adt-clients
+  // 23 gave every member one — the refusal reading is handed to it there now,
+  // the same as to `read`/`readMetadata` on this same class.
   const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
   const detail = detailOf(args);
 
@@ -69,7 +70,10 @@ export async function handleGetUnitTestStatus(
 
   return answer(
     { tool: 'GetUnitTestStatus', detail },
-    () => unitTest.getStatus(run_id, with_long_polling),
+    () =>
+      unitTest.getStatus(run_id, with_long_polling, {
+        analyse: analyseException,
+      }),
     project(detail, terseRunStatus),
   );
 }

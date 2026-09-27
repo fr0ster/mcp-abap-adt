@@ -24,6 +24,7 @@
  * Run: npm test -- --testPathPatterns=integration/behaviorDefinitionAndImplementation.*Low
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleCreateBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleCreateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleDeleteBehaviorDefinition';
 import { handleLockBehaviorDefinition } from '../../../../handlers/behavior_definition/low/handleLockBehaviorDefinition';
@@ -599,15 +600,20 @@ describe('BehaviorDefinition + BehaviorImplementation Low-Level Handlers Integra
             );
           } else {
             const client = createAdtClient(connection);
-            await client.getBehaviorImplementation().update(
-              {
-                className,
-                behaviorDefinition,
-                implementationCode: bimplParams.implementation_code,
-                transportRequest,
-              },
-              { lockHandle },
-            );
+            const updatedBehaviorImplementation = await client
+              .getBehaviorImplementation()
+              .update(
+                {
+                  className,
+                  behaviorDefinition,
+                  implementationCode: bimplParams.implementation_code,
+                  transportRequest,
+                },
+                { lockHandle, analyse: analyseException },
+              );
+            if (!updatedBehaviorImplementation.ok) {
+              throw new Error(updatedBehaviorImplementation.getError().message);
+            }
             testLogger?.info?.(`   + implementation updated`);
           }
         } finally {

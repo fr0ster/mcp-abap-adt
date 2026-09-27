@@ -20,6 +20,7 @@ jest.mock('../../lib/clients', () => ({
   }),
 }));
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { handleGetObjectVersionSource } from '../../handlers/common/readonly/handleGetObjectVersionSource';
 import { handleGetObjectVersions } from '../../handlers/common/readonly/handleGetObjectVersions';
 
@@ -67,9 +68,10 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
 
     expect(result.isError).toBe(false);
     expect(mockGetClass).toHaveBeenCalled();
-    expect(mockClassGetVersions).toHaveBeenCalledWith({
-      className: 'ZCL_MY_CLASS',
-    });
+    expect(mockClassGetVersions).toHaveBeenCalledWith(
+      { className: 'ZCL_MY_CLASS' },
+      { analyse: analyseException },
+    );
     const data = payload(result);
     expect(data.success).toBe(true);
     expect(data.object_type).toBe('class');
@@ -112,9 +114,10 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
 
     expect(result.isError).toBe(false);
     expect(mockGetTable).toHaveBeenCalled();
-    expect(mockTableGetVersions).toHaveBeenCalledWith({
-      tableName: 'ZMY_TABLE',
-    });
+    expect(mockTableGetVersions).toHaveBeenCalledWith(
+      { tableName: 'ZMY_TABLE' },
+      { analyse: analyseException },
+    );
     expect(payload(result).versions).toEqual([]);
   });
 
@@ -129,6 +132,7 @@ describe('GetObjectVersions / GetObjectVersionSource (#30)', () => {
     expect(result.isError).toBe(false);
     expect(mockClassGetVersionSource).toHaveBeenCalledWith(
       '/sap/bc/adt/oo/classes/zcl_x/source/main?version=00001',
+      { analyse: analyseException },
     );
     const data = payload(result);
     expect(data.success).toBe(true);

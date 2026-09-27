@@ -12,9 +12,12 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import { AuthorizationCodeProvider } from '@mcp-abap-adt/auth-providers';
+import {
+  AuthorizationCodeProvider,
+  browserCallbackStrategy,
+} from '@mcp-abap-adt/auth-providers';
 import type { SapConfig } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type {
   IServiceKeyStore,
   ISessionStore,
@@ -217,18 +220,18 @@ async function createConnectionViaBroker(
       const providerLogger = createProviderLogger();
       const brokerLogger = createBrokerLogger();
 
-      // `browser` is not part of AuthorizationCodeProviderConfig any more (the
-      // package now takes an `authorization` strategy instead) — carried as a
-      // typed variable rather than an inline literal, same as brokerFactory.ts's
-      // own providerConfig, so this still documents the intent without tripping
-      // the excess-property check on a fresh object literal.
+      // `browser` is not a field of `AuthorizationCodeProviderConfig` any more:
+      // auth-providers 4 takes an `authorization` strategy, and how the login is
+      // conducted is that strategy's business. Keeping the old field would have
+      // been silent — the object is a `const`, so no excess-property check runs
+      // at the call below — so the setting goes where it is read now.
       const providerConfig = {
         uaaUrl: authConfig.uaaUrl,
         clientId: authConfig.uaaClientId,
         clientSecret: authConfig.uaaClientSecret,
         refreshToken: authConfig.refreshToken,
         accessToken: sessionConnConfig?.authorizationToken,
-        browser: 'system',
+        authorization: browserCallbackStrategy({ browser: 'system' }),
         logger: providerLogger,
       };
       const tokenProvider = wrapLegacyTokenProvider(
@@ -238,9 +241,11 @@ async function createConnectionViaBroker(
         {
           serviceKeyStore,
           sessionStore,
-          tokenProvider,
+          // `tokenProvider` is `provider` in auth-broker 3, and the browser
+          // argument is gone — it was never read, and how a login is conducted
+          // belongs to the provider's authorization strategy.
+          provider: tokenProvider,
         },
-        'system',
         brokerLogger,
       );
 

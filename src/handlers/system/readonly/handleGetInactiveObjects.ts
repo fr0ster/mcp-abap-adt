@@ -2,6 +2,7 @@
  * GetInactiveObjects Handler - Retrieve list of inactive ABAP objects
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -66,13 +67,16 @@ export async function handleGetInactiveObjects(
 
   logger?.info('Retrieving inactive objects...');
 
-  // `getInactiveObjects()` takes no parameters at all — no `analyse` to pass.
+  // `getInactiveObjects()` took no parameters at all until adt-clients 23 gave
+  // every member an options object; the refusal reading is passed there now,
+  // because "nothing is inactive" and "the read was refused" are answers a
+  // caller must not confuse — this is the member the activation suites poll.
   return answer(
     { tool: 'GetInactiveObjects', detail },
     () =>
       createAdtClient(connection, logger)
         .getUtils(ourUtils)
-        .getInactiveObjects(),
+        .getInactiveObjects({ analyse: analyseException }),
     project(detail, (value) => {
       const objects = extractInactiveObjects(value);
       return { success: true, count: objects.length, objects };

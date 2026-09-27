@@ -218,7 +218,7 @@ export async function handleUpdateDataElement(
       );
 
       const written = await withLock(
-        () => obj.lock({ dataElementName }),
+        () => obj.lock({ dataElementName }, { analyse: analyseException }),
         (lockHandle): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
           sequence(
             () =>
@@ -249,7 +249,10 @@ export async function handleUpdateDataElement(
                 analyse: analyseException,
               }),
           ),
-        (lockHandle) => obj.unlock({ dataElementName }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ dataElementName }, lockHandle, {
+            analyse: analyseException,
+          }),
       );
 
       if (!written.ok) {

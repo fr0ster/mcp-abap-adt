@@ -8,7 +8,8 @@
  */
 
 import type { AdtClient } from '@mcp-abap-adt/adt-clients';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt';
+import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
+import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../../lib/clients';
 import {
   getSystemContext,
@@ -82,13 +83,15 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of functionModules) {
         const status = await safeDelete(
           `function_module ${item.name}`,
-          async () => {
-            await client.getFunctionModule().delete({
-              functionModuleName: item.name,
-              functionGroupName: item.group,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getFunctionModule().delete(
+              {
+                functionModuleName: item.name,
+                functionGroupName: item.group,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({
@@ -103,12 +106,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of functionGroups) {
         const status = await safeDelete(
           `function_group ${item.name}`,
-          async () => {
-            await client.getFunctionGroup().delete({
-              functionGroupName: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getFunctionGroup().delete(
+              {
+                functionGroupName: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({
@@ -123,12 +128,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of classes) {
         const status = await safeDelete(
           `class ${item.name}`,
-          async () => {
-            await client.getClass().delete({
-              className: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getClass().delete(
+              {
+                className: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({ type: 'classes', name: item.name, status });
@@ -139,12 +146,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of serviceDefinitions) {
         const status = await safeDelete(
           `service_definition ${item.name}`,
-          async () => {
-            await client.getServiceDefinition().delete({
-              serviceDefinitionName: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getServiceDefinition().delete(
+              {
+                serviceDefinitionName: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({
@@ -159,12 +168,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of bdefs) {
         const status = await safeDelete(
           `behavior_definition ${item.name}`,
-          async () => {
-            await client.getBehaviorDefinition().delete({
-              name: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getBehaviorDefinition().delete(
+              {
+                name: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({
@@ -179,12 +190,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of views) {
         const status = await safeDelete(
           `view ${item.name}`,
-          async () => {
-            await client.getDdl().delete({
-              ddlName: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getDdl().delete(
+              {
+                ddlName: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({ type: 'views', name: item.name, status });
@@ -198,12 +211,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of structures) {
         const status = await safeDelete(
           `structure ${item.name}`,
-          async () => {
-            await client.getStructure().delete({
-              structureName: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getStructure().delete(
+              {
+                structureName: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({ type: 'structures', name: item.name, status });
@@ -214,12 +229,14 @@ describe('Admin: Teardown shared dependencies', () => {
       for (const item of tables) {
         const status = await safeDelete(
           `table ${item.name}`,
-          async () => {
-            await client.getTable().delete({
-              tableName: item.name,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getTable().delete(
+              {
+                tableName: item.name,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({ type: 'tables', name: item.name, status });
@@ -229,12 +246,14 @@ describe('Admin: Teardown shared dependencies', () => {
       if (sharedConfig.package) {
         const status = await safeDelete(
           `package ${sharedConfig.package}`,
-          async () => {
-            await client.getPackage().delete({
-              packageName: sharedConfig.package,
-              transportRequest,
-            });
-          },
+          () =>
+            client.getPackage().delete(
+              {
+                packageName: sharedConfig.package,
+                transportRequest,
+              },
+              { analyse: analyseDeletion },
+            ),
           testsLogger,
         );
         results.push({

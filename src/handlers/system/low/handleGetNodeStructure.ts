@@ -185,6 +185,7 @@ export async function handleGetNodeStructure(
             .fetchNodeStructure(parent_type, parent_name, {
               nodeId: node_id || '0000',
               withShortDescriptions: with_short_descriptions !== false,
+              analyse: analyseException,
             }),
         async (rawXml) => {
           if (!isIndeterminateWalkAnswer(rawXml)) {

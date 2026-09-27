@@ -217,7 +217,7 @@ export async function handleCreateDomain(
           ),
         () =>
           withLock(
-            () => obj.lock({ domainName }),
+            () => obj.lock({ domainName }, { analyse: analyseException }),
             (
               lockHandle,
             ): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> =>
@@ -253,7 +253,10 @@ export async function handleCreateDomain(
                     },
                   ),
               ),
-            (lockHandle) => obj.unlock({ domainName }, lockHandle),
+            (lockHandle) =>
+              obj.unlock({ domainName }, lockHandle, {
+                analyse: analyseException,
+              }),
           ),
         // Best-effort: wait for the write to be visible, right before the
         // first call that reads it back — this is the call most likely to

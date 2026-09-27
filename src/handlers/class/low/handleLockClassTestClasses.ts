@@ -4,11 +4,17 @@
  * Uses AdtClient.getClass().lockTestClasses from @mcp-abap-adt/adt-clients 19.
  *
  * `lockTestClasses()` is not part of the `IAdtLockable` shape every other
- * family's `lock()` implements — it takes only a config and answers a bare
- * `string`, not an `IAdtResponse`. There is therefore no `analyse` to inject
- * (the member has no `options` parameter at all) and no reading to route
- * through `answer()`: this stays a direct call, the same shape the pre-19
- * code already used.
+ * family's `lock()` implements, but since adt-clients 23 it answers the way
+ * `lock` does: an `IAdtResponse` carrying the handle, with an `analyse` of its
+ * own. Its own doc comment states the change — "until 23.0.0 it answered the
+ * bare handle and threw when SAP's answer carried none".
+ *
+ * **Which is why the answer is read here, and not merely awaited.** The call
+ * goes through an `as any` (see below), so nothing in the compiler noticed that
+ * `await` stopped yielding a string: the response object is truthy, the
+ * emptiness guard below would have passed it, and the handler would have
+ * answered a JSON dump of the response as the lock handle — a handle no update
+ * could use, and no failure said so.
  *
  * The `as any` stays, for a structural reason rather than a typing gap the
  * package left open: `AdtClient.getClass()` is typed to return
@@ -20,6 +26,7 @@
  * call it through the client facade at all.
  */
 
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
@@ -92,7 +99,19 @@ export async function handleLockClassTestClasses(
 
     try {
       const classClient = createAdtClient(connection, logger).getClass() as any;
-      const lockHandle = await classClient.lockTestClasses({ className });
+      const locked = await classClient.lockTestClasses(
+        { className },
+        { analyse: analyseException },
+      );
+      if (!locked?.ok) {
+        return return_error(
+          new Error(
+            locked?.getError?.()?.message ??
+              `Locking the test classes of ${className} was refused, and the answer carried no message.`,
+          ),
+        );
+      }
+      const lockHandle: string = locked.getResult().value;
 
       if (!lockHandle) {
         throw new Error(

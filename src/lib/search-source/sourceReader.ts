@@ -1,3 +1,4 @@
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { XMLParser } from 'fast-xml-parser';
 import { createAdtClient } from '../clients';
 import type { HandlerContext } from '../handlers/interfaces';
@@ -164,13 +165,20 @@ export function createSourceReaderDeps(
     // `read()`/`getObjectStructure()` now answer `IAdtResponse<string>` (the
     // 19.0.0 envelope) instead of the old transport frame with `.readResult`/
     // `.data` on it — both defaulted to `rawDocument`, the document as it
-    // arrived, exactly what `.readResult.data`/`.data` used to hand back. No
-    // `analyse` strategy is passed: a refusal (missing object, no access) now
-    // answers `ok: false` instead of throwing, and is read that way below
-    // rather than relying on the outer `try/catch` — `safe()` still catches a
-    // genuine throw (a connection failure), but a refusal is no longer one.
+    // arrived, exactly what `.readResult.data`/`.data` used to hand back. A
+    // refusal (missing object, no access) answers `ok: false` instead of
+    // throwing, and is read that way below rather than relying on the outer
+    // `try/catch` — `safe()` still catches a genuine throw (a connection
+    // failure), but a refusal is no longer one.
+    //
+    // `analyseException` is passed to each: since adt-clients 23 no member
+    // judges its own answer, so without it `ok` would be true for anything HTTP
+    // accepted — and here that would put an ADT error document into the search
+    // index as if it were source.
     async readProgram(programName, version) {
-      const r = await client.getProgram().read({ programName }, version);
+      const r = await client
+        .getProgram()
+        .read({ programName }, version, { analyse: analyseException });
       return r.ok ? r.getResult().value : null;
     },
     async readInclude(includeName) {
@@ -183,11 +191,15 @@ export function createSourceReaderDeps(
       return typeof r?.data === 'string' ? r.data : null;
     },
     async readClassMain(className, version) {
-      const r = await client.getClass().read({ className }, version);
+      const r = await client
+        .getClass()
+        .read({ className }, version, { analyse: analyseException });
       return r.ok ? r.getResult().value : null;
     },
     async fetchFugrStructure(fugrName) {
-      const r = await client.getUtils().getObjectStructure('FUGR/F', fugrName);
+      const r = await client
+        .getUtils()
+        .getObjectStructure('FUGR/F', fugrName, { analyse: analyseException });
       return r.ok ? parseFugrChildrenFromXml(r.getResult().value) : [];
     },
     async readFugrFm(fugrName, fmName) {

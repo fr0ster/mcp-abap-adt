@@ -3,30 +3,28 @@
  *
  * Uses AdtClient.getRequest().create from @mcp-abap-adt/adt-clients 19.
  *
- * **`created` is NOT kept as shipped — `resultsFor(transportDocuments)`
+ * **`created` is NOT kept as shipped — `ourTransport`
  * plain, then the number is parsed out here.** Same reasoning as
  * `CreateTransportLow`: `transportDocuments.created` (the shipped
- * `parseCreatedTransport`) reads the body, which `verbatim` (the table's
+ * `transportCreated`) reads the body, which `verbatim` (the table's
  * default for the slot name `created`) already carries whole, as a string,
  * in `AdtReading.value`. Parsing the number out of that value in the
  * projection is what keeps `resultsFor`'s two-exception keep-list at two.
  *
  * No corpus fixture for `/cts/transportrequests` POST exists — the document
- * below is hand-built from the shipped `parseCreatedTransport` and
+ * below is hand-built from the shipped `transportCreated` and
  * `create.js`'s own XML, not proven against a captured response.
  */
 
-import {
-  parseCreatedTransport,
-  transportDocuments,
-} from '@mcp-abap-adt/adt-clients';
+import { transportDocuments } from '@mcp-abap-adt/adt-clients';
+import type { ICreatedTransport } from '@mcp-abap-adt/adt-strategies';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
-import { resultsFor } from '../../../lib/strategies/resultSets';
+import { ourTransport } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -83,8 +81,10 @@ export async function handleCreateTransport(
 
   const detail = detailOf(args);
 
-  const terseCreatedTransport: Terse<string> = (value) => {
-    const created = parseCreatedTransport(value);
+  // The `created` slot is `transportCreated` now, so the parse arrives here
+  // rather than being done here: this projection reads the shape and adds what
+  // only the caller's arguments know.
+  const terseCreatedTransport: Terse<ICreatedTransport> = (created) => {
     return {
       success: true,
       transport_number: created.transportNumber,
@@ -100,7 +100,7 @@ export async function handleCreateTransport(
     { tool: 'CreateTransport', detail },
     () =>
       createAdtClient(connection, logger)
-        .getRequest(resultsFor(transportDocuments))
+        .getRequest(ourTransport)
         .create(
           {
             description: args.description,

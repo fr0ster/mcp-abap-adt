@@ -82,13 +82,14 @@ export async function handleDeleteLocalMacros(
       );
 
       const deleted = await withLock(
-        () => obj.lock({ className }),
+        () => obj.lock({ className }, { analyse: analyseException }),
         (lockHandle) =>
           obj.update(
             { className, transportRequest: args.transport_request },
             { source: '', lockHandle, analyse: analyseException },
           ),
-        (lockHandle) => obj.unlock({ className }, lockHandle),
+        (lockHandle) =>
+          obj.unlock({ className }, lockHandle, { analyse: analyseException }),
       );
 
       if (!deleted.ok || !shouldActivate) {

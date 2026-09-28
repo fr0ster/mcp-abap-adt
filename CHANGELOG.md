@@ -60,6 +60,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     characters", the field-label lengths) and the transport tools' own text, where
     request against task IS the subject of the tool.
 
+### Fixed
+
+- **The tool-docs generator dropped everything after the first string literal of a
+  concatenated description.** It reads source with regexes rather than importing
+  the built definitions, and the pattern stopped at one literal — so five tools
+  lost a whole sentence each from the generated docs: the legacy refusal notes on
+  `GetCdsUnitTest`, `GetCdsUnitTestStatus`, `CreateCdsUnitTest` and
+  `GetStructuresList`, and the polling bound on `GetCdsUnitTestResult`. What made
+  it visible was cosmetic — `git diff --check` flagged two trailing spaces, which
+  were the seam where the text had been cut (found by a reviewer on PR #244). The
+  generator reads the whole `+` chain now, in the tool description and in every
+  parameter description.
+
 ### Added
 
 - **The description ratchet covers parameter descriptions too, in every class.**

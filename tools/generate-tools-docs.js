@@ -175,6 +175,26 @@ function extractInputSchemaRef(toolBlock) {
   return refMatch ? refMatch[1] : null;
 }
 
+/**
+ * A `description:` whose value is several string literals joined with `+`.
+ *
+ * This reads source with regexes rather than importing the built definitions, so
+ * a concatenation used to be captured up to its FIRST literal and the rest of the
+ * text was dropped from the generated docs — five tools lost a whole sentence
+ * each, and `CreateCdsUnitTest` ended on the seam, which is the trailing space a
+ * reviewer saw in `git diff --check` (PR #244). Reads the whole chain now.
+ */
+function readDescription(text) {
+  const LITERAL = "'(?:\\\\.|[^'\\\\])*'|\"(?:\\\\.|[^\"\\\\])*\"|`(?:\\\\.|[^`\\\\])*`";
+  const chain = text.match(
+    new RegExp(`description\\s*:\\s*((?:${LITERAL})(?:\\s*\\+\\s*(?:${LITERAL}))*)`),
+  );
+  if (!chain) return '';
+  return (chain[1].match(new RegExp(LITERAL, 'g')) || [])
+    .map((part) => part.slice(1, -1).replace(/\\(['"`\\])/g, '$1'))
+    .join('');
+}
+
 function findMatchingBrace(content, openIndex) {
   let depth = 0;
   let inSingle = false;
@@ -290,10 +310,7 @@ function parseTopLevelProperties(propertiesContent) {
 
       const type =
         body.match(/type\s*:\s*(['"])((?:\\.|(?!\1).)*)\1/)?.[2] || 'any';
-      const description =
-        body
-          .match(/description\s*:\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/)?.[2]
-          ?.replace(/\\(['"\\])/g, '$1') || '';
+      const description = readDescription(body);
       const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
 
       props[key] = {
@@ -367,9 +384,7 @@ function extractToolDefinition(filePath) {
   const nameMatch = block.match(/name\s*:\s*['"]([^'"]+)['"]/);
   if (!nameMatch) return null;
 
-  const descMatch = block.match(
-    /description\s*:\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/,
-  );
+  const toolDescription = readDescription(block);
   const inputSchemaBlock = extractInputSchemaBlock(block);
   const inputSchemaRef = inputSchemaBlock ? null : extractInputSchemaRef(block);
   let inputSchema = parseInputSchemaBlock(inputSchemaBlock);
@@ -408,7 +423,7 @@ function extractToolDefinition(filePath) {
 
   return {
     name: nameMatch[1],
-    description: descMatch ? descMatch[2].replace(/\\(['"\\])/g, '$1') : '',
+    description: toolDescription,
     inputSchema,
     inputSchemaRef,
     availableIn,

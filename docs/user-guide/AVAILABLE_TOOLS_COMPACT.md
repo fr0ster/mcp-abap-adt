@@ -163,7 +163,7 @@ Preferred dedicated compact tools and minimal payloads:
 **Parameters:**
 - `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.
 - `object_name` (string, optional) - Object name for single-object activation form.
-- `object_type` (any, optional) - 
+- `object_type` (any, optional) - ${commonObjectTypeSchema.description} For single-object activation, this alone is enough — no ADT type code needed.
 - `objects` (array, optional) - Explicit objects list for batch activation.
 - `preaudit` (boolean, optional) - Run pre-audit checks before activation.
 

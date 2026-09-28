@@ -942,7 +942,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.
 - `object_name` (string, optional) - Object name for single-object activation form.
-- `object_type` (any, optional) - 
+- `object_type` (any, optional) - ${commonObjectTypeSchema.description} For single-object activation, this alone is enough — no ADT type code needed.
 - `objects` (array, optional) - Explicit objects list for batch activation.
 - `preaudit` (boolean, optional) - Run pre-audit checks before activation.
 
@@ -2548,7 +2548,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
+**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -2602,7 +2602,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
+**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -2613,7 +2613,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
+**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -2626,7 +2626,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id. 
+**Description:** Retrieve CDS unit test run status for a run_id. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 

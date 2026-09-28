@@ -547,7 +547,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. 
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the DDIC structure/table endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 

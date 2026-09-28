@@ -140,10 +140,54 @@ group gets the write handlers with it. For the split to mean anything the router
 has to come apart along the same line: a read-only group importing read-only
 routes only. That is the actual task; the two manifests are the easy part.
 
+## Decided: the five packages
+
+`lib` stays what it is; the compact tools MOVE OUT of it into two new library
+packages, and a new bin-bearing package serves the compact facade. (Stated by the
+user 2026-09-28.)
+
+| package | carries | bin | licence |
+|---|---|---|---|
+| `@mcp-abap-adt/lib` | handlers, registries, embeddable — **minus** the compact tools | no | Apache-2.0 |
+| `@mcp-abap-adt/compact-readonly` | the 13 non-modifying compact tools | no | Apache-2.0 |
+| `@mcp-abap-adt/compact-modify` | the 9 modifying or executing compact tools | no | Apache-2.0 |
+| `@mcp-abap-adt/core` | transports, launcher, `mcp-abap-adt` | yes | AGPL-3.0-only |
+| `@mcp-abap-adt/compact` | the compact server and its bin | yes | AGPL-3.0-only |
+
+So the bin is split by DECOMPOSITION — object-oriented in `core`, operation-oriented
+in `compact` — and never by capability: locally each command gives every access, and
+choosing read-only is the consumer's act of importing `compact-readonly` rather than
+a flag or a second binary.
+
+### What this makes breaking, and for whom
+
+- **Moving the compact tools out of `lib` is a major for `lib`.** Anything importing
+  them from `@mcp-abap-adt/lib/handlers` stops finding them; the two new packages
+  are where they live. That is 14.0.0 with a migration note naming the new import
+  path per tool.
+- **`core` currently owns `--exposition=compact`** (`launcher.ts:236` →
+  `CompactHandlersGroup`, which would no longer be in `lib`). Two ways out, and this
+  is the one open question of the new shape:
+  1. `core` depends on the two compact libraries and keeps `--exposition=compact`,
+     so nothing a user runs today changes and `compact` is a convenience package
+     whose bin defaults to that exposition;
+  2. `core` drops `compact` from its expositions and the facade is only reachable
+     through the new package — a second breaking change, in the CLI this time, and
+     `validateExposition`'s rule about compact-alone becomes moot in `core`.
+
+  (1) keeps every existing invocation working and costs `core` a dependency on two
+  Apache-2.0 libraries. (2) is cleaner as a boundary and breaks a documented flag.
+  Recommendation: **(1)** — the flag is documented in `ServerConfigManager`'s help
+  and in the YAML config, and breaking it buys nothing a dependency does not.
+
 ## Open questions for the brainstorm
-1. **Release mechanics.** `publish-all.sh` gains two more entries and the release
-   checklist two more versions to keep in step — the same drift that has bitten
-   `server.json` before. Lockstep versions for all four packages, or independent?
+1. **`core`'s `--exposition=compact`**: keep it via a dependency, or drop it —
+   see the two options above.
+2. **Release mechanics.** `publish-all.sh` gains two more entries and the release
+   checklist three more versions to keep in step — the same drift that has bitten
+   `server.json` before. Lockstep versions for all five packages, or independent?
+   Lockstep is the recommendation: the compact packages are a decomposition of the
+   same `lib`, and independent versions would create combinations nobody has run.
 
 ## Tasks, once the questions above are answered
 
@@ -163,9 +207,14 @@ routes only. That is the actual task; the two manifests are the easy part.
       that reads the activation run's results.
 - [ ] **Split the compact router along the capability line** so a read-only group
       imports no write route. This is the real work, and it is in `lib`.
-- [ ] **The two packages**: manifests, `LICENSE` (Apache-2.0, both — no bin),
-      `publish-all.sh`, the release checklist. No bins, so `binSmoke.test.ts` and
-      `server.json` are untouched.
+- [ ] **The two library packages**: manifests, `LICENSE` (Apache-2.0, both — no
+      bin), `publish-all.sh`, the release checklist.
+- [ ] **The `compact` package**: manifest, `LICENSE` (AGPL-3.0-only), `COPYING`,
+      its bin, `server.json` (a second registry entry — a different tool list is a
+      different server to a client), `publish-all.sh`, and `binSmoke.test.ts`
+      extended to its bin.
+- [ ] **`lib` 14.0.0 and its migration note**: which tool moved to which package,
+      per tool.
 - [ ] **What a consumer imports**, named explicitly: the two packages' entry points
       answer a handler registry, and the shape has to be the one cloud-llm-hub can
       use directly rather than something it has to adapt.

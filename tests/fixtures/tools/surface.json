@@ -2086,5 +2086,11 @@
     "name": "GetObjectsByType",
     "inputs": "parent_name*, parent_tech_name*, parent_type*, node_id*, format, with_short_descriptions",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "system",
+    "name": "GetServiceBindingPreviewUrl",
+    "inputs": "service_binding_name*, entity_set, navigation, target_entity_set, client, language",
+    "available_in": "cloud, onprem"
   }
 ]

@@ -1,0 +1,240 @@
+/**
+ * The URL that opens a published service binding's preview in a browser.
+ *
+ * **Why a tool.** Nothing in a binding's payload carries it. ADT's Preview button
+ * builds the URL itself from repository facts, and the path segment it puts after
+ * `feap/` is not a token the server issued — it is a `##`-joined descriptor of the
+ * service, shifted by 20 and percent-encoded (see `feapDescriptor.ts`, whose fixture
+ * is a URL Eclipse produced, re-encoded byte for byte). So the URL can be assembled
+ * from reads, and until now every tier of this server could read the binding and
+ * still not answer "where do I look at it".
+ *
+ * **What it reads, and why each one.** The binding says the service, its version and
+ * the protocol — and NOT the entity sets, which are the `expose … as <alias>`
+ * aliases in the service definition. The navigation segment is an association or
+ * composition of the exposed root view, so the view's source is read only when a
+ * navigation is wanted and none was given.
+ *
+ * **What it refuses to invent.** A preview needs an entity set, a navigation and the
+ * target that navigation reaches. When those cannot be resolved the answer carries
+ * the service URLs, the entity sets to choose from and what is missing — rather than
+ * a URL built on a guess, which would look exactly like a working one.
+ */
+import {
+  ddlDocuments,
+  serviceDefinitionDocuments,
+  serviceDocuments,
+} from '@mcp-abap-adt/adt-clients';
+import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
+import { answer } from '../../../lib/answer';
+import { createAdtClient } from '../../../lib/clients';
+import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  annotationServiceOf,
+  feapDescriptor,
+  feapPreviewUrl,
+} from '../../../lib/strategies/feapDescriptor';
+import type { AdtReading } from '../../../lib/strategies/reading';
+import { resultsFor } from '../../../lib/strategies/resultSets';
+import { sequence, succeededWith } from '../../../lib/strategies/sequence';
+import {
+  associationsOf,
+  exposedEntitiesOf,
+  serviceBindingFactsOf,
+} from '../../../lib/strategies/serviceBindingFacts';
+import { return_error } from '../../../lib/utils';
+
+export const TOOL_DEFINITION = {
+  name: 'GetServiceBindingPreviewUrl',
+  available_in: ['onprem', 'cloud'] as const,
+  description:
+    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, a navigation and its target, and says what is missing rather than guessing.',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      service_binding_name: {
+        type: 'string',
+        description: 'Service binding name.',
+      },
+      entity_set: {
+        type: 'string',
+        description:
+          'Entity set to open. Omitted, the first one the service definition exposes is used.',
+      },
+      navigation: {
+        type: 'string',
+        description:
+          'Association or composition to follow. Omitted, the first one of the exposed root view is used.',
+      },
+      target_entity_set: {
+        type: 'string',
+        description:
+          'Entity set the navigation reaches. Omitted, the second exposed entity set is used.',
+      },
+      client: {
+        type: 'string',
+        description:
+          'Client for the sap-client parameter. Omitted, the parameter is left out.',
+      },
+      language: {
+        type: 'string',
+        description: 'Logon language for the preview. Default EN.',
+      },
+    },
+    required: ['service_binding_name'],
+  },
+} as const;
+
+export async function handleGetServiceBindingPreviewUrl(
+  context: HandlerContext,
+  args: {
+    service_binding_name: string;
+    entity_set?: string;
+    navigation?: string;
+    target_entity_set?: string;
+    client?: string;
+    language?: string;
+  },
+) {
+  const { connection, logger } = context;
+  const { service_binding_name } = args;
+  if (!service_binding_name)
+    return return_error(new Error('service_binding_name is required'));
+
+  const bindingName = service_binding_name.trim().toUpperCase();
+  const adt = createAdtClient(connection, logger);
+  const binding = adt.getServiceBinding(resultsFor(serviceDocuments));
+  const definition = adt.getServiceDefinition(
+    resultsFor(serviceDefinitionDocuments),
+  );
+  const baseUrl = (await connection.getBaseUrl()).replace(/\/+$/, '');
+
+  interface Found {
+    facts: ReturnType<typeof serviceBindingFactsOf>;
+    exposed: ReturnType<typeof exposedEntitiesOf>;
+    associations: string[];
+  }
+
+  return answer(
+    { tool: 'GetServiceBindingPreviewUrl', detail: 'terse' },
+    () =>
+      sequence(
+        () =>
+          binding.read({ bindingName }, undefined, {
+            analyse: analyseException,
+          }),
+        async (
+          bindingSource: AdtReading<string>,
+        ): Promise<IAdtResponse<Found, IAdtError>> => {
+          const facts = serviceBindingFactsOf(bindingSource.raw);
+          if (!facts.serviceDefinition) {
+            // A binding with no definition names nothing to expose; the answer
+            // says so through `missing` rather than failing the read that worked.
+            return succeededWith<Found>({
+              facts,
+              exposed: [],
+              associations: [],
+            });
+          }
+
+          const srvd = await definition.read(
+            { serviceDefinitionName: facts.serviceDefinition },
+            'active',
+            { analyse: analyseException },
+          );
+          if (!srvd.ok)
+            return srvd as unknown as IAdtResponse<Found, IAdtError>;
+          const exposed = exposedEntitiesOf(
+            (srvd.getResult().value as AdtReading<string>).raw,
+          );
+
+          // The view is read only when a navigation is needed and none was
+          // named: a third request for a segment the caller already knows is
+          // waste, and this tool is meant to be cheap enough to call blind.
+          let associations: string[] = [];
+          if (args.navigation === undefined && exposed.length > 0) {
+            const ddl = await adt
+              .getDdl(resultsFor(ddlDocuments))
+              .read({ ddlName: exposed[0].entity }, 'active', {
+                analyse: analyseException,
+              });
+            if (ddl.ok) {
+              associations = associationsOf(
+                (ddl.getResult().value as AdtReading<string>).raw,
+              );
+            }
+          }
+
+          return succeededWith<Found>({ facts, exposed, associations });
+        },
+      ),
+    ({ facts, exposed, associations }: Found) => {
+      const entitySet = args.entity_set ?? exposed[0]?.entitySet;
+      const navigation = args.navigation ?? associations[0];
+      const target =
+        args.target_entity_set ?? exposed[1]?.entitySet ?? entitySet;
+
+      const serviceUrl =
+        facts.protocol === 'odatav2'
+          ? `${baseUrl}/sap/opu/odata/sap/${facts.service ?? bindingName}/`
+          : `${baseUrl}/sap/opu/odata4/sap/${bindingName.toLowerCase()}` +
+            `/srvd/sap/${(facts.serviceDefinition ?? '').toLowerCase()}` +
+            `/${facts.version ?? '0001'}/`;
+
+      const missing: string[] = [];
+      if (!facts.service) missing.push('service (srvb:services/@srvb:name)');
+      if (!facts.protocol)
+        missing.push('protocol (srvb:binding/@srvb:version)');
+      if (!entitySet) missing.push('entity_set');
+      if (!navigation) missing.push('navigation');
+
+      const descriptor =
+        facts.service !== undefined &&
+        facts.protocol !== undefined &&
+        entitySet !== undefined &&
+        navigation !== undefined
+          ? {
+              service: facts.service,
+              entitySet,
+              navigation,
+              targetEntitySet: target ?? entitySet,
+              annotationService: annotationServiceOf(facts.service),
+              version: facts.version ?? '0001',
+            }
+          : undefined;
+
+      return {
+        success: true,
+        service_binding_name: bindingName,
+        published: facts.published,
+        protocol: facts.protocol,
+        service: facts.service,
+        service_definition: facts.serviceDefinition,
+        version: facts.version,
+        entity_sets: exposed.map((one) => one.entitySet),
+        associations,
+        service_url: serviceUrl,
+        metadata_url: `${serviceUrl}$metadata`,
+        preview_url:
+          descriptor === undefined || facts.protocol === undefined
+            ? undefined
+            : feapPreviewUrl({
+                baseUrl,
+                protocol: facts.protocol,
+                descriptor,
+                client: args.client,
+                language: args.language,
+              }),
+        preview_descriptor:
+          descriptor === undefined ? undefined : feapDescriptor(descriptor),
+        // Said out loud: a preview URL that quietly guesses a segment is
+        // indistinguishable from one that works, until it opens nothing.
+        missing: missing.length === 0 ? undefined : missing,
+        note: facts.published
+          ? undefined
+          : 'The binding is not published, so neither the service nor the preview answers until it is.',
+      };
+    },
+  );
+}

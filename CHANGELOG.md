@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`GetServiceBindingPreviewUrl` — the browser URL for a published service binding,
+  which no document carries.** ADT's Preview button does not ask the server for a
+  URL: it builds one, and the path segment after `feap/` is not a token but a
+  `##`-joined descriptor of the service, shifted by 20 (0x14) and percent-encoded as
+  UTF-8 — which is why bytes above 0x7F arrive as `%C2%XX`. The rule was derived from
+  a URL Eclipse produced for an on-premise V2 binding and **verified by re-encoding
+  it byte for byte**; that pair is the fixture in `feapDescriptor.test.ts`, and the
+  handler test asserts the tool reproduces that exact URL.
+
+  What it reads, and why each one is needed, all of it measured rather than assumed:
+
+  | descriptor part | where it lives |
+  |---|---|
+  | service | `srvb:services/@srvb:name` — **not** the service definition: a trial binding answered `services="ZUI_TRAVEL"` with definition `ZTRAVEL_SD` |
+  | version | `srvb:content/@srvb:version` (`minorVersion`/`patchVersion` belong to neither URL) |
+  | protocol | `srvb:binding/@srvb:version`: `V2` → `odatav2`, `V4` → `odatav4` |
+  | entity set, target | `expose … as <alias>` in the service definition — the ALIAS is the entity set |
+  | navigation | an association or composition of the exposed root view |
+  | annotation service | `<service>_VAN`, the generated Gateway Vocabulary Annotation (object type `IWVB`) |
+
+  **It refuses to invent the parts it cannot read.** Without an entity set or a
+  navigation there is no `preview_url` — the answer carries `missing`, the entity
+  sets to choose from, the service and `$metadata` URLs, and, when the binding is
+  unpublished, a note saying nothing will answer until it is published. A preview URL
+  with one guessed segment is indistinguishable from a working one until it opens
+  nothing.
+
+  The view is read only when a navigation is needed and none was given, so the usual
+  cost is two requests.
+
+
 ## [14.0.1] - 2026-09-28
 
 ### Fixed

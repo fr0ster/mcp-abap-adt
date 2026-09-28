@@ -464,7 +464,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readbehaviordefinition-read-only-behavior-definition"></a>
 #### ReadBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** Operation: Read, Create, Update. Subject: BehaviorDefinition. Will be useful for reading, creating, or updating behavior definition. [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
 
@@ -494,7 +494,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** Operation: Read, Create, Update. Subject: Class. Will be useful for reading, creating, or updating class. [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
@@ -550,7 +550,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdataelement-read-only-data-element"></a>
 #### ReadDataElement (Read-Only / Data Element)
-**Description:** Operation: Read, Create, Update. Subject: DataElement. Will be useful for reading, creating, or updating data element. [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.
+**Description:** [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.
 
 **Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
 
@@ -565,7 +565,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readddl-read-only-ddl"></a>
 #### ReadDdl (Read-Only / Ddl)
-**Description:** Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
 
@@ -580,7 +580,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdomain-read-only-domain"></a>
 #### ReadDomain (Read-Only / Domain)
-**Description:** Operation: Read, Create, Update. Subject: Domain. Will be useful for reading, creating, or updating domain. [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.
+**Description:** [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.
 
 **Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
 
@@ -686,7 +686,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -730,7 +730,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** Operation: Read, Create, Update. Subject: Interface. Will be useful for reading, creating, or updating interface. [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
@@ -745,7 +745,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclass-read-only-message-class"></a>
 #### ReadMessageClass (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
+**Description:** [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
 
@@ -756,7 +756,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclassmessage-read-only-message-class"></a>
 #### ReadMessageClassMessage (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of a message class", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
+**Description:** [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of a message class", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
 
@@ -771,7 +771,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmetadataextension-read-only-metadata-extension"></a>
 #### ReadMetadataExtension (Read-Only / Metadata Extension)
-**Description:** Operation: Read, Create, Update. Subject: MetadataExtension. Will be useful for reading, creating, or updating metadata extension. [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
 
@@ -873,7 +873,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicebinding-read-only-service-binding"></a>
 #### ReadServiceBinding (Read-Only / Service Binding)
-**Description:** Operation: Read, Create, Update. Subject: ServiceBinding. Will be useful for reading, creating, or updating service binding. [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.
+**Description:** [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.
 
 **Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
 
@@ -887,7 +887,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicedefinition-read-only-service-definition"></a>
 #### ReadServiceDefinition (Read-Only / Service Definition)
-**Description:** Operation: Read, Create, Update. Subject: ServiceDefinition. Will be useful for reading, creating, or updating service definition. [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
 
@@ -916,7 +916,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readstructure-read-only-structure"></a>
 #### ReadStructure (Read-Only / Structure)
-**Description:** Operation: Read, Create, Update. Subject: Structure. Will be useful for reading, creating, or updating structure. [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
+**Description:** [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
 
 **Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
 
@@ -1352,7 +1352,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readtable-read-only-table"></a>
 #### ReadTable (Read-Only / Table)
-**Description:** Operation: Read, Create, Update. Subject: Table. Will be useful for reading, creating, or updating table. [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.
+**Description:** [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.
 
 **Source:** `src/handlers/table/readonly/handleReadTable.ts`
 
@@ -1471,7 +1471,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Operation: Create. Subject: BehaviorDefinition. Will be useful for creating behavior definition. Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
+**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -1513,7 +1513,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Operation: Update, Create. Subject: BehaviorDefinition. Will be useful for updating or creating behavior definition. Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -1531,7 +1531,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
+**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -1601,7 +1601,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
+**Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -1744,7 +1744,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Operation: Update, Create. Subject: Class. Will be useful for updating or creating class. Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -2602,7 +2602,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Operation: Create. Subject: DataElement. Will be useful for creating data element. Create a new ABAP data element in SAP system. Creates the data element object in initial state.
+**Description:** Create a new ABAP data element in SAP system. Creates the data element object in initial state.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -2653,7 +2653,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Operation: Update, Create. Subject: DataElement. Will be useful for updating or creating data element. Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
@@ -2696,7 +2696,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
+**Description:** Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -2735,7 +2735,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
+**Description:** Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -2764,7 +2764,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Operation: Create. Subject: MetadataExtension. Will be useful for creating metadata extension. Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
+**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -2780,7 +2780,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Operation: Update, Create. Subject: MetadataExtension. Will be useful for updating or creating metadata extension. Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -2810,7 +2810,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Operation: Create. Subject: Domain. Will be useful for creating domain. Create a new ABAP domain in SAP system. Creates the domain object in initial state.
+**Description:** Create a new ABAP domain in SAP system. Creates the domain object in initial state.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -2858,7 +2858,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Operation: Update, Create. Subject: Domain. Will be useful for updating or creating domain. Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -2925,7 +2925,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Operation: Create. Subject: FunctionModule. Will be useful for creating function module. Create a new ABAP function module within an existing function group. Creates the function module in initial state.
+**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -2952,7 +2952,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Operation: Update, Create. Subject: FunctionModule. Will be useful for updating or creating function module. Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -2997,7 +2997,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+**Description:** Create a new ABAP include within an existing function group. Creates the include in initial state.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -3024,7 +3024,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+**Description:** Update source code of an existing ABAP function group include.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
@@ -3083,7 +3083,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.
+**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -3122,7 +3122,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Operation: Update, Create. Subject: Interface. Will be useful for updating or creating interface. Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -3139,7 +3139,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Operation: Create. Subject: Message Class (MSAG). Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+**Description:** Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -3154,7 +3154,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Create. Subject: a single message inside a Message Class (MSAG). Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
+**Description:** Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -3182,7 +3182,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Delete. Subject: a single message inside a Message Class (MSAG). Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+**Description:** Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
@@ -3218,7 +3218,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
+**Description:** Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
@@ -3231,7 +3231,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -3327,7 +3327,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
+**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -3368,7 +3368,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -3385,7 +3385,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Operation: Create. Subject: ServiceBinding. Will be useful for creating service binding. Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
+**Description:** Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -3442,7 +3442,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Operation: Update, Create. Subject: ServiceBinding. Will be useful for updating or creating service binding. Update publication state of an existing ABAP service binding.
+**Description:** Update publication state of an existing ABAP service binding.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -3476,7 +3476,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Operation: Create. Subject: ServiceDefinition. Will be useful for creating service definition. Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
+**Description:** Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -3517,7 +3517,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Operation: Update, Create. Subject: ServiceDefinition. Will be useful for updating or creating service definition. Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
@@ -3547,7 +3547,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Operation: Create. Subject: Structure. Will be useful for creating structure. Create a new ABAP structure in SAP system. Creates the structure object in initial state.
+**Description:** Create a new ABAP structure in SAP system. Creates the structure object in initial state.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -3589,7 +3589,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Operation: Update, Create. Subject: Structure. Will be useful for updating or creating structure. Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
+**Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
@@ -3637,7 +3637,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Operation: Create. Subject: Table. Will be useful for creating table. Create a new ABAP table in SAP system. Creates the table object in initial state.
+**Description:** Create a new ABAP table in SAP system. Creates the table object in initial state.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -3676,7 +3676,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Operation: Update, Create. Subject: Table. Will be useful for updating or creating table. Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
+**Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -3752,7 +3752,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
+**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -3924,7 +3924,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### ActivateBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** Operation: Activate, Create, Update. Subject: BehaviorDefinition. Will be useful for activating, creating, or updating behavior definition. [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
@@ -4094,7 +4094,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateclasslow-low-level-class"></a>
 #### ActivateClassLow (Low-Level / Class)
-**Description:** Operation: Activate, Create, Update. Subject: Class. Will be useful for activating, creating, or updating class. [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -4408,7 +4408,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatedataelementlow-low-level-data-element"></a>
 #### ActivateDataElementLow (Low-Level / Data Element)
-**Description:** Operation: Activate, Create, Update. Subject: DataElement. Will be useful for activating, creating, or updating data element. [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -4528,7 +4528,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateddllow-low-level-ddl"></a>
 #### ActivateDdlLow (Low-Level / Ddl)
-**Description:** Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -4646,7 +4646,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatemetadataextensionlow-low-level-ddlx"></a>
 #### ActivateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** Operation: Activate, Create, Update. Subject: Metadata Extension. Will be useful for activating, creating, or updating a metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
@@ -4763,7 +4763,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatedomainlow-low-level-domain"></a>
 #### ActivateDomainLow (Low-Level / Domain)
-**Description:** Operation: Activate, Create, Update. Subject: Domain. Will be useful for activating, creating, or updating domain. [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
@@ -4891,7 +4891,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatefunctionmodulelow-low-level-function"></a>
 #### ActivateFunctionModuleLow (Low-Level / Function)
-**Description:** Operation: Activate, Create, Update. Subject: FunctionModule. Will be useful for activating, creating, or updating function module. [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -5098,7 +5098,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateinterfacelow-low-level-interface"></a>
 #### ActivateInterfaceLow (Low-Level / Interface)
-**Description:** Operation: Activate, Create, Update. Subject: Interface. Will be useful for activating, creating, or updating interface. [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -5326,7 +5326,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateprogramlow-low-level-program"></a>
 #### ActivateProgramLow (Low-Level / Program)
-**Description:** Operation: Activate, Create, Update. Subject: Program. Will be useful for activating, creating, or updating program. [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -5444,7 +5444,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateservicebindinglow-low-level-service-binding"></a>
 #### ActivateServiceBindingLow (Low-Level / Service Binding)
-**Description:** Operation: Activate, Create, Update. Subject: ServiceBinding. Will be useful for activating, creating, or updating service binding. [low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
@@ -5460,7 +5460,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateservicedefinitionlow-low-level-service-definition"></a>
 #### ActivateServiceDefinitionLow (Low-Level / Service Definition)
-**Description:** Operation: Activate, Create, Update. Subject: ServiceDefinition. Will be useful for activating, creating, or updating service definition. [low-level] Activate an ABAP service definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP service definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
@@ -5476,7 +5476,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatestructurelow-low-level-structure"></a>
 #### ActivateStructureLow (Low-Level / Structure)
-**Description:** Operation: Activate, Create, Update. Subject: Structure. Will be useful for activating, creating, or updating a structure. [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
@@ -5643,7 +5643,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatetablelow-low-level-table"></a>
 #### ActivateTableLow (Low-Level / Table)
-**Description:** Operation: Activate, Create, Update. Subject: Table. Will be useful for activating, creating, or updating a table. [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 

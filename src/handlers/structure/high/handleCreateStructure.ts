@@ -57,7 +57,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Structure. Will be useful for creating structure. Create a new ABAP structure in SAP system. Creates the structure object in initial state.',
+    'Create a new ABAP structure in SAP system. Creates the structure object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateInterface',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.',
+    'Create a new ABAP interface in SAP system. Creates the interface object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

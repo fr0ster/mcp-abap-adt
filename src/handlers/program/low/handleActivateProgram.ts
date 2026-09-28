@@ -22,7 +22,7 @@ export const TOOL_DEFINITION = {
   name: 'ActivateProgramLow',
   available_in: ['onprem'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: Program. Will be useful for activating, creating, or updating program. [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {

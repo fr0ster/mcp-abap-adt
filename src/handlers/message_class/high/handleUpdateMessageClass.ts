@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
+    'Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.',
+    'Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.',
   inputSchema: {
     type: 'object',
     properties: {

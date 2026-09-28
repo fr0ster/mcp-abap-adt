@@ -59,7 +59,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: DataElement. Will be useful for updating or creating data element. Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
+    'Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

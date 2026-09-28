@@ -161,7 +161,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### ActivateBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** Operation: Activate, Create, Update. Subject: BehaviorDefinition. Will be useful for activating, creating, or updating behavior definition. [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP behavior definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
@@ -331,7 +331,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateclasslow-low-level-class"></a>
 #### ActivateClassLow (Low-Level / Class)
-**Description:** Operation: Activate, Create, Update. Subject: Class. Will be useful for activating, creating, or updating class. [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
@@ -645,7 +645,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatedataelementlow-low-level-data-element"></a>
 #### ActivateDataElementLow (Low-Level / Data Element)
-**Description:** Operation: Activate, Create, Update. Subject: DataElement. Will be useful for activating, creating, or updating data element. [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP data element. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
@@ -765,7 +765,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateddllow-low-level-ddl"></a>
 #### ActivateDdlLow (Low-Level / Ddl)
-**Description:** Operation: Activate, Create, Update. Subject: DDL source. Will be useful for activating, creating, or updating a DDL source. [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP DDL source (CDS view). Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
@@ -883,7 +883,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatemetadataextensionlow-low-level-ddlx"></a>
 #### ActivateMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** Operation: Activate, Create, Update. Subject: Metadata Extension. Will be useful for activating, creating, or updating a metadata extension. [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP metadata extension. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
@@ -1000,7 +1000,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatedomainlow-low-level-domain"></a>
 #### ActivateDomainLow (Low-Level / Domain)
-**Description:** Operation: Activate, Create, Update. Subject: Domain. Will be useful for activating, creating, or updating domain. [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP domain. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
@@ -1128,7 +1128,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatefunctionmodulelow-low-level-function"></a>
 #### ActivateFunctionModuleLow (Low-Level / Function)
-**Description:** Operation: Activate, Create, Update. Subject: FunctionModule. Will be useful for activating, creating, or updating function module. [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP function module. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
@@ -1335,7 +1335,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateinterfacelow-low-level-interface"></a>
 #### ActivateInterfaceLow (Low-Level / Interface)
-**Description:** Operation: Activate, Create, Update. Subject: Interface. Will be useful for activating, creating, or updating interface. [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
@@ -1563,7 +1563,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateprogramlow-low-level-program"></a>
 #### ActivateProgramLow (Low-Level / Program)
-**Description:** Operation: Activate, Create, Update. Subject: Program. Will be useful for activating, creating, or updating program. [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP program. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
@@ -1681,7 +1681,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateservicebindinglow-low-level-service-binding"></a>
 #### ActivateServiceBindingLow (Low-Level / Service Binding)
-**Description:** Operation: Activate, Create, Update. Subject: ServiceBinding. Will be useful for activating, creating, or updating service binding. [low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP service binding. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
@@ -1697,7 +1697,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activateservicedefinitionlow-low-level-service-definition"></a>
 #### ActivateServiceDefinitionLow (Low-Level / Service Definition)
-**Description:** Operation: Activate, Create, Update. Subject: ServiceDefinition. Will be useful for activating, creating, or updating service definition. [low-level] Activate an ABAP service definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP service definition. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
@@ -1713,7 +1713,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatestructurelow-low-level-structure"></a>
 #### ActivateStructureLow (Low-Level / Structure)
-**Description:** Operation: Activate, Create, Update. Subject: Structure. Will be useful for activating, creating, or updating a structure. [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/structure/low/handleActivateStructure.ts`
 
@@ -1880,7 +1880,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="activatetablelow-low-level-table"></a>
 #### ActivateTableLow (Low-Level / Table)
-**Description:** Operation: Activate, Create, Update. Subject: Table. Will be useful for activating, creating, or updating a table. [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
+**Description:** [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.
 
 **Source:** `src/handlers/table/low/handleActivateTable.ts`
 

@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: ServiceDefinition. Will be useful for updating or creating service definition. Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.',
+    'Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

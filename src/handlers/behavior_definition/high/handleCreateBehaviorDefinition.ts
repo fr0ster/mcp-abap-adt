@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: BehaviorDefinition. Will be useful for creating behavior definition. Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.',
+    'Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

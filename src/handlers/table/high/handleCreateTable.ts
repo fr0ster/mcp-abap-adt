@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Table. Will be useful for creating table. Create a new ABAP table in SAP system. Creates the table object in initial state.',
+    'Create a new ABAP table in SAP system. Creates the table object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

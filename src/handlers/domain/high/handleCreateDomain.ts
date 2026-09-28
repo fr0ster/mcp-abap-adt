@@ -52,7 +52,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Domain. Will be useful for creating domain. Create a new ABAP domain in SAP system. Creates the domain object in initial state.',
+    'Create a new ABAP domain in SAP system. Creates the domain object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

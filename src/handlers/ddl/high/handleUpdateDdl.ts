@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
+    'Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
   inputSchema: {
     type: 'object',
     properties: {

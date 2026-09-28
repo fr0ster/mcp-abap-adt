@@ -267,7 +267,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Operation: Create. Subject: BehaviorDefinition. Will be useful for creating behavior definition. Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
+**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -309,7 +309,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Operation: Update, Create. Subject: BehaviorDefinition. Will be useful for updating or creating behavior definition. Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -327,7 +327,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
+**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
@@ -397,7 +397,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
+**Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
@@ -540,7 +540,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Operation: Update, Create. Subject: Class. Will be useful for updating or creating class. Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
@@ -1398,7 +1398,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Operation: Create. Subject: DataElement. Will be useful for creating data element. Create a new ABAP data element in SAP system. Creates the data element object in initial state.
+**Description:** Create a new ABAP data element in SAP system. Creates the data element object in initial state.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
@@ -1449,7 +1449,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Operation: Update, Create. Subject: DataElement. Will be useful for updating or creating data element. Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
@@ -1492,7 +1492,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
+**Description:** Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
@@ -1531,7 +1531,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
+**Description:** Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
@@ -1560,7 +1560,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Operation: Create. Subject: MetadataExtension. Will be useful for creating metadata extension. Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
+**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -1576,7 +1576,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Operation: Update, Create. Subject: MetadataExtension. Will be useful for updating or creating metadata extension. Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -1606,7 +1606,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Operation: Create. Subject: Domain. Will be useful for creating domain. Create a new ABAP domain in SAP system. Creates the domain object in initial state.
+**Description:** Create a new ABAP domain in SAP system. Creates the domain object in initial state.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -1654,7 +1654,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Operation: Update, Create. Subject: Domain. Will be useful for updating or creating domain. Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -1721,7 +1721,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Operation: Create. Subject: FunctionModule. Will be useful for creating function module. Create a new ABAP function module within an existing function group. Creates the function module in initial state.
+**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
@@ -1748,7 +1748,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Operation: Update, Create. Subject: FunctionModule. Will be useful for updating or creating function module. Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
@@ -1793,7 +1793,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+**Description:** Create a new ABAP include within an existing function group. Creates the include in initial state.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
@@ -1820,7 +1820,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+**Description:** Update source code of an existing ABAP function group include.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
@@ -1879,7 +1879,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.
+**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
@@ -1918,7 +1918,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Operation: Update, Create. Subject: Interface. Will be useful for updating or creating interface. Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
@@ -1935,7 +1935,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Operation: Create. Subject: Message Class (MSAG). Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+**Description:** Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
@@ -1950,7 +1950,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Create. Subject: a single message inside a Message Class (MSAG). Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
+**Description:** Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
@@ -1978,7 +1978,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Delete. Subject: a single message inside a Message Class (MSAG). Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+**Description:** Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
@@ -2014,7 +2014,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
+**Description:** Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
@@ -2027,7 +2027,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
@@ -2123,7 +2123,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
+**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -2164,7 +2164,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
@@ -2181,7 +2181,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Operation: Create. Subject: ServiceBinding. Will be useful for creating service binding. Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
+**Description:** Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -2238,7 +2238,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Operation: Update, Create. Subject: ServiceBinding. Will be useful for updating or creating service binding. Update publication state of an existing ABAP service binding.
+**Description:** Update publication state of an existing ABAP service binding.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -2272,7 +2272,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Operation: Create. Subject: ServiceDefinition. Will be useful for creating service definition. Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
+**Description:** Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2313,7 +2313,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Operation: Update, Create. Subject: ServiceDefinition. Will be useful for updating or creating service definition. Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
@@ -2343,7 +2343,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Operation: Create. Subject: Structure. Will be useful for creating structure. Create a new ABAP structure in SAP system. Creates the structure object in initial state.
+**Description:** Create a new ABAP structure in SAP system. Creates the structure object in initial state.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -2385,7 +2385,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Operation: Update, Create. Subject: Structure. Will be useful for updating or creating structure. Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
+**Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
@@ -2433,7 +2433,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Operation: Create. Subject: Table. Will be useful for creating table. Create a new ABAP table in SAP system. Creates the table object in initial state.
+**Description:** Create a new ABAP table in SAP system. Creates the table object in initial state.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
@@ -2472,7 +2472,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Operation: Update, Create. Subject: Table. Will be useful for updating or creating table. Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
+**Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
@@ -2548,7 +2548,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
+**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 

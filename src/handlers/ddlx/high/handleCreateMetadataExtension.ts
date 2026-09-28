@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: MetadataExtension. Will be useful for creating metadata extension. Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.',
+    'Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

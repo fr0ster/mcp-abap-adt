@@ -71,7 +71,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Delete. Subject: a single message inside a Message Class (MSAG). Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.',
+    'Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.',
   inputSchema: {
     type: 'object',
     properties: {

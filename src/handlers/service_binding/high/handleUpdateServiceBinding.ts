@@ -110,8 +110,7 @@ type DesiredPublicationStateInput = 'published' | 'unpublished' | 'unchanged';
 export const TOOL_DEFINITION = {
   name: 'UpdateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Operation: Update, Create. Subject: ServiceBinding. Will be useful for updating or creating service binding. Update publication state of an existing ABAP service binding.',
+  description: 'Update publication state of an existing ABAP service binding.',
   inputSchema: {
     type: 'object',
     properties: {

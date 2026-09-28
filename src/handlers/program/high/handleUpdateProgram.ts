@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem'] as const,
   description:
-    'Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
+    'Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

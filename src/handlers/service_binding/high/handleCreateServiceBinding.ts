@@ -78,7 +78,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: ServiceBinding. Will be useful for creating service binding. Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.',
+    'Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

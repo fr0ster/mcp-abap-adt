@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: Structure. Will be useful for updating or creating structure. Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.',
+    'Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

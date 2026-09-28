@@ -58,7 +58,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: Domain. Will be useful for updating or creating domain. Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
+    'Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {

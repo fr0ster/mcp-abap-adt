@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'ActivateTableLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: Table. Will be useful for activating, creating, or updating a table. [low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Activate an ABAP table. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {

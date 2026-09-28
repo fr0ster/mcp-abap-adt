@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateBehaviorImplementation',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.',
+    'Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.',
   inputSchema: {
     type: 'object',
     properties: {

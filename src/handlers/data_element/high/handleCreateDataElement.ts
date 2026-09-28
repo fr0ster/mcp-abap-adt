@@ -53,7 +53,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: DataElement. Will be useful for creating data element. Create a new ABAP data element in SAP system. Creates the data element object in initial state.',
+    'Create a new ABAP data element in SAP system. Creates the data element object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

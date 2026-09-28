@@ -32,7 +32,7 @@ export const TOOL_DEFINITION = {
     properties: {
       transport_number: {
         type: 'string',
-        description: 'Transport request number (e.g., E19K905635, DEVK905123)',
+        description: 'Transport request number',
       },
       include_objects: {
         type: 'boolean',

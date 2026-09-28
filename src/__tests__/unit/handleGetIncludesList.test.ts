@@ -10,7 +10,7 @@ import {
  * GetIncludesList builds the include tree itself, from pieces adt-clients
  * does answer.
  *
- * Measured on E19, 2026-09-25: the handler still called
+ * Measured on premise, 2026-09-25: the handler still called
  * `fetchNodeStructure(type, name, '000000', true)` — the pre-22 positional
  * signature — and read `.data` off an `IAdtResponse` that has none, so every
  * program, include and class answered `children: []` (SAPLSLVC_FULLSCREEN

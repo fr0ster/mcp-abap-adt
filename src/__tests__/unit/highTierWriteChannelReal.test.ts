@@ -107,7 +107,7 @@ const TEST_DOUBLES_OK =
 
 const TRANSPORT_CREATED_XML =
   '<?xml version="1.0" encoding="utf-8"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm" tm:useraction="newrequest">' +
-  '<tm:request tm:number="E19K900123" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project="">' +
+  '<tm:request tm:number="SIDK900123" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project="">' +
   '<tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
 
 const cases: ChannelCase[] = [

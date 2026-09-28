@@ -80,7 +80,7 @@ export const TOOL_DEFINITION = {
       node_id: {
         type: 'string',
         description:
-          'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: E19 answers it with an empty body.',
+          'Optional node ID (default: "000000", the root). Use to fetch child nodes. "0000" is not the root: the server answers it with an empty body.',
         default: '000000',
       },
       with_short_descriptions: {

@@ -143,7 +143,7 @@ describe('the node reading', () => {
 
 /**
  * The library's own reading of a node structure, as `getUtils()` without
- * `ourUtils` answers it — measured on E19, 2026-09-25:
+ * `ourUtils` answers it — measured on premise, 2026-09-25:
  * `{objects: [{objectType, objectName, techName, objectUri}],
  *   childNodes: [{objectType, nodeId: '000035'}]}`.
  *
@@ -188,7 +188,7 @@ describe("the library's own reading is mapped, never passed through as ours", ()
 /**
  * A subpackage's objects belong under the subpackage, not under the root.
  * `walkPackage` answered one flat list with no owner, so `assembleTree` hung
- * everything off the root and left every subpackage `children: []` (E19,
+ * everything off the root and left every subpackage `children: []` (an on-premise system,
  * TEST_MCP with include_subpackages, 2026-09-25), and `assembleList` gave a
  * subpackage's objects the ROOT as their `packageName`.
  */
@@ -237,7 +237,7 @@ describe('subpackages keep their own objects', () => {
 
 /**
  * SAP puts a message where an object should be when a node cannot be loaded —
- * E19, TEST_AC_SHR's VIEW/DV node, 2026-09-25: OBJECT_NAME "Error loading
+ * On premise, TEST_AC_SHR's VIEW/DV node, 2026-09-25: OBJECT_NAME "Error loading
  * node:", no OBJECT_TYPE, the explanation in TECH_NAME. It is not an object,
  * and listing it as one put a nameless-typed row in GetPackageTree.
  */

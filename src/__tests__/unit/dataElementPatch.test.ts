@@ -40,7 +40,7 @@ describe('patching a data element changes what was asked and nothing else', () =
   });
 
   it("sets the data element's own description, not packageRef's, when the root has none yet", () => {
-    // Measured live against E19 (RFC), 2026-09-21, GitHub #211: a fresh
+    // Measured live against an on-premise system (RFC), 2026-09-21, GitHub #211: a fresh
     // data element's readMetadata answers with no adtcore:description on
     // the root at all, while the sibling packageRef carries the package's
     // own description. The unscoped patch used to match packageRef's

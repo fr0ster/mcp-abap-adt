@@ -71,14 +71,12 @@ export const TOOL_DEFINITION = {
     transport_layer: z
       .string()
       .optional()
-      .describe(
-        'Transport layer (e.g., ZE19). Required for transportable packages.',
-      ),
+      .describe('Transport layer. Required for transportable packages.'),
     transport_request: z
       .string()
       .optional()
       .describe(
-        'Transport request number (e.g., E19K905635). Required if package is transportable.',
+        'Transport request number. Required if package is transportable.',
       ),
     record_changes: z
       .boolean()

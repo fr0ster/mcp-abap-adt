@@ -40,10 +40,10 @@ describe('ReadTransportObjects', () => {
    */
   const document = {
     'tm:root': {
-      '@': { 'tm:number': 'E19K905942' },
+      '@': { 'tm:number': 'SIDK905942' },
       'tm:request': {
         'tm:task': {
-          '@': { 'tm:number': 'E19K905943' },
+          '@': { 'tm:number': 'SIDK905943' },
           'tm:abap_object': [
             {
               '@': {
@@ -79,10 +79,10 @@ describe('ReadTransportObjects', () => {
     });
 
     const result = await handleReadTransportObjects(context as any, {
-      transport_number: 'E19K905943',
+      transport_number: 'SIDK905943',
     });
 
-    expect(asked).toBe('E19K905943');
+    expect(asked).toBe('SIDK905943');
     const answered = body(result);
     expect(answered.count).toBe(2);
     expect(answered.objects[0]).toMatchObject({
@@ -118,7 +118,7 @@ describe('ReadTransportObjects', () => {
     });
 
     const result = await handleReadTransportObjects(context as any, {
-      transport_number: 'E19K905943',
+      transport_number: 'SIDK905943',
     });
 
     expect(body(result).objects[0].position).toBeNull();
@@ -136,13 +136,13 @@ describe('RemoveTransportObject', () => {
     });
 
     await handleRemoveTransportObject(context as any, {
-      transport_number: 'E19K905943',
+      transport_number: 'SIDK905943',
       object_name: 'ZCL_X',
       object_type: 'CLAS',
       position: '000026',
     });
 
-    expect(sent.number).toBe('E19K905943');
+    expect(sent.number).toBe('SIDK905943');
     expect(sent.object).toMatchObject({
       name: 'ZCL_X',
       type: 'CLAS',
@@ -163,7 +163,7 @@ describe('RemoveTransportObject', () => {
 
     const answered = body(
       await handleRemoveTransportObject(context as any, {
-        transport_number: 'E19K905943',
+        transport_number: 'SIDK905943',
         object_name: 'ZCL_X',
         object_type: 'CLAS',
         position: '000026',
@@ -188,7 +188,7 @@ describe('RemoveTransportObject', () => {
     const result = await handleRemoveTransportObject(
       context as any,
       {
-        transport_number: 'E19K905943',
+        transport_number: 'SIDK905943',
         object_name: 'ZCL_X',
         object_type: 'CLAS',
       } as never,
@@ -209,7 +209,7 @@ describe('AddTransportObject', () => {
     });
 
     await handleAddTransportObject(context as any, {
-      transport_number: 'E19K905943',
+      transport_number: 'SIDK905943',
       object_name: 'ZCL_X',
       object_type: 'CLAS',
     });
@@ -225,7 +225,7 @@ describe('AddTransportObject', () => {
 
     const answered = body(
       await handleAddTransportObject(context as any, {
-        transport_number: 'E19K905943',
+        transport_number: 'SIDK905943',
         object_name: 'ZCL_X',
         object_type: 'CLAS',
       }),
@@ -249,20 +249,20 @@ describe('CreateTransportTask', () => {
       createTask: (_number: unknown, given: unknown) => {
         options = given;
         return okResponse(
-          reading({ '@': { 'tm:number': 'E19K907073' } } as never),
+          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
         );
       },
     });
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
       }),
     );
 
     expect(options.targetUser).toBe('DEVELOPER');
-    expect(answered.task_number).toBe('E19K907073');
+    expect(answered.task_number).toBe('SIDK907073');
     expect(answered.owner).toBe('DEVELOPER');
   });
 
@@ -278,7 +278,7 @@ describe('CreateTransportTask', () => {
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
       }),
     );
@@ -298,7 +298,7 @@ describe('CreateTransportTask', () => {
     const typed: unknown[][] = [];
     fakeClient = fakeClientOf({
       createTask: () =>
-        okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
       changeTaskType: (...given: unknown[]) => {
         typed.push(given);
         return okResponse(reading('<tm:root/>'));
@@ -307,13 +307,13 @@ describe('CreateTransportTask', () => {
 
     const answered = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
       }),
     );
 
     expect(typed).toHaveLength(1);
-    expect(typed[0].slice(0, 2)).toEqual(['E19K907073', 'S']);
+    expect(typed[0].slice(0, 2)).toEqual(['SIDK907073', 'S']);
     expect(answered.task_type).toBe('S');
   });
 
@@ -328,7 +328,7 @@ describe('CreateTransportTask', () => {
     const refused = () =>
       fakeClientOf({
         createTask: () =>
-          okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+          okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
         changeTaskType: () =>
           refusedResponse(
             'You can only change the type of tasks in workbench requests',
@@ -338,7 +338,7 @@ describe('CreateTransportTask', () => {
     fakeClient = refused();
     const terse = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
       }),
     );
@@ -349,7 +349,7 @@ describe('CreateTransportTask', () => {
     fakeClient = refused();
     const full = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
         detail: 'full',
       }),
@@ -360,7 +360,7 @@ describe('CreateTransportTask', () => {
     fakeClient = refused();
     const raw = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
         detail: 'raw',
       }),
@@ -375,7 +375,7 @@ describe('CreateTransportTask', () => {
     const typed: unknown[][] = [];
     fakeClient = fakeClientOf({
       createTask: () =>
-        okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
       changeTaskType: (...given: unknown[]) => {
         typed.push(given);
         return okResponse(reading('<tm:root/>'));
@@ -384,14 +384,14 @@ describe('CreateTransportTask', () => {
 
     const repair = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
         task_type: 'R',
       }),
     );
     const unclassified = body(
       await handleCreateTransportTask(context as any, {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
         task_type: 'X',
       }),
@@ -410,18 +410,18 @@ describe('CreateTransportTask', () => {
   it('still answers the task when typing it is refused, and says it is unclassified', async () => {
     fakeClient = fakeClientOf({
       createTask: () =>
-        okResponse(reading({ '@': { 'tm:number': 'E19K907073' } } as never)),
+        okResponse(reading({ '@': { 'tm:number': 'SIDK907073' } } as never)),
       changeTaskType: () => refusedResponse('Specified task type is unknown'),
     });
 
     const result = await handleCreateTransportTask(context as any, {
-      transport_number: 'E19K905941',
+      transport_number: 'SIDK905941',
       target_user: 'DEVELOPER',
     });
     const answered = body(result);
 
     expect(result.isError).toBe(false);
-    expect(answered.task_number).toBe('E19K907073');
+    expect(answered.task_number).toBe('SIDK907073');
     expect(answered.task_type).toBe('X');
     expect(answered.task_type_error).toMatch(/unknown/);
     expect(answered.note).toMatch(/AddTransportObject/);
@@ -433,7 +433,7 @@ describe('CreateTransportTask', () => {
       createTask: () => {
         created = true;
         return okResponse(
-          reading({ '@': { 'tm:number': 'E19K907073' } } as never),
+          reading({ '@': { 'tm:number': 'SIDK907073' } } as never),
         );
       },
     });
@@ -441,7 +441,7 @@ describe('CreateTransportTask', () => {
     const result = await handleCreateTransportTask(
       context as any,
       {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
         target_user: 'DEVELOPER',
         task_type: 'K',
       } as never,
@@ -459,7 +459,7 @@ describe('CreateTransportTask', () => {
     const result = await handleCreateTransportTask(
       context as any,
       {
-        transport_number: 'E19K905941',
+        transport_number: 'SIDK905941',
       } as never,
     );
 
@@ -489,7 +489,7 @@ describe('ReadTransportActionLog', () => {
 
     const answered = body(
       await handleReadTransportActionLog(context as any, {
-        transport_number: 'E19K905942',
+        transport_number: 'SIDK905942',
       }),
     );
 
@@ -498,7 +498,7 @@ describe('ReadTransportActionLog', () => {
   });
 
   /**
-   * The shape an on-premise system answers, measured 2026-09-25 on E19: the
+   * The shape an on-premise system answers, measured 2026-09-25 on premise: the
    * text is the content of `log:message/log:messageText`, with the T100 key
    * beside it as an attribute — no `log:text` anywhere. Reading only
    * `log:text` answered `count: 0` for a log that held six entries.
@@ -540,7 +540,7 @@ describe('ReadTransportActionLog', () => {
 
     const answered = body(
       await handleReadTransportActionLog(context as any, {
-        transport_number: 'E19K907299',
+        transport_number: 'SIDK907299',
       }),
     );
 

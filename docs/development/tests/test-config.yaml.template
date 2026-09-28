@@ -233,7 +233,7 @@ runtime_readonly_handlers:
 environment:
   default_package: "ZOK_LOCAL"
   default_transport: "<YOUR_TRANSPORT_REQUEST>"  # ⚠️ UPDATE THIS BEFORE TESTING
-  default_system: "E19"
+  default_system: ""
   default_client: "100"
 
 # Test Execution Settings

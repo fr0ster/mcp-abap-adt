@@ -1,7 +1,7 @@
 /**
  * SearchSource over RFC fetches one source at a time: one RFC session answers
  * one call at a time, and parallel fetches lost sources without an error
- * (E19, 2026-09-26: 4 of 13 read at concurrency 8, all 13 at 1).
+ * (on premise, 2026-09-26: 4 of 13 read at concurrency 8, all 13 at 1).
  */
 const run = jest.fn(async () => ({ results: [] }));
 jest.mock('../../lib/search-source/orchestrator', () => ({

@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **No parameter description names a transport request, and nothing in the tree
+  names the system it was measured on.** The rule is the user's and it is about
+  agnosticism, not retrieval: *we do not know who will use this, where, or how, so
+  we state only what we know.* A tool's text says what the tool does and what its
+  parameters mean; a request number from somebody's landscape is not part of that.
+
+  - **78 transport-number literals removed from parameter descriptions**, across 78
+    files — one real request 73 times, four more once or twice each. `Transport
+    request number (e.g., …). Required for transportable objects.` now reads
+    `Transport request number. Required for transportable objects.`, and the three
+    transport tools whose text turns on the request/task distinction keep the
+    distinction and lose the example. The worst case was not retrieval: an example
+    request number is a value a model can copy into a write, and it addressed a
+    real transport.
+  - **The system id is gone from the whole tree** — descriptions, code comments,
+    test comments, test data, captured fixtures, the installation guides, the test
+    template and this changelog's own history. What a measurement note knows is the
+    platform and the date, so `on E19 (2026-09-26)` reads `on premise
+    (2026-09-26)`, and `Measured on E19 (BASIS 816) and E98 (BASIS 756)` reads
+    `Measured on BASIS 816 and on BASIS 756` — the release is the fact that
+    mattered. `--env=…/e19.env` reads `--env=…/your-system.env`; a `SAP_MASTER_SYSTEM`
+    example reads *the three-character SID*; captured fixtures carry `SID`, beside
+    the `SAPUSER01` they already carried. Test data keeps its numbers under a
+    placeholder prefix (`SIDK9…`), so every assertion still pairs with its input.
+  - One of these was a live defect rather than a wording problem:
+    `GetNodeStructureLow`'s `node_id` description explained `"0000"` by naming the
+    system that answered an empty body for it.
+
+### Added
+
+- **The description ratchet now covers parameter descriptions, class by class.**
+  `toolDescriptionsCarryNoLiterals.test.ts` checks every `description` anywhere in
+  an input schema against the classes listed in `ON_PARAMETERS_TOO` — today the
+  transport number, the one class that is clean. The package and customer-object
+  classes stay description-only until their text is replaced (254 of 370 tools),
+  and each joins the list as it is cleared; a class enforced on descriptions but
+  not on parameters is one still being worked through, not one that is exempt. A
+  guard test asserts the walker actually reads the parameter text it claims to
+  (>500 descriptions found), because a selector that matches nothing is how a
+  probe once reported "0 violations" over 0 tools.
+
 ## [13.0.2] - 2026-09-28
 
 ### Fixed
@@ -260,7 +303,7 @@ they arrived as success.
 
 ### Verified
 
-- **On premise, E19, soft mode** (PR #230): HTTP **47/47 suites, 105/105 tests**;
+- **On premise, soft mode** (PR #230): HTTP **47/47 suites, 105/105 tests**;
   RFC **43/47, 100/105**, the four failures all one finding — `RfcTransport` keeps
   one ABAP session for the connection's lifetime, so a stateless read after a
   create on the same connection answers `400 SADT_RESOURCE 007` while a fresh
@@ -1536,7 +1579,7 @@ These two auth paths pass full unit coverage but have **not** been exercised aga
 - `SearchSource.scanned.packages` now reports the resolved-and-deduplicated starting-package count (post-mask resolution, post-dedup) instead of raw input length. Closes #87.
 
 ### Notes
-- `+` (single-char) wildcard probed against an onprem E19 system and found unsupported by the ADT `informationsystem/search` endpoint (despite SAP CP-pattern docs). Dropped from public examples; the resolver still detects `+` for forward-compat with backends that may honor it.
+- `+` (single-char) wildcard probed against an on-premise system and found unsupported by the ADT `informationsystem/search` endpoint (despite SAP CP-pattern docs). Dropped from public examples; the resolver still detects `+` for forward-compat with backends that may honor it.
 
 ## [6.7.0] - 2026-05-14
 
@@ -2058,7 +2101,7 @@ These two auth paths pass full unit coverage but have **not** been exercised aga
   - Responsible resolution: `SAP_RESPONSIBLE` env var → `SAP_USERNAME` fallback → API.
   - Ensures correct transport request binding on on-premise systems.
 - **New `.env` variables for on-premise configuration**:
-  - `SAP_MASTER_SYSTEM` — SAP system ID (e.g., `E19`, `DEV`). Required for on-prem create/update operations.
+  - `SAP_MASTER_SYSTEM` — SAP system ID (the three-character SID). Required for on-prem create/update operations.
   - `SAP_RESPONSIBLE` — Responsible user (optional, falls back to `SAP_USERNAME`).
 - **Test infrastructure**: `resolveTestSystemContext()` resolves system context from YAML config for integration tests.
 

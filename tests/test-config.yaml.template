@@ -91,7 +91,7 @@ lock_config:
 environment:
   # Connection: .env file from standard sessions folder (~/Documents/mcp-abap-adt/sessions/)
   # Contains SAP_URL, SAP_USERNAME, SAP_PASSWORD, SAP_CLIENT, SAP_AUTH_TYPE, etc.
-  env: ""                                    # ← CHANGE: session file name (e.g., "e19.env", "mdd.env")
+  env: ""                                    # ← CHANGE: session file name (e.g., "your-system.env", "another-system.env")
   # System and connection type (explicit, no auto-detection)
   system_type: ""                            # ← CHANGE: "onprem" | "cloud" | "legacy"
   connection_type: "http"                    # "http" | "rfc"
@@ -297,7 +297,7 @@ shared_dependencies:
   # above are active. ZMCP_SHR_STRU_APP extends ZMCP_SHR_STRU, for
   # GetStructuresList's append (enhancement) reading. The enhancement category
   # annotation is required: without it the source is refused with
-  # SBD_MESSAGES 007 "Can't save due to errors in source" (E19, 2026-09-26).
+  # SBD_MESSAGES 007 "Can't save due to errors in source" (on premise, 2026-09-26).
   append_structures:
     - name: "ZMCP_SHR_STRU_APP"
       base_structure: "ZMCP_SHR_STRU"
@@ -406,7 +406,7 @@ shared_dependencies:
     # without an implementation class: nothing here needs one. Strict, so the
     # check answers clean — without it SAP warns W BDL339 "should be flagged
     # as strict". `authorization master ( none )` is what strict ( 2 ) takes
-    # with no behaviour pool (checked on E19, 2026-09-26: no message at all).
+    # with no behaviour pool (checked on premise, 2026-09-26: no message at all).
     - name: "ZI_MCP_SHR_ROOT"
       description: "Shared BDEF for check tests"
       available_in: ["onprem", "cloud"]
@@ -834,7 +834,7 @@ create_behavior_implementation:
           ENDCLASS.
         # Differs from implementation_code so the update is a real one. No
         # `create FOR MODIFY`: ZMCP_BLD_I_BDEF is managed, and SAP refuses the
-        # class with "the implementation type CREATE is superfluous" (E19,
+        # class with "the implementation type CREATE is superfluous" (on premise,
         # 2026-09-26) — the framework creates.
         update_implementation_code: |
           CLASS lhc_ZMCP_BLD_I_BDEF DEFINITION INHERITING FROM cl_abap_behavior_handler.
@@ -2141,7 +2141,7 @@ run_atc:
       enabled: true
       description: "RunATC over a shared class with the DEFAULT check variant, then its status and findings"
       params:
-        # A shared object: ATC reads it and changes nothing. On E19 the DEFAULT
+        # A shared object: ATC reads it and changes nothing. On premise the DEFAULT
         # variant finds 3 in it (priorities 2 and 3, SLIN among them).
         object_name: "ZMCP_SHR_FGRP"
         object_type: "function_group"

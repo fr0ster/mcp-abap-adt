@@ -32,7 +32,7 @@
   - `node tests/run-all-tests.js` - Run all enabled tests
 - **Build Output:** Compiled JavaScript and type definitions in `dist/`
 - **Testing:** YAML-based test configuration in `tests/test-config.yaml` (created from `tests/test-config.yaml.template`)
-- **Configuration:** Environment variables loaded from `.env` files (e.g., `e19.env`)
+- **Configuration:** Environment variables loaded from `.env` files (e.g., `your-system.env`)
 
 Use this snapshot to rehydrate context quickly when a new chat session starts.
 

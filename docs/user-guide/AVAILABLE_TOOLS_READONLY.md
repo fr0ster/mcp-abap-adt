@@ -1019,7 +1019,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `include_objects` (boolean, optional (default: true))) - Include list of objects in transport (default: true)
 - `include_tasks` (boolean, optional (default: true))) - Include list of tasks in transport (default: true)
-- `transport_number` (string, required) - Transport request number (e.g., E19K905635, DEVK905123)
+- `transport_number` (string, required) - Transport request number
 
 ---
 
@@ -1042,7 +1042,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
 **Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number, e.g. E19K905942. A request answers its own lifecycle events; a task answers the events of the objects on it.
+- `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
 
@@ -1053,7 +1053,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
 **Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number, e.g. E19K905942. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
+- `transport_number` (string, required) - Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
 
 ---
 

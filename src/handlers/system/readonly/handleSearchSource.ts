@@ -109,7 +109,7 @@ type SearchSourceArgs = OrchestratorInput;
 // Over RFC the scan runs one fetch at a time, whatever the caller asked for.
 // An RFC connection is one ABAP session, and one session answers one call at a
 // time. Fetched in parallel (the default concurrency is 8), sources were lost
-// without an error: on E19 (2026-09-26) a scan of the shared package read 4 of
+// without an error: on premise (2026-09-26) a scan of the shared package read 4 of
 // its 13 sources and found nothing, where concurrency 1 read all 13 and found
 // both hits, as HTTP does.
 

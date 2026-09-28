@@ -40,7 +40,7 @@ cp tests/test-config.yaml.template tests/test-config.yaml
 ```
 
 **Required changes** (marked `# ← CHANGE`):
-- `environment.env` — session .env file name (`"e19.env"`, `"mdd.env"`) from standard sessions folder
+- `environment.env` — session .env file name (`"your-system.env"`, `"another-system.env"`) from standard sessions folder
 - `environment.system_type` — `"onprem"`, `"cloud"`, or `"legacy"`
 - `environment.connection_type` — `"http"` (default) or `"rfc"`
 - `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
@@ -222,6 +222,30 @@ We took the fix and skipped the check.
 `src/__tests__/unit/binSmoke.test.ts` performs it now. Before a release, make sure
 it ran; when adding a bin, add it there. And treat any `__dirname`-relative path
 in `server/` as suspect: count the levels for both layouts.
+
+## What we write names nothing concrete
+
+**The rule: we do not know who will use this, where, or how — so we state only
+what we know.** It holds for tool descriptions, parameter descriptions, code
+comments, test data and captured fixtures alike.
+
+- **A description says what the tool does and what a parameter means**, most
+  important first, and never gives an example object, package or transport. A
+  literal in a tool description is search text in a consumer's tool-RAG and
+  retrieves the wrong tools in bulk (#241); a literal in a parameter description
+  is worse in a different way — a model can copy it into a write, and an example
+  transport request addresses a real one.
+- **A measurement note records the platform and the date, not the landscape.**
+  `on premise (2026-09-26)` and `BASIS 816`, never a system id: the release is
+  what made the behaviour, and the SID means nothing to anyone else reading it.
+- **Captured fixtures are sanitised** — `SAPUSER01`, `SID`, a placeholder
+  transport prefix — and the note says the capture was sanitised. Test data keeps
+  its numbers under a placeholder prefix so assertions still pair with inputs.
+- `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts` keeps the rule. It
+  covers every tool description, and parameter descriptions for each class listed
+  in `ON_PARAMETERS_TOO`. **Clearing a class of literal means adding it there in
+  the same change** — the list is the record of what is enforced, and a class
+  missing from it is unfinished work, not an exemption.
 
 ## Plans and Specs
 

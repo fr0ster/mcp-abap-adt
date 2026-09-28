@@ -466,7 +466,7 @@ it.each([
 // A profiler option the caller did not give must not reach adt-clients as a
 // key holding `undefined`: the client merges `{ ...DEFAULTS, ...options }`,
 // and an undefined key there REPLACES the default. maxSizeForTraceFile lost
-// its 30720 that way and left the parameters document altogether; E19
+// its 30720 that way and left the parameters document altogether; an on-premise system
 // (2026-09-25) then recorded every trace in state "Size violation". With the
 // size given, the same run finished.
 it.each(handlers)(

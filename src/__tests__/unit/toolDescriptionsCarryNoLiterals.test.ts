@@ -14,12 +14,16 @@
  * where descriptions are authored and where no RAG runs — without it the next
  * `$TMP` returns and nothing here notices until a consumer's retrieval degrades.
  *
- * **Scope: tool descriptions only, deliberately.** Parameter descriptions break
- * the same rule today — measured on this branch, 254 of 370 tools, 464
- * occurrences, among them a real transport number from a real system 72 times and
- * the author's own package names 42 times. Extending this test to them is the
- * follow-up that replaces that text; widening it now would only fail 254 tools
- * without fixing one of them.
+ * **Scope: every tool description, and parameter descriptions class by class as
+ * each class is cleared.** Parameter descriptions broke the same rule — measured
+ * 2026-09-28, 254 of 370 tools and 464 occurrences, among them a real transport
+ * number from a real system 78 times and the author's own package names 42 times.
+ * The transport numbers are gone (78 of them, across 78 files), so that class is
+ * enforced on parameters here from now on. The package and customer-object classes
+ * are not yet: enforcing them today would fail 254 tools without replacing one
+ * line of their text, so each joins `ON_PARAMETERS_TOO` when its text is rewritten.
+ * A class enforced on descriptions but not on parameters is a class still being
+ * worked through, not a class exempt.
  *
  * A consumer's tool-RAG indexes `description` and ranks it against the user's
  * request, so an incidental literal in it is a match on that literal. "Transport
@@ -43,7 +47,7 @@ const INCIDENTAL = [
     pattern: /\b[ZY][A-Z0-9_]{2,}/,
   },
   {
-    name: 'a transport number (E19K905635)',
+    name: 'a transport number (SIDK905635)',
     pattern: /\b[A-Z0-9]{3}K9\d{5}\b/,
   },
 ];
@@ -69,7 +73,7 @@ describe('tool descriptions carry no incidental literals', () => {
       "e.g. 'ZCL_DEMO'",
       'mask ZOK*',
       'class YFOO_BAR',
-      'transport E19K905635',
+      'transport SIDK905635',
     ]) {
       expect([literal, caught(literal)]).toEqual([literal, true]);
     }
@@ -98,4 +102,54 @@ describe('tool descriptions carry no incidental literals', () => {
       expect(offenders).toEqual([]);
     });
   }
+
+  /**
+   * The classes already cleared out of PARAMETER descriptions, which are indexed
+   * by a consumer's tool-RAG alongside the tool's own text and read by the model
+   * that fills the argument. A transport number in `corrNr`'s description is the
+   * worst of the three: it is a real request from a real system, so a model that
+   * copies the example addresses somebody's transport.
+   */
+  const ON_PARAMETERS_TOO = ['a transport number (SIDK905635)'];
+
+  /** Every `description` anywhere in an input schema, nesting included. */
+  const parameterDescriptions = (node: unknown): string[] => {
+    if (Array.isArray(node)) return node.flatMap(parameterDescriptions);
+    if (node === null || typeof node !== 'object') return [];
+    const found: string[] = [];
+    for (const [key, value] of Object.entries(node)) {
+      if (key === 'description' && typeof value === 'string') found.push(value);
+      else found.push(...parameterDescriptions(value));
+    }
+    return found;
+  };
+
+  for (const { name, pattern } of INCIDENTAL.filter((c) =>
+    ON_PARAMETERS_TOO.includes(c.name),
+  )) {
+    it(`no parameter description names ${name}`, () => {
+      const offenders = tools
+        .flatMap((t) =>
+          parameterDescriptions(t.inputSchema?.properties).map(
+            (text) => [t.name, text] as const,
+          ),
+        )
+        .filter(([, text]) => pattern.test(text))
+        .map(([tool, text]) => `${tool}: ${text.slice(0, 80)}`);
+      expect(offenders).toEqual([]);
+    });
+  }
+
+  it('reads the parameter descriptions it claims to read', () => {
+    // Guards the walker itself: a selector that finds nothing would make the
+    // test above pass over any text at all, which is how the first version of
+    // this file reported "0 violations" from a probe that scanned 0 tools.
+    const all = tools.flatMap((t) =>
+      parameterDescriptions(t.inputSchema?.properties),
+    );
+    expect(all.length).toBeGreaterThan(500);
+    expect(all.some((text) => /transport request number/i.test(text))).toBe(
+      true,
+    );
+  });
 });

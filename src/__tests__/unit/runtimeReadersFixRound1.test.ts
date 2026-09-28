@@ -56,7 +56,7 @@ jest.mock('../../lib/clients', () => ({
 }));
 
 /**
- * A cut of E19's `GET /sap/bc/adt/feeds` (2026-09-26): the dumps feed with its
+ * A cut of an on-premise system's `GET /sap/bc/adt/feeds` (2026-09-26): the dumps feed with its
  * two query variants, and a feed with none.
  */
 const feedListXml =

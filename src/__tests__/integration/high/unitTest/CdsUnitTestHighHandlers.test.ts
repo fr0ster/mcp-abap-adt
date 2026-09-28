@@ -197,7 +197,7 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
         // (create → activate → read). A class just created has no version to
         // read yet: over RFC — one ABAP session for the run — the read in the
         // creating session answered 400 SADT_RESOURCE 007 "wrong input data"
-        // (E19, 2026-09-26). HTTP happened to answer a generated shell.
+        // (on premise, 2026-09-26). HTTP happened to answer a generated shell.
         testLogger?.info(`   • activate cds unit test class: ${className}`);
         const activateResponse = await tester.invokeToolOrHandler(
           'ActivateClassLow',

@@ -58,7 +58,7 @@ export function nodeLevel(answer: unknown): NodeLevel {
         uri: textOf(n?.OBJECT_URI) || undefined,
       }))
       // Every object has a type. An entry without one is SAP's message for
-      // a node it could not load ("Error loading node:", E19 2026-09-25),
+      // a node it could not load ("Error loading node:", on premise 2026-09-25),
       // not an object.
       .filter((o) => o.name && o.type),
     childNodes: asArray(data?.OBJECT_TYPES?.SEU_ADT_OBJECT_TYPE_INFO)
@@ -128,7 +128,7 @@ function levelOf(answer: unknown): NodeLevel {
     // each is recognised by what it carries, never assumed. Having
     // `childNodes` is NOT enough to be ours: the library's reading has them
     // too, keyed `objectType`/`objectName`, and passing it through as ours
-    // answered nameless, typeless rows (E19, 2026-09-25).
+    // answered nameless, typeless rows (on premise, 2026-09-25).
     if (value && typeof value === 'object' && 'childNodes' in value) {
       return isOurLevel(value) ? value : fromLibraryLevel(value);
     }

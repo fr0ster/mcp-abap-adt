@@ -96,7 +96,7 @@ POST /sap/bc/adt/deletion/delete
 
 It is not an enqueue lock and not the lock handle: the `LOCK` right before the
 `PUT` answers 200 with a handle, and the `UNLOCK` after it answers 200. Traced on
-E19 (2026-09-26) through the ABAP code:
+premise (2026-09-26) through the ABAP code:
 
 - `PAK/058` is raised in exactly one place — `CL_PACKAGE`, method
   `IF_PACKAGE~SET_CHANGEABLE` (include `CM01A`, line 39), when the package
@@ -128,7 +128,7 @@ and so is a second update (measured over RFC, below).
 
 **Workaround:** change or delete the package from a new ABAP session — a new
 RFC connection, or a new stateful HTTP session. There is no ADT call that
-resets the buffered state from inside the session. Measured over RFC on E19
+resets the buffered state from inside the session. Measured over RFC on premise
 (2026-09-26), one connection per session:
 
 | session | call | answer |
@@ -146,7 +146,7 @@ session, not to an enqueue: C updates while A and B are still open.
 package integration test creates, updates and deletes on three connections.
 
 **Over HTTP too.** One stateful HTTP session cannot save a package twice either.
-Measured on E19 (2026-09-27) on one connection held across calls, as the
+Measured on premise (2026-09-27) on one connection held across calls, as the
 server holds it:
 
 - the create is a stateless request and does not count;
@@ -164,7 +164,7 @@ per ABAP session.
 - **HTTP: in the connection** (`@mcp-abap-adt/connection`, fr0ster/mcp-abap-connection#60).
   - The stateful context a `LOCK` opens is named by the `sap-contextid` cookie. The connection used to send that cookie on every request, so the `PUT` after a `LOCK` ran in the lock's context.
   - With #60, only stateful requests (`LOCK`, `UNLOCK`) carry `x-sap-adt-sessiontype: stateful` and `sap-contextid`. Everything else runs outside the context, as Eclipse ADT does. The `PUT`'s save then ends with its own ABAP session, and one connection can update and delete a package repeatedly.
-  - Measured on E19 (BASIS 816) and E98 (BASIS 756). Before, E98 answered every package `PUT` on the same connection with `423` "invalid lock handle".
+  - Measured on BASIS 816 and on BASIS 756. Before, the older release answered every package `PUT` on the same connection with `423` "invalid lock handle".
 - **RFC: in this server** (`src/lib/packageSessions.ts`). An RFC connection has no stateless request: every call shares its one ABAP session. So over RFC:
   - `CreatePackage` / `CreatePackageLow` run on a new connection, closed when they answer.
   - `LockPackageLow` opens a new connection, locks on it, and keeps it under the lock handle. `UpdatePackageLow` with that handle runs on it, and `UnlockPackageLow` unlocks there and closes it, whatever the unlock answered.

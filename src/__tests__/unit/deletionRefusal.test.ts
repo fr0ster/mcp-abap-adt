@@ -1,7 +1,7 @@
 /**
  * The deletion reading — adt-strategies' since 0.5.0 (#172), re-exported by
  * `deletionRefusal.ts` beside this consumer's `absentPerCheck` — against
- * answers E19 sent on 2026-09-26
+ * answers an on-premise system sent on 2026-09-26
  * (integration run 8), trimmed to the elements the reading looks at.
  */
 import { ADT_NO_FAILURE } from '@mcp-abap-adt/interfaces-adt';
@@ -28,7 +28,7 @@ const SRVB_CHECK_TWO_MESSAGES =
 const TABL_DELETE_TWO_OBJECTS =
   `<?xml version="1.0" encoding="utf-8"?><del:deletionResult ${NS}>` +
   '<del:object del:isDeleted="true" adtcore:type="TABT/DTT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="S"><del:text/></del:message></del:object>' +
-  '<del:object del:isDeleted="false" adtcore:type="TABL/DT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="W"><del:text>Release transport E19K905876 to remove the object directory entry</del:text></del:message></del:object>' +
+  '<del:object del:isDeleted="false" adtcore:type="TABL/DT" adtcore:name="ZMCP_BLD_TAB_H1"><del:message del:priority="0" del:type="W"><del:text>Release transport SIDK905876 to remove the object directory entry</del:text></del:message></del:object>' +
   '</del:deletionResult>';
 
 /** Delete of a behavior definition refused with SWB_TOOL 029. */
@@ -76,7 +76,7 @@ describe('readDeletionRefusal (adt-strategies, re-exported)', () => {
       messages: [
         {
           type: 'W',
-          text: 'ZMCP_BLD_TAB_H1: Release transport E19K905876 to remove the object directory entry',
+          text: 'ZMCP_BLD_TAB_H1: Release transport SIDK905876 to remove the object directory entry',
         },
       ],
     });

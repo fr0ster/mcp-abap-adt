@@ -121,9 +121,9 @@ function deletionSuccessXml(objectName: string): string {
   );
 }
 
-/** The deletion check's answer, as E19 sent it (2026-09-26): deletable, or
+/** The deletion check's answer, as an on-premise system sent it (2026-09-26): deletable, or
  * refused with the reason in `del:message`. */
-/** A check that permits the delete of an object that is not there — E19,
+/** A check that permits the delete of an object that is not there — an on-premise system,
  * 2026-09-26, for an object whose directory entry waits on an open request. */
 function absentCheckXml(objectName: string): string {
   return (

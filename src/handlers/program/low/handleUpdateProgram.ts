@@ -11,7 +11,7 @@
  * channel every sibling family in this cluster shares. `transport_request`
  * goes to `config.transportRequest`, which `uploadProgramSource` puts on the
  * URL as `corrNr` — without it a write into a transportable package is
- * refused on premise ("Parameter corrNr could not be found.", E19
+ * refused on premise ("Parameter corrNr could not be found.",
  * 2026-09-25, measured on a view; the same member shape here). Verified
  * against `AdtProgram.js`, not the declaration file.
  */

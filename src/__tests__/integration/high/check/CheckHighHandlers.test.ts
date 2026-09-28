@@ -899,7 +899,7 @@ describe('Check High-Level Handlers Integration', () => {
           // or the program type is INCLUDE." — as what SAP says about any
           // function group (measured 2026-09-16). It is what SAP says about a
           // group that was never activated, whose main program has not been
-          // generated yet: once the shared group was activated (E19,
+          // generated yet: once the shared group was activated (an on-premise system,
           // 2026-09-25) the same check answered no message at all, and the
           // test failed on a correct answer. A shared object is active by
           // definition, so this asserts the answer's shape, as CheckTable

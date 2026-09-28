@@ -537,7 +537,7 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             // it) and repeated runs of THIS SAME test each leave their own
             // "Division by 0" entry behind, so even the newest matching
             // title can be a previous run's, not this one's. Confirmed live
-            // (2026-09-22, E19): filtering by the correct current user still
+            // (2026-09-22, on premise): filtering by the correct current user still
             // was not enough on its own. `title` narrows to the right kind
             // of dump for free; content, from the one candidate actually
             // worth opening, decides which run made it.

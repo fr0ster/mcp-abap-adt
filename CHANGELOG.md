@@ -43,19 +43,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     objects.` — ABAP Cloud has no `$TMP` anyway. Constraints that change the call
     stay word for word ("must already exist", "required for validation", "start
     with Z or Y", the REQUEST/TASK distinction). What goes is only the example.
-    A few needed a sentence rather than a deletion: the software component no
-    longer names two components, the search pattern explains `"*"` as a prefix
-    match instead of listing masks, the function-module code sample calls its
-    function `<function module name>`, and a behaviour pool's naming convention is
-    stated instead of spelled.
+    A couple needed a sentence rather than a deletion: the software component no
+    longer names two components, and the search pattern explains `"*"` as a prefix
+    match instead of listing masks.
+  - **Naming rules left with the names, and so did the CTS lesson.** A tool works
+    with any object the caller is authorised for, whatever it is called, so "must
+    follow SAP naming conventions", "start with Z or Y", "for the customer
+    namespace", a behaviour pool's conventional name and the worked ABAP snippet in
+    the function-module source parameter are all gone (28 descriptions). The
+    consumer's skill carries the naming rules and answers for the validity of what
+    it sends. The same cut trimmed 104 `transport_request` descriptions: `request`
+    is a word a description may use, a number never is, so the text keeps `not a
+    task` — the one fact that decides whether this call succeeds — and drops how CTS
+    works, which tool to call after it, and `CTS_WBO_API 020` / `SADT_RESOURCE 017`.
+    What stays is a limit that says what fits in the parameter ("up to 26
+    characters", the field-label lengths) and the transport tools' own text, where
+    request against task IS the subject of the tool.
 
 ### Added
 
 - **The description ratchet covers parameter descriptions too, in every class.**
   `toolDescriptionsCarryNoLiterals.test.ts` checks every `description` anywhere in
   an input schema, not only the tool's own text: three classes (a package, a
-  customer-namespace object, a transport number) over both, six assertions. Two
-  refinements came out of running it:
+  customer-namespace object, a transport number) over both, six assertions. The
+  transport class carries two shapes — `<SID>K9…` and a plain letters-and-digits
+  number like `ER121235`, named by the user — and a message number, a release and a
+  short SAP code (`CTS_WBO_API 020`, `BASIS 816`, `TK127`) sit in the self-check as
+  text that must stay allowed. Two more refinements came out of running it:
   - **A format placeholder is not a name.** `YYYYMMDDHHMMSS` matched the
     customer-object pattern on its leading `Y`; a token built only from the letters
     of a date is allowed by rule, and the self-check states it.

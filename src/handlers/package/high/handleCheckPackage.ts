@@ -37,16 +37,17 @@ export const TOOL_DEFINITION = {
       },
       super_package: {
         type: 'string',
-        description: 'Super package name (parent package).',
+        description:
+          'Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.',
       },
     },
-    required: ['package_name', 'super_package'],
+    required: ['package_name'],
   },
 } as const;
 
 export async function handleCheckPackage(
   context: HandlerContext,
-  args: { package_name: string; super_package: string },
+  args: { package_name: string; super_package?: string },
 ) {
   const result = await handleCheckPackageLow(context, args);
   return normalizeCheckResponse(result, args.package_name?.toUpperCase());

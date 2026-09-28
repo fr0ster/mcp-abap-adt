@@ -93,7 +93,30 @@ available: types a major or two ahead describe API that is not there on 22, and
 the compiler would wave it through. `^22` was measured clean across
 `tsconfig.json`, `tsconfig.test.json`, `server/tsconfig.json` and the full suite.
 
-A newer Node on a development machine is fine; nothing here may require it.
+A newer Node on a development machine is fine; nothing here may require it —
+this one runs 26.7.0, and that changes nothing here.
+
+**Node 26 is not a third supported version. Checked 2026-09-27:**
+
+- SAP's own docs for the Cloud Foundry environment list exactly three for
+  `nodejs_buildpack` — **20** (end of life 2026-04-30), **22**, **24** — and say
+  nothing about 26. A `nodejs 26` app has nothing to be staged on.
+- Node 26 is in **Current**, not LTS: released 2026-05-05, LTS in October 2026,
+  and Node's own guidance is Active or Maintenance LTS for production.
+- `@sap/cds` 10.1.1, `@sap/cds-compiler` 7.1.1 and `@cap-js/cds-typer` 0.41.1
+  declare `engines.node >=22`. A floor, not a statement that 26 was tested — the
+  same open range admitted 25, which the platform never had.
+
+**One thing 26 does change, and it is about installing rather than running.**
+`@mcp-abap-adt/auth-broker` 3.0.2 and `auth-providers` 4.2.1 widened `engines` to
+`"^22 || ^24 || ^26"` because under Node 26 npm skips a release whose `engines`
+does not admit it and installs the newest one that does — silently an older
+major (measured: `npm i -g @mcp-abap-adt/proxy` on 26.7.0 took 4.2.0 while 5.0.1
+was `latest`). This project declares `engines.node: ">=22.0.0"`, an open range, so
+it was never subject to that; keep it open for the same reason.
+
+So the matrices stay **22 and 24**, and the question reopens when the buildpack
+lists 26, not when Node releases it.
 
 ### The TypeScript major follows SAP
 
@@ -106,7 +129,7 @@ upgrade waiting to happen. Measured 2026-09-24:
   `typescript` peer at all, and CAP's docs name no version — `cds watch` runs
   `cds-tsx`, which transpiles without type checking. But cds-typer and cds-types
   both devDepend on `typescript ^6.0.3`, so 6 is what SAP tests.
-- `ts-jest` caps it: the latest, 29.4.13, declares
+- `ts-jest` caps it: the latest, 29.4.14, declares
   `peerDependencies.typescript: ">=4.3 <7"`, and every suite here runs through
   it. `.npmrc` sets `legacy-peer-deps=true`, so npm would install the conflict
   silently rather than refuse it.
@@ -116,6 +139,71 @@ upgrade waiting to happen. Measured 2026-09-24:
 The cheap signal, if the question ever comes back:
 `npm view ts-jest peerDependencies.typescript`. Even then SAP moving is the
 deciding condition, not ts-jest.
+
+## The SAP errata: ambiguity we account for, not defects we fix
+
+`node_modules/@mcp-abap-adt/adt-clients/docs/usage/ERRATA.md` — 25 entries of
+measured SAP behaviour, each with Symptom, Cause, Rule, Workaround, Evidence and
+"where it bites", and an object tree saying which types answer something the
+others do not. Read it **before** measuring a surprising ADT answer again.
+
+**What it is.** Not our bug list, and not a to-do. It records where the platform
+is *ambiguous*, and the ambiguity is ours to account for. The canonical case:
+`403` on the LOCK before a service binding's publication. It is neither an error
+nor a success — it means an editing session holds the binding — and Eclipse ADT
+ignores it and posts the job, because the job needs no lock of the caller's. The
+errata even hands the choice over: *"If the `403` should stop you, pass
+`analyseException` instead."*
+
+**Where the choice lives: the `analyse` at the call site.** Three shapes of it:
+
+- **treat as no failure what looks like one** — `analysePublicationLock` on that
+  `403`; `activationExecuted="false"` with no messages ("nothing to do"); an
+  untyped `S::000` beside `isDeleted="true"`;
+- **treat as a failure what looks like success** — `200` with
+  `isDeleted="false"`, `activationExecuted="false"` with `<msg type="E">`, `200`
+  with an empty body where a `404` was meant;
+- **leave to a second read what no single answer settles** — acceptance is not
+  completion: `/activation/runs` answers a run id, and `GetInactiveObjects` is
+  the only answer to "is it active now".
+
+**How to apply.** New call → look for an entry on that endpoint and pass the
+strategy it names. Choosing differently from Eclipse is allowed, and then the
+reason belongs in a comment at the call site, because it is our decision about an
+ambiguous answer, not the system's behaviour.
+
+Two entries are the connector's, not a reading's: **PAK/058** ("a package can be
+saved only once per ABAP session" — the message says *locked*, but it is
+`CL_PACKAGE`'s in-memory instance buffer) and the session-type header.
+`@mcp-abap-adt/connection` handles both — HTTP from 9.3.1, RFC from 9.3.2, and
+from 9.3.4 on a reused conversation whose server context is reset after each
+call, which needs `@mcp-abap-adt/sap-rfc-lite` **0.2.1** — 0.2.0 was published from
+a stale `lib/` with no `resetServerContext` in it, so the connector silently fell
+back to a new RFC connection per stateless call (correct, and half again as slow:
+~1010 s against ~684 s for a full RFC run). PR #230's on-premise RFC run
+measured the same thing from our side: a stateless read after a create on one RFC
+connection answered `400 SADT_RESOURCE 007`, and a fresh connection answered
+`200`.
+
+## Seeing the wire
+
+`DEBUG_HTTP_WIRE=true` prints every HTTP exchange on stderr — method, URL,
+params, headers with their values redacted by name, and bodies clipped at
+`DEBUG_HTTP_BODY_CHARS` (default 2000, `0` for the size alone, `Infinity` for all
+of it). `DEBUG_RFC_WIRE` is its RFC twin.
+
+**Reach for it before writing a probe.** `DEBUG_CONNECTORS` and `DEBUG_ADT_LIBS`
+do NOT answer "what did we send and what came back": `@mcp-abap-adt/connection`
+logs the session, the CSRF token and the critical section and nothing about a
+request, and `logWire` is an RFC transport option the HTTP transports do not
+take. That gap cost a diagnostic cycle on 2026-09-28 — `CheckPackage` answered
+`isError: true` with no message and no request, and the cause (a guard refusing
+before the wire) was only visible after wrapping `makeAdtRequest` by hand.
+
+And when a suite reports `Expected: false / Received: true`, the payload is what
+is missing, not the wire: a handler's envelope carries `message`, `origin` and
+`request`. A test that asserts `isError` should raise that payload — see
+`CheckHighHandlers.test.ts`'s `expectAccepted`.
 
 ## Plans and Specs
 

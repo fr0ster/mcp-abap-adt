@@ -80,9 +80,16 @@ import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import {
+  type ActivationRunOutcome,
+  type ActivationRunSource,
+  awaitActivationRun,
+  isRefusal,
+} from '../../../lib/strategies/activationRun';
 import { detailOf } from '../../../lib/strategies/detail';
 import { project, terseActivation } from '../../../lib/strategies/projections';
 import { ourUtils, resultsFor } from '../../../lib/strategies/resultSets';
+import { succeededWith } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -317,46 +324,75 @@ export async function handleActivateObject(
   // does not map to a family client. See the module doc comment: ADT's
   // answer here is acceptance, not completion, and this path is honest about
   // that rather than inventing a verdict it does not have.
+  // **Three requests, because only the third says what happened.** The POST
+  // answers `202` with the run id in `Location` and a body that carries
+  // nothing, so a handler that stopped there had acceptance and no verdict —
+  // and the empty body parses to zero messages, which reads exactly like "no
+  // errors". `getActivationRun` then says whether the run is still going, and
+  // `getActivationResults` carries the `chkl:messages` the single-object
+  // endpoint answers inline. See `lib/strategies/activationRun.ts`.
+  const utils = client.getUtils(ourUtils);
   return answer(
     { tool: 'ActivateObjectLow', detail: 'terse' },
-    () =>
-      client
-        .getUtils(ourUtils)
-        .activateObjectsGroup(activationObjects, preaudit, {
-          analyse: analyseException,
-        }),
-    (runId: string) => {
-      // A run id is the only evidence this path has that anything was
-      // accepted — `activationRunId` answers `''` when no `Location` header
-      // carried one (see its own doc comment in adt-clients). `accepted`
-      // must say so rather than being hardcoded true: a caller scanning
-      // field names, not the prose, would otherwise read this as success in
-      // the one case where the reading found no evidence of acceptance.
-      const accepted = runId !== '';
+    async () => {
+      const started = await utils.activateObjectsGroup(
+        activationObjects,
+        preaudit,
+        { analyse: analyseException },
+      );
+      if (!started.ok) return started as never;
+      const runId = started.getResult().value;
+      const outcome = await awaitActivationRun(
+        utils as unknown as ActivationRunSource,
+        runId,
+        analyseException,
+      );
+      return succeededWith(outcome);
+    },
+    (outcome: ActivationRunOutcome) => {
+      // A run id is the only evidence that anything was accepted —
+      // `utilActivationRunId` answers `''` when no `Location` header carried
+      // one. `accepted` says so rather than being hardcoded true.
+      const accepted = outcome.runId !== '';
+      const refusals = outcome.messages.filter(isRefusal);
+      // `activated` is a verdict now, and `null` only where there genuinely is
+      // none: a run that has not settled within the bounded wait. A settled run
+      // with no error-severity message activated what it was given; the errata
+      // is explicit that only such a message is a failure, and that a run with
+      // nothing to do says nothing at all.
+      const activated = !outcome.settled
+        ? null
+        : refusals.length === 0 && outcome.status !== 'failed';
       return {
         accepted,
-        run_id: accepted ? runId : null,
-        // Explicitly null, not omitted: this call never carries a verdict —
-        // acceptance is not completion — and a missing field reads
-        // differently from a field that says so.
-        activated: null,
+        run_id: accepted ? outcome.runId : null,
+        run_status: outcome.status || null,
+        activated,
+        messages: outcome.messages,
         objects_count: activationObjects.length,
         objects: activationObjects,
-        message: accepted
-          ? `Activation run ${runId} accepted for ${activationObjects.length} object(s). ` +
-            'ADT confirms acceptance here, not completion — call GetInactiveObjects ' +
-            'afterwards; an object still listed there did not activate. Right after ' +
-            'acceptance the run may still be in progress, so an immediate check can ' +
-            'still show an object as inactive that goes on to activate a moment ' +
-            'later. Separately, a refusal embedded in this accept response is not ' +
-            'read as a failure on this path: the answer read here is the run id, ' +
-            'and the analyseException passed with it reads only an exception ' +
-            'document.'
-          : `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
-            'object(s) — no run id came back, so this handler has no evidence a run ' +
-            'was queued at all. Prefer calling this tool one object at a time when ' +
-            "the type is supported, which reads a real verdict from the object's " +
-            'own activate().',
+        message: !accepted
+          ? `activateObjectsGroup did not accept the request for ${activationObjects.length} ` +
+            'object(s) — no run id came back, so there is no evidence a run was ' +
+            'queued at all.'
+          : activated === null
+            ? `Activation run ${outcome.runId} was accepted for ${activationObjects.length} object(s) and ` +
+              `has not settled yet (runs:status "${outcome.status || 'unknown'}"). Its results carry no ` +
+              'verdict while it runs; ask again, or read GetInactiveObjects — an object still ' +
+              'listed there did not activate.'
+            : activated
+              ? `Activation run ${outcome.runId} finished for ${activationObjects.length} object(s) with no ` +
+                'error-severity message. GetInactiveObjects is still the answer to "is it active ' +
+                'now": an object can stay listed for scope rather than for failure — activating a ' +
+                "function group clears the regenerated include, not the group's own entry."
+              : `Activation run ${outcome.runId} finished and refused ${refusals.length} of ` +
+                `${activationObjects.length} object(s): ` +
+                refusals
+                  .map(
+                    (m) =>
+                      `${m.objectName ? `${m.objectName}: ` : ''}${m.text}`,
+                  )
+                  .join('; '),
       };
     },
   );

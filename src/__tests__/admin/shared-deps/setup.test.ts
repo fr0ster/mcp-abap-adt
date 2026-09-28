@@ -15,8 +15,11 @@
  * Run:  npm run shared:setup
  */
 
-import { type AdtClient, utilDocuments } from '@mcp-abap-adt/adt-clients';
-import { asItCame } from '@mcp-abap-adt/adt-strategies';
+import type { AdtClient } from '@mcp-abap-adt/adt-clients';
+import {
+  analyseActivation,
+  analyseException,
+} from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleUpdateBehaviorDefinition } from '../../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
 import { handleUpdateClass } from '../../../handlers/class/high/handleUpdateClass';
@@ -35,12 +38,17 @@ import { handleUpdateServiceDefinition } from '../../../handlers/service_definit
 import { handleUpdateStructure } from '../../../handlers/structure/high/handleUpdateStructure';
 import { handleUpdateTable } from '../../../handlers/table/high/handleUpdateTable';
 import { createAdtClient } from '../../../lib/clients';
+import {
+  type ActivationRunSource,
+  awaitActivationRun,
+  isRefusal,
+} from '../../../lib/strategies/activationRun';
+import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
 import {
   getSystemContext,
   resolveSystemContext,
 } from '../../../lib/systemContext';
-import { parseActivationResponse } from '../../../lib/utils';
 import {
   getSharedDependenciesConfig,
   getTimeout,
@@ -70,29 +78,60 @@ async function forceSaveViewSource(
   // adt-clients 19: `lock` answers `IAdtResponse<string>`, not a bare handle
   // (IAdtCapabilities.ts), and `update` takes the source through
   // `options.source`, not `config.source` (see UpdateDdlLow).
-  const lockResponse = await client.getDdl().lock({ ddlName: viewName });
+  const lockResponse = await client
+    .getDdl()
+    .lock({ ddlName: viewName }, { analyse: analyseException });
   if (!lockResponse.ok) {
     throw new Error(lockResponse.getError().message);
   }
   const lockHandle = lockResponse.getResult().value;
+
+  // **Both failures, raised together, write first.**
+  //
+  // A refused release arrives in the answer since adt-clients 23, so the
+  // `catch` that used to sit here saw nothing and a lock left on a SHARED view
+  // was accepted in silence — the failure mode that locked `ZMCP_SHR_I_BDFL`
+  // out of every later run, with nothing in ADT able to release an enqueue held
+  // by a dead session.
+  //
+  // Logging it is not enough either, and that was the first fix's mistake: when
+  // the write succeeded and the release did not, nothing failed at all and the
+  // setup went on to report a shared view as ready while it stayed locked. So
+  // both outcomes are collected and raised as one error — the write's own
+  // failure stays first, because it is the one a reader needs, and the
+  // unreleased lock is named after it rather than instead of it.
+  const failures: string[] = [];
   try {
     const updated = await client
       .getDdl()
       .update(
         { ddlName: viewName, transportRequest },
-        { source: ddlSource, lockHandle },
+        { source: ddlSource, lockHandle, analyse: analyseException },
       );
     if (!updated.ok) {
-      throw new Error(updated.getError().message);
+      failures.push(`write refused: ${updated.getError().message}`);
     }
-  } finally {
-    try {
-      // `unlock` no longer throws on a refusal — only a genuine
-      // connection-level throw reaches this catch now.
-      await client.getDdl().unlock({ ddlName: viewName }, lockHandle);
-    } catch {
-      // ignore unlock errors
+  } catch (error: unknown) {
+    failures.push(`write threw: ${(error as Error)?.message ?? String(error)}`);
+  }
+  try {
+    const released = await client
+      .getDdl()
+      .unlock({ ddlName: viewName }, lockHandle, {
+        analyse: analyseException,
+      });
+    if (!released.ok) {
+      failures.push(
+        `🔒 the lock was NOT released and stays on ${viewName}: ${released.getError().message}`,
+      );
     }
+  } catch (error: unknown) {
+    failures.push(
+      `🔒 the lock was NOT released and stays on ${viewName}: ${(error as Error)?.message ?? String(error)}`,
+    );
+  }
+  if (failures.length > 0) {
+    throw new Error(`${viewName}: ${failures.join('; ')}`);
   }
 }
 
@@ -351,20 +390,28 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getTable()
-                .read({ tableName: item.name });
+                .read({ tableName: item.name }, undefined, {
+                  analyse: analyseException,
+                });
               exists = readResult.ok;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getTable().create({
-                tableName: item.name,
-                packageName,
-                description: item.description || 'Shared test table',
-                source: item.source,
-                transportRequest,
-              });
+              const createdTable = await client.getTable().create(
+                {
+                  tableName: item.name,
+                  packageName,
+                  description: item.description || 'Shared test table',
+                  source: item.source,
+                  transportRequest,
+                },
+                { analyse: analyseException },
+              );
+              if (!createdTable.ok) {
+                throw new Error(createdTable.getError().message);
+              }
               testsLogger?.info?.(`Created table ${item.name}`);
             }
 
@@ -464,7 +511,9 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getStructure()
-                .read({ structureName: item.name });
+                .read({ structureName: item.name }, undefined, {
+                  analyse: analyseException,
+                });
               exists = readResult.ok;
             } catch {
               exists = false;
@@ -473,12 +522,18 @@ describe('Admin: Setup shared dependencies', () => {
             if (!exists) {
               try {
                 // create() only builds the skeleton (does NOT apply ddlCode)
-                await client.getStructure().create({
-                  structureName: item.name,
-                  packageName,
-                  description: item.description || 'Shared test structure',
-                  transportRequest,
-                });
+                const createdStructure = await client.getStructure().create(
+                  {
+                    structureName: item.name,
+                    packageName,
+                    description: item.description || 'Shared test structure',
+                    transportRequest,
+                  },
+                  { analyse: analyseException },
+                );
+                if (!createdStructure.ok) {
+                  throw new Error(createdStructure.getError().message);
+                }
                 testsLogger?.info?.(`Created structure ${item.name}`);
               } catch (createError: any) {
                 const cmsg =
@@ -522,7 +577,15 @@ describe('Admin: Setup shared dependencies', () => {
               );
               testsLogger?.info?.(`Updated structure ${item.name} source`);
             }
-            await client.getStructure().activate({ structureName: item.name });
+            const activatedStructure = await client
+              .getStructure()
+              .activate(
+                { structureName: item.name },
+                { analyse: analyseActivation },
+              );
+            if (!activatedStructure.ok) {
+              throw new Error(activatedStructure.getError().message);
+            }
             testsLogger?.info?.(`Activated structure ${item.name}`);
 
             results.push({
@@ -562,20 +625,28 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getDdl()
-                .read({ ddlName: item.name });
+                .read({ ddlName: item.name }, undefined, {
+                  analyse: analyseException,
+                });
               exists = readResult.ok;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getDdl().create({
-                ddlName: item.name,
-                packageName,
-                description: item.description || 'Shared test view',
-                source: item.source,
-                transportRequest,
-              });
+              const createdDdl = await client.getDdl().create(
+                {
+                  ddlName: item.name,
+                  packageName,
+                  description: item.description || 'Shared test view',
+                  source: item.source,
+                  transportRequest,
+                },
+                { analyse: analyseException },
+              );
+              if (!createdDdl.ok) {
+                throw new Error(createdDdl.getError().message);
+              }
               testsLogger?.info?.(`Created view ${item.name}`);
             }
 
@@ -680,22 +751,32 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getBehaviorDefinition()
-                .read({ name: item.name });
+                .read({ name: item.name }, undefined, {
+                  analyse: analyseException,
+                });
               exists = readResult.ok;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getBehaviorDefinition().create({
-                name: item.name,
-                packageName,
-                rootEntity: item.root_entity || item.name,
-                implementationType: item.implementation_type || 'Managed',
-                description: item.description || 'Shared test BDEF',
-                source: item.source,
-                transportRequest,
-              });
+              const createdBehaviorDefinition = await client
+                .getBehaviorDefinition()
+                .create(
+                  {
+                    name: item.name,
+                    packageName,
+                    rootEntity: item.root_entity || item.name,
+                    implementationType: item.implementation_type || 'Managed',
+                    description: item.description || 'Shared test BDEF',
+                    source: item.source,
+                    transportRequest,
+                  },
+                  { analyse: analyseException },
+                );
+              if (!createdBehaviorDefinition.ok) {
+                throw new Error(createdBehaviorDefinition.getError().message);
+              }
               testsLogger?.info?.(`Created behavior definition ${item.name}`);
             }
 
@@ -789,7 +870,9 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getClass()
-                .read({ className: item.name });
+                .read({ className: item.name }, undefined, {
+                  analyse: analyseException,
+                });
               exists = readResult.ok;
             } catch {
               exists = false;
@@ -803,12 +886,18 @@ describe('Admin: Setup shared dependencies', () => {
                 status: 'existed',
               });
             } else {
-              await client.getClass().create({
-                className: item.name,
-                packageName,
-                description: item.description || 'Shared test class',
-                transportRequest,
-              });
+              const createdClass = await client.getClass().create(
+                {
+                  className: item.name,
+                  packageName,
+                  description: item.description || 'Shared test class',
+                  transportRequest,
+                },
+                { analyse: analyseException },
+              );
+              if (!createdClass.ok) {
+                throw new Error(createdClass.getError().message);
+              }
               testsLogger?.info?.(`Created class ${item.name}`);
               results.push({
                 type: 'classes',
@@ -916,19 +1005,31 @@ describe('Admin: Setup shared dependencies', () => {
               // (IAdtMetadataReadable, not IAdtReadable): AdtFunctionGroup.d.ts.
               const readResult = await client
                 .getFunctionGroup()
-                .readMetadata({ functionGroupName: item.name });
+                .readMetadata(
+                  { functionGroupName: item.name },
+                  { analyse: analyseException },
+                );
               exists = readResult.ok;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getFunctionGroup().create({
-                functionGroupName: item.name,
-                description: item.description || 'Shared test function group',
-                packageName,
-                transportRequest,
-              });
+              const createdFunctionGroup = await client
+                .getFunctionGroup()
+                .create(
+                  {
+                    functionGroupName: item.name,
+                    description:
+                      item.description || 'Shared test function group',
+                    packageName,
+                    transportRequest,
+                  },
+                  { analyse: analyseException },
+                );
+              if (!createdFunctionGroup.ok) {
+                throw new Error(createdFunctionGroup.getError().message);
+              }
               testsLogger?.info?.(`Created function group ${item.name}`);
             }
 
@@ -990,10 +1091,14 @@ describe('Admin: Setup shared dependencies', () => {
           try {
             let exists = false;
             try {
-              const readResult = await client.getFunctionModule().read({
-                functionModuleName: item.name,
-                functionGroupName: item.group,
-              });
+              const readResult = await client.getFunctionModule().read(
+                {
+                  functionModuleName: item.name,
+                  functionGroupName: item.group,
+                },
+                undefined,
+                { analyse: analyseException },
+              );
               exists = readResult.ok;
             } catch {
               exists = false;
@@ -1005,12 +1110,21 @@ describe('Admin: Setup shared dependencies', () => {
               // comment) — so the empty `source` this used to send is
               // dropped rather than ported; it never reached the wire either
               // way, and the type now says so.
-              await client.getFunctionModule().create({
-                functionModuleName: item.name,
-                functionGroupName: item.group,
-                description: item.description || 'Shared test function module',
-                transportRequest,
-              });
+              const createdFunctionModule = await client
+                .getFunctionModule()
+                .create(
+                  {
+                    functionModuleName: item.name,
+                    functionGroupName: item.group,
+                    description:
+                      item.description || 'Shared test function module',
+                    transportRequest,
+                  },
+                  { analyse: analyseException },
+                );
+              if (!createdFunctionModule.ok) {
+                throw new Error(createdFunctionModule.getError().message);
+              }
               testsLogger?.info?.(`Created function module ${item.name}`);
             }
 
@@ -1026,14 +1140,21 @@ describe('Admin: Setup shared dependencies', () => {
               ))
             ) {
               try {
-                const lockResponse = await client.getFunctionModule().lock({
-                  functionModuleName: item.name,
-                  functionGroupName: item.group,
-                });
+                const lockResponse = await client.getFunctionModule().lock(
+                  {
+                    functionModuleName: item.name,
+                    functionGroupName: item.group,
+                  },
+                  { analyse: analyseException },
+                );
                 if (!lockResponse.ok) {
                   throw new Error(lockResponse.getError().message);
                 }
                 const lockHandle = lockResponse.getResult().value;
+                // Both failures, raised together, write first — see
+                // `forceSaveViewSource` above for why logging the refused
+                // release is not enough.
+                const moduleFailures: string[] = [];
                 try {
                   const updated = await client.getFunctionModule().update(
                     {
@@ -1041,28 +1162,49 @@ describe('Admin: Setup shared dependencies', () => {
                       functionGroupName: item.group,
                       transportRequest,
                     },
-                    { source: item.source, lockHandle },
+                    {
+                      source: item.source,
+                      lockHandle,
+                      analyse: analyseException,
+                    },
                   );
                   if (!updated.ok) {
-                    throw new Error(updated.getError().message);
+                    moduleFailures.push(
+                      `write refused: ${updated.getError().message}`,
+                    );
+                  } else {
+                    testsLogger?.info?.(
+                      `Updated function module ${item.name} source`,
+                    );
                   }
-                  testsLogger?.info?.(
-                    `Updated function module ${item.name} source`,
+                } catch (error: unknown) {
+                  moduleFailures.push(
+                    `write threw: ${(error as Error)?.message ?? String(error)}`,
                   );
-                } finally {
-                  try {
-                    // `unlock` no longer throws on a refusal — only a
-                    // genuine connection-level throw reaches this catch.
-                    await client.getFunctionModule().unlock(
+                }
+                try {
+                  const releasedModule = await client
+                    .getFunctionModule()
+                    .unlock(
                       {
                         functionModuleName: item.name,
                         functionGroupName: item.group,
                       },
                       lockHandle,
+                      { analyse: analyseException },
                     );
-                  } catch {
-                    // ignore unlock errors
+                  if (!releasedModule.ok) {
+                    moduleFailures.push(
+                      `🔒 the lock was NOT released and stays on function module ${item.name}: ${releasedModule.getError().message}`,
+                    );
                   }
+                } catch (error: unknown) {
+                  moduleFailures.push(
+                    `🔒 the lock was NOT released and stays on function module ${item.name}: ${(error as Error)?.message ?? String(error)}`,
+                  );
+                }
+                if (moduleFailures.length > 0) {
+                  throw new Error(`${item.name}: ${moduleFailures.join('; ')}`);
                 }
               } catch (updateError: any) {
                 testsLogger?.error?.(
@@ -1136,21 +1278,31 @@ describe('Admin: Setup shared dependencies', () => {
             try {
               const readResult = await client
                 .getServiceDefinition()
-                .read({ serviceDefinitionName: item.name });
+                .read({ serviceDefinitionName: item.name }, undefined, {
+                  analyse: analyseException,
+                });
               exists = readResult.ok;
             } catch {
               exists = false;
             }
 
             if (!exists) {
-              await client.getServiceDefinition().create({
-                serviceDefinitionName: item.name,
-                packageName,
-                description:
-                  item.description || 'Shared test service definition',
-                source: item.source,
-                transportRequest,
-              });
+              const createdServiceDefinition = await client
+                .getServiceDefinition()
+                .create(
+                  {
+                    serviceDefinitionName: item.name,
+                    packageName,
+                    description:
+                      item.description || 'Shared test service definition',
+                    source: item.source,
+                    transportRequest,
+                  },
+                  { analyse: analyseException },
+                );
+              if (!createdServiceDefinition.ok) {
+                throw new Error(createdServiceDefinition.getError().message);
+              }
               testsLogger?.info?.(`Created service definition ${item.name}`);
             }
 
@@ -1360,25 +1512,43 @@ describe('Admin: Setup shared dependencies', () => {
           label: 'append structure',
           typeCode: 'TABL/DS',
           create: async (item) => {
-            await client.getAppendStructure().create({
-              appendStructureName: item.name,
-              baseObject: item.base_structure,
-              packageName,
-              description: item.description || 'Shared append structure',
-            });
+            const createdAppendStructure = await client
+              .getAppendStructure()
+              .create(
+                {
+                  appendStructureName: item.name,
+                  baseObject: item.base_structure,
+                  packageName,
+                  description: item.description || 'Shared append structure',
+                },
+                { analyse: analyseException },
+              );
+            if (!createdAppendStructure.ok) {
+              throw new Error(createdAppendStructure.getError().message);
+            }
             return [];
           },
           update: async (item) => {
             const obj = client.getAppendStructure();
             const written = await withLock(
-              () => obj.lock({ appendStructureName: item.name }),
+              () =>
+                obj.lock(
+                  { appendStructureName: item.name },
+                  { analyse: analyseException },
+                ),
               (lockHandle) =>
                 obj.update(
                   { appendStructureName: item.name },
-                  { source: item.source, lockHandle },
+                  {
+                    source: item.source,
+                    lockHandle,
+                    analyse: analyseException,
+                  },
                 ),
               (lockHandle) =>
-                obj.unlock({ appendStructureName: item.name }, lockHandle),
+                obj.unlock({ appendStructureName: item.name }, lockHandle, {
+                  analyse: analyseException,
+                }),
             );
             return written.ok
               ? { isError: false }
@@ -1490,27 +1660,33 @@ describe('Admin: Setup shared dependencies', () => {
             `Group-activating ${toActivate.length} objects (attempt ${attempt}/${maxActivationAttempts})...`,
           );
           try {
-            // adt-clients 19's shipped default for the `activation` slot is
-            // the run id, not the document — acceptance, not completion (see
-            // handleActivateObject.ts). This script wants the messages a
-            // group-activate answers, so it asks for the raw document back
-            // explicitly (utilResultSet.d.ts: "rawDocument is one argument
-            // away") rather than the run id neither loop here follows up on.
-            const response = await client
-              .getUtils({ ...utilDocuments, activation: asItCame })
-              .activateObjectsGroup(toActivate, true);
-            if (!response.ok) {
-              throw new Error(response.getError().message);
+            // **The messages are in the run's results, not in the POST.**
+            // `/activation/runs` answers `202` with the id in `Location` and an
+            // empty body, so asking for that body and parsing it found zero
+            // messages and read like "no errors": this script logged "Group
+            // activation completed successfully" over eleven objects that stayed
+            // inactive, with not one SAP message to say why. The run id, then
+            // `getActivationRun` until it settles, then `getActivationResults`
+            // — see `lib/strategies/activationRun.ts`.
+            const utils = client.getUtils(ourUtils);
+            const started = await utils.activateObjectsGroup(toActivate, true, {
+              analyse: analyseException,
+            });
+            if (!started.ok) {
+              throw new Error(started.getError().message);
             }
-            const activationResult = parseActivationResponse(
-              response.getResult().value,
+            const outcome = await awaitActivationRun(
+              utils as unknown as ActivationRunSource,
+              started.getResult().value,
+              analyseException,
+            );
+            testsLogger?.info?.(
+              `Activation run ${outcome.runId || '(no id)'} — runs:status ${outcome.status || 'unknown'}, ${outcome.messages.length} message(s)`,
             );
 
-            const errors = activationResult.messages.filter(
-              (m) => m.type === 'error' || m.type === 'E',
-            );
-            const warnings = activationResult.messages.filter(
-              (m) => m.type === 'warning' || m.type === 'W',
+            const errors = outcome.messages.filter(isRefusal);
+            const warnings = outcome.messages.filter((m) =>
+              /^[WI]$|^warning$/i.test(m.type),
             );
 
             if (errors.length > 0) {
@@ -1521,7 +1697,12 @@ describe('Admin: Setup shared dependencies', () => {
                 continue;
               }
               testsLogger?.error?.(
-                `Group activation errors:\n${errors.map((e: any) => `  ${e.shortText || e.text}`).join('\n')}`,
+                `Group activation errors:\n${errors
+                  .map(
+                    (e) =>
+                      `  ${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
+                  )
+                  .join('\n')}`,
               );
             } else {
               testsLogger?.info?.('Group activation completed successfully');
@@ -1529,7 +1710,12 @@ describe('Admin: Setup shared dependencies', () => {
             }
             if (warnings.length > 0) {
               testsLogger?.warn?.(
-                `Group activation warnings:\n${warnings.map((w: any) => `  ${w.shortText || w.text}`).join('\n')}`,
+                `Group activation warnings:\n${warnings
+                  .map(
+                    (w) =>
+                      `  ${w.objectName ? `${w.objectName}: ` : ''}${w.text}`,
+                  )
+                  .join('\n')}`,
               );
             }
             break; // Success or final attempt — stop retrying
@@ -1579,19 +1765,30 @@ describe('Admin: Setup shared dependencies', () => {
                 }
               };
               try {
-                const resp = await client
-                  .getUtils({ ...utilDocuments, activation: asItCame })
-                  .activateObjectsGroup(chunk, true);
+                // The same three requests as the bulk path above: a chunk is
+                // still an activation run, and its POST still answers only the
+                // id.
+                const utils = client.getUtils(ourUtils);
+                const resp = await utils.activateObjectsGroup(chunk, true, {
+                  analyse: analyseException,
+                });
                 if (!resp.ok) {
                   throw new Error(resp.getError().message);
                 }
-                const r = parseActivationResponse(resp.getResult().value);
-                const errs = r.messages.filter(
-                  (m) => m.type === 'error' || m.type === 'E',
+                const chunkOutcome = await awaitActivationRun(
+                  utils as unknown as ActivationRunSource,
+                  resp.getResult().value,
+                  analyseException,
                 );
+                const errs = chunkOutcome.messages.filter(isRefusal);
                 if (errs.length > 0) {
                   recordFailure(
-                    errs.map((e: any) => e.shortText || e.text).join('; '),
+                    errs
+                      .map(
+                        (e) =>
+                          `${e.objectName ? `${e.objectName}: ` : ''}${e.text}`,
+                      )
+                      .join('; '),
                   );
                 }
               } catch (e: any) {

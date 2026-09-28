@@ -7,6 +7,201 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.0.0] - 2026-09-27
+
+Migration: [`docs/MIGRATION-13.0.md`](docs/MIGRATION-13.0.md).
+
+**No MCP tool changed** — not a name, not a parameter, not an answer shape; the
+generated tool docs moved only their date, which is the check for that. What
+changed is what a refusal does: a number of them now arrive as refusals where
+they arrived as success.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` 22 → 23.0.4, and the release interprets nothing.**
+  Every member takes an `options.analyse`; no member applies a verdict of its own;
+  the readings four of them had built in now ship as named strategies in
+  `@mcp-abap-adt/adt-strategies`. 79 members grew the parameter in the same
+  release.
+
+  Here that took the call sites accepting an `analyse` from 275 to **513** in
+  `src/handlers` alone, and every one of them carries a strategy now.
+  `handlerInvariants.test.ts` resolves them from the type checker, so a call added
+  without one fails the build; its exception list is gone, because all four
+  entries were members whose tailored default 23 removed — the reason to pass
+  nothing inverted into a reason to pass exactly `analysePublication`,
+  `analysePublicationLock`, `analyseMessageClassMessage(msgno)` and
+  `analyseUnitTestStart`.
+
+  A call with no strategy has no verdict at all: whatever HTTP accepted is a
+  success, including the refusals ADT embeds in a `200`. That is the class of
+  defect this repository has been closing since 8.10.0, and 23 moved the
+  responsibility for it from the library to us.
+
+- **Every reading 22 applied by default is injected now** — ATC, the profiler,
+  the feeds, the executors, transports, object versions, run ids, and the
+  read-edit-write of a message class. Most of those defaults are typed `unknown`,
+  so the compiler flagged none of them: a result set left to its default answers
+  the document, and a projection that reads `.length` or walks an array runs over
+  a string without complaint.
+
+- **`analyseLock` refuses a `2xx` that names no lock handle** and returns SAP's
+  answer as `raw_body`, on every lock including the LockX tools.
+
+- **A high-level delete runs `checkDeletion` first** and sends no delete for an
+  object the check reports as absent.
+
+- **The rest of the contract**: `interfaces-adt` 9 → 11, the new
+  `interfaces-adt-connection` 1.0.0 (`IAbapConnection` and `IAdtWireResponse`
+  moved there), `interfaces-network` 2.0.0 as a direct dependency,
+  `interfaces-auth` 1 → 2, `auth-broker` 2 → 3.0.4 (one options object, the token
+  provider inside it as `provider`, and it requires `refreshTokens`),
+  `auth-providers` 2 → 4.2.1, `auth-stores` 1.2.4, `connection` 9.2.1 → 9.4.2,
+  `adt-strategies` 0.6.0, `logger` 0.4.1.
+
+  The last two of those are packaging fixes in the family's own CLIs rather than
+  anything this project calls differently: `auth-broker` 3.0.4 made
+  `@mcp-abap-adt/logger` a runtime dependency, because `mcp-sso` imported it while
+  it was only a dev dependency and died on `Cannot find module` from an installed
+  tarball; `logger` 0.4.1 stopped printing `PinoLogger initialization error` at
+  import, building its `PinoLogger` on first call instead. Both are worth taking
+  here so this project's tree holds one copy of each at the fixed version.
+
+- **`sap-rfc-lite` ^0.1.0 → ^0.2.1 is load-bearing on RFC.** It is the range
+  `connection` itself declares, and adt-clients' `ERRATA.md` says why: a package
+  can be saved only once per ABAP session (`PAK/058` — the message says *locked*,
+  but it is `CL_PACKAGE`'s in-memory instance buffer, not an enqueue), and the
+  connector is what keeps a non-stateful request out of the stateful context —
+  over HTTP from 9.3.1, over RFC from 9.3.2, and from 9.3.4 on a reused
+  conversation whose server context is reset after each call.
+
+  **`0.2.1`, not `0.2.0`, and the difference is invisible at run time.** 0.2.0 was
+  packed from a stale `lib/`, so its JS client has no `resetServerContext`: the
+  connector found no reset and fell back to a new RFC connection per stateless
+  call — correct, and about 1010 s for a full RFC run instead of about 684 s.
+  `connection` 9.4.2 raises its own minimum for exactly that, which also makes npm
+  replace a 0.2.0 already in a lockfile. Declaring `^0.1.0` at the root, as this
+  project did, put 0.1.x there for an RFC consumer to load; the root range has to
+  move with the connector's.
+
+- **Third-party, in range**: `@modelcontextprotocol/sdk` 1.30.1, `axios` 1.20.0,
+  `express` 5.2.1, `fast-xml-parser` 5.11.1, `pino` 10.3.1, `zod` 4.6.5, `dotenv`
+  18.0.4, `biome` 2.5.14, `jest` 30.5.2, `ts-jest` 29.4.14, `tsx` 4.23.15.
+
+  Not taken, and not an oversight: **`typescript` 7** and **`@types/node` 26** (on
+  versions we follow SAP — `ts-jest` 29.4.14 still declares
+  `peerDependencies.typescript: ">=4.3 <7"`), and **`lint-staged` 17**, which
+  wants `node >=22.22.1`, above the floor this project declares. Node 26 is
+  supported by `auth-broker` 3.0.2 and `auth-providers` 4.2.1 as an *install* fix
+  — under Node 26 npm skips a release whose `engines` excludes it and silently
+  takes an older major — and this project's open `>=22.0.0` was never subject to
+  that. It is still not a deployment target: the CF buildpack lists 20, 22 and 24.
+
+### Fixed
+
+- **`GetInactiveObjects` dropped every entry** it was meant to list.
+- **`GetObjectVersions` answered `{"ok":true}`** instead of the versions.
+- **`--browser` and `--browser-auth-port` had stopped reaching the login** —
+  ignored since auth-providers 2.0. `AuthorizationCodeProviderConfig` replaced
+  both fields with an `authorization` strategy, and TypeScript runs no
+  excess-property check on a `const` passed to a constructor, so every OAuth
+  callback landed on the package default (61001) rather than the port the IdP has
+  registered.
+- **An untyped deletion message is not an error**, and every `del:message` of a
+  deletion answer is read.
+- **`LockClassTestClasses` answered a response object as the lock handle** —
+  `lockTestClasses` answers an `IAdtResponse` in 23 where it answered the bare
+  handle, and the call goes through an `as any`. `UnlockClassTestClasses` had the
+  other half: a refused release reported as success.
+- **`RuntimeListFeeds` lists feed variants**, read out of the feed list, and the
+  profiler no longer wipes its own defaults for options a caller did not give.
+- **A package is saved once per ABAP session**, and over RFC each save gets its
+  own.
+- **The polygon and the suites that build their own fixtures stop reporting
+  success over a refusal.** 69 calls in `src/__tests__` and
+  `src/lib/search-source` had no strategy; 25 `await`s dropped an `IAdtResponse`
+  entirely, so `ensureSharedPackage` logged "Created" over a refused create and
+  `safeDelete` — which classified a *thrown* message — reported `deleted` for
+  every object a teardown failed to remove. Two unlocks in a `finally` ignored a
+  refused release, the shape that left an enqueue on `ZMCP_SHR_I_BDFL` and locked
+  every later run out; they report it by name now.
+
+- **A group activation is three requests, and only the third says what
+  happened.** `POST /activation/runs` answers `202` with the run id in
+  `Location` and an empty body — which parses to zero messages and reads exactly
+  like "no errors". So `shared:setup` logged *"Group activation completed
+  successfully"* over eleven objects that stayed inactive, with not one SAP
+  message to say why, and `ActivateObjectLow`'s group path answered
+  `activated: null` for every call. `lib/strategies/activationRun.ts` waits on
+  `getActivationRun` (long-polling, bounded) until `runs:status` settles and then
+  reads `getActivationResults`, where the `chkl:messages` are. The tool answers
+  `run_status`, `messages` and a real `activated` now — `null` only for a run that
+  has not settled — and the setup's retry is driven by the inactive list rather
+  than by the accept. Re-run on a BTP trial 2026-09-28: `runs:status finished,
+  8 message(s)`, all eight warnings (`Key must have the type Inverted Individual
+  on the database`), `Confirmed active: all 30 object(s)`.
+
+- **`CheckPackage`/`CheckPackageLow` required a `super_package` they never
+  sent.** The guard refused before any request, so a package with no parent —
+  `super_package: ""`, which is what a top-level package has — could not be
+  checked at all: measured on a BTP trial 2026-09-28, the suite's own
+  `ZMCP_SHR_PKG` answered `isError: true` with nothing on the wire while the
+  other nine check tools passed. The member takes
+  `check({ packageName }, status?, options?)`, and the parameter's own
+  description had said it does not reach the endpoint all along. It stays
+  accepted and is no longer required; the surface ratchet records the relaxation
+  rather than having its fixture edited.
+
+- **`DEBUG_HTTP_WIRE` — there was no HTTP wire log at all.**
+  `@mcp-abap-adt/connection` logs the session, the CSRF token and the critical
+  section and nothing about a request, and `logWire` is an RFC transport option
+  the HTTP transports do not take, so `DEBUG_CONNECTORS` answered nothing when
+  the question was *what did we send and what came back*. Finding the
+  `CheckPackage` cause needed a throwaway script that wrapped `makeAdtRequest` by
+  hand. The switch lives in `connectionFactory` now, symmetric with
+  `DEBUG_RFC_WIRE`: method, URL, params, headers with their values redacted by
+  name, and bodies clipped at `DEBUG_HTTP_BODY_CHARS`, on stderr.
+
+- **A refused check says what it refused.**
+  `expect(response.isError).toBe(false)` printed `Expected: false / Received:
+  true` and nothing else, so the `CheckPackage` refusal was invisible from the
+  suite; all fifteen assertions in that file raise the handler's own payload now.
+
+
+### Removed
+
+- **`fetchNodeStructure` from `@mcp-abap-adt/lib/utils`** — a deprecated stub that
+  threw `fetchNodeStructure not implemented in AdtClient yet` on every call, for a
+  member that has existed for several majors.
+- **`src/lib/strategies/atcRun.ts`** — its `answering()` turned the `AdtSAPError`
+  that `resolveCheckVariant` and `createWorklist` threw back into a response; both
+  answer an `IAdtResponse` in 23, so it had no callers left.
+
+### Verified
+
+- **On premise, E19, soft mode** (PR #230): HTTP **47/47 suites, 105/105 tests**;
+  RFC **43/47, 100/105**, the four failures all one finding — `RfcTransport` keeps
+  one ABAP session for the connection's lifetime, so a stateless read after a
+  create on the same connection answers `400 SADT_RESOURCE 007` while a fresh
+  connection answers `200`. That is the connector's decision to make, and
+  `connection` 9.4.x with sap-rfc-lite 0.2.0 is where it is made.
+- **On a BTP trial, cloud, on this branch's own versions**: the full soft-mode
+  sweep, **48/48 suites and 108/108 tests**, nothing left on the system. Two
+  skips remain and both are the platform saying no — programs do not exist on
+  ABAP Cloud. Within it: the auth-broker path (`Session ready`, every suite on a
+  connection from the broker), the class unit-test workflow including the
+  test-classes lock and its release, the feed descriptors and dump entries
+  parsed, the group activation read from its run's results, and the BDEF+BIMPL
+  suites creating, activating and deleting their own views.
+
+- **The dumps test reads the feed rather than one user's dumps.** It required
+  `params.dumps_user` and skipped without it, so on a machine whose config named
+  no user it never ran; a user filter is not what it is about. It lists what the
+  system shows, picks a dump and reads it — measured on the trial: `5 dump(s) in
+  the feed`. The only skip left there is a system with no dumps at all.
+- Unit: **111 suites / 1704 tests**. `tsc --noEmit` clean on all three projects,
+  `biome check` clean, `release:dry` reports `Published: 2  Skipped: 0`.
+
 ## [12.0.0] - 2026-09-24
 
 Migration: [`docs/MIGRATION-12.0.md`](docs/MIGRATION-12.0.md).

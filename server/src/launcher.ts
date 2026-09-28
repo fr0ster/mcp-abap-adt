@@ -84,8 +84,27 @@ function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
   }
 }
 
+/**
+ * This package's own version, read from this package's own manifest.
+ *
+ * **It was two levels up, and that only works inside the repository.** From
+ * `server/dist/` two steps reach the repo root, whose `package.json` is
+ * `@mcp-abap-adt/lib` — so `--version` printed the LIBRARY's version, and only
+ * because a checkout happens to have a manifest there. From an installed
+ * package the same two steps land on `node_modules/@mcp-abap-adt/`, which is the
+ * scope DIRECTORY and never has a `package.json`: every `mcp-abap-adt --version`
+ * from npm died with `ENOENT … node_modules/@mcp-abap-adt/package.json`.
+ * Measured on 13.0.0 by installing the published tarball into an empty directory
+ * — the check `bin-smoke.test.ts` now performs, because the three other bins in
+ * this family were fixed for the same class of defect one release earlier and
+ * nothing here would have caught ours.
+ *
+ * One step up is `server/` in a checkout and the package root when installed,
+ * and in both it is `@mcp-abap-adt/core`'s manifest — which is what this CLI
+ * should answer with.
+ */
 function showVersion(): void {
-  const packageJsonPath = path.join(__dirname, '..', '..', 'package.json');
+  const packageJsonPath = path.join(__dirname, '..', 'package.json');
   const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
   console.log(packageJson.version);
   process.exit(0);

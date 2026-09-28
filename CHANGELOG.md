@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.0.1] - 2026-09-28
+
+### Fixed
+
+- **`mcp-abap-adt --version` died on every installed copy.** The launcher read
+  `path.join(__dirname, '..', '..', 'package.json')`: from `server/dist/` that
+  reaches the repo root in a checkout — whose manifest is `@mcp-abap-adt/lib`, so
+  it answered the LIBRARY's version — and from an installed package it reaches
+  `node_modules/@mcp-abap-adt/`, the scope directory, which never has a manifest.
+  So the CLI the MCP registry points at answered
+  `[MCP] launcher failed: ENOENT … node_modules/@mcp-abap-adt/package.json`
+  for anyone who installed 13.0.0. One level up is `server/` in a checkout and
+  the package root when installed, and in both it is `@mcp-abap-adt/core`'s own
+  manifest, which is what this CLI should state.
+
+  Found by installing the published 13.0.0 tarball into an empty directory and
+  running each bin — which is how `@mcp-abap-adt/auth-broker` 3.0.4 had found the
+  same class of defect one release earlier, and 13.0.0 took that fix without
+  performing that check. `release:dry` reporting `Published: 2  Skipped: 0` does
+  not cover it: packing proves a tarball builds, not that anything inside it runs.
+  The three other bins in the installed tree were healthy — `mcp-auth` and
+  `mcp-sso` 3.0.4, `sap-abap-auth` 9.4.2.
+
+### Added
+
+- **`binSmoke.test.ts` — a bin that does not start is now a failing test.** It
+  packs both packages, installs the two tarballs into a temporary directory and
+  runs `mcp-abap-adt --version` from there, asserting it answers `core`'s own
+  version. Verified in both directions: it fails with the old path (the same
+  `ENOENT`) and passes with the fix. `SKIP_BIN_SMOKE=true` skips it where packing
+  is not available, and says so.
+
 ## [13.0.0] - 2026-09-27
 
 Migration: [`docs/MIGRATION-13.0.md`](docs/MIGRATION-13.0.md).

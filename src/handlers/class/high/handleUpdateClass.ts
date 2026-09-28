@@ -51,7 +51,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name (e.g., ZCL_TEST_CLASS_001).',
+        description: 'Class name.',
       },
       source_code: {
         type: 'string',

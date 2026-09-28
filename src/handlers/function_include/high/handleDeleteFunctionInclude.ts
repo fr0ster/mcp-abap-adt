@@ -31,17 +31,16 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name containing the include (e.g., Z_MY_FG).',
+        description: 'Function group name containing the include.',
       },
       include_name: {
         type: 'string',
-        description: 'Include name (e.g., LZ_MY_FGF01).',
+        description: 'Include name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
       },
       ...DETAIL_PROPERTY,
     },

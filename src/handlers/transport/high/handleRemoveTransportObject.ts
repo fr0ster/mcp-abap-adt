@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
       },
       object_name: {
         type: 'string',
-        description: 'Object name, e.g. ZCL_MY_CLASS.',
+        description: 'Object name.',
       },
       object_type: {
         type: 'string',

@@ -77,7 +77,7 @@ export const TOOL_DEFINITION = {
     properties: {
       message_class_name: {
         type: 'string',
-        description: 'Parent message class name (e.g., ZMY_MSGS).',
+        description: 'Parent message class name.',
       },
       msgno: {
         type: 'string',
@@ -86,7 +86,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects, optional for local ($TMP).',
+          'Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects, optional for local ones.',
       },
     },
     required: ['message_class_name', 'msgno'],

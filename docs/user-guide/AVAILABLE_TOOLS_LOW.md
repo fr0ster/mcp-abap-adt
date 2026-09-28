@@ -166,7 +166,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/low/handleActivateBehaviorDefinition.ts`
 
 **Parameters:**
-- `name` (string, required) - Behavior definition name (root entity, e.g., ZI_MY_ENTITY).
+- `name` (string, required) - Behavior definition name (root entity).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -179,7 +179,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/low/handleCheckBehaviorDefinition.ts`
 
 **Parameters:**
-- `name` (string, required) - BehaviorDefinition name (e.g., Z_MY_PROGRAM).
+- `name` (string, required) - BehaviorDefinition name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
@@ -195,9 +195,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, required) - Behavior Definition description.
 - `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.
-- `name` (string, required) - Behavior Definition name (e.g., ZI_MY_BDEF).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
-- `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY).
+- `name` (string, required) - Behavior Definition name.
+- `package_name` (string, required) - Package name.
+- `root_entity` (string, required) - Root entity name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -211,8 +211,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/low/handleDeleteBehaviorDefinition.ts`
 
 **Parameters:**
-- `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `name` (string, required) - BehaviorDefinition name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -223,7 +223,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/low/handleLockBehaviorDefinition.ts`
 
 **Parameters:**
-- `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
+- `name` (string, required) - BehaviorDefinition name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -237,7 +237,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockBehaviorDefinition operation.
-- `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
+- `name` (string, required) - BehaviorDefinition name.
 - `session_id` (string, required) - Session ID from LockBehaviorDefinition operation. Must be the same as used in LockBehaviorDefinition.
 - `session_state` (object, optional) - Session state from LockBehaviorDefinition (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -251,7 +251,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `name` (string, required) - Behavior definition name (e.g., ZOK_C_TEST_0001). Behavior definition must already exist.
+- `name` (string, required) - Behavior definition name. Behavior definition must already exist.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete behavior definition source code.
@@ -268,9 +268,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, required) - BehaviorDefinition description. Required for validation.
 - `implementation_type` (string, required) - Implementation type: 'Managed', 'Unmanaged', 'Abstract', or 'Projection'.
-- `name` (string, required) - BehaviorDefinition name to validate (e.g., ZI_MY_BDEF).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
-- `root_entity` (string, required) - Root entity name (e.g., ZI_MY_ENTITY). Required for validation.
+- `name` (string, required) - BehaviorDefinition name to validate.
+- `package_name` (string, required) - Package name. Required for validation.
+- `root_entity` (string, required) - Root entity name. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -286,11 +286,11 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_implementation/low/handleCreateBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). Required.
-- `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions.
+- `behavior_definition` (string, required) - Behavior Definition name. Required.
+- `class_name` (string, required) - Behavior Implementation class name. Must follow SAP naming conventions.
 - `description` (string, required) - Class description.
 - `implementation_code` (string, optional) - Implementation code for the implementations include (optional). When given, the class is locked, the code is written to the implementations include, and unlocked, right after creation. Does NOT write the FOR BEHAVIOR OF main source — the class is not bound to behavior_definition by this alone.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -304,7 +304,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_implementation/low/handleLockBehaviorImplementation.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY).
+- `class_name` (string, required) - Behavior Implementation class name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -317,10 +317,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_implementation/low/handleValidateBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). Required for validation.
-- `class_name` (string, required) - Behavior Implementation class name to validate (e.g., ZBP_MY_ENTITY).
+- `behavior_definition` (string, required) - Behavior Definition name. Required for validation.
+- `class_name` (string, required) - Behavior Implementation class name to validate.
 - `description` (string, required) - Class description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `package_name` (string, required) - Package name. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -336,7 +336,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleActivateClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -349,7 +349,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleActivateClassTestClasses.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `test_class_name` (string, optional) - Ignored. This activates the whole class, test classes included, without naming one — there is no per-test-class activation to target.
@@ -363,7 +363,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleCheckClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS)
+- `class_name` (string, required) - Class name
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
@@ -379,11 +379,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `abstract` (boolean, optional (default: false).)) - Mark class as abstract (optional, default: false).
-- `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001). Must follow SAP naming conventions.
+- `class_name` (string, required) - Class name. Must follow SAP naming conventions.
 - `create_protected` (boolean, optional (default: false).)) - Create protected section (optional, default: false).
 - `description` (string, required) - Class description.
 - `final` (boolean, optional (default: false).)) - Mark class as final (optional, default: false).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `superclass` (string, optional) - Superclass name (optional).
@@ -398,8 +398,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleDeleteClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Class name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -439,7 +439,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleLockClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 
 ---
 
@@ -450,7 +450,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleLockClassTestClasses.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -481,7 +481,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleUnlockClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `lock_handle` (string, required) - Lock handle from LockClass operation.
 
 ---
@@ -493,7 +493,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleUnlockClassTestClasses.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `lock_handle` (string, required) - Lock handle returned by LockClassTestClassesLow.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -507,7 +507,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleUpdateClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001). Class must already exist.
+- `class_name` (string, required) - Class name. Class must already exist.
 - `lock_handle` (string, required) - Lock handle from LockClass operation. Required for update operation.
 - `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
@@ -521,7 +521,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleUpdateClassTestClasses.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `lock_handle` (string, required) - Test classes lock handle from LockClassTestClassesLow.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -537,7 +537,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/low/handleValidateClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name to validate (e.g., ZCL_MY_CLASS)
+- `class_name` (string, required) - Class name to validate
 - `description` (string, required) - Description for validation (required).
 - `package_name` (string, required) - Package name for validation (required).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -569,7 +569,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/common/low/handleCheckObject.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM)
+- `object_name` (string, required) - Object name
 - `object_type` (string, required) - Object type
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -585,7 +585,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, optional) - Required only for function_module type
-- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS)
+- `object_name` (string, required) - Object name
 - `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
 - `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
@@ -598,7 +598,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/common/low/handleLockObject.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME
+- `object_name` (string, required) - Object name. For function modules, use format GROUP|FM_NAME
 - `object_type` (string, required) - Object type
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -614,7 +614,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockObject operation
-- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME
+- `object_name` (string, required) - Object name. For function modules, use format GROUP|FM_NAME
 - `object_type` (string, required) - Object type
 - `session_id` (string, required) - Session ID from LockObject operation. Must be the same session.
 - `session_state` (object, optional) - Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -631,7 +631,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `behavior_definition` (string, optional) - Optional behavior definition name (required for behavior_implementation validation)
 - `description` (string, optional) - Optional description for validation
 - `implementation_type` (string, optional) - Implementation type: 'Managed', 'Unmanaged', or 'External' (required for behavior_definition validation)
-- `object_name` (string, required) - Object name to validate (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)
+- `object_name` (string, required) - Object name to validate
 - `object_type` (string, required) - Object type: 'class', 'program', 'interface', 'function_group', 'table', 'structure', 'ddl', 'domain', 'data_element', 'package', 'behavior_definition', 'behavior_implementation', 'metadata_extension'
 - `package_name` (string, optional) - Optional package name for validation
 - `root_entity` (string, optional) - Root entity name (required for behavior_definition validation)
@@ -650,7 +650,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleActivateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., ZDT_MY_ELEMENT).
+- `data_element_name` (string, required) - Data element name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -663,7 +663,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleCheckDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name (e.g., Z_MY_PROGRAM).
+- `data_element_name` (string, required) - DataElement name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
@@ -677,12 +677,12 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleCreateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `data_element_name` (string, required) - DataElement name. Must follow SAP naming conventions.
 - `data_type` (string, optional) - Does not reach creation — the shipped create endpoint never reads it (only sends name/description/package/transport). Use UpdateDataElementLow (with lock_handle) after creating to set the data type or domain name.
 - `decimals` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the decimal places.
 - `description` (string, required) - DataElement description.
 - `length` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the data type length.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -698,8 +698,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleDeleteDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `data_element_name` (string, required) - DataElement name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -710,7 +710,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleLockDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name (e.g., Z_MY_PROGRAM).
+- `data_element_name` (string, required) - DataElement name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -723,7 +723,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleUnlockDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name (e.g., Z_MY_PROGRAM).
+- `data_element_name` (string, required) - DataElement name.
 - `lock_handle` (string, required) - Lock handle from LockDataElement operation.
 - `session_id` (string, required) - Session ID from LockDataElement operation. Must be the same as used in LockDataElement.
 - `session_state` (object, optional) - Session state from LockDataElement (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -737,7 +737,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleUpdateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., ZOK_E_TEST_0001). Data element must already exist.
+- `data_element_name` (string, required) - Data element name. Data element must already exist.
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
 - `properties` (object, required) - Data element properties object. Can include: description, type_name, type_kind, data_type, field_label_short, field_label_medium, field_label_long, etc.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -752,9 +752,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleValidateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name to validate (e.g., Z_MY_PROGRAM).
+- `data_element_name` (string, required) - DataElement name to validate.
 - `description` (string, required) - DataElement description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `package_name` (string, required) - Package name. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -770,7 +770,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleActivateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., ZVW_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -783,7 +783,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleCheckDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name.
 - `ddl_source` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -799,9 +799,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `ddl_name` (string, required) - DDL source name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `ddl_name` (string, required) - DDL source name. Must follow SAP naming conventions.
 - `description` (string, required) - DDL source description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -815,8 +815,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `ddl_name` (string, required) - DDL source name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -827,7 +827,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleLockDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -840,7 +840,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleUnlockDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name.
 - `lock_handle` (string, required) - Lock handle from LockDdlLow operation.
 - `session_id` (string, required) - Session ID from LockDdlLow operation. Must be the same as used in LockDdlLow.
 - `session_state` (object, optional) - Session state from LockDdlLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -854,7 +854,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleUpdateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.
+- `ddl_name` (string, required) - DDL source name. DDL source must already exist.
 - `ddl_source` (string, required) - Complete DDL source code. CDS: include @AbapCatalog.sqlViewName and other annotations. Classic: plain 'define view' statement.
 - `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -870,9 +870,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/low/handleValidateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name to validate (e.g., Z_MY_PROGRAM).
+- `ddl_name` (string, required) - DDL source name to validate.
 - `description` (string, required) - DDL source description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `package_name` (string, required) - Package name. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -888,7 +888,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleActivateMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
+- `name` (string, required) - Metadata Extension name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -901,7 +901,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleCheckMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
+- `name` (string, required) - MetadataExtension name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional (default: active)) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back — asking for a version the extension does not have answers status notProcessed, 'Error while reading the object … from the database', rather than checking the other one.
@@ -917,8 +917,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, required) - Metadata Extension description.
 - `master_language` (string, optional) - Master language (optional, e.g., 'EN').
-- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `name` (string, required) - Metadata Extension name.
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -932,8 +932,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleDeleteMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - MetadataExtension name (e.g., ZI_MY_DDLX).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `name` (string, required) - MetadataExtension name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -944,7 +944,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/low/handleLockMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
+- `name` (string, required) - Metadata Extension name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -958,7 +958,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockMetadataExtensionLow operation.
-- `name` (string, required) - Metadata Extension name (e.g., ZI_MY_DDLX).
+- `name` (string, required) - Metadata Extension name.
 - `session_id` (string, required) - Session ID from LockMetadataExtensionLow operation. Must be the same as used in LockMetadataExtensionLow.
 - `session_state` (object, optional) - Session state from LockMetadataExtensionLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -972,7 +972,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `name` (string, required) - Metadata extension name (e.g., ZOK_C_TEST_0001). Metadata extension must already exist.
+- `name` (string, required) - Metadata extension name. Metadata extension must already exist.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete metadata extension source code.
@@ -988,8 +988,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Metadata Extension description. Required for validation.
-- `name` (string, required) - Metadata Extension name to validate (e.g., ZI_MY_DDLX).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `name` (string, required) - Metadata Extension name to validate.
+- `package_name` (string, required) - Package name. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1005,7 +1005,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/low/handleActivateDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., ZDM_MY_DOMAIN).
+- `domain_name` (string, required) - Domain name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1018,7 +1018,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/low/handleCheckDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_PROGRAM).
+- `domain_name` (string, required) - Domain name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
@@ -1033,8 +1033,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Domain description.
-- `domain_name` (string, required) - Domain name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `domain_name` (string, required) - Domain name. Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -1048,8 +1048,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/low/handleDeleteDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `domain_name` (string, required) - Domain name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1060,7 +1060,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/low/handleLockDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_PROGRAM).
+- `domain_name` (string, required) - Domain name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1073,7 +1073,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/low/handleUnlockDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_PROGRAM).
+- `domain_name` (string, required) - Domain name.
 - `lock_handle` (string, required) - Lock handle from LockDomain operation.
 - `session_id` (string, required) - Session ID from LockDomain operation. Must be the same as used in LockDomain.
 - `session_state` (object, optional) - Session state from LockDomain (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1087,7 +1087,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/low/handleUpdateDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., ZOK_D_TEST_0001). Domain must already exist.
+- `domain_name` (string, required) - Domain name. Domain must already exist.
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
 - `properties` (object, required) - Domain properties object. Can include: description, datatype, length, decimals, conversion_exit, lowercase, sign_exists, value_table, fixed_values, etc.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -1103,7 +1103,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Domain description (required for validation).
-- `domain_name` (string, required) - Domain name to validate (e.g., Z_MY_PROGRAM).
+- `domain_name` (string, required) - Domain name to validate.
 - `package_name` (string, required) - Package name (required for validation).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1120,7 +1120,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleActivateFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_FG_TEST).
+- `function_group_name` (string, required) - Function group name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1133,8 +1133,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleActivateFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_FG_TEST).
-- `function_module_name` (string, required) - Function module name (e.g., Z_FM_TEST).
+- `function_group_name` (string, required) - Function group name.
+- `function_module_name` (string, required) - Function module name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1147,7 +1147,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleCheckFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
+- `function_group_name` (string, required) - FunctionGroup name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
@@ -1161,8 +1161,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleCheckFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_FUGR_TEST_0001)
-- `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FM)
+- `function_group_name` (string, required) - Function group name
+- `function_module_name` (string, required) - Function module name
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active
@@ -1177,8 +1177,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Function group description.
-- `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP). Must follow SAP naming conventions.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `function_group_name` (string, required) - Function group name. Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -1193,8 +1193,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Function module description.
-- `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
+- `function_group_name` (string, required) - Function group name.
+- `function_module_name` (string, required) - Function module name.
 - `package_name` (string, required) - Accepted for compatibility; not sent to the server. A function module lives inside its function group's package — the shipped create endpoint takes no package of its own.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1209,8 +1209,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleDeleteFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - FunctionGroup name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1221,9 +1221,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleDeleteFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - Function group name.
+- `function_module_name` (string, required) - Function module name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1234,7 +1234,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleLockFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
+- `function_group_name` (string, required) - FunctionGroup name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1247,8 +1247,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleLockFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
+- `function_group_name` (string, required) - Function group name.
+- `function_module_name` (string, required) - Function module name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1261,7 +1261,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleUnlockFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_PROGRAM).
+- `function_group_name` (string, required) - FunctionGroup name.
 - `lock_handle` (string, required) - Lock handle from LockFunctionGroup operation.
 - `session_id` (string, required) - Session ID from LockFunctionGroup operation. Must be the same as used in LockFunctionGroup.
 - `session_state` (object, optional) - Session state from LockFunctionGroup (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1275,8 +1275,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleUnlockFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., ZFG_MY_GROUP).
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
+- `function_group_name` (string, required) - Function group name.
+- `function_module_name` (string, required) - Function module name.
 - `lock_handle` (string, required) - Lock handle from LockFunctionModule operation.
 - `session_id` (string, required) - Session ID from LockFunctionModule operation. Must be the same as used in LockFunctionModule.
 - `session_state` (object, optional) - Session state from LockFunctionModule (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1290,8 +1290,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/low/handleUpdateFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_TEST_FG).
-- `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FM). Function module must already exist.
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name. Function module must already exist.
 - `lock_handle` (string, required) - Lock handle from LockFunctionModule. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1308,7 +1308,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, optional) - Optional description for validation. Defaults to the function group name when omitted — the endpoint requires a non-empty description.
-- `function_group_name` (string, required) - FunctionGroup name to validate (e.g., Z_MY_PROGRAM).
+- `function_group_name` (string, required) - FunctionGroup name to validate.
 - `package_name` (string, optional) - Package name for validation (optional but recommended).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1323,8 +1323,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, optional) - Optional description for validation
-- `function_group_name` (string, required) - Function group name (e.g., Z_FUGR_TEST_0001)
-- `function_module_name` (string, required) - Function module name to validate (e.g., Z_TEST_FM)
+- `function_group_name` (string, required) - Function group name
+- `function_module_name` (string, required) - Function module name to validate
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1340,7 +1340,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/low/handleActivateInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `interface_name` (string, required) - Interface name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1353,7 +1353,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/low/handleCheckInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., Z_MY_PROGRAM).
+- `interface_name` (string, required) - Interface name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
@@ -1368,8 +1368,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Interface description.
-- `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE). Must follow SAP naming conventions.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `interface_name` (string, required) - Interface name. Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
@@ -1383,8 +1383,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/low/handleDeleteInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `interface_name` (string, required) - Interface name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1395,7 +1395,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/low/handleLockInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `interface_name` (string, required) - Interface name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1408,7 +1408,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/low/handleUnlockInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., Z_MY_PROGRAM).
+- `interface_name` (string, required) - Interface name.
 - `lock_handle` (string, required) - Lock handle from LockInterface operation.
 - `session_id` (string, required) - Session ID from LockInterface operation. Must be the same as used in LockInterface.
 - `session_state` (object, optional) - Session state from LockInterface (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1422,7 +1422,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/low/handleUpdateInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE). Interface must already exist.
+- `interface_name` (string, required) - Interface name. Interface must already exist.
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1439,8 +1439,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Interface description. Required for validation.
-- `interface_name` (string, required) - Interface name to validate (e.g., Z_MY_PROGRAM).
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
+- `interface_name` (string, required) - Interface name to validate.
+- `package_name` (string, required) - Package name. Required for validation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1456,7 +1456,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/low/handleCheckPackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, optional) - Optional, and it does not reach the check endpoint — the shipped check() call takes only the package name. Kept for compatibility with ValidatePackage/CreatePackage, which do read it (LockPackage/UnlockPackage/UpdatePackage do not either). Requiring it here refused the call before any request was made.
@@ -1472,14 +1472,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `application_component` (string, optional) - Application component (e.g., BC-ABA).
 - `description` (string, required) - Package description.
-- `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name. Must follow SAP naming conventions.
 - `package_type` (string, optional) - Package type (development/structure). Defaults to development.
-- `record_changes` (boolean, optional) - Enable change recording for the package. Required for transportable packages (non-$TMP). Default: false.
+- `record_changes` (boolean, optional) - Enable change recording for the package. Required for a transportable package. Default: false.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `software_component` (string, optional) - Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).
-- `super_package` (string, required) - Super package (parent package) name (e.g., ZOK_PACKAGE). Required.
-- `transport_layer` (string, optional) - Transport layer (e.g., ZDEV). Required for transportable packages.
+- `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
+- `super_package` (string, required) - Super package (parent package) name. Required.
+- `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
@@ -1493,8 +1493,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `connection_config` (object, optional) - Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
-- `package_name` (string, required) - Package name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1505,7 +1505,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/low/handleLockPackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, required) - Does not reach the lock endpoint — the shipped lockPackage() call takes only the package name. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
@@ -1520,7 +1520,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockObject operation
-- `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Package must already exist.
+- `package_name` (string, required) - Package name. Package must already exist.
 - `session_id` (string, required) - Session ID from LockObject operation. Must be the same as used in LockObject.
 - `session_state` (object, optional) - Session state from LockObject (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, required) - Does not reach the unlock endpoint — the shipped unlockPackage() call takes only the package name and lock handle. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
@@ -1535,7 +1535,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002). Package must already exist.
+- `package_name` (string, required) - Package name. Package must already exist.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, required) - Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
@@ -1551,7 +1551,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/low/handleValidatePackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name to validate.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, required) - Parent (super) package name. The new package will be created under this package.
@@ -1568,7 +1568,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/low/handleActivateProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1581,7 +1581,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/low/handleCheckProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
@@ -1597,8 +1597,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
 - `description` (string, required) - Program description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
-- `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name.
+- `program_name` (string, required) - Program name. Must follow SAP naming conventions.
 - `program_type` (string, optional) - Program type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1613,8 +1613,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/low/handleDeleteProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `program_name` (string, required) - Program name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1625,7 +1625,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/low/handleLockProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1639,7 +1639,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockProgram operation.
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `session_id` (string, required) - Session ID from LockProgram operation. Must be the same as used in LockProgram.
 - `session_state` (object, optional) - Session state from LockProgram (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1653,7 +1653,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
-- `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM). Program must already exist.
+- `program_name` (string, required) - Program name. Program must already exist.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP program source code.
@@ -1669,8 +1669,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Program description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.
-- `program_name` (string, required) - Program name to validate (e.g., Z_MY_PROGRAM).
+- `package_name` (string, required) - Package name. Required for validation.
+- `program_name` (string, required) - Program name to validate.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1686,7 +1686,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/low/handleActivateServiceBinding.ts`
 
 **Parameters:**
-- `name` (string, required) - Service binding name (e.g., ZSB_MY_SERVICE).
+- `name` (string, required) - Service binding name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1702,7 +1702,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_definition/low/handleActivateServiceDefinition.ts`
 
 **Parameters:**
-- `name` (string, required) - Service definition name (e.g., ZSD_MY_SERVICE).
+- `name` (string, required) - Service definition name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 
@@ -1720,7 +1720,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., ZST_MY_STRUCT).
+- `structure_name` (string, required) - Structure name.
 
 ---
 
@@ -1734,7 +1734,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `ddl_code` (string, optional) - Optional DDL source code to validate (for checking new/unsaved code). If provided, code will be base64 encoded and sent in check request body.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
+- `structure_name` (string, required) - Structure name.
 - `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: inactive
 
 ---
@@ -1748,10 +1748,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
 - `description` (string, required) - Structure description.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.
+- `structure_name` (string, required) - Structure name. Must follow SAP naming conventions.
 - `structure_type` (string, optional) - Accepted for compatibility; not forwarded to the create request. (These values name ABAP program subtypes — a DDIC structure has no structure-type concept of its own.)
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
@@ -1764,8 +1764,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/structure/low/handleDeleteStructure.ts`
 
 **Parameters:**
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `structure_name` (string, required) - Structure name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1778,7 +1778,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
+- `structure_name` (string, required) - Structure name.
 
 ---
 
@@ -1792,7 +1792,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, required) - Lock handle from LockStructureLow operation.
 - `session_id` (string, required) - Session ID from LockStructureLow operation. Must be the same as used in LockStructureLow.
 - `session_state` (object, optional) - Session state from LockStructureLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_PROGRAM).
+- `structure_name` (string, required) - Structure name.
 
 ---
 
@@ -1807,7 +1807,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.
+- `structure_name` (string, required) - Structure name. Structure must already exist.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
 
 ---
@@ -1820,10 +1820,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Structure description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
+- `package_name` (string, required) - Package name. Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name to validate (e.g., Z_MY_PROGRAM).
+- `structure_name` (string, required) - Structure name to validate.
 
 ---
 
@@ -1853,7 +1853,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/low/handleGetObjectStructure.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name (e.g., "ZMY_CLASS", "ZMY_PROGRAM")
+- `object_name` (string, required) - Object name
 - `object_type` (string, required) - Object type (e.g., "CLAS/OC", "PROG/P", "DEVC/K", "DDLS/DF")
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
@@ -1869,7 +1869,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `facet_order` (array, optional (default: ['package)) - Order of facets in response (e.g., ["package", "group", "type"]). Default: ["package", "group", "type"]
 - `ignore_short_descriptions` (boolean, optional (default: false)) - Ignore short descriptions in response
-- `object_search_pattern` (string, optional (default: *)) - Object search pattern (e.g., "*", "Z*", "ZCL_*"). Default: "*"
+- `object_search_pattern` (string, optional (default: *)) - Object search pattern: "*" matches any name, and a trailing "*" matches a prefix. Default: "*"
 - `preselection` (array, optional) - Optional preselection filters (facet-value pairs for filtering)
 - `with_versions` (boolean, optional (default: false)) - Include version information in response
 
@@ -1887,7 +1887,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., ZT_MY_TABLE).
+- `table_name` (string, required) - Table name.
 
 ---
 
@@ -1902,7 +1902,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `reporter` (string, optional) - Accepted for compatibility; not sent to the server. The shipped check endpoint always runs 'abapCheckRun', regardless of this value.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE)
+- `table_name` (string, required) - Table name
 - `version` (string, optional) - Version to check: 'active' selects the last activated version. 'inactive' and 'new' are accepted for compatibility but indistinguishable — the shipped check endpoint treats anything other than 'active' as 'inactive'. Default: new.
 
 ---
@@ -1914,10 +1914,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/table/low/handleCreateTable.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects).
+- `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., ZT_TEST_001). Must follow SAP naming conventions.
+- `table_name` (string, required) - Table name. Must follow SAP naming conventions.
 - `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
@@ -1929,8 +1929,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/table/low/handleDeleteTable.ts`
 
 **Parameters:**
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `table_name` (string, required) - Table name.
+- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
 
@@ -1943,7 +1943,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
+- `table_name` (string, required) - Table name.
 
 ---
 
@@ -1957,7 +1957,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, required) - Lock handle from LockTableLow operation.
 - `session_id` (string, required) - Session ID from LockTableLow operation. Must be the same as used in LockTableLow.
 - `session_state` (object, optional) - Session state from LockTableLow (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
+- `table_name` (string, required) - Table name.
 
 ---
 
@@ -1972,7 +1972,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, required) - Lock handle from LockObject. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name (e.g., ZOK_T_TEST_0001). Table must already exist.
+- `table_name` (string, required) - Table name. Table must already exist.
 - `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
 
 ---
@@ -1985,10 +1985,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Table description. Required for validation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
+- `package_name` (string, required) - Package name. Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name to validate (e.g., Z_MY_TABLE)
+- `table_name` (string, required) - Table name to validate
 
 ---
 

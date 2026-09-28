@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       domain_name: {
         type: 'string',
-        description: 'Domain name (e.g., Z_MY_DOMAIN).',
+        description: 'Domain name.',
       },
       version: {
         type: 'string',

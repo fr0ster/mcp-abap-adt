@@ -36,11 +36,11 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).',
+        description: 'DDL source name.',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LAB, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',

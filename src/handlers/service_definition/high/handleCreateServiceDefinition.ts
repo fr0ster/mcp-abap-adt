@@ -51,7 +51,7 @@ export const TOOL_DEFINITION = {
       service_definition_name: {
         type: 'string',
         description:
-          'Service definition name (e.g., ZSD_MY_SERVICE). Must follow SAP naming conventions (start with Z or Y).',
+          'Service definition name. Must follow SAP naming conventions (start with Z or Y).',
       },
       description: {
         type: 'string',
@@ -60,7 +60,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',

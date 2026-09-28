@@ -50,13 +50,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name containing the include (e.g., ZOK_FG_MCP01).',
+        description: 'Function group name containing the include.',
       },
       include_name: {
         type: 'string',
-        description:
-          'Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.',
+        description: 'Include name. Include must already exist.',
       },
       source_code: {
         type: 'string',

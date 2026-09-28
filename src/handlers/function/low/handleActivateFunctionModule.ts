@@ -24,11 +24,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_module_name: {
         type: 'string',
-        description: 'Function module name (e.g., Z_FM_TEST).',
+        description: 'Function module name.',
       },
       function_group_name: {
         type: 'string',
-        description: 'Function group name (e.g., Z_FG_TEST).',
+        description: 'Function group name.',
       },
       session_id: {
         type: 'string',

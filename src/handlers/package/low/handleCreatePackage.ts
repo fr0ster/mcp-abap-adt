@@ -41,13 +41,11 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions.',
+        description: 'Package name. Must follow SAP naming conventions.',
       },
       super_package: {
         type: 'string',
-        description:
-          'Super package (parent package) name (e.g., ZOK_PACKAGE). Required.',
+        description: 'Super package (parent package) name. Required.',
       },
       description: {
         type: 'string',
@@ -61,12 +59,11 @@ export const TOOL_DEFINITION = {
       software_component: {
         type: 'string',
         description:
-          'Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).',
+          'Software component. If not provided, SAP will set a default.',
       },
       transport_layer: {
         type: 'string',
-        description:
-          'Transport layer (e.g., ZDEV). Required for transportable packages.',
+        description: 'Transport layer. Required for transportable packages.',
       },
       transport_request: {
         type: 'string',
@@ -76,7 +73,7 @@ export const TOOL_DEFINITION = {
       record_changes: {
         type: 'boolean',
         description:
-          'Enable change recording for the package. Required for transportable packages (non-$TMP). Default: false.',
+          'Enable change recording for the package. Required for a transportable package. Default: false.',
       },
       application_component: {
         type: 'string',

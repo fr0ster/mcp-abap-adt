@@ -63,8 +63,7 @@ export const TOOL_DEFINITION = {
           properties: {
             container_class: {
               type: 'string',
-              description:
-                'Class that owns the test include (e.g., ZCL_MAIN_CLASS).',
+              description: 'Class that owns the test include.',
             },
             test_class: {
               type: 'string',

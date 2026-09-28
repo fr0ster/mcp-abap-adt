@@ -47,8 +47,7 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name (e.g., ZTEST_FG_001). Must exist in the system.',
+        description: 'Function group name. Must exist in the system.',
       },
       description: {
         type: 'string',

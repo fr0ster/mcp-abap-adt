@@ -48,7 +48,7 @@ export const TOOL_DEFINITION = {
     properties: {
       message_class_name: {
         type: 'string',
-        description: 'Message class name (e.g., ZMY_MSGS).',
+        description: 'Message class name.',
       },
       description: {
         type: 'string',

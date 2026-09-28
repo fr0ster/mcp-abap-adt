@@ -18,12 +18,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name containing the include (e.g., Z_MY_FG).',
+        description: 'Function group name containing the include.',
       },
       include_name: {
         type: 'string',
-        description: 'Include name (e.g., LZ_MY_FGTOP, LZ_MY_FGU01).',
+        description: 'Include name.',
       },
       version: {
         type: 'string',

@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
     package_name: z
       .string()
       .describe(
-        'Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions (start with Z or Y for customer namespace).',
+        'Package name. Must follow SAP naming conventions (start with Z or Y for customer namespace).',
       ),
     description: z
       .string()
@@ -55,9 +55,7 @@ export const TOOL_DEFINITION = {
       ),
     super_package: z
       .string()
-      .describe(
-        'Parent package name (e.g., ZOK_PACKAGE). Required for structure packages.',
-      ),
+      .describe('Parent package name. Required for structure packages.'),
     package_type: z
       .enum(['development', 'structure'])
       .default('development')
@@ -65,9 +63,7 @@ export const TOOL_DEFINITION = {
     software_component: z
       .string()
       .optional()
-      .describe(
-        'Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).',
-      ),
+      .describe('Software component. If not provided, SAP will set a default.'),
     transport_layer: z
       .string()
       .optional()

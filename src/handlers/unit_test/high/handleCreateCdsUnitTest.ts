@@ -65,11 +65,11 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Container class name (e.g., ZCL_CDS_TEST).',
+        description: 'Container class name.',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_TEST_PKG_01, $TMP).',
+        description: 'Package name.',
       },
       cds_view_name: {
         type: 'string',

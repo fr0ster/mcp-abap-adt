@@ -58,8 +58,7 @@ export const TOOL_DEFINITION = {
     properties: {
       domain_name: {
         type: 'string',
-        description:
-          'Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions.',
+        description: 'Domain name. Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
@@ -68,8 +67,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description:
-          '(optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: '(optional) Package name',
       },
       transport_request: {
         type: 'string',

@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
       },
       object_name: {
         type: 'string',
-        description: 'Object name (e.g., "ZMY_CLASS", "ZMY_PROGRAM")',
+        description: 'Object name',
       },
       session_id: {
         type: 'string',

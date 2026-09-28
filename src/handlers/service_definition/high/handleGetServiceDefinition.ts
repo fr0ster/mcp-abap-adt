@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       service_definition_name: {
         type: 'string',
-        description: 'ServiceDefinition name (e.g., Z_MY_SERVICEDEFINITION).',
+        description: 'ServiceDefinition name.',
       },
       version: {
         type: 'string',

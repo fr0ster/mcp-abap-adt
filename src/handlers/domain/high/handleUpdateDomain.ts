@@ -64,7 +64,7 @@ export const TOOL_DEFINITION = {
     properties: {
       domain_name: {
         type: 'string',
-        description: 'Domain name to update (e.g., ZZ_TEST_0001)',
+        description: 'Domain name to update',
       },
       description: {
         type: 'string',
@@ -72,7 +72,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',

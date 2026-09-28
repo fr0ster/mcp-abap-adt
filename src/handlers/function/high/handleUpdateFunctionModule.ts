@@ -47,18 +47,17 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name containing the function module (e.g., ZOK_FG_MCP01).',
+        description: 'Function group name containing the function module.',
       },
       function_module_name: {
         type: 'string',
         description:
-          'Function module name (e.g., Z_TEST_FM_MCP01). Function module must already exist.',
+          'Function module name. Function module must already exist.',
       },
       source_code: {
         type: 'string',
         description:
-          'Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION Z_TEST_FM\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION.',
+          'Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION <function module name>\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION.',
       },
       transport_request: {
         type: 'string',

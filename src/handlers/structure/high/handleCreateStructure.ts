@@ -63,8 +63,7 @@ export const TOOL_DEFINITION = {
     properties: {
       structure_name: {
         type: 'string',
-        description:
-          'Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions.',
+        description: 'Structure name. Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
@@ -73,7 +72,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',

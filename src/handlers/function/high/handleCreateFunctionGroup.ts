@@ -48,7 +48,7 @@ export const TOOL_DEFINITION = {
       function_group_name: {
         type: 'string',
         description:
-          'Function group name (e.g., ZTEST_FG_001). Must follow SAP naming conventions (start with Z or Y, max 26 chars).',
+          'Function group name. Must follow SAP naming conventions (start with Z or Y, max 26 chars).',
       },
       description: {
         type: 'string',
@@ -57,7 +57,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LAB, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',

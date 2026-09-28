@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description: 'Data element name (e.g., Z_MY_DATA_ELEMENT).',
+        description: 'Data element name.',
       },
       version: {
         type: 'string',

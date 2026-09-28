@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
     properties: {
       interface_name: {
         type: 'string',
-        description: 'Interface name (e.g., Z_MY_PROGRAM).',
+        description: 'Interface name.',
       },
       lock_handle: {
         type: 'string',

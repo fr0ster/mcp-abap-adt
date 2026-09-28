@@ -45,8 +45,7 @@ export const TOOL_DEFINITION = {
     properties: {
       interface_name: {
         type: 'string',
-        description:
-          'Interface name (e.g., ZIF_MY_INTERFACE). Must exist in the system.',
+        description: 'Interface name. Must exist in the system.',
       },
       source_code: {
         type: 'string',

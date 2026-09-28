@@ -24,8 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description:
-          'Behavior definition name (root entity, e.g., ZI_MY_ENTITY).',
+        description: 'Behavior definition name (root entity).',
       },
       session_id: {
         type: 'string',

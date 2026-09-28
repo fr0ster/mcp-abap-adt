@@ -26,7 +26,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Metadata Extension name (e.g., ZI_MY_DDLX).',
+        description: 'Metadata Extension name.',
       },
       session_id: {
         type: 'string',

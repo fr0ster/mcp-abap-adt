@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Metadata Extension name (e.g., ZI_MY_DDLX).',
+        description: 'Metadata Extension name.',
       },
       description: {
         type: 'string',
@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

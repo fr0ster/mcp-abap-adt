@@ -31,8 +31,7 @@ export const TOOL_DEFINITION = {
     properties: {
       structure_name: {
         type: 'string',
-        description:
-          'Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.',
+        description: 'Structure name. Structure must already exist.',
       },
       ddl_code: {
         type: 'string',

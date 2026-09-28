@@ -114,7 +114,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
 
 **Parameters:**
-- `behavior_definition_name` (string, required) - Behavior definition name (e.g., Z_MY_BDEF).
+- `behavior_definition_name` (string, required) - Behavior definition name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -129,7 +129,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_implementation_name` (string, required) - Behavior implementation name (e.g., ZBP_MY_CLASS).
+- `behavior_implementation_name` (string, required) - Behavior implementation name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -144,7 +144,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -173,7 +173,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
-- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, ZIF_MY_INTERFACE, Z_MY_TABLE).
+- `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object type.
 
 ---
@@ -200,7 +200,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `data_element_name` (string, required) - Data element name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -215,7 +215,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -230,7 +230,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_DOMAIN).
+- `domain_name` (string, required) - Domain name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -283,7 +283,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `function_group_name` (string, required) - Function group name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -298,7 +298,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `function_group_name` (string, required) - Function group name.
 
 ---
 
@@ -309,7 +309,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `function_group_name` (string, required) - Function group name.
 
 ---
 
@@ -320,8 +320,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
-- `include_name` (string, required) - Include name (e.g., LZ_MY_FGTOP, LZ_MY_FGU01).
+- `function_group_name` (string, required) - Function group name containing the include.
+- `include_name` (string, required) - Include name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -336,8 +336,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_MY_FG).
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FM).
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -380,7 +380,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `interface_name` (string, required) - Interface name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -395,7 +395,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Message class name.
 
 ---
 
@@ -406,7 +406,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
 ---
@@ -421,7 +421,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
 
 **Parameters:**
-- `metadata_extension_name` (string, required) - Metadata extension name (e.g., Z_MY_DDLX).
+- `metadata_extension_name` (string, required) - Metadata extension name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -447,7 +447,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
+- `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -462,7 +462,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -523,7 +523,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
 
 **Parameters:**
-- `service_binding_name` (string, required) - Service binding name (e.g., ZUI_MY_BINDING).
+- `service_binding_name` (string, required) - Service binding name.
 
 ---
 
@@ -537,7 +537,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
 
 **Parameters:**
-- `service_definition_name` (string, required) - Service definition name (e.g., Z_MY_SRVD).
+- `service_definition_name` (string, required) - Service definition name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -553,7 +553,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name.
 - `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
@@ -566,7 +566,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
 
 **Parameters:**
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -1002,7 +1002,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/table/readonly/handleReadTable.ts`
 
 **Parameters:**
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
+- `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---

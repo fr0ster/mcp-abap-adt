@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       structure_name: {
         type: 'string',
-        description: 'Structure name (e.g., ZST_MY_STRUCT).',
+        description: 'Structure name.',
       },
       session_id: {
         type: 'string',

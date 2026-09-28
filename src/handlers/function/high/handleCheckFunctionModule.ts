@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
       },
       function_module_name: {
         type: 'string',
-        description: 'Function module name (e.g., Z_MY_FUNCTION).',
+        description: 'Function module name.',
       },
       version: {
         type: 'string',

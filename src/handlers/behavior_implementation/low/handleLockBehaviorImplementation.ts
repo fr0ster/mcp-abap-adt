@@ -32,8 +32,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description:
-          'Behavior Implementation class name (e.g., ZBP_MY_ENTITY).',
+        description: 'Behavior Implementation class name.',
       },
       session_id: {
         type: 'string',

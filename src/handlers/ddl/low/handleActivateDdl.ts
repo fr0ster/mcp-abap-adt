@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., ZVW_MY_VIEW).',
+        description: 'DDL source name.',
       },
       session_id: {
         type: 'string',

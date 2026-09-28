@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
     properties: {
       service_binding_name: {
         type: 'string',
-        description: 'Service binding name (e.g., ZUI_MY_BINDING).',
+        description: 'Service binding name.',
       },
     },
     required: ['service_binding_name'],

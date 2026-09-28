@@ -31,12 +31,11 @@ export const TOOL_DEFINITION = {
       function_module_name: {
         type: 'string',
         description:
-          'Function module name (e.g., Z_TEST_FM). Function module must already exist.',
+          'Function module name. Function module must already exist.',
       },
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name containing the function module (e.g., Z_TEST_FG).',
+        description: 'Function group name containing the function module.',
       },
       source_code: {
         type: 'string',

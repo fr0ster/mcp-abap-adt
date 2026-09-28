@@ -47,8 +47,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description:
-          'DataElement name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
+        description: 'DataElement name. Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
@@ -56,7 +55,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

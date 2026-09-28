@@ -33,11 +33,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description: 'Function group name (e.g., Z_FUGR_TEST_0001)',
+        description: 'Function group name',
       },
       function_module_name: {
         type: 'string',
-        description: 'Function module name (e.g., Z_TEST_FM)',
+        description: 'Function module name',
       },
       version: {
         type: 'string',

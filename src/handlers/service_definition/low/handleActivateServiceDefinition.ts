@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Service definition name (e.g., ZSD_MY_SERVICE).',
+        description: 'Service definition name.',
       },
       session_id: {
         type: 'string',

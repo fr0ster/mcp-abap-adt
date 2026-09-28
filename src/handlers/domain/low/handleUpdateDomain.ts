@@ -46,8 +46,7 @@ export const TOOL_DEFINITION = {
     properties: {
       domain_name: {
         type: 'string',
-        description:
-          'Domain name (e.g., ZOK_D_TEST_0001). Domain must already exist.',
+        description: 'Domain name. Domain must already exist.',
       },
       properties: {
         type: 'object',

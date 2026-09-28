@@ -36,12 +36,11 @@ export const TOOL_DEFINITION = {
     properties: {
       table_name: {
         type: 'string',
-        description:
-          'Table name (e.g., ZT_TEST_001). Must follow SAP naming conventions.',
+        description: 'Table name. Must follow SAP naming conventions.',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

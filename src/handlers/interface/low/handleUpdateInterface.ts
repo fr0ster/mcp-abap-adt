@@ -33,8 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       interface_name: {
         type: 'string',
-        description:
-          'Interface name (e.g., ZIF_TEST_INTERFACE). Interface must already exist.',
+        description: 'Interface name. Interface must already exist.',
       },
       source_code: {
         type: 'string',

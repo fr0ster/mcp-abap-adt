@@ -30,7 +30,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Behavior Definition name (e.g., ZI_MY_BDEF).',
+        description: 'Behavior Definition name.',
       },
       description: {
         type: 'string',
@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',
@@ -47,7 +47,7 @@ export const TOOL_DEFINITION = {
       },
       root_entity: {
         type: 'string',
-        description: 'Root entity name (e.g., ZI_MY_ENTITY).',
+        description: 'Root entity name.',
       },
       implementation_type: {
         type: 'string',

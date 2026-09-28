@@ -33,8 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description:
-          'Class name (e.g., ZCL_TEST_CLASS_001). Class must already exist.',
+        description: 'Class name. Class must already exist.',
       },
       source_code: {
         type: 'string',

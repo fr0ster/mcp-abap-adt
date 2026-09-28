@@ -43,8 +43,7 @@ export const TOOL_DEFINITION = {
     properties: {
       program_name: {
         type: 'string',
-        description:
-          'Program name (e.g., Z_TEST_PROGRAM_001). Program must already exist.',
+        description: 'Program name. Program must already exist.',
       },
       source_code: {
         type: 'string',

@@ -78,11 +78,11 @@ export const TOOL_DEFINITION = {
       class_name: {
         type: 'string',
         description:
-          'Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions.',
+          'Behavior Implementation class name. Must follow SAP naming conventions.',
       },
       behavior_definition: {
         type: 'string',
-        description: 'Behavior Definition name (e.g., ZI_MY_ENTITY). Required.',
+        description: 'Behavior Definition name. Required.',
       },
       description: {
         type: 'string',
@@ -90,7 +90,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

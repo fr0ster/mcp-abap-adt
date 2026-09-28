@@ -28,7 +28,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Service binding name (e.g., ZSB_MY_SERVICE).',
+        description: 'Service binding name.',
       },
       session_id: {
         type: 'string',

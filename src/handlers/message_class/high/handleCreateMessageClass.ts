@@ -28,8 +28,7 @@ export const TOOL_DEFINITION = {
     properties: {
       message_class_name: {
         type: 'string',
-        description:
-          'Message class name (e.g., ZMY_MSGS). Must follow SAP naming conventions.',
+        description: 'Message class name. Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
@@ -38,7 +37,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZMY_PKG, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

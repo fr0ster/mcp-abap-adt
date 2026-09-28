@@ -31,8 +31,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description:
-          'DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.',
+        description: 'DDL source name. DDL source must already exist.',
       },
       ddl_source: {
         type: 'string',

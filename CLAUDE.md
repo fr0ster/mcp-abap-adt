@@ -225,27 +225,38 @@ in `server/` as suspect: count the levels for both layouts.
 
 ## What we write names nothing concrete
 
-**The rule: we do not know who will use this, where, or how — so we state only
-what we know.** It holds for tool descriptions, parameter descriptions, code
-comments, test data and captured fixtures alike.
+**The rule: a description is read by a model and indexed by a vector search, so it
+names nothing concrete.** We say `class`; we do not say which class. It holds for
+tool descriptions, parameter descriptions, code comments, test data and captured
+fixtures alike, and the reason is retrieval, not taste: ask for a report in `$TMP`
+and a search over the descriptions returns everything whose text mentions `$TMP`,
+whatever the rest of the sentence says. Issue #241 measured it in cloud-llm-hub's
+tool-RAG — `Delete*` went from 12 of the top 15 to 1 once the literal left their
+text. In a PARAMETER description it is worse in a second way: the model fills the
+argument from what it reads there, and an example transport request addressed a
+real one.
 
-- **A description says what the tool does and what a parameter means**, most
-  important first, and never gives an example object, package or transport. A
-  literal in a tool description is search text in a consumer's tool-RAG and
-  retrieves the wrong tools in bulk (#241); a literal in a parameter description
-  is worse in a different way — a model can copy it into a write, and an example
-  transport request addresses a real one.
+**A consumer who wants names is not stuck.** They import `@mcp-abap-adt/lib`,
+inherit, and override the descriptions to suit their own retrieval. What we ship
+stays agnostic because we do not know who indexes it, where, or how.
+
+- **What a description says**: the operation, then the parameters and the answer,
+  most important first, plus the constraints that change the call ("must already
+  exist", "required for validation", "start with Z or Y"). Never an example object,
+  package, transport, software component or search prefix. A bare mask (`Z*`, `Y*`,
+  any-namespace) and a format placeholder (`YYYYMMDDHHMMSS`) name nothing and stay.
 - **A measurement note records the platform and the date, not the landscape.**
-  `on premise (2026-09-26)` and `BASIS 816`, never a system id: the release is
-  what made the behaviour, and the SID means nothing to anyone else reading it.
-- **Captured fixtures are sanitised** — `SAPUSER01`, `SID`, a placeholder
-  transport prefix — and the note says the capture was sanitised. Test data keeps
-  its numbers under a placeholder prefix so assertions still pair with inputs.
-- `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts` keeps the rule. It
-  covers every tool description, and parameter descriptions for each class listed
-  in `ON_PARAMETERS_TOO`. **Clearing a class of literal means adding it there in
-  the same change** — the list is the record of what is enforced, and a class
-  missing from it is unfinished work, not an exemption.
+  `on premise (2026-09-26)` and `BASIS 816`, never a system id: the release is what
+  made the behaviour, and the SID means nothing to anyone else reading it.
+- **Captured fixtures are sanitised** — `SAPUSER01`, `SID`, a placeholder transport
+  prefix — and the note says so. Test data keeps its numbers under a placeholder
+  prefix so assertions still pair with their inputs.
+- `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts` keeps the rule over
+  **both** tool and parameter descriptions, in three classes: a package (`$TMP`), a
+  customer object (`ZCL_…`, and `L…`/`SAPL…` for a function group's generated
+  includes), a transport number. Add a class rather than an exception when a new
+  kind of literal appears; the generated prefixes are there because the first
+  version of the pattern missed `LZOK_FG_…F01` and the test found it.
 
 ## Plans and Specs
 

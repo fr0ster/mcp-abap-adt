@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description: 'Package name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'Package name to validate.',
       },
       super_package: {
         type: 'string',

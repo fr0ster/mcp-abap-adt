@@ -36,7 +36,7 @@ export const TOOL_DEFINITION = {
       name: {
         type: 'string',
         description:
-          'Behavior definition name (e.g., ZOK_C_TEST_0001). Behavior definition must already exist.',
+          'Behavior definition name. Behavior definition must already exist.',
       },
       source_code: {
         type: 'string',

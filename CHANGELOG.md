@@ -36,19 +36,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - One of these was a live defect rather than a wording problem:
     `GetNodeStructureLow`'s `node_id` description explained `"0000"` by naming the
     system that answered an empty body for it.
+  - **And then every other name went with them: 255 of 370 tools, 350 parameter
+    descriptions, 169 distinct strings.** `Class name (e.g., ZCL_MY_CLASS).` reads
+    `Class name.`; `Package name (e.g., ZOK_LOCAL, $TMP for local objects).` reads
+    `Package name.`; `Optional for local objects ($TMP).` reads `Optional for local
+    objects.` — ABAP Cloud has no `$TMP` anyway. Constraints that change the call
+    stay word for word ("must already exist", "required for validation", "start
+    with Z or Y", the REQUEST/TASK distinction). What goes is only the example.
+    A few needed a sentence rather than a deletion: the software component no
+    longer names two components, the search pattern explains `"*"` as a prefix
+    match instead of listing masks, the function-module code sample calls its
+    function `<function module name>`, and a behaviour pool's naming convention is
+    stated instead of spelled.
 
 ### Added
 
-- **The description ratchet now covers parameter descriptions, class by class.**
+- **The description ratchet covers parameter descriptions too, in every class.**
   `toolDescriptionsCarryNoLiterals.test.ts` checks every `description` anywhere in
-  an input schema against the classes listed in `ON_PARAMETERS_TOO` — today the
-  transport number, the one class that is clean. The package and customer-object
-  classes stay description-only until their text is replaced (254 of 370 tools),
-  and each joins the list as it is cleared; a class enforced on descriptions but
-  not on parameters is one still being worked through, not one that is exempt. A
-  guard test asserts the walker actually reads the parameter text it claims to
-  (>500 descriptions found), because a selector that matches nothing is how a
-  probe once reported "0 violations" over 0 tools.
+  an input schema, not only the tool's own text: three classes (a package, a
+  customer-namespace object, a transport number) over both, six assertions. Two
+  refinements came out of running it:
+  - **A format placeholder is not a name.** `YYYYMMDDHHMMSS` matched the
+    customer-object pattern on its leading `Y`; a token built only from the letters
+    of a date is allowed by rule, and the self-check states it.
+  - **The generated prefixes count.** A function group's includes are `L<group>…`
+    and its main program `SAPL<group>`, so the customer name starts one character
+    in. The first pattern missed `LZOK_FG_MCP01F01` in five descriptions and the
+    widened one found them — the ratchet caught what the sweep did not.
+
+  A guard test asserts the selector really reads parameter text (>500 descriptions
+  found): one that matches nothing is how a probe once reported "0 violations" over
+  0 tools.
 
 ## [13.0.2] - 2026-09-28
 

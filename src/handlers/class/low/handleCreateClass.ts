@@ -29,8 +29,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description:
-          'Class name (e.g., ZCL_TEST_CLASS_001). Must follow SAP naming conventions.',
+        description: 'Class name. Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
@@ -38,7 +37,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

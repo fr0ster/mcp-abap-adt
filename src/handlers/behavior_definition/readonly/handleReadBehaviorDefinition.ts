@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
     properties: {
       behavior_definition_name: {
         type: 'string',
-        description: 'Behavior definition name (e.g., Z_MY_BDEF).',
+        description: 'Behavior definition name.',
       },
       version: {
         type: 'string',

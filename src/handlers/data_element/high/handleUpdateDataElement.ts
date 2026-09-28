@@ -65,7 +65,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description: 'Data element name to update (e.g., ZZ_TEST_DTEL_01)',
+        description: 'Data element name to update',
       },
       description: {
         type: 'string',
@@ -73,7 +73,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',

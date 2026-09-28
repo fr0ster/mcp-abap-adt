@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'BehaviorDefinition name (e.g., ZI_MY_BDEF).',
+        description: 'BehaviorDefinition name.',
       },
       version: {
         type: 'string',

@@ -71,12 +71,12 @@ export const TOOL_DEFINITION = {
       class_name: {
         type: 'string',
         description:
-          'Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.',
+          'Behavior Implementation class name. Must exist in the system.',
       },
       behavior_definition: {
         type: 'string',
         description:
-          'Referenced Behavior Definition name (e.g., ZI_MY_ENTITY). Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).',
+          'Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).',
       },
       implementation_code: {
         type: 'string',

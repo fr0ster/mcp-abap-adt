@@ -40,8 +40,7 @@ export const TOOL_DEFINITION = {
     properties: {
       program_name: {
         type: 'string',
-        description:
-          'Program name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
+        description: 'Program name. Must follow SAP naming conventions.',
       },
       description: {
         type: 'string',
@@ -49,7 +48,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name (e.g., ZCL_TEST_CLASS_001).',
+        description: 'Class name.',
       },
       description: {
         type: 'string',
@@ -41,7 +41,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LAB, $TMP).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',

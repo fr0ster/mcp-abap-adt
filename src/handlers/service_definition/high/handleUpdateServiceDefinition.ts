@@ -44,8 +44,7 @@ export const TOOL_DEFINITION = {
     properties: {
       service_definition_name: {
         type: 'string',
-        description:
-          'Service definition name (e.g., ZSD_MY_SERVICE). Must exist in the system.',
+        description: 'Service definition name. Must exist in the system.',
       },
       source_code: {
         type: 'string',

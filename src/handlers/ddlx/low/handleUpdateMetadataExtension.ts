@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
       name: {
         type: 'string',
         description:
-          'Metadata extension name (e.g., ZOK_C_TEST_0001). Metadata extension must already exist.',
+          'Metadata extension name. Metadata extension must already exist.',
       },
       source_code: {
         type: 'string',

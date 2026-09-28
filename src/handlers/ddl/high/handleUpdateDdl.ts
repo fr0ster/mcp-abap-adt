@@ -43,7 +43,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., ZOK_R_TEST_0002).',
+        description: 'DDL source name.',
       },
       ddl_source: { type: 'string', description: 'Complete DDL source code.' },
       transport_request: {

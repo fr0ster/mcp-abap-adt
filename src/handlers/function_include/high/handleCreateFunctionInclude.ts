@@ -32,11 +32,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description: 'Parent function group name (e.g., ZTEST_FG_001)',
+        description: 'Parent function group name',
       },
       include_name: {
         type: 'string',
-        description: 'Include name (e.g., LZTEST_FG_001F01).',
+        description: 'Include name.',
       },
       description: {
         type: 'string',

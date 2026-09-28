@@ -21,8 +21,7 @@ export const TOOL_DEFINITION = {
     properties: {
       service_binding_name: {
         type: 'string',
-        description:
-          'Service binding name (for example: ZUI_MY_BINDING). Case-insensitive.',
+        description: 'Service binding name. Case-insensitive.',
       },
       response_format: {
         type: 'string',

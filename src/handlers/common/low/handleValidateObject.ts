@@ -51,8 +51,7 @@ export const TOOL_DEFINITION = {
     properties: {
       object_name: {
         type: 'string',
-        description:
-          'Object name to validate (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE)',
+        description: 'Object name to validate',
       },
       object_type: {
         type: 'string',

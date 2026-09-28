@@ -46,7 +46,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Global test class name (e.g., ZCL_CDS_TEST).',
+        description: 'Global test class name.',
       },
       transport_request: {
         type: 'string',

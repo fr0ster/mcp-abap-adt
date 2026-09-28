@@ -37,12 +37,12 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description: 'Parent function group name (e.g., ZTEST_FG_001)',
+        description: 'Parent function group name',
       },
       function_module_name: {
         type: 'string',
         description:
-          'Function module name (e.g., Z_TEST_FUNCTION_001). Must follow SAP naming conventions (start with Z or Y, max 30 chars).',
+          'Function module name. Must follow SAP naming conventions (start with Z or Y, max 30 chars).',
       },
       description: {
         type: 'string',

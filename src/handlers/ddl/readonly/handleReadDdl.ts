@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., Z_MY_VIEW).',
+        description: 'DDL source name.',
       },
       version: {
         type: 'string',

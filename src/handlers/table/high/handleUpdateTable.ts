@@ -48,8 +48,7 @@ export const TOOL_DEFINITION = {
     properties: {
       table_name: {
         type: 'string',
-        description:
-          'Table name (e.g., ZZ_TEST_TABLE_001). Table must already exist.',
+        description: 'Table name. Table must already exist.',
       },
       ddl_code: {
         type: 'string',

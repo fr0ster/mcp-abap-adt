@@ -70,10 +70,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evaluates an interpolation. `generate-tools-docs.js` keeps the source parse for
   structure — which tools exist, their files, tiers and schema shape — and takes
   every description from the BUILT definitions through `HandlerExporter`, the same
-  strings a consumer's RAG indexes. Without `dist` it says so once and documents the
-  parsed text, so `docs:tools` still runs on an unbuilt tree. Beside the
-  interpolation, this filled in five compact parameters that were documented as
-  empty because their schema is a shared constant the regex could not follow.
+  strings a consumer's RAG indexes. Beside the interpolation, this filled in five
+  compact parameters that were documented as empty because their schema is a
+  shared constant the regex could not follow.
+
+  **And reading `dist` is only correct while `dist` is current, so that is checked
+  rather than assumed.** A reviewer edited `DeleteClass`'s description, ran
+  `docs:tools` and got success with the previous text in the documents, because the
+  script did not build. `docs:tools` now builds first, and the generator refuses to
+  run when `dist` is missing or older than any source file, saying how far behind it
+  is and what to do. The check throws rather than exiting: a unit test requires this
+  module, and a generator that kills the process from inside a test run is its own
+  defect. The "fall back to the parsed text" path is gone — it was the mechanism
+  that let wrong text look like success.
 
 - **The generator dropped everything after the first string literal of a
   concatenated description.** It reads source with regexes rather than importing

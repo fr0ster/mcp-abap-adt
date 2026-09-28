@@ -88,19 +88,54 @@ with:
    empty. That is precisely what `compactSchemaCompleteness` cannot see: it
    compares argument NAMES and never learns where a route goes.
 
+## Decided: split compact by capability, and every bin is AGPL
+
+**Two compact packages, not one: `compact-readonly` and `compact-modify`.** The
+line is whether an operation changes the system. (Both decisions stated by the
+user 2026-09-28.)
+
+This is the one thing that makes a compact package a genuinely smaller install as
+well as a smaller surface — a read-only facade does not need a single write
+handler — and the stronger argument is not size at all: **an agent given
+`compact-readonly` cannot change the system.** Capability is enforced by what is
+installed, not by a flag someone can pass.
+
+The 22, classified:
+
+**Non-modifying (13)** — `HandlerGet`, `HandlerValidate` (asks whether a name is
+admissible), `HandlerCheckRun` (a syntax check), `HandlerUnitTestStatus`,
+`HandlerUnitTestResult`, `HandlerCdsUnitTestStatus`, `HandlerCdsUnitTestResult`,
+`HandlerProfileList`, `HandlerProfileView`, `HandlerDumpList`, `HandlerDumpView`,
+`HandlerServiceBindingListTypes`, `HandlerServiceBindingValidate`.
+
+**Modifying or executing (9)** — `HandlerCreate`, `HandlerUpdate`,
+`HandlerDelete`, `HandlerActivate`, `HandlerTransportCreate`, `HandlerLock`,
+`HandlerUnlock` (a lock is an enqueue: it changes state and blocks other users),
+`HandlerUnitTestRun` and `HandlerProfileRun` (both **execute ABAP** — they change
+no repository object but they run code and leave traces, which is not something a
+read-only surface may offer).
+
+**Licence: every package that ships a bin is AGPL-3.0-only**, so both compact
+packages are, exactly as `core` is. `lib` stays Apache-2.0 because it ships no bin
+and no transport. That settles the question this plan opened with, and it settles
+it the same way for anything added later.
+
+**And the work this exposes is in `lib`, not in the new packages.** Today
+`CompactHandlersGroup` imports all 22 compact handlers, and each of those imports
+the high-tier handlers it routes to — so a `compact-readonly` that imports the
+group gets the write handlers with it. For the split to mean anything the router
+has to come apart along the same line: a read-only group importing read-only
+routes only. That is the actual task; the two manifests are the easy part.
+
 ## Open questions for the brainstorm
-1. **Licence.** `core` is AGPL-3.0-only because it is a network service; anything
-   with a transport in it follows. A `compact` that depends on `core` inherits
-   that; one that only re-exports handlers could be Apache-2.0 like `lib`. This
-   has to be decided before the first publish, not after.
-2. **The command.** A bin of its own (`mcp-abap-adt-compact`), or `core`'s bin
+1. **The commands.** A bin of its own (`mcp-abap-adt-compact`), or `core`'s bin
    with the exposition defaulted by the package that installed it? A third bin
    goes into `binSmoke.test.ts` either way.
-3. **Registry metadata.** `server.json` describes one server. Does the compact
+2. **Registry metadata.** `server.json` describes one server. Does the compact
    variant get its own entry, or a documented flag on the existing one?
-4. **Release mechanics.** `publish-all.sh` gains a third entry and the release
-   checklist a third version to keep in step — the same drift that has bitten
-   `server.json` before.
+3. **Release mechanics.** `publish-all.sh` gains two more entries and the release
+   checklist two more versions to keep in step — the same drift that has bitten
+   `server.json` before. Lockstep versions for all four packages, or independent?
 
 ## Tasks, once the questions above are answered
 
@@ -118,9 +153,11 @@ with:
       because a compact cycle needs objects of its own.
 - [ ] **`HandlerActivate` through compact, on a system**, including the group path
       that reads the activation run's results.
-- [ ] **The package**, per the shape decided: manifest, licence file, bin,
-      `publish-all.sh`, `server.json`, release checklist, and `binSmoke.test.ts`
-      extended to the new bin.
+- [ ] **Split the compact router along the capability line** so a read-only group
+      imports no write route. This is the real work, and it is in `lib`.
+- [ ] **The two packages**: manifests, `LICENSE` (AGPL-3.0-only, both),
+      `COPYING`, bins, `publish-all.sh`, `server.json`, the release checklist, and
+      `binSmoke.test.ts` extended to both new bins.
 - [ ] **Docs**: README's Dependencies and Licensing sections, the tool docs
       generator (does it need a compact-only page?), and a migration note if
       anything about `core` changes.

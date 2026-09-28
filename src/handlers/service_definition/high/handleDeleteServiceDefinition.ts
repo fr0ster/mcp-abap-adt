@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

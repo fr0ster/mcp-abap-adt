@@ -214,7 +214,20 @@ facade. Everything below follows from that. (All three stated by the user
 (`handlers/common/low/handleActivateObject`). The 83 router routes are most of the
 104; the rest belong to the 18 compact tools that do not go through the router.
 
-**So `lib` must export those handlers publicly, and it must export them in halves.**
+**Done: `lib` exports them publicly, in halves.**
+`@mcp-abap-adt/lib/handlers/read` (35 symbols) and
+`@mcp-abap-adt/lib/handlers/write` (69 plus `TYPE_TO_FAMILY`), with `exports` and
+`typesVersions` entries — the existing `packageEntryPoints` ratchet caught the second
+one missing, which is what it is for. Membership was measured from each half's import
+graph rather than curated: 35 and 69, **no symbol in both**, so the line the
+capability split draws inside the package is the line the barrels draw at its
+boundary. `handlerBarrels.test.ts` keeps them disjoint, keeps
+create/update/delete/activate/lock/unlock out of the read barrel by name and by
+module graph, and asserts their union still covers every handler module the facade
+reaches — a handler in neither barrel would leave the package that routes to it
+unable to import it. Additive: nothing moved.
+
+**Why halves, and not one barrel.**
 One barrel of all 104 would defeat the split the moment `compact-readonly` imported
 it: the read-only package would link every write handler again, and
 `compactCapabilitySplit.test.ts` would fail — correctly. Two entry points,

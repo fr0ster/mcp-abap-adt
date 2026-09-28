@@ -285,7 +285,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
@@ -342,7 +342,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
@@ -416,7 +416,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
@@ -1425,7 +1425,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
@@ -1507,7 +1507,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
@@ -1630,7 +1630,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
@@ -1766,7 +1766,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
@@ -1807,7 +1807,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for local objects.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
@@ -1838,7 +1838,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
@@ -1894,7 +1894,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
@@ -1966,7 +1966,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).
+**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local objects.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
@@ -2046,7 +2046,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
@@ -2079,7 +2079,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `package_name` (string, required) - Package name (e.g., ZMY_PACKAGE).
-- `super_package` (string, required) - Super package name (parent package).
+- `super_package` (string, optional) - Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.
 
 ---
 
@@ -2140,7 +2140,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
@@ -2202,7 +2202,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
@@ -2289,7 +2289,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
@@ -2361,7 +2361,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
@@ -2448,7 +2448,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
@@ -2712,4 +2712,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-27*
+*Last updated: 2026-09-28*

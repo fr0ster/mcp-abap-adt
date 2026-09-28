@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

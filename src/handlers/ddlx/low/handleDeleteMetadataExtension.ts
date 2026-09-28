@@ -29,7 +29,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtensionLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.',
+    '[low-level] Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

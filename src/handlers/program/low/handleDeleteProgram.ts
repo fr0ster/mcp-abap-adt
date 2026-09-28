@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteProgramLow',
   available_in: ['onprem'] as const,
   description:
-    '[low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    '[low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

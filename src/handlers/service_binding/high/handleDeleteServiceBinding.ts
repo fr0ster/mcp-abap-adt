@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

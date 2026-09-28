@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).',
+    'Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

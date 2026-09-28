@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

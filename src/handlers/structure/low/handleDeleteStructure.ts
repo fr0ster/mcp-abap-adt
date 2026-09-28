@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteStructureLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete a structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    '[low-level] Delete a structure from the SAP system via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

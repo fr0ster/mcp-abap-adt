@@ -206,7 +206,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletebehaviordefinitionlow-low-level-behavior-definition"></a>
 #### DeleteBehaviorDefinitionLow (Low-Level / Behavior Definition)
-**Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/behavior_definition/low/handleDeleteBehaviorDefinition.ts`
 
@@ -393,7 +393,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteclasslow-low-level-class"></a>
 #### DeleteClassLow (Low-Level / Class)
-**Description:** [low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/class/low/handleDeleteClass.ts`
 
@@ -579,7 +579,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteobjectlow-low-level-common"></a>
 #### DeleteObjectLow (Low-Level / Common)
-**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.
+**Description:** [low-level] Delete an ABAP object via ADT deletion API. Transport request optional for local objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.
 
 **Source:** `src/handlers/common/low/handleDeleteObject.ts`
 
@@ -693,7 +693,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedataelementlow-low-level-data-element"></a>
 #### DeleteDataElementLow (Low-Level / Data Element)
-**Description:** [low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/data_element/low/handleDeleteDataElement.ts`
 
@@ -810,7 +810,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteddllow-low-level-ddl"></a>
 #### DeleteDdlLow (Low-Level / Ddl)
-**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/ddl/low/handleDeleteDdl.ts`
 
@@ -927,7 +927,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemetadataextensionlow-low-level-ddlx"></a>
 #### DeleteMetadataExtensionLow (Low-Level / Ddlx)
-**Description:** [low-level] Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.
 
 **Source:** `src/handlers/ddlx/low/handleDeleteMetadataExtension.ts`
 
@@ -1043,7 +1043,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedomainlow-low-level-domain"></a>
 #### DeleteDomainLow (Low-Level / Domain)
-**Description:** [low-level] Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/domain/low/handleDeleteDomain.ts`
 
@@ -1204,7 +1204,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctiongrouplow-low-level-function"></a>
 #### DeleteFunctionGroupLow (Low-Level / Function)
-**Description:** [low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/function/low/handleDeleteFunctionGroup.ts`
 
@@ -1216,7 +1216,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctionmodulelow-low-level-function"></a>
 #### DeleteFunctionModuleLow (Low-Level / Function)
-**Description:** [low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/function/low/handleDeleteFunctionModule.ts`
 
@@ -1378,7 +1378,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteinterfacelow-low-level-interface"></a>
 #### DeleteInterfaceLow (Low-Level / Interface)
-**Description:** [low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/interface/low/handleDeleteInterface.ts`
 
@@ -1451,7 +1451,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="checkpackagelow-low-level-package"></a>
 #### CheckPackageLow (Low-Level / Package)
-**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. super_package is required by this schema but not read by the check endpoint — see its own parameter description.
+**Description:** [low-level] Perform syntax check on an ABAP package. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session. super_package is accepted but not read by the check endpoint — see its own parameter description.
 
 **Source:** `src/handlers/package/low/handleCheckPackage.ts`
 
@@ -1459,7 +1459,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name (e.g., ZOK_TEST_0002).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `super_package` (string, required) - Does not reach the check endpoint — the shipped checkPackage() call takes only the package name. Kept for compatibility with ValidatePackage/CreatePackage, which do read it (LockPackage/UnlockPackage/UpdatePackage do not either).
+- `super_package` (string, optional) - Optional, and it does not reach the check endpoint — the shipped check() call takes only the package name. Kept for compatibility with ValidatePackage/CreatePackage, which do read it (LockPackage/UnlockPackage/UpdatePackage do not either). Requiring it here refused the call before any request was made.
 
 ---
 
@@ -1486,7 +1486,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletepackagelow-low-level-package"></a>
 #### DeletePackageLow (Low-Level / Package)
-**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
+**Description:** [low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.
 
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
 
@@ -1608,7 +1608,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteprogramlow-low-level-program"></a>
 #### DeleteProgramLow (Low-Level / Program)
-**Description:** [low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/program/low/handleDeleteProgram.ts`
 
@@ -1759,7 +1759,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletestructurelow-low-level-structure"></a>
 #### DeleteStructureLow (Low-Level / Structure)
-**Description:** [low-level] Delete a structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a structure from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/structure/low/handleDeleteStructure.ts`
 
@@ -1924,7 +1924,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletetablelow-low-level-table"></a>
 #### DeleteTableLow (Low-Level / Table)
-**Description:** [low-level] Delete a table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** [low-level] Delete a table from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/table/low/handleDeleteTable.ts`
 
@@ -2007,4 +2007,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-27*
+*Last updated: 2026-09-28*

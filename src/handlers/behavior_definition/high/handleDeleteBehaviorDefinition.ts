@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {

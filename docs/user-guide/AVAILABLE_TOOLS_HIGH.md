@@ -2232,7 +2232,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
 
 ---
 

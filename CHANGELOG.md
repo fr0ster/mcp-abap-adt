@@ -78,9 +78,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     in. The first pattern missed `LZOK_FG_MCP01F01` in five descriptions and the
     widened one found them — the ratchet caught what the sweep did not.
 
-  A guard test asserts the selector really reads parameter text (>500 descriptions
-  found): one that matches nothing is how a probe once reported "0 violations" over
-  0 tools.
+  **And it read one shape of schema only, which a reviewer found.** Eight tools
+  declare a flat map of Zod fields rather than JSON Schema — no `properties`
+  wrapper, and in Zod 4 `.description` is a getter on the prototype, so
+  `Object.entries` never saw it. `CreatePackage` and seven others were not checked
+  at all: the literal was put back into `CreatePackage`'s `transport_request` and
+  every assertion stayed green. The walker now reads `description` by access
+  instead of by enumeration and recurses through Zod's wrappers, and the coverage
+  guard asserts PER TOOL — the only tools with no parameter text are the two that
+  take no parameters (`TAKES_NO_PARAMETERS`), because a total of ">500" hid a whole
+  shape reading as zero. Two things the fix immediately caught: `SearchSource`'s
+  `packages` named a package and a prefix mask in its examples, and
+  `ListServiceBindingTypes`' `response_format` was a bare enum with no description
+  at all.
 
 ## [13.0.2] - 2026-09-28
 

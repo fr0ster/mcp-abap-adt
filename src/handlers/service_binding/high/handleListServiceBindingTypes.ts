@@ -22,6 +22,8 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['xml', 'json', 'plain'],
         default: 'xml',
+        description:
+          'Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.',
       },
     },
   },

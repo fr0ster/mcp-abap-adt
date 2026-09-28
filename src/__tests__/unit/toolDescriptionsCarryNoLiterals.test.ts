@@ -74,17 +74,60 @@ const literalsIn = (text: string): string[] =>
     ),
   ).map(({ name }) => name);
 
-/** Every `description` anywhere in an input schema, nesting included. */
+/**
+ * Every parameter description in an input schema, in both shapes this repo
+ * ships.
+ *
+ * **Two shapes, and the second one is why this is not a one-liner.** Most tools
+ * declare JSON Schema (`{ type: 'object', properties: { x: { description } } }`),
+ * where the text is an own enumerable property. Eight declare a flat map of Zod
+ * fields instead (`{ package_name: z.string().describe('…') }`) — no
+ * `properties` wrapper, and in Zod 4 `.description` is a GETTER on the prototype,
+ * so `Object.entries` does not see it and `inputSchema.properties` is `undefined`.
+ * The first version of this walker read only `properties` and only own keys, so
+ * `CreatePackage` and seven others were never checked at all: a reviewer put the
+ * transport literal back into `CreatePackage`'s `transport_request` and every
+ * assertion stayed green (PR #244).
+ *
+ * So: read `description` by ACCESS rather than by enumeration, and recurse
+ * through Zod's wrappers (`ZodOptional`, `ZodDefault`, `ZodArray`, `ZodObject`)
+ * as well as plain objects and arrays.
+ */
 const parameterDescriptions = (node: unknown): string[] => {
   if (Array.isArray(node)) return node.flatMap(parameterDescriptions);
   if (node === null || typeof node !== 'object') return [];
   const found: string[] = [];
+  // A getter or an own property, JSON Schema or Zod, both answer here.
+  const stated = (node as { description?: unknown }).description;
+  if (typeof stated === 'string') found.push(stated);
+  const def = (node as { def?: Record<string, unknown> }).def;
+  for (const inner of [def?.shape, def?.innerType, def?.type, def?.options]) {
+    if (inner !== undefined) found.push(...parameterDescriptions(inner));
+  }
   for (const [key, value] of Object.entries(node)) {
-    if (key === 'description' && typeof value === 'string') found.push(value);
-    else found.push(...parameterDescriptions(value));
+    if (key === 'description' && typeof value === 'string') continue;
+    found.push(...parameterDescriptions(value));
   }
   return found;
 };
+
+/** A tool's parameter text, whichever shape its schema is written in. */
+const parametersOf = (definition: {
+  inputSchema?: { properties?: unknown };
+}): string[] =>
+  parameterDescriptions(
+    definition.inputSchema?.properties ?? definition.inputSchema,
+  );
+
+/**
+ * The tools that take no parameter at all — a fixed, tiny list, so a schema
+ * shape that stops being read shows up here as a new name rather than as
+ * silence. Both of these answer a feed with no argument.
+ */
+const TAKES_NO_PARAMETERS = [
+  'HandlerProfileList',
+  'RuntimeListProfilerTraceFiles',
+];
 
 describe('descriptions carry no incidental literals', () => {
   const tools = new HandlerExporter({
@@ -141,13 +184,20 @@ describe('descriptions carry no incidental literals', () => {
     // Guards the selector: one that finds nothing would make the checks below
     // pass over no text at all, which is how a probe once reported "0
     // violations" from a scan of 0 tools.
-    const all = tools.flatMap((t) =>
-      parameterDescriptions(t.inputSchema?.properties),
-    );
+    const all = tools.flatMap(parametersOf);
     expect(all.length).toBeGreaterThan(500);
     expect(all.some((text) => /transport request number/i.test(text))).toBe(
       true,
     );
+    // The gap this replaced was invisible to a total: a whole shape of schema
+    // read as zero while the total stayed over 500. So assert per tool — every
+    // tool that declares a parameter yields its text, and the only tools
+    // without one are the tools that take no parameters.
+    const silent = tools
+      .filter((t) => parametersOf(t).length === 0)
+      .map((t) => t.name)
+      .sort();
+    expect(silent).toEqual(TAKES_NO_PARAMETERS);
   });
 
   for (const { name } of INCIDENTAL) {
@@ -160,11 +210,7 @@ describe('descriptions carry no incidental literals', () => {
 
     it(`no parameter description names ${name}`, () => {
       const offenders = tools
-        .flatMap((t) =>
-          parameterDescriptions(t.inputSchema?.properties).map(
-            (text) => [t.name, text] as const,
-          ),
-        )
+        .flatMap((t) => parametersOf(t).map((text) => [t.name, text] as const))
         .filter(([, text]) => literalsIn(text).includes(name))
         .map(([tool, text]) => `${tool}: ${text.slice(0, 80)}`);
       expect(offenders).toEqual([]);

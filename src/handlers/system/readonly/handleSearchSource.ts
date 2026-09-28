@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
       .array(z.string().min(1))
       .min(1)
       .describe(
-        'Packages to scan. Each entry is either an exact dev-class name or a `*` mask (* = any chars). Examples: "ZFI_OBSOLETE", "Z*", "ZFI_*", "/NS/Z*".',
+        'Packages to scan. Each entry is either an exact dev-class name or a `*` mask, where `*` stands for any characters and a namespace prefix may lead it.',
       ),
     include_subpackages: z
       .boolean()

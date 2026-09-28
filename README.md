@@ -213,6 +213,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-14.0.md](docs/MIGRATION-14.0.md)** - The compact facade moved to its own
+  packages and `--exposition=compact` became the `mcp-abap-adt-compact` command
 - **[docs/MIGRATION-13.0.md](docs/MIGRATION-13.0.md)** - What a consumer on the 12.x contract changes
 - **[docs/MIGRATION-12.0.md](docs/MIGRATION-12.0.md)** - What a consumer on the 11.x contract changes
 

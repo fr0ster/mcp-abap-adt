@@ -703,13 +703,13 @@ describe('behavior_definition', () => {
       name: 'ZBDEF_X',
       source_code: 'behavior definitions',
       lock_handle: 'h',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('update');
     expect(call?.factory).toBe('getBehaviorDefinition');
     expect(call?.args[0]).toEqual({
       name: 'ZBDEF_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.args[1]).toMatchObject({
       source: 'behavior definitions',
@@ -850,7 +850,7 @@ describe('behavior_implementation — declared over the class document set', () 
       behavior_definition: 'ZI_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
       implementation_code: 'CLASS lhc_x DEFINITION.\nENDCLASS.',
     });
 
@@ -861,7 +861,7 @@ describe('behavior_implementation — declared over the class document set', () 
       behaviorDefinition: 'ZI_X',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(createCall?.analyse).toBe(analyseException);
 
@@ -879,7 +879,7 @@ describe('behavior_implementation — declared over the class document set', () 
     expect(updateCall?.args[0]).toEqual({
       className: 'ZBP_X',
       behaviorDefinition: 'ZI_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(updateCall?.args[1]).toMatchObject({
       source: 'CLASS lhc_x DEFINITION.\nENDCLASS.',
@@ -996,7 +996,7 @@ describe('ddl', () => {
       ddl_name: 'ZVW_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('create');
     expect(call?.factory).toBe('getDdl');
@@ -1004,7 +1004,7 @@ describe('ddl', () => {
       ddlName: 'ZVW_X',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
@@ -1162,7 +1162,7 @@ describe('ddlx (metadataExtension)', () => {
       name: 'ZI_X_DDLX',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
       master_language: 'EN',
     });
     const call = callTo('create');
@@ -1171,7 +1171,7 @@ describe('ddlx (metadataExtension)', () => {
       name: 'ZI_X_DDLX',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
       masterLanguage: 'EN',
     });
     expect(call?.carriedAnalyse).toBe(true);
@@ -1336,7 +1336,7 @@ describe('structure', () => {
       structure_name: 'ZST_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('create');
     expect(call?.factory).toBe('getStructure');
@@ -1344,7 +1344,7 @@ describe('structure', () => {
       structureName: 'ZST_X',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
@@ -1475,13 +1475,13 @@ describe('table', () => {
       table_name: 'ZT_X',
       ddl_code: 'define table zt_x { client : abap.clnt; }',
       lock_handle: 'h',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('update');
     expect(call?.factory).toBe('getTable');
     expect(call?.args[0]).toEqual({
       tableName: 'ZT_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.args[1]).toMatchObject({
       source: 'define table zt_x { client : abap.clnt; }',
@@ -1495,14 +1495,14 @@ describe('table', () => {
     await handleCreateTable(context as any, {
       table_name: 'ZT_X',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('create');
     expect(call?.factory).toBe('getTable');
     expect(call?.args[0]).toEqual({
       tableName: 'ZT_X',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
@@ -1632,7 +1632,7 @@ describe('program', () => {
       program_name: 'Z_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
       program_type: 'executable',
       application: '*',
     });
@@ -1642,7 +1642,7 @@ describe('program', () => {
       programName: 'Z_X',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
       programType: 'executable',
       application: '*',
     });
@@ -1653,13 +1653,13 @@ describe('program', () => {
   it('DeleteProgramLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
     await handleDeleteProgram(context as any, {
       program_name: 'Z_X',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('delete');
     expect(call?.factory).toBe('getProgram');
     expect(call?.args[0]).toEqual({
       programName: 'Z_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
@@ -1874,7 +1874,7 @@ describe('function (function group)', () => {
       function_group_name: 'ZFG_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('create');
     expect(call?.factory).toBe('getFunctionGroup');
@@ -1882,7 +1882,7 @@ describe('function (function group)', () => {
       functionGroupName: 'ZFG_X',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
@@ -1921,13 +1921,13 @@ describe('function (function group)', () => {
   it('DeleteFunctionGroupLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
     await handleDeleteFunctionGroup(context as any, {
       function_group_name: 'ZFG_X',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('delete');
     expect(call?.factory).toBe('getFunctionGroup');
     expect(call?.args[0]).toEqual({
       functionGroupName: 'ZFG_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
@@ -2083,14 +2083,14 @@ describe('function (function module)', () => {
       function_group_name: 'ZFG_X',
       source_code: 'FUNCTION zfm_x.\nENDFUNCTION.',
       lock_handle: 'h',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('update');
     expect(call?.factory).toBe('getFunctionModule');
     expect(call?.args[0]).toEqual({
       functionModuleName: 'ZFM_X',
       functionGroupName: 'ZFG_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.args[1]).toMatchObject({
       source: 'FUNCTION zfm_x.\nENDFUNCTION.',
@@ -2106,7 +2106,7 @@ describe('function (function module)', () => {
       function_group_name: 'ZFG_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('create');
     expect(call?.factory).toBe('getFunctionModule');
@@ -2114,7 +2114,7 @@ describe('function (function module)', () => {
       functionModuleName: 'ZFM_X',
       functionGroupName: 'ZFG_X',
       description: 'x',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     // The negative half: packageName never lands in config at all, so a
     // regression that starts forwarding it (a field the member never reads)
@@ -2128,14 +2128,14 @@ describe('function (function module)', () => {
     await handleDeleteFunctionModule(context as any, {
       function_module_name: 'ZFM_X',
       function_group_name: 'ZFG_X',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('delete');
     expect(call?.factory).toBe('getFunctionModule');
     expect(call?.args[0]).toEqual({
       functionModuleName: 'ZFM_X',
       functionGroupName: 'ZFG_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
@@ -2278,7 +2278,7 @@ describe('data_element', () => {
   /**
    * An object that is only active has no inactive version, and a check of
    * the inactive one is answered "Error while importing object … from the
-   * database" (E19, ZMCP_SHR_DOMAIN / ZMCP_SHR_DTEL, 2026-09-25). `version`
+   * database" (on premise, ZMCP_SHR_DOMAIN / ZMCP_SHR_DTEL, 2026-09-25). `version`
    * is how a caller asks about the active one.
    */
   it('CheckDataElementLow passes version through to the check member', async () => {
@@ -2351,7 +2351,7 @@ describe('data_element', () => {
       data_element_name: 'ZDT_X',
       description: 'x',
       package_name: 'ZP',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
       type_kind: 'domain',
       data_type: 'ZD',
       type_name: 'ZD',
@@ -2367,7 +2367,7 @@ describe('data_element', () => {
       dataElementName: 'ZDT_X',
       description: 'x',
       packageName: 'ZP',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
@@ -2442,7 +2442,7 @@ describe('data_element', () => {
 
     const result: any = await handleUpdateDataElement(context as any, {
       data_element_name: 'zdt_x',
-      properties: { description: 'after', transport_request: 'E19K900001' },
+      properties: { description: 'after', transport_request: 'SIDK900001' },
       lock_handle: 'h',
     });
 
@@ -2450,7 +2450,7 @@ describe('data_element', () => {
     expect(double.factory).toBe('getDataElement');
     expect(updateCall?.config).toEqual({
       dataElementName: 'ZDT_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(updateCall?.options).toEqual({
       source: expect.stringContaining('adtcore:description="after"'),
@@ -2555,13 +2555,13 @@ describe('data_element', () => {
   it('DeleteDataElementLow passes transportRequest through to the delete member — a delete losing it is a different request against a transportable object', async () => {
     await handleDeleteDataElement(context as any, {
       data_element_name: 'ZDT_X',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('delete');
     expect(call?.factory).toBe('getDataElement');
     expect(call?.args[0]).toEqual({
       dataElementName: 'ZDT_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
@@ -2715,7 +2715,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
     expect(call?.args).toEqual([
       'DEVC/K',
       'ZP_X',
-      // The root is `000000`: `0000` answers 200 with an empty body on E19
+      // The root is `000000`: `0000` answers 200 with an empty body on premise
       // (2026-09-25), which read as an empty package.
       { nodeId: '000000', withShortDescriptions: true },
     ]);
@@ -2930,7 +2930,7 @@ describe('system — three getUtils() reads, each given analyseException (interf
   });
 
   /**
-   * The shape E19 answers for a class (CLAS/OC CL_ABAP_CHAR_UTILITIES,
+   * The shape an on-premise system answers for a class (CLAS/OC CL_ABAP_CHAR_UTILITIES,
    * 2026-09-25), cut down: folders carry `isfolder="true"`, a `description`
    * and no `objectname`; components carry their own name in `description`
    * while `objectname` names the OWNER — the class for an attribute, the
@@ -3052,7 +3052,7 @@ describe('package — no Activate tool (a package is a container, no activation)
       super_package: 'ZP',
       description: 'x',
       software_component: 'ZLOCAL',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('create');
     expect(call?.factory).toBe('getPackage');
@@ -3063,7 +3063,7 @@ describe('package — no Activate tool (a package is a container, no activation)
       packageType: undefined,
       softwareComponent: 'ZLOCAL',
       transportLayer: undefined,
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
       recordChanges: undefined,
       applicationComponent: undefined,
     });
@@ -3169,13 +3169,13 @@ describe('package — no Activate tool (a package is a container, no activation)
   it('DeletePackageLow passes transportRequest through to the delete member, taking analyseDeletion explicitly over the shipped packageDeletionRefusal default', async () => {
     await handleDeletePackage(context as any, {
       package_name: 'ZP_X',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = callTo('delete');
     expect(call?.factory).toBe('getPackage');
     expect(call?.args[0]).toEqual({
       packageName: 'ZP_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
@@ -3280,7 +3280,7 @@ describe('package — no Activate tool (a package is a container, no activation)
 // parseCreatedTransport/create.js field names, not a captured one.
 describe('transport — Create only, no lock/unlock/check/update/delete/validate tool exists at this tier', () => {
   const createdTransportXml =
-    '<?xml version="1.0" encoding="ASCII"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request tm:number="E19K900042" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project=""><tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
+    '<?xml version="1.0" encoding="ASCII"?><tm:root xmlns:tm="http://www.sap.com/cts/adt/tm"><tm:request tm:number="SIDK900042" tm:desc="x" tm:type="K" tm:target="LOCAL" tm:cts_project=""><tm:task tm:owner="SAPUSER01"/></tm:request></tm:root>';
 
   it('CreateTransportLow reaches getRequest with analyseException, forwarding description and transportType', async () => {
     await handleCreateTransport(context as any, {
@@ -3326,12 +3326,12 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
     const payload = JSON.parse(result.content[0].text);
     expect(payload).toEqual({
       success: true,
-      transport_number: 'E19K900042',
+      transport_number: 'SIDK900042',
       description: 'x',
       transport_type: 'workbench',
       target_system: 'LOCAL',
       owner: 'SAPUSER01',
-      message: 'Transport request E19K900042 created successfully.',
+      message: 'Transport request SIDK900042 created successfully.',
     });
   });
 
@@ -3364,7 +3364,7 @@ describe('transport — Create only, no lock/unlock/check/update/delete/validate
 /**
  * The seven low-tier writes that had no `transport_request` at all. A caller
  * passing one had it dropped on the floor, the write went out without
- * `corrNr`, and an on-premise system refused it — measured on E19,
+ * `corrNr`, and an on-premise system refused it — measured on premise,
  * 2026-09-25, for a view in a transportable package: `400
  * ExceptionParameterNotFound`, "Parameter corrNr could not be found."
  * (SADT_RESOURCE 017). Every one of these members reads
@@ -3388,7 +3388,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             class_name: 'ZCL_X',
             source_code: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { className: 'ZCL_X' },
@@ -3403,7 +3403,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             class_name: 'ZCL_X',
             test_class_source: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { className: 'ZCL_X' },
@@ -3418,7 +3418,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             ddl_name: 'ZVW_X',
             ddl_source: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { ddlName: 'ZVW_X' },
@@ -3433,7 +3433,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             name: 'ZDDLX_X',
             source_code: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { name: 'ZDDLX_X' },
@@ -3448,7 +3448,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             interface_name: 'ZIF_X',
             source_code: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { interfaceName: 'ZIF_X' },
@@ -3463,7 +3463,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             structure_name: 'ZST_X',
             ddl_code: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { structureName: 'ZST_X' },
@@ -3478,7 +3478,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
             program_name: 'ZPROG_X',
             source_code: 'x',
             lock_handle: 'h',
-            transport_request: 'E19K900001',
+            transport_request: 'SIDK900001',
           } as any,
         ),
       { programName: 'ZPROG_X' },
@@ -3493,7 +3493,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
       expect(call?.factory).toBe(factory);
       expect(call?.args[0]).toMatchObject({
         ...key,
-        transportRequest: 'E19K900001',
+        transportRequest: 'SIDK900001',
       });
     },
   );
@@ -3502,7 +3502,7 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
 /**
  * The checkrun body carries the version (`chkrun:version`), exactly as ADT
  * sends it; these tools could only ever ask about the inactive one, and an
- * active-only object has none — E19, 2026-09-25: G46 "REPORT/PROGRAM
+ * active-only object has none — on premise, 2026-09-25: G46 "REPORT/PROGRAM
  * statement is missing" for an active program, "Inactive version … does not
  * exist" for an active BDEF. `version` reaches the check member now.
  */

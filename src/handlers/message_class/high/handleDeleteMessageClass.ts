@@ -29,12 +29,12 @@ export const TOOL_DEFINITION = {
     properties: {
       message_class_name: {
         type: 'string',
-        description: 'Message class name (e.g., ZMY_MSGS).',
+        description: 'Message class name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects, optional for local ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable objects, optional for local ones.',
       },
       ...DETAIL_PROPERTY,
     },

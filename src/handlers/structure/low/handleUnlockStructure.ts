@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
     properties: {
       structure_name: {
         type: 'string',
-        description: 'Structure name (e.g., Z_MY_PROGRAM).',
+        description: 'Structure name.',
       },
       lock_handle: {
         type: 'string',

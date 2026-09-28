@@ -393,12 +393,12 @@ describe('UpdateDomainLow', () => {
 
     const result: any = await handleUpdateDomain(context as any, {
       domain_name: 'zd',
-      properties: { description: 'after', transport_request: 'E19K900123' },
+      properties: { description: 'after', transport_request: 'SIDK900123' },
       lock_handle: 'h',
     });
 
     expect(result.isError).toBe(false);
-    expect(updateCall?.config?.transportRequest).toBe('E19K900123');
+    expect(updateCall?.config?.transportRequest).toBe('SIDK900123');
   });
 
   it('accepts the camelCase alias too, the same fallback UpdateDataElementLow reads', async () => {
@@ -415,10 +415,10 @@ describe('UpdateDomainLow', () => {
 
     await handleUpdateDomain(context as any, {
       domain_name: 'zd',
-      properties: { description: 'after', transportRequest: 'E19K900456' },
+      properties: { description: 'after', transportRequest: 'SIDK900456' },
       lock_handle: 'h',
     });
 
-    expect(updateCall?.config?.transportRequest).toBe('E19K900456');
+    expect(updateCall?.config?.transportRequest).toBe('SIDK900456');
   });
 });

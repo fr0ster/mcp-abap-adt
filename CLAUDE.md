@@ -40,7 +40,7 @@ cp tests/test-config.yaml.template tests/test-config.yaml
 ```
 
 **Required changes** (marked `# ← CHANGE`):
-- `environment.env` — session .env file name (`"e19.env"`, `"mdd.env"`) from standard sessions folder
+- `environment.env` — session .env file name (`"your-system.env"`, `"another-system.env"`) from standard sessions folder
 - `environment.system_type` — `"onprem"`, `"cloud"`, or `"legacy"`
 - `environment.connection_type` — `"http"` (default) or `"rfc"`
 - `environment.default_package` — dev package (`ZMCP_TEST`, `$TMP`)
@@ -222,6 +222,55 @@ We took the fix and skipped the check.
 `src/__tests__/unit/binSmoke.test.ts` performs it now. Before a release, make sure
 it ran; when adding a bin, add it there. And treat any `__dirname`-relative path
 in `server/` as suspect: count the levels for both layouts.
+
+## What we write names nothing concrete
+
+**The rule: a description is read by a model and indexed by a vector search, so it
+names nothing concrete.** We say `class`; we do not say which class. It holds for
+tool descriptions, parameter descriptions, code comments, test data and captured
+fixtures alike, and the reason is retrieval, not taste: ask for a report in `$TMP`
+and a search over the descriptions returns everything whose text mentions `$TMP`,
+whatever the rest of the sentence says. Issue #241 measured it in cloud-llm-hub's
+tool-RAG — `Delete*` went from 12 of the top 15 to 1 once the literal left their
+text. In a PARAMETER description it is worse in a second way: the model fills the
+argument from what it reads there, and an example transport request addressed a
+real one.
+
+**A consumer who wants names is not stuck.** They import `@mcp-abap-adt/lib`,
+inherit, and override the descriptions to suit their own retrieval. What we ship
+stays agnostic because we do not know who indexes it, where, or how.
+
+- **What a description says**: the operation, then the parameters and the answer,
+  most important first, plus the constraints that change THIS call ("must already
+  exist", "required for validation", "not a task", "up to 26 characters"). Never an
+  example object, package, transport, software component or search prefix. A bare
+  mask (`Z*`, `Y*`, any-namespace) and a format placeholder (`YYYYMMDDHHMMSS`) name
+  nothing and stay.
+- **A description is not an ABAP tutorial.** A tool works with any object the
+  caller is authorised for, whatever it is called, so naming conventions are not
+  ours to state: "must follow SAP naming conventions", "start with Z or Y", "for
+  the customer namespace", how a behaviour pool is conventionally named and a
+  worked ABAP snippet are all out (stated by the user 2026-09-28). The CONSUMER's
+  skill carries the naming rules and its own requirements, and the consumer is
+  responsible for the validity of the parameters it sends. The same cut removed
+  the CTS lesson from 104 `transport_request` descriptions: `request` is a word a
+  description may use, a number like `ER121235` never is, so the text keeps `not a
+  task` — the one fact that decides whether THIS call succeeds — and drops how CTS
+  works, which tool to call next and the SAP message it answers. The transport
+  tools themselves keep their full text: there, request against task is the
+  subject of the tool, not a general lesson.
+- **A measurement note records the platform and the date, not the landscape.**
+  `on premise (2026-09-26)` and `BASIS 816`, never a system id: the release is what
+  made the behaviour, and the SID means nothing to anyone else reading it.
+- **Captured fixtures are sanitised** — `SAPUSER01`, `SID`, a placeholder transport
+  prefix — and the note says so. Test data keeps its numbers under a placeholder
+  prefix so assertions still pair with their inputs.
+- `src/__tests__/unit/toolDescriptionsCarryNoLiterals.test.ts` keeps the rule over
+  **both** tool and parameter descriptions, in three classes: a package (`$TMP`), a
+  customer object (`ZCL_…`, and `L…`/`SAPL…` for a function group's generated
+  includes), a transport number. Add a class rather than an exception when a new
+  kind of literal appears; the generated prefixes are there because the first
+  version of the pattern missed `LZOK_FG_…F01` and the test found it.
 
 ## Plans and Specs
 

@@ -18,13 +18,13 @@ export const TOOL_DEFINITION = {
   name: 'ActivateInterfaceLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: Interface. Will be useful for activating, creating, or updating interface. [low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Activate an ABAP interface. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
       interface_name: {
         type: 'string',
-        description: 'Interface name (e.g., ZIF_MY_INTERFACE).',
+        description: 'Interface name.',
       },
       session_id: {
         type: 'string',

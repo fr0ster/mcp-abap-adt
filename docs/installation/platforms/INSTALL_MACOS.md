@@ -238,7 +238,7 @@ Uses **stdio** mode (must be explicitly specified).
       "command": "mcp-abap-adt",
       "args": [
         "--transport=stdio",
-        "--env=/path/to/your/e19.env"
+        "--env=/path/to/your/your-system.env"
       ]
     }
   }
@@ -271,7 +271,7 @@ Uses **stdio** mode (must be explicitly specified).
       "args": [
         "/usr/local/lib/node_modules/@mcp-abap-adt/core/bin/mcp-abap-adt.js",
         "--transport=stdio",
-        "--env=/path/to/your/e19.env"
+        "--env=/path/to/your/your-system.env"
       ]
     }
   }
@@ -293,7 +293,7 @@ Add to Cursor settings (`~/.cursor/config.json`):
       "command": "mcp-abap-adt",
       "args": [
         "--transport=stdio",
-        "--env=/path/to/your/e19.env"
+        "--env=/path/to/your/your-system.env"
       ]
     }
   }
@@ -359,7 +359,7 @@ Server will be available at: `http://localhost:8080/mcp/stream/http`
 
 ```bash
 # Using .env file with HTTP mode
-mcp-abap-adt --transport=streamable-http --env=/path/to/your/e19.env
+mcp-abap-adt --transport=streamable-http --env=/path/to/your/your-system.env
 ```
 
 ### SSE Mode (Server-Sent Events)
@@ -370,10 +370,10 @@ mcp-abap-adt --transport=streamable-http --env=/path/to/your/e19.env
 
 ```bash
 # Start server in SSE mode (requires .env file)
-mcp-abap-adt --transport=sse --env=/path/to/your/e19.env
+mcp-abap-adt --transport=sse --env=/path/to/your/your-system.env
 
 # Or with custom port
-mcp-abap-adt --transport=sse --port=3001 --env=/path/to/your/e19.env
+mcp-abap-adt --transport=sse --port=3001 --env=/path/to/your/your-system.env
 ```
 
 **SSE Server Options:**
@@ -389,7 +389,7 @@ mcp-abap-adt --transport=sse --port=3001 --env=/path/to/your/e19.env
 
 **Example with custom port and host:**
 ```bash
-mcp-abap-adt --transport=sse --port=4100 --host=127.0.0.1 --env=/path/to/your/e19.env
+mcp-abap-adt --transport=sse --port=4100 --host=127.0.0.1 --env=/path/to/your/your-system.env
 ```
 
 Server will be available at: `http://127.0.0.1:4100/sse`

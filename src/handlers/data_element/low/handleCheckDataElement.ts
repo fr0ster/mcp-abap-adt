@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description: 'DataElement name (e.g., Z_MY_PROGRAM).',
+        description: 'DataElement name.',
       },
       session_id: {
         type: 'string',

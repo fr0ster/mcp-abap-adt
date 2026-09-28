@@ -199,7 +199,7 @@ Place your session `.env` file in the standard sessions folder:
 - **Unix/macOS**: `~/.config/mcp-abap-adt/sessions/`
 
 ```env
-# e.g., ~/Documents/mcp-abap-adt/sessions/e19.env
+# e.g., ~/Documents/mcp-abap-adt/sessions/your-system.env
 SAP_URL=http://your-sap-system.com:8000
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
@@ -207,7 +207,7 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 ```
 
-Then set `environment.env: "e19.env"` in `tests/test-config.yaml`.
+Then set `environment.env: "your-system.env"` in `tests/test-config.yaml`.
 
 ## Test Results Interpretation
 

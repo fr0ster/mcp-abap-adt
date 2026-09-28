@@ -37,7 +37,7 @@ export const TOOL_DEFINITION = {
       name: {
         type: 'string',
         description:
-          'Metadata extension name (e.g., ZOK_C_TEST_0001). Metadata extension must already exist.',
+          'Metadata extension name. Metadata extension must already exist.',
       },
       source_code: {
         type: 'string',
@@ -66,7 +66,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+          'Transport request number (required for transportable packages), not a task.',
       },
       ...DETAIL_PROPERTY,
     },

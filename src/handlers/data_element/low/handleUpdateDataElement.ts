@@ -59,8 +59,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description:
-          'Data element name (e.g., ZOK_E_TEST_0001). Data element must already exist.',
+        description: 'Data element name. Data element must already exist.',
       },
       properties: {
         type: 'object',

@@ -26,17 +26,17 @@ export const TOOL_DEFINITION = {
   name: 'CreateFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.',
+    'Create a new ABAP include within an existing function group. Creates the include in initial state.',
   inputSchema: {
     type: 'object',
     properties: {
       function_group_name: {
         type: 'string',
-        description: 'Parent function group name (e.g., ZTEST_FG_001)',
+        description: 'Parent function group name',
       },
       include_name: {
         type: 'string',
-        description: 'Include name (e.g., LZTEST_FG_001F01).',
+        description: 'Include name.',
       },
       description: {
         type: 'string',
@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       ...DETAIL_PROPERTY,
     },

@@ -5,7 +5,7 @@
  * list itself — `GET /sap/bc/adt/feeds`, one `atom:entry` per feed, its
  * `feed:extendedData/feed:queryVariants/feed:queryVariant` carrying `title`,
  * `queryString` and `isDefault`. `GET /sap/bc/adt/feeds/variants?category=…`
- * answered 200 with an empty body for every one of E19's seven feed ids
+ * answered 200 with an empty body for every one of the seven feed ids a system listed
  * (2026-09-26). So this is a reading of the answer `list()` already fetches,
  * not a request of its own.
  *

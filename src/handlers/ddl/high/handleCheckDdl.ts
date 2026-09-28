@@ -33,8 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description:
-          'CDS view name to check, passed as ddl_name (e.g., ZI_MY_VIEW).',
+        description: 'CDS view name to check, passed as ddl_name.',
       },
       version: {
         type: 'string',

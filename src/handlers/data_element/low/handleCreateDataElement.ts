@@ -47,8 +47,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description:
-          'DataElement name (e.g., Z_TEST_PROGRAM). Must follow SAP naming conventions.',
+        description: 'DataElement name.',
       },
       description: {
         type: 'string',
@@ -56,12 +55,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       data_type: {
         type: 'string',

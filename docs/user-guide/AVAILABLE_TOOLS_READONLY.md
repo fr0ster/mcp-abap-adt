@@ -109,12 +109,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readbehaviordefinition-read-only-behavior-definition"></a>
 #### ReadBehaviorDefinition (Read-Only / Behavior Definition)
-**Description:** Operation: Read, Create, Update. Subject: BehaviorDefinition. Will be useful for reading, creating, or updating behavior definition. [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/behavior_definition/readonly/handleReadBehaviorDefinition.ts`
 
 **Parameters:**
-- `behavior_definition_name` (string, required) - Behavior definition name (e.g., Z_MY_BDEF).
+- `behavior_definition_name` (string, required) - Behavior definition name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -129,7 +129,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_implementation/readonly/handleReadBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_implementation_name` (string, required) - Behavior implementation name (e.g., ZBP_MY_CLASS).
+- `behavior_implementation_name` (string, required) - Behavior implementation name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -139,12 +139,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readclass-read-only-class"></a>
 #### ReadClass (Read-Only / Class)
-**Description:** Operation: Read, Create, Update. Subject: Class. Will be useful for reading, creating, or updating class. [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP class source code and metadata. Answers: "show class code", "display class source", "view class definition/implementation", "get class X". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/class/readonly/handleReadClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -173,7 +173,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, optional) - Owning function group name. Required when object_type is function_module.
-- `object_name` (string, required) - Object name (e.g., ZCL_MY_CLASS, ZIF_MY_INTERFACE, Z_MY_TABLE).
+- `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object type.
 
 ---
@@ -195,12 +195,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdataelement-read-only-data-element"></a>
 #### ReadDataElement (Read-Only / Data Element)
-**Description:** Operation: Read, Create, Update. Subject: DataElement. Will be useful for reading, creating, or updating data element. [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.
+**Description:** [read-only] Read ABAP data element definition and metadata. Answers: "show data element X", "display data element properties", "view DTEL definition", "get data element type". Returns definition, domain, package, responsible, description.
 
 **Source:** `src/handlers/data_element/readonly/handleReadDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `data_element_name` (string, required) - Data element name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -210,12 +210,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readddl-read-only-ddl"></a>
 #### ReadDdl (Read-Only / Ddl)
-**Description:** Operation: Read, Create, Update. Subject: DDL source. Will be useful for reading, creating, or updating a DDL source. [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP CDS view source code and metadata. Answers: "show CDS view source", "display view definition", "view CDS X", "get CDS code". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/ddl/readonly/handleReadDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -225,12 +225,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readdomain-read-only-domain"></a>
 #### ReadDomain (Read-Only / Domain)
-**Description:** Operation: Read, Create, Update. Subject: Domain. Will be useful for reading, creating, or updating domain. [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.
+**Description:** [read-only] Read ABAP domain definition and metadata. Answers: "show domain X", "display domain fixed values", "view domain definition", "get domain properties". Returns definition, fixed values, package, responsible, description.
 
 **Source:** `src/handlers/domain/readonly/handleReadDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_DOMAIN).
+- `domain_name` (string, required) - Domain name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -283,7 +283,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_group/readonly/handleReadFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `function_group_name` (string, required) - Function group name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -298,7 +298,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_include/readonly/handleListFunctionGroupIncludes.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `function_group_name` (string, required) - Function group name.
 
 ---
 
@@ -309,7 +309,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_include/readonly/handleListFunctionModules.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., Z_MY_FG).
+- `function_group_name` (string, required) - Function group name.
 
 ---
 
@@ -320,8 +320,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_include/readonly/handleReadFunctionInclude.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
-- `include_name` (string, required) - Include name (e.g., LZ_MY_FGTOP, LZ_MY_FGU01).
+- `function_group_name` (string, required) - Function group name containing the include.
+- `include_name` (string, required) - Include name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -331,13 +331,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** Operation: Read, Create, Update. Subject: FunctionModule. Will be useful for reading, creating, or updating function module. [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the function module (e.g., Z_MY_FG).
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FM).
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -375,12 +375,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readinterface-read-only-interface"></a>
 #### ReadInterface (Read-Only / Interface)
-**Description:** Operation: Read, Create, Update. Subject: Interface. Will be useful for reading, creating, or updating interface. [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP interface source code and metadata. Answers: "show interface code", "display interface definition", "view interface X", "get interface source". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/interface/readonly/handleReadInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `interface_name` (string, required) - Interface name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -390,23 +390,23 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmessageclass-read-only-message-class"></a>
 #### ReadMessageClass (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: Message Class (MSAG). Will be useful for reading a message class and its messages. [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
+**Description:** [read-only] Read an ABAP message class (T100) as its ADT metadata document (XML), under the `metadata` field. Answers: "show message class X", "list messages of message class", "display message text 001 of class". adt-clients 19 no longer parses it into named fields (name, description, package, master language, message list) — the caller reads the document itself.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClass.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Message class name.
 
 ---
 
 <a id="readmessageclassmessage-read-only-message-class"></a>
 #### ReadMessageClassMessage (Read-Only / Message Class)
-**Description:** Operation: Read. Subject: a single message inside a Message Class (MSAG). [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of a message class", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
+**Description:** [read-only] Read one message (by number) from an ABAP message class. Answers: "show message 001 of a message class", "get text of message". There is no per-message resource: this returns the ENTIRE parent class document (XML) under `metadata`, which the caller must search for `msgno` — adt-clients 19 no longer extracts one message from it. `msgno` itself IS validated server-side (a number absent from the class refuses as not-found); it is the text that is not parsed out for you.
 
 **Source:** `src/handlers/message_class/readonly/handleReadMessageClassMessage.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
 ---
@@ -416,12 +416,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readmetadataextension-read-only-metadata-extension"></a>
 #### ReadMetadataExtension (Read-Only / Metadata Extension)
-**Description:** Operation: Read, Create, Update. Subject: MetadataExtension. Will be useful for reading, creating, or updating metadata extension. [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP metadata extension (DDLX) source code and metadata. Answers: "show metadata extension", "display DDLX source", "view UI annotations", "get metadata extension X". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/metadata_extension/readonly/handleReadMetadataExtension.ts`
 
 **Parameters:**
-- `metadata_extension_name` (string, required) - Metadata extension name (e.g., Z_MY_DDLX).
+- `metadata_extension_name` (string, required) - Metadata extension name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -447,7 +447,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/readonly/handleReadPackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
+- `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -462,7 +462,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/readonly/handleReadProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -518,12 +518,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicebinding-read-only-service-binding"></a>
 #### ReadServiceBinding (Read-Only / Service Binding)
-**Description:** Operation: Read, Create, Update. Subject: ServiceBinding. Will be useful for reading, creating, or updating service binding. [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.
+**Description:** [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.
 
 **Source:** `src/handlers/service_binding/readonly/handleReadServiceBinding.ts`
 
 **Parameters:**
-- `service_binding_name` (string, required) - Service binding name (e.g., ZUI_MY_BINDING).
+- `service_binding_name` (string, required) - Service binding name.
 
 ---
 
@@ -532,12 +532,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readservicedefinition-read-only-service-definition"></a>
 #### ReadServiceDefinition (Read-Only / Service Definition)
-**Description:** Operation: Read, Create, Update. Subject: ServiceDefinition. Will be useful for reading, creating, or updating service definition. [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.
+**Description:** [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.
 
 **Source:** `src/handlers/service_definition/readonly/handleReadServiceDefinition.ts`
 
 **Parameters:**
-- `service_definition_name` (string, required) - Service definition name (e.g., Z_MY_SRVD).
+- `service_definition_name` (string, required) - Service definition name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -547,13 +547,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getstructureslist-read-only-structure"></a>
 #### GetStructuresList (Read-Only / Structure)
-**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. 
+**Description:** [read-only] Recursively list the structures embedded in an ABAP structure (.INCLUDE / append), as a tree. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getStructure()/getTable() both throw — the DDIC structure/table endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/structure/readonly/handleGetStructuresList.ts`
 
 **Parameters:**
 - `include_extensions` (boolean, optional (default: true)) - [read-only] Also find extension (append) structures via where-used (objects that `extend type <this> with …`). Default true. Set false to skip the (slower) where-used lookups and return includes only.
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name.
 - `timeout` (number, optional) - [read-only] Timeout in ms for each ADT request.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
@@ -561,12 +561,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readstructure-read-only-structure"></a>
 #### ReadStructure (Read-Only / Structure)
-**Description:** Operation: Read, Create, Update. Subject: Structure. Will be useful for reading, creating, or updating structure. [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
+**Description:** [read-only] Read ABAP structure definition and metadata. Answers: "show structure fields", "display structure X", "view structure definition", "get structure components". Returns field list, package, responsible, description.
 
 **Source:** `src/handlers/structure/readonly/handleReadStructure.ts`
 
 **Parameters:**
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -997,12 +997,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readtable-read-only-table"></a>
 #### ReadTable (Read-Only / Table)
-**Description:** Operation: Read, Create, Update. Subject: Table. Will be useful for reading, creating, or updating table. [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.
+**Description:** [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.
 
 **Source:** `src/handlers/table/readonly/handleReadTable.ts`
 
 **Parameters:**
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
+- `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) or "inactive".
 
 ---
@@ -1019,7 +1019,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `include_objects` (boolean, optional (default: true))) - Include list of objects in transport (default: true)
 - `include_tasks` (boolean, optional (default: true))) - Include list of tasks in transport (default: true)
-- `transport_number` (string, required) - Transport request number (e.g., E19K905635, DEVK905123)
+- `transport_number` (string, required) - Transport request number, not a task
 
 ---
 
@@ -1042,7 +1042,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/readonly/handleReadTransportActionLog.ts`
 
 **Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number, e.g. E19K905942. A request answers its own lifecycle events; a task answers the events of the objects on it.
+- `transport_number` (string, required) - Transport REQUEST or TASK number. A request answers its own lifecycle events; a task answers the events of the objects on it.
 
 ---
 
@@ -1053,7 +1053,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/readonly/handleReadTransportObjects.ts`
 
 **Parameters:**
-- `transport_number` (string, required) - Transport REQUEST or TASK number, e.g. E19K905942. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
+- `transport_number` (string, required) - Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
 
 ---
 

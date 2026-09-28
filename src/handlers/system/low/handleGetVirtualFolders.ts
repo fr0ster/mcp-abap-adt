@@ -35,7 +35,7 @@ export const TOOL_DEFINITION = {
       object_search_pattern: {
         type: 'string',
         description:
-          'Object search pattern (e.g., "*", "Z*", "ZCL_*"). Default: "*"',
+          'Object search pattern: "*" matches any name, and a trailing "*" matches a prefix. Default: "*"',
         default: '*',
       },
       preselection: {

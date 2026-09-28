@@ -56,8 +56,7 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_TEST_0002). Package must already exist.',
+        description: 'Package name. Package must already exist.',
       },
       super_package: {
         type: 'string',
@@ -71,7 +70,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+          'Transport request number (required for transportable packages), not a task.',
       },
       lock_handle: {
         type: 'string',

@@ -11,9 +11,7 @@ export const TOOL_DEFINITION = {
   description:
     '[read-only] Retrieve objects inside an ABAP package as a flat list. Supports recursive traversal of subpackages.',
   inputSchema: {
-    package_name: z
-      .string()
-      .describe('Name of the ABAP package (e.g., "ZMY_PACKAGE")'),
+    package_name: z.string().describe('Name of the ABAP package'),
     include_subpackages: z
       .boolean()
       .optional()

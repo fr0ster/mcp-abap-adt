@@ -12,13 +12,13 @@ export const TOOL_DEFINITION = {
   name: 'ReadServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: ServiceBinding. Will be useful for reading, creating, or updating service binding. [read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.',
+    '[read-only] Read ABAP service binding (SRVB) payload and metadata. Answers: "show service binding", "display SRVB config", "view service binding X", "get OData service binding". Returns payload, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
       service_binding_name: {
         type: 'string',
-        description: 'Service binding name (e.g., ZUI_MY_BINDING).',
+        description: 'Service binding name.',
       },
     },
     required: ['service_binding_name'],

@@ -58,13 +58,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDomain',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: Domain. Will be useful for updating or creating domain. Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
+    'Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {
       domain_name: {
         type: 'string',
-        description: 'Domain name to update (e.g., ZZ_TEST_0001)',
+        description: 'Domain name to update',
       },
       description: {
         type: 'string',
@@ -72,12 +72,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       datatype: {
         type: 'string',

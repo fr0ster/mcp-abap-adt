@@ -62,8 +62,8 @@ type ParentKind = 'PROG/P' | 'PROG/I' | 'FUGR/F' | 'CLAS/OC';
 
 /**
  * What the caller asked for, in the four kinds this tool walks. A function
- * group's main program `SAPL<fg>` is not readable as a program — on E19 its
- * program and include URIs both answer 404 — so it is walked as the group.
+ * group's main program `SAPL<fg>` is not readable as a program — its
+ * program and include URIs both answer 404 on premise — so it is walked as the group.
  */
 function resolveParent(
   objectType: string,

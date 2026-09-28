@@ -36,7 +36,7 @@ export const TOOL_DEFINITION = {
       name: {
         type: 'string',
         description:
-          'Behavior definition name (e.g., ZOK_C_TEST_0001). Behavior definition must already exist.',
+          'Behavior definition name. Behavior definition must already exist.',
       },
       source_code: {
         type: 'string',
@@ -50,7 +50,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number (required for transportable packages), not a task.',
       },
       session_id: {
         type: 'string',

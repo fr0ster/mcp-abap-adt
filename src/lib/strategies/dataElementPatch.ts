@@ -43,7 +43,7 @@ export interface DataElementChanges {
  * from the caller's fields.
  *
  * **The description half is scoped to the root element, on purpose — an
- * unscoped match corrupted the wrong attribute.** Measured live against E19
+ * unscoped match corrupted the wrong attribute.** Measured live on premise
  * (2026-09-21, GitHub #211): a freshly created data element's own
  * `readMetadata` answers `<blue:wbobj …>` with **no `adtcore:description`
  * attribute on the root at all** — SAP does not echo it back there — while

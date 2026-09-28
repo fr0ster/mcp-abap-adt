@@ -25,8 +25,7 @@ export const TOOL_DEFINITION = {
           properties: {
             name: {
               type: 'string',
-              description:
-                'Object name in uppercase (e.g., ZOK7_D_MTART, ZCL_MY_CLASS)',
+              description: 'Object name in uppercase',
             },
             type: {
               type: 'string',

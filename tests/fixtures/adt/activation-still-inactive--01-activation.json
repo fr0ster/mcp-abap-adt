@@ -23,5 +23,5 @@
     },
     "bodyFile": "activation-still-inactive--01-activation.body.xml"
   },
-  "note": "Captured live against E19 (RFC connection) 2026-09-21 while chasing mcp-abap-adt#221/#223: ActivateFunctionGroupLow answered `ioc:inactiveObjects` instead of `chkl:messages` for ZMCP_BLD_FGR_L1 — terseActivation previously read that as `undefined` and the tool reported `projection_failed` for a call SAP had, in fact, answered."
+  "note": "Captured live on premise (RFC connection) 2026-09-21 while chasing mcp-abap-adt#221/#223: ActivateFunctionGroupLow answered `ioc:inactiveObjects` instead of `chkl:messages` for ZMCP_BLD_FGR_L1 — terseActivation previously read that as `undefined` and the tool reported `projection_failed` for a call SAP had, in fact, answered."
 }

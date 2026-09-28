@@ -42,13 +42,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
+    'Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.',
   inputSchema: {
     type: 'object',
     properties: {
       message_class_name: {
         type: 'string',
-        description: 'Message class name (e.g., ZMY_MSGS).',
+        description: 'Message class name.',
       },
       description: {
         type: 'string',
@@ -57,7 +57,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          '(optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.',
+          '(optional) Transport request number, not a task. Required for transportable objects.',
       },
       ...DETAIL_PROPERTY,
     },

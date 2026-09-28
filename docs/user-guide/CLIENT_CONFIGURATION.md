@@ -542,7 +542,7 @@ When creating or updating ABAP objects on on-premise systems, SAP ADT requires `
 
 | Variable | Purpose | Resolution order |
 |----------|---------|-----------------|
-| `SAP_MASTER_SYSTEM` | SAP system ID (e.g., `E19`, `DEV`) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only) |
+| `SAP_MASTER_SYSTEM` | SAP system ID (the three-character SID) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only) |
 | `SAP_RESPONSIBLE` | Responsible user for the object | 1. Env var `SAP_RESPONSIBLE` → 2. Env var `SAP_USERNAME` → 3. `getSystemInformation()` API (cloud only) |
 
 **On-premise systems** do not support the `getSystemInformation()` API endpoint, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.

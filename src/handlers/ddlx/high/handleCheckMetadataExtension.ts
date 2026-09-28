@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Metadata extension name (e.g., ZC_MY_DDLX).',
+        description: 'Metadata extension name.',
       },
       // **The one knob that is not a knob.** This wrapper deliberately offers
       // less than its low-tier sibling — no `detail`, no session control — but

@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
     properties: {
       domain_name: {
         type: 'string',
-        description: 'Domain name (e.g., Z_MY_PROGRAM).',
+        description: 'Domain name.',
       },
       lock_handle: {
         type: 'string',

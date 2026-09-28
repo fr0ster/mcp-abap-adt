@@ -43,20 +43,17 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'UpdateFunctionInclude',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.',
+  description: 'Update source code of an existing ABAP function group include.',
   inputSchema: {
     type: 'object',
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name containing the include (e.g., ZOK_FG_MCP01).',
+        description: 'Function group name containing the include.',
       },
       include_name: {
         type: 'string',
-        description:
-          'Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.',
+        description: 'Include name. Include must already exist.',
       },
       source_code: {
         type: 'string',
@@ -65,7 +62,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable includes. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable includes.',
       },
       activate: {
         type: 'boolean',

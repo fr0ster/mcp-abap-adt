@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., Z_MY_PACKAGE).',
+        description: 'Package name.',
       },
       version: {
         type: 'string',

@@ -32,12 +32,11 @@ export const TOOL_DEFINITION = {
     properties: {
       program_name: {
         type: 'string',
-        description: 'Program name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'Program name to validate.',
       },
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+        description: 'Package name. Required for validation.',
       },
       description: {
         type: 'string',

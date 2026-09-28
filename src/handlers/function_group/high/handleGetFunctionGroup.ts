@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description: 'FunctionGroup name (e.g., Z_MY_FUNCTIONGROUP).',
+        description: 'FunctionGroup name.',
       },
       version: {
         type: 'string',

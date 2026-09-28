@@ -175,6 +175,29 @@ function extractInputSchemaRef(toolBlock) {
   return refMatch ? refMatch[1] : null;
 }
 
+/**
+ * A `description:` whose value is several string literals joined with `+`.
+ *
+ * This reads source with regexes rather than importing the built definitions, so
+ * a concatenation used to be captured up to its FIRST literal and the rest of the
+ * text was dropped from the generated docs — five tools lost a whole sentence
+ * each, and `CreateCdsUnitTest` ended on the seam, which is the trailing space a
+ * reviewer saw in `git diff --check` (PR #244). Reads the whole chain now.
+ */
+function readDescription(text) {
+  const LITERAL =
+    '\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"|`(?:\\\\.|[^`\\\\])*`';
+  const chain = text.match(
+    new RegExp(
+      `description\\s*:\\s*((?:${LITERAL})(?:\\s*\\+\\s*(?:${LITERAL}))*)`,
+    ),
+  );
+  if (!chain) return '';
+  return (chain[1].match(new RegExp(LITERAL, 'g')) || [])
+    .map((part) => part.slice(1, -1).replace(/\\(['"`\\])/g, '$1'))
+    .join('');
+}
+
 function findMatchingBrace(content, openIndex) {
   let depth = 0;
   let inSingle = false;
@@ -290,10 +313,7 @@ function parseTopLevelProperties(propertiesContent) {
 
       const type =
         body.match(/type\s*:\s*(['"])((?:\\.|(?!\1).)*)\1/)?.[2] || 'any';
-      const description =
-        body
-          .match(/description\s*:\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/)?.[2]
-          ?.replace(/\\(['"\\])/g, '$1') || '';
+      const description = readDescription(body);
       const defaultRaw = body.match(/default\s*:\s*([^,\n]+)/)?.[1]?.trim();
 
       props[key] = {
@@ -367,9 +387,7 @@ function extractToolDefinition(filePath) {
   const nameMatch = block.match(/name\s*:\s*['"]([^'"]+)['"]/);
   if (!nameMatch) return null;
 
-  const descMatch = block.match(
-    /description\s*:\s*(['"])((?:\\.|(?!\1)[\s\S])*)\1/,
-  );
+  const toolDescription = readDescription(block);
   const inputSchemaBlock = extractInputSchemaBlock(block);
   const inputSchemaRef = inputSchemaBlock ? null : extractInputSchemaRef(block);
   let inputSchema = parseInputSchemaBlock(inputSchemaBlock);
@@ -408,7 +426,7 @@ function extractToolDefinition(filePath) {
 
   return {
     name: nameMatch[1],
-    description: descMatch ? descMatch[2].replace(/\\(['"\\])/g, '$1') : '',
+    description: toolDescription,
     inputSchema,
     inputSchemaRef,
     availableIn,
@@ -558,6 +576,122 @@ function loadObjectVersionTools() {
   return tools;
 }
 
+/**
+ * The text the model actually receives, taken from the BUILT definitions.
+ *
+ * **Why from `dist` and not from the source.** Three reviewer findings on PR #244
+ * were the same defect wearing different clothes: a Zod `.description` is a
+ * prototype getter and was invisible to `Object.entries`; a description built as
+ * `'…' + '…'` was cut at the first literal; a template literal printed
+ * `${commonObjectTypeSchema.description}` verbatim, because no regex evaluates an
+ * interpolation. Source text and shipped text are not the same thing, and the docs
+ * must show the shipped one — the string a consumer's RAG indexes and a model reads.
+ *
+ * **Which is exactly why a stale `dist` may not be used silently.** A fourth
+ * finding: the reviewer edited `DeleteClass`'s description, ran `docs:tools`, and
+ * the generator answered success while documenting the previous text, because
+ * `docs:tools` did not build. Reading `dist` is only correct when `dist` is newer
+ * than every source file, so that is a precondition now and not an assumption: it
+ * is checked, and a stale or absent build stops the run with what to do about it.
+ * `npm run docs:tools` builds first, so the ordinary path needs no thought.
+ */
+function newestMtime(dir, extensions) {
+  let newest = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      if (!extensions.some((extension) => entry.name.endsWith(extension)))
+        continue;
+      const { mtimeMs } = fs.statSync(full);
+      if (mtimeMs > newest) newest = mtimeMs;
+    }
+  }
+  return newest;
+}
+
+/**
+ * Stops the run rather than documenting text nobody ships.
+ *
+ * Throws instead of calling `process.exit`, because this module is also required
+ * by a unit test and a generator that kills the process from inside a test run is
+ * its own kind of defect. The CLI at the bottom turns it into an exit code.
+ */
+function requireFreshBuild(distEntry) {
+  const advice =
+    'Run `npm run build` first — or `npm run docs:tools`, which builds.';
+  if (!fs.existsSync(distEntry)) {
+    throw new Error(`${distEntry} is missing. ${advice}`);
+  }
+  const sourceRoot = path.join(__dirname, '..', 'src');
+  const distRoot = path.join(__dirname, '..', 'dist');
+  const source = newestMtime(sourceRoot, ['.ts']);
+  const built = newestMtime(distRoot, ['.js']);
+  if (source > built) {
+    const behind = Math.round((source - built) / 1000);
+    throw new Error(
+      `dist is ${behind}s behind src, so the documented descriptions would not be the ones this tree ships. ${advice}`,
+    );
+  }
+}
+
+function builtDefinitions() {
+  const distEntry = path.join(
+    __dirname,
+    '..',
+    'dist',
+    'lib',
+    'handlers',
+    'HandlerExporter.js',
+  );
+  requireFreshBuild(distEntry);
+  const { HandlerExporter } = require(distEntry);
+  const entries = new HandlerExporter({
+    includeReadOnly: true,
+    includeHighLevel: true,
+    includeLowLevel: true,
+    includeCompact: true,
+    includeSystem: true,
+    includeSearch: true,
+  }).getHandlerEntries();
+  const byName = new Map();
+  for (const entry of entries)
+    byName.set(entry.toolDefinition.name, entry.toolDefinition);
+  return byName;
+}
+
+/** A parameter's own schema, in either shape a definition is written in. */
+function builtProperty(definition, key) {
+  const flat = definition.inputSchema;
+  const properties = flat && flat.properties ? flat.properties : flat;
+  return properties ? properties[key] : undefined;
+}
+
+/** Overwrite parsed text with the shipped text, tool by tool and parameter by parameter. */
+function applyBuiltText(tools) {
+  const built = builtDefinitions();
+  for (const tool of tools) {
+    const definition = built.get(tool.name);
+    if (!definition) continue;
+    if (typeof definition.description === 'string' && definition.description)
+      tool.description = definition.description;
+    const props = tool.inputSchema && tool.inputSchema.properties;
+    if (!props) continue;
+    for (const key of Object.keys(props)) {
+      // `.description` by ACCESS, so a Zod getter answers as well as a plain key.
+      const stated = builtProperty(definition, key);
+      const text = stated ? stated.description : undefined;
+      if (typeof text === 'string' && text) props[key].description = text;
+    }
+  }
+  return tools;
+}
+
 function loadToolsFromHandlers() {
   const files = [];
   walk(HANDLERS_ROOT, files);
@@ -593,7 +727,7 @@ function loadToolsFromHandlers() {
     return a.name.localeCompare(b.name);
   });
 
-  return tools;
+  return applyBuiltText(tools);
 }
 
 function levelTitle(level) {
@@ -1040,7 +1174,12 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  try {
+    main();
+  } catch (error) {
+    console.error(`\u274c  ${error.message}`);
+    process.exit(1);
+  }
 }
 
 module.exports = {

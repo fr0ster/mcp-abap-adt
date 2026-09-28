@@ -56,12 +56,12 @@ describe('responsible and master system are request-scoped', () => {
   });
 
   it('a scope carrying them wins over the process context', () => {
-    runWithRequestContext({ responsible: 'ALICE', masterSystem: 'E19' }, () => {
+    runWithRequestContext({ responsible: 'ALICE', masterSystem: 'SID' }, () => {
       createAdtClient(conn);
     });
     expect(lastOptions()).toMatchObject({
       responsible: 'ALICE',
-      masterSystem: 'E19',
+      masterSystem: 'SID',
     });
   });
 

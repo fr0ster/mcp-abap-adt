@@ -34,7 +34,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'Metadata Extension name (e.g., ZI_MY_DDLX).',
+        description: 'Metadata Extension name.',
       },
       description: {
         type: 'string',
@@ -42,12 +42,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Optional for local objects.',
       },
       master_language: {
         type: 'string',

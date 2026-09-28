@@ -109,7 +109,7 @@ describe('the MCP tool surface', () => {
       // **Fourth exception: `CreateTransportTask` gained `task_type`.** A task
       // `newtask` creates is Unclassified, and on premise the first
       // `addobject` onto it is refused (`SCTS_ADT_MSG 009` / TK127, measured
-      // on E19 2026-09-25) until `changetasktype` gives it a type. The tool
+      // on premise 2026-09-25) until `changetasktype` gives it a type. The tool
       // now types the task itself, `S` by default; the parameter is how a
       // caller asks for Repair (`R`) or leaves it Unclassified (`X`).
       //
@@ -118,13 +118,13 @@ describe('the MCP tool surface', () => {
       // CheckFunctionGroup and CheckInterface.
       // They could only ask about the inactive version, and an object that
       // is only active has none: SAP answered "Error while importing object
-      // … from the database" for the shared domain and data element (E19,
+      // … from the database" for the shared domain and data element (an on-premise system,
       // 2026-09-25). Every other DDIC check already took a version.
       //
       // **Fifth exception: seven low-tier writes gained `transport_request`.**
       // They had none, so a caller's request number was dropped and the write
       // went out without `corrNr` — refused on premise with "Parameter corrNr
-      // could not be found." (SADT_RESOURCE 017, E19 2026-09-25). Every other
+      // could not be found." (SADT_RESOURCE 017, on premise 2026-09-25). Every other
       // low-tier write already carried it.
       // **One relaxation, and it is a relaxation rather than a loss.**
       // `CheckPackage`/`CheckPackageLow` required `super_package` and never sent

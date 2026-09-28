@@ -2039,7 +2039,7 @@ export interface AuthDisplayConfig {
 /**
  * Format auth configuration for console output
  * @param config - Auth configuration to display
- * @param source - Source of the config (e.g., 'e19.env', 'service-key')
+ * @param source - Source of the config (e.g., an .env file name, 'service-key')
  * @returns Formatted string for console output
  */
 export function formatAuthConfigForDisplay(

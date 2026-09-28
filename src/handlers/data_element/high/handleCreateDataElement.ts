@@ -53,14 +53,13 @@ export const TOOL_DEFINITION = {
   name: 'CreateDataElement',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: DataElement. Will be useful for creating data element. Create a new ABAP data element in SAP system. Creates the data element object in initial state.',
+    'Create a new ABAP data element in SAP system. Creates the data element object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {
       data_element_name: {
         type: 'string',
-        description:
-          'Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions.',
+        description: 'Data element name.',
       },
       description: {
         type: 'string',
@@ -69,12 +68,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       data_type: {
         type: 'string',

@@ -51,7 +51,7 @@ function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
   // `ioc:object` comes back as an array too — `structured` forces
   // `object` to one. Read as a single element it gave no `ioc:ref`, and
   // every entry was dropped: this tool answered "count: 0" over an
-  // inactive BDEF on E19 (2026-09-26), and so did every caller relying on
+  // inactive BDEF on premise (2026-09-26), and so did every caller relying on
   // it to confirm an activation.
   for (const entry of entries) {
     for (const object of asArray(entry?.['ioc:object'])) {

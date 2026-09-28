@@ -10,7 +10,7 @@
  * object that does not exist, answers in a way a caller reads as "deleted".
  *
  * A refused check is answered as it came, and `delete()` is never sent. On
- * E19 (2026-09-26) the check answered `del:isDeletable="false"` with "Object
+ * premise (2026-09-26) the check answered `del:isDeletable="false"` with "Object
  * does not exist" for a missing table, and with "5 strong and 3 weak external
  * references" for a table still used by the shared CDS views; `analyseDeletion`
  * reads both as refusals.

@@ -18,7 +18,7 @@ export const TOOL_DEFINITION = {
     properties: {
       behavior_implementation_name: {
         type: 'string',
-        description: 'Behavior implementation name (e.g., ZBP_MY_CLASS).',
+        description: 'Behavior implementation name.',
       },
       version: {
         type: 'string',

@@ -42,7 +42,7 @@ export const TOOL_DEFINITION = {
           properties: {
             name: {
               type: 'string',
-              description: 'Object name, e.g. "ZCL_MY_CLASS".',
+              description: 'Object name.',
             },
             type: {
               type: 'string',

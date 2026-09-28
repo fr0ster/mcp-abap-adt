@@ -18,13 +18,13 @@ export const TOOL_DEFINITION = {
   name: 'ActivateStructureLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: Structure. Will be useful for activating, creating, or updating a structure. [low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Activate an ABAP structure. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
       structure_name: {
         type: 'string',
-        description: 'Structure name (e.g., ZST_MY_STRUCT).',
+        description: 'Structure name.',
       },
       session_id: {
         type: 'string',

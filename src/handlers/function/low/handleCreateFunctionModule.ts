@@ -37,11 +37,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_module_name: {
         type: 'string',
-        description: 'Function module name (e.g., Z_MY_FUNCTION).',
+        description: 'Function module name.',
       },
       function_group_name: {
         type: 'string',
-        description: 'Function group name (e.g., ZFG_MY_GROUP).',
+        description: 'Function group name.',
       },
       description: {
         type: 'string',
@@ -55,7 +55,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       session_id: {
         type: 'string',

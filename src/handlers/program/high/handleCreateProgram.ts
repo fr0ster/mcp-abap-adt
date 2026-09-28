@@ -27,14 +27,13 @@ export const TOOL_DEFINITION = {
   name: 'CreateProgram',
   available_in: ['onprem'] as const,
   description:
-    'Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
+    'Create a new ABAP program (report) in SAP system. Creates the program object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {
       program_name: {
         type: 'string',
-        description:
-          'Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).',
+        description: 'Program name.',
       },
       description: {
         type: 'string',
@@ -43,12 +42,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LAB, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       program_type: {
         type: 'string',

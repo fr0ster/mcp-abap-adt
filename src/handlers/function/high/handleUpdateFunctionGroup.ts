@@ -47,8 +47,7 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name (e.g., ZTEST_FG_001). Must exist in the system.',
+        description: 'Function group name. Must exist in the system.',
       },
       description: {
         type: 'string',
@@ -57,7 +56,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Optional if object is local or already in transport.',
       },
       ...DETAIL_PROPERTY,
     },

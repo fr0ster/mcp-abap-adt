@@ -12,7 +12,7 @@
  * So a package can be saved only once per ABAP session. The server holds one
  * connection across calls: over RFC one session for everything, so after
  * CreatePackage the next update was refused; over HTTP one stateful session
- * for every lock → update → unlock, so the second update was refused (E19,
+ * for every lock → update → unlock, so the second update was refused (on premise,
  * 2026-09-27, both). The workaround is the consumer's, and this is it: the
  * server's own session never saves a package.
  *

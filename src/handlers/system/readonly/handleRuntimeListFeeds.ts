@@ -104,7 +104,7 @@ export async function handleRuntimeListFeeds(
       // On premise each feed's query variants come inside the feed list —
       // `feed:queryVariants` in every `atom:entry` of `GET /sap/bc/adt/feeds`
       // — while `GET /sap/bc/adt/feeds/variants?category=…` answered 200 with
-      // an empty body for every feed id E19 lists (2026-09-26). So the
+      // an empty body for every feed id the system lists (2026-09-26). So the
       // variants are a reading of the answer `list()` already fetches: the
       // same request, with this repository's reading in the `feeds` slot
       // (feedVariantsOf) in place of the library's, which keeps the feeds and

@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       metadata_extension_name: {
         type: 'string',
-        description: 'MetadataExtension name (e.g., Z_MY_METADATAEXTENSION).',
+        description: 'MetadataExtension name.',
       },
       version: {
         type: 'string',

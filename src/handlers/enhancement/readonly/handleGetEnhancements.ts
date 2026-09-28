@@ -137,7 +137,7 @@ export function parseEnhancementsFromXml(
       // `enh:enhancementImplementations adtcore:name="…"`, so the nearest one
       // opened before this source is its own — the patterns above searched
       // the whole preceding document and took its FIRST name, which named
-      // all five of SAPMV45A's implementations after the first (E19,
+      // all five of SAPMV45A's implementations after the first (on premise,
       // 2026-09-25). They stay as the fallback for a document without it.
       const owners = beforeSource.match(
         /<enh:enhancementImplementations\b[^>]*>/g,
@@ -186,7 +186,7 @@ export function parseEnhancementsFromXml(
  *
  * **The caller's `object_type` decides; guessing is the fallback.** This
  * used to ignore it and probe class → program → include. A function group's
- * main program `SAPL<fg>` is none of those addressable things — on E19
+ * main program `SAPL<fg>` is none of those addressable things — on premise
  * (2026-09-25) all three URIs answered 404 — so the tool failed outright.
  * Its enhancements are the group's, at `/functions/groups/<fg>/source/main`,
  * which answers 200. Each probe that remains is its own try, and its Accept
@@ -418,7 +418,7 @@ async function getIncludesListInternal(
     const includesNode = rootResponse
       .getResult()
       // The includes node is `PROG/I` or `FUGR/I` (SAPMV45A's is FUGR/I,
-      // with PROG/I objects under it — E19, 2026-09-25).
+      // with PROG/I objects under it — on premise, 2026-09-25).
       .value.childNodes.find((info) => /\/I$/.test(info.type));
 
     if (!includesNode) {

@@ -42,11 +42,7 @@ export const TOOL_DEFINITION = {
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
   inputSchema: {
-    package_name: z
-      .string()
-      .describe(
-        'Package name (e.g., ZOK_TEST_0002). Must follow SAP naming conventions (start with Z or Y for customer namespace).',
-      ),
+    package_name: z.string().describe('Package name.'),
     description: z
       .string()
       .optional()
@@ -55,9 +51,7 @@ export const TOOL_DEFINITION = {
       ),
     super_package: z
       .string()
-      .describe(
-        'Parent package name (e.g., ZOK_PACKAGE). Required for structure packages.',
-      ),
+      .describe('Parent package name. Required for structure packages.'),
     package_type: z
       .enum(['development', 'structure'])
       .default('development')
@@ -65,20 +59,16 @@ export const TOOL_DEFINITION = {
     software_component: z
       .string()
       .optional()
-      .describe(
-        'Software component (e.g., HOME, ZLOCAL). If not provided, SAP will set a default (typically ZLOCAL for local packages).',
-      ),
+      .describe('Software component. If not provided, SAP will set a default.'),
     transport_layer: z
       .string()
       .optional()
-      .describe(
-        'Transport layer (e.g., ZE19). Required for transportable packages.',
-      ),
+      .describe('Transport layer. Required for transportable packages.'),
     transport_request: z
       .string()
       .optional()
       .describe(
-        'Transport request number (e.g., E19K905635). Required if package is transportable.',
+        'Transport request number, not a task. Required if the package is transportable.',
       ),
     record_changes: z
       .boolean()

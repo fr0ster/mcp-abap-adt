@@ -31,14 +31,13 @@ export const TOOL_DEFINITION = {
   name: 'CreateTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Table. Will be useful for creating table. Create a new ABAP table in SAP system. Creates the table object in initial state.',
+    'Create a new ABAP table in SAP system. Creates the table object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {
       table_name: {
         type: 'string',
-        description:
-          'Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.',
+        description: 'Table name.',
       },
       description: {
         type: 'string',
@@ -47,12 +46,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LOCAL, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       master_language: {
         type: 'string',

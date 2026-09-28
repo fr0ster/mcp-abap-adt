@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZMY_PACKAGE).',
+        description: 'Package name.',
       },
       super_package: {
         type: 'string',

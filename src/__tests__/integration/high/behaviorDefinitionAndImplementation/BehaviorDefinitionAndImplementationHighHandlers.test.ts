@@ -328,7 +328,7 @@ describe('BehaviorDefinition + BehaviorImplementation High-Level Handlers Integr
         // description says so): without `FOR BEHAVIOR OF` the class is no
         // behaviour pool, and its handler class cannot compile — SAP cancelled
         // the activation with "Local classes of CL_ABAP_BEHAVIOR_HANDLER can
-        // only be derived in … a global BEHAVIOR class" (E19, 2026-09-26),
+        // only be derived in … a global BEHAVIOR class" (on premise, 2026-09-26),
         // which GetInactiveObjects hid until it read its own list.
         const mainSource =
           bimplParams.main_source ||

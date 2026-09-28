@@ -77,7 +77,7 @@ function flatNodesOf(value: unknown): FlatObjectStructureNode[] {
 }
 
 /**
- * **SAP does not send the object itself.** For a class on E19
+ * **SAP does not send the object itself.** For a class on premise
  * (2026-09-25) the folders carry `parentid="000001"` and no node `000001`
  * arrives, so without the object asked for they each came out as a root of
  * their own. A node whose parent was named but not sent hangs under `root`

@@ -1,6 +1,6 @@
 /**
  * A package can be saved only once per ABAP session (PAK/058, CL_PACKAGE's
- * instance buffer — E19, 2026-09-26/27). A create over RFC and every lock
+ * instance buffer — on premise, 2026-09-26/27). A create over RFC and every lock
  * chain, on either transport, run in sessions of their own.
  */
 const opened: Array<{
@@ -95,7 +95,7 @@ describe('package sessions', () => {
 
   it('locks on the caller connection over HTTP', async () => {
     // The connection keeps the lock's context to the stateful requests, so the
-    // PUT on the same connection runs outside it (E19 and E98, 2026-09-27).
+    // PUT on the same connection runs outside it (on two on-premise releases, 2026-09-27).
     const caller = connectionOf('http');
     const lockOn = await connectionForPackageLock(caller, undefined);
     expect(lockOn.connection).toBe(caller);

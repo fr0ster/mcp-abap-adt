@@ -40,7 +40,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: BehaviorDefinition. Will be useful for creating behavior definition. Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.',
+    'Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -59,8 +59,7 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description:
-          'Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+        description: 'Transport request number, not a task',
       },
       root_entity: {
         type: 'string',

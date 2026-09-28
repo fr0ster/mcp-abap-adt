@@ -3,7 +3,7 @@ import { handleGetEnhancements } from '../../handlers/enhancement/readonly/handl
 /**
  * GetEnhancements addresses the object it was told about.
  *
- * Measured on E19, 2026-09-25: for SAPLSLVC_FULLSCREEN with object_type
+ * Measured on premise, 2026-09-25: for SAPLSLVC_FULLSCREEN with object_type
  * 'program' it ignored the type and probed class → program → include; a
  * function group's main program is none of those addressable things (all
  * three URIs answer 404), so the tool failed with "Failed to determine object
@@ -102,7 +102,7 @@ describe('GetEnhancements', () => {
  * Each source is named by the enhancement implementation it sits in.
  *
  * The document nests `enh:source` inside `enh:sourceCodePlugin` inside
- * `enh:enhancementImplementations adtcore:name="…"` (E19, SAPMV45A,
+ * `enh:enhancementImplementations adtcore:name="…"` (on premise, SAPMV45A,
  * 2026-09-25). The parser looked for a name in everything before the source
  * and took the FIRST match in the document, so all five of SAPMV45A's
  * implementations came out named Z_TEST_SAPMV45A_ENHANCEMENT.

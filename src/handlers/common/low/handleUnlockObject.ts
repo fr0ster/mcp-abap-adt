@@ -45,7 +45,7 @@ export const TOOL_DEFINITION = {
       object_name: {
         type: 'string',
         description:
-          'Object name (e.g., ZCL_MY_CLASS, Z_MY_PROGRAM, ZIF_MY_INTERFACE). For function modules, use format GROUP|FM_NAME',
+          'Object name. For function modules, use format GROUP|FM_NAME',
       },
       object_type: {
         type: 'string',

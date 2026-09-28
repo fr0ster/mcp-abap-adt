@@ -142,7 +142,7 @@ describe('Transported Object CRUD (GitHub #11)', () => {
       // Before the reads, as adt-clients' class suite does: a class just
       // created has no version to read yet. Over RFC — one ABAP session for the
       // run — a read in the creating session answered 400 SADT_RESOURCE 007
-      // "wrong input data" (E19, 2026-09-26); after the first write it reads.
+      // "wrong input data" (on premise, 2026-09-26); after the first write it reads.
       logger?.info(`Step 2: Updating class source (TR: ${transportRequest})`);
       const updateCtx = createHandlerContext({ connection, logger });
       const newSource = `CLASS ${className} DEFINITION PUBLIC FINAL CREATE PUBLIC.

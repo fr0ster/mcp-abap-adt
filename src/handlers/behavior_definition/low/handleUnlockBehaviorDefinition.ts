@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'BehaviorDefinition name (e.g., ZI_MY_BDEF).',
+        description: 'BehaviorDefinition name.',
       },
       lock_handle: {
         type: 'string',

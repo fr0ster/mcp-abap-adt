@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Parent class name (e.g., ZCL_MY_CLASS).',
+        description: 'Parent class name.',
       },
       version: {
         type: 'string',

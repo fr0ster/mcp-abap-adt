@@ -11,7 +11,7 @@
  * channel every sibling family in this cluster shares. `transport_request`
  * goes to `config.transportRequest`, which `uploadProgramSource` puts on the
  * URL as `corrNr` — without it a write into a transportable package is
- * refused on premise ("Parameter corrNr could not be found.", E19
+ * refused on premise ("Parameter corrNr could not be found.",
  * 2026-09-25, measured on a view; the same member shape here). Verified
  * against `AdtProgram.js`, not the declaration file.
  */
@@ -40,8 +40,7 @@ export const TOOL_DEFINITION = {
     properties: {
       program_name: {
         type: 'string',
-        description:
-          'Program name (e.g., Z_TEST_PROGRAM). Program must already exist.',
+        description: 'Program name. Program must already exist.',
       },
       source_code: {
         type: 'string',
@@ -70,7 +69,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+          'Transport request number (required for transportable packages), not a task.',
       },
       ...DETAIL_PROPERTY,
     },

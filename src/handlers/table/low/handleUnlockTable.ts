@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
     properties: {
       table_name: {
         type: 'string',
-        description: 'Table name (e.g., Z_MY_TABLE).',
+        description: 'Table name.',
       },
       lock_handle: {
         type: 'string',

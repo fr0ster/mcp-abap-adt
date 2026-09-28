@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       structure_name: {
         type: 'string',
-        description: 'Structure name (e.g., ZST_MY_STRUCTURE).',
+        description: 'Structure name.',
       },
       version: {
         type: 'string',

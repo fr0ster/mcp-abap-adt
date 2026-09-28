@@ -30,22 +30,22 @@ export const TOOL_DEFINITION = {
   name: 'CreateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
+    'Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).',
+        description: 'DDL source name.',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LAB, $TMP for local objects)',
+        description: 'Package name',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number (required for transportable packages), not a task.',
       },
       description: {
         type: 'string',

@@ -31,8 +31,7 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_TEST_0002). Package must already exist.',
+        description: 'Package name. Package must already exist.',
       },
       super_package: {
         type: 'string',

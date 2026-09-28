@@ -40,13 +40,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateMessageClassMessage',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.',
+    'Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.',
   inputSchema: {
     type: 'object',
     properties: {
       message_class_name: {
         type: 'string',
-        description: 'Parent message class name (e.g., ZMY_MSGS).',
+        description: 'Parent message class name.',
       },
       msgno: {
         type: 'string',
@@ -68,7 +68,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          '(optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.',
+          '(optional) Transport request number, not a task. Required for transportable objects.',
       },
     },
     required: ['message_class_name', 'msgno', 'msgtext'],

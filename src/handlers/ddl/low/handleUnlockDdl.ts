@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., Z_MY_PROGRAM).',
+        description: 'DDL source name.',
       },
       lock_handle: {
         type: 'string',

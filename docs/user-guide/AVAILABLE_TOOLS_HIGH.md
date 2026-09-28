@@ -260,14 +260,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/high/handleCheckBehaviorDefinition.ts`
 
 **Parameters:**
-- `name` (string, required) - BehaviorDefinition name (e.g., ZI_MY_BDEF).
+- `name` (string, required) - BehaviorDefinition name.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
 <a id="createbehaviordefinition-high-level-behavior-definition"></a>
 #### CreateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Operation: Create. Subject: BehaviorDefinition. Will be useful for creating behavior definition. Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
+**Description:** Create a new ABAP Behavior Definition (BDEF) in SAP system. Creates the behavior definition object in initial state.
 
 **Source:** `src/handlers/behavior_definition/high/handleCreateBehaviorDefinition.ts`
 
@@ -279,19 +279,19 @@ Generated from code in `src/handlers/**` (not from docs).
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
 - `package_name` (string, required) - Package name
 - `root_entity` (string, required) - Root Entity name (CDS View name)
-- `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task
 
 ---
 
 <a id="deletebehaviordefinition-high-level-behavior-definition"></a>
 #### DeleteBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior definition from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/behavior_definition/high/handleDeleteBehaviorDefinition.ts`
 
 **Parameters:**
-- `behavior_definition_name` (string, required) - BehaviorDefinition name (e.g., Z_MY_BEHAVIORDEFINITION).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `behavior_definition_name` (string, required) - BehaviorDefinition name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -302,14 +302,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_definition/high/handleGetBehaviorDefinition.ts`
 
 **Parameters:**
-- `behavior_definition_name` (string, required) - BehaviorDefinition name (e.g., Z_MY_BEHAVIORDEFINITION).
+- `behavior_definition_name` (string, required) - BehaviorDefinition name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updatebehaviordefinition-high-level-behavior-definition"></a>
 #### UpdateBehaviorDefinition (High-Level / Behavior Definition)
-**Description:** Operation: Update, Create. Subject: BehaviorDefinition. Will be useful for updating or creating behavior definition. Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP Behavior Definition (BDEF). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/behavior_definition/high/handleUpdateBehaviorDefinition.ts`
 
@@ -318,7 +318,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -327,28 +327,28 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createbehaviorimplementation-high-level-behavior-implementation"></a>
 #### CreateBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Operation: Create. Subject: BehaviorImplementation. Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
+**Description:** Create a new ABAP behavior implementation class for a behavior definition. Creates the object in initial state — no FOR BEHAVIOR OF main source and no implementations include yet. Use UpdateClass to write the main source and UpdateBehaviorImplementation (with a lock handle from LockClass) to write the implementations include.
 
 **Source:** `src/handlers/behavior_implementation/high/handleCreateBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_definition` (string, required) - Behavior Definition name (e.g., ZI_MY_ENTITY). The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
-- `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must follow SAP naming conventions (typically starts with ZBP_ for behavior implementations).
+- `behavior_definition` (string, required) - Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
+- `class_name` (string, required) - Behavior Implementation class name.
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deletebehaviorimplementation-high-level-behavior-implementation"></a>
 #### DeleteBehaviorImplementation (High-Level / Behavior Implementation)
-**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP behavior implementation from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/behavior_implementation/high/handleDeleteBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_implementation_name` (string, required) - BehaviorImplementation name (e.g., Z_MY_BEHAVIORIMPLEMENTATION).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `behavior_implementation_name` (string, required) - BehaviorImplementation name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -359,7 +359,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/behavior_implementation/high/handleGetBehaviorImplementation.ts`
 
 **Parameters:**
-- `behavior_implementation_name` (string, required) - BehaviorImplementation name (e.g., Z_MY_BEHAVIORIMPLEMENTATION).
+- `behavior_implementation_name` (string, required) - BehaviorImplementation name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -372,10 +372,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate behavior implementation after update. Default: true.
-- `behavior_definition` (string, required) - Referenced Behavior Definition name (e.g., ZI_MY_ENTITY). Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
-- `class_name` (string, required) - Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.
+- `behavior_definition` (string, required) - Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
+- `class_name` (string, required) - Behavior Implementation class name. Must exist in the system.
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -389,7 +389,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/high/handleCheckClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `source_code` (string, optional) - Optional: source code to validate. If provided, validates hypothetical code without creating object. Must include complete CLASS DEFINITION and IMPLEMENTATION sections.
 - `version` (string, optional) - Version to check: 'active' (last activated) or 'inactive' (current unsaved). Default: active.
 
@@ -397,32 +397,32 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createclass-high-level-class"></a>
 #### CreateClass (High-Level / Class)
-**Description:** Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
+**Description:** Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.
 
 **Source:** `src/handlers/class/high/handleCreateClass.ts`
 
 **Parameters:**
 - `abstract` (boolean, optional) - Mark class as abstract. Default: false
-- `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001).
+- `class_name` (string, required) - Class name.
 - `create_protected` (boolean, optional) - Protected constructor. Default: false
 - `description` (string, optional) - Class description (defaults to class_name).
 - `final` (boolean, optional) - Mark class as final. Default: false
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP).
+- `package_name` (string, required) - Package name.
 - `superclass` (string, optional) - Optional superclass name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
 <a id="deleteclass-high-level-class"></a>
 #### DeleteClass (High-Level / Class)
-**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP class from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/class/high/handleDeleteClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Class name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -434,8 +434,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Parent class name.
+- `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
@@ -447,8 +447,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Parent class name.
+- `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
@@ -460,8 +460,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting test class. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Parent class name.
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -473,8 +473,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Parent class name.
+- `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
@@ -485,7 +485,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/high/handleGetClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -497,7 +497,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/high/handleGetLocalDefinitions.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -509,7 +509,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/high/handleGetLocalMacros.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -521,7 +521,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -533,22 +533,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/class/high/handleGetLocalTypes.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateclass-high-level-class"></a>
 #### UpdateClass (High-Level / Class)
-**Description:** Operation: Update, Create. Subject: Class. Will be useful for updating or creating class. Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/class/high/handleUpdateClass.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
-- `class_name` (string, required) - Class name (e.g., ZCL_TEST_CLASS_001).
+- `class_name` (string, required) - Class name.
 - `source_code` (string, required) - Complete ABAP class source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -560,9 +560,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -574,9 +574,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `macros_code` (string, required) - Updated source code for local macros.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -588,9 +588,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `test_class_code` (string, required) - Updated source code for the local test class.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -602,9 +602,9 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
-- `class_name` (string, required) - Parent class name (e.g., ZCL_MY_CLASS).
+- `class_name` (string, required) - Parent class name.
 - `local_types_code` (string, required) - Updated source code for local types.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -942,7 +942,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `object_adt_type` (string, optional) - ADT object type code (e.g. CLAS/OC, PROG/P), for a type object_type does not cover. Only needed when object_type is not enough; prefer object_type otherwise.
 - `object_name` (string, optional) - Object name for single-object activation form.
-- `object_type` (any, optional) - 
+- `object_type` (any, optional) - ABAP object type for routed compact operation. For single-object activation, this alone is enough — no ADT type code needed.
 - `objects` (array, optional) - Explicit objects list for batch activation.
 - `preaudit` (boolean, optional) - Run pre-audit checks before activation.
 
@@ -1045,7 +1045,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `length` (number, optional) - Length for typed artifacts.
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `object_type` (any, required) - 
+- `object_type` (any, required) - ABAP object type for routed compact operation.
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `program_type` (string, optional) - ABAP program type.
@@ -1056,7 +1056,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
 - `tests` (array, optional) - Container/test class pairs (for UNIT_TEST create).
-- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
 ---
@@ -1078,14 +1078,14 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_module_name` (string, optional) - ABAP function module name.
 - `interface_name` (string, optional) - Interface name.
 - `metadata_extension_name` (string, optional) - Metadata extension name.
-- `object_type` (any, required) - 
+- `object_type` (any, required) - ABAP object type for routed compact operation.
 - `program_name` (string, optional) - ABAP program name.
 - `run_id` (string, optional) - Unit test run id (UNIT_TEST delete).
 - `service_binding_name` (string, optional) - Service binding name.
 - `service_definition_name` (string, optional) - Service definition name.
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
-- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request id (if required by system).
 
 ---
 
@@ -1133,7 +1133,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_module_name` (string, optional) - Function module name.
 - `interface_name` (string, optional) - Interface name.
 - `metadata_extension_name` (string, optional) - Metadata extension name.
-- `object_type` (any, required) - 
+- `object_type` (any, required) - ABAP object type for routed compact operation.
 - `package_name` (string, optional) - Package name.
 - `program_name` (string, optional) - Program name.
 - `response_format` (string, optional) - Response format for SERVICE_BINDING reads.
@@ -1142,7 +1142,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `service_definition_name` (string, optional) - Service definition name.
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
-- `version` (any, optional) - 
+- `version` (any, optional) - Object version to read/check.
 
 ---
 
@@ -1342,7 +1342,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lowercase` (boolean, optional) - Allow lowercase values (domain setting).
 - `macros_code` (string, optional) - Updated source for class local macros.
 - `name` (string, optional) - Object name for handlers that require a generic `name` (behavior definition, metadata extension).
-- `object_type` (any, required) - 
+- `object_type` (any, required) - ABAP object type for routed compact operation.
 - `package_name` (string, optional) - ABAP package name.
 - `program_name` (string, optional) - ABAP program name.
 - `run_id` (string, optional) - Unit test run id (UNIT_TEST update).
@@ -1355,7 +1355,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `table_name` (string, optional) - Table name.
 - `test_class_code` (string, optional) - Updated source for the local test class.
 - `test_class_source` (string, optional) - Updated local test class source (CDS_UNIT_TEST update).
-- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
 ---
@@ -1391,19 +1391,19 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/high/handleCheckDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., ZDE_MY_ELEMENT).
+- `data_element_name` (string, required) - Data element name.
 - `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
 
 ---
 
 <a id="createdataelement-high-level-data-element"></a>
 #### CreateDataElement (High-Level / Data Element)
-**Description:** Operation: Create. Subject: DataElement. Will be useful for creating data element. Create a new ABAP data element in SAP system. Creates the data element object in initial state.
+**Description:** Create a new ABAP data element in SAP system. Creates the data element object in initial state.
 
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., ZZ_E_TEST_001). Must follow SAP naming conventions.
+- `data_element_name` (string, required) - Data element name.
 - `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.
 - `decimals` (number, optional (default: 0)) - Decimal places. Usually inherited from domain.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
@@ -1412,12 +1412,12 @@ Generated from code in `src/handlers/**` (not from docs).
 - `long_label` (string, optional) - Long field label (max 40 chars). Applied during update step after creation.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `medium_label` (string, optional) - Medium field label (max 20 chars). Applied during update step after creation.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `package_name` (string, required) - Package name
 - `search_help` (string, optional) - Search help name. Applied during update step after creation.
 - `search_help_parameter` (string, optional) - Search help parameter. Applied during update step after creation.
 - `set_get_parameter` (string, optional) - Set/Get parameter ID. Applied during update step after creation.
 - `short_label` (string, optional) - Short field label (max 10 chars). Applied during update step after creation.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `type_kind` (string, optional (default: domain)) - Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.
 - `type_name` (string, optional) - Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')
 
@@ -1425,13 +1425,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletedataelement-high-level-data-element"></a>
 #### DeleteDataElement (High-Level / Data Element)
-**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP data element from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/data_element/high/handleDeleteDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `data_element_name` (string, required) - Data element name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1442,20 +1442,20 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/high/handleGetDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name (e.g., Z_MY_DATA_ELEMENT).
+- `data_element_name` (string, required) - Data element name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updatedataelement-high-level-data-element"></a>
 #### UpdateDataElement (High-Level / Data Element)
-**Description:** Operation: Update, Create. Subject: DataElement. Will be useful for updating or creating data element. Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Update an existing ABAP data element. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/data_element/high/handleUpdateDataElement.ts`
 
 **Parameters:**
 - `activate` (boolean, optional (default: true))) - Activate data element after update (default: true)
-- `data_element_name` (string, required) - Data element name to update (e.g., ZZ_TEST_DTEL_01)
+- `data_element_name` (string, required) - Data element name to update
 - `data_type` (string, optional) - Data type (CHAR, NUMC, etc.) - for predefinedAbapType or refToPredefinedAbapType
 - `decimals` (number, optional) - Decimals - for predefinedAbapType or refToPredefinedAbapType
 - `description` (string, optional) - New data element description
@@ -1464,11 +1464,11 @@ Generated from code in `src/handlers/**` (not from docs).
 - `field_label_medium` (string, optional) - Medium field label (max 20 chars)
 - `field_label_short` (string, optional) - Short field label (max 10 chars)
 - `length` (number, optional) - Length - for predefinedAbapType or refToPredefinedAbapType
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `package_name` (string, required) - Package name
 - `search_help` (string, optional) - Search help name
 - `search_help_parameter` (string, optional) - Search help parameter
 - `set_get_parameter` (string, optional) - Set/Get parameter ID
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `type_kind` (string, optional (default: domain)) - Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType
 - `type_name` (string, optional) - Type name: domain name, data element name, or class name (depending on type_kind)
 
@@ -1484,7 +1484,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/high/handleCheckDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - CDS view name to check, passed as ddl_name (e.g., ZI_MY_VIEW).
+- `ddl_name` (string, required) - CDS view name to check, passed as ddl_name.
 - `ddl_source` (string, optional) - Optional: DDL source code to validate instead of the saved version.
 - `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
 
@@ -1492,28 +1492,28 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createddl-high-level-ddl"></a>
 #### CreateDdl (High-Level / Ddl)
-**Description:** Operation: Create. Subject: DDL source. Will be useful for creating a DDL source. Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
+**Description:** Create a new CDS View or Classic View in SAP system. Creates the DDL source object in initial state. Use UpdateDdl to set DDL source code.
 
 **Source:** `src/handlers/ddl/high/handleCreateDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002, Z_I_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name.
 - `description` (string, optional) - Optional description (defaults to ddl_name).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
 <a id="deleteddl-high-level-ddl"></a>
 #### DeleteDdl (High-Level / Ddl)
-**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete a DDL source from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/ddl/high/handleDeleteDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `ddl_name` (string, required) - DDL source name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1524,22 +1524,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddl/high/handleGetDdl.ts`
 
 **Parameters:**
-- `ddl_name` (string, required) - DDL source name (e.g., Z_MY_VIEW).
+- `ddl_name` (string, required) - DDL source name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateddl-high-level-ddl"></a>
 #### UpdateDdl (High-Level / Ddl)
-**Description:** Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
+**Description:** Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.
 
 **Source:** `src/handlers/ddl/high/handleUpdateDdl.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate after update. Default: false.
-- `ddl_name` (string, required) - DDL source name (e.g., ZOK_R_TEST_0002).
+- `ddl_name` (string, required) - DDL source name.
 - `ddl_source` (string, required) - Complete DDL source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -1553,14 +1553,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/ddlx/high/handleCheckMetadataExtension.ts`
 
 **Parameters:**
-- `name` (string, required) - Metadata extension name (e.g., ZC_MY_DDLX).
+- `name` (string, required) - Metadata extension name.
 - `version` (string, optional (default: active)) - Which version to check: 'active' (default) or 'inactive', the unsaved one right after a write. This endpoint does not fall back to whichever exists.
 
 ---
 
 <a id="createmetadataextension-high-level-ddlx"></a>
 #### CreateMetadataExtension (High-Level / Ddlx)
-**Description:** Operation: Create. Subject: MetadataExtension. Will be useful for creating metadata extension. Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
+**Description:** Create a new ABAP Metadata Extension (DDLX) in SAP system. Creates the metadata extension object in initial state.
 
 **Source:** `src/handlers/ddlx/high/handleCreateMetadataExtension.ts`
 
@@ -1570,13 +1570,13 @@ Generated from code in `src/handlers/**` (not from docs).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task
 
 ---
 
 <a id="updatemetadataextension-high-level-ddlx"></a>
 #### UpdateMetadataExtension (High-Level / Ddlx)
-**Description:** Operation: Update, Create. Subject: MetadataExtension. Will be useful for updating or creating metadata extension. Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP Metadata Extension (DDLX). Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/ddlx/high/handleUpdateMetadataExtension.ts`
 
@@ -1585,7 +1585,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -1599,14 +1599,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/high/handleCheckDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., ZDM_MY_DOMAIN).
+- `domain_name` (string, required) - Domain name.
 - `version` (string, optional) - Which version to check. Defaults to the inactive one, what a caller wants right after a write; an object that is only active has no inactive version, and SAP answers such a check with "Error while importing object … from the database" — ask for active.
 
 ---
 
 <a id="createdomain-high-level-domain"></a>
 #### CreateDomain (High-Level / Domain)
-**Description:** Operation: Create. Subject: Domain. Will be useful for creating domain. Create a new ABAP domain in SAP system. Creates the domain object in initial state.
+**Description:** Create a new ABAP domain in SAP system. Creates the domain object in initial state.
 
 **Source:** `src/handlers/domain/high/handleCreateDomain.ts`
 
@@ -1616,27 +1616,27 @@ Generated from code in `src/handlers/**` (not from docs).
 - `datatype` (string, optional (default: CHAR)) - (optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional (default: 0)) - (optional) Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - (optional) Domain description. If not provided, domain_name will be used.
-- `domain_name` (string, required) - Domain name (e.g., ZZ_TEST_0001). Must follow SAP naming conventions.
+- `domain_name` (string, required) - Domain name.
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
 - `lowercase` (boolean, optional (default: false)) - (optional) Allow lowercase input
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, optional) - (optional) Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `package_name` (string, optional) - (optional) Package name
 - `sign_exists` (boolean, optional (default: false)) - (optional) Field has sign (+/-)
-- `transport_request` (string, optional) - (optional) Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable packages.
 - `value_table` (string, optional) - (optional) Value table name for foreign key relationship
 
 ---
 
 <a id="deletedomain-high-level-domain"></a>
 #### DeleteDomain (High-Level / Domain)
-**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP domain from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/domain/high/handleDeleteDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_DOMAIN).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `domain_name` (string, required) - Domain name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1647,14 +1647,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/domain/high/handleGetDomain.ts`
 
 **Parameters:**
-- `domain_name` (string, required) - Domain name (e.g., Z_MY_DOMAIN).
+- `domain_name` (string, required) - Domain name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updatedomain-high-level-domain"></a>
 #### UpdateDomain (High-Level / Domain)
-**Description:** Operation: Update, Create. Subject: Domain. Will be useful for updating or creating domain. Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
+**Description:** Update an existing ABAP domain. Locks, updates with provided parameters (complete replacement), unlocks, and optionally activates.
 
 **Source:** `src/handlers/domain/high/handleUpdateDomain.ts`
 
@@ -1664,13 +1664,13 @@ Generated from code in `src/handlers/**` (not from docs).
 - `datatype` (string, optional) - Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional) - Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - New domain description (optional)
-- `domain_name` (string, required) - Domain name to update (e.g., ZZ_TEST_0001)
+- `domain_name` (string, required) - Domain name to update
 - `fixed_values` (array, optional) - Array of fixed values for domain value range
 - `length` (number, optional) - Field length (max depends on datatype)
 - `lowercase` (boolean, optional) - Allow lowercase input
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
+- `package_name` (string, required) - Package name
 - `sign_exists` (boolean, optional) - Field has sign (+/-)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `value_table` (string, optional) - Value table name for foreign key relationship
 
 ---
@@ -1685,7 +1685,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function/high/handleCheckFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name (e.g., ZFGRP_MY_GROUP).
+- `function_group_name` (string, required) - Function group name.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
@@ -1698,7 +1698,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the function module.
-- `function_module_name` (string, required) - Function module name (e.g., Z_MY_FUNCTION).
+- `function_module_name` (string, required) - Function module name.
 - `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: active.
 
 ---
@@ -1712,24 +1712,24 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
-- `function_group_name` (string, required) - Function group name (e.g., ZTEST_FG_001). Must follow SAP naming conventions (start with Z or Y, max 26 chars).
+- `function_group_name` (string, required) - Function group name. Up to 26 characters.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="createfunctionmodule-high-level-function"></a>
 #### CreateFunctionModule (High-Level / Function)
-**Description:** Operation: Create. Subject: FunctionModule. Will be useful for creating function module. Create a new ABAP function module within an existing function group. Creates the function module in initial state.
+**Description:** Create a new ABAP function module within an existing function group. Creates the function module in initial state.
 
 **Source:** `src/handlers/function/high/handleCreateFunctionModule.ts`
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the function module
-- `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
-- `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FUNCTION_001). Must follow SAP naming conventions (start with Z or Y, max 30 chars).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - Parent function group name
+- `function_module_name` (string, required) - Function module name. Up to 30 characters.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -1741,23 +1741,23 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - New description for the function group.
-- `function_group_name` (string, required) - Function group name (e.g., ZTEST_FG_001). Must exist in the system.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - Function group name. Must exist in the system.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
 <a id="updatefunctionmodule-high-level-function"></a>
 #### UpdateFunctionModule (High-Level / Function)
-**Description:** Operation: Update, Create. Subject: FunctionModule. Will be useful for updating or creating function module. Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP function module. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/function/high/handleUpdateFunctionModule.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
-- `function_group_name` (string, required) - Function group name containing the function module (e.g., ZOK_FG_MCP01).
-- `function_module_name` (string, required) - Function module name (e.g., Z_TEST_FM_MCP01). Function module must already exist.
-- `source_code` (string, required) - Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION Z_TEST_FM\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable function modules. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - Function group name containing the function module.
+- `function_module_name` (string, required) - Function module name. Function module must already exist.
+- `source_code` (string, required) - Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable function modules.
 
 ---
 
@@ -1766,13 +1766,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctiongroup-high-level-function-group"></a>
 #### DeleteFunctionGroup (High-Level / Function Group)
-**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/function_group/high/handleDeleteFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_FUNCTIONGROUP).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - FunctionGroup name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1783,7 +1783,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_group/high/handleGetFunctionGroup.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name (e.g., Z_MY_FUNCTIONGROUP).
+- `function_group_name` (string, required) - FunctionGroup name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -1793,43 +1793,43 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createfunctioninclude-high-level-function-include"></a>
 #### CreateFunctionInclude (High-Level / Function Include)
-**Description:** Operation: Create. Subject: FunctionInclude. Will be useful for creating function group include. Create a new ABAP include within an existing function group. Creates the include in initial state.
+**Description:** Create a new ABAP include within an existing function group. Creates the include in initial state.
 
 **Source:** `src/handlers/function_include/high/handleCreateFunctionInclude.ts`
 
 **Parameters:**
 - `description` (string, optional) - Optional description for the include
-- `function_group_name` (string, required) - Parent function group name (e.g., ZTEST_FG_001)
-- `include_name` (string, required) - Include name (e.g., LZTEST_FG_001F01).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - Parent function group name
+- `include_name` (string, required) - Include name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deletefunctioninclude-high-level-function-include"></a>
 #### DeleteFunctionInclude (High-Level / Function Include)
-**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function group include from the SAP system via ADT deletion API. Note: function module includes must be deleted via the Function Builder; the backend rejects such deletions. Transport request optional for local objects.
 
 **Source:** `src/handlers/function_include/high/handleDeleteFunctionInclude.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - Function group name containing the include (e.g., Z_MY_FG).
-- `include_name` (string, required) - Include name (e.g., LZ_MY_FGF01).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - Function group name containing the include.
+- `include_name` (string, required) - Include name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
 <a id="updatefunctioninclude-high-level-function-include"></a>
 #### UpdateFunctionInclude (High-Level / Function Include)
-**Description:** Operation: Update. Subject: FunctionInclude. Will be useful for updating a function group include. Update source code of an existing ABAP function group include.
+**Description:** Update source code of an existing ABAP function group include.
 
 **Source:** `src/handlers/function_include/high/handleUpdateFunctionInclude.ts`
 
 **Parameters:**
 - `activate` (boolean, optional (default: false)) - Activate the include after the source update. Default: false. Set true to make the updated source the active version immediately.
-- `function_group_name` (string, required) - Function group name containing the include (e.g., ZOK_FG_MCP01).
-- `include_name` (string, required) - Include name (e.g., LZOK_FG_MCP01F01). Include must already exist.
+- `function_group_name` (string, required) - Function group name containing the include.
+- `include_name` (string, required) - Include name. Include must already exist.
 - `source_code` (string, required) - Complete ABAP include source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable includes. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable includes.
 
 ---
 
@@ -1838,14 +1838,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletefunctionmodule-high-level-function-module"></a>
 #### DeleteFunctionModule (High-Level / Function Module)
-**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP function module from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/function_module/high/handleDeleteFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).
-- `function_module_name` (string, required) - FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_group_name` (string, required) - FunctionGroup name containing the function module.
+- `function_module_name` (string, required) - FunctionModule name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1856,8 +1856,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
 **Parameters:**
-- `function_group_name` (string, required) - FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).
-- `function_module_name` (string, required) - FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).
+- `function_group_name` (string, required) - FunctionGroup name containing the function module.
+- `function_module_name` (string, required) - FunctionModule name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -1872,35 +1872,35 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/high/handleCheckInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE).
+- `interface_name` (string, required) - Interface name.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
 <a id="createinterface-high-level-interface"></a>
 #### CreateInterface (High-Level / Interface)
-**Description:** Operation: Create. Subject: Interface. Will be useful for creating interface. Create a new ABAP interface in SAP system. Creates the interface object in initial state.
+**Description:** Create a new ABAP interface in SAP system. Creates the interface object in initial state.
 
 **Source:** `src/handlers/interface/high/handleCreateInterface.ts`
 
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
-- `interface_name` (string, required) - Interface name (e.g., ZIF_TEST_INTERFACE_001). Must follow SAP naming conventions (start with Z or Y).
+- `interface_name` (string, required) - Interface name.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deleteinterface-high-level-interface"></a>
 #### DeleteInterface (High-Level / Interface)
-**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP interface from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/interface/high/handleDeleteInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., Z_MY_INTERFACE).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `interface_name` (string, required) - Interface name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1911,22 +1911,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/interface/high/handleGetInterface.ts`
 
 **Parameters:**
-- `interface_name` (string, required) - Interface name (e.g., Z_MY_INTERFACE).
+- `interface_name` (string, required) - Interface name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateinterface-high-level-interface"></a>
 #### UpdateInterface (High-Level / Interface)
-**Description:** Operation: Update, Create. Subject: Interface. Will be useful for updating or creating interface. Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/interface/high/handleUpdateInterface.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
-- `interface_name` (string, required) - Interface name (e.g., ZIF_MY_INTERFACE). Must exist in the system.
+- `interface_name` (string, required) - Interface name. Must exist in the system.
 - `source_code` (string, required) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -1935,57 +1935,57 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createmessageclass-high-level-message-class"></a>
 #### CreateMessageClass (High-Level / Message Class)
-**Description:** Operation: Create. Subject: Message Class (MSAG). Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
+**Description:** Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClass.ts`
 
 **Parameters:**
 - `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
 - `master_language` (string, optional) - (optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS). Must follow SAP naming conventions.
-- `package_name` (string, required) - Package name (e.g., ZMY_PKG, $TMP for local objects).
-- `transport_request` (string, optional) - (optional) Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `message_class_name` (string, required) - Message class name.
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="createmessageclassmessage-high-level-message-class"></a>
 #### CreateMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Create. Subject: a single message inside a Message Class (MSAG). Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
+**Description:** Add a message (number + text) to an existing ABAP message class (T100). The parent class must exist first (CreateMessageClass).
 
 **Source:** `src/handlers/message_class/high/handleCreateMessageClassMessage.ts`
 
 **Parameters:**
 - `description` (string, optional) - (optional) Long description for the message.
-- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 - `msgtext` (string, required) - Message text. May contain placeholders &1 &2 &3 &4 (or &).
 - `self_explanatory` (boolean, optional (default: false)) - (optional) Mark the message as self-explanatory (no long text needed). Default: false.
-- `transport_request` (string, optional) - (optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
 ---
 
 <a id="deletemessageclass-high-level-message-class"></a>
 #### DeleteMessageClass (High-Level / Message Class)
-**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).
+**Description:** Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local objects.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClass.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects, optional for local ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `message_class_name` (string, required) - Message class name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
 ---
 
 <a id="deletemessageclassmessage-high-level-message-class"></a>
 #### DeleteMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Delete. Subject: a single message inside a Message Class (MSAG). Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
+**Description:** Remove one message (by number) from an ABAP message class (T100), keeping the class and its other messages. Transport request required for transportable objects.
 
 **Source:** `src/handlers/message_class/high/handleDeleteMessageClassMessage.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number to delete (e.g., "001").
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects, optional for local ($TMP).
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
 ---
 
@@ -1996,7 +1996,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/message_class/high/handleGetMessageClass.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Message class name.
 
 ---
 
@@ -2007,37 +2007,37 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/message_class/high/handleGetMessageClassMessage.ts`
 
 **Parameters:**
-- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 
 ---
 
 <a id="updatemessageclass-high-level-message-class"></a>
 #### UpdateMessageClass (High-Level / Message Class)
-**Description:** Operation: Update. Subject: Message Class (MSAG). Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
+**Description:** Update a message class header (e.g. its description). To add or change individual messages use CreateMessageClassMessage / UpdateMessageClassMessage.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClass.ts`
 
 **Parameters:**
 - `description` (string, required) - New short description for the message class.
-- `message_class_name` (string, required) - Message class name (e.g., ZMY_MSGS).
-- `transport_request` (string, optional) - (optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.
+- `message_class_name` (string, required) - Message class name.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
 ---
 
 <a id="updatemessageclassmessage-high-level-message-class"></a>
 #### UpdateMessageClassMessage (High-Level / Message Class)
-**Description:** Operation: Update. Subject: a single message inside a Message Class (MSAG). Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
+**Description:** Change the text / flags of an existing message in an ABAP message class (T100). Upserts the message if it does not exist yet.
 
 **Source:** `src/handlers/message_class/high/handleUpdateMessageClassMessage.ts`
 
 **Parameters:**
 - `description` (string, optional) - (optional) Long description for the message.
-- `message_class_name` (string, required) - Parent message class name (e.g., ZMY_MSGS).
+- `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number (e.g., "001").
 - `msgtext` (string, required) - New message text. May contain placeholders &1 &2 &3 &4 (or &).
 - `self_explanatory` (boolean, optional) - (optional) Mark the message as self-explanatory.
-- `transport_request` (string, optional) - (optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
 ---
 
@@ -2046,13 +2046,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletemetadataextension-high-level-metadata-extension"></a>
 #### DeleteMetadataExtension (High-Level / Metadata Extension)
-**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.
 
 **Source:** `src/handlers/metadata_extension/high/handleDeleteMetadataExtension.ts`
 
 **Parameters:**
-- `metadata_extension_name` (string, required) - MetadataExtension name (e.g., Z_MY_METADATAEXTENSION).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `metadata_extension_name` (string, required) - MetadataExtension name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2063,7 +2063,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/metadata_extension/high/handleGetMetadataExtension.ts`
 
 **Parameters:**
-- `metadata_extension_name` (string, required) - MetadataExtension name (e.g., Z_MY_METADATAEXTENSION).
+- `metadata_extension_name` (string, required) - MetadataExtension name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -2078,8 +2078,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/high/handleCheckPackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., ZMY_PACKAGE).
-- `super_package` (string, required) - Super package name (parent package).
+- `package_name` (string, required) - Package name.
+- `super_package` (string, optional) - Optional, and not read by the check endpoint — see CheckPackageLow. Requiring it refused the call before any request was made, for a package with no parent.
 
 ---
 
@@ -2101,7 +2101,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/high/handleGetPackage.ts`
 
 **Parameters:**
-- `package_name` (string, required) - Package name (e.g., Z_MY_PACKAGE).
+- `package_name` (string, required) - Package name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
@@ -2116,14 +2116,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/high/handleCheckProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., ZMCP_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `version` (string, optional) - Which version to check — it goes into the checkrun body as chkrun:version, as ADT sends it. Omitted, the inactive one is checked; an object that is only active has none, and SAP answers such a check with a finding against an empty source (e.g. G46 "REPORT/PROGRAM statement is missing") or "Inactive version … does not exist" — ask for active.
 
 ---
 
 <a id="createprogram-high-level-program"></a>
 #### CreateProgram (High-Level / Program)
-**Description:** Operation: Create. Subject: Program. Will be useful for creating program. Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
+**Description:** Create a new ABAP program (report) in SAP system. Creates the program object in initial state.
 
 **Source:** `src/handlers/program/high/handleCreateProgram.ts`
 
@@ -2131,22 +2131,22 @@ Generated from code in `src/handlers/**` (not from docs).
 - `application` (string, optional) - Application area (e.g., 'S' for System, 'M' for Materials Management). Default: '*'
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LAB, $TMP for local objects)
-- `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Must follow SAP naming conventions (start with Z or Y).
+- `package_name` (string, required) - Package name
+- `program_name` (string, required) - Program name.
 - `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deleteprogram-high-level-program"></a>
 #### DeleteProgram (High-Level / Program)
-**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP program from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/program/high/handleDeleteProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `program_name` (string, required) - Program name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2157,22 +2157,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/program/high/handleGetProgram.ts`
 
 **Parameters:**
-- `program_name` (string, required) - Program name (e.g., Z_MY_PROGRAM).
+- `program_name` (string, required) - Program name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateprogram-high-level-program"></a>
 #### UpdateProgram (High-Level / Program)
-**Description:** Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/program/high/handleUpdateProgram.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
-- `program_name` (string, required) - Program name (e.g., Z_TEST_PROGRAM_001). Program must already exist.
+- `program_name` (string, required) - Program name. Program must already exist.
 - `source_code` (string, required) - Complete ABAP program source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -2181,7 +2181,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Operation: Create. Subject: ServiceBinding. Will be useful for creating service binding. Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
+**Description:** Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -2196,20 +2196,20 @@ Generated from code in `src/handlers/**` (not from docs).
 - `service_definition_name` (string, required) - Referenced service definition name.
 - `service_name` (string, optional) - Published service name. Default: service_binding_name if omitted.
 - `service_version` (string, optional) - Published service version. Default: 0001.
-- `transport_request` (string, optional) - Optional transport request for transport checks. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Optional transport request for transport checks.
 
 ---
 
 <a id="deleteservicebinding-high-level-service-binding"></a>
 #### DeleteServiceBinding (High-Level / Service Binding)
-**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/service_binding/high/handleDeleteServiceBinding.ts`
 
 **Parameters:**
 - `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
-- `transport_request` (string, optional) - Optional transport request for deletion transport flow. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Optional transport request for deletion transport flow.
 
 ---
 
@@ -2221,7 +2221,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `response_format` (string, optional (default: xml)) - Preferred response format. "json" requests JSON from endpoint, "xml" parses XML payload, "plain" returns raw text.
-- `service_binding_name` (string, required) - Service binding name (for example: ZUI_MY_BINDING). Case-insensitive.
+- `service_binding_name` (string, required) - Service binding name. Case-insensitive.
 
 ---
 
@@ -2232,13 +2232,13 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_binding/high/handleListServiceBindingTypes.ts`
 
 **Parameters:**
-- `response_format` (string, optional (default: xml)) - 
+- `response_format` (string, optional (default: xml)) - Shape of the answer: the document as the server sent it, the same parsed, or a flat list of the type names.
 
 ---
 
 <a id="updateservicebinding-high-level-service-binding"></a>
 #### UpdateServiceBinding (High-Level / Service Binding)
-**Description:** Operation: Update, Create. Subject: ServiceBinding. Will be useful for updating or creating service binding. Update publication state of an existing ABAP service binding.
+**Description:** Update publication state of an existing ABAP service binding.
 
 **Source:** `src/handlers/service_binding/high/handleUpdateServiceBinding.ts`
 
@@ -2272,7 +2272,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Operation: Create. Subject: ServiceDefinition. Will be useful for creating service definition. Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
+**Description:** Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2280,22 +2280,22 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate service definition after creation. Default: true.
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
-- `service_definition_name` (string, required) - Service definition name (e.g., ZSD_MY_SERVICE). Must follow SAP naming conventions (start with Z or Y).
+- `package_name` (string, required) - Package name
+- `service_definition_name` (string, required) - Service definition name.
 - `source_code` (string, optional) - Service definition source code (optional). If not provided, a minimal template will be created.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deleteservicedefinition-high-level-service-definition"></a>
 #### DeleteServiceDefinition (High-Level / Service Definition)
-**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP service definition from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/service_definition/high/handleDeleteServiceDefinition.ts`
 
 **Parameters:**
-- `service_definition_name` (string, required) - ServiceDefinition name (e.g., Z_MY_SERVICEDEFINITION).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `service_definition_name` (string, required) - ServiceDefinition name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2306,22 +2306,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/service_definition/high/handleGetServiceDefinition.ts`
 
 **Parameters:**
-- `service_definition_name` (string, required) - ServiceDefinition name (e.g., Z_MY_SERVICEDEFINITION).
+- `service_definition_name` (string, required) - ServiceDefinition name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updateservicedefinition-high-level-service-definition"></a>
 #### UpdateServiceDefinition (High-Level / Service Definition)
-**Description:** Operation: Update, Create. Subject: ServiceDefinition. Will be useful for updating or creating service definition. Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
+**Description:** Update source code of an existing ABAP service definition. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/service_definition/high/handleUpdateServiceDefinition.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
-- `service_definition_name` (string, required) - Service definition name (e.g., ZSD_MY_SERVICE). Must exist in the system.
+- `service_definition_name` (string, required) - Service definition name. Must exist in the system.
 - `source_code` (string, required) - Complete service definition source code.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -2336,14 +2336,14 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `structure_name` (string, required) - Structure name (e.g., ZST_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name.
 - `version` (string, optional) - Version to check: 'active' or 'inactive'. Default: inactive.
 
 ---
 
 <a id="createstructure-high-level-structure"></a>
 #### CreateStructure (High-Level / Structure)
-**Description:** Operation: Create. Subject: Structure. Will be useful for creating structure. Create a new ABAP structure in SAP system. Creates the structure object in initial state.
+**Description:** Create a new ABAP structure in SAP system. Creates the structure object in initial state.
 
 **Source:** `src/handlers/structure/high/handleCreateStructure.ts`
 
@@ -2353,21 +2353,21 @@ Generated from code in `src/handlers/**` (not from docs).
 - `fields` (array, required (default: 0)) - Does not reach creation — the shipped create endpoint posts a metadata document only. Use UpdateStructure (with ddl_code) after creating to set the fields.
 - `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
-- `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Must follow SAP naming conventions.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name
+- `structure_name` (string, required) - Structure name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deletestructure-high-level-structure"></a>
 #### DeleteStructure (High-Level / Structure)
-**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP structure from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/structure/high/handleDeleteStructure.ts`
 
 **Parameters:**
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `structure_name` (string, required) - Structure name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2378,22 +2378,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/structure/high/handleGetStructure.ts`
 
 **Parameters:**
-- `structure_name` (string, required) - Structure name (e.g., Z_MY_STRUCTURE).
+- `structure_name` (string, required) - Structure name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updatestructure-high-level-structure"></a>
 #### UpdateStructure (High-Level / Structure)
-**Description:** Operation: Update, Create. Subject: Structure. Will be useful for updating or creating structure. Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
+**Description:** Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/structure/high/handleUpdateStructure.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for structure. Example: '@EndUserText.label : \'My Structure\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'
-- `structure_name` (string, required) - Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `structure_name` (string, required) - Structure name. Structure must already exist.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -2411,7 +2411,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `include_descriptions` (boolean, optional (default: true)) - Include object descriptions in response. Default: true
 - `include_subpackages` (boolean, optional (default: true)) - Include subpackages recursively in the tree. If false, subpackages are shown as first-level objects but not recursively expanded. Default: true
 - `max_depth` (integer, optional (default: 5)) - Maximum depth for recursive package traversal. Default: 5
-- `package_name` (string, required) - Package name (e.g., "ZMY_PACKAGE")
+- `package_name` (string, required) - Package name
 
 ---
 
@@ -2426,35 +2426,35 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `ddl_code` (string, optional) - Optional: DDL source code to validate instead of the saved version.
-- `table_name` (string, required) - Table name (e.g., ZMCP_MY_TABLE).
+- `table_name` (string, required) - Table name.
 - `version` (string, optional) - Version to check: 'active', 'inactive', or 'new'. Default: new.
 
 ---
 
 <a id="createtable-high-level-table"></a>
 #### CreateTable (High-Level / Table)
-**Description:** Operation: Create. Subject: Table. Will be useful for creating table. Create a new ABAP table in SAP system. Creates the table object in initial state.
+**Description:** Create a new ABAP table in SAP system. Creates the table object in initial state.
 
 **Source:** `src/handlers/table/high/handleCreateTable.ts`
 
 **Parameters:**
 - `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `package_name` (string, required) - Package name (e.g., ZOK_LOCAL, $TMP for local objects)
-- `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Must follow SAP naming conventions.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name
+- `table_name` (string, required) - Table name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
 <a id="deletetable-high-level-table"></a>
 #### DeleteTable (High-Level / Table)
-**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for $TMP objects.
+**Description:** Delete an ABAP table from the SAP system via ADT deletion API. Transport request optional for local objects.
 
 **Source:** `src/handlers/table/high/handleDeleteTable.ts`
 
 **Parameters:**
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `table_name` (string, required) - Table name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2465,22 +2465,22 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/table/high/handleGetTable.ts`
 
 **Parameters:**
-- `table_name` (string, required) - Table name (e.g., Z_MY_TABLE).
+- `table_name` (string, required) - Table name.
 - `version` (string, optional (default: active)) - Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.
 
 ---
 
 <a id="updatetable-high-level-table"></a>
 #### UpdateTable (High-Level / Table)
-**Description:** Operation: Update, Create. Subject: Table. Will be useful for updating or creating table. Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
+**Description:** Update DDL source code of an existing ABAP table. Locks, updates, unlocks, and optionally activates.
 
 **Source:** `src/handlers/table/high/handleUpdateTable.ts`
 
 **Parameters:**
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
-- `table_name` (string, required) - Table name (e.g., ZZ_TEST_TABLE_001). Table must already exist.
-- `transport_request` (string, optional) - Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `table_name` (string, required) - Table name. Table must already exist.
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -2494,10 +2494,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name, e.g. ZCL_MY_CLASS.
+- `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
-- `transport_number` (string, required) - The TASK to attach the object to, e.g. E19K905943 — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.
+- `transport_number` (string, required) - The TASK to attach the object to — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.
 
 ---
 
@@ -2524,7 +2524,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `target_user` (string, required) - SAP user the task belongs to, e.g. DEVELOPER. Required — the server will not choose one, and naming another user is how a task is made for somebody else.
 - `task_type` (string, optional (default: S)) - S — Development/Correction (default), R — Repair of an object this system does not own, X — leave it Unclassified, as the server creates it. An Unclassified task refuses AddTransportObject on premise (TK127).
-- `transport_number` (string, required) - The REQUEST to create the task under, e.g. E19K905941 — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
+- `transport_number` (string, required) - The REQUEST to create the task under — never another task. The number that comes back is the task, and that is what AddTransportObject, RemoveTransportObject and ReadTransportObjects address afterwards.
 
 ---
 
@@ -2535,11 +2535,11 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name, e.g. ZCL_MY_CLASS.
+- `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
 - `position` (string, required) - The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200.
-- `transport_number` (string, required) - The TASK holding the entry, e.g. E19K905943 — read it from ReadTransportObjects. Not the request above it: a request displays its tasks' entries and refuses to detach one, answering that the entry "does not exist in request/task".
+- `transport_number` (string, required) - The TASK holding the entry — read it from ReadTransportObjects. Not the request above it: a request displays its tasks' entries and refuses to detach one, answering that the entry "does not exist in request/task".
 
 ---
 
@@ -2548,16 +2548,16 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. 
+**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Parameters:**
 - `cds_view_name` (string, required) - CDS view name to check for unit test doubles before creating the class.
-- `class_name` (string, required) - Container class name (e.g., ZCL_CDS_TEST).
+- `class_name` (string, required) - Container class name.
 - `description` (string, optional) - Optional description for the container class.
-- `package_name` (string, required) - Package name (e.g., ZOK_TEST_PKG_01, $TMP).
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `package_name` (string, required) - Package name.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -2584,8 +2584,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Global test class name (e.g., ZCL_CDS_TEST).
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `class_name` (string, required) - Global test class name.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -2602,7 +2602,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
+**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -2613,7 +2613,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
+**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -2626,7 +2626,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id. 
+**Description:** Retrieve CDS unit test run status for a run_id. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 
@@ -2695,9 +2695,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Global test class name (e.g., ZCL_CDS_TEST).
+- `class_name` (string, required) - Global test class name.
 - `test_class_source` (string, required) - Updated local test class ABAP source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -2712,4 +2712,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-27*
+*Last updated: 2026-09-28*

@@ -58,18 +58,18 @@ export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Operation: Create. Subject: the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. " +
+    "Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. " +
     'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Container class name (e.g., ZCL_CDS_TEST).',
+        description: 'Container class name.',
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_TEST_PKG_01, $TMP).',
+        description: 'Package name.',
       },
       cds_view_name: {
         type: 'string',
@@ -83,7 +83,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number (required for transportable packages), not a task.',
       },
       ...DETAIL_PROPERTY,
     },

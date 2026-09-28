@@ -22,14 +22,13 @@ export const TOOL_DEFINITION = {
   name: 'CreateMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Message Class (MSAG). Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.',
+    'Create a new ABAP message class (T100) shell. Individual messages are added afterwards with CreateMessageClassMessage. Message classes are not activated.',
   inputSchema: {
     type: 'object',
     properties: {
       message_class_name: {
         type: 'string',
-        description:
-          'Message class name (e.g., ZMY_MSGS). Must follow SAP naming conventions.',
+        description: 'Message class name.',
       },
       description: {
         type: 'string',
@@ -38,12 +37,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZMY_PKG, $TMP for local objects).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',
         description:
-          '(optional) Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          '(optional) Transport request number, not a task. Required for transportable packages.',
       },
       master_language: {
         type: 'string',

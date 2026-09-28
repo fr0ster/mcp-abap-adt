@@ -26,7 +26,7 @@ export const TOOL_DEFINITION = {
     properties: {
       interface_name: {
         type: 'string',
-        description: 'Interface name (e.g., ZIF_MY_INTERFACE).',
+        description: 'Interface name.',
       },
       session_id: {
         type: 'string',

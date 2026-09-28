@@ -92,7 +92,7 @@ create_domain:
       enabled: true
       params:
         domain_name: "ZZ_TEST_MCP_01"
-        transport_request: "E19K905999"  # Your transport!
+        transport_request: "SIDK905999"  # Your transport!
         package_name: "ZOK_LOCAL"
 ```
 
@@ -124,7 +124,7 @@ node tests/run-all-tests.js --list
 ```javascript
 const args = {
   domain_name: 'ZZ_TEST_MCP_01',
-  transport_request: 'E19K905635',  // ❌ Hardcoded, needs editing
+  transport_request: 'SIDK905635',  // ❌ Hardcoded, needs editing
   package_name: 'ZOK_LOCAL'
 };
 ```
@@ -138,7 +138,7 @@ create_domain:
       enabled: true
       params:
         domain_name: "ZZ_TEST_MCP_01"
-        transport_request: "E19K905635"  # ✅ One place to update
+        transport_request: "SIDK905635"  # ✅ One place to update
 ```
 
 ### Advantages
@@ -191,7 +191,7 @@ To migrate a legacy test:
 ## ⚠️ Important Notes
 
 - **Transport Requests**: Must be updated in YAML before running write operations
-- **Environment**: Tests load `.env` file (default: `e19.env`)
+- **Environment**: Tests load `.env` file (default: `your-system.env`)
 - **Dependencies**: Run `npm install` (yaml package now installed)
 - **Build**: Always run `npm run build` after code changes
 - **Legacy Tests**: Old tests still work but don't use YAML config

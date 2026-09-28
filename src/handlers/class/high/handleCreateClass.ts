@@ -27,13 +27,13 @@ export const TOOL_DEFINITION = {
   name: 'CreateClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Create. Subject: Class. Will be useful for creating class. Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.',
+    'Create a new ABAP class in SAP system. Creates the class object in initial state. Use UpdateClass to set source code.',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name (e.g., ZCL_TEST_CLASS_001).',
+        description: 'Class name.',
       },
       description: {
         type: 'string',
@@ -41,12 +41,12 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_LAB, $TMP).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number (required for transportable packages), not a task.',
       },
       superclass: { type: 'string', description: 'Optional superclass name.' },
       final: {

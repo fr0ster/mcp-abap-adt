@@ -7,6 +7,177 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.1.0] - 2026-09-28
+
+### Changed
+
+- **No parameter description names a transport request, and nothing in the tree
+  names the system it was measured on.** The rule is the user's and it is about
+  agnosticism, not retrieval: *we do not know who will use this, where, or how, so
+  we state only what we know.* A tool's text says what the tool does and what its
+  parameters mean; a request number from somebody's landscape is not part of that.
+
+  - **78 transport-number literals removed from parameter descriptions**, across 78
+    files — one real request 73 times, four more once or twice each. `Transport
+    request number (e.g., …). Required for transportable objects.` now reads
+    `Transport request number. Required for transportable objects.`, and the three
+    transport tools whose text turns on the request/task distinction keep the
+    distinction and lose the example. The worst case was not retrieval: an example
+    request number is a value a model can copy into a write, and it addressed a
+    real transport.
+  - **The system id is gone from the whole tree** — descriptions, code comments,
+    test comments, test data, captured fixtures, the installation guides, the test
+    template and this changelog's own history. What a measurement note knows is the
+    platform and the date, so `on E19 (2026-09-26)` reads `on premise
+    (2026-09-26)`, and `Measured on E19 (BASIS 816) and E98 (BASIS 756)` reads
+    `Measured on BASIS 816 and on BASIS 756` — the release is the fact that
+    mattered. `--env=…/e19.env` reads `--env=…/your-system.env`; a `SAP_MASTER_SYSTEM`
+    example reads *the three-character SID*; captured fixtures carry `SID`, beside
+    the `SAPUSER01` they already carried. Test data keeps its numbers under a
+    placeholder prefix (`SIDK9…`), so every assertion still pairs with its input.
+  - One of these was a live defect rather than a wording problem:
+    `GetNodeStructureLow`'s `node_id` description explained `"0000"` by naming the
+    system that answered an empty body for it.
+  - **And then every other name went with them: 255 of 370 tools, 350 parameter
+    descriptions, 169 distinct strings.** `Class name (e.g., ZCL_MY_CLASS).` reads
+    `Class name.`; `Package name (e.g., ZOK_LOCAL, $TMP for local objects).` reads
+    `Package name.`; `Optional for local objects ($TMP).` reads `Optional for local
+    objects.` — ABAP Cloud has no `$TMP` anyway. Constraints that change the call
+    stay word for word ("must already exist", "required for validation", "start
+    with Z or Y", the REQUEST/TASK distinction). What goes is only the example.
+    A couple needed a sentence rather than a deletion: the software component no
+    longer names two components, and the search pattern explains `"*"` as a prefix
+    match instead of listing masks.
+  - **Naming rules left with the names, and so did the CTS lesson.** A tool works
+    with any object the caller is authorised for, whatever it is called, so "must
+    follow SAP naming conventions", "start with Z or Y", "for the customer
+    namespace", a behaviour pool's conventional name and the worked ABAP snippet in
+    the function-module source parameter are all gone (28 descriptions). The
+    consumer's skill carries the naming rules and answers for the validity of what
+    it sends. The same cut trimmed 104 `transport_request` descriptions: `request`
+    is a word a description may use, a number never is, so the text keeps `not a
+    task` — the one fact that decides whether this call succeeds — and drops how CTS
+    works, which tool to call after it, and `CTS_WBO_API 020` / `SADT_RESOURCE 017`.
+    What stays is a limit that says what fits in the parameter ("up to 26
+    characters", the field-label lengths) and the transport tools' own text, where
+    request against task IS the subject of the tool.
+
+### Fixed
+
+- **The tool docs now show the text the model receives, not the text a regex could
+  parse out of the source.** Three reviewer findings on PR #244 were one defect in
+  three costumes: a Zod `.description` is a prototype getter and was invisible; a
+  description built as `'…' + '…'` was cut at the first literal; a template literal
+  printed `${commonObjectTypeSchema.description}` verbatim, because no regex
+  evaluates an interpolation. `generate-tools-docs.js` keeps the source parse for
+  structure — which tools exist, their files, tiers and schema shape — and takes
+  every description from the BUILT definitions through `HandlerExporter`, the same
+  strings a consumer's RAG indexes. Beside the interpolation, this filled in five
+  compact parameters that were documented as empty because their schema is a
+  shared constant the regex could not follow.
+
+  **And reading `dist` is only correct while `dist` is current, so that is checked
+  rather than assumed.** A reviewer edited `DeleteClass`'s description, ran
+  `docs:tools` and got success with the previous text in the documents, because the
+  script did not build. `docs:tools` now builds first, and the generator refuses to
+  run when `dist` is missing or older than any source file, saying how far behind it
+  is and what to do. The check throws rather than exiting: a unit test requires this
+  module, and a generator that kills the process from inside a test run is its own
+  defect. The "fall back to the parsed text" path is gone — it was the mechanism
+  that let wrong text look like success.
+
+- **The generator dropped everything after the first string literal of a
+  concatenated description.** It reads source with regexes rather than importing
+  the built definitions, and the pattern stopped at one literal — so five tools
+  lost a whole sentence each from the generated docs: the legacy refusal notes on
+  `GetCdsUnitTest`, `GetCdsUnitTestStatus`, `CreateCdsUnitTest` and
+  `GetStructuresList`, and the polling bound on `GetCdsUnitTestResult`. What made
+  it visible was cosmetic — `git diff --check` flagged two trailing spaces, which
+  were the seam where the text had been cut (found by a reviewer on PR #244). The
+  generator reads the whole `+` chain now, in the tool description and in every
+  parameter description.
+
+### Added
+
+- **The description ratchet covers parameter descriptions too, in every class.**
+  `toolDescriptionsCarryNoLiterals.test.ts` checks every `description` anywhere in
+  an input schema, not only the tool's own text: three classes (a package, a
+  customer-namespace object, a transport number) over both, six assertions. The
+  transport class carries two shapes — `<SID>K9…` and a plain letters-and-digits
+  number like `ER121235`, named by the user — and a message number, a release and a
+  short SAP code (`CTS_WBO_API 020`, `BASIS 816`, `TK127`) sit in the self-check as
+  text that must stay allowed. Two more refinements came out of running it:
+  - **A format placeholder is not a name.** `YYYYMMDDHHMMSS` matched the
+    customer-object pattern on its leading `Y`; a token built only from the letters
+    of a date is allowed by rule, and the self-check states it.
+  - **The generated prefixes count.** A function group's includes are `L<group>…`
+    and its main program `SAPL<group>`, so the customer name starts one character
+    in. The first pattern missed `LZOK_FG_MCP01F01` in five descriptions and the
+    widened one found them — the ratchet caught what the sweep did not.
+
+  **And it read one shape of schema only, which a reviewer found.** Eight tools
+  declare a flat map of Zod fields rather than JSON Schema — no `properties`
+  wrapper, and in Zod 4 `.description` is a getter on the prototype, so
+  `Object.entries` never saw it. `CreatePackage` and seven others were not checked
+  at all: the literal was put back into `CreatePackage`'s `transport_request` and
+  every assertion stayed green. The walker now reads `description` by access
+  instead of by enumeration and recurses through Zod's wrappers, and the coverage
+  guard asserts PER TOOL — the only tools with no parameter text are the two that
+  take no parameters (`TAKES_NO_PARAMETERS`), because a total of ">500" hid a whole
+  shape reading as zero. Two things the fix immediately caught: `SearchSource`'s
+  `packages` named a package and a prefix mask in its examples, and
+  `ListServiceBindingTypes`' `response_format` was a bare enum with no description
+  at all.
+
+## [13.0.2] - 2026-09-28
+
+### Fixed
+
+- **A tool description is search text, and an incidental literal in it retrieves
+  the wrong tools in bulk** (#241). *"Transport request optional for `$TMP`
+  objects"* sat in 30 `Delete*` descriptions, so any request mentioning `$TMP`
+  pulled the delete tools into the top of a consumer's tool-RAG. Measured in
+  cloud-llm-hub's retrieval — two collections, 0.7/0.3 fusion, translation, k=15,
+  developer role:
+
+  | query | `Delete*` in the top 15, before | after |
+  |---|---|---|
+  | "Які пакети в $TMP маємо?" | 12 | 1 |
+  | "Create class … in package $TMP" | 3, `CreateClass` third | 1, `CreateClass` second |
+  | create CDS / program / update in `$TMP` | 3–4 | 1–2 |
+
+  The wording without the literal was never worse on any query.
+
+  `$TMP objects` reads `local objects` now, which is also the more accurate
+  sentence: ABAP Cloud has no `$TMP` at all. The other incidental literals went
+  with it — a sample mask in `SearchObject`, a message class in
+  `ReadMessageClassMessage`, a namespace example in `SearchSource`. Parameter
+  descriptions are untouched here: the calling model reads them, retrieval does
+  not index them, and the literals in them are a larger replacement of their own
+  (254 of 370 tools, 464 occurrences — the follow-up).
+
+### Added
+
+- **`toolDescriptionsCarryNoLiterals.test.ts` — the rule is kept by a test.** No
+  tool description names anything concrete: a package (`$TMP`, `$ANY`), a
+  customer-namespace object or prefix (`ZCL_DEMO`, `ZOK*`, `YFOO_BAR`), or a
+  transport number. A bare mask names nothing and stays allowed — `Z*`, `Y*`,
+  `/NS/Z*`, any-namespace — and the test's own self-check pins both lists, so
+  neither a new literal nor a regex tightened against a legitimate mask passes
+  silently.
+
+  Ranking is not what it measures: that is measured by loading the descriptions
+  into a RAG and querying it, which is where the table above comes from. The test
+  keeps the rule in the repository where descriptions are authored and where no
+  RAG runs — without it the next `$TMP` returns and nothing here notices until a
+  consumer's retrieval degrades. Green on arrival: 370 descriptions, none naming
+  anything concrete.
+
+### Changed
+
+- `docs/user-guide/AVAILABLE_TOOLS*.md` regenerated, which also picks up the
+  `CheckPackage` wording 13.0.1 changed and did not regenerate.
+
 ## [13.0.1] - 2026-09-28
 
 ### Fixed
@@ -211,7 +382,7 @@ they arrived as success.
 
 ### Verified
 
-- **On premise, E19, soft mode** (PR #230): HTTP **47/47 suites, 105/105 tests**;
+- **On premise, soft mode** (PR #230): HTTP **47/47 suites, 105/105 tests**;
   RFC **43/47, 100/105**, the four failures all one finding — `RfcTransport` keeps
   one ABAP session for the connection's lifetime, so a stateless read after a
   create on the same connection answers `400 SADT_RESOURCE 007` while a fresh
@@ -1487,7 +1658,7 @@ These two auth paths pass full unit coverage but have **not** been exercised aga
 - `SearchSource.scanned.packages` now reports the resolved-and-deduplicated starting-package count (post-mask resolution, post-dedup) instead of raw input length. Closes #87.
 
 ### Notes
-- `+` (single-char) wildcard probed against an onprem E19 system and found unsupported by the ADT `informationsystem/search` endpoint (despite SAP CP-pattern docs). Dropped from public examples; the resolver still detects `+` for forward-compat with backends that may honor it.
+- `+` (single-char) wildcard probed against an on-premise system and found unsupported by the ADT `informationsystem/search` endpoint (despite SAP CP-pattern docs). Dropped from public examples; the resolver still detects `+` for forward-compat with backends that may honor it.
 
 ## [6.7.0] - 2026-05-14
 
@@ -2009,7 +2180,7 @@ These two auth paths pass full unit coverage but have **not** been exercised aga
   - Responsible resolution: `SAP_RESPONSIBLE` env var → `SAP_USERNAME` fallback → API.
   - Ensures correct transport request binding on on-premise systems.
 - **New `.env` variables for on-premise configuration**:
-  - `SAP_MASTER_SYSTEM` — SAP system ID (e.g., `E19`, `DEV`). Required for on-prem create/update operations.
+  - `SAP_MASTER_SYSTEM` — SAP system ID (the three-character SID). Required for on-prem create/update operations.
   - `SAP_RESPONSIBLE` — Responsible user (optional, falls back to `SAP_USERNAME`).
 - **Test infrastructure**: `resolveTestSystemContext()` resolves system context from YAML config for integration tests.
 

@@ -24,12 +24,11 @@ export const TOOL_DEFINITION = {
     properties: {
       interface_name: {
         type: 'string',
-        description: 'Interface name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'Interface name to validate.',
       },
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+        description: 'Package name. Required for validation.',
       },
       description: {
         type: 'string',

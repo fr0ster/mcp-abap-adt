@@ -168,7 +168,7 @@ function resolveTransportRequest(sharedConfig: any): string | undefined {
  *
  * `create`, `update` and `activate` answer an IAdtResponse; a refusal is
  * `ok: false`, not a throw. This script only ever caught throws, so a refused
- * write logged "Updated … source" and went on — on E19 (2026-09-25) that left
+ * write logged "Updated … source" and went on — on premise (2026-09-25) that left
  * ZMCP_SHR_STRU with ADT's generated stub, ZMCP_SHR_SRVD01 empty and
  * ZMCP_SHR_I_ROOT with the stub behaviour, all "updated". Reads are left
  * alone: a read that answers `ok: false` is how an absent object is found.
@@ -177,7 +177,7 @@ function resolveTransportRequest(sharedConfig: any): string | undefined {
  * Write a source through a high-level Update handler, which locks, writes
  * and unlocks. The bare `update()` this used to call sends no lock handle, and
  * SAP refuses every such write — `400`, "Parameter lockHandle could not be
- * found." (SADT_RESOURCE 017, E19 2026-09-25) — which is how ADT's generated
+ * found." (SADT_RESOURCE 017, on premise 2026-09-25) — which is how ADT's generated
  * stubs stayed in ZMCP_SHR_STRU, ZMCP_SHR_SRVD01 and ZMCP_SHR_I_ROOT while
  * this script logged them "updated". A handler answers `isError` rather than
  * throwing; this makes it throw, so the existing catch records the failure.
@@ -247,7 +247,7 @@ function resolvePackageName(sharedConfig: any): string {
  * SAP does not hand back the text it was given. A table comes back with a
  * blank line after `{` and before `}`; a function module comes back with its
  * signature pretty-printed — lower-cased names, its own indentation, blank
- * lines after the signature (E19, 2026-09-26). Outside '…', `…` and |…| none
+ * lines after the signature (on premise, 2026-09-26). Outside '…', `…` and |…| none
  * of that changes the program, so it is folded away; the literals are kept
  * exactly, so a changed text in one still counts as a change.
  */
@@ -267,7 +267,7 @@ const normalizedSource = (source: string): string =>
  * A shared object is written only when it differs. Writing an unchanged
  * source still leaves an inactive version behind until the group activation
  * runs, and any activation that then misses leaves a shared object inactive —
- * which is how the two shared BDEFs were found inactive on E19 (2026-09-26).
+ * which is how the two shared BDEFs were found inactive on premise (2026-09-26).
  * Activation itself is not skipped: every shared object is still activated
  * and confirmed active below. An object that cannot be read counts as
  * different, so it is written.
@@ -1818,7 +1818,7 @@ describe('Admin: Setup shared dependencies', () => {
       // 4. Confirm from the system. The activation answer says what the
       // server stated; only GetInactiveObjects says what is true, and
       // activation is asynchronous. "Group activation completed
-      // successfully" was logged over four inactive objects on E19.
+      // successfully" was logged over four inactive objects on premise.
       if (toActivate.length > 0) {
         let inactive: string[] = [];
         for (let attempt = 1; attempt <= 8; attempt++) {

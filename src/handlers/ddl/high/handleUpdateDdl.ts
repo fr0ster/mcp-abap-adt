@@ -37,19 +37,19 @@ export const TOOL_DEFINITION = {
   name: 'UpdateDdl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: DDL source. Will be useful for updating or creating a DDL source. Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
+    'Update DDL source code of an existing CDS View or Classic View. Locks, updates, unlocks, and optionally activates. Use CreateDdl to create a new DDL source.',
   inputSchema: {
     type: 'object',
     properties: {
       ddl_name: {
         type: 'string',
-        description: 'DDL source name (e.g., ZOK_R_TEST_0002).',
+        description: 'DDL source name.',
       },
       ddl_source: { type: 'string', description: 'Complete DDL source code.' },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       activate: {
         type: 'boolean',

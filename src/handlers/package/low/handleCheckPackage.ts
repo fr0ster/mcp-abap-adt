@@ -38,7 +38,7 @@ export const TOOL_DEFINITION = {
     properties: {
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., ZOK_TEST_0002).',
+        description: 'Package name.',
       },
       super_package: {
         type: 'string',

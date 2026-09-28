@@ -9,7 +9,7 @@ Integration tests run against a real SAP system using Jest. All test parameters 
 Place your SAP credentials in the standard sessions folder (`~/Documents/mcp-abap-adt/sessions/` on Windows, `~/.config/mcp-abap-adt/sessions/` on Unix):
 
 ```env
-# e.g., ~/Documents/mcp-abap-adt/sessions/e19.env
+# e.g., ~/Documents/mcp-abap-adt/sessions/your-system.env
 SAP_URL=http://your-sap-system.com:8000
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
@@ -29,11 +29,11 @@ The template works out of the box with sensible defaults. Edit **only** the line
 
 | Parameter | Description | Example |
 |---|---|---|
-| `environment.env` | Session .env file name from sessions folder | `"e19.env"`, `"mdd.env"` |
+| `environment.env` | Session .env file name from sessions folder | `"your-system.env"`, `"another-system.env"` |
 | `environment.system_type` | SAP system type | `"onprem"`, `"cloud"`, `"legacy"` |
 | `environment.connection_type` | Connection protocol | `"http"` (default), `"rfc"` |
 | `environment.default_package` | Dev package for test objects | `ZMCP_TEST`, `$TMP` |
-| `environment.default_transport` | Transport request (or `""` for local) | `E19K900001` |
+| `environment.default_transport` | Transport request (or `""` for local) | `SIDK900001` |
 | `shared_dependencies.package` | Package for shared test objects | `ZMCP_SHARED` |
 | `shared_dependencies.software_component` | Software component | `LOCAL`, `HOME` |
 

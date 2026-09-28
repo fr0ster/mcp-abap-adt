@@ -19,12 +19,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_module_name: {
         type: 'string',
-        description: 'FunctionModule name (e.g., Z_MY_FUNCTIONMODULE).',
+        description: 'FunctionModule name.',
       },
       function_group_name: {
         type: 'string',
-        description:
-          'FunctionGroup name containing the function module (e.g., Z_MY_FUNCTIONGROUP).',
+        description: 'FunctionGroup name containing the function module.',
       },
       version: {
         type: 'string',

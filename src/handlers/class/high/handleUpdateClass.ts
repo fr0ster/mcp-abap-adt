@@ -45,13 +45,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: Class. Will be useful for updating or creating class. Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.',
+    'Update source code of an existing ABAP class. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name (e.g., ZCL_TEST_CLASS_001).',
+        description: 'Class name.',
       },
       source_code: {
         type: 'string',
@@ -60,7 +60,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       activate: {
         type: 'boolean',

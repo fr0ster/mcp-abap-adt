@@ -27,11 +27,11 @@ export const TOOL_DEFINITION = {
     properties: {
       function_module_name: {
         type: 'string',
-        description: 'Function module name (e.g., Z_MY_FUNCTION).',
+        description: 'Function module name.',
       },
       function_group_name: {
         type: 'string',
-        description: 'Function group name (e.g., ZFG_MY_GROUP).',
+        description: 'Function group name.',
       },
       lock_handle: {
         type: 'string',

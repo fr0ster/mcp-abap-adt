@@ -12,13 +12,13 @@ export const TOOL_DEFINITION = {
   name: 'ReadBehaviorDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: BehaviorDefinition. Will be useful for reading, creating, or updating behavior definition. [read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.',
+    '[read-only] Read ABAP RAP behavior definition (BDEF) source code and metadata. Answers: "show behavior definition", "display BDEF source", "view RAP behavior X", "get behavior definition code". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
       behavior_definition_name: {
         type: 'string',
-        description: 'Behavior definition name (e.g., Z_MY_BDEF).',
+        description: 'Behavior definition name.',
       },
       version: {
         type: 'string',

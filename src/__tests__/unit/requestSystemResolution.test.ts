@@ -48,7 +48,7 @@ function cloudConn(): IAbapConnection {
 
 function onPremConn(): IAbapConnection {
   return {
-    getBaseUrl: async () => 'http://sap-e19.local:8000',
+    getBaseUrl: async () => 'http://sap.example.com:8000',
   } as unknown as IAbapConnection;
 }
 
@@ -145,7 +145,7 @@ describe('withResolvedSystemContext', () => {
   it('a scope carrying both makes no lookup and createAdtClient sees the scope', async () => {
     const conn = cloudConn();
     await runWithRequestContext(
-      { responsible: 'ALICE', masterSystem: 'E19' },
+      { responsible: 'ALICE', masterSystem: 'SID' },
       () =>
         withResolvedSystemContext(conn, () => {
           createAdtClient(conn);
@@ -154,7 +154,7 @@ describe('withResolvedSystemContext', () => {
     expect(lookup).not.toHaveBeenCalled();
     expect(lastOptions()).toMatchObject({
       responsible: 'ALICE',
-      masterSystem: 'E19',
+      masterSystem: 'SID',
     });
   });
 

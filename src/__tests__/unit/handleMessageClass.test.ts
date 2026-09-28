@@ -142,16 +142,16 @@ describe('Message Class (MSAG) CRUD tools', () => {
 
     const result = await handleDeleteMessageClass(ctx, {
       message_class_name: 'ZMY_MSGS',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
 
     expect(result.isError).toBe(false);
     expect(mockMc.checkDeletion).toHaveBeenCalledWith(
-      { name: 'ZMY_MSGS', transportRequest: 'E19K900001' },
+      { name: 'ZMY_MSGS', transportRequest: 'SIDK900001' },
       expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(mockMc.delete).toHaveBeenCalledWith(
-      { name: 'ZMY_MSGS', transportRequest: 'E19K900001' },
+      { name: 'ZMY_MSGS', transportRequest: 'SIDK900001' },
       expect.objectContaining({ analyse: expect.any(Function) }),
     );
     expect(payload(result)).toMatchObject({
@@ -174,7 +174,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
       msgno: '001',
       msgtext: 'Hello &1',
       self_explanatory: true,
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
 
     expect(result.isError).toBe(false);
@@ -185,7 +185,7 @@ describe('Message Class (MSAG) CRUD tools', () => {
         msgtext: 'Hello &1',
         selfExplanatory: true,
         description: undefined,
-        transportRequest: 'E19K900001',
+        transportRequest: 'SIDK900001',
       },
       expect.objectContaining({ analyse: expect.any(Function) }),
     );

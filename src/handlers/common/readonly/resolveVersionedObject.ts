@@ -151,7 +151,7 @@ export function resolveVersionedObject(
  *
  * `getVersions`/`getVersionSource` answer `IAdtResponse`; the tools serialised
  * that envelope as it was, and a response object serialises as `{"ok":true}` —
- * every version listing answered that and nothing else (E19, 2026-09-26).
+ * every version listing answered that and nothing else (on premise, 2026-09-26).
  */
 function thrown(error: { message: string; code?: string }): Error {
   const failure = new Error(error.message) as Error & { code?: string };

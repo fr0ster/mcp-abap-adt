@@ -1,5 +1,5 @@
 /**
- * GetInactiveObjects against the inactive-objects list E19 sent on
+ * GetInactiveObjects against the inactive-objects list an on-premise system sent on
  * 2026-09-26, through a real AdtClient — the reading the handler gets is the
  * one `structured` makes, where `ioc:object` is an array.
  */
@@ -35,7 +35,7 @@ async function run(body: string) {
 }
 
 describe('GetInactiveObjects', () => {
-  it('lists an inactive object (E19 answer, one entry)', async () => {
+  it('lists an inactive object (on premise answer, one entry)', async () => {
     expect(await run(ONE_INACTIVE_BDEF)).toEqual({
       success: true,
       count: 1,

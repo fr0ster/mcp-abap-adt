@@ -26,18 +26,15 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description:
-          'Behavior Implementation class name to validate (e.g., ZBP_MY_ENTITY).',
+        description: 'Behavior Implementation class name to validate.',
       },
       behavior_definition: {
         type: 'string',
-        description:
-          'Behavior Definition name (e.g., ZI_MY_ENTITY). Required for validation.',
+        description: 'Behavior Definition name. Required for validation.',
       },
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+        description: 'Package name. Required for validation.',
       },
       description: {
         type: 'string',

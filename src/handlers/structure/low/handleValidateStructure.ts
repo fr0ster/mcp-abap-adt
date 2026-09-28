@@ -31,12 +31,12 @@ export const TOOL_DEFINITION = {
     properties: {
       structure_name: {
         type: 'string',
-        description: 'Structure name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'Structure name to validate.',
       },
       package_name: {
         type: 'string',
         description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.',
+          'Package name. Required by this tool, but the validation endpoint takes no package — the verdict is package-independent.',
       },
       description: {
         type: 'string',

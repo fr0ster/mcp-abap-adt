@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
     properties: {
       program_name: {
         type: 'string',
-        description: 'Program name (e.g., Z_MY_PROGRAM).',
+        description: 'Program name.',
       },
       lock_handle: {
         type: 'string',

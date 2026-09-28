@@ -39,14 +39,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateInterface',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: Interface. Will be useful for updating or creating interface. Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.',
+    'Update source code of an existing ABAP interface. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {
       interface_name: {
         type: 'string',
-        description:
-          'Interface name (e.g., ZIF_MY_INTERFACE). Must exist in the system.',
+        description: 'Interface name. Must exist in the system.',
       },
       source_code: {
         type: 'string',
@@ -56,7 +55,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Optional if object is local or already in transport.',
       },
       activate: {
         type: 'boolean',

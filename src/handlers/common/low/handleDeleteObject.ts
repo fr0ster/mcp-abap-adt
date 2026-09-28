@@ -35,13 +35,13 @@ export const TOOL_DEFINITION = {
   name: 'DeleteObjectLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for $TMP objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.',
+    '[low-level] Delete an ABAP object via ADT deletion API. Transport request optional for local objects. Note: object_type "program" is onprem only — calling it on ABAP Cloud will fail.',
   inputSchema: {
     type: 'object',
     properties: {
       object_name: {
         type: 'string',
-        description: 'Object name (e.g., ZCL_MY_CLASS)',
+        description: 'Object name',
       },
       object_type: {
         type: 'string',
@@ -54,8 +54,7 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description:
-          'Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+        description: 'Transport request number, not a task',
       },
       ...DETAIL_PROPERTY,
     },

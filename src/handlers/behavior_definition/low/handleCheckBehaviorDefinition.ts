@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'BehaviorDefinition name (e.g., Z_MY_PROGRAM).',
+        description: 'BehaviorDefinition name.',
       },
       session_id: {
         type: 'string',

@@ -33,18 +33,18 @@ export const TOOL_DEFINITION = {
   name: 'DeletePackageLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for $TMP objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
+    '[low-level] Delete an ABAP package from the SAP system via ADT deletion API. Transport request optional for local objects. A package can be saved only once per ABAP session (PAK/058 "Package … is already locked" otherwise). The package tools of this server never save a package in its own session, so a delete here works after them; for a package saved elsewhere through this connection, pass force_new_connection=true to delete from a new session, closed afterwards.',
   inputSchema: {
     type: 'object',
     properties: {
       package_name: {
         type: 'string',
-        description: 'Package name (e.g., Z_MY_PROGRAM).',
+        description: 'Package name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
       },
       force_new_connection: {
         type: 'boolean',

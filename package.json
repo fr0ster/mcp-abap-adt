@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/lib",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "13.0.1",
+  "version": "13.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -93,7 +93,7 @@
     "auth": "npx sap-abap-auth auth",
     "clean": "make clean",
     "chrono": "./tools/version-stats.sh",
-    "docs:tools": "node ./tools/generate-tools-docs.js",
+    "docs:tools": "npm run build && node ./tools/generate-tools-docs.js",
     "release:publish": "bash scripts/publish-all.sh",
     "release:dry": "bash scripts/publish-all.sh --dry-run",
     "prepublishOnly": "npm run build",

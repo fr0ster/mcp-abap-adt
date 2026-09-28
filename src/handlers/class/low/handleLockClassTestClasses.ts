@@ -28,7 +28,7 @@ import { restoreSessionInConnection, return_error } from '../../../lib/utils';
  * It names what they answer, not `any`: under `any` the change in
  * adt-clients 23 — both answer `IAdtResponse` now, not a bare handle — went
  * unseen, and the whole envelope was handed on as the lock handle
- * (`lockHandle=[object Object]`, SAP 423, E19 2026-09-26).
+ * (`lockHandle=[object Object]`, SAP 423, on premise 2026-09-26).
  */
 interface TestClassesLocking {
   lockTestClasses(
@@ -52,7 +52,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name (e.g., ZCL_MY_CLASS).',
+        description: 'Class name.',
       },
       session_id: {
         type: 'string',

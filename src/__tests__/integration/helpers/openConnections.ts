@@ -4,7 +4,7 @@
  * A connection that connected must disconnect: `disconnect()` sends the logoff
  * that ends its HTTP security session. Without it every test file left its
  * session in SM05 until the server's timeout — one per file, and nothing in the
- * helpers ever closed one (E19, 2026-09-27). The ABAP session of a stateless
+ * helpers ever closed one (on premise, 2026-09-27). The ABAP session of a stateless
  * request ends with the request; the HTTP session, and a stateful context
  * inside it, do not.
  *

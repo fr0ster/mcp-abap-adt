@@ -24,7 +24,7 @@ export const TOOL_DEFINITION = {
     properties: {
       domain_name: {
         type: 'string',
-        description: 'Domain name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'Domain name to validate.',
       },
       description: {
         type: 'string',

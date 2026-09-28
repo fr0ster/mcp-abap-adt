@@ -132,7 +132,7 @@ describe('MetadataExtension High-Level Handlers Integration', () => {
             ...(transportRequest && { transport_request: transportRequest }),
             // Create is the empty object; activating it activates an empty
             // DDLX, which SAP refuses — SDDIC_ADT_DDLX(804) "Malformed
-            // 'annotate' statement" at line 1 (E19, 2026-09-25). The source
+            // 'annotate' statement" at line 1 (on premise, 2026-09-25). The source
             // arrives with the update, which activates.
             activate: false,
           },

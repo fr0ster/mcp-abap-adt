@@ -37,14 +37,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateProgram',
   available_in: ['onprem'] as const,
   description:
-    'Operation: Update, Create. Subject: Program. Will be useful for updating or creating program. Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
+    'Update source code of an existing ABAP program. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {
       program_name: {
         type: 'string',
-        description:
-          'Program name (e.g., Z_TEST_PROGRAM_001). Program must already exist.',
+        description: 'Program name. Program must already exist.',
       },
       source_code: {
         type: 'string',
@@ -53,7 +52,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       activate: {
         type: 'boolean',

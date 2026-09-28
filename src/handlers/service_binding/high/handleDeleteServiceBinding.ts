@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete ABAP service binding via ADT deletion API. Transport request optional for $TMP objects.',
+    'Delete ABAP service binding via ADT deletion API. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -43,8 +43,7 @@ export const TOOL_DEFINITION = {
       },
       transport_request: {
         type: 'string',
-        description:
-          'Optional transport request for deletion transport flow. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+        description: 'Optional transport request for deletion transport flow.',
       },
       response_format: {
         type: 'string',

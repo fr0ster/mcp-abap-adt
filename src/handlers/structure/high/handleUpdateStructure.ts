@@ -41,14 +41,13 @@ export const TOOL_DEFINITION = {
   name: 'UpdateStructure',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Update, Create. Subject: Structure. Will be useful for updating or creating structure. Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.',
+    'Update DDL source code of an existing ABAP structure. Locks, updates, unlocks, and optionally activates.',
   inputSchema: {
     type: 'object',
     properties: {
       structure_name: {
         type: 'string',
-        description:
-          'Structure name (e.g., ZZ_S_TEST_001). Structure must already exist.',
+        description: 'Structure name. Structure must already exist.',
       },
       ddl_code: {
         type: 'string',
@@ -58,7 +57,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Optional if object is local or already in transport.',
       },
       activate: {
         type: 'boolean',

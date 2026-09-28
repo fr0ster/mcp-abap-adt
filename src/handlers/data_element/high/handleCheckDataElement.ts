@@ -33,7 +33,7 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description: 'Data element name (e.g., ZDE_MY_ELEMENT).',
+        description: 'Data element name.',
       },
       version: {
         type: 'string',

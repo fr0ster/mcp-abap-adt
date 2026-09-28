@@ -71,12 +71,12 @@ export const TOOL_DEFINITION = {
       class_name: {
         type: 'string',
         description:
-          'Behavior Implementation class name (e.g., ZBP_MY_ENTITY). Must exist in the system.',
+          'Behavior Implementation class name. Must exist in the system.',
       },
       behavior_definition: {
         type: 'string',
         description:
-          'Referenced Behavior Definition name (e.g., ZI_MY_ENTITY). Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).',
+          'Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).',
       },
       implementation_code: {
         type: 'string',
@@ -86,7 +86,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Optional if object is local or already in transport.',
       },
       activate: {
         type: 'boolean',

@@ -17,7 +17,7 @@ export const TOOL_DEFINITION = {
     properties: {
       interface_name: {
         type: 'string',
-        description: 'Interface name (e.g., Z_MY_INTERFACE).',
+        description: 'Interface name.',
       },
       version: {
         type: 'string',

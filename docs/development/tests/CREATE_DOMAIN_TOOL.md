@@ -28,7 +28,7 @@ The `CreateDomain` tool creates a new ABAP domain in the SAP system through ADT 
 | `domain_name` | string | ✅ | - | Domain name (e.g., `ZZ_TEST_0001`). Must follow SAP naming conventions |
 | `description` | string | ❌ | domain_name | Domain description |
 | `package_name` | string | ✅ | - | Package name (e.g., `ZOK_LOCAL`, `$TMP`) |
-| `transport_request` | string | ✅ | - | Transport request number (e.g., `E19K905635`) |
+| `transport_request` | string | ✅ | - | Transport request number (e.g., `SIDK905635`) |
 | `datatype` | string | ❌ | `CHAR` | Data type: `CHAR`, `NUMC`, `DATS`, `TIMS`, `DEC`, `INT1`, `INT2`, `INT4`, `INT8`, `CURR`, `QUAN` |
 | `length` | number | ❌ | 100 | Field length (max depends on datatype) |
 | `decimals` | number | ❌ | 0 | Decimal places (for `DEC`, `CURR`, `QUAN` types) |
@@ -44,7 +44,7 @@ The `CreateDomain` tool creates a new ABAP domain in the SAP system through ADT 
 {
   "domain_name": "ZZ_TEST_0001",
   "package_name": "ZOK_LOCAL",
-  "transport_request": "E19K905635"
+  "transport_request": "SIDK905635"
 }
 ```
 
@@ -54,7 +54,7 @@ The `CreateDomain` tool creates a new ABAP domain in the SAP system through ADT 
   "domain_name": "ZZ_CUSTOMER_ID",
   "description": "Customer ID Domain",
   "package_name": "ZCUSTOMER",
-  "transport_request": "E19K905635",
+  "transport_request": "SIDK905635",
   "datatype": "CHAR",
   "length": 10,
   "decimals": 0,
@@ -73,7 +73,7 @@ The `CreateDomain` tool creates a new ABAP domain in the SAP system through ADT 
   "success": true,
   "domain_name": "ZZ_TEST_0001",
   "package": "ZOK_LOCAL",
-  "transport_request": "E19K905635",
+  "transport_request": "SIDK905635",
   "status": "active",
   "session_id": "9887bcfa3a564460843569a9efc55981",
   "message": "Domain ZZ_TEST_0001 created and activated successfully",

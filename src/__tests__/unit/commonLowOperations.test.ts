@@ -263,14 +263,14 @@ describe('DeleteObjectLow', () => {
     await handleDeleteObject(context as any, {
       object_type: 'class',
       object_name: 'zcl_x',
-      transport_request: 'E19K900001',
+      transport_request: 'SIDK900001',
     });
     const call = seen.calls.filter((c) => c.member === 'delete').at(-1);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseDeletion);
     expect(call?.args[0]).toEqual({
       className: 'ZCL_X',
-      transportRequest: 'E19K900001',
+      transportRequest: 'SIDK900001',
     });
   });
 
@@ -433,7 +433,7 @@ describe('ActivateObjectLow', () => {
    */
   const finishedRun = (results: string) =>
     fakeClientOf({
-      activateObjectsGroup: async () => okResponse('E19-ACT-RUN-1'),
+      activateObjectsGroup: async () => okResponse('ACT-RUN-1'),
       getActivationRun: async () =>
         okResponse(
           reading(
@@ -487,7 +487,7 @@ describe('ActivateObjectLow', () => {
     expect(result.isError).toBe(false);
     const payload = JSON.parse(result.content[0].text);
     expect(payload.accepted).toBe(true);
-    expect(payload.run_id).toBe('E19-ACT-RUN-1');
+    expect(payload.run_id).toBe('ACT-RUN-1');
     expect(payload.run_status).toBe('finished');
   });
 

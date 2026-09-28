@@ -381,7 +381,7 @@ export const ourProgramExecutor = {
 /**
  * The feed set with the readings adt-clients 22 applied by default
  * (MIGRATION-23 §9). `RuntimeListFeeds`' variants are not `feedVariants`:
- * on E19 `/feeds/variants` answers an empty body, and the variants are read
+ * on premise `/feeds/variants` answers an empty body, and the variants are read
  * out of the feed list instead (`feedVariantsOf`).
  */
 export const ourFeeds = {

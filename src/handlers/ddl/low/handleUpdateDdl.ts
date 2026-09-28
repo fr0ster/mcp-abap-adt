@@ -31,8 +31,7 @@ export const TOOL_DEFINITION = {
     properties: {
       ddl_name: {
         type: 'string',
-        description:
-          'DDL source name (e.g., ZOK_R_TEST_0002). DDL source must already exist.',
+        description: 'DDL source name. DDL source must already exist.',
       },
       ddl_source: {
         type: 'string',
@@ -62,7 +61,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.',
+          'Transport request number (required for transportable packages), not a task.',
       },
       ...DETAIL_PROPERTY,
     },

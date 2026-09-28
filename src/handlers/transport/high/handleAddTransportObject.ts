@@ -37,11 +37,11 @@ export const TOOL_DEFINITION = {
       transport_number: {
         type: 'string',
         description:
-          'The TASK to attach the object to, e.g. E19K905943 — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.',
+          'The TASK to attach the object to — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.',
       },
       object_name: {
         type: 'string',
-        description: 'Object name, e.g. ZCL_MY_CLASS.',
+        description: 'Object name.',
       },
       object_type: {
         type: 'string',

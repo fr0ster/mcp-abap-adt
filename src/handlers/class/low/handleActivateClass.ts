@@ -18,13 +18,13 @@ export const TOOL_DEFINITION = {
   name: 'ActivateClassLow',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Activate, Create, Update. Subject: Class. Will be useful for activating, creating, or updating class. [low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
+    '[low-level] Activate an ABAP class. Returns activation status and any warnings/errors. Can use session_id and session_state from GetSession to maintain the same session.',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name (e.g., ZCL_MY_CLASS).',
+        description: 'Class name.',
       },
       session_id: {
         type: 'string',

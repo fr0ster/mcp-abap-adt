@@ -46,18 +46,18 @@ export const TOOL_DEFINITION = {
   name: 'DeleteMetadataExtension',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP metadata extension from the SAP system. Transport request optional for $TMP objects.',
+    'Delete an ABAP metadata extension from the SAP system. Transport request optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {
       metadata_extension_name: {
         type: 'string',
-        description: 'MetadataExtension name (e.g., Z_MY_METADATAEXTENSION).',
+        description: 'MetadataExtension name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects. Optional for local objects ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable objects. Optional for local objects.',
       },
       ...DETAIL_PROPERTY,
     },

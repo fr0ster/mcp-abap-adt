@@ -12,13 +12,13 @@ export const TOOL_DEFINITION = {
   name: 'ReadTable',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: Table. Will be useful for reading, creating, or updating table. [read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.',
+    '[read-only] Read ABAP table definition and metadata. Answers: "show table fields", "display table structure", "view table X", "get table definition". Returns field list, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
       table_name: {
         type: 'string',
-        description: 'Table name (e.g., Z_MY_TABLE).',
+        description: 'Table name.',
       },
       version: {
         type: 'string',

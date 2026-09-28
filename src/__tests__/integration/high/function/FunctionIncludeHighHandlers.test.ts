@@ -11,7 +11,7 @@
  * **Its own function group, never the shared one.** Creating an include adds
  * an `INCLUDE` line to the group's main program SAPL<group>, and deleting it
  * takes the line out again — a change to the group. Run inside the shared
- * ZMCP_SHR_FGRP it left SAPLZMCP_SHR_FGRP inactive after every run (E19,
+ * ZMCP_SHR_FGRP it left SAPLZMCP_SHR_FGRP inactive after every run (an on-premise system,
  * 2026-09-26), and put the shared group on the test request. The group here
  * is a test object: created in the test package on the test request, and
  * deleted with the include.

@@ -23,18 +23,18 @@ export const TOOL_DEFINITION = {
   name: 'DeleteMessageClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local ($TMP).',
+    'Delete an ABAP message class (MSAG) and all of its messages from the SAP system via ADT deletion API. Transport request required for transportable objects, optional for local objects.',
   inputSchema: {
     type: 'object',
     properties: {
       message_class_name: {
         type: 'string',
-        description: 'Message class name (e.g., ZMY_MSGS).',
+        description: 'Message class name.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (e.g., E19K905635). Required for transportable objects, optional for local ($TMP). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable objects, optional for local ones.',
       },
       ...DETAIL_PROPERTY,
     },

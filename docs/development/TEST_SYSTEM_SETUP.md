@@ -17,7 +17,7 @@ cp test-config.yaml.template test-config.yaml
 
 ```yaml
 environment:
-  env: "e19.env"                # ⚠️ Ім'я .env файлу зі стандартної папки sessions
+  env: "your-system.env"                # ⚠️ Ім'я .env файлу зі стандартної папки sessions
   system_type: "onprem"         # ⚠️ "onprem" | "cloud" | "legacy"
   connection_type: "http"       # "http" | "rfc"
   default_package: "TEST_MCP"   # ⚠️ Оновити на ваш пакет
@@ -25,8 +25,8 @@ environment:
 ```
 
 Файл `.env` розташовується у стандартній папці sessions:
-- **Windows**: `~/Documents/mcp-abap-adt/sessions/e19.env`
-- **Unix/macOS**: `~/.config/mcp-abap-adt/sessions/e19.env`
+- **Windows**: `~/Documents/mcp-abap-adt/sessions/your-system.env`
+- **Unix/macOS**: `~/.config/mcp-abap-adt/sessions/your-system.env`
 
 ### 3. Оновити Transport Requests
 
@@ -68,12 +68,12 @@ environment:
 У `create_package.basic_package`:
 
 ```yaml
-transport_layer: "ZE19"  # ⚠️ Оновити на ваш transport layer
+transport_layer: "ZDEV"  # ⚠️ Оновити на ваш transport layer
 ```
 
 **Як дізнатися transport layer:**
 - Перевірити в існуючому пакеті через SE80 або ADT
-- Або використати стандартний для вашої системи (наприклад, "ZE19", "ZDEV")
+- Або використати стандартний для вашої системи (наприклад, "ZDEV", "ZDEV")
 
 ### 6. Оновити Target System
 

@@ -50,7 +50,7 @@ function textOf(node: unknown): string {
  * delete.
  *
  * An object deleted earlier whose object-directory entry waits on an open
- * request is "deletable" to the check — E19, 2026-09-26: `isDeletable="true"`
+ * request is "deletable" to the check — on premise, 2026-09-26: `isDeletable="true"`
  * with W "ZMCP_BLD_I_BDEF does not exist", while a GET of it answered 404.
  * The delete sent after it fails on its own: SWB_TOOL 029 "Error while
  * deleting object … from the database" for a BDEF or a metadata extension,

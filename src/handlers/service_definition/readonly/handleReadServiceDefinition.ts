@@ -12,13 +12,13 @@ export const TOOL_DEFINITION = {
   name: 'ReadServiceDefinition',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Operation: Read, Create, Update. Subject: ServiceDefinition. Will be useful for reading, creating, or updating service definition. [read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.',
+    '[read-only] Read ABAP service definition (SRVD) source code and metadata. Answers: "show service definition", "display SRVD source", "view service definition X", "get service exposure". Returns source code, package, responsible, description.',
   inputSchema: {
     type: 'object',
     properties: {
       service_definition_name: {
         type: 'string',
-        description: 'Service definition name (e.g., Z_MY_SRVD).',
+        description: 'Service definition name.',
       },
       version: {
         type: 'string',

@@ -25,7 +25,7 @@ export const TOOL_DEFINITION = {
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class name to validate (e.g., ZCL_MY_CLASS)',
+        description: 'Class name to validate',
       },
       package_name: {
         type: 'string',

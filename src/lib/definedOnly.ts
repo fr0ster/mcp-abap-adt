@@ -5,7 +5,7 @@
  * `{ ...DEFAULTS, ...options }`. There a key present with `undefined` is not
  * "not given": it REPLACES the default. The profiler parameters lost
  * `maxSizeForTraceFile: 30720` exactly that way, the size then left the
- * request altogether, and every trace on E19 (2026-09-25) was recorded in
+ * request altogether, and every trace measured on premise (2026-09-25) was recorded in
  * state "Size violation". An option the caller did not give must not reach
  * the member at all.
  */

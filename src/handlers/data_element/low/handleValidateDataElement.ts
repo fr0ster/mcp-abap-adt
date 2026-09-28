@@ -24,12 +24,11 @@ export const TOOL_DEFINITION = {
     properties: {
       data_element_name: {
         type: 'string',
-        description: 'DataElement name to validate (e.g., Z_MY_PROGRAM).',
+        description: 'DataElement name to validate.',
       },
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+        description: 'Package name. Required for validation.',
       },
       description: {
         type: 'string',

@@ -49,7 +49,7 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'MetadataExtension name (e.g., ZI_MY_DDLX).',
+        description: 'MetadataExtension name.',
       },
       version: {
         type: 'string',

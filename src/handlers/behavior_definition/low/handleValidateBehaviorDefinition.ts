@@ -29,12 +29,11 @@ export const TOOL_DEFINITION = {
     properties: {
       name: {
         type: 'string',
-        description: 'BehaviorDefinition name to validate (e.g., ZI_MY_BDEF).',
+        description: 'BehaviorDefinition name to validate.',
       },
       root_entity: {
         type: 'string',
-        description:
-          'Root entity name (e.g., ZI_MY_ENTITY). Required for validation.',
+        description: 'Root entity name. Required for validation.',
       },
       implementation_type: {
         type: 'string',
@@ -44,8 +43,7 @@ export const TOOL_DEFINITION = {
       },
       package_name: {
         type: 'string',
-        description:
-          'Package name (e.g., ZOK_LOCAL, $TMP for local objects). Required for validation.',
+        description: 'Package name. Required for validation.',
       },
       description: {
         type: 'string',

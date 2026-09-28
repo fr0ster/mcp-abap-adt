@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [13.0.2] - 2026-09-28
+
+### Fixed
+
+- **A tool description is search text, and an incidental literal in it retrieves
+  the wrong tools in bulk** (#241). *"Transport request optional for `$TMP`
+  objects"* sat in 30 `Delete*` descriptions, so any request mentioning `$TMP`
+  pulled the delete tools into the top of a consumer's tool-RAG. Measured in
+  cloud-llm-hub's retrieval — two collections, 0.7/0.3 fusion, translation, k=15,
+  developer role:
+
+  | query | `Delete*` in the top 15, before | after |
+  |---|---|---|
+  | "Які пакети в $TMP маємо?" | 12 | 1 |
+  | "Create class … in package $TMP" | 3, `CreateClass` third | 1, `CreateClass` second |
+  | create CDS / program / update in `$TMP` | 3–4 | 1–2 |
+
+  The wording without the literal was never worse on any query.
+
+  `$TMP objects` reads `local objects` now, which is also the more accurate
+  sentence: ABAP Cloud has no `$TMP` at all. The other incidental literals went
+  with it — a sample mask in `SearchObject`, a message class in
+  `ReadMessageClassMessage`, a namespace example in `SearchSource`. Parameter
+  descriptions are untouched here: the calling model reads them, retrieval does
+  not index them, and the literals in them are a larger replacement of their own
+  (254 of 370 tools, 464 occurrences — the follow-up).
+
+### Added
+
+- **`toolDescriptionsCarryNoLiterals.test.ts` — the rule is kept by a test.** No
+  tool description names anything concrete: a package (`$TMP`, `$ANY`), a
+  customer-namespace object or prefix (`ZCL_DEMO`, `ZOK*`, `YFOO_BAR`), or a
+  transport number. A bare mask names nothing and stays allowed — `Z*`, `Y*`,
+  `/NS/Z*`, any-namespace — and the test's own self-check pins both lists, so
+  neither a new literal nor a regex tightened against a legitimate mask passes
+  silently.
+
+  Ranking is not what it measures: that is measured by loading the descriptions
+  into a RAG and querying it, which is where the table above comes from. The test
+  keeps the rule in the repository where descriptions are authored and where no
+  RAG runs — without it the next `$TMP` returns and nothing here notices until a
+  consumer's retrieval degrades. Green on arrival: 370 descriptions, none naming
+  anything concrete.
+
+### Changed
+
+- `docs/user-guide/AVAILABLE_TOOLS*.md` regenerated, which also picks up the
+  `CheckPackage` wording 13.0.1 changed and did not regenerate.
+
 ## [13.0.1] - 2026-09-28
 
 ### Fixed

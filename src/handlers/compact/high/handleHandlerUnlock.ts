@@ -1,8 +1,8 @@
+import { toLowObjectType } from '../../../lib/compact/compactLifecycleUtils';
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import { compactUnlockSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleUnlockObject } from '../../common/low/handleUnlockObject';
-import { toLowObjectType } from './compactLifecycleUtils';
-import type { CompactObjectType } from './compactObjectTypes';
-import { compactUnlockSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnlock',

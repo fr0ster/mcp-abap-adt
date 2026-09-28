@@ -8,10 +8,11 @@
  * way to be wrong: a route that lands in NEITHER file. So the union is what is
  * checked here, and each half is checked for carrying only its own operations.
  */
-import { COMPACT_CRUD_MATRIX } from '../handlers/compact/high/compactMatrix';
-import { COMPACT_OBJECT_TYPES } from '../handlers/compact/high/compactObjectTypes';
+
 import { compactReadRouterMap } from '../handlers/compact/high/compactReadRoutes';
 import { compactWriteRouterMap } from '../handlers/compact/high/compactWriteRoutes';
+import { COMPACT_CRUD_MATRIX } from '../lib/compact/compactMatrix';
+import { COMPACT_OBJECT_TYPES } from '../lib/compact/compactObjectTypes';
 
 const routesFor = (objectType: (typeof COMPACT_OBJECT_TYPES)[number]) => ({
   ...compactWriteRouterMap[objectType],

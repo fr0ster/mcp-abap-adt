@@ -1,6 +1,6 @@
+import { compactDumpListSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleRuntimeListFeeds } from '../../system/readonly/handleRuntimeListFeeds';
-import { compactDumpListSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpList',

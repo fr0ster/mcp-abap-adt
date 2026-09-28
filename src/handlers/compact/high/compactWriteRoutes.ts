@@ -7,6 +7,13 @@
  * the intention.
  */
 
+import type { CompactCrudOperation } from '../../../lib/compact/compactMatrix';
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import {
+  type CompactHandler,
+  type CompactRouterMap,
+  dispatchCompact,
+} from '../../../lib/compact/compactRoutes';
 import { handleCreateBehaviorDefinition } from '../../behavior_definition/high/handleCreateBehaviorDefinition';
 import { handleDeleteBehaviorDefinition } from '../../behavior_definition/high/handleDeleteBehaviorDefinition';
 import { handleUpdateBehaviorDefinition } from '../../behavior_definition/high/handleUpdateBehaviorDefinition';
@@ -68,13 +75,6 @@ import { handleDeleteCdsUnitTest } from '../../unit_test/high/handleDeleteCdsUni
 import { handleDeleteUnitTest } from '../../unit_test/high/handleDeleteUnitTest';
 import { handleUpdateCdsUnitTest } from '../../unit_test/high/handleUpdateCdsUnitTest';
 import { handleUpdateUnitTest } from '../../unit_test/high/handleUpdateUnitTest';
-import type { CompactCrudOperation } from './compactMatrix';
-import type { CompactObjectType } from './compactObjectTypes';
-import {
-  type CompactHandler,
-  type CompactRouterMap,
-  dispatchCompact,
-} from './compactRoutes';
 
 export const compactWriteRouterMap: CompactRouterMap = {
   PACKAGE: {

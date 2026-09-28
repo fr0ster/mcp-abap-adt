@@ -1,6 +1,6 @@
+import { compactUnitTestRunSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleRunUnitTest } from '../../unit_test/high/handleRunUnitTest';
-import { compactUnitTestRunSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestRun',

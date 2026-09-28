@@ -1,6 +1,6 @@
+import { compactServiceBindingListTypesSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleListServiceBindingTypes } from '../../service_binding/high/handleListServiceBindingTypes';
-import { compactServiceBindingListTypesSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingListTypes',

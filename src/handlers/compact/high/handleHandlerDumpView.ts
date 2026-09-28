@@ -1,6 +1,6 @@
+import { compactDumpViewSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleRuntimeGetDumpById } from '../../system/readonly/handleRuntimeGetDumpById';
-import { compactDumpViewSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDumpView',

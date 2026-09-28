@@ -28,11 +28,6 @@ import { TOOL_DEFINITION as U_LOCAL_DEFINITIONS } from '../../handlers/class/hig
 import { TOOL_DEFINITION as U_LOCAL_MACROS } from '../../handlers/class/high/handleUpdateLocalMacros';
 import { TOOL_DEFINITION as U_LOCAL_TEST_CLASS } from '../../handlers/class/high/handleUpdateLocalTestClass';
 import { TOOL_DEFINITION as U_LOCAL_TYPES } from '../../handlers/class/high/handleUpdateLocalTypes';
-import {
-  compactCreateSchema,
-  compactDeleteSchema,
-  compactUpdateSchema,
-} from '../../handlers/compact/high/compactSchemas';
 import { TOOL_DEFINITION as FACADE_CREATE } from '../../handlers/compact/high/handleHandlerCreate';
 import { TOOL_DEFINITION as FACADE_DELETE } from '../../handlers/compact/high/handleHandlerDelete';
 import { TOOL_DEFINITION as FACADE_UPDATE } from '../../handlers/compact/high/handleHandlerUpdate';
@@ -83,6 +78,11 @@ import { TOOL_DEFINITION as D_CDS_UNIT_TEST } from '../../handlers/unit_test/hig
 import { TOOL_DEFINITION as D_UNIT_TEST } from '../../handlers/unit_test/high/handleDeleteUnitTest';
 import { TOOL_DEFINITION as U_CDS_UNIT_TEST } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import { TOOL_DEFINITION as U_UNIT_TEST } from '../../handlers/unit_test/high/handleUpdateUnitTest';
+import {
+  compactCreateSchema,
+  compactDeleteSchema,
+  compactUpdateSchema,
+} from '../../lib/compact/compactSchemas';
 
 // inputSchema shape varies across handlers (JSON-schema-style objects with a
 // top-level `required: string[]`, or Zod schemas with no `required`). We only

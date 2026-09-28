@@ -1,6 +1,6 @@
+import { compactProfileListSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleRuntimeListProfilerTraceFiles } from '../../system/readonly/handleRuntimeListProfilerTraceFiles';
-import { compactProfileListSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileList',

@@ -9,6 +9,13 @@
  * route cannot go missing by landing in neither file.
  */
 
+import type { CompactCrudOperation } from '../../../lib/compact/compactMatrix';
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import {
+  type CompactHandler,
+  type CompactRouterMap,
+  dispatchCompact,
+} from '../../../lib/compact/compactRoutes';
 import { handleGetBehaviorDefinition } from '../../behavior_definition/high/handleGetBehaviorDefinition';
 import { handleGetBehaviorImplementation } from '../../behavior_implementation/high/handleGetBehaviorImplementation';
 import { handleGetClass } from '../../class/high/handleGetClass';
@@ -31,13 +38,6 @@ import { handleGetStructure } from '../../structure/high/handleGetStructure';
 import { handleGetTable } from '../../table/high/handleGetTable';
 import { handleGetCdsUnitTest } from '../../unit_test/high/handleGetCdsUnitTest';
 import { handleGetUnitTest } from '../../unit_test/high/handleGetUnitTest';
-import type { CompactCrudOperation } from './compactMatrix';
-import type { CompactObjectType } from './compactObjectTypes';
-import {
-  type CompactHandler,
-  type CompactRouterMap,
-  dispatchCompact,
-} from './compactRoutes';
 
 export const compactReadRouterMap: CompactRouterMap = {
   PACKAGE: {

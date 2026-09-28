@@ -1,7 +1,7 @@
+import { compactProfileViewSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleRuntimeAnalyzeProfilerTrace } from '../../system/readonly/handleRuntimeAnalyzeProfilerTrace';
 import { handleRuntimeGetProfilerTraceData } from '../../system/readonly/handleRuntimeGetProfilerTraceData';
-import { compactProfileViewSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileView',

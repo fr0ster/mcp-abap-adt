@@ -1,6 +1,6 @@
+import { compactUnitTestResultSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleGetUnitTestResult } from '../../unit_test/high/handleGetUnitTestResult';
-import { compactUnitTestResultSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestResult',

@@ -1,9 +1,9 @@
+import { compactProfileRunSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleRuntimeRunClass } from '../../system/readonly/handleRuntimeRunClass';
 import { handleRuntimeRunClassWithProfiling } from '../../system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeRunProgram } from '../../system/readonly/handleRuntimeRunProgram';
 import { handleRuntimeRunProgramWithProfiling } from '../../system/readonly/handleRuntimeRunProgramWithProfiling';
-import { compactProfileRunSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerProfileRun',

@@ -10,8 +10,8 @@
  * shape, the map shape, and the dispatch. It imports no handler, so importing it
  * pulls nothing either half would not have pulled anyway.
  */
-import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import { return_error } from '../../../lib/utils';
+import type { HandlerContext } from '../../handlers/interfaces';
+import { return_error } from '../utils';
 import type { CompactCrudOperation } from './compactMatrix';
 import type { CompactObjectType } from './compactObjectTypes';
 

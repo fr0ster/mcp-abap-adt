@@ -1,7 +1,7 @@
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import { compactGetSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { CompactObjectType } from './compactObjectTypes';
 import { routeCompactRead } from './compactReadRoutes';
-import { compactGetSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerGet',

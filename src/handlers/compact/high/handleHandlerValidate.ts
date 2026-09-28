@@ -19,12 +19,13 @@
  * make everywhere: no `detail`, no low-level session knobs) rather than
  * exposed here for the first time.
  */
+
+import { toLowObjectType } from '../../../lib/compact/compactLifecycleUtils';
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import { compactValidateSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleValidateObject } from '../../common/low/handleValidateObject';
 import { handleValidateServiceBinding } from '../../service_binding/high/handleValidateServiceBinding';
-import { toLowObjectType } from './compactLifecycleUtils';
-import type { CompactObjectType } from './compactObjectTypes';
-import { compactValidateSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerValidate',

@@ -1,6 +1,6 @@
+import { compactCdsUnitTestStatusSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleGetCdsUnitTestStatus } from '../../unit_test/high/handleGetCdsUnitTestStatus';
-import { compactCdsUnitTestStatusSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCdsUnitTestStatus',

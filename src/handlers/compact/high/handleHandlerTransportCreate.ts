@@ -1,6 +1,6 @@
+import { compactTransportCreateSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleCreateTransport } from '../../transport/high/handleCreateTransport';
-import { compactTransportCreateSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerTransportCreate',

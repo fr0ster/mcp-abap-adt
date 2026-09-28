@@ -1,8 +1,8 @@
+import { toLowObjectType } from '../../../lib/compact/compactLifecycleUtils';
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import { compactLockSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleLockObject } from '../../common/low/handleLockObject';
-import { toLowObjectType } from './compactLifecycleUtils';
-import type { CompactObjectType } from './compactObjectTypes';
-import { compactLockSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerLock',

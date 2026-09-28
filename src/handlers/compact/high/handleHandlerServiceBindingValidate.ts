@@ -1,6 +1,6 @@
+import { compactServiceBindingValidateSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleValidateServiceBinding } from '../../service_binding/high/handleValidateServiceBinding';
-import { compactServiceBindingValidateSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerServiceBindingValidate',

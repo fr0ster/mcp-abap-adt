@@ -1,6 +1,6 @@
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import { compactCreateSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
-import type { CompactObjectType } from './compactObjectTypes';
-import { compactCreateSchema } from './compactSchemas';
 import { routeCompactWrite } from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {

@@ -54,6 +54,11 @@
       "types": "./dist/lib/handlers/write.d.ts",
       "import": "./dist/lib/handlers/write.js",
       "require": "./dist/lib/handlers/write.js"
+    },
+    "./compact-shared": {
+      "types": "./dist/lib/compact/index.d.ts",
+      "import": "./dist/lib/compact/index.js",
+      "require": "./dist/lib/compact/index.js"
     }
   },
   "typesVersions": {
@@ -84,6 +89,9 @@
       ],
       "handlers/write": [
         "dist/lib/handlers/write.d.ts"
+      ],
+      "compact-shared": [
+        "dist/lib/compact/index.d.ts"
       ]
     }
   },

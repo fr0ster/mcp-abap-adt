@@ -1,14 +1,14 @@
 import type { IObjectReference } from '@mcp-abap-adt/interfaces-adt';
+import {
+  COMPACT_OBJECT_TYPES,
+  type CompactObjectType,
+} from '../../../lib/compact/compactObjectTypes';
+import { compactActivateSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   handleActivateObject,
   TYPE_TO_FAMILY,
 } from '../../common/low/handleActivateObject';
-import {
-  COMPACT_OBJECT_TYPES,
-  type CompactObjectType,
-} from './compactObjectTypes';
-import { compactActivateSchema } from './compactSchemas';
 
 /**
  * ADT type codes for compact types the activation map does not name, taken

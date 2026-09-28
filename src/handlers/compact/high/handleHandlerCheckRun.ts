@@ -17,11 +17,12 @@
  * `compact/` tools make everywhere: no `detail`, no low-level session
  * knobs) rather than exposed here for the first time.
  */
+
+import { toLowObjectType } from '../../../lib/compact/compactLifecycleUtils';
+import type { CompactObjectType } from '../../../lib/compact/compactObjectTypes';
+import { compactCheckRunSchema } from '../../../lib/compact/compactSchemas';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { handleCheckObject } from '../../common/low/handleCheckObject';
-import { toLowObjectType } from './compactLifecycleUtils';
-import type { CompactObjectType } from './compactObjectTypes';
-import { compactCheckRunSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerCheckRun',

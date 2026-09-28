@@ -185,11 +185,20 @@ they arrived as success.
   create on the same connection answers `400 SADT_RESOURCE 007` while a fresh
   connection answers `200`. That is the connector's decision to make, and
   `connection` 9.4.x with sap-rfc-lite 0.2.0 is where it is made.
-- **On a BTP trial, cloud** (this release's own bumps): the auth-broker path
-  (`Session ready`, every suite on a connection from the broker), the class
-  unit-test workflow including the test-classes lock and release, the feed
-  descriptors and dump entries parsed, and the BDEF+BIMPL low suite creating,
-  activating and deleting its own views.
+- **On a BTP trial, cloud, on this branch's own versions**: the full soft-mode
+  sweep, **48/48 suites and 108/108 tests**, nothing left on the system. Two
+  skips remain and both are the platform saying no — programs do not exist on
+  ABAP Cloud. Within it: the auth-broker path (`Session ready`, every suite on a
+  connection from the broker), the class unit-test workflow including the
+  test-classes lock and its release, the feed descriptors and dump entries
+  parsed, the group activation read from its run's results, and the BDEF+BIMPL
+  suites creating, activating and deleting their own views.
+
+- **The dumps test reads the feed rather than one user's dumps.** It required
+  `params.dumps_user` and skipped without it, so on a machine whose config named
+  no user it never ran; a user filter is not what it is about. It lists what the
+  system shows, picks a dump and reads it — measured on the trial: `5 dump(s) in
+  the feed`. The only skip left there is a system with no dumps at all.
 - Unit: **111 suites / 1704 tests**. `tsc --noEmit` clean on all three projects,
   `biome check` clean, `release:dry` reports `Published: 2  Skipped: 0`.
 

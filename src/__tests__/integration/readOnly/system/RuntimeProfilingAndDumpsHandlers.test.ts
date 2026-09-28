@@ -711,23 +711,24 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
     'should list dumps and read a dump by ID',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const dumpsUser = context.params?.dumps_user || undefined;
-        if (!dumpsUser) {
-          throw new Error(
-            'SKIP: dumps_user not configured in test params (set params.dumps_user)',
-          );
-        }
-
+        // **Every dump the system shows, not one user's.** This asked for
+        // `params.dumps_user` and skipped without it, so the test did not run at
+        // all on a machine whose config had no user in it — and a user filter is
+        // not what the test is about: it reads the feed, picks a dump and reads
+        // that dump. Whose it is does not matter, and naming one only narrows the
+        // feed to the point of emptiness on a system where the dumps belong to
+        // someone else. The dump-generating test in this same file runs before
+        // this one, so the feed normally has at least the dump it made.
         const invoke = async (
           toolName: string,
           args: Record<string, unknown>,
           directCall: () => Promise<any>,
         ) => tester.invokeToolOrHandler(toolName, args, directCall);
 
-        // Step 1: list dumps via feeds to get a known dump_id
+        // Step 1: list dumps via feeds to get a dump_id — no user filter
         const listResult = await invoke(
           'RuntimeListFeeds',
-          { feed_type: 'dumps', user: dumpsUser, max_results: 5 },
+          { feed_type: 'dumps', max_results: 5 },
           async () => {
             const handlerContext = createHandlerContext({
               connection: context.connection,
@@ -735,7 +736,6 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
             });
             return handleRuntimeListFeeds(handlerContext, {
               feed_type: 'dumps',
-              user: dumpsUser,
               max_results: 5,
             });
           },
@@ -745,9 +745,15 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         expect(listData.entries).toBeDefined();
         const dumpIds = extractDumpIdsFromFeedEntries(listData.entries ?? []);
         if (dumpIds.length === 0) {
-          throw new Error(`SKIP: no dumps found for user "${dumpsUser}"`);
+          // The one honest skip left: a system with no dumps at all has nothing
+          // to read, and that is the system's state rather than a missing
+          // parameter.
+          throw new Error('SKIP: this system shows no dumps to read');
         }
 
+        logger?.info?.(
+          `   • ${dumpIds.length} dump(s) in the feed; reading ${dumpIds[0]}`,
+        );
         const expectedDumpId = dumpIds[0];
 
         // Step 2: read the dump by ID

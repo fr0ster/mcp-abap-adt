@@ -180,10 +180,72 @@ a flag or a second binary.
   Recommendation: **(1)** — the flag is documented in `ServerConfigManager`'s help
   and in the YAML config, and breaking it buys nothing a dependency does not.
 
+## Decided: who compact is for, the flag leaves `core`, versions move together
+
+**Compact exists for a client that cannot build an LLM pipeline and must still work
+with ABAP through MCP reliably.** A constrained host, a small context, no retrieval
+layer of its own: it needs a tool list that is short by construction rather than one
+selected for it per request. **cloud-llm-hub is not that consumer** — it indexes all
+370 tools in its own tool-RAG and picks per request, so it has no use for the
+facade. Everything below follows from that. (All three stated by the user
+2026-09-28.)
+
+1. **`core` drops `compact` from its expositions, and this is not a breaking change
+   in practice.** The flag serves nobody who is using it: the consumer that drives
+   this repo does not want compact, and a consumer that does want it installs the
+   compact package — which is the package's whole purpose. A clean boundary too, one
+   decomposition per binary, and `validateExposition`'s "compact alone" rule becomes
+   moot in `core`, which then depends on neither compact library. The migration note
+   still names the flag, as a move rather than a removal.
+
+   It also fixes the shape of the compact bin: its job is to BE the server for such
+   a host — a fixed, short tool list, with no flag to get it wrong.
+2. **Lockstep versions for all five packages.** They are one decomposition of one
+   `lib`; independent numbers would create combinations nobody has run, and the
+   drift that already bit `server.json` would get three more places to hide. The
+   cost is accepted: a patch in one package bumps all five, so the registry shows
+   versions with no change in them.
+
+## What the packaging actually requires, measured
+
+**The compact folder needs 104 handler functions out of `lib`**, plus
+`HandlerContext` (already public via `./handlers`), `return_error` (public via
+`./utils`), and `TYPE_TO_FAMILY`, which is internal today
+(`handlers/common/low/handleActivateObject`). The 83 router routes are most of the
+104; the rest belong to the 18 compact tools that do not go through the router.
+
+**So `lib` must export those handlers publicly, and it must export them in halves.**
+One barrel of all 104 would defeat the split the moment `compact-readonly` imported
+it: the read-only package would link every write handler again, and
+`compactCapabilitySplit.test.ts` would fail — correctly. Two entry points,
+`@mcp-abap-adt/lib/handlers/read` and `@mcp-abap-adt/lib/handlers/write`, are
+therefore not a matter of taste but the condition for the capability to survive
+packaging. This is additive to `lib` and can land before anything moves.
+
+### A correction to this plan's own reasoning
+
+The section above claims the split makes "a genuinely smaller install as well as a
+smaller surface". **That is wrong, and measuring the imports is what showed it.**
+Both compact packages depend on `@mcp-abap-adt/lib`, so all of `lib` is on disk
+either way; what `compact-readonly` avoids is LINKING the write handlers, not
+shipping them. A smaller install would need `lib` itself split along the same line,
+which nobody has asked for and which this plan does not propose.
+
+What the split does give — and this is the part that matters — is that **the tool
+list a consumer assembles from `compact-readonly` offers no way to write**, proven
+against the module graph rather than against a list. Capability here is the shape of
+the facade, not a sandbox: code that deliberately reaches into `lib` can still call
+a write handler. The claim is worth making precisely, because "cannot change the
+system" and "is not offered the means to" are different promises.
+
 ## Open questions for the brainstorm
-1. **`core`'s `--exposition=compact`**: keep it via a dependency, or drop it —
-   see the two options above.
-2. **Release mechanics.** `publish-all.sh` gains two more entries and the release
+1. **Whether moving the compact tools out of `lib` is a major at all.** By the
+   letter of semver it removes exports; in practice no consumer we know imports
+   them, for the same reason the flag serves nobody. The version call is the user's.
+2. **The compact command's name.** `mcp-abap-adt-compact` is the obvious one and
+   needs a `server.json` entry of its own, since a different tool list is a
+   different server to a client. Nothing else is blocked on it.
+3. **Release mechanics.** `publish-all.sh` gains two more entries and the release
    checklist three more versions to keep in step — the same drift that has bitten
    `server.json` before. Lockstep versions for all five packages, or independent?
    Lockstep is the recommendation: the compact packages are a decomposition of the

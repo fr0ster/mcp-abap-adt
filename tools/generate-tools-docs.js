@@ -12,13 +12,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const HANDLERS_ROOT = path.join(__dirname, '../src/handlers');
-const COMPACT_MATRIX_PATH = path.join(
-  __dirname,
-  '../src/handlers/compact/high/compactMatrix.ts',
-);
 // Per-object high-level version tools are built by a DRY factory (#30) rather
 // than one-TOOL_DEFINITION-per-file, so the file walker can't see them. Parse
-// the factory's VERSIONED_TYPES table directly (same pattern as compactMatrix).
+// the factory's VERSIONED_TYPES table directly.
 const OBJECT_VERSION_TOOLS_PATH = path.join(
   __dirname,
   '../src/handlers/common/high/objectVersionTools.ts',
@@ -31,10 +27,6 @@ const OUTPUT_PATHS = {
   ),
   high: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_HIGH.md'),
   low: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LOW.md'),
-  compact: path.join(
-    __dirname,
-    '../docs/user-guide/AVAILABLE_TOOLS_COMPACT.md',
-  ),
   legacy: path.join(__dirname, '../docs/user-guide/AVAILABLE_TOOLS_LEGACY.md'),
 };
 const LEVELS = ['readonly', 'high', 'low'];
@@ -48,7 +40,6 @@ Scans src/handlers/**/(readonly|high|low)/*.ts and generates:
   docs/user-guide/AVAILABLE_TOOLS_READONLY.md
   docs/user-guide/AVAILABLE_TOOLS_HIGH.md
   docs/user-guide/AVAILABLE_TOOLS_LOW.md
-  docs/user-guide/AVAILABLE_TOOLS_COMPACT.md
   docs/user-guide/AVAILABLE_TOOLS_LEGACY.md   (only when a tool declares legacy)
 
 Output hierarchy:
@@ -474,18 +465,6 @@ function parseMatrixObject(block) {
   return result;
 }
 
-function loadCompactMatrix() {
-  const content = fs.readFileSync(COMPACT_MATRIX_PATH, 'utf8');
-  const crudBlock = extractConstObjectBlock(content, 'COMPACT_CRUD_MATRIX');
-  if (!crudBlock) {
-    throw new Error('Failed to read COMPACT_CRUD_MATRIX from compactMatrix.ts');
-  }
-
-  return {
-    crud: parseMatrixObject(crudBlock),
-  };
-}
-
 /**
  * Synthesize doc entries for the per-object high-level version tools (#30),
  * which are produced by the buildObjectVersionTools() factory and therefore are
@@ -655,7 +634,6 @@ function builtDefinitions() {
     includeReadOnly: true,
     includeHighLevel: true,
     includeLowLevel: true,
-    includeCompact: true,
     includeSystem: true,
     includeSearch: true,
   }).getHandlerEntries();
@@ -782,9 +760,6 @@ function generateMarkdown(tools) {
     readonly: tools.filter((t) => t.level === 'readonly').length,
     high: tools.filter((t) => t.level === 'high').length,
     low: tools.filter((t) => t.level === 'low').length,
-    compact: tools.filter(
-      (t) => t.level === 'high' && t.objectFolder === 'compact',
-    ).length,
   };
 
   let md = `# Available Tools Reference - MCP ABAP ADT Server\n\n`;
@@ -794,7 +769,6 @@ function generateMarkdown(tools) {
   md += `- Read-only tools: ${summary.readonly}\n`;
   md += `- High-level tools: ${summary.high}\n`;
   md += `- Low-level tools: ${summary.low}\n\n`;
-  md += `- Compact tools: ${summary.compact} (included in High-level group)\n\n`;
 
   md += `## Handler Sets\n\n`;
   md += `- \`readonly\` -> [Read-Only Group](#read-only-group)\n`;
@@ -911,129 +885,6 @@ function generateLevelMarkdown(tools, level) {
   return md;
 }
 
-function generateCompactMarkdown(tools) {
-  const compactTools = tools.filter(
-    (t) => t.level === 'high' && t.objectFolder === 'compact',
-  );
-  const compactMatrix = loadCompactMatrix();
-
-  let md = `# Compact Tools - MCP ABAP ADT Server\n\n`;
-  md += `Generated from code in \`src/handlers/compact/high\` (not from docs).\n\n`;
-  md += `- Group: Compact\n`;
-  md += `- Total tools: ${compactTools.length}\n\n`;
-
-  md += `## How It Works\n\n`;
-  md += `Compact is a facade over existing high-level/runtime handlers.\n`;
-  md += `You call one compact tool by intent and route by typed payload fields.\n\n`;
-  md += `## Start Here\n\n`;
-  md += `Pick tool by intent:\n\n`;
-  md += `- Create object -> \`HandlerCreate\`\n`;
-  md += `- Read object -> \`HandlerGet\`\n`;
-  md += `- Update object -> \`HandlerUpdate\`\n`;
-  md += `- Delete object -> \`HandlerDelete\`\n`;
-  md += `- Validate object/binding -> \`HandlerValidate\`\n`;
-  md += `- Activate object(s) -> \`HandlerActivate\`\n`;
-  md += `- Lock object -> \`HandlerLock\`\n`;
-  md += `- Unlock object -> \`HandlerUnlock\`\n`;
-  md += `- Check run (syntax) -> \`HandlerCheckRun\`\n`;
-  md += `- ABAP Unit run/status/result -> \`HandlerUnitTestRun|HandlerUnitTestStatus|HandlerUnitTestResult\`\n`;
-  md += `- CDS Unit status/result -> \`HandlerCdsUnitTestStatus|HandlerCdsUnitTestResult\`\n`;
-  md += `- Runtime profile run/list/view -> \`HandlerProfileRun|HandlerProfileList|HandlerProfileView\`\n`;
-  md += `- Runtime dump list/view -> \`HandlerDumpList|HandlerDumpView\`\n`;
-  md += `- Service binding list/validate -> \`HandlerServiceBindingListTypes|HandlerServiceBindingValidate\`\n`;
-  md += `- Transport create -> \`HandlerTransportCreate\`\n`;
-  md += `\n`;
-  md += `Request contract:\n\n`;
-  md += `- CRUD: \`HandlerCreate|HandlerGet|HandlerUpdate|HandlerDelete\` with required \`object_type\`.\n`;
-  md += `- Lifecycle: \`HandlerValidate|HandlerActivate|HandlerLock|HandlerUnlock|HandlerCheckRun\` with compact lifecycle params.\n`;
-  md += `- Action-specific tools above use narrow typed payloads.\n\n`;
-  md += `## Routing Matrix\n\n`;
-  md += `Source of truth: \`src/handlers/compact/high/compactMatrix.ts\`.\n`;
-  md += `Facade dispatch is deterministic by \`object_type\` and CRUD operation.\n\n`;
-  md += `| object_type | CRUD |\n`;
-  md += `| --- | --- |\n`;
-  for (const objectType of Object.keys(compactMatrix.crud).sort()) {
-    const crud = compactMatrix.crud[objectType];
-    md += `| \`${objectType}\` | ${
-      crud.length > 0 ? `\`${crud.join('`, `')}\`` : '-'
-    } |\n`;
-  }
-  md += `\n`;
-  md += `Unsupported combinations return deterministic error:\n`;
-  md += `- \`Unsupported <operation> for object_type: <TYPE>\`\n\n`;
-
-  md += `## Action Recipes\n\n`;
-  md += `Preferred dedicated compact tools and minimal payloads:\n\n`;
-  md += `| Goal | Tool | Required fields |\n`;
-  md += `| --- | --- | --- |\n`;
-  md += `| Run ABAP Unit | \`HandlerUnitTestRun\` | \`tests[]\` |\n`;
-  md += `| Unit status | \`HandlerUnitTestStatus\` | \`run_id\` |\n`;
-  md += `| Unit result | \`HandlerUnitTestResult\` | \`run_id\` |\n`;
-  md += `| CDS unit status | \`HandlerCdsUnitTestStatus\` | \`run_id\` |\n`;
-  md += `| CDS unit result | \`HandlerCdsUnitTestResult\` | \`run_id\` |\n`;
-  md += `| List binding types | \`HandlerServiceBindingListTypes\` | none |\n`;
-  md += `| Validate binding | \`HandlerServiceBindingValidate\` | \`service_binding_name\`, \`service_definition_name\` |\n`;
-  md += `| Create transport | \`HandlerTransportCreate\` | \`description\` |\n`;
-  md += `| Run profiling (class/program) | \`HandlerProfileRun\` | \`target_type\` + target name |\n`;
-  md += `| List profiler traces | \`HandlerProfileList\` | none |\n`;
-  md += `| Read profiler trace | \`HandlerProfileView\` | \`trace_id_or_uri\`, \`view\` |\n`;
-  md += `| List dumps | \`HandlerDumpList\` | none |\n`;
-  md += `| Read dump | \`HandlerDumpView\` | \`dump_id\` |\n\n`;
-
-  md += `## Minimal Payload Contracts\n\n`;
-  md += `- \`HandlerCreate|Get|Update|Delete\`: always require \`object_type\`, plus object-specific fields.\n`;
-  md += `- Dedicated action tools above expose narrow payloads.\n`;
-  md += `- Common required pairs:\n`;
-  md += `  - unit tests status/result: \`run_id\`\n`;
-  md += `  - dump details: \`dump_id\`\n`;
-  md += `  - profiler details: \`trace_id_or_uri\` + \`view\` (\`hitlist|statements|db_accesses\`)\n`;
-  md += `  - service binding validate: \`service_binding_name\` + \`service_definition_name\`\n`;
-  md += `  - class profiling: \`class_name\`\n`;
-  md += `  - program profiling: \`program_name\`\n\n`;
-  md += `### Quick Examples\n\n`;
-  md += `- Run profiling for class:\n`;
-  md += `  - \`HandlerProfileRun\` + \`{ "target_type":"CLASS", "class_name":"ZCL_FOO" }\`\n`;
-  md += `- Read one profiler trace:\n`;
-  md += `  - \`HandlerProfileView\` + \`{ "trace_id_or_uri":"...", "view":"hitlist" }\`\n`;
-  md += `- Read one dump:\n`;
-  md += `  - \`HandlerDumpView\` + \`{ "dump_id":"...", "view":"summary" }\`\n\n`;
-  md += `- List dumps:\n`;
-  md += `  - \`HandlerDumpList\` + \`{ "top":20, "orderby":"CREATED_AT desc" }\`\n`;
-  md += `- List profiler traces:\n`;
-  md += `  - \`HandlerProfileList\` + \`{}\`\n`;
-  md += `- Validate service binding:\n`;
-  md += `  - \`HandlerServiceBindingValidate\` + \`{ "service_binding_name":"ZSB_FOO", "service_definition_name":"ZSD_FOO" }\`\n\n`;
-
-  md += `## Navigation\n\n`;
-  md += `- [Compact Group](#compact-group)\n`;
-  for (const tool of compactTools) {
-    const toolHeading = `${tool.name} (Compact)`;
-    md += `  - [${tool.name}](#${anchorFromHeading(toolHeading)})\n`;
-  }
-
-  md += `\n---\n\n`;
-  md += `<a id="compact-group"></a>\n`;
-  md += `## Compact Group\n\n`;
-  md += `<a id="compact"></a>\n`;
-  md += `### Compact\n\n`;
-
-  for (const tool of compactTools.sort((a, b) =>
-    a.name.localeCompare(b.name),
-  )) {
-    const toolHeading = `${tool.name} (Compact)`;
-    md += `<a id="${anchorFromHeading(toolHeading)}"></a>\n`;
-    md += `#### ${toolHeading}\n`;
-    md += `**Description:** ${tool.description || 'No description'}\n\n`;
-    md += `**Source:** \`${tool.filePath}\`\n\n`;
-    md += `**Parameters:**\n`;
-    md += renderParams(tool);
-    md += `\n---\n\n`;
-  }
-
-  md += `*Last updated: ${new Date().toISOString().slice(0, 10)}*\n`;
-  return md;
-}
-
 function generateEnvironmentMarkdown(tools, envName, envLabel, envDescription) {
   const envTools = tools.filter(
     (t) => t.availableIn && t.availableIn.includes(envName),
@@ -1131,11 +982,6 @@ function main() {
     generateLevelMarkdown(tools, 'low'),
     'utf8',
   );
-  fs.writeFileSync(
-    OUTPUT_PATHS.compact,
-    generateCompactMarkdown(tools),
-    'utf8',
-  );
   // The legacy page writes itself back when there is something to put on it.
   //
   // Support for legacy systems (BASIS < 7.50) is parked on
@@ -1165,7 +1011,6 @@ function main() {
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.readonly}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.high}`);
   console.log(`✅ Documentation generated: ${OUTPUT_PATHS.low}`);
-  console.log(`✅ Documentation generated: ${OUTPUT_PATHS.compact}`);
   console.log(
     declaresLegacy
       ? `✅ Documentation generated: ${OUTPUT_PATHS.legacy}`
@@ -1188,5 +1033,4 @@ module.exports = {
   parseTopLevelProperties,
   generateMarkdown,
   generateLevelMarkdown,
-  generateCompactMarkdown,
 };

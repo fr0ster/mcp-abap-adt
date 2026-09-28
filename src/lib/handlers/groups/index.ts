@@ -6,12 +6,6 @@
  * to use different sets of handlers.
  */
 
-export { CompactHandlersGroup } from './CompactHandlersGroup.js';
-// The two halves of the compact facade, so a consumer can take the capability
-// it means to hand out: the read-only group's module graph carries no write
-// route (see compactCapabilitySplit.test.ts).
-export { CompactModifyHandlersGroup } from './CompactModifyHandlersGroup.js';
-export { CompactReadOnlyHandlersGroup } from './CompactReadOnlyHandlersGroup.js';
 export { HighLevelHandlersGroup } from './HighLevelHandlersGroup.js';
 export { LowLevelHandlersGroup } from './LowLevelHandlersGroup.js';
 export { ReadOnlyHandlersGroup } from './ReadOnlyHandlersGroup.js';

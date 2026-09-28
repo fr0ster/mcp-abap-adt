@@ -117,7 +117,7 @@ const server = new EmbeddableMcpServer({
 await server.connect(transport);
 ```
 
-See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high/low/compact, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
+See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-guide/HANDLERS_MANAGEMENT.md#embeddablemcpserver-dedup-strategies) for how readonly tools are deduped against high/low, how to opt out with `NoDedupStrategy`, and how to plug a custom `IReadOnlyDedupStrategy` for role-based rules.
 
 ## Quick Start
 

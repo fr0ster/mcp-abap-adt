@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **The compact facade left `lib` for three packages of its own.** It exists for a
+  host that cannot build a retrieval pipeline — a small context, no tool-RAG, no way
+  to select tools per request — and must still drive ABAP through MCP. Such a host
+  needs a tool list short by construction, and a package whose default IS that list
+  cannot be misconfigured into something else.
+
+  | package | carries | bin | licence |
+  |---|---|---|---|
+  | `@mcp-abap-adt/lib` | handlers, registries, embeddable — **minus** the compact tools | no | Apache-2.0 |
+  | `@mcp-abap-adt/compact-readonly` | the 13 compact tools that change nothing | no | Apache-2.0 |
+  | `@mcp-abap-adt/compact-modify` | the 9 that write, lock, activate or execute | no | Apache-2.0 |
+  | `@mcp-abap-adt/core` | transports, launcher, `mcp-abap-adt` | yes | AGPL-3.0-only |
+  | `@mcp-abap-adt/compact` | the compact server, `mcp-abap-adt-compact` | yes | AGPL-3.0-only |
+
+  Versions move in lockstep: the compact packages are one decomposition of the same
+  `lib`, and independent numbers would create combinations nobody has run.
+
+- **`core` no longer serves `--exposition=compact`.** The value is recognised and
+  refused, naming the package that serves it — a configuration asking for a tool
+  list it will not get should fail at startup rather than start with tools missing.
+  This breaks nobody in practice: the consumer that drives this repo indexes all the
+  tools itself and never wanted the facade, and whoever does want it installs the
+  command.
+
+- **One launcher, two commands.** `main()` in `@mcp-abap-adt/core/launcher` is
+  exported and takes `extraGroups`, `exposition` and `includeSearch`, so
+  `mcp-abap-adt-compact` is a twenty-line bin over the same configuration,
+  transports and auth rather than a second copy of four hundred lines. It self-starts
+  only when it is the program, so an import does not start a server, and each bin
+  calls `main()` itself. `--version` on the compact command answers the compact
+  package's version, not core's.
+
+### Added
+
+- **`@mcp-abap-adt/lib/handlers/read` and `/write`** — the 35 and 69 handler
+  functions the facade routes to, in halves, because one barrel of all 104 would
+  relink every write route into `compact-readonly` and defeat its own split.
+  `@mcp-abap-adt/lib/compact-shared` exports the facade's kernel: object types, the
+  CRUD matrix, the schemas, the lifecycle helpers and `dispatchCompact` — data and
+  dispatch, no handler, which is what makes it shareable by both halves.
+
+- **The capability split is asserted against the module graph, across packages.**
+  `compactCapabilitySplit.test.ts` walks the imports from each package's entry —
+  relative files AND bare specifiers — and holds that `compact-readonly` never names
+  `@mcp-abap-adt/lib/handlers/write` or the modifying package, that its manifest
+  declares only `lib` as a dependency, that the modifying half DOES reach the write
+  routes (so a split that lost them fails too), and that each of the 22 tool files
+  belongs to exactly one half.
+
+- **The compact surface has its own frozen fixture and its own generated page.**
+  `lib`'s `surface.json` lost 22 rows; they moved to `compact/tests/fixtures/`, where
+  `compactSurface.test.ts` freezes them from the packages' entry builders — a ratchet
+  that loses its subject silently is worse than no ratchet. `compact/docs/AVAILABLE_TOOLS.md`
+  is generated from the BUILT packages (`npm run docs:tools` in `compact/`), refusing
+  a stale build, and `lib`'s generator no longer writes a compact page.
+
+- **`binSmoke` covers the third bin.** It packs all five packages, installs the
+  tarballs into an empty directory and runs both commands: `mcp-abap-adt --version`
+  answers core's version and `mcp-abap-adt-compact --version` answers compact's.
+
+
 ## [13.1.0] - 2026-09-28
 
 ### Changed

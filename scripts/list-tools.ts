@@ -1,6 +1,8 @@
 import type { HandlerContext } from '../src/handlers/interfaces.js';
+// The compact facade is its own package now, and this script lists what `lib`
+// serves — so `compact` is no longer one of the groups here. Its 22 tools are
+// listed by `@mcp-abap-adt/compact`'s own tooling.
 import {
-  CompactHandlersGroup,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -21,7 +23,6 @@ const groups = {
   readonly: new ReadOnlyHandlersGroup(ctx),
   high: new HighLevelHandlersGroup(ctx),
   low: new LowLevelHandlersGroup(ctx),
-  compact: new CompactHandlersGroup(ctx),
   system: new SystemHandlersGroup(ctx),
   search: new SearchHandlersGroup(ctx),
 };
@@ -127,7 +128,8 @@ const EXPOSITIONS: ReadonlyArray<readonly GroupKey[]> = [
   ['low'],
   ['readonly', 'high'], // the default
   ['readonly', 'low'],
-  ['compact'],
+  // `['compact']` was the sixth: the facade is `@mcp-abap-adt/compact` now, a
+  // command of its own, and `validateExposition` refuses the value here.
 ];
 
 // Mirrors launcher.ts:203-241: overriding groups first, then a read-only group that has

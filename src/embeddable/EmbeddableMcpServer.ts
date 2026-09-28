@@ -2,7 +2,6 @@ import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import type { HandlerContext } from '../handlers/interfaces.js';
 import { noopLogger } from '../lib/handlerLogger.js';
-import { CompactHandlersGroup } from '../lib/handlers/groups/CompactHandlersGroup.js';
 import { HighLevelHandlersGroup } from '../lib/handlers/groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from '../lib/handlers/groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from '../lib/handlers/groups/ReadOnlyHandlersGroup.js';
@@ -200,9 +199,6 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
     if (exposition.includes('low')) {
       overridingGroups.push(new LowLevelHandlersGroup(dummyContext));
-    }
-    if (exposition.includes('compact')) {
-      overridingGroups.push(new CompactHandlersGroup(dummyContext));
     }
 
     const overridingToolNames = new Set<string>();

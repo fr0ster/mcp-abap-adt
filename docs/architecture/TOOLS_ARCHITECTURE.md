@@ -20,7 +20,8 @@ Handlers are organized into categorized subdirectories under `src/handlers/`:
 - `behavior_implementation/` - Behavior Implementation handlers
 - `class/` - Class handlers
 - `common/` - Common handlers (activate, delete, check, lock, unlock, validate)
-- `compact/` - Compact facade handlers
+- (the compact facade moved out of this package: `@mcp-abap-adt/compact-readonly`,
+  `@mcp-abap-adt/compact-modify` and the `@mcp-abap-adt/compact` command)
 - `data_element/` - Data Element handlers
 - `ddlx/` - DDLX (metadata extension) handlers
 - `domain/` - Domain handlers

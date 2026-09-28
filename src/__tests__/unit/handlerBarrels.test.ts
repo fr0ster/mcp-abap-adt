@@ -1,6 +1,10 @@
 /**
  * `lib`'s two public handler halves stay two halves.
  *
+ * (The union's coverage of the compact facade is asserted where the facade lives,
+ * in `compact/src/__tests__/compactCapabilitySplit.test.ts` — from here the
+ * packages' graphs are not visible and their needs are not lib's business.)
+ *
  * **What they are for.** The compact facade is moving into packages of its own, and
  * `@mcp-abap-adt/compact-readonly` must not be able to reach a write handler —
  * capability is what a package imports, not what its tool list enumerates. It
@@ -90,43 +94,5 @@ describe("lib's read and write handler barrels", () => {
       .map((file) => file.slice(SRC.length + 1))
       .sort();
     expect(offenders).toEqual([]);
-  });
-
-  it('together cover the compact facade, module for module', () => {
-    // The union is what the facade needs; a handler that belongs to neither
-    // barrel would leave the package that routes to it unable to import it.
-    const facade = new Set(
-      [
-        ...moduleGraph(
-          join(
-            SRC,
-            'lib',
-            'handlers',
-            'groups',
-            'CompactReadOnlyHandlersGroup.ts',
-          ),
-        ),
-        ...moduleGraph(
-          join(
-            SRC,
-            'lib',
-            'handlers',
-            'groups',
-            'CompactModifyHandlersGroup.ts',
-          ),
-        ),
-      ].filter((file) =>
-        /\/handlers\/(?!compact\/)[a-z_]+\/\w+\/handle\w+\.ts$/.test(file),
-      ),
-    );
-    const barrelled = new Set([
-      ...moduleGraph(join(SRC, 'lib', 'handlers', 'read.ts')),
-      ...moduleGraph(join(SRC, 'lib', 'handlers', 'write.ts')),
-    ]);
-    const missing = [...facade]
-      .filter((file) => !barrelled.has(file))
-      .map((file) => file.slice(SRC.length + 1))
-      .sort();
-    expect(missing).toEqual([]);
   });
 });

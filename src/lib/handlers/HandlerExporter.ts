@@ -6,7 +6,6 @@ import {
   type SystemContextResolver,
   withResolvedSystemContext,
 } from '../requestSystemResolution.js';
-import { CompactHandlersGroup } from './groups/CompactHandlersGroup.js';
 import { HighLevelHandlersGroup } from './groups/HighLevelHandlersGroup.js';
 import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
@@ -47,12 +46,6 @@ export interface HandlerExporterOptions {
    * @default true
    */
   includeLowLevel?: boolean;
-
-  /**
-   * Include compact facade handlers
-   * @default false
-   */
-  includeCompact?: boolean;
 
   /**
    * Include system handlers
@@ -128,9 +121,6 @@ export class HandlerExporter {
     }
     if (options?.includeHighLevel !== false) {
       this.handlerGroups.push(new HighLevelHandlersGroup(dummyContext));
-    }
-    if (options?.includeCompact === true) {
-      this.handlerGroups.push(new CompactHandlersGroup(dummyContext));
     }
     if (options?.includeLowLevel !== false) {
       this.handlerGroups.push(new LowLevelHandlersGroup(dummyContext));

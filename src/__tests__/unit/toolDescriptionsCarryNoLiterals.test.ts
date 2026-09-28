@@ -122,19 +122,16 @@ const parametersOf = (definition: {
 /**
  * The tools that take no parameter at all — a fixed, tiny list, so a schema
  * shape that stops being read shows up here as a new name rather than as
- * silence. Both of these answer a feed with no argument.
+ * silence. This one answers a feed with no argument; `HandlerProfileList` was the
+ * other until the compact facade moved into `@mcp-abap-adt/compact-readonly`.
  */
-const TAKES_NO_PARAMETERS = [
-  'HandlerProfileList',
-  'RuntimeListProfilerTraceFiles',
-];
+const TAKES_NO_PARAMETERS = ['RuntimeListProfilerTraceFiles'];
 
 describe('descriptions carry no incidental literals', () => {
   const tools = new HandlerExporter({
     includeReadOnly: true,
     includeHighLevel: true,
     includeLowLevel: true,
-    includeCompact: true,
     includeSystem: true,
     includeSearch: true,
   })

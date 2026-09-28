@@ -15,7 +15,9 @@ export interface YamlConfig {
   unsafe?: boolean;
   'auth-broker'?: boolean;
   'auth-broker-path'?: string;
-  exposition?: string | string[]; // Handler sets: readonly, high, low, compact
+  // Handler sets: readonly, high, low. `compact` is recognised and refused —
+  // that facade is the @mcp-abap-adt/compact command.
+  exposition?: string | string[];
   http?: {
     port?: number;
     host?: string;
@@ -250,7 +252,8 @@ auth-broker: false
 # If not specified, uses platform-specific default paths
 auth-broker-path:
 
-# Handler sets to expose: readonly, high, low, compact
+# Handler sets to expose: readonly, high, low
+# (compact moved to the @mcp-abap-adt/compact command and is refused here)
 # Default: readonly,high
 # Use comma-separated list or YAML array
 exposition: readonly,high

@@ -316,6 +316,35 @@ This is releasable on its own: no package moved, no manifest changed, no public
 export removed. What remains below needs the packaging decisions and, because a
 consumer installs from npm rather than a local link, a publish between the phases.
 
+## Done: the three packages exist
+
+- **`compact-readonly`** (13 tools + the read routes), **`compact-modify`** (9 +
+  the write routes), both Apache-2.0 with no bin, both depending on `lib` alone;
+  **`compact`** (AGPL-3.0-only) with `mcp-abap-adt-compact` and the union group.
+- **Five shared kernel modules stayed in `lib`** as `@mcp-abap-adt/lib/compact-shared`
+  — object types, the CRUD matrix, the schemas, the lifecycle helpers, the dispatch.
+  They are data and types, no handler, which is why both halves may share them.
+- **`lib` lost the facade**: `CompactHandlersGroup` (it lives in the command now),
+  the three group exports, `HandlerExporter`'s `includeCompact`, the compact page in
+  the docs generator, and the `compact` entries in `list-tools.ts`. Its frozen
+  surface went from 370 rows to 348; the 22 moved to `compact/tests/fixtures/`.
+- **`core` kept the launcher and gained an injection point.** `main()` is exported
+  and takes `extraGroups`, `exposition` and `includeSearch`; it self-starts only when
+  it is the program, so each bin calls it. The compact command is a twenty-line bin
+  over the same configuration, transports and auth — and `--version` answers its own
+  package's version, which is the defect 13.0.0 shipped in the other direction.
+- **Tests moved with their code**, into `compact*/src/__tests__`, with jest `roots`
+  and `moduleNameMapper` plus `tsconfig.test.json` `paths` so a test may import a
+  sibling package by name while the shipped code never does.
+- **`publish-all.sh` walks five** in dependency order; `server-compact.json` is the
+  second registry entry, because a different tool list is a different server; the
+  three packages have READMEs and `compact/docs/AVAILABLE_TOOLS.md` is generated from
+  the built packages.
+
+Verified: five projects type-check, 117 suites / 1739 tests green, and `binSmoke`
+packs all five, installs the tarballs and runs both commands — `mcp-abap-adt`
+answers core's version, `mcp-abap-adt-compact` answers compact's.
+
 ## Tasks, once the questions above are answered
 
 - [ ] Decide the four questions left and write the decision down (here, then in
@@ -334,12 +363,12 @@ consumer installs from npm rather than a local link, a publish between the phase
       that reads the activation run's results.
 - [x] **Split the compact router along the capability line** so a read-only group
       imports no write route — done, see the section above.
-- [ ] **The two library packages**: manifests, `LICENSE` (Apache-2.0, both — no
-      bin), `publish-all.sh`, the release checklist.
-- [ ] **The `compact` package**: manifest, `LICENSE` (AGPL-3.0-only), `COPYING`,
+- [x] **The two library packages**: manifests, `LICENSE` (Apache-2.0, both — no
+      bin), `publish-all.sh`, the release checklist. — done.
+- [x] **The `compact` package**: manifest, `LICENSE` (AGPL-3.0-only), `COPYING`,
       its bin, `server.json` (a second registry entry — a different tool list is a
       different server to a client), `publish-all.sh`, and `binSmoke.test.ts`
-      extended to its bin.
+      extended to its bin. — done.
 - [ ] **`lib` 14.0.0 and its migration note**: which tool moved to which package,
       per tool.
 - [ ] **What a consumer imports**, named explicitly: the two packages' entry points

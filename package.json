@@ -209,7 +209,10 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "roots": [
-      "<rootDir>/src"
+      "<rootDir>/src",
+      "<rootDir>/compact-readonly/src",
+      "<rootDir>/compact-modify/src",
+      "<rootDir>/compact/src"
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
@@ -228,6 +231,18 @@
       "json"
     ],
     "moduleNameMapper": {
+      "^@mcp-abap-adt/lib$": "<rootDir>/src/index.ts",
+      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/src/lib/handlers/index.ts",
+      "^@mcp-abap-adt/lib/handlers/read$": "<rootDir>/src/lib/handlers/read.ts",
+      "^@mcp-abap-adt/lib/handlers/write$": "<rootDir>/src/lib/handlers/write.ts",
+      "^@mcp-abap-adt/lib/compact-shared$": "<rootDir>/src/lib/compact/index.ts",
+      "^@mcp-abap-adt/lib/utils$": "<rootDir>/src/lib/utils.ts",
+      "^@mcp-abap-adt/lib/config$": "<rootDir>/src/lib/config/index.ts",
+      "^@mcp-abap-adt/compact-readonly$": "<rootDir>/compact-readonly/src/index.ts",
+      "^@mcp-abap-adt/compact-modify$": "<rootDir>/compact-modify/src/index.ts",
+      "^@mcp-abap-adt/core/launcher$": "<rootDir>/server/src/launcher.ts",
+      "^@mcp-abap-adt/compact-readonly/routes$": "<rootDir>/compact-readonly/src/handlers/compactReadRoutes.ts",
+      "^@mcp-abap-adt/compact-modify/routes$": "<rootDir>/compact-modify/src/handlers/compactWriteRoutes.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "collectCoverageFrom": [

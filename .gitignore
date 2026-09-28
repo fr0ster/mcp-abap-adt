@@ -83,10 +83,17 @@ mdd.json
 # A bare pattern matches at any depth, so this hides every package.json in the
 # tree, not the one it was written for. The root manifest survives only because
 # it was tracked before the rule existed; server/package.json was created after
-# and silently never committed — the server package had no manifest in git.
+# and silently never committed — the server package had no manifest in git. It
+# happened AGAIN when the compact packages were added: three manifests missing
+# from the commit, and CI said `ENOENT .../compact-readonly/package.json`, not
+# "this file is ignored". Every manifest this repository publishes is listed
+# below; a new package adds its line here in the same commit that adds it.
 package.json
 !/package.json
 !/server/package.json
+!/compact-readonly/package.json
+!/compact-modify/package.json
+!/compact/package.json
 .npm-cache/**
 SAP_ADT.json
 dev.json

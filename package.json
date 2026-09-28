@@ -44,6 +44,21 @@
       "types": "./dist/lib/requestContext.d.ts",
       "import": "./dist/lib/requestContext.js",
       "require": "./dist/lib/requestContext.js"
+    },
+    "./handlers/read": {
+      "types": "./dist/lib/handlers/read.d.ts",
+      "import": "./dist/lib/handlers/read.js",
+      "require": "./dist/lib/handlers/read.js"
+    },
+    "./handlers/write": {
+      "types": "./dist/lib/handlers/write.d.ts",
+      "import": "./dist/lib/handlers/write.js",
+      "require": "./dist/lib/handlers/write.js"
+    },
+    "./compact-shared": {
+      "types": "./dist/lib/compact/index.d.ts",
+      "import": "./dist/lib/compact/index.js",
+      "require": "./dist/lib/compact/index.js"
     }
   },
   "typesVersions": {
@@ -68,11 +83,20 @@
       ],
       "request-context": [
         "dist/lib/requestContext.d.ts"
+      ],
+      "handlers/read": [
+        "dist/lib/handlers/read.d.ts"
+      ],
+      "handlers/write": [
+        "dist/lib/handlers/write.d.ts"
+      ],
+      "compact-shared": [
+        "dist/lib/compact/index.d.ts"
       ]
     }
   },
   "scripts": {
-    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' — edit lines marked CHANGE')}\"",
+    "test:init": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';if(fs.existsSync(s)){console.log(s+' already exists, skipping (use test:reinit to overwrite)')}else{fs.copyFileSync(t,s);console.log('Created '+s+' \u2014 edit lines marked CHANGE')}\"",
     "test:reinit": "node -e \"const fs=require('fs'),s='tests/test-config.yaml',t=s+'.template';fs.copyFileSync(t,s);console.log('Recreated '+s+' from template')\"",
     "test": "jest --passWithNoTests",
     "test:integration": "jest --testPathPatterns=integration --testPathIgnorePatterns='__tests__/admin/' --runInBand --passWithNoTests --forceExit",
@@ -86,8 +110,8 @@
     "lint": "npx biome check --write src",
     "lint:check": "npx biome check src",
     "format": "npx biome format --write src",
-    "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','server/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
-    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p server/tsconfig.json",
+    "prebuild": "node -e \"const fs=require('node:fs');for(const d of ['dist','server/dist','compact-readonly/dist','compact-modify/dist','compact/dist'])fs.rmSync(d,{recursive:true,force:true})\"",
+    "build": "npx biome check --write --diagnostic-level=error src && npx tsc -p tsconfig.json && npx tsc -p server/tsconfig.json && npx tsc -p compact-readonly/tsconfig.json && npx tsc -p compact-modify/tsconfig.json && npx tsc -p compact/tsconfig.json",
     "build:fast": "npx tsc -p tsconfig.json",
     "check-todos": "node tools/check-todos.js",
     "auth": "npx sap-abap-auth auth",
@@ -185,7 +209,10 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "roots": [
-      "<rootDir>/src"
+      "<rootDir>/src",
+      "<rootDir>/compact-readonly/src",
+      "<rootDir>/compact-modify/src",
+      "<rootDir>/compact/src"
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
@@ -204,6 +231,18 @@
       "json"
     ],
     "moduleNameMapper": {
+      "^@mcp-abap-adt/lib$": "<rootDir>/src/index.ts",
+      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/src/lib/handlers/index.ts",
+      "^@mcp-abap-adt/lib/handlers/read$": "<rootDir>/src/lib/handlers/read.ts",
+      "^@mcp-abap-adt/lib/handlers/write$": "<rootDir>/src/lib/handlers/write.ts",
+      "^@mcp-abap-adt/lib/compact-shared$": "<rootDir>/src/lib/compact/index.ts",
+      "^@mcp-abap-adt/lib/utils$": "<rootDir>/src/lib/utils.ts",
+      "^@mcp-abap-adt/lib/config$": "<rootDir>/src/lib/config/index.ts",
+      "^@mcp-abap-adt/compact-readonly$": "<rootDir>/compact-readonly/src/index.ts",
+      "^@mcp-abap-adt/compact-modify$": "<rootDir>/compact-modify/src/index.ts",
+      "^@mcp-abap-adt/core/launcher$": "<rootDir>/server/src/launcher.ts",
+      "^@mcp-abap-adt/compact-readonly/routes$": "<rootDir>/compact-readonly/src/handlers/compactReadRoutes.ts",
+      "^@mcp-abap-adt/compact-modify/routes$": "<rootDir>/compact-modify/src/handlers/compactWriteRoutes.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     },
     "collectCoverageFrom": [

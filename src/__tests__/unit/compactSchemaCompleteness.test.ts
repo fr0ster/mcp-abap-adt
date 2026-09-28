@@ -11,6 +11,7 @@
  * from the SAME path `compactRouter.ts` imports the handler function from.
  */
 
+import { compactModifyEntries } from '@mcp-abap-adt/compact-modify';
 import { TOOL_DEFINITION as C_BEHAVIOR_DEFINITION } from '../../handlers/behavior_definition/high/handleCreateBehaviorDefinition';
 import { TOOL_DEFINITION as D_BEHAVIOR_DEFINITION } from '../../handlers/behavior_definition/high/handleDeleteBehaviorDefinition';
 import { TOOL_DEFINITION as U_BEHAVIOR_DEFINITION } from '../../handlers/behavior_definition/high/handleUpdateBehaviorDefinition';
@@ -28,14 +29,6 @@ import { TOOL_DEFINITION as U_LOCAL_DEFINITIONS } from '../../handlers/class/hig
 import { TOOL_DEFINITION as U_LOCAL_MACROS } from '../../handlers/class/high/handleUpdateLocalMacros';
 import { TOOL_DEFINITION as U_LOCAL_TEST_CLASS } from '../../handlers/class/high/handleUpdateLocalTestClass';
 import { TOOL_DEFINITION as U_LOCAL_TYPES } from '../../handlers/class/high/handleUpdateLocalTypes';
-import {
-  compactCreateSchema,
-  compactDeleteSchema,
-  compactUpdateSchema,
-} from '../../handlers/compact/high/compactSchemas';
-import { TOOL_DEFINITION as FACADE_CREATE } from '../../handlers/compact/high/handleHandlerCreate';
-import { TOOL_DEFINITION as FACADE_DELETE } from '../../handlers/compact/high/handleHandlerDelete';
-import { TOOL_DEFINITION as FACADE_UPDATE } from '../../handlers/compact/high/handleHandlerUpdate';
 import { TOOL_DEFINITION as C_DATA_ELEMENT } from '../../handlers/data_element/high/handleCreateDataElement';
 import { TOOL_DEFINITION as D_DATA_ELEMENT } from '../../handlers/data_element/high/handleDeleteDataElement';
 import { TOOL_DEFINITION as U_DATA_ELEMENT } from '../../handlers/data_element/high/handleUpdateDataElement';
@@ -83,6 +76,11 @@ import { TOOL_DEFINITION as D_CDS_UNIT_TEST } from '../../handlers/unit_test/hig
 import { TOOL_DEFINITION as D_UNIT_TEST } from '../../handlers/unit_test/high/handleDeleteUnitTest';
 import { TOOL_DEFINITION as U_CDS_UNIT_TEST } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import { TOOL_DEFINITION as U_UNIT_TEST } from '../../handlers/unit_test/high/handleUpdateUnitTest';
+import {
+  compactCreateSchema,
+  compactDeleteSchema,
+  compactUpdateSchema,
+} from '../../lib/compact/compactSchemas';
 
 // inputSchema shape varies across handlers (JSON-schema-style objects with a
 // top-level `required: string[]`, or Zod schemas with no `required`). We only
@@ -218,10 +216,27 @@ function parseDescriptionArgs(
   return pairs;
 }
 
+/**
+ * The facade's own tool definitions, taken from the package that owns them.
+ *
+ * `HandlerCreate`, `HandlerUpdate` and `HandlerDelete` live in
+ * `@mcp-abap-adt/compact-modify` now. The entries builder is their public shape, so
+ * the definitions are looked up by name from it rather than imported file by file —
+ * a test in this repository may reach a sibling package's source; the PUBLISHED
+ * `lib` does not, and must not.
+ */
+const facadeDefinition = (name: string) => {
+  const entry = compactModifyEntries(() => ({}) as never).find(
+    (candidate) => candidate.toolDefinition.name === name,
+  );
+  if (!entry) throw new Error(`the compact facade has no ${name}`);
+  return entry.toolDefinition;
+};
+
 const FACADE = {
-  create: FACADE_CREATE,
-  update: FACADE_UPDATE,
-  delete: FACADE_DELETE,
+  create: facadeDefinition('HandlerCreate'),
+  update: facadeDefinition('HandlerUpdate'),
+  delete: facadeDefinition('HandlerDelete'),
 } as const;
 
 for (const op of ['create', 'update', 'delete'] as const) {

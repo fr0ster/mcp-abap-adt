@@ -14,10 +14,32 @@
     // eighteen errors of their own that predate this migration, and adopting
     // them here would make "errors naming the files this task touched" — the
     // measure every remaining task reports against — noisier for no gain.
-    "rootDir": "."
+    "rootDir": ".",
+    // The compact facade lives in sibling packages now, and the tests that
+    // exercise it import them by package name. ts-jest resolves those names
+    // through these paths, the jest runtime through `moduleNameMapper` in
+    // package.json — the two lists have to agree, which is what
+    // `packageEntryPoints`-style drift would otherwise hide.
+    "paths": {
+      "@mcp-abap-adt/lib": ["./src/index.ts"],
+      "@mcp-abap-adt/lib/handlers": ["./src/lib/handlers/index.ts"],
+      "@mcp-abap-adt/lib/handlers/read": ["./src/lib/handlers/read.ts"],
+      "@mcp-abap-adt/lib/handlers/write": ["./src/lib/handlers/write.ts"],
+      "@mcp-abap-adt/lib/compact-shared": ["./src/lib/compact/index.ts"],
+      "@mcp-abap-adt/lib/utils": ["./src/lib/utils.ts"],
+      "@mcp-abap-adt/lib/config": ["./src/lib/config/index.ts"],
+      "@mcp-abap-adt/compact-readonly": ["./compact-readonly/src/index.ts"],
+      "@mcp-abap-adt/compact-readonly/routes": ["./compact-readonly/src/handlers/compactReadRoutes.ts"],
+      "@mcp-abap-adt/compact-modify": ["./compact-modify/src/index.ts"],
+      "@mcp-abap-adt/compact-modify/routes": ["./compact-modify/src/handlers/compactWriteRoutes.ts"],
+      "@mcp-abap-adt/core/launcher": ["./server/src/launcher.ts"]
+    }
   },
   "include": [
     "src/**/*",
+    "compact-readonly/src/**/*",
+    "compact-modify/src/**/*",
+    "compact/src/**/*",
     "src/__tests__/**/*",
     "src/lib/servers/v2/__tests__/**/*",
     "scripts/lib/**/*",

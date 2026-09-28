@@ -21,10 +21,6 @@ describe('validateExposition', () => {
     expect(() => validateExposition(['low'])).not.toThrow();
   });
 
-  it('accepts [compact] alone', () => {
-    expect(() => validateExposition(['compact'])).not.toThrow();
-  });
-
   it('accepts empty array', () => {
     expect(() => validateExposition([])).not.toThrow();
   });
@@ -35,15 +31,18 @@ describe('validateExposition', () => {
     );
   });
 
-  it('rejects compact combined with readonly', () => {
-    expect(() => validateExposition(['compact', 'readonly'])).toThrow(/alone/i);
-  });
-
-  it('rejects compact combined with high', () => {
-    expect(() => validateExposition(['compact', 'high'])).toThrow(/alone/i);
-  });
-
-  it('rejects compact combined with low', () => {
-    expect(() => validateExposition(['compact', 'low'])).toThrow(/alone/i);
+  // `compact` is not served from here any more: the facade is
+  // `@mcp-abap-adt/compact`, its own command. The value is still recognised, and
+  // refused with that pointer — a configuration asking for a tool list it will not
+  // get should fail at startup rather than start with tools missing.
+  it.each([
+    ['compact'],
+    ['compact', 'readonly'],
+    ['compact', 'high'],
+    ['compact', 'low'],
+  ])('refuses %j and names the package that serves it', (...exposition) => {
+    expect(() => validateExposition(exposition as never)).toThrow(
+      /@mcp-abap-adt\/compact/,
+    );
   });
 });

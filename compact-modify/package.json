@@ -1,0 +1,60 @@
+{
+  "name": "@mcp-abap-adt/compact-modify",
+  "version": "13.1.0",
+  "description": "The compact ABAP ADT tools that write, lock, activate or execute: one tool per operation, the object in the arguments.",
+  "license": "Apache-2.0",
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "homepage": null,
+  "bugs": null,
+  "keywords": [
+    "sap",
+    "abap",
+    "adt",
+    "mcp",
+    "compact",
+    "write"
+  ],
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./routes": {
+      "types": "./dist/handlers/compactWriteRoutes.d.ts",
+      "import": "./dist/handlers/compactWriteRoutes.js",
+      "require": "./dist/handlers/compactWriteRoutes.js"
+    }
+  },
+  "files": [
+    "dist/",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "jest --passWithNoTests",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/lib": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "@types/node": "^22.20.4"
+  }
+}

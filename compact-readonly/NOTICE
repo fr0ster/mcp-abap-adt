@@ -1,0 +1,17 @@
+@mcp-abap-adt/lib
+Copyright 2025-2026 Oleksii Kyslytsia and contributors
+
+This product includes software developed as part of the mcp-abap-adt project
+(https://github.com/fr0ster/mcp-abap-adt).
+
+Licensed under the Apache License, Version 2.0. See LICENSE.
+
+Portions of this work originate from the mcp-abap-adt project as published by
+mario-andreschak under the MIT License (releases up to and including 8.13.0),
+and are redistributed here under the terms above. The MIT grant covering those
+releases is unaffected: anyone may still obtain 8.13.0 or earlier under MIT.
+See CONTRIBUTORS.md for the full account.
+
+The standalone server built on this library is distributed separately as
+@mcp-abap-adt/core under the GNU Affero General Public License v3.0 only. It is
+not part of this package, and nothing here is subject to its terms.

@@ -1,0 +1,35 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": {
+      "@mcp-abap-adt/lib": [
+        "../dist/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers": [
+        "../dist/lib/handlers/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers/read": [
+        "../dist/lib/handlers/read.d.ts"
+      ],
+      "@mcp-abap-adt/lib/handlers/write": [
+        "../dist/lib/handlers/write.d.ts"
+      ],
+      "@mcp-abap-adt/lib/compact-shared": [
+        "../dist/lib/compact/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/utils": [
+        "../dist/lib/utils.d.ts"
+      ]
+    }
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/__tests__"
+  ]
+}

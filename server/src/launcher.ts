@@ -2,10 +2,10 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as dotenv from 'dotenv';
 import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import type { HandlerSet } from '@mcp-abap-adt/lib/config';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import { validateExposition } from '@mcp-abap-adt/lib/config';
 import {
-  CompactHandlersGroup,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
@@ -192,7 +192,30 @@ function showHelp(): void {
   console.error(ServerConfigManager.generateHelp(V2_HELP_SECTIONS));
 }
 
-async function main() {
+/**
+ * What a command may add to the tool list this launcher serves.
+ *
+ * `@mcp-abap-adt/compact` is a second command over the same server: same config,
+ * same transports, same auth, a different DECOMPOSITION of the tool list. Rather
+ * than copy four hundred lines of launcher into it, it calls `main` with its own
+ * groups. `exposition` decides the sets this package knows (`readonly`, `high`,
+ * `low`), and `extraGroups` adds what it does not — so the compact command passes
+ * an exposition of its own and its two halves, and nothing about the flags changes
+ * here.
+ */
+export interface LauncherOptions {
+  /** Built against the launcher's own base context, once, at startup. */
+  extraGroups?: (context: HandlerContext) => IHandlerGroup[];
+  /** Overrides the configured exposition, for a command with a fixed tool list. */
+  exposition?: readonly HandlerSet[];
+  /**
+   * Whether the search tools join the list. They always do for `mcp-abap-adt`;
+   * a command whose whole point is a tool list of a known size says `false`.
+   */
+  includeSearch?: boolean;
+}
+
+export async function main(options: LauncherOptions = {}) {
   // Check for --version first
   if (hasArg('--version') || hasArg('-v')) {
     showVersion();
@@ -220,7 +243,7 @@ async function main() {
   } satisfies HandlerContext;
 
   // Build handlers based on exposition config (default to readonly,high)
-  const exposition = config.exposition || ['readonly', 'high'];
+  const exposition = options.exposition ?? config.exposition ?? ['readonly', 'high'];
   validateExposition(exposition);
 
   // Non-readonly groups are built first so that their tool names can be fed
@@ -233,8 +256,9 @@ async function main() {
   if (exposition.includes('low')) {
     overridingGroups.push(new LowLevelHandlersGroup(baseContext));
   }
-  if (exposition.includes('compact')) {
-    overridingGroups.push(new CompactHandlersGroup(baseContext));
+
+  for (const group of options.extraGroups?.(baseContext) ?? []) {
+    overridingGroups.push(group);
   }
 
   const overridingToolNames = new Set<string>();
@@ -256,8 +280,10 @@ async function main() {
     handlerGroups.push(new SystemHandlersGroup(baseContext));
   }
   handlerGroups.push(...overridingGroups);
-  // SearchHandlersGroup is always included
-  handlerGroups.push(new SearchHandlersGroup(baseContext));
+  // Search joins every list but a fixed one — see LauncherOptions.includeSearch.
+  if (options.includeSearch !== false) {
+    handlerGroups.push(new SearchHandlersGroup(baseContext));
+  }
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
 
@@ -419,11 +445,15 @@ async function main() {
   await server.start();
 }
 
-void main().catch((err) => {
+// Run only when this module is the program. The bin calls `main()` itself, and a
+// sibling command imports it — neither wants a server started by an import.
+if (require.main === module) {
+  void main().catch((err) => {
   // eslint-disable-next-line no-console
   console.error(
     '[MCP] launcher failed:',
     err instanceof Error ? err.message : String(err),
   );
   process.exit(1);
-});
+  });
+}

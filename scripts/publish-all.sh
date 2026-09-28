@@ -28,7 +28,10 @@ done
 # until the library has.
 PACKAGES=(
   "."
+  "./compact-readonly"
+  "./compact-modify"
   "./server"
+  "./compact"
 )
 
 PUBLISHED=0

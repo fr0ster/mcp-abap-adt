@@ -66,9 +66,11 @@ describe('the published bins start from an installed package', () => {
 
     workdir = mkdtempSync(join(tmpdir(), 'mcp-bin-smoke-'));
 
-    // Pack both, because `core` depends on `lib` by version and the version
-    // being released is not on the registry yet — installing the tarballs
-    // together is what an installed tree looks like without publishing first.
+    // Pack all five, because each depends on the others by version and the
+    // versions being released are not on the registry yet — installing the
+    // tarballs together is what an installed tree looks like without publishing
+    // first. `compact` is here because a third bin is a third chance to ship a
+    // launcher that cannot find its own manifest.
     const libTarball = run(
       'npm',
       ['pack', ROOT, '--pack-destination', workdir],
@@ -77,14 +79,16 @@ describe('the published bins start from an installed package', () => {
       .trim()
       .split('\n')
       .at(-1) as string;
-    const coreTarball = run(
-      'npm',
-      ['pack', join(ROOT, 'server'), '--pack-destination', workdir],
-      workdir,
-    )
-      .trim()
-      .split('\n')
-      .at(-1) as string;
+    const work = workdir;
+    const pack = (dir: string) =>
+      run('npm', ['pack', join(ROOT, dir), '--pack-destination', work], work)
+        .trim()
+        .split('\n')
+        .at(-1) as string;
+    const coreTarball = pack('server');
+    const readOnlyTarball = pack('compact-readonly');
+    const modifyTarball = pack('compact-modify');
+    const compactTarball = pack('compact');
 
     run('npm', ['init', '-y'], workdir);
     run(
@@ -95,6 +99,9 @@ describe('the published bins start from an installed package', () => {
         '--ignore-scripts',
         join(workdir, libTarball),
         join(workdir, coreTarball),
+        join(workdir, readOnlyTarball),
+        join(workdir, modifyTarball),
+        join(workdir, compactTarball),
       ],
       workdir,
     );
@@ -112,6 +119,21 @@ describe('the published bins start from an installed package', () => {
     // The defect this exists for: from here `__dirname/../..` is the scope
     // directory, and reading a manifest there answers ENOENT.
     const printed = run('node', [bin, '--version'], workdir).trim();
+
+    const compactBin = join(
+      workdir,
+      'node_modules',
+      '@mcp-abap-adt',
+      'compact',
+      'bin',
+      'mcp-abap-adt-compact.js',
+    );
+    expect(existsSync(compactBin)).toBe(true);
+    // And the compact command answers ITS version, not the one core would print
+    // — a launcher that reports a sibling's manifest reads as the truth.
+    expect(run('node', [compactBin, '--version'], workdir).trim()).toBe(
+      version('compact/package.json'),
+    );
 
     expect(printed).toBe(version('server/package.json'));
     // And not the library's, which is what two levels up answered in a checkout

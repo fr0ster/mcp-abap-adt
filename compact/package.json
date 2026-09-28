@@ -1,0 +1,69 @@
+{
+  "name": "@mcp-abap-adt/compact",
+  "version": "13.1.0",
+  "description": "The compact MCP server for SAP ABAP ADT: one tool per operation with the object in the arguments \u2014 22 tools instead of 370, for a host that cannot build a retrieval pipeline of its own.",
+  "license": "AGPL-3.0-only",
+  "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fr0ster/mcp-abap-adt.git"
+  },
+  "homepage": null,
+  "bugs": null,
+  "keywords": [
+    "sap",
+    "abap",
+    "adt",
+    "mcp",
+    "mcp-server",
+    "compact"
+  ],
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./launcher": {
+      "types": "./dist/launcher.d.ts",
+      "import": "./dist/launcher.js",
+      "require": "./dist/launcher.js"
+    }
+  },
+  "bin": {
+    "mcp-abap-adt-compact": "./bin/mcp-abap-adt-compact.js"
+  },
+  "files": [
+    "dist/",
+    "bin/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
+    "build": "npx tsc -p tsconfig.json",
+    "test": "jest --passWithNoTests",
+    "lint:check": "npx biome check src",
+    "prepublishOnly": "npm run build",
+    "start": "node ./bin/mcp-abap-adt-compact.js",
+    "docs:tools": "node ./tools/generate-docs.js"
+  },
+  "dependencies": {
+    "@mcp-abap-adt/compact-modify": "^13.1.0",
+    "@mcp-abap-adt/compact-readonly": "^13.1.0",
+    "@mcp-abap-adt/core": "^13.1.0",
+    "@mcp-abap-adt/lib": "^13.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.2",
+    "@types/node": "^22.20.4"
+  }
+}

@@ -280,7 +280,7 @@ function exporterWith(
 
 describe('HandlerExporter.getHandlerEntries', () => {
   it('keeps every handler arity the embedders branch on', () => {
-    const exporter = new HandlerExporter({ includeCompact: true });
+    const exporter = new HandlerExporter({});
     const raw = (
       exporter as unknown as { handlerGroups: IHandlerGroup[] }
     ).handlerGroups.flatMap((g) => g.getHandlers());

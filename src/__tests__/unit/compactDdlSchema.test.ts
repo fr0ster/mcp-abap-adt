@@ -2,7 +2,7 @@ import {
   compactCreateSchema,
   compactDeleteSchema,
   compactUpdateSchema,
-} from '../../handlers/compact/high/compactSchemas';
+} from '../../lib/compact/compactSchemas';
 
 /**
  * Guard: the compact facade routes object_type 'DDL' create/update/delete into

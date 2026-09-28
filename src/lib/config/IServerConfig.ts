@@ -19,6 +19,14 @@ export interface TlsConfig {
 export type Transport = 'stdio' | 'sse' | 'http';
 
 /** Handler set for exposition control */
+/**
+ * The handler sets a configuration may name.
+ *
+ * `compact` is still a member and is deliberately NOT served here: the facade is
+ * `@mcp-abap-adt/compact`, its own command. Keeping the value means a configuration
+ * that asks for it is recognised and refused with that pointer
+ * (`validateExposition`) rather than parsed as a typo or silently ignored.
+ */
 export type HandlerSet = 'readonly' | 'high' | 'low' | 'compact';
 
 export interface IServerConfig {

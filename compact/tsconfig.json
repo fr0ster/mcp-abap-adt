@@ -1,0 +1,17 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src",
+    "outDir": "./dist",
+    "paths": {
+      "@mcp-abap-adt/lib": ["../dist/index.d.ts"],
+      "@mcp-abap-adt/lib/handlers": ["../dist/lib/handlers/index.d.ts"],
+      "@mcp-abap-adt/lib/config": ["../dist/lib/config/index.d.ts"],
+      "@mcp-abap-adt/compact-readonly": ["../compact-readonly/dist/index.d.ts"],
+      "@mcp-abap-adt/compact-modify": ["../compact-modify/dist/index.d.ts"],
+      "@mcp-abap-adt/core/launcher": ["../server/dist/launcher.d.ts"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "src/__tests__"]
+}

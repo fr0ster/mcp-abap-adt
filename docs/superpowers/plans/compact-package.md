@@ -115,10 +115,23 @@ admissible), `HandlerCheckRun` (a syntax check), `HandlerUnitTestStatus`,
 no repository object but they run code and leave traces, which is not something a
 read-only surface may offer).
 
-**Licence: every package that ships a bin is AGPL-3.0-only**, so both compact
-packages are, exactly as `core` is. `lib` stays Apache-2.0 because it ships no bin
-and no transport. That settles the question this plan opened with, and it settles
-it the same way for anything added later.
+**The bin is NOT split.** Locally the server gives every access; the separation is
+the CONSUMER's to make. (Corrected by the user 2026-09-28, against the conclusion
+one paragraph earlier in this plan's history.) So:
+
+- `mcp-abap-adt` stays one command with `--exposition` as it is. No new bin, no new
+  `server.json` entry, no registry question at all.
+- `compact-readonly` and `compact-modify` are **library packages a consumer
+  imports** to build its own tool list — the thing cloud-llm-hub needs when it
+  decides what to put in front of an LLM. Capability is chosen by what the consumer
+  imports, and enforced by the fact that the read-only package does not carry the
+  write handlers.
+
+**Licence follows from that, and not the way this plan first concluded.** The rule
+is the user's: *every package that ships a bin is AGPL-3.0-only.* These two ship no
+bin and no transport, so they are **Apache-2.0 like `lib`** — the earlier line
+here, which made them AGPL, was reasoning from a bin they will not have. `core`
+stays AGPL-3.0-only as the one package with a transport in it.
 
 **And the work this exposes is in `lib`, not in the new packages.** Today
 `CompactHandlersGroup` imports all 22 compact handlers, and each of those imports
@@ -128,12 +141,7 @@ has to come apart along the same line: a read-only group importing read-only
 routes only. That is the actual task; the two manifests are the easy part.
 
 ## Open questions for the brainstorm
-1. **The commands.** A bin of its own (`mcp-abap-adt-compact`), or `core`'s bin
-   with the exposition defaulted by the package that installed it? A third bin
-   goes into `binSmoke.test.ts` either way.
-2. **Registry metadata.** `server.json` describes one server. Does the compact
-   variant get its own entry, or a documented flag on the existing one?
-3. **Release mechanics.** `publish-all.sh` gains two more entries and the release
+1. **Release mechanics.** `publish-all.sh` gains two more entries and the release
    checklist two more versions to keep in step — the same drift that has bitten
    `server.json` before. Lockstep versions for all four packages, or independent?
 
@@ -155,9 +163,12 @@ routes only. That is the actual task; the two manifests are the easy part.
       that reads the activation run's results.
 - [ ] **Split the compact router along the capability line** so a read-only group
       imports no write route. This is the real work, and it is in `lib`.
-- [ ] **The two packages**: manifests, `LICENSE` (AGPL-3.0-only, both),
-      `COPYING`, bins, `publish-all.sh`, `server.json`, the release checklist, and
-      `binSmoke.test.ts` extended to both new bins.
+- [ ] **The two packages**: manifests, `LICENSE` (Apache-2.0, both — no bin),
+      `publish-all.sh`, the release checklist. No bins, so `binSmoke.test.ts` and
+      `server.json` are untouched.
+- [ ] **What a consumer imports**, named explicitly: the two packages' entry points
+      answer a handler registry, and the shape has to be the one cloud-llm-hub can
+      use directly rather than something it has to adapt.
 - [ ] **Docs**: README's Dependencies and Licensing sections, the tool docs
       generator (does it need a compact-only page?), and a migration note if
       anything about `core` changes.

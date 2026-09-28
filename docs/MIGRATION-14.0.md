@@ -28,8 +28,19 @@ mcp-abap-adt-compact          # stdio, the 22 compact tools and nothing else
 ```
 
 Configuration is unchanged — connection, authentication, transports, the YAML file
-and every flag work exactly as before, because it is the same launcher. What
-changed is the tool list and the entry point's name.
+and every flag work exactly as before, because it is the same launcher. What changed
+is the tool list and the entry point's name.
+
+**`--exposition` still exists on the compact command, with its own two values:**
+
+| | tools |
+|---|---|
+| `--exposition=rw` (default) | all 22 |
+| `--exposition=ro` | the 13 that change nothing |
+
+`ro` is not a filter over the same list: the write tools are not in it at all, so a
+client cannot call one. `readonly`, `high` and `low` are sets of the object-oriented
+surface and are refused here by name, pointing at `mcp-abap-adt`.
 
 `mcp-abap-adt` now REFUSES the value at startup rather than ignoring it:
 

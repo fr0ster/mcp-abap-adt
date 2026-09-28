@@ -1,27 +1,26 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import * as dotenv from 'dotenv';
 import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
 import type { HandlerSet } from '@mcp-abap-adt/lib/config';
-import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
-import { validateExposition } from '@mcp-abap-adt/lib/config';
 import {
+  ServerConfigManager,
+  validateExposition,
+} from '@mcp-abap-adt/lib/config';
+import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
+import {
+  CompositeHandlersRegistry,
   HighLevelHandlersGroup,
   LowLevelHandlersGroup,
   ReadOnlyHandlersGroup,
+  ReadVsGetDedupStrategy,
   SearchHandlersGroup,
   SystemHandlersGroup,
 } from '@mcp-abap-adt/lib/handlers';
-import { ReadVsGetDedupStrategy } from '@mcp-abap-adt/lib/handlers';
-import type {
-  HandlerContext,
-  IHandlerGroup,
-} from '@mcp-abap-adt/lib/handlers';
-import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
+import * as dotenv from 'dotenv';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
 import { StdioServer } from './StdioServer.js';
@@ -188,8 +187,14 @@ GENERATING .ENV FROM SERVICE KEY:
   Generate .env: sap-abap-auth auth -k path/to/service-key.json
 `;
 
-function showHelp(): void {
-  console.error(ServerConfigManager.generateHelp(V2_HELP_SECTIONS));
+function showHelp(options: LauncherOptions = {}): void {
+  console.error(
+    ServerConfigManager.generateHelp(V2_HELP_SECTIONS, {
+      program: options.program,
+      // A sibling command documents its OWN exposition vocabulary, not this one's.
+      expositionSection: options.helpExposition,
+    }),
+  );
 }
 
 /**
@@ -208,6 +213,15 @@ export interface LauncherOptions {
   extraGroups?: (context: HandlerContext) => IHandlerGroup[];
   /** Overrides the configured exposition, for a command with a fixed tool list. */
   exposition?: readonly HandlerSet[];
+  /** The command's own name, for USAGE in `--help`. */
+  program?: string;
+  /**
+   * Replaces the HANDLER EXPOSITION section of `--help`.
+   *
+   * A sibling command has its own sets — `mcp-abap-adt-compact` takes `ro` and
+   * `rw` over the compact facade — and parses them itself before calling here.
+   */
+  helpExposition?: string;
   /**
    * Whether the search tools join the list. They always do for `mcp-abap-adt`;
    * a command whose whole point is a tool list of a known size says `false`.
@@ -223,7 +237,7 @@ export async function main(options: LauncherOptions = {}) {
 
   // Check for --help
   if (hasArg('--help') || hasArg('-h')) {
-    showHelp();
+    showHelp(options);
     process.exit(0);
   }
 
@@ -243,7 +257,8 @@ export async function main(options: LauncherOptions = {}) {
   } satisfies HandlerContext;
 
   // Build handlers based on exposition config (default to readonly,high)
-  const exposition = options.exposition ?? config.exposition ?? ['readonly', 'high'];
+  const exposition = options.exposition ??
+    config.exposition ?? ['readonly', 'high'];
   validateExposition(exposition);
 
   // Non-readonly groups are built first so that their tool names can be fed
@@ -372,7 +387,9 @@ export async function main(options: LauncherOptions = {}) {
       brokerKey = configuredBrokerKey!;
     } else {
       // Inspection-only mode: no connection parameters provided
-      const { MockAbapConnection } = await import('@mcp-abap-adt/lib/embeddable');
+      const { MockAbapConnection } = await import(
+        '@mcp-abap-adt/lib/embeddable'
+      );
       const mockConnection = new MockAbapConnection();
       broker = {
         getSession: async () => ({
@@ -449,11 +466,11 @@ export async function main(options: LauncherOptions = {}) {
 // sibling command imports it — neither wants a server started by an import.
 if (require.main === module) {
   void main().catch((err) => {
-  // eslint-disable-next-line no-console
-  console.error(
-    '[MCP] launcher failed:',
-    err instanceof Error ? err.message : String(err),
-  );
-  process.exit(1);
+    // eslint-disable-next-line no-console
+    console.error(
+      '[MCP] launcher failed:',
+      err instanceof Error ? err.message : String(err),
+    );
+    process.exit(1);
   });
 }

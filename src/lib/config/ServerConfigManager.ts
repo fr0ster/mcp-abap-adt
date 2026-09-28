@@ -191,7 +191,12 @@ export class ServerConfigManager {
 
   /**
    * Parse handler exposition from command line
-   * Format: --exposition=readonly,high,low,compact
+   * Format: --exposition=readonly,high,low
+   *
+   * `compact` is still ACCEPTED here on purpose, so `validateExposition` can refuse
+   * it by name and say which command serves it. Dropping it from the filter would
+   * turn a wrong value into silence — the exposition would come out empty and the
+   * server would start with a tool list nobody asked for.
    */
   private parseExposition(): HandlerSet[] {
     const value = ArgumentsParser.getArgument('--exposition');
@@ -217,7 +222,7 @@ export class ServerConfigManager {
     return `
 HANDLER EXPOSITION:
   --exposition=<sets>              Comma-separated handler sets to expose
-                                   Options: readonly, high, low, compact
+                                   Options: readonly, high, low
                                    Default: readonly,high
 
                                    Handler Sets:
@@ -228,9 +233,6 @@ HANDLER EXPOSITION:
                                                (safe create/update via ADT)
                                    - low:      Update*Low, Delete*, Activate*
                                                (direct/dangerous operations)
-                                   - compact:  HandlerCreate, HandlerGet,
-                                               HandlerUpdate, HandlerDelete
-                                               (object_type-routed facade)
                                    - search:   SearchObject (included with readonly)
                                    - system:   GetWhereUsed, GetTypeInfo, GetObjectInfo,
                                                GetAbapAST, GetSession, etc.
@@ -240,22 +242,42 @@ HANDLER EXPOSITION:
                                    --exposition=readonly       (readonly + search + system)
                                    --exposition=readonly,high  (readonly + high + search + system)
                                    --exposition=high           (high only, NO search/system)
-                                   --exposition=compact        (compact facade only)
                                    --exposition=readonly,high,low (all handlers)
+
+                                   The compact facade is NOT an exposition of this
+                                   command any more. It is its own command, with
+                                   that tool list as its default and no exposition
+                                   to get wrong:
+                                     npm i -g @mcp-abap-adt/compact
+                                     mcp-abap-adt-compact
+                                   This command refuses --exposition=compact and
+                                   says the same.
 
                                    For details: docs/user-guide/HANDLERS_MANAGEMENT.md
 `;
   }
 
   /**
-   * Generate complete help text with all configuration options
+   * Generate complete help text with all configuration options.
+   *
+   * `program` and `expositionSection` exist for the sibling command:
+   * `mcp-abap-adt-compact` shares this launcher, so it shares this help — but it
+   * must not print `mcp-abap-adt` in USAGE, and its exposition is a different
+   * vocabulary: `ro` and `rw` over the compact facade rather than
+   * `readonly`/`high`/`low` over the object-oriented one. It passes its own section;
+   * an empty string prints none. A help text that documents values the command does
+   * not accept is worse than no help.
    */
-  static generateHelp(additionalSections?: string): string {
+  static generateHelp(
+    additionalSections?: string,
+    options?: { program?: string; expositionSection?: string },
+  ): string {
+    const program = options?.program ?? 'mcp-abap-adt';
     return `
 MCP ABAP ADT Server - SAP ABAP Development Tools MCP Integration
 
 USAGE:
-  mcp-abap-adt [options]
+  ${program} [options]
 
 DESCRIPTION:
   MCP server for interacting with SAP ABAP systems via ADT (ABAP Development Tools).
@@ -298,7 +320,7 @@ AUTHENTICATION:
   --allow-destination-header       Allow x-mcp-destination header to override
                                    default destination (HTTP/SSE only, disabled by default)
 
-${ServerConfigManager.getHandlerSetsDescription()}
+${options?.expositionSection ?? ServerConfigManager.getHandlerSetsDescription()}
 HTTP OPTIONS:
   --http-json-response             Enable JSON response format
 

@@ -31,9 +31,16 @@ smaller install, and it is not a sandbox — code that deliberately reaches into
 
 ```bash
 npm install -g @mcp-abap-adt/compact
-mcp-abap-adt-compact            # stdio, the 22 compact tools and nothing else
+mcp-abap-adt-compact                    # stdio, all 22 compact tools
+mcp-abap-adt-compact --exposition=ro    # the 13 that change nothing
 mcp-abap-adt-compact --version
 ```
+
+`--exposition` takes **`rw`** (the default — all 22 tools, every access, which is
+what a local server gives) or **`ro`** (the 13 tools that change nothing: no create,
+update, delete, activate, lock, unlock, unit-test run or profiler run is in the tool
+list at all, so a client cannot call one). The object-oriented sets
+`readonly`/`high`/`low` belong to `mcp-abap-adt` and are refused here by name.
 
 Configuration — connection, authentication, transports — is the same as
 `mcp-abap-adt`'s, because the launcher is the same one: this command passes its own

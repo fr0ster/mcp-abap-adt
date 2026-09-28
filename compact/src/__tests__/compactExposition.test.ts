@@ -35,6 +35,22 @@ describe('the compact command reads its own exposition', () => {
     );
   });
 
+  it('refuses a flag that was given no value, rather than defaulting', () => {
+    // Reported in review: `--exposition="$MODE"` with an unset variable opened all
+    // 22 tools, writes included, and an empty repeat overrode a deliberate `ro`.
+    // The default belongs to an ABSENT flag only.
+    for (const argv of [
+      ['--exposition='],
+      ['--exposition', ''],
+      ['--exposition'],
+      ['--exposition', '--transport=stdio'],
+      ['--exposition=ro', '--exposition='],
+      ['--exposition=ro', '--exposition'],
+    ]) {
+      expect(() => parseCompactExposition(argv)).toThrow(/no value/);
+    }
+  });
+
   it('refuses a set of the object-oriented surface, by name', () => {
     for (const wrong of ['readonly', 'high', 'low', 'compact', 'all']) {
       expect(() => parseCompactExposition([`--exposition=${wrong}`])).toThrow(

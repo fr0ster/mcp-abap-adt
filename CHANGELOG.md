@@ -32,6 +32,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     sibling command documents its own vocabulary instead of inheriting one that does
     not apply.
 
+  - **An empty value is refused, not defaulted.** The first version treated "no
+    flag" and "flag with nothing in it" alike, so `--exposition="$MODE"` with an
+    unset variable opened all 22 tools — writes included — and
+    `--exposition=ro --exposition=` overrode a deliberate `ro` the same way (found in
+    review). The default belongs to an ABSENT flag; a flag that is present but says
+    nothing is a caller who meant something and lost it in a shell, so it fails at
+    startup. `--exposition` with a following flag rather than a value counts as empty
+    too.
+
   Two mistakes of mine while writing this, both caught before release: the first
   version REFUSED `--exposition` on the compact command instead of giving it `ro`/`rw`
   (the user's correction), and the `ro` branch first wrapped the entries in an object

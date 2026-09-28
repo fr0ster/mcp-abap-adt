@@ -52,20 +52,40 @@ HANDLER EXPOSITION:
  * `--exposition=ro` and `--exposition ro`; anything else is refused by name rather
  * than falling back to a default, because starting with a different tool list than
  * the one that was asked for is the failure this is meant to prevent.
+ *
+ * **The default belongs to an ABSENT flag, never to an empty value.** The first
+ * version treated the two alike, so `--exposition="$MODE"` with an unset variable
+ * opened all 22 tools — writes included — and `--exposition=ro --exposition=`
+ * overrode a deliberate `ro` the same way (found in review on PR #247). A flag that
+ * is present but says nothing is a caller who meant something and lost it in a
+ * shell; the only safe answer is to refuse.
  */
 export function parseCompactExposition(
   argv: readonly string[],
 ): CompactExposition {
+  let seen = false;
   let value: string | undefined;
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === '--exposition') value = argv[index + 1];
-    else if (arg.startsWith('--exposition='))
+    if (arg === '--exposition') {
+      seen = true;
+      const next = argv[index + 1];
+      // `--exposition --transport=stdio` gives the flag no value of its own.
+      value = next !== undefined && !next.startsWith('-') ? next : undefined;
+    } else if (arg.startsWith('--exposition=')) {
+      seen = true;
       value = arg.slice('--exposition='.length);
+    }
   }
-  if (value === undefined || value === '') return 'rw';
-  const wanted = value.trim().toLowerCase();
+  // The default belongs to an ABSENT flag, never to an empty value.
+  if (!seen) return 'rw';
+  const wanted = (value ?? '').trim().toLowerCase();
   if (wanted === 'ro' || wanted === 'rw') return wanted;
+  if (wanted === '') {
+    throw new Error(
+      "--exposition was given no value. This command takes 'ro' (the 13 tools that change nothing) or 'rw' (all 22). An empty value is refused rather than defaulted: an unset shell variable must not silently open the write tools.",
+    );
+  }
   throw new Error(
     `--exposition=${value} is not a compact set. This command takes 'ro' (the 13 tools that change nothing) or 'rw' (all 22, the default). The sets readonly/high/low belong to \`mcp-abap-adt\`.`,
   );

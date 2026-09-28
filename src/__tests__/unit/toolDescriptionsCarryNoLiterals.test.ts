@@ -33,8 +33,8 @@ import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
  * Classes of literal, not a list of known offenders: a new example of the same
  * kind — another package, another customer object, a transport number — fails
  * here too. What is caught is a concrete name or prefix, mask or not: `ZOK*`
- * names our prefix and fails. A mask with no concrete prefix — `Z*`, `/NS/Z*`,
- * the namespace alone — names nothing and stays allowed.
+ * names our prefix and fails. A bare mask — `Z*`, `Y*`, any-namespace — names
+ * nothing and stays allowed (the self-check below lists them).
  */
 const INCIDENTAL = [
   { name: 'a package name ($TMP, $ANY)', pattern: /\$[A-Z][A-Z0-9_]*/ },
@@ -76,6 +76,8 @@ describe('tool descriptions carry no incidental literals', () => {
     for (const generic of [
       "wildcard pattern (e.g. 'Z*')",
       'masks (Z*, /NS/Z*)',
+      'customer masks Z* and Y*',
+      'any namespace: /*/*',
       'filter by type (PROG, CLAS, INTF, DEVC, TABL)',
       'e.g. "CLAS/OC"',
       'optional for local objects',

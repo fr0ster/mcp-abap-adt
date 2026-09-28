@@ -205,6 +205,24 @@ is missing, not the wire: a handler's envelope carries `message`, `origin` and
 `request`. A test that asserts `isError` should raise that payload — see
 `CheckHighHandlers.test.ts`'s `expectAccepted`.
 
+## A release is not verified until an installed copy runs
+
+`release:dry` reporting `Published: 2  Skipped: 0` says the tarballs build. It
+says nothing about whether anything inside them runs: paths that resolve in a
+checkout resolve differently under `node_modules`.
+
+13.0.0 shipped with `mcp-abap-adt --version` dead on every installed copy — the
+launcher read `__dirname/../../package.json`, which is the repo root in a checkout
+and the *scope directory* `node_modules/@mcp-abap-adt/` from npm. The sibling
+packages had fixed exactly this one release earlier (`auth-broker` 3.0.4:
+`mcp-sso` importing a dev-only dependency), and their changelog even said how they
+found it — *installing the tarball into an empty directory and running each bin.*
+We took the fix and skipped the check.
+
+`src/__tests__/unit/binSmoke.test.ts` performs it now. Before a release, make sure
+it ran; when adding a bin, add it there. And treat any `__dirname`-relative path
+in `server/` as suspect: count the levels for both layouts.
+
 ## Plans and Specs
 
 Plans under `docs/superpowers/plans/` and specs under `docs/superpowers/specs/` are kept in the tree only while active — i.e. not yet implemented and not cancelled. Once a plan/spec has been fully implemented OR cancelled, delete the file. History lives in git; these directories hold only work in progress.

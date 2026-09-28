@@ -1374,7 +1374,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `include_objects` (boolean, optional (default: true))) - Include list of objects in transport (default: true)
 - `include_tasks` (boolean, optional (default: true))) - Include list of tasks in transport (default: true)
-- `transport_number` (string, required) - Transport request number
+- `transport_number` (string, required) - Transport request number, not a task
 
 ---
 
@@ -1483,7 +1483,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `name` (string, required) - Behavior Definition name (usually same as Root Entity name)
 - `package_name` (string, required) - Package name
 - `root_entity` (string, required) - Root Entity name (CDS View name)
-- `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task
 
 ---
 
@@ -1495,7 +1495,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `behavior_definition_name` (string, required) - BehaviorDefinition name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1522,7 +1522,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally (not recommended for stateful flows).
 - `name` (string, required) - Behavior Definition name
 - `source_code` (string, required) - New source code
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -1537,10 +1537,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `behavior_definition` (string, required) - Behavior Definition name. The behavior definition must exist. Accepted for compatibility; not forwarded to the create request — the shipped create endpoint posts a metadata document (name/description/package) only. The class is bound to this behavior definition when its FOR BEHAVIOR OF main source is written, separately, via UpdateClass.
-- `class_name` (string, required) - Behavior Implementation class name. Must follow SAP naming conventions. A behaviour pool is conventionally named after its behaviour definition.
+- `class_name` (string, required) - Behavior Implementation class name.
 - `description` (string, optional) - Class description. If not provided, class_name will be used.
 - `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -1552,7 +1552,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `behavior_implementation_name` (string, required) - BehaviorImplementation name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1579,7 +1579,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `behavior_definition` (string, required) - Referenced Behavior Definition name. Accepted for compatibility; not forwarded to the write — the shipped update() no longer reads it (it writes the implementations include only, never the FOR BEHAVIOR OF main source).
 - `class_name` (string, required) - Behavior Implementation class name. Must exist in the system.
 - `implementation_code` (string, required) - Implementation code for the implementations include. Contains the actual behavior implementation methods.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -1614,7 +1614,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name.
 - `superclass` (string, optional) - Optional superclass name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -1626,7 +1626,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -1639,7 +1639,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
@@ -1652,7 +1652,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
@@ -1665,7 +1665,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting test class. Default: false
 - `class_name` (string, required) - Parent class name.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -1678,7 +1678,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate_on_delete` (boolean, optional (default: false)) - Activate parent class after deleting. Default: false
 - `class_name` (string, required) - Parent class name.
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task.
 
 ---
 
@@ -1752,7 +1752,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `class_name` (string, required) - Class name.
 - `source_code` (string, required) - Complete ABAP class source code.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -1766,7 +1766,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local definitions. Default: false
 - `class_name` (string, required) - Parent class name.
 - `definitions_code` (string, required) - Updated source code for local definitions.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -1780,7 +1780,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local macros. Default: false
 - `class_name` (string, required) - Parent class name.
 - `macros_code` (string, required) - Updated source code for local macros.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -1794,7 +1794,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating test class. Default: false
 - `class_name` (string, required) - Parent class name.
 - `test_class_code` (string, required) - Updated source code for the local test class.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -1808,7 +1808,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate_on_update` (boolean, optional (default: false)) - Activate parent class after updating local types. Default: false
 - `class_name` (string, required) - Parent class name.
 - `local_types_code` (string, required) - Updated source code for local types.
-- `transport_request` (string, optional) - Transport request number (required for transportable objects). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable objects), not a task.
 
 ---
 
@@ -2260,7 +2260,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
 - `tests` (array, optional) - Container/test class pairs (for UNIT_TEST create).
-- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
 ---
@@ -2289,7 +2289,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `service_definition_name` (string, optional) - Service definition name.
 - `structure_name` (string, optional) - Structure name.
 - `table_name` (string, optional) - Table name.
-- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request id (if required by system).
 
 ---
 
@@ -2559,7 +2559,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `table_name` (string, optional) - Table name.
 - `test_class_code` (string, optional) - Updated source for the local test class.
 - `test_class_source` (string, optional) - Updated local test class source (CDS_UNIT_TEST update).
-- `transport_request` (string, optional) - Transport request id (if required by system). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request id (if required by system).
 - `value_table` (string, optional) - Foreign key value table.
 
 ---
@@ -2607,7 +2607,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/high/handleCreateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - Data element name. Must follow SAP naming conventions.
+- `data_element_name` (string, required) - Data element name.
 - `data_type` (string, optional (default: CHAR)) - Data type (e.g., CHAR, NUMC) or domain name when type_kind is 'domain'.
 - `decimals` (number, optional (default: 0)) - Decimal places. Usually inherited from domain.
 - `description` (string, optional) - Data element description. If not provided, data_element_name will be used.
@@ -2621,7 +2621,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `search_help_parameter` (string, optional) - Search help parameter. Applied during update step after creation.
 - `set_get_parameter` (string, optional) - Set/Get parameter ID. Applied during update step after creation.
 - `short_label` (string, optional) - Short field label (max 10 chars). Applied during update step after creation.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `type_kind` (string, optional (default: domain)) - Type kind: 'domain' (default), 'predefinedAbapType', 'refToPredefinedAbapType', 'refToDictionaryType', 'refToClifType'. If not specified, defaults to 'domain'.
 - `type_name` (string, optional) - Type name: domain name (when type_kind is 'domain'), data element name (when type_kind is 'refToDictionaryType'), or class name (when type_kind is 'refToClifType')
 
@@ -2635,7 +2635,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - Data element name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2672,7 +2672,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `search_help` (string, optional) - Search help name
 - `search_help_parameter` (string, optional) - Search help parameter
 - `set_get_parameter` (string, optional) - Set/Get parameter ID
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `type_kind` (string, optional (default: domain)) - Type kind: domain, predefinedAbapType, refToPredefinedAbapType, refToDictionaryType, refToClifType
 - `type_name` (string, optional) - Type name: domain name, data element name, or class name (depending on type_kind)
 
@@ -2705,7 +2705,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Optional description (defaults to ddl_name).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -2717,7 +2717,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2743,7 +2743,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate after update. Default: false.
 - `ddl_name` (string, required) - DDL source name.
 - `ddl_source` (string, required) - Complete DDL source code.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -2774,7 +2774,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `name` (string, required) - Metadata Extension name
 - `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task
 
 ---
 
@@ -2789,7 +2789,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, optional) - Lock handle from LockObject. If not provided, will attempt to lock internally.
 - `name` (string, required) - Metadata Extension name
 - `source_code` (string, required) - New source code
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -2820,14 +2820,14 @@ Generated from code in `src/handlers/**` (not from docs).
 - `datatype` (string, optional (default: CHAR)) - (optional) Data type: CHAR, NUMC, DATS, TIMS, DEC, INT1, INT2, INT4, INT8, CURR, QUAN, etc.
 - `decimals` (number, optional (default: 0)) - (optional) Decimal places (for DEC, CURR, QUAN types)
 - `description` (string, optional) - (optional) Domain description. If not provided, domain_name will be used.
-- `domain_name` (string, required) - Domain name. Must follow SAP naming conventions.
+- `domain_name` (string, required) - Domain name.
 - `fixed_values` (array, optional) - (optional) Array of fixed values for domain value range
 - `length` (number, optional (default: 100)) - (optional) Field length (max depends on datatype)
 - `lowercase` (boolean, optional (default: false)) - (optional) Allow lowercase input
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, optional) - (optional) Package name
 - `sign_exists` (boolean, optional (default: false)) - (optional) Field has sign (+/-)
-- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable packages.
 - `value_table` (string, optional) - (optional) Value table name for foreign key relationship
 
 ---
@@ -2840,7 +2840,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -2874,7 +2874,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lowercase` (boolean, optional) - Allow lowercase input
 - `package_name` (string, required) - Package name
 - `sign_exists` (boolean, optional) - Field has sign (+/-)
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `value_table` (string, optional) - Value table name for foreign key relationship
 
 ---
@@ -2916,10 +2916,10 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `activate` (boolean, optional) - Activate function group after creation. Default: true. Set to false for batch operations.
 - `description` (string, optional) - Function group description. If not provided, function_group_name will be used.
-- `function_group_name` (string, required) - Function group name. Must follow SAP naming conventions (start with Z or Y, max 26 chars).
+- `function_group_name` (string, required) - Function group name. Up to 26 characters.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -2932,8 +2932,8 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, optional) - Optional description for the function module
 - `function_group_name` (string, required) - Parent function group name
-- `function_module_name` (string, required) - Function module name. Must follow SAP naming conventions (start with Z or Y, max 30 chars).
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `function_module_name` (string, required) - Function module name. Up to 30 characters.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -2946,7 +2946,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, required) - New description for the function group.
 - `function_group_name` (string, required) - Function group name. Must exist in the system.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -2960,8 +2960,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate function module after source update. Default: false. Set to true to activate immediately.
 - `function_group_name` (string, required) - Function group name containing the function module.
 - `function_module_name` (string, required) - Function module name. Function module must already exist.
-- `source_code` (string, required) - Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION <function module name>\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION.
-- `transport_request` (string, optional) - Transport request number. Required for transportable function modules. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `source_code` (string, required) - Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable function modules.
 
 ---
 
@@ -2976,7 +2976,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3005,7 +3005,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Optional description for the include
 - `function_group_name` (string, required) - Parent function group name
 - `include_name` (string, required) - Include name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3018,7 +3018,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3033,7 +3033,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_group_name` (string, required) - Function group name containing the include.
 - `include_name` (string, required) - Include name. Include must already exist.
 - `source_code` (string, required) - Complete ABAP include source code.
-- `transport_request` (string, optional) - Transport request number. Required for transportable includes. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable includes.
 
 ---
 
@@ -3049,7 +3049,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name containing the function module.
 - `function_module_name` (string, required) - FunctionModule name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3089,10 +3089,10 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, optional) - Interface description. If not provided, interface_name will be used.
-- `interface_name` (string, required) - Interface name. Must follow SAP naming conventions (start with Z or Y).
+- `interface_name` (string, required) - Interface name.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3104,7 +3104,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3130,7 +3130,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate interface after update. Default: true.
 - `interface_name` (string, required) - Interface name. Must exist in the system.
 - `source_code` (string, required) - Complete ABAP interface source code with INTERFACE...ENDINTERFACE section.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -3146,9 +3146,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, optional) - (optional) Short description. If not provided, message_class_name is used.
 - `master_language` (string, optional) - (optional) Master/original language (e.g. "EN", "DE"). Defaults to the session language (SAP_LANGUAGE) or EN.
-- `message_class_name` (string, required) - Message class name. Must follow SAP naming conventions.
+- `message_class_name` (string, required) - Message class name.
 - `package_name` (string, required) - Package name.
-- `transport_request` (string, optional) - (optional) Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3164,7 +3164,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `msgno` (string, required) - Message number (e.g., "001").
 - `msgtext` (string, required) - Message text. May contain placeholders &1 &2 &3 &4 (or &).
 - `self_explanatory` (boolean, optional (default: false)) - (optional) Mark the message as self-explanatory (no long text needed). Default: false.
-- `transport_request` (string, optional) - (optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
 ---
 
@@ -3176,7 +3176,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `message_class_name` (string, required) - Message class name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects, optional for local ones. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
 ---
 
@@ -3189,7 +3189,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `message_class_name` (string, required) - Parent message class name.
 - `msgno` (string, required) - Message number to delete (e.g., "001").
-- `transport_request` (string, optional) - Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects, optional for local ones.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects, optional for local ones.
 
 ---
 
@@ -3225,7 +3225,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `description` (string, required) - New short description for the message class.
 - `message_class_name` (string, required) - Message class name.
-- `transport_request` (string, optional) - (optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
 ---
 
@@ -3241,7 +3241,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `msgno` (string, required) - Message number (e.g., "001").
 - `msgtext` (string, required) - New message text. May contain placeholders &1 &2 &3 &4 (or &).
 - `self_explanatory` (boolean, optional) - (optional) Mark the message as self-explanatory.
-- `transport_request` (string, optional) - (optional) Transport request number. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request". Required for transportable objects.
+- `transport_request` (string, optional) - (optional) Transport request number, not a task. Required for transportable objects.
 
 ---
 
@@ -3256,7 +3256,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `metadata_extension_name` (string, required) - MetadataExtension name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3336,9 +3336,9 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Program description. If not provided, program_name will be used.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `program_name` (string, required) - Program name. Must follow SAP naming conventions (start with Z or Y).
+- `program_name` (string, required) - Program name.
 - `program_type` (string, optional) - Program type: 'executable' (Report), 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool'. Default: 'executable'
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3350,7 +3350,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `program_name` (string, required) - Program name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3376,7 +3376,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate program after source update. Default: false. Set to true to activate immediately, or use ActivateObject for batch activation.
 - `program_name` (string, required) - Program name. Program must already exist.
 - `source_code` (string, required) - Complete ABAP program source code.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3400,7 +3400,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `service_definition_name` (string, required) - Referenced service definition name.
 - `service_name` (string, optional) - Published service name. Default: service_binding_name if omitted.
 - `service_version` (string, optional) - Published service version. Default: 0001.
-- `transport_request` (string, optional) - Optional transport request for transport checks. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Optional transport request for transport checks.
 
 ---
 
@@ -3413,7 +3413,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured deletion result.
 - `service_binding_name` (string, required) - Service binding name to delete.
-- `transport_request` (string, optional) - Optional transport request for deletion transport flow. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Optional transport request for deletion transport flow.
 
 ---
 
@@ -3485,9 +3485,9 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Service definition description. If not provided, service_definition_name will be used.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `service_definition_name` (string, required) - Service definition name. Must follow SAP naming conventions (start with Z or Y).
+- `service_definition_name` (string, required) - Service definition name.
 - `source_code` (string, optional) - Service definition source code (optional). If not provided, a minimal template will be created.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3499,7 +3499,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `service_definition_name` (string, required) - ServiceDefinition name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3525,7 +3525,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate service definition after update. Default: true.
 - `service_definition_name` (string, required) - Service definition name. Must exist in the system.
 - `source_code` (string, required) - Complete service definition source code.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -3558,8 +3558,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `includes` (array, optional) - Does not reach creation — see `fields`. Use UpdateStructure (with ddl_code) after creating to set includes.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `structure_name` (string, required) - Structure name. Must follow SAP naming conventions.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `structure_name` (string, required) - Structure name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3571,7 +3571,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `structure_name` (string, required) - Structure name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3597,7 +3597,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate structure after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for structure. Example: '@EndUserText.label : \'My Structure\' @AbapCatalog.tableCategory : #TRANSPARENT define structure zz_s_test_001 { client : abap.clnt not null; id : abap.char(10); name : abap.char(255); }'
 - `structure_name` (string, required) - Structure name. Structure must already exist.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -3645,8 +3645,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `description` (string, optional) - Does not reach creation — the shipped create endpoint has no description field of its own. Use UpdateTable (with ddl_code) after creating to set the DDL source, which carries the description.
 - `master_language` (string, optional) - Optional master/original language for the created object (e.g. "EN", "DE", "ZH"). Defaults to the session language (SAP_LANGUAGE) or EN.
 - `package_name` (string, required) - Package name
-- `table_name` (string, required) - Table name. Must follow SAP naming conventions.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `table_name` (string, required) - Table name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -3658,7 +3658,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `table_name` (string, required) - Table name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -3684,7 +3684,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `activate` (boolean, optional) - Activate table after source update. Default: true.
 - `ddl_code` (string, required) - Complete DDL source code for table. Example: '@EndUserText.label : \'My Table\' @AbapCatalog.tableCategory : #TRANSPARENT define table ztst_table { key client : abap.clnt not null; key id : abap.char(10); name : abap.char(255); }'
 - `table_name` (string, required) - Table name. Table must already exist.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 
@@ -3761,7 +3761,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Container class name.
 - `description` (string, optional) - Optional description for the container class.
 - `package_name` (string, required) - Package name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -3789,7 +3789,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Global test class name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -3901,7 +3901,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `class_name` (string, required) - Global test class name.
 - `test_class_source` (string, required) - Updated local test class ABAP source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -3963,7 +3963,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `root_entity` (string, required) - Root entity name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required.
 
 ---
 
@@ -3975,7 +3975,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `name` (string, required) - BehaviorDefinition name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4018,7 +4018,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete behavior definition source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages). A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -4050,13 +4050,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `behavior_definition` (string, required) - Behavior Definition name. Required.
-- `class_name` (string, required) - Behavior Implementation class name. Must follow SAP naming conventions.
+- `class_name` (string, required) - Behavior Implementation class name.
 - `description` (string, required) - Class description.
 - `implementation_code` (string, optional) - Implementation code for the implementations include (optional). When given, the class is locked, the code is written to the implementations include, and unlocked, right after creation. Does NOT write the FOR BEHAVIOR OF main source — the class is not bound to behavior_definition by this alone.
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -4142,7 +4142,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `abstract` (boolean, optional (default: false).)) - Mark class as abstract (optional, default: false).
-- `class_name` (string, required) - Class name. Must follow SAP naming conventions.
+- `class_name` (string, required) - Class name.
 - `create_protected` (boolean, optional (default: false).)) - Create protected section (optional, default: false).
 - `description` (string, required) - Class description.
 - `final` (boolean, optional (default: false).)) - Mark class as final (optional, default: false).
@@ -4150,7 +4150,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `superclass` (string, optional) - Superclass name (optional).
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -4162,7 +4162,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4273,7 +4273,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Class name. Class must already exist.
 - `lock_handle` (string, required) - Lock handle from LockClass operation. Required for update operation.
 - `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -4289,7 +4289,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `test_class_source` (string, required) - Complete ABAP Unit test class source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -4350,7 +4350,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `function_group_name` (string, optional) - Required only for function_module type
 - `object_name` (string, required) - Object name
 - `object_type` (string, required) - Object type. Supported: class, program (onprem only), interface, function_group, function_module, table, structure, ddl, domain, data_element, behavior_definition, metadata_extension. Also accepts ADT codes (clas/oc, prog/p, intf/oi, fugr/f, fugr/ff, tabl/dt, ttyp/st, ddls/df, doma/dm, dtel/de, bdef/bd, ddlx/ex).
-- `transport_request` (string, optional) - Transport request number A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task
 
 ---
 
@@ -4440,7 +4440,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/data_element/low/handleCreateDataElement.ts`
 
 **Parameters:**
-- `data_element_name` (string, required) - DataElement name. Must follow SAP naming conventions.
+- `data_element_name` (string, required) - DataElement name.
 - `data_type` (string, optional) - Does not reach creation — the shipped create endpoint never reads it (only sends name/description/package/transport). Use UpdateDataElementLow (with lock_handle) after creating to set the data type or domain name.
 - `decimals` (number, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the decimal places.
 - `description` (string, required) - DataElement description.
@@ -4448,7 +4448,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 - `type_kind` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type kind ('E'/'domain', 'P'/'predefinedAbapType', etc.).
 - `type_name` (string, optional) - Does not reach creation — the shipped create endpoint never reads it. Use UpdateDataElementLow (with lock_handle) after creating to set the type name (domain, data element, or class name depending on type_kind).
 
@@ -4462,7 +4462,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `data_element_name` (string, required) - DataElement name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4562,12 +4562,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
-- `ddl_name` (string, required) - DDL source name. Must follow SAP naming conventions.
+- `ddl_name` (string, required) - DDL source name.
 - `description` (string, required) - DDL source description.
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -4579,7 +4579,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `ddl_name` (string, required) - DDL source name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4622,7 +4622,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `lock_handle` (string, required) - Lock handle from LockDdlLow. Required for update operation.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -4684,7 +4684,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional for local objects.
 
 ---
 
@@ -4696,7 +4696,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `name` (string, required) - MetadataExtension name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4739,7 +4739,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete metadata extension source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -4796,11 +4796,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Domain description.
-- `domain_name` (string, required) - Domain name. Must follow SAP naming conventions.
+- `domain_name` (string, required) - Domain name.
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -4812,7 +4812,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `domain_name` (string, required) - Domain name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4940,11 +4940,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Function group description.
-- `function_group_name` (string, required) - Function group name. Must follow SAP naming conventions.
+- `function_group_name` (string, required) - Function group name.
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -4961,7 +4961,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Accepted for compatibility; not sent to the server. A function module lives inside its function group's package — the shipped create endpoint takes no package of its own.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -4973,7 +4973,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `function_group_name` (string, required) - FunctionGroup name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -4986,7 +4986,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `function_group_name` (string, required) - Function group name.
 - `function_module_name` (string, required) - Function module name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -5059,7 +5059,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP function module source code.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects locked in a request. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects locked in a request.
 
 ---
 
@@ -5131,11 +5131,11 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `description` (string, required) - Interface description.
-- `interface_name` (string, required) - Interface name. Must follow SAP naming conventions.
+- `interface_name` (string, required) - Interface name.
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -5147,7 +5147,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `interface_name` (string, required) - Interface name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -5190,7 +5190,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP interface source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -5235,7 +5235,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `application_component` (string, optional) - Application component (e.g., BC-ABA).
 - `description` (string, required) - Package description.
-- `package_name` (string, required) - Package name. Must follow SAP naming conventions.
+- `package_name` (string, required) - Package name.
 - `package_type` (string, optional) - Package type (development/structure). Defaults to development.
 - `record_changes` (boolean, optional) - Enable change recording for the package. Required for a transportable package. Default: false.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
@@ -5243,7 +5243,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `software_component` (string, optional) - Software component. If not provided, SAP will set a default.
 - `super_package` (string, required) - Super package (parent package) name. Required.
 - `transport_layer` (string, optional) - Transport layer. Required for transportable packages.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -5257,7 +5257,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `connection_config` (object, optional) - Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 - `package_name` (string, required) - Package name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -5302,7 +5302,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `super_package` (string, required) - Does not reach the update endpoint — the shipped updatePackage() call reads only the patched document, the package name and the transport request. Kept for compatibility with CreatePackage/ValidatePackage, which do read it.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 - `updated_description` (string, required) - New description for the package.
 
 ---
@@ -5361,11 +5361,11 @@ Generated from code in `src/handlers/**` (not from docs).
 - `application` (string, optional (default: *').)) - Application area (optional, default: '*').
 - `description` (string, required) - Program description.
 - `package_name` (string, required) - Package name.
-- `program_name` (string, required) - Program name. Must follow SAP naming conventions.
+- `program_name` (string, required) - Program name.
 - `program_type` (string, optional) - Program type: 'executable', 'include', 'module_pool', 'function_group', 'class_pool', 'interface_pool' (optional).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -5377,7 +5377,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `program_name` (string, required) - Program name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -5420,7 +5420,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `source_code` (string, required) - Complete ABAP program source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -5514,9 +5514,9 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `structure_name` (string, required) - Structure name. Must follow SAP naming conventions.
+- `structure_name` (string, required) - Structure name.
 - `structure_type` (string, optional) - Accepted for compatibility; not forwarded to the create request. (These values name ABAP program subtypes — a DDIC structure has no structure-type concept of its own.)
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -5528,7 +5528,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `structure_name` (string, required) - Structure name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -5571,7 +5571,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `structure_name` (string, required) - Structure name. Structure must already exist.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages): it travels as corrNr on the write, and without it an on-premise system answers "Parameter corrNr could not be found." (SADT_RESOURCE 017). A REQUEST number, not a task.
+- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---
 
@@ -5680,8 +5680,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `package_name` (string, required) - Package name.
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `table_name` (string, required) - Table name. Must follow SAP naming conventions.
-- `transport_request` (string, optional) - Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `table_name` (string, required) - Table name.
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable packages.
 
 ---
 
@@ -5693,7 +5693,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `table_name` (string, required) - Table name.
-- `transport_request` (string, optional) - Transport request number. Required for transportable objects. Optional for local objects. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.
 
 ---
 
@@ -5736,7 +5736,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
 - `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
 - `table_name` (string, required) - Table name. Table must already exist.
-- `transport_request` (string, optional) - Transport request number. Optional if object is local or already in transport. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".
+- `transport_request` (string, optional) - Transport request number, not a task. Optional if object is local or already in transport.
 
 ---
 

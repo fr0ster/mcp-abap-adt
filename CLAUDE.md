@@ -241,10 +241,24 @@ inherit, and override the descriptions to suit their own retrieval. What we ship
 stays agnostic because we do not know who indexes it, where, or how.
 
 - **What a description says**: the operation, then the parameters and the answer,
-  most important first, plus the constraints that change the call ("must already
-  exist", "required for validation", "start with Z or Y"). Never an example object,
-  package, transport, software component or search prefix. A bare mask (`Z*`, `Y*`,
-  any-namespace) and a format placeholder (`YYYYMMDDHHMMSS`) name nothing and stay.
+  most important first, plus the constraints that change THIS call ("must already
+  exist", "required for validation", "not a task", "up to 26 characters"). Never an
+  example object, package, transport, software component or search prefix. A bare
+  mask (`Z*`, `Y*`, any-namespace) and a format placeholder (`YYYYMMDDHHMMSS`) name
+  nothing and stay.
+- **A description is not an ABAP tutorial.** A tool works with any object the
+  caller is authorised for, whatever it is called, so naming conventions are not
+  ours to state: "must follow SAP naming conventions", "start with Z or Y", "for
+  the customer namespace", how a behaviour pool is conventionally named and a
+  worked ABAP snippet are all out (stated by the user 2026-09-28). The CONSUMER's
+  skill carries the naming rules and its own requirements, and the consumer is
+  responsible for the validity of the parameters it sends. The same cut removed
+  the CTS lesson from 104 `transport_request` descriptions: `request` is a word a
+  description may use, a number like `ER121235` never is, so the text keeps `not a
+  task` — the one fact that decides whether THIS call succeeds — and drops how CTS
+  works, which tool to call next and the SAP message it answers. The transport
+  tools themselves keep their full text: there, request against task is the
+  subject of the tool, not a general lesson.
 - **A measurement note records the platform and the date, not the landscape.**
   `on premise (2026-09-26)` and `BASIS 816`, never a system id: the release is what
   made the behaviour, and the SID means nothing to anyone else reading it.

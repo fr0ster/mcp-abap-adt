@@ -55,8 +55,11 @@ const INCIDENTAL = [
     pattern: /\b(?:SAPL|L)?[ZY][A-Z0-9_]{2,}/,
   },
   {
-    name: 'a transport number (SIDK905635)',
-    pattern: /\b[A-Z0-9]{3}K9\d{5}\b/,
+    // Two shapes, because the number is not always `<SID>K9…`: the user named
+    // `ER121235` as one that must fail too. The word `request` is what a
+    // description may say; a number never is.
+    name: 'a transport number (SIDK905635, ER121235)',
+    pattern: /\b[A-Z0-9]{3}K9\d{5}\b|\b[A-Z]{2,4}\d{6,}\b/,
   },
 ];
 
@@ -104,6 +107,7 @@ describe('descriptions carry no incidental literals', () => {
       'class YFOO_BAR',
       'include LZOK_FG_MCP01F01',
       'transport SIDK905635',
+      'transport ER121235',
     ]) {
       expect([literal, literalsIn(literal).length > 0]).toEqual([
         literal,
@@ -120,6 +124,10 @@ describe('descriptions carry no incidental literals', () => {
       'optional for local objects',
       'Start of time range in YYYYMMDDHHMMSS format.',
       'End of time range (YYYYMMDDHHMMSS).',
+      // Neither a message number nor a release is a transport number.
+      'refused with CTS_WBO_API 020',
+      'measured on BASIS 816',
+      'answers TK127 on premise',
     ]) {
       expect([generic, literalsIn(generic)]).toEqual([generic, []]);
     }

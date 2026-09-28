@@ -42,11 +42,7 @@ export const TOOL_DEFINITION = {
   description:
     'Create a new ABAP package in SAP system. Packages are containers for development objects and are essential for organizing code.',
   inputSchema: {
-    package_name: z
-      .string()
-      .describe(
-        'Package name. Must follow SAP naming conventions (start with Z or Y for customer namespace).',
-      ),
+    package_name: z.string().describe('Package name.'),
     description: z
       .string()
       .optional()
@@ -72,7 +68,7 @@ export const TOOL_DEFINITION = {
       .string()
       .optional()
       .describe(
-        'Transport request number. Required if package is transportable.',
+        'Transport request number, not a task. Required if the package is transportable.',
       ),
     record_changes: z
       .boolean()

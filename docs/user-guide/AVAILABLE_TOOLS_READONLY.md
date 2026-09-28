@@ -1019,7 +1019,7 @@ Generated from code in `src/handlers/**` (not from docs).
 **Parameters:**
 - `include_objects` (boolean, optional (default: true))) - Include list of objects in transport (default: true)
 - `include_tasks` (boolean, optional (default: true))) - Include list of tasks in transport (default: true)
-- `transport_number` (string, required) - Transport request number
+- `transport_number` (string, required) - Transport request number, not a task
 
 ---
 

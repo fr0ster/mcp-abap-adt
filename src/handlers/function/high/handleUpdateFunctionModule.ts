@@ -57,12 +57,12 @@ export const TOOL_DEFINITION = {
       source_code: {
         type: 'string',
         description:
-          'Complete ABAP function module source code. Must include FUNCTION statement with parameters and ENDFUNCTION. Example:\n\nFUNCTION <function module name>\n  IMPORTING\n    VALUE(iv_input) TYPE string\n  EXPORTING\n    VALUE(ev_output) TYPE string.\n  \n  ev_output = iv_input.\nENDFUNCTION.',
+          'Complete ABAP function module source code, from FUNCTION to ENDFUNCTION.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number. Required for transportable function modules. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable function modules.',
       },
       activate: {
         type: 'boolean',

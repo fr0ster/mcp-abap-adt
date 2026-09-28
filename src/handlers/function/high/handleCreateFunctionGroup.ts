@@ -47,8 +47,7 @@ export const TOOL_DEFINITION = {
     properties: {
       function_group_name: {
         type: 'string',
-        description:
-          'Function group name. Must follow SAP naming conventions (start with Z or Y, max 26 chars).',
+        description: 'Function group name. Up to 26 characters.',
       },
       description: {
         type: 'string',
@@ -62,7 +61,7 @@ export const TOOL_DEFINITION = {
       transport_request: {
         type: 'string',
         description:
-          'Transport request number. Required for transportable packages. A REQUEST number, not a task: an object is created on a request and moved onto a task afterwards with AddTransportObject. A task number here answers SUCCESS on a create and is then refused on the next write with CTS_WBO_API 020, "already locked in request".',
+          'Transport request number, not a task. Required for transportable packages.',
       },
       activate: {
         type: 'boolean',

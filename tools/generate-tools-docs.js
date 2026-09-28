@@ -185,9 +185,12 @@ function extractInputSchemaRef(toolBlock) {
  * reviewer saw in `git diff --check` (PR #244). Reads the whole chain now.
  */
 function readDescription(text) {
-  const LITERAL = "'(?:\\\\.|[^'\\\\])*'|\"(?:\\\\.|[^\"\\\\])*\"|`(?:\\\\.|[^`\\\\])*`";
+  const LITERAL =
+    '\'(?:\\\\.|[^\'\\\\])*\'|"(?:\\\\.|[^"\\\\])*"|`(?:\\\\.|[^`\\\\])*`';
   const chain = text.match(
-    new RegExp(`description\\s*:\\s*((?:${LITERAL})(?:\\s*\\+\\s*(?:${LITERAL}))*)`),
+    new RegExp(
+      `description\\s*:\\s*((?:${LITERAL})(?:\\s*\\+\\s*(?:${LITERAL}))*)`,
+    ),
   );
   if (!chain) return '';
   return (chain[1].match(new RegExp(LITERAL, 'g')) || [])
@@ -576,43 +579,90 @@ function loadObjectVersionTools() {
 /**
  * The text the model actually receives, taken from the BUILT definitions.
  *
- * **Why this exists.** This generator reads source with regexes, and three
- * reviewer findings on PR #244 were all the same defect wearing different
- * clothes: a Zod `.description` is a prototype getter and was invisible; a
- * description built as `'…' + '…'` was cut at the first literal; a template
- * literal printed `${commonObjectTypeSchema.description}` verbatim, because no
- * regex evaluates an interpolation. Source text and shipped text are not the same
- * thing, and the docs must show the shipped one — the same string a consumer's RAG
- * indexes and a model reads.
+ * **Why from `dist` and not from the source.** Three reviewer findings on PR #244
+ * were the same defect wearing different clothes: a Zod `.description` is a
+ * prototype getter and was invisible to `Object.entries`; a description built as
+ * `'…' + '…'` was cut at the first literal; a template literal printed
+ * `${commonObjectTypeSchema.description}` verbatim, because no regex evaluates an
+ * interpolation. Source text and shipped text are not the same thing, and the docs
+ * must show the shipped one — the string a consumer's RAG indexes and a model reads.
  *
- * So the regex parse stays (it finds the tools, their files, tiers and schema
- * shape) and the TEXT is overwritten from `dist`. When `dist` is missing the
- * generator says so once and keeps the parsed text, so `docs:tools` still runs on
- * a tree that has not been built.
+ * **Which is exactly why a stale `dist` may not be used silently.** A fourth
+ * finding: the reviewer edited `DeleteClass`'s description, ran `docs:tools`, and
+ * the generator answered success while documenting the previous text, because
+ * `docs:tools` did not build. Reading `dist` is only correct when `dist` is newer
+ * than every source file, so that is a precondition now and not an assumption: it
+ * is checked, and a stale or absent build stops the run with what to do about it.
+ * `npm run docs:tools` builds first, so the ordinary path needs no thought.
  */
-function builtDefinitions() {
-  try {
-    const {
-      HandlerExporter,
-    } = require('../dist/lib/handlers/HandlerExporter.js');
-    const entries = new HandlerExporter({
-      includeReadOnly: true,
-      includeHighLevel: true,
-      includeLowLevel: true,
-      includeCompact: true,
-      includeSystem: true,
-      includeSearch: true,
-    }).getHandlerEntries();
-    const byName = new Map();
-    for (const entry of entries)
-      byName.set(entry.toolDefinition.name, entry.toolDefinition);
-    return byName;
-  } catch (error) {
-    console.warn(
-      `\u26a0\ufe0f  dist not loadable (${error.message.split('\n')[0]}) — documenting the text as parsed from source. Run \`npm run build\` first for the shipped text.`,
-    );
-    return new Map();
+function newestMtime(dir, extensions) {
+  let newest = 0;
+  const stack = [dir];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    for (const entry of fs.readdirSync(current, { withFileTypes: true })) {
+      const full = path.join(current, entry.name);
+      if (entry.isDirectory()) {
+        stack.push(full);
+        continue;
+      }
+      if (!extensions.some((extension) => entry.name.endsWith(extension)))
+        continue;
+      const { mtimeMs } = fs.statSync(full);
+      if (mtimeMs > newest) newest = mtimeMs;
+    }
   }
+  return newest;
+}
+
+/**
+ * Stops the run rather than documenting text nobody ships.
+ *
+ * Throws instead of calling `process.exit`, because this module is also required
+ * by a unit test and a generator that kills the process from inside a test run is
+ * its own kind of defect. The CLI at the bottom turns it into an exit code.
+ */
+function requireFreshBuild(distEntry) {
+  const advice =
+    'Run `npm run build` first — or `npm run docs:tools`, which builds.';
+  if (!fs.existsSync(distEntry)) {
+    throw new Error(`${distEntry} is missing. ${advice}`);
+  }
+  const sourceRoot = path.join(__dirname, '..', 'src');
+  const distRoot = path.join(__dirname, '..', 'dist');
+  const source = newestMtime(sourceRoot, ['.ts']);
+  const built = newestMtime(distRoot, ['.js']);
+  if (source > built) {
+    const behind = Math.round((source - built) / 1000);
+    throw new Error(
+      `dist is ${behind}s behind src, so the documented descriptions would not be the ones this tree ships. ${advice}`,
+    );
+  }
+}
+
+function builtDefinitions() {
+  const distEntry = path.join(
+    __dirname,
+    '..',
+    'dist',
+    'lib',
+    'handlers',
+    'HandlerExporter.js',
+  );
+  requireFreshBuild(distEntry);
+  const { HandlerExporter } = require(distEntry);
+  const entries = new HandlerExporter({
+    includeReadOnly: true,
+    includeHighLevel: true,
+    includeLowLevel: true,
+    includeCompact: true,
+    includeSystem: true,
+    includeSearch: true,
+  }).getHandlerEntries();
+  const byName = new Map();
+  for (const entry of entries)
+    byName.set(entry.toolDefinition.name, entry.toolDefinition);
+  return byName;
 }
 
 /** A parameter's own schema, in either shape a definition is written in. */
@@ -625,7 +675,6 @@ function builtProperty(definition, key) {
 /** Overwrite parsed text with the shipped text, tool by tool and parameter by parameter. */
 function applyBuiltText(tools) {
   const built = builtDefinitions();
-  if (built.size === 0) return tools;
   for (const tool of tools) {
     const definition = built.get(tool.name);
     if (!definition) continue;
@@ -1125,7 +1174,12 @@ function main() {
 }
 
 if (require.main === module) {
-  main();
+  try {
+    main();
+  } catch (error) {
+    console.error(`\u274c  ${error.message}`);
+    process.exit(1);
+  }
 }
 
 module.exports = {

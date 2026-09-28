@@ -25,17 +25,16 @@
  * request, so an incidental literal in it is a match on that literal. "Transport
  * request optional for $TMP objects" in every Delete* description made any
  * request mentioning $TMP — "which packages are in $TMP", "create a class in
- * $TMP" — retrieve the Delete* tools in bulk (issue #241). A description says
- * what the tool does; examples of package names, object prefixes or sample ids
- * belong in the parameter descriptions, which the calling model reads and
- * retrieval does not.
+ * $TMP" — retrieve the Delete* tools in bulk (issue #241).
  */
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 
 /**
  * Classes of literal, not a list of known offenders: a new example of the same
  * kind — another package, another customer object, a transport number — fails
- * here too. A bare mask such as `Z*` names no object and stays allowed.
+ * here too. What is caught is a concrete name or prefix, mask or not: `ZOK*`
+ * names our prefix and fails. A mask with no concrete prefix — `Z*`, `/NS/Z*`,
+ * the namespace alone — names nothing and stays allowed.
  */
 const INCIDENTAL = [
   { name: 'a package name ($TMP, $ANY)', pattern: /\$[A-Z][A-Z0-9_]*/ },

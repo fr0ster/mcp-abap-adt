@@ -1,8 +1,8 @@
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import express from 'express';
-import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import type { IHttpApplication } from '@mcp-abap-adt/lib/embeddable';
+import { CompositeHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import express from 'express';
 import { SseServer } from '../SseServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 

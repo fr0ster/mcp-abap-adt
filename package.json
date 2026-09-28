@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/lib",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "14.0.0",
+  "version": "14.0.1",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

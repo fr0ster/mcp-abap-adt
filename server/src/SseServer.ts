@@ -1,19 +1,19 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { Logger } from '@mcp-abap-adt/logger';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import express from 'express';
 import type { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
-import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
-import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
-import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
-import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import type {
   IHttpApplication,
   RouteRegistrationOptions,
 } from '@mcp-abap-adt/lib/embeddable';
+import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
+import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
+import { noopLogger } from '@mcp-abap-adt/lib/logger';
+import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+import type { Logger } from '@mcp-abap-adt/logger';
+import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import express from 'express';
+import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
 const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';

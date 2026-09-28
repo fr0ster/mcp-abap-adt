@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [14.0.1] - 2026-09-28
+
+### Fixed
+
+- **The help text described a surface neither command has, and the compact command
+  had no exposition of its own.** 14.0.0 moved the facade out and taught
+  `validateExposition` to refuse `compact`, but `--help` still listed it among the
+  sets — `--exposition=compact        (compact facade only)` — and
+  `mcp-abap-adt-compact` printed that same help, offering `readonly`/`high`/`low`,
+  which it does not serve, under a USAGE line naming the other command.
+
+  - `mcp-abap-adt --help` lists `readonly, high, low`, and says in its place that the
+    compact facade is its own command with its own default.
+  - `mcp-abap-adt-compact --help` names itself in USAGE and documents **its** sets.
+  - **`mcp-abap-adt-compact --exposition=ro|rw`**: `rw` is the default — all 22
+    tools, every access, which is what a local server gives — and `ro` serves the 13
+    that change nothing. `ro` is not a filter over one list: no create, update,
+    delete, activate, lock, unlock, unit-test run or profiler run is IN the list, so
+    a client cannot call one (verified from installed tarballs: 22 tools with 9
+    writes against 13 with 0). A set of the object-oriented surface is refused by
+    name, pointing at `mcp-abap-adt`.
+  - `ServerConfigManager.generateHelp` takes `program` and `expositionSection`, so a
+    sibling command documents its own vocabulary instead of inheriting one that does
+    not apply.
+
+  Two mistakes of mine while writing this, both caught before release: the first
+  version REFUSED `--exposition` on the compact command instead of giving it `ro`/`rw`
+  (the user's correction), and the `ro` branch first wrapped the entries in an object
+  literal, which closes over the startup context — the P1 from PR #240 review, in a
+  new place. It builds a real `CompactReadOnlyHandlersGroup` now, so the per-request
+  context reaches the handlers.
+
+
 ## [14.0.0] - 2026-09-28
 
 Migration: [`docs/MIGRATION-14.0.md`](docs/MIGRATION-14.0.md).

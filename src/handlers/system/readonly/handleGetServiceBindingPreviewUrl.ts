@@ -22,6 +22,7 @@
  */
 import {
   ddlDocuments,
+  getSystemInformation,
   serviceDefinitionDocuments,
   serviceDocuments,
 } from '@mcp-abap-adt/adt-clients';
@@ -75,11 +76,12 @@ export const TOOL_DEFINITION = {
       client: {
         type: 'string',
         description:
-          'Client for the sap-client parameter. Omitted, the parameter is left out.',
+          'Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.',
       },
       language: {
         type: 'string',
-        description: 'Logon language for the preview. Default EN.',
+        description:
+          'Logon language for the preview. Omitted, the language the system reports is used.',
       },
     },
     required: ['service_binding_name'],
@@ -109,6 +111,32 @@ export async function handleGetServiceBindingPreviewUrl(
     resultsFor(serviceDefinitionDocuments),
   );
   const baseUrl = (await connection.getBaseUrl()).replace(/\/+$/, '');
+
+  // `client` and `language` are what the preview URL carries and what a caller
+  // has no way to know. ADT answers both from `systeminformation`, which this
+  // server already reads for a request's system context, so they are not the
+  // caller's to supply — asked for only when one was left out.
+  //
+  // A failure here is not this tool's failure: the URL is answerable without a
+  // client, and `getSystemInformation` answers `null` where the endpoint is
+  // absent but THROWS on anything else. So it is caught, reported in the answer
+  // beside the URL it shaped, and never allowed to fail a read that worked.
+  // An explicit empty string suppresses the parameter.
+  let systemClient: string | undefined;
+  let systemLanguage: string | undefined;
+  let systemLookupFailed: string | undefined;
+  if (args.client === undefined || args.language === undefined) {
+    try {
+      const info = await getSystemInformation(connection);
+      systemClient = info?.client;
+      systemLanguage = info?.language;
+    } catch (error) {
+      systemLookupFailed =
+        error instanceof Error ? error.message : String(error);
+    }
+  }
+  const client = args.client ?? systemClient;
+  const language = args.language ?? systemLanguage;
 
   interface Found {
     facts: ReturnType<typeof serviceBindingFactsOf>;
@@ -204,6 +232,15 @@ export async function handleGetServiceBindingPreviewUrl(
             }
           : undefined;
 
+      const notes = [
+        facts.published
+          ? undefined
+          : 'The binding is not published, so neither the service nor the preview answers until it is.',
+        systemLookupFailed === undefined
+          ? undefined
+          : `The client and language the system reports could not be read (${systemLookupFailed}), so the preview URL carries only what was passed in.`,
+      ].filter((one): one is string => one !== undefined);
+
       return {
         success: true,
         service_binding_name: bindingName,
@@ -213,6 +250,8 @@ export async function handleGetServiceBindingPreviewUrl(
         service_definition: facts.serviceDefinition,
         version: facts.version,
         entity_sets: exposed.map((one) => one.entitySet),
+        client,
+        language,
         associations,
         service_url: serviceUrl,
         metadata_url: `${serviceUrl}$metadata`,
@@ -223,17 +262,15 @@ export async function handleGetServiceBindingPreviewUrl(
                 baseUrl,
                 protocol: facts.protocol,
                 descriptor,
-                client: args.client,
-                language: args.language,
+                client,
+                language,
               }),
         preview_descriptor:
           descriptor === undefined ? undefined : feapDescriptor(descriptor),
         // Said out loud: a preview URL that quietly guesses a segment is
         // indistinguishable from one that works, until it opens nothing.
         missing: missing.length === 0 ? undefined : missing,
-        note: facts.published
-          ? undefined
-          : 'The binding is not published, so neither the service nor the preview answers until it is.',
+        note: notes.length === 0 ? undefined : notes.join(' '),
       };
     },
   );

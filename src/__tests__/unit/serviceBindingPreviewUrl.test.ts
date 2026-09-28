@@ -8,9 +8,19 @@
  * so the test asserts the composition, and asserts that a missing piece produces NO
  * url rather than a plausible one.
  */
+import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
 import { fakeClientOf, okResponse, reading } from '../helpers/fakeClient';
+
+// The client and the language come from ADT's own `systeminformation`, so the
+// tool is tested against what that endpoint answers — including its refusals,
+// which must not fail a read that worked.
+jest.mock('@mcp-abap-adt/adt-clients', () => ({
+  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
+  getSystemInformation: jest.fn(),
+}));
+const systemInfo = getSystemInformation as jest.Mock;
 
 const BINDING = `<?xml version="1.0" encoding="utf-8"?>
 <srvb:serviceBinding srvb:published="true" srvb:bindingCreated="true"
@@ -80,6 +90,11 @@ const payloadOf = async (args: Record<string, unknown>) => {
 };
 
 describe('GetServiceBindingPreviewUrl', () => {
+  beforeEach(() => {
+    systemInfo.mockReset();
+    systemInfo.mockResolvedValue(null);
+  });
+
   it('composes the preview URL from the binding, the definition and the view', async () => {
     fakeClient = clientFor({
       binding: BINDING,
@@ -185,5 +200,75 @@ describe('GetServiceBindingPreviewUrl', () => {
         '/srvd/sap/zui_student/0001/',
     );
     expect(payload.preview_url).toContain('/businessservices/odatav4/feap/');
+  });
+
+  it('takes the client and the language from the system when none were given', async () => {
+    // What a caller cannot know and does not have to: the same record this
+    // server already reads to resolve a request's system.
+    systemInfo.mockResolvedValue({ client: '100', language: 'EN' });
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.client).toBe('100');
+    expect(payload.language).toBe('EN');
+    expect(payload.preview_url).toContain('sap-client=100');
+    expect(payload.note).toBeUndefined();
+  });
+
+  it('leaves the parameter out when the caller passes an empty client', async () => {
+    systemInfo.mockResolvedValue({ client: '100', language: 'EN' });
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({
+      service_binding_name: 'ZSB_STUDENT_V2',
+      client: '',
+    });
+
+    expect(payload.preview_url).not.toContain('sap-client');
+    // And an explicit empty string is not overridden by the system's answer.
+    expect(payload.client).toBe('');
+  });
+
+  it('does not ask the system when the caller gave both', async () => {
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    await payloadOf({
+      service_binding_name: 'ZSB_STUDENT_V2',
+      client: '200',
+      language: 'DE',
+    });
+
+    expect(systemInfo).not.toHaveBeenCalled();
+  });
+
+  it('still answers the URL when the system record cannot be read, and says so', async () => {
+    // `getSystemInformation` answers null where the endpoint is absent and
+    // THROWS on anything else. Neither is this tool's failure.
+    systemInfo.mockRejectedValue(new Error('403 Forbidden'));
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.success).toBe(true);
+    expect(payload.preview_url).toContain('/feap/');
+    expect(payload.preview_url).not.toContain('sap-client');
+    expect(payload.note).toContain('403 Forbidden');
   });
 });

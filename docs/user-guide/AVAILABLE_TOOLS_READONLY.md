@@ -687,9 +687,9 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
 
 **Parameters:**
-- `client` (string, optional) - Client for the sap-client parameter. Omitted, the parameter is left out.
+- `client` (string, optional) - Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.
 - `entity_set` (string, optional) - Entity set to open. Omitted, the first one the service definition exposes is used.
-- `language` (string, optional) - Logon language for the preview. Default EN.
+- `language` (string, optional) - Logon language for the preview. Omitted, the language the system reports is used.
 - `navigation` (string, optional) - Association or composition to follow. Omitted, the first one of the exposed root view is used.
 - `service_binding_name` (string, required) - Service binding name.
 - `target_entity_set` (string, optional) - Entity set the navigation reaches. Omitted, the second exposed entity set is used.

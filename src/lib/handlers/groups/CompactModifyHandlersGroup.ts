@@ -49,56 +49,70 @@ import {
   TOOL_DEFINITION as HandlerUpdate_Tool,
   handleHandlerUpdate,
 } from '../../../handlers/compact/high/handleHandlerUpdate';
+import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
+
+/**
+ * The entries, built against a LIVE context rather than a snapshot.
+ *
+ * Same contract as the read-only half: the context is read per call, from
+ * whichever group owns the entry. See `compactReadOnlyEntries` for why a snapshot
+ * is wrong.
+ */
+export function compactModifyEntries(
+  getContext: () => HandlerContext,
+): HandlerEntry[] {
+  const withContext = <TArgs, TResult>(
+    handler: (context: HandlerContext, args: TArgs) => TResult,
+  ) => {
+    return (args: unknown) => handler(getContext(), args as TArgs);
+  };
+
+  return [
+    {
+      toolDefinition: HandlerCreate_Tool,
+      handler: withContext(handleHandlerCreate),
+    },
+    {
+      toolDefinition: HandlerUpdate_Tool,
+      handler: withContext(handleHandlerUpdate),
+    },
+    {
+      toolDefinition: HandlerDelete_Tool,
+      handler: withContext(handleHandlerDelete),
+    },
+    {
+      toolDefinition: HandlerActivate_Tool,
+      handler: withContext(handleHandlerActivate),
+    },
+    {
+      toolDefinition: HandlerTransportCreate_Tool,
+      handler: withContext(handleHandlerTransportCreate),
+    },
+    {
+      toolDefinition: HandlerLock_Tool,
+      handler: withContext(handleHandlerLock),
+    },
+    {
+      toolDefinition: HandlerUnlock_Tool,
+      handler: withContext(handleHandlerUnlock),
+    },
+    {
+      toolDefinition: HandlerUnitTestRun_Tool,
+      handler: withContext(handleHandlerUnitTestRun),
+    },
+    {
+      toolDefinition: HandlerProfileRun_Tool,
+      handler: withContext(handleHandlerProfileRun),
+    },
+  ];
+}
 
 export class CompactModifyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactModifyHandlers';
 
   getHandlers(): HandlerEntry[] {
-    const withContext = <TArgs, TResult>(
-      handler: (context: typeof this.context, args: TArgs) => TResult,
-    ) => {
-      return (args: unknown) => handler(this.context, args as TArgs);
-    };
-
-    return [
-      {
-        toolDefinition: HandlerCreate_Tool,
-        handler: withContext(handleHandlerCreate),
-      },
-      {
-        toolDefinition: HandlerUpdate_Tool,
-        handler: withContext(handleHandlerUpdate),
-      },
-      {
-        toolDefinition: HandlerDelete_Tool,
-        handler: withContext(handleHandlerDelete),
-      },
-      {
-        toolDefinition: HandlerActivate_Tool,
-        handler: withContext(handleHandlerActivate),
-      },
-      {
-        toolDefinition: HandlerTransportCreate_Tool,
-        handler: withContext(handleHandlerTransportCreate),
-      },
-      {
-        toolDefinition: HandlerLock_Tool,
-        handler: withContext(handleHandlerLock),
-      },
-      {
-        toolDefinition: HandlerUnlock_Tool,
-        handler: withContext(handleHandlerUnlock),
-      },
-      {
-        toolDefinition: HandlerUnitTestRun_Tool,
-        handler: withContext(handleHandlerUnitTestRun),
-      },
-      {
-        toolDefinition: HandlerProfileRun_Tool,
-        handler: withContext(handleHandlerProfileRun),
-      },
-    ];
+    return compactModifyEntries(() => this.context);
   }
 }

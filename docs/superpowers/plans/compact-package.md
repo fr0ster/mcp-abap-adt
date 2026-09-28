@@ -274,7 +274,19 @@ splitting: 22 read handlers, 61 write handlers, **zero overlap**.
   both exported from `lib/handlers/groups`; `CompactHandlersGroup` now composes the
   two, so `--exposition=compact` serves the same 22 in the same order.
 
-**Two tests hold it, and each was verified to fail when it should.**
+**One regression came out of the composition, and it is worth recording.** The
+first version of `CompactHandlersGroup` composed two child GROUP INSTANCES, each
+constructed with `this.context`. `BaseMcpServer` builds a fresh context per call
+and sets it on the group that owns the entry (`setContext`, else `group.context =`),
+so the children kept the context from construction: a call ran against a stale
+connection, or against the `null` a server holds before it has connected. Found in
+review on PR #240. The halves now export ENTRY BUILDERS that take
+`() => HandlerContext`, so every handler reads the owning group's context at call
+time and no snapshot exists anywhere. `compactGroupContext.test.ts` replaces the
+context after the list is built, exactly as the server does, and checks all three
+groups — it fails against the old composition and passes against this one.
+
+**Three tests hold it, and each was verified to fail when it should.**
 `compactCapabilitySplit.test.ts` walks the transitive IMPORTS from each group's
 file and asserts the read-only graph reaches `compactReadRoutes` and never
 `compactWriteRoutes`, no `handleCreate*`/`handleUpdate*`/`handleDelete*`, and no

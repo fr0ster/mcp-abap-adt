@@ -72,72 +72,90 @@ import {
   TOOL_DEFINITION as HandlerValidate_Tool,
   handleHandlerValidate,
 } from '../../../handlers/compact/high/handleHandlerValidate';
+import type { HandlerContext } from '../../../handlers/interfaces.js';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerEntry } from '../interfaces.js';
+
+/**
+ * The entries, built against a LIVE context rather than a snapshot.
+ *
+ * `BaseMcpServer` sets the context on the group that OWNS an entry, once per
+ * request — a fresh connection each time. So an entry must read the context when
+ * it is CALLED, never capture the one that existed when the list was built: a
+ * composed group that instantiated this one with a snapshot handed its handlers a
+ * stale connection, or the initial `null` (found in review on PR #240). Taking a
+ * getter means the owning group can be this class or the composed facade, and
+ * either way the handler sees that group's current context.
+ */
+export function compactReadOnlyEntries(
+  getContext: () => HandlerContext,
+): HandlerEntry[] {
+  const withContext = <TArgs, TResult>(
+    handler: (context: HandlerContext, args: TArgs) => TResult,
+  ) => {
+    return (args: unknown) => handler(getContext(), args as TArgs);
+  };
+
+  return [
+    {
+      toolDefinition: HandlerGet_Tool,
+      handler: withContext(handleHandlerGet),
+    },
+    {
+      toolDefinition: HandlerValidate_Tool,
+      handler: withContext(handleHandlerValidate),
+    },
+    {
+      toolDefinition: HandlerCheckRun_Tool,
+      handler: withContext(handleHandlerCheckRun),
+    },
+    {
+      toolDefinition: HandlerUnitTestStatus_Tool,
+      handler: withContext(handleHandlerUnitTestStatus),
+    },
+    {
+      toolDefinition: HandlerUnitTestResult_Tool,
+      handler: withContext(handleHandlerUnitTestResult),
+    },
+    {
+      toolDefinition: HandlerCdsUnitTestStatus_Tool,
+      handler: withContext(handleHandlerCdsUnitTestStatus),
+    },
+    {
+      toolDefinition: HandlerCdsUnitTestResult_Tool,
+      handler: withContext(handleHandlerCdsUnitTestResult),
+    },
+    {
+      toolDefinition: HandlerProfileList_Tool,
+      handler: withContext(handleHandlerProfileList),
+    },
+    {
+      toolDefinition: HandlerProfileView_Tool,
+      handler: withContext(handleHandlerProfileView),
+    },
+    {
+      toolDefinition: HandlerDumpList_Tool,
+      handler: withContext(handleHandlerDumpList),
+    },
+    {
+      toolDefinition: HandlerDumpView_Tool,
+      handler: withContext(handleHandlerDumpView),
+    },
+    {
+      toolDefinition: HandlerServiceBindingListTypes_Tool,
+      handler: withContext(handleHandlerServiceBindingListTypes),
+    },
+    {
+      toolDefinition: HandlerServiceBindingValidate_Tool,
+      handler: withContext(handleHandlerServiceBindingValidate),
+    },
+  ];
+}
 
 export class CompactReadOnlyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'CompactReadOnlyHandlers';
 
   getHandlers(): HandlerEntry[] {
-    const withContext = <TArgs, TResult>(
-      handler: (context: typeof this.context, args: TArgs) => TResult,
-    ) => {
-      return (args: unknown) => handler(this.context, args as TArgs);
-    };
-
-    return [
-      {
-        toolDefinition: HandlerGet_Tool,
-        handler: withContext(handleHandlerGet),
-      },
-      {
-        toolDefinition: HandlerValidate_Tool,
-        handler: withContext(handleHandlerValidate),
-      },
-      {
-        toolDefinition: HandlerCheckRun_Tool,
-        handler: withContext(handleHandlerCheckRun),
-      },
-      {
-        toolDefinition: HandlerUnitTestStatus_Tool,
-        handler: withContext(handleHandlerUnitTestStatus),
-      },
-      {
-        toolDefinition: HandlerUnitTestResult_Tool,
-        handler: withContext(handleHandlerUnitTestResult),
-      },
-      {
-        toolDefinition: HandlerCdsUnitTestStatus_Tool,
-        handler: withContext(handleHandlerCdsUnitTestStatus),
-      },
-      {
-        toolDefinition: HandlerCdsUnitTestResult_Tool,
-        handler: withContext(handleHandlerCdsUnitTestResult),
-      },
-      {
-        toolDefinition: HandlerProfileList_Tool,
-        handler: withContext(handleHandlerProfileList),
-      },
-      {
-        toolDefinition: HandlerProfileView_Tool,
-        handler: withContext(handleHandlerProfileView),
-      },
-      {
-        toolDefinition: HandlerDumpList_Tool,
-        handler: withContext(handleHandlerDumpList),
-      },
-      {
-        toolDefinition: HandlerDumpView_Tool,
-        handler: withContext(handleHandlerDumpView),
-      },
-      {
-        toolDefinition: HandlerServiceBindingListTypes_Tool,
-        handler: withContext(handleHandlerServiceBindingListTypes),
-      },
-      {
-        toolDefinition: HandlerServiceBindingValidate_Tool,
-        handler: withContext(handleHandlerServiceBindingValidate),
-      },
-    ];
+    return compactReadOnlyEntries(() => this.context);
   }
 }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [14.0.0] - 2026-09-28
+
+Migration: [`docs/MIGRATION-14.0.md`](docs/MIGRATION-14.0.md).
+
 ### Changed
 
 - **The compact facade left `lib` for three packages of its own.** It exists for a

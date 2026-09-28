@@ -573,6 +573,76 @@ function loadObjectVersionTools() {
   return tools;
 }
 
+/**
+ * The text the model actually receives, taken from the BUILT definitions.
+ *
+ * **Why this exists.** This generator reads source with regexes, and three
+ * reviewer findings on PR #244 were all the same defect wearing different
+ * clothes: a Zod `.description` is a prototype getter and was invisible; a
+ * description built as `'…' + '…'` was cut at the first literal; a template
+ * literal printed `${commonObjectTypeSchema.description}` verbatim, because no
+ * regex evaluates an interpolation. Source text and shipped text are not the same
+ * thing, and the docs must show the shipped one — the same string a consumer's RAG
+ * indexes and a model reads.
+ *
+ * So the regex parse stays (it finds the tools, their files, tiers and schema
+ * shape) and the TEXT is overwritten from `dist`. When `dist` is missing the
+ * generator says so once and keeps the parsed text, so `docs:tools` still runs on
+ * a tree that has not been built.
+ */
+function builtDefinitions() {
+  try {
+    const {
+      HandlerExporter,
+    } = require('../dist/lib/handlers/HandlerExporter.js');
+    const entries = new HandlerExporter({
+      includeReadOnly: true,
+      includeHighLevel: true,
+      includeLowLevel: true,
+      includeCompact: true,
+      includeSystem: true,
+      includeSearch: true,
+    }).getHandlerEntries();
+    const byName = new Map();
+    for (const entry of entries)
+      byName.set(entry.toolDefinition.name, entry.toolDefinition);
+    return byName;
+  } catch (error) {
+    console.warn(
+      `\u26a0\ufe0f  dist not loadable (${error.message.split('\n')[0]}) — documenting the text as parsed from source. Run \`npm run build\` first for the shipped text.`,
+    );
+    return new Map();
+  }
+}
+
+/** A parameter's own schema, in either shape a definition is written in. */
+function builtProperty(definition, key) {
+  const flat = definition.inputSchema;
+  const properties = flat && flat.properties ? flat.properties : flat;
+  return properties ? properties[key] : undefined;
+}
+
+/** Overwrite parsed text with the shipped text, tool by tool and parameter by parameter. */
+function applyBuiltText(tools) {
+  const built = builtDefinitions();
+  if (built.size === 0) return tools;
+  for (const tool of tools) {
+    const definition = built.get(tool.name);
+    if (!definition) continue;
+    if (typeof definition.description === 'string' && definition.description)
+      tool.description = definition.description;
+    const props = tool.inputSchema && tool.inputSchema.properties;
+    if (!props) continue;
+    for (const key of Object.keys(props)) {
+      // `.description` by ACCESS, so a Zod getter answers as well as a plain key.
+      const stated = builtProperty(definition, key);
+      const text = stated ? stated.description : undefined;
+      if (typeof text === 'string' && text) props[key].description = text;
+    }
+  }
+  return tools;
+}
+
 function loadToolsFromHandlers() {
   const files = [];
   walk(HANDLERS_ROOT, files);
@@ -608,7 +678,7 @@ function loadToolsFromHandlers() {
     return a.name.localeCompare(b.name);
   });
 
-  return tools;
+  return applyBuiltText(tools);
 }
 
 function levelTitle(level) {

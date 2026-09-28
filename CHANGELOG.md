@@ -62,7 +62,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- **The tool-docs generator dropped everything after the first string literal of a
+- **The tool docs now show the text the model receives, not the text a regex could
+  parse out of the source.** Three reviewer findings on PR #244 were one defect in
+  three costumes: a Zod `.description` is a prototype getter and was invisible; a
+  description built as `'…' + '…'` was cut at the first literal; a template literal
+  printed `${commonObjectTypeSchema.description}` verbatim, because no regex
+  evaluates an interpolation. `generate-tools-docs.js` keeps the source parse for
+  structure — which tools exist, their files, tiers and schema shape — and takes
+  every description from the BUILT definitions through `HandlerExporter`, the same
+  strings a consumer's RAG indexes. Without `dist` it says so once and documents the
+  parsed text, so `docs:tools` still runs on an unbuilt tree. Beside the
+  interpolation, this filled in five compact parameters that were documented as
+  empty because their schema is a shared constant the regex could not follow.
+
+- **The generator dropped everything after the first string literal of a
   concatenated description.** It reads source with regexes rather than importing
   the built definitions, and the pattern stopped at one literal — so five tools
   lost a whole sentence each from the generated docs: the legacy refusal notes on

@@ -1,7 +1,7 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { CompactObjectType } from './compactObjectTypes';
-import { routeCompactOperation } from './compactRouter';
 import { compactDeleteSchema } from './compactSchemas';
+import { routeCompactWrite } from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerDelete',
@@ -20,5 +20,5 @@ export async function handleHandlerDelete(
   context: HandlerContext,
   args: HandlerDeleteArgs,
 ) {
-  return routeCompactOperation(context, 'delete', args);
+  return routeCompactWrite(context, 'delete', args);
 }

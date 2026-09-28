@@ -1,6 +1,6 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { CompactObjectType } from './compactObjectTypes';
-import { routeCompactOperation } from './compactRouter';
+import { routeCompactRead } from './compactReadRoutes';
 import { compactGetSchema } from './compactSchemas';
 
 export const TOOL_DEFINITION = {
@@ -20,5 +20,5 @@ export async function handleHandlerGet(
   context: HandlerContext,
   args: HandlerGetArgs,
 ) {
-  return routeCompactOperation(context, 'get', args);
+  return routeCompactRead(context, args);
 }

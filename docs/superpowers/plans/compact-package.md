@@ -189,6 +189,46 @@ a flag or a second binary.
    Lockstep is the recommendation: the compact packages are a decomposition of the
    same `lib`, and independent versions would create combinations nobody has run.
 
+## Done: the capability split, inside `lib`
+
+**The real work named in this plan is finished, and it turned out smaller than the
+plan feared.** The router was ONE map, `object_type → { create, get, update,
+delete } → high-tier handler`, and only 4 of the 22 compact tools imported it
+(`HandlerGet`, `HandlerCreate`, `HandlerUpdate`, `HandlerDelete`). So the line of
+the split is a COLUMN of that map, not a rewrite of 22 tools. Measured while
+splitting: 22 read handlers, 61 write handlers, **zero overlap**.
+
+- `compactRoutes.ts` — the handler and map types plus `dispatchCompact`, and no
+  handler import at all, so both halves share the "no `object_type`" and
+  "unsupported operation" answers without sharing a graph.
+- `compactReadRoutes.ts` — the `get` column, `compactReadRouterMap`,
+  `routeCompactRead`.
+- `compactWriteRoutes.ts` — `create`/`update`/`delete`, `compactWriteRouterMap`,
+  `routeCompactWrite`.
+- `compactRouter.ts` is **gone**. A merged façade would have re-linked both graphs
+  for anything that imported it, which is exactly the coupling the split exists to
+  remove; the union is asserted in a test instead.
+- `CompactReadOnlyHandlersGroup` (13 tools) and `CompactModifyHandlersGroup` (9),
+  both exported from `lib/handlers/groups`; `CompactHandlersGroup` now composes the
+  two, so `--exposition=compact` serves the same 22 in the same order.
+
+**Two tests hold it, and each was verified to fail when it should.**
+`compactCapabilitySplit.test.ts` walks the transitive IMPORTS from each group's
+file and asserts the read-only graph reaches `compactReadRoutes` and never
+`compactWriteRoutes`, no `handleCreate*`/`handleUpdate*`/`handleDelete*`, and no
+`handleLock*`/`handleUnlock*`/`handleActivate*` — proving the capability of what is
+imported rather than of what a list enumerates. It also asserts the modifying graph
+DOES reach the write routes, so a split that merely lost them fails too, and that
+the walker resolves a real graph, since a resolver finding nothing would make every
+other assertion pass. `compactRouter.test.ts` checks that the union of the halves is
+exactly `COMPACT_CRUD_MATRIX` — splitting a map adds one new way to be wrong, a
+route that lands in neither file — and that each half carries only its own
+operations.
+
+This is releasable on its own: no package moved, no manifest changed, no public
+export removed. What remains below needs the packaging decisions and, because a
+consumer installs from npm rather than a local link, a publish between the phases.
+
 ## Tasks, once the questions above are answered
 
 - [ ] Decide the four questions left and write the decision down (here, then in
@@ -205,8 +245,8 @@ a flag or a second binary.
       because a compact cycle needs objects of its own.
 - [ ] **`HandlerActivate` through compact, on a system**, including the group path
       that reads the activation run's results.
-- [ ] **Split the compact router along the capability line** so a read-only group
-      imports no write route. This is the real work, and it is in `lib`.
+- [x] **Split the compact router along the capability line** so a read-only group
+      imports no write route — done, see the section above.
 - [ ] **The two library packages**: manifests, `LICENSE` (Apache-2.0, both — no
       bin), `publish-all.sh`, the release checklist.
 - [ ] **The `compact` package**: manifest, `LICENSE` (AGPL-3.0-only), `COPYING`,

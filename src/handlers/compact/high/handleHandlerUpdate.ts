@@ -1,7 +1,7 @@
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import type { CompactObjectType } from './compactObjectTypes';
-import { routeCompactOperation } from './compactRouter';
 import { compactUpdateSchema } from './compactSchemas';
+import { routeCompactWrite } from './compactWriteRoutes';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUpdate',
@@ -20,5 +20,5 @@ export async function handleHandlerUpdate(
   context: HandlerContext,
   args: HandlerUpdateArgs,
 ) {
-  return routeCompactOperation(context, 'update', args);
+  return routeCompactWrite(context, 'update', args);
 }

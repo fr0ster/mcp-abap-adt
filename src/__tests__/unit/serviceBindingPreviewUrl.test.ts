@@ -43,7 +43,8 @@ const clientFor = (parts: {
   view?: string;
 }) =>
   fakeClientOf({
-    read: async (config: Record<string, string>) => {
+    read: async (...args: unknown[]) => {
+      const config = (args[0] ?? {}) as Record<string, string>;
       if (config.bindingName !== undefined)
         return okResponse(reading(parts.binding ?? '')) as IAdtResponse<
           unknown,

@@ -39,6 +39,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The view is read only when a navigation is needed and none was given, so the usual
   cost is two requests.
 
+- **`part` on the compact `HandlerGet`: `source`, `metadata` or `urls`.** Compact is
+  one tool per OPERATION, so "which aspect of this object" is an argument of the read
+  rather than a twenty-third tool — and it is the same parameter the object-oriented
+  tiers still lack, where eight `Get*` tools fetch a metadata document and discard it
+  while the `Read*` that would answer it is hidden by the Read-vs-Get dedup.
+
+  `metadata` routes to the readers that actually return the document (sixteen object
+  types have one); `urls` routes to `GetServiceBindingPreviewUrl` and therefore exists
+  for a service binding alone, which is the honest size of it.
+
+  **A part the type does not offer is refused by name, never substituted.** Asking for
+  `urls` on a class answers `part=urls is not available for object_type=CLASS. It
+  offers: source, metadata.` — the refusal carries what to ask instead, and answering
+  the source would be a success meaning something other than the question. The refusal
+  is returned the way the router returns an unsupported operation, so both paths
+  through the surface have one shape. A missing `object_type` stays the router's own
+  refusal rather than gaining a second voice.
+
+  `@mcp-abap-adt/lib/handlers/read` grew from 35 to 54 exports for this: the metadata
+  readers and the preview tool. The read-only half still reaches no write route —
+  `compactCapabilitySplit` checks that against the import graph, not the intention.
+
 
 ## [14.0.1] - 2026-09-28
 

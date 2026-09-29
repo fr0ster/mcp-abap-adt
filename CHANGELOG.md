@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Publishing an OData V2 service binding could not succeed.** `UpdateServiceBinding`
+  took `service_name` and `service_version` — `service_name` is required on the tool
+  surface — and dropped both, because the library had nowhere to put them. A V2
+  publication job resolves the service from them, so the job answered `200` with
+  `SEVERITY ERROR` naming an EMPTY service and version `0000`: *"Activating Local
+  Service Endpoint of service ␠ with version 0000 failed"*. The binding was active and
+  `srvb:allowedAction` named the very action asked for.
+
+  `@mcp-abap-adt/adt-clients` `^23.0.5` (was `^23.0.4`) takes them per protocol, so
+  this handler now passes them for `odatav2` and not for `odatav4`, where the request
+  names its target on its own. Measured there on **all four binding variants**: both
+  V2 ones refuse without the fields and succeed with them, both V4 ones succeed
+  without them — so the axis is the protocol, not the UI/Web API category. See that
+  package's ERRATA, *"A V2 publication job resolves the service by name and version"*.
+
+  The two parameter descriptions said the job "no longer carries" these fields. It
+  carries them again for V2, and they now say which protocol uses them and that V4
+  ignores them.
+
+  Found while removing the probe objects from #248: two V4 bindings unpublished
+  through this tool and the V2 one did not, which made the comparison single-variable.
+
 ## [14.1.1] - 2026-09-29
 
 ### Fixed

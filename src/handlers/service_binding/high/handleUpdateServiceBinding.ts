@@ -52,12 +52,19 @@
  * repository uses — releasing it on every path out of `update()`, refused
  * or not.
  *
- * **`service_name`/`service_version` stay on the tool surface but no longer
- * reach the wire.** `IServiceBindingPublicationConfig` doesn't carry them at
- * all — "the service name and version have nowhere to go" per
- * `types.d.ts`'s own comment — so they are validated as required (the tool
- * surface is frozen) and otherwise ignored, the same acceptance
- * `handleDeleteServiceBinding.ts` gives `response_format`.
+ * **`service_name`/`service_version` reach the wire again, for V2.** They were
+ * accepted and dropped while `IServiceBindingPublicationConfig` had nowhere to
+ * put them — "the service name and version have nowhere to go", said
+ * `types.d.ts` — and the consequence was that a V2 publication through this
+ * handler could not succeed: the job answered `200` with `SEVERITY ERROR`,
+ * naming an EMPTY service and version `0000`. adt-clients 23.0.5 takes them per
+ * protocol, so this handler passes them for `odatav2` and not for `odatav4`,
+ * where the body settles the target on its own. Both were measured on both
+ * binding categories — UI and Web API behave the same on each protocol — so the
+ * axis here is the protocol, not the variant.
+ *
+ * `service_version` keeps its `0001` default from the tool surface; `service_name`
+ * is already required there, which is why nothing new is demanded of a caller.
  *
  * **`desired_publication_state: 'unchanged'` is refused before any client is
  * built.** `update()`'s own `updateRequest` throws synchronously for it
@@ -138,12 +145,12 @@ export const TOOL_DEFINITION = {
       service_name: {
         type: 'string',
         description:
-          'Published service name. Accepted for backward compatibility; the publication job no longer carries it.',
+          'Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.',
       },
       service_version: {
         type: 'string',
         description:
-          'Published service version. Accepted for backward compatibility; the publication job no longer carries it.',
+          'Published service version. Default 0001. Used by an OData V2 publication job together with the service name; ignored for V4.',
       },
       response_format: {
         type: 'string',
@@ -216,7 +223,24 @@ export async function handleUpdateServiceBinding(
         () => obj.lock({ bindingName }, { analyse: analyseLock }),
         (lockHandle) =>
           obj.update(
-            { bindingName, desiredPublicationState, serviceType },
+            // **V2 resolves the service by name and version; V4 does not.**
+            // The job's body names the target by type (`SCGR`) and name, and for
+            // V2 that is not enough — without the two fields it answers `200`
+            // with `SEVERITY ERROR`, naming an empty service and version `0000`.
+            // Measured on all four variants (adt-clients 23.0.5 ERRATA, "A V2
+            // publication job resolves the service by name and version"): both
+            // V2 variants refuse without them, both V4 ones succeed without
+            // them. So the branch is the protocol's, which is also the shape
+            // `IServiceBindingPublicationParams` requires.
+            serviceType === 'odatav2'
+              ? {
+                  bindingName,
+                  desiredPublicationState,
+                  serviceType,
+                  serviceName: args.service_name.trim().toUpperCase(),
+                  serviceVersion: (args.service_version ?? '0001').trim(),
+                }
+              : { bindingName, desiredPublicationState, serviceType },
             // adt-clients 23 no longer reads SAP's publication refusal on its
             // own (MIGRATION-23 §3); `analysePublication` is that verdict.
             {

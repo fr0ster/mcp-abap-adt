@@ -219,34 +219,29 @@ export async function handleUpdateServiceBinding(
       const obj = createAdtClient(connection, logger).getServiceBinding(
         resultsFor(serviceDocuments),
       );
-      return withLock(
-        // **`analysePublicationLock`, not `analyseLock`.** A `403` on this LOCK
-        // means an editing session holds the binding — an open editor keeps its
-        // lock after a publication — and the publication job needs no lock of
-        // ours: Eclipse posts the job after its own LOCK's `403`. The errata is
-        // explicit ("`403` on the LOCK before a publish or unpublish — ignore
-        // it"), and with `analyseLock` this handler refused instead, so a binding
-        // anybody had open could not be published or unpublished through this
-        // server at all. The strategy answers a lock without a handle (`''`) for
-        // that one refusal and leaves every other one a refusal; `withLock` sends
-        // no UNLOCK for an empty handle.
-        //
-        // Measured here the hard way: a publication whose client timed out left
-        // the lock behind, and the unpublish that followed was refused with
-        // "User … is currently editing ZMCP_E2E_V2" — exactly the case Eclipse
-        // publishes straight through.
-        () => obj.lock({ bindingName }, { analyse: analysePublicationLock }),
-        (lockHandle) =>
+      return (async () => {
+        // **`analysePublicationLock`, not `analyseLock`.** The `403` on this LOCK
+        // means an editing session holds the binding, and the publication job
+        // needs no lock of ours — Eclipse posts it after its own LOCK's `403`.
+        // The strategy turns that one refusal into a lock without a handle and
+        // leaves every other refusal a refusal, so there is nothing to decide
+        // here beyond what it answered. With `analyseLock` this handler refused
+        // instead, and a binding anybody had open could not be published or
+        // unpublished through this server at all.
+        const acquired = await obj.lock(
+          { bindingName },
+          { analyse: analysePublicationLock },
+        );
+        if (!acquired.ok) return acquired;
+
+        const publish = (lockHandle: string) =>
           obj.update(
-            // **V2 resolves the service by name and version; V4 does not.**
-            // The job's body names the target by type (`SCGR`) and name, and for
-            // V2 that is not enough — without the two fields it answers `200`
-            // with `SEVERITY ERROR`, naming an empty service and version `0000`.
+            // **V2 resolves the service by name and version; V4 does not.** The
+            // job's body names the target by type (`SCGR`) and name, and for V2
+            // that is not enough — without the two fields it answers `200` with
+            // `SEVERITY ERROR`, naming an empty service and version `0000`.
             // Measured on all four variants (adt-clients 23.0.5 ERRATA, "A V2
-            // publication job resolves the service by name and version"): both
-            // V2 variants refuse without them, both V4 ones succeed without
-            // them. So the branch is the protocol's, which is also the shape
-            // `IServiceBindingPublicationParams` requires.
+            // publication job resolves the service by name and version").
             serviceType === 'odatav2'
               ? {
                   bindingName,
@@ -263,15 +258,21 @@ export async function handleUpdateServiceBinding(
               timeout: PUBLISH_TIMEOUT_MS,
               analyse: analysePublication,
             },
-          ),
-        (lockHandle) =>
-          obj.unlock({ bindingName }, lockHandle, {
-            analyse: analyseException,
-          }),
-        // An empty handle here is `analysePublicationLock`'s reading of the
-        // `403`, and the job needs no lock of ours.
-        'proceed',
-      );
+          );
+
+        // No handle, so there is nothing to give back: an UNLOCK without one
+        // answers 200 and changes nothing. `withLock` exists to release what was
+        // taken, and nothing was.
+        const lockHandle = acquired.getResult().value;
+        if (lockHandle === '') return publish('');
+
+        return withLock(
+          () => Promise.resolve(acquired),
+          publish,
+          (handle) =>
+            obj.unlock({ bindingName }, handle, { analyse: analyseException }),
+        );
+      })();
     },
     project(detail, terseWrite),
   );

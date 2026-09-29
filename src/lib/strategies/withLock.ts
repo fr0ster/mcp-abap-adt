@@ -74,17 +74,6 @@ export async function withLock<H, T>(
   acquire: () => Promise<IAdtResponse<H, IAdtError>>,
   body: (handle: H) => Promise<IAdtResponse<T, IAdtError>>,
   release: (handle: H) => Promise<IAdtResponse<unknown, IAdtError>>,
-  /**
-   * What an empty handle means. `'refuse'` — the default, and what every write
-   * under a lock wants — treats it as SAP having answered something that is not
-   * a lock answer. `'proceed'` runs the body anyway and releases nothing, which
-   * is only right where the call genuinely does not need the caller's lock: a
-   * service binding's publication, whose `403` on the LOCK means an editing
-   * session holds the binding and which Eclipse posts regardless. That reading
-   * comes from `analysePublicationLock`, so the two belong together — the
-   * strategy turns the `403` into `''` and this says what `''` may do.
-   */
-  onHandleless: 'refuse' | 'proceed' = 'refuse',
 ): Promise<IAdtResponse<T, IAdtError>> {
   const acquired = await acquire();
   if (!acquired.ok) return acquired as unknown as IAdtResponse<T, IAdtError>;
@@ -95,12 +84,6 @@ export async function withLock<H, T>(
   // called without it would still stop here rather than write under an empty
   // handle. There is no handle to release.
   if ((handle as unknown) === '') {
-    if (onHandleless === 'proceed') {
-      // No handle, so nothing to release — and no `release` call either, which
-      // is the point: an UNLOCK without a handle answers 200 and changes
-      // nothing, so sending one would only look like cleanup.
-      return await body(handle);
-    }
     return failure<T>({
       message: 'SAP answered the lock request without a lock handle',
       origin: 'refusal',

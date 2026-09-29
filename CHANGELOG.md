@@ -31,6 +31,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Found while removing the probe objects from #248: two V4 bindings unpublished
   through this tool and the V2 one did not, which made the comparison single-variable.
 
+- **A binding anybody had open could not be published or unpublished at all.**
+  `UpdateServiceBinding` passed `analyseLock` to its LOCK, so the `403` that means
+  *an editing session holds this binding* was a refusal: *"User … is currently
+  editing ZMCP_E2E_V2"*. adt-clients' ERRATA is explicit that this one `403` is to
+  be ignored — the publication job needs no lock of the caller's, and Eclipse posts
+  it after its own LOCK's `403` — and names the strategy for it,
+  `analysePublicationLock`, which answers a lock without a handle instead.
+
+  Swapping the strategy was not enough: `withLock` treats an empty handle as SAP
+  having answered something that is not a lock answer, which is right for every
+  write under a lock. It now takes `onHandleless`, `'refuse'` by default and
+  `'proceed'` only here: the body runs and nothing is released, because an UNLOCK
+  without a handle answers `200` and changes nothing, so sending one would only look
+  like cleanup.
+
+  Measured the hard way. A publication whose client gave up at 120 s — the job takes
+  ~133 s — left the lock behind, and the unpublish that followed was refused. With
+  the two changes the same call went through, and the wire shows both fixes at once:
+
+      POST …/bindings/zmcp_e2e_v2?_action=LOCK&accessMode=MODIFY  -> threw 403
+      POST …/businessservices/odatav2/unpublishjobs
+      params {"servicename":"ZMCP_E2E_V2","serviceversion":"0001"}
+
 ## [14.1.1] - 2026-09-29
 
 ### Fixed

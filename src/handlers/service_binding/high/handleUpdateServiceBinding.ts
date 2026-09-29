@@ -88,6 +88,7 @@ import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   analysePublication,
+  analysePublicationLock,
 } from '@mcp-abap-adt/adt-strategies';
 import {
   SERVICE_BINDING_VARIANT_MAP,
@@ -97,7 +98,6 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { analyseLock } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
@@ -220,7 +220,22 @@ export async function handleUpdateServiceBinding(
         resultsFor(serviceDocuments),
       );
       return withLock(
-        () => obj.lock({ bindingName }, { analyse: analyseLock }),
+        // **`analysePublicationLock`, not `analyseLock`.** A `403` on this LOCK
+        // means an editing session holds the binding — an open editor keeps its
+        // lock after a publication — and the publication job needs no lock of
+        // ours: Eclipse posts the job after its own LOCK's `403`. The errata is
+        // explicit ("`403` on the LOCK before a publish or unpublish — ignore
+        // it"), and with `analyseLock` this handler refused instead, so a binding
+        // anybody had open could not be published or unpublished through this
+        // server at all. The strategy answers a lock without a handle (`''`) for
+        // that one refusal and leaves every other one a refusal; `withLock` sends
+        // no UNLOCK for an empty handle.
+        //
+        // Measured here the hard way: a publication whose client timed out left
+        // the lock behind, and the unpublish that followed was refused with
+        // "User … is currently editing ZMCP_E2E_V2" — exactly the case Eclipse
+        // publishes straight through.
+        () => obj.lock({ bindingName }, { analyse: analysePublicationLock }),
         (lockHandle) =>
           obj.update(
             // **V2 resolves the service by name and version; V4 does not.**
@@ -253,6 +268,9 @@ export async function handleUpdateServiceBinding(
           obj.unlock({ bindingName }, lockHandle, {
             analyse: analyseException,
           }),
+        // An empty handle here is `analysePublicationLock`'s reading of the
+        // `403`, and the job needs no lock of ours.
+        'proceed',
       );
     },
     project(detail, terseWrite),

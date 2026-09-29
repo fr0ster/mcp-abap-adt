@@ -45,6 +45,10 @@ import { handleGetObjectNodeFromCache } from '../../../handlers/system/readonly/
 import { TOOL_DEFINITION as GetObjectStructure_Tool } from '../../../handlers/system/readonly/handleGetObjectStructure';
 import { handleGetObjectStructure } from '../../../handlers/system/readonly/handleGetObjectStructure.js';
 import {
+  TOOL_DEFINITION as GetServiceBindingPreviewUrl_Tool,
+  handleGetServiceBindingPreviewUrl,
+} from '../../../handlers/system/readonly/handleGetServiceBindingPreviewUrl';
+import {
   TOOL_DEFINITION as GetSession_Tool,
   handleGetSession,
 } from '../../../handlers/system/readonly/handleGetSession';
@@ -129,6 +133,11 @@ export class SystemHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return [
+      {
+        toolDefinition: GetServiceBindingPreviewUrl_Tool,
+        handler: (args: any) =>
+          handleGetServiceBindingPreviewUrl(this.context, args),
+      },
       {
         toolDefinition: GetTypeInfo_Tool,
         handler: (args: any) => handleGetTypeInfo(this.context, args),

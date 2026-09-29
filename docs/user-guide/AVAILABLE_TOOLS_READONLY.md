@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Read-Only
-- Total tools: 66
+- Total tools: 67
 
 ## Navigation
 
@@ -72,6 +72,7 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetObjectInfo](#getobjectinfo-read-only-system)
     - [GetObjectNodeFromCache](#getobjectnodefromcache-read-only-system)
     - [GetObjectStructure](#getobjectstructure-read-only-system)
+    - [GetServiceBindingPreviewUrl](#getservicebindingpreviewurl-read-only-system)
     - [GetSession](#getsession-read-only-system)
     - [GetSqlQuery](#getsqlquery-read-only-system)
     - [GetTransaction](#gettransaction-read-only-system)
@@ -679,6 +680,22 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="getservicebindingpreviewurl-read-only-system"></a>
+#### GetServiceBindingPreviewUrl (Read-Only / System)
+**Description:** [read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and says what is missing rather than guessing. A Web API binding has no preview page and answers the service URLs instead.
+
+**Source:** `src/handlers/system/readonly/handleGetServiceBindingPreviewUrl.ts`
+
+**Parameters:**
+- `client` (string, optional) - Client for the sap-client parameter. Omitted, the client the system reports is used; an empty string leaves the parameter out.
+- `entity_set` (string, optional) - Entity set to open. Omitted, the first one the service definition exposes is used.
+- `language` (string, optional) - Logon language for the preview. Omitted, the language the system reports is used.
+- `navigation` (string, optional) - Association or composition to follow. Omitted, the first one of the exposed root view is used.
+- `service_binding_name` (string, required) - Service binding name.
+- `target_entity_set` (string, optional) - Entity set the navigation reaches. Omitted, the second exposed entity set is used.
+
+---
+
 <a id="getsession-read-only-system"></a>
 #### GetSession (Read-Only / System)
 **Description:** [read-only] Get a new session ID and current session state (cookies, CSRF token) for reuse across multiple ADT operations. Use this to maintain the same session and lock handle across multiple requests.
@@ -1057,4 +1074,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-28*
+*Last updated: 2026-09-29*

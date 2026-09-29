@@ -151,10 +151,27 @@ export const compactCreateSchema = {
   required: ['object_type'],
 } as const;
 
+/**
+ * Which aspect of an object a read answers.
+ *
+ * The compact surface is one tool per OPERATION, so "source or metadata or the URLs"
+ * is an argument of the read, not three tools. A part the object does not have is
+ * refused by name — silently answering the source instead would be a success that
+ * means something other than what was asked.
+ */
+const readPartSchema = {
+  type: 'string',
+  enum: ['source', 'metadata', 'urls'],
+  default: 'source',
+  description:
+    'Which aspect to read: the source, the ADT metadata document, or the service and preview URLs. A part this object type does not offer is refused, naming the parts it does.',
+} as const;
+
 export const compactGetSchema = {
   type: 'object',
   properties: {
     object_type: commonObjectTypeSchema,
+    part: readPartSchema,
     package_name: { type: 'string', description: 'Package name.' },
     class_name: { type: 'string', description: 'Class name.' },
     interface_name: { type: 'string', description: 'Interface name.' },

@@ -60,7 +60,10 @@ describe("lib's read and write handler barrels", () => {
   const write = Object.keys(writeBarrel).sort();
 
   it('export the halves that were measured', () => {
-    expect(read).toHaveLength(35);
+    // 35 were what the compact facade's read half routed to. The metadata readers
+    // and the preview-URL tool joined them when `HandlerGet` gained `part`, which
+    // is why this number moves deliberately and in a commit that says so.
+    expect(read).toHaveLength(54);
     // 69 handlers plus TYPE_TO_FAMILY, the activation family map.
     expect(write).toHaveLength(70);
   });

@@ -191,7 +191,9 @@ export class ServerConfigManager {
 
   /**
    * Parse handler exposition from command line
-   * Format: --exposition=readonly,high,low
+   * Format: --exposition=readonly,high — a comma-separated list of
+   * `readonly`, `high` and `low`, of which `high` and `low` are mutually
+   * exclusive (`validateExposition` refuses the pair).
    *
    * `compact` is still ACCEPTED here on purpose, so `validateExposition` can refuse
    * it by name and say which command serves it. Dropping it from the filter would
@@ -241,8 +243,12 @@ HANDLER EXPOSITION:
                                    Examples:
                                    --exposition=readonly       (readonly + search + system)
                                    --exposition=readonly,high  (readonly + high + search + system)
+                                   --exposition=readonly,low   (readonly + low + search + system)
                                    --exposition=high           (high only, NO search/system)
-                                   --exposition=readonly,high,low (all handlers)
+
+                                   'high' and 'low' are mutually exclusive and the
+                                   pair is refused at startup, so there is no value
+                                   that serves every handler at once.
 
                                    The compact facade is NOT an exposition of this
                                    command any more. It is its own command, with

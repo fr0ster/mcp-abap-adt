@@ -39,12 +39,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it after its own LOCK's `403` — and names the strategy for it,
   `analysePublicationLock`, which answers a lock without a handle instead.
 
-  Swapping the strategy was not enough: `withLock` treats an empty handle as SAP
-  having answered something that is not a lock answer, which is right for every
-  write under a lock. It now takes `onHandleless`, `'refuse'` by default and
-  `'proceed'` only here: the body runs and nothing is released, because an UNLOCK
-  without a handle answers `200` and changes nothing, so sending one would only look
-  like cleanup.
+  **But `analysePublicationLock` alone would have opened a second hole**, found in
+  review: it forgives by STATUS — `403` — and is built on `analyseException`, which
+  sees only documents. A `200` naming no lock handle is therefore no failure to it
+  either, and the caller is handed the same empty handle as for the `403`. A login
+  page on an expired session is a `200`, so "publish when there is no handle" would
+  publish after a lock that never happened — exactly the check `analyseLock` had
+  been doing.
+
+  So the handler passes its own composed strategy, `analysePublicationLockAnswer`:
+  `analyseLock` first, so a `2xx` without a handle stays a refusal, and the `403`
+  forgiveness after it. An empty handle then means one thing only, which is what
+  lets the handler publish without a handle and send no UNLOCK — there is nothing to
+  release. `withLock` is untouched.
 
   Measured the hard way. A publication whose client gave up at 120 s — the job takes
   ~133 s — left the lock behind, and the unpublish that followed was refused. With

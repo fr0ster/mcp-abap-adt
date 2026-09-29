@@ -108,4 +108,64 @@ describe('the publication job UpdateServiceBinding issues', () => {
     // Left exactly as it was measured working; sending it there was never measured.
     expect(job?.params).toBeUndefined();
   });
+
+  it('refuses a 200 that names no lock handle, instead of publishing on it', async () => {
+    // The hole a review found: `analysePublicationLock` forgives by STATUS 403, and
+    // it is built on `analyseException`, so a `200` naming no handle is no failure
+    // to it either — a login page on an expired session is a `200`. Treating that
+    // empty handle as "proceed without a lock" would publish after a lock that
+    // never happened. `analysePublicationLockAnswer` composes `analyseLock` under
+    // the forgiveness, so only the `403` yields an empty handle.
+    const connection = recordingConnection([
+      { data: '<html><body>Logon</body></html>', status: 200 },
+    ]);
+
+    const answered = await handleUpdateServiceBinding(
+      ctx(connection) as never,
+      {
+        service_binding_name: 'ZMCP_X',
+        desired_publication_state: 'published',
+        binding_variant: 'ODATA_V2_UI',
+        service_name: 'ZMCP_X_SRV',
+      } as never,
+    );
+
+    expect((answered as { isError?: boolean }).isError).toBe(true);
+    // And no job was posted on the strength of it.
+    expect(jobOf(connection)).toBeUndefined();
+  });
+
+  it('publishes without a handle when the lock answered 403', async () => {
+    // The forgiven case: an editing session holds the binding, the job needs no
+    // lock of the caller's, and no UNLOCK is sent because there is nothing to
+    // release.
+    const connection = recordingConnection([
+      {
+        status: 403,
+        data: '<?xml version="1.0"?><exc:exception xmlns:exc="http://www.sap.com/abapxml/types/communicationframework"><localizedMessage>User X is currently editing ZMCP_X</localizedMessage></exc:exception>',
+      },
+      { data: OK_JOB },
+    ]);
+
+    await handleUpdateServiceBinding(
+      ctx(connection) as never,
+      {
+        service_binding_name: 'ZMCP_X',
+        desired_publication_state: 'published',
+        binding_variant: 'ODATA_V2_UI',
+        service_name: 'ZMCP_X_SRV',
+      } as never,
+    );
+
+    const job = jobOf(connection);
+    expect(job?.url).toContain('/businessservices/odatav2/publishjobs');
+    expect(job?.params).toEqual({
+      servicename: 'ZMCP_X_SRV',
+      serviceversion: '0001',
+    });
+    // Nothing to release: no UNLOCK on the wire.
+    expect(
+      connection.requests.some((r) => r.url.includes('_action=UNLOCK')),
+    ).toBe(false);
+  });
 });

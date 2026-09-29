@@ -88,7 +88,6 @@ import { serviceDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseException,
   analysePublication,
-  analysePublicationLock,
 } from '@mcp-abap-adt/adt-strategies';
 import {
   SERVICE_BINDING_VARIANT_MAP,
@@ -98,6 +97,7 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { analysePublicationLockAnswer } from '../../../lib/strategies/lockAnswer';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
@@ -220,17 +220,21 @@ export async function handleUpdateServiceBinding(
         resultsFor(serviceDocuments),
       );
       return (async () => {
-        // **`analysePublicationLock`, not `analyseLock`.** The `403` on this LOCK
+        // **`analysePublicationLockAnswer`.** The `403` on this LOCK
         // means an editing session holds the binding, and the publication job
         // needs no lock of ours — Eclipse posts it after its own LOCK's `403`.
         // The strategy turns that one refusal into a lock without a handle and
-        // leaves every other refusal a refusal, so there is nothing to decide
-        // here beyond what it answered. With `analyseLock` this handler refused
-        // instead, and a binding anybody had open could not be published or
-        // unpublished through this server at all.
+        // leaves every other refusal a refusal — including a `2xx` that names no
+        // handle, which adt-strategies' own `analysePublicationLock` does not
+        // catch: it is built on `analyseException`, so a login page on an expired
+        // session is a `200` and therefore no failure to it, and the caller gets
+        // the same empty handle as for the `403`. Composing `analyseLock` under
+        // the forgiveness is what makes an empty handle here mean exactly one
+        // thing. With plain `analyseLock` this handler refused the `403` instead,
+        // and a binding anybody had open could not be published at all.
         const acquired = await obj.lock(
           { bindingName },
-          { analyse: analysePublicationLock },
+          { analyse: analysePublicationLockAnswer },
         );
         if (!acquired.ok) return acquired;
 

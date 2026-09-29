@@ -113,11 +113,32 @@ export function exposedEntitiesOf(source: string): ExposedEntity[] {
  * normally navigates through its compositions. A pattern that knows only
  * `association … to …` finds nothing on exactly the views this is for; that is how
  * the first version of this failed its own test.
+ *
+ * **And a PROJECTION spells it a third way.** It does not define the association, it
+ * redirects one the underlying view already has:
+ *
+ * ```abap
+ * _children : redirected to composition child ZMCP_PRV_C_CHLD
+ * _parent   : redirected to parent ZMCP_PRV_C_ROOT
+ * ```
+ *
+ * Measured on a trial, 2026-09-29: an OData V4 UI service exposes projections, not
+ * interface views — a V4 binding over interface views answers `403` — so the view
+ * this reads for a V4 preview is normally a projection, and the two patterns above
+ * find nothing in it. The answer then carried `associations: []` for a view that has
+ * one, which is not a missing field but a wrong one.
  */
 export function associationsOf(source: string): string[] {
   const found = new Set<string>();
+  // Defined here: `association [0..1] to X as name`, `composition [0..*] of Y as name`.
   for (const match of source.matchAll(
     /(?:association|composition)(?:\s*\[[^\]]*\])?\s+(?:to|of)\s+(?:parent\s+)?[A-Za-z0-9_/]+\s+as\s+([A-Za-z0-9_]+)/gi,
+  )) {
+    found.add(match[1]);
+  }
+  // Redirected in a projection: `name : redirected to [composition child|parent] X`.
+  for (const match of source.matchAll(
+    /([A-Za-z0-9_]+)\s*:\s*redirected\s+to\s+(?:composition\s+child|parent|)\s*[A-Za-z0-9_/]+/gi,
   )) {
     found.add(match[1]);
   }

@@ -99,3 +99,43 @@ describe('associations of an exposed view', () => {
     expect(associationsOf(view)).toEqual(['_Address', 'to_CLASS']);
   });
 });
+
+describe('a projection redirects an association instead of defining one', () => {
+  // The view a V4 preview reads is a projection: a V4 binding over interface
+  // views answers 403, so the exposed entity is a projection, and it spells the
+  // navigation a third way. Measured on a trial, 2026-09-29.
+  const PROJECTION = `@AccessControl.authorizationCheck: #NOT_REQUIRED
+define root view entity ZMCP_PRV_C_ROOT
+  provider contract transactional_query
+  as projection on ZMCP_SHR_I_ROOT
+{
+  key Fld1,
+  Fld2,
+  _children : redirected to composition child ZMCP_PRV_C_CHLD
+}`;
+
+  const CHILD_PROJECTION = `define view entity ZMCP_PRV_C_CHLD
+  as projection on ZMCP_SHR_I_CHLD
+{
+  key ChldId,
+  _parent : redirected to parent ZMCP_PRV_C_ROOT
+}`;
+
+  it('reads a redirected composition', () => {
+    expect(associationsOf(PROJECTION)).toEqual(['_children']);
+  });
+
+  it('reads a redirected parent', () => {
+    expect(associationsOf(CHILD_PROJECTION)).toEqual(['_parent']);
+  });
+
+  it('still reads the defining forms', () => {
+    expect(
+      associationsOf(`define root view entity X
+  as select from t
+  composition [0..*] of Y as _kids
+  association [0..1] to Z as to_thing
+{ key a }`),
+    ).toEqual(['_kids', 'to_thing']);
+  });
+});

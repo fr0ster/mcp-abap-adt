@@ -129,9 +129,11 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.missing).toBeUndefined();
   });
 
-  it('answers no preview URL when the navigation cannot be found', async () => {
-    // A view with no association: the descriptor would need a segment nobody
-    // knows, and inventing it is what this refuses to do.
+  it('still answers a URL when no association is found, because the segment is not read', async () => {
+    // A view with no association. The FEAP endpoint derives the navigation from
+    // the service's metadata and ignores the descriptor's segment — measured
+    // against its own `manifest.json` — so withholding the URL here withheld one
+    // that works. The segment goes out empty.
     fakeClient = clientFor({
       binding: BINDING,
       definition: DEFINITION,
@@ -140,9 +142,29 @@ describe('GetServiceBindingPreviewUrl', () => {
 
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
+    expect(payload.missing).toBeUndefined();
+    expect(payload.associations).toEqual([]);
+    expect(payload.preview_descriptor).toBe(
+      'ZSB_STUDENT_V2##student_data####student_address##ZSB_STUDENT_V2_VAN##0001',
+    );
+    expect(payload.preview_url).toContain('/businessservices/odatav2/feap/');
+    expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
+  });
+
+  it('answers no preview URL when the entity set cannot be found', async () => {
+    // The one segment the server DOES read. A definition that exposes nothing
+    // leaves nothing to open, and a guessed entity set answers a broken app:
+    // measured, a bogus one yields `ListReport|<bogus>` with no page under it.
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: 'define service ZUI_STUDENT { }',
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
     expect(payload.preview_url).toBeUndefined();
-    expect(payload.missing).toEqual(['navigation']);
-    // The service is still answered: that part was read, not guessed.
+    expect(payload.missing).toEqual(['entity_set']);
     expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
   });
 

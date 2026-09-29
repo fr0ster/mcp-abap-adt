@@ -15,10 +15,21 @@
  * composition of the exposed root view, so the view's source is read only when a
  * navigation is wanted and none was given.
  *
- * **What it refuses to invent.** A preview needs an entity set, a navigation and the
- * target that navigation reaches. When those cannot be resolved the answer carries
- * the service URLs, the entity sets to choose from and what is missing — rather than
- * a URL built on a guess, which would look exactly like a working one.
+ * **What the descriptor's segments are actually worth.** Measured against the FEAP
+ * endpoint's own `manifest.json` (trial, OData V2, 2026-09-29) by asking for one
+ * descriptor after another: the server reads the SERVICE and the ENTITY SET and
+ * derives the rest. An empty, bogus or plain wrong navigation segment all answered
+ * the same nested page — `"navigationProperty": "to_children", "entitySet":
+ * "Child"` — and an empty annotation-service segment still answered
+ * `TechnicalName='…_VAN'`. Only a bogus entity set changed the answer, to a list
+ * report with no page under it. The segments are still filled, because that is the
+ * shape Eclipse produces and a later release may begin to read them.
+ *
+ * **What it refuses to invent.** The entity set, then — the one segment that decides
+ * what opens. When it cannot be resolved the answer carries the service URLs, the
+ * entity sets to choose from and what is missing, rather than a URL built on a guess
+ * that would look exactly like a working one. A Web API binding has no preview at
+ * all, and says so instead of carrying a FEAP URL that opens nothing.
  */
 import {
   ddlDocuments,
@@ -50,7 +61,7 @@ export const TOOL_DEFINITION = {
   name: 'GetServiceBindingPreviewUrl',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, a navigation and its target, and says what is missing rather than guessing.',
+    '[read-only] Build the browser URL that previews a published service binding, and the service and $metadata URLs beside it. Answers: "open the service in a browser", "preview this service binding", "what is the OData URL of this binding". Reads the binding for the service, version and protocol, and the service definition for the entity sets; the preview URL needs an entity set, and says what is missing rather than guessing. A Web API binding has no preview page and answers the service URLs instead.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -221,21 +232,31 @@ export async function handleGetServiceBindingPreviewUrl(
       if (!facts.service) missing.push('service (srvb:services/@srvb:name)');
       if (!facts.protocol)
         missing.push('protocol (srvb:binding/@srvb:version)');
-      if (previewApplies) {
-        if (!entitySet) missing.push('entity_set');
-        if (!navigation) missing.push('navigation');
-      }
+      // Only the entity set. **Measured** against the FEAP endpoint's own
+      // `manifest.json` on a trial, OData V2, 2026-09-29: of the six descriptor
+      // segments the server reads exactly two — the service and the entity set.
+      // A descriptor whose navigation segment was empty, bogus (`BOGUS_NAV`) or
+      // the wrong association (`_parent`) answered the same nested page,
+      // `"navigationProperty": "to_children", "entitySet": "Child"`, because the
+      // server derives the navigation and its target from the service's metadata.
+      // An empty annotation-service segment still answered
+      // `TechnicalName='ZMCP_PRV_SB_VAN'`. Only a bogus ENTITY SET changed the
+      // answer — `ListReport|Nope` with no nested page at all.
+      //
+      // So refusing a URL for want of a navigation withheld one that works. The
+      // segments are still filled, because that is the shape Eclipse produces and
+      // a future release may start reading them; none of them gates the answer.
+      if (previewApplies && !entitySet) missing.push('entity_set');
 
       const descriptor =
         previewApplies &&
         facts.service !== undefined &&
         facts.protocol !== undefined &&
-        entitySet !== undefined &&
-        navigation !== undefined
+        entitySet !== undefined
           ? {
               service: facts.service,
               entitySet,
-              navigation,
+              navigation: navigation ?? '',
               targetEntitySet: target ?? entitySet,
               annotationService: annotationServiceOf(facts.service),
               version: facts.version ?? '0001',

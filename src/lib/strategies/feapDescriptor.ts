@@ -97,6 +97,35 @@ export function annotationServiceOf(service: string): string {
  * `protocol` is `odatav2` or `odatav4`, taken from the binding's own
  * `srvb:binding/@srvb:version`, because the endpoint differs per protocol.
  */
+/**
+ * The host a PREVIEW URL must carry, which is not always the host ADT answers on.
+ *
+ * **Measured on a BTP trial, 2026-09-29.** An ABAP environment in BTP is reached
+ * through two hosts: `<id>.abap.<region>.hana.ondemand.com` serves ADT and the
+ * APIs, and `<id>.abap-web.<region>.hana.ondemand.com` serves the browser. The
+ * same FEAP path on each behaves differently and decisively:
+ *
+ * - on `abap.` — `401` with `WWW-Authenticate: Basic`, on every variation tried
+ *   (with and without `sap-client`, with and without browser `User-Agent` and
+ *   `Accept`). A trial user has no ABAP password, because authentication is a
+ *   propagated token, so that prompt can never be answered. Eclipse opens the URL
+ *   only because it sends its own `Authorization` header.
+ * - on `abap-web.` — `200` with the BTP logon bootstrap, which sets
+ *   `fragmentAfterLogin` / `locationAfterLogin` and goes to the identity provider,
+ *   then returns to the requested URL. That is the browser flow.
+ *
+ * So a preview URL built on the ADT host is correct and unopenable. The service and
+ * `$metadata` URLs are the opposite case — they are addressed with a token — and
+ * stay on the ADT host. On premise there is no such split and the host is returned
+ * unchanged.
+ */
+export function browserHostOf(baseUrl: string): string {
+  return baseUrl.replace(
+    /^(https?:\/\/[^./]+)\.abap\.(?=[^./]+\.hana\.ondemand\.com)/i,
+    '$1.abap-web.',
+  );
+}
+
 export function feapPreviewUrl(input: {
   baseUrl: string;
   protocol: 'odatav2' | 'odatav4';
@@ -110,6 +139,6 @@ export function feapPreviewUrl(input: {
     `sap-ui-language=${input.language ?? 'EN'}`,
     ...(input.client ? [`sap-client=${input.client}`] : []),
   ].join('&');
-  const base = input.baseUrl.replace(/\/+$/, '');
+  const base = browserHostOf(input.baseUrl.replace(/\/+$/, ''));
   return `${base}/sap/bc/adt/businessservices/${input.protocol}/feap/${segment}/flp.html?${query}`;
 }

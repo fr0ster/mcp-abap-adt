@@ -11,6 +11,7 @@
  */
 import {
   annotationServiceOf,
+  browserHostOf,
   decodeFeapSegment,
   encodeFeapSegment,
   feapDescriptor,
@@ -61,6 +62,22 @@ describe('the ADT preview segment', () => {
   it('names the annotation service after the service', () => {
     expect(annotationServiceOf('ZSB_STUDENT_V2')).toBe('ZSB_STUDENT_V2_VAN');
     expect(annotationServiceOf('zsb_student_v2')).toBe('ZSB_STUDENT_V2_VAN');
+  });
+
+  it('moves a BTP preview onto the browser host, and leaves on premise alone', () => {
+    // Measured: the ADT host answers 401 Basic for this path and a trial user has
+    // no password; the `abap-web` host answers the BTP logon bootstrap.
+    expect(browserHostOf('https://abc123.abap.us10.hana.ondemand.com')).toBe(
+      'https://abc123.abap-web.us10.hana.ondemand.com',
+    );
+    // On premise there is no such split.
+    expect(browserHostOf('https://host.example.com:44300')).toBe(
+      'https://host.example.com:44300',
+    );
+    // And a host that merely contains the word is not rewritten.
+    expect(browserHostOf('https://abap.example.com')).toBe(
+      'https://abap.example.com',
+    );
   });
 
   it('builds the absolute URL ADT opens', () => {

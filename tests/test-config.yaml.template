@@ -104,6 +104,10 @@ environment:
     enabled: false
     transport: "stdio"
     mcp_destination: ""                      # MCP destination (optional, for hard mode)
+    exposition: "readonly,high"              # tool surface the spawned server serves.
+                                             # "high" and "low" are mutually exclusive —
+                                             # the launcher refuses the pair — so one run
+                                             # covers one tier: use "readonly,low" for low.
 
 # ============================================================================
 # SHARED DEPENDENCIES — persistent Lego library for integration tests

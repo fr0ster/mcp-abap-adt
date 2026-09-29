@@ -15,6 +15,15 @@ export interface HardModeConfig {
   mcp_destination?: string; // --mcp=<dest> (auth-broker / service key)
   env_destination?: string; // --env=<dest> (session .env from default folder)
   env_path?: string; // --env-path=<path> (explicit .env file)
+  /**
+   * stdio only: the exposition the spawned server serves.
+   *
+   * `high` and `low` are mutually exclusive — `validateExposition` refuses the
+   * pair and the launcher exits — so there is no value that serves both tiers,
+   * and asking for both was never a test of anything. A run covers one tier;
+   * set this to `readonly,low` for the low one.
+   */
+  exposition?: string;
   // http/sse only: auth headers sent to a running server
   headers?: Record<string, string>;
 }
@@ -53,6 +62,10 @@ export function getHardModeConfig(): HardModeConfig {
     mcp_destination: hard.mcp_destination,
     env_destination: hard.env_destination,
     env_path: hard.env_path,
+    exposition:
+      typeof hard.exposition === 'string' && hard.exposition.trim() !== ''
+        ? hard.exposition.trim()
+        : 'readonly,high',
     headers: Object.keys(headers).length > 0 ? headers : undefined,
   };
 }
@@ -102,6 +115,7 @@ export async function createHardModeClient(): Promise<{
     // so it needs the server package built, not just this one.
     const launcherPath = path.resolve(process.cwd(), 'server/dist/launcher.js');
     const cfg = loadTestConfig();
+    const exposition = getHardModeConfig().exposition as string;
     const useUnsafe =
       process.env.MCP_UNSAFE === 'true' ||
       cfg?.auth_broker?.unsafe === true ||
@@ -109,7 +123,7 @@ export async function createHardModeClient(): Promise<{
     const args = [
       launcherPath,
       '--transport=stdio',
-      '--exposition=readonly,high,low',
+      `--exposition=${exposition}`,
       ...(useUnsafe ? ['--unsafe'] : []),
     ];
     if (hard.mcp_destination) {

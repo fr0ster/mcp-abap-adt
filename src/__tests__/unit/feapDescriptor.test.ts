@@ -16,6 +16,7 @@ import {
   encodeFeapSegment,
   feapDescriptor,
   feapPreviewUrl,
+  feapV4Descriptor,
 } from '../../lib/strategies/feapDescriptor';
 
 /** The path segment Eclipse produced, exactly as it appeared in the browser. */
@@ -97,6 +98,71 @@ describe('the ADT preview segment', () => {
     expect(url).toBe(
       'https://host.example.com:44300/sap/bc/adt/businessservices/odatav2/feap/' +
         `${ECLIPSE_SEGMENT}/flp.html?sap-ui-xx-viewCache=false&sap-ui-language=EN&sap-client=100`,
+    );
+  });
+});
+
+/**
+ * The V4 descriptor, from two URLs Eclipse produced for one binding — the root
+ * entity set and the child. Seven parts, the service's URL path first, the BINDING
+ * last: a different document from the V2 one, not the same with another protocol in
+ * the path, which is what this repository assumed until these two arrived.
+ */
+describe('the V4 descriptor Eclipse produces', () => {
+  const PATH = '/sap/opu/odata4/sap/zmcp_prv_sb4u/srvd/sap/zmcp_prv_sb4u/0001/';
+
+  const ROOT_SEGMENT =
+    'C%C2%87u%C2%84C%C2%83%C2%84%C2%89C%C2%83xu%C2%88uHC%C2%87u%C2%84C%C2%8E%C2%81w%C2%84s%C2%84%C2%86%C2%8As%C2%87vH%C2%89C%C2%87%C2%86%C2%8AxC%C2%87u%C2%84C%C2%8E%C2%81w%C2%84s%C2%84%C2%86%C2%8As%C2%87vH%C2%89CDDDEC77f%C2%83%C2%83%C2%8877sw%7C%7D%C2%80x%C2%86y%C2%8277W%7C%7D%C2%80x77naWdsdfjsgVHi77DDDE77naWdsdfjsgVHi';
+  const ROOT_DESCRIPTOR = `${PATH}##Root##_children##Child##ZMCP_PRV_SB4U##0001##ZMCP_PRV_SB4U`;
+
+  const CHILD_SEGMENT =
+    'C%C2%87u%C2%84C%C2%83%C2%84%C2%89C%C2%83xu%C2%88uHC%C2%87u%C2%84C%C2%8E%C2%81w%C2%84s%C2%84%C2%86%C2%8As%C2%87vH%C2%89C%C2%87%C2%86%C2%8AxC%C2%87u%C2%84C%C2%8E%C2%81w%C2%84s%C2%84%C2%86%C2%8As%C2%87vH%C2%89CDDDEC77W%7C%7D%C2%80x77s%C2%84u%C2%86y%C2%82%C2%8877f%C2%83%C2%83%C2%8877naWdsdfjsgVHi77DDDE77naWdsdfjsgVHi';
+  const CHILD_DESCRIPTOR = `${PATH}##Child##_parent##Root##ZMCP_PRV_SB4U##0001##ZMCP_PRV_SB4U`;
+
+  const parts = (entitySet: string, navigation: string, target: string) =>
+    ({
+      servicePath: PATH,
+      entitySet,
+      navigation,
+      targetEntitySet: target,
+      service: 'ZMCP_PRV_SB4U',
+      version: '0001',
+      binding: 'ZMCP_PRV_SB4U',
+    }) satisfies FeapV4Descriptor;
+
+  it('decodes the root capture', () => {
+    expect(decodeFeapSegment(ROOT_SEGMENT)).toBe(ROOT_DESCRIPTOR);
+  });
+
+  it('decodes the child capture, which differs only in parts 2 to 4', () => {
+    expect(decodeFeapSegment(CHILD_SEGMENT)).toBe(CHILD_DESCRIPTOR);
+  });
+
+  it('joins seven parts in the order the preview expects', () => {
+    expect(feapV4Descriptor(parts('Root', '_children', 'Child'))).toBe(
+      ROOT_DESCRIPTOR,
+    );
+    expect(feapV4Descriptor(parts('Child', '_parent', 'Root'))).toBe(
+      CHILD_DESCRIPTOR,
+    );
+  });
+
+  it('re-encodes to the very segments Eclipse produced', () => {
+    expect(encodeFeapSegment(ROOT_DESCRIPTOR)).toBe(ROOT_SEGMENT);
+    expect(encodeFeapSegment(CHILD_DESCRIPTOR)).toBe(CHILD_SEGMENT);
+  });
+
+  it('builds the V4 preview URL from the V4 parts', () => {
+    const url = feapPreviewUrl({
+      baseUrl: 'https://abc123.abap.us10.hana.ondemand.com',
+      protocol: 'odatav4',
+      descriptor: parts('Root', '_children', 'Child'),
+      client: '100',
+    });
+    expect(url).toBe(
+      'https://abc123.abap-web.us10.hana.ondemand.com' +
+        `/sap/bc/adt/businessservices/odatav4/feap/${ROOT_SEGMENT}` +
+        '/flp.html?sap-ui-xx-viewCache=false&sap-ui-language=EN&sap-client=100',
     );
   });
 });

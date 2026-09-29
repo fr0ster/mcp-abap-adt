@@ -207,28 +207,6 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.associations).toEqual([]);
   });
 
-  it('answers no preview for a V4 binding, and says the composition is unmeasured', async () => {
-    // The V2 descriptor came from a URL Eclipse produced. The V4 one was
-    // extrapolated by swapping the protocol in the path, and measured against a
-    // published V4 UI service the endpoint answered 404 for every composition
-    // tried. So: no URL, and the reason said out loud.
-    fakeClient = clientFor({
-      binding: BINDING.replace('srvb:version="V2"', 'srvb:version="V4"'),
-      definition: DEFINITION,
-      view: ROOT_VIEW,
-    });
-
-    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
-
-    expect(payload.protocol).toBe('odatav4');
-    expect(payload.preview_url).toBeUndefined();
-    expect(payload.preview_descriptor).toBeUndefined();
-    expect(payload.note).toMatch(/not established/);
-    // The URLs that ARE measured still come back.
-    expect(payload.service_url).toContain('/sap/opu/odata4/sap/');
-    expect(payload.metadata_url).toContain('$metadata');
-  });
-
   it('builds the V4 root when the binding is V4', async () => {
     fakeClient = clientFor({
       binding: BINDING.replace('srvb:version="V2"', 'srvb:version="V4"'),
@@ -239,12 +217,26 @@ describe('GetServiceBindingPreviewUrl', () => {
     const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
 
     expect(payload.protocol).toBe('odatav4');
+    // Binding first, then the SERVICE — `ZSB_STUDENT_V2` in both positions here,
+    // not the service definition `ZUI_STUDENT`. This fixture is the discriminating
+    // case: the two names differ, and a URL Eclipse produced for a binding whose
+    // names also differ carries the service. Where they coincide, as on a
+    // SAP-delivered binding, the wrong reading answers 200 and hides itself.
     expect(payload.service_url).toBe(
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata4/sap/zsb_student_v2' +
-        '/srvd/sap/zui_student/0001/',
+        '/srvd/sap/zsb_student_v2/0001/',
     );
-    // No preview for V4 — see the test above; the service URL is the point here.
-    expect(payload.preview_url).toBeUndefined();
+    // V4 answers a preview too, from a different descriptor: the service's URL
+    // path first, the binding last. Decoded from two URLs Eclipse produced; the
+    // byte-exact fixtures live in feapDescriptor.test.ts.
+    expect(payload.preview_descriptor).toBe(
+      'https://epbyminsd0654.epam.com:44300/sap/opu/odata4/sap/zsb_student_v2/srvd/sap/zsb_student_v2/0001/'.replace(
+        'https://epbyminsd0654.epam.com:44300',
+        '',
+      ) +
+        '##student_data##to_ADDRESS##student_address##ZSB_STUDENT_V2##0001##ZSB_STUDENT_V2',
+    );
+    expect(payload.preview_url).toContain('/businessservices/odatav4/feap/');
   });
 
   it('answers no preview for a Web API binding, because it has none', async () => {

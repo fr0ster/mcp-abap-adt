@@ -86,6 +86,70 @@ export function feapDescriptor(parts: FeapDescriptor): string {
   ].join('##');
 }
 
+/**
+ * The OData **V4** descriptor, which is a different document with seven parts.
+ *
+ * Two URLs Eclipse produced for one binding — the root entity set and the child —
+ * decoded to:
+ *
+ * ```
+ * /sap/opu/odata4/sap/<binding>/srvd/sap/<service>/<version>/##Root##_children##Child##<service>##<version>##<binding>
+ * /sap/opu/odata4/sap/<binding>/srvd/sap/<service>/<version>/##Child##_parent##Root##<service>##<version>##<binding>
+ * ```
+ *
+ * So the first part is the service's URL PATH, not a name, and the V2 form — the
+ * service name first, `<service>_VAN` fifth, six parts — answers `404` here. A V4
+ * binding has no `_VAN` object at all: publication creates a service group
+ * (`SCO2`/`SIA6`) and no `IWVB`.
+ *
+ * **What each part is worth**, measured against the endpoint's own `manifest.json`
+ * (trial, 2026-09-29) by varying one at a time:
+ *
+ * | part | content | read |
+ * |------|---------|------|
+ * | 1 | the service URL path | required — absent or six-part answers `404` |
+ * | 2 | entity set | **required**: a bogus one answers a list report with no page under it |
+ * | 3 | navigation | not read. Empty and bogus both answered `/Root/_children`, derived |
+ * | 4 | target entity set | not read, same as V2 |
+ * | 5 | the SERVICE name | the annotations: a wrong one answers `200` with the nested pages GONE |
+ * | 6 | version | the same — `9999` loses the nested pages |
+ * | 7 | the BINDING name | **authorisation**: the service name here answers `401`, a bogus one `400` |
+ *
+ * Parts 5 and 7 differ, and only a binding whose service has another name shows it:
+ * `5=service 7=binding` answered the full manifest, down to a third level
+ * (`/Travel/_Booking/_Customer`) the server derived by itself; `5=binding` answered
+ * without annotations; `7=service` answered `401`.
+ */
+export interface FeapV4Descriptor {
+  /** The service's URL path, e.g. `/sap/opu/odata4/sap/<binding>/srvd/sap/<service>/<version>/`. */
+  servicePath: string;
+  /** The entity set to open. */
+  entitySet: string;
+  /** The association to follow. Not read by the server; carried for the shape. */
+  navigation: string;
+  /** The entity set it leads to. Not read either. */
+  targetEntitySet: string;
+  /** `srvb:services/@srvb:name` — what the annotations are looked up under. */
+  service: string;
+  /** `srvb:content/@srvb:version`. */
+  version: string;
+  /** `adtcore:name` of the binding — what the authorisation check reads. */
+  binding: string;
+}
+
+/** Join a V4 descriptor in the order the preview expects. */
+export function feapV4Descriptor(parts: FeapV4Descriptor): string {
+  return [
+    parts.servicePath,
+    parts.entitySet,
+    parts.navigation,
+    parts.targetEntitySet,
+    parts.service,
+    parts.version,
+    parts.binding,
+  ].join('##');
+}
+
 /** `<service>_VAN` — the annotation service's name follows the service's. */
 export function annotationServiceOf(service: string): string {
   return `${service.toUpperCase()}_VAN`;
@@ -129,11 +193,16 @@ export function browserHostOf(baseUrl: string): string {
 export function feapPreviewUrl(input: {
   baseUrl: string;
   protocol: 'odatav2' | 'odatav4';
-  descriptor: FeapDescriptor;
+  descriptor: FeapDescriptor | FeapV4Descriptor;
   client?: string;
   language?: string;
 }): string {
-  const segment = encodeFeapSegment(feapDescriptor(input.descriptor));
+  const descriptor = input.descriptor;
+  const segment = encodeFeapSegment(
+    'servicePath' in descriptor
+      ? feapV4Descriptor(descriptor)
+      : feapDescriptor(descriptor),
+  );
   const query = [
     'sap-ui-xx-viewCache=false',
     `sap-ui-language=${input.language ?? 'EN'}`,

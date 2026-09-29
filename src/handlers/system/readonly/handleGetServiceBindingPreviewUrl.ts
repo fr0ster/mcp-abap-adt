@@ -44,8 +44,11 @@ import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   annotationServiceOf,
+  type FeapDescriptor,
+  type FeapV4Descriptor,
   feapDescriptor,
   feapPreviewUrl,
+  feapV4Descriptor,
 } from '../../../lib/strategies/feapDescriptor';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
@@ -255,8 +258,14 @@ export async function handleGetServiceBindingPreviewUrl(
       const composedUrl =
         facts.protocol === 'odatav2'
           ? `${baseUrl}/sap/opu/odata/sap/${facts.service ?? bindingName}/`
-          : `${baseUrl}/sap/opu/odata4/sap/${bindingName.toLowerCase()}` +
-            `/srvd/sap/${(facts.serviceDefinition ?? '').toLowerCase()}` +
+          : // The second position is the SERVICE, not the service definition.
+            // Two systems were needed to see it: on a SAP-delivered binding the
+            // service and the definition are both `ZUI_TRAVEL`, so the wrong
+            // reading answered `200`; on our own, where the service is the
+            // binding's name and the definition is not, the same rule answered
+            // `404`. A URL Eclipse produced for it carries the service.
+            `${baseUrl}/sap/opu/odata4/sap/${bindingName.toLowerCase()}` +
+            `/srvd/sap/${(facts.service ?? bindingName).toLowerCase()}` +
             `/${facts.version ?? '0001'}/`;
       // The system's own answer wins when there is one.
       const serviceUrl =
@@ -288,8 +297,7 @@ export async function handleGetServiceBindingPreviewUrl(
       // exactly the mistake this repository has a note about: a capture shows what
       // is sent, not what is required. Until a V4 capture exists, no URL — the
       // service and `$metadata` URLs are answered, and those are measured.
-      const previewApplies =
-        facts.category !== 'web_api' && facts.protocol === 'odatav2';
+      const previewApplies = facts.category !== 'web_api';
 
       const missing: string[] = [];
       if (!facts.service) missing.push('service (srvb:services/@srvb:name)');
@@ -311,20 +319,34 @@ export async function handleGetServiceBindingPreviewUrl(
       // a future release may start reading them; none of them gates the answer.
       if (previewApplies && !entitySet) missing.push('entity_set');
 
-      const descriptor =
-        previewApplies &&
-        facts.service !== undefined &&
-        facts.protocol !== undefined &&
-        entitySet !== undefined
-          ? {
-              service: facts.service,
-              entitySet,
-              navigation: navigation ?? '',
-              targetEntitySet: target ?? entitySet,
-              annotationService: annotationServiceOf(facts.service),
-              version: facts.version ?? '0001',
-            }
-          : undefined;
+      // Two protocols, two documents. V2 names the service and the `_VAN`
+      // annotation service; V4 carries the service's URL PATH first and the
+      // BINDING last, because that is what its authorisation check reads. Both
+      // shapes are decoded from URLs Eclipse produced; see `feapDescriptor.ts`.
+      const descriptor: FeapDescriptor | FeapV4Descriptor | undefined =
+        !previewApplies ||
+        facts.service === undefined ||
+        facts.protocol === undefined ||
+        entitySet === undefined
+          ? undefined
+          : facts.protocol === 'odatav4'
+            ? {
+                servicePath: new URL(serviceUrl).pathname,
+                entitySet,
+                navigation: navigation ?? '',
+                targetEntitySet: target ?? entitySet,
+                service: facts.service,
+                version: facts.version ?? '0001',
+                binding: bindingName,
+              }
+            : {
+                service: facts.service,
+                entitySet,
+                navigation: navigation ?? '',
+                targetEntitySet: target ?? entitySet,
+                annotationService: annotationServiceOf(facts.service),
+                version: facts.version ?? '0001',
+              };
 
       const notes = [
         facts.published
@@ -334,13 +356,7 @@ export async function handleGetServiceBindingPreviewUrl(
           ? 'This is an OData Web API binding, which has no Fiori preview page. ' +
             'The service and $metadata URLs are how it is addressed.'
           : undefined,
-        facts.category !== 'web_api' && facts.protocol === 'odatav4'
-          ? 'No preview URL is answered for an OData V4 binding: the descriptor ' +
-            'the V4 preview endpoint expects is not established. The V2 endpoint ' +
-            'answers its page and manifest; the V4 one answered 404 for every ' +
-            'composition tried, including on a published V4 UI service. The ' +
-            'service and $metadata URLs below are measured and usable.'
-          : undefined,
+
         systemLookupFailed === undefined
           ? undefined
           : `The client and language the system reports could not be read (${systemLookupFailed}), so the preview URL carries only what was passed in.`,
@@ -375,7 +391,11 @@ export async function handleGetServiceBindingPreviewUrl(
                 language,
               }),
         preview_descriptor:
-          descriptor === undefined ? undefined : feapDescriptor(descriptor),
+          descriptor === undefined
+            ? undefined
+            : 'servicePath' in descriptor
+              ? feapV4Descriptor(descriptor)
+              : feapDescriptor(descriptor),
         // Said out loud: a preview URL that quietly guesses a segment is
         // indistinguishable from one that works, until it opens nothing.
         missing: missing.length === 0 ? undefined : missing,

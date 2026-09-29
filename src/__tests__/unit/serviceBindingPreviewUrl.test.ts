@@ -207,6 +207,28 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.associations).toEqual([]);
   });
 
+  it('answers no preview for a V4 binding, and says the composition is unmeasured', async () => {
+    // The V2 descriptor came from a URL Eclipse produced. The V4 one was
+    // extrapolated by swapping the protocol in the path, and measured against a
+    // published V4 UI service the endpoint answered 404 for every composition
+    // tried. So: no URL, and the reason said out loud.
+    fakeClient = clientFor({
+      binding: BINDING.replace('srvb:version="V2"', 'srvb:version="V4"'),
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.protocol).toBe('odatav4');
+    expect(payload.preview_url).toBeUndefined();
+    expect(payload.preview_descriptor).toBeUndefined();
+    expect(payload.note).toMatch(/not established/);
+    // The URLs that ARE measured still come back.
+    expect(payload.service_url).toContain('/sap/opu/odata4/sap/');
+    expect(payload.metadata_url).toContain('$metadata');
+  });
+
   it('builds the V4 root when the binding is V4', async () => {
     fakeClient = clientFor({
       binding: BINDING.replace('srvb:version="V2"', 'srvb:version="V4"'),
@@ -221,7 +243,8 @@ describe('GetServiceBindingPreviewUrl', () => {
       'https://epbyminsd0654.epam.com:44300/sap/opu/odata4/sap/zsb_student_v2' +
         '/srvd/sap/zui_student/0001/',
     );
-    expect(payload.preview_url).toContain('/businessservices/odatav4/feap/');
+    // No preview for V4 — see the test above; the service URL is the point here.
+    expect(payload.preview_url).toBeUndefined();
   });
 
   it('answers no preview for a Web API binding, because it has none', async () => {
@@ -329,5 +352,60 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.preview_url).toContain('/feap/');
     expect(payload.preview_url).not.toContain('sap-client');
     expect(payload.note).toContain('403 Forbidden');
+  });
+
+  it('prefers the URL the system names over the one a rule composes', async () => {
+    // The Service Binding editor reads this resource for its own "Service URL"
+    // field, so when it answers, its answer wins: it knows about prefixes and
+    // rewrites a naming rule cannot. Measured on a trial it comes back empty, and
+    // then the composed URL stays — which every other test here exercises.
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const answered = await handleGetServiceBindingPreviewUrl(
+      {
+        connection: {
+          getBaseUrl: async () => 'https://epbyminsd0654.epam.com:44300/',
+          getSessionId: () => null,
+          makeAdtRequest: async () => ({
+            data: `<?xml version="1.0" encoding="utf-8"?>
+<odatav2:serviceList xmlns:odatav2="http://www.sap.com/categories/odatav2">
+  <odatav2:services odatav2:serviceId="ZSB_STUDENT_V2" odatav2:serviceVersion="0001"
+    odatav2:serviceUrl="/sap/opu/odata/sap/ELSEWHERE/" odatav2:annotationUrl="/sap/opu/odata/annotations/X/"
+    odatav2:published="true"/>
+</odatav2:serviceList>`,
+            status: 200,
+          }),
+        } as never,
+        logger: undefined,
+      } as never,
+      { service_binding_name: 'ZSB_STUDENT_V2' } as never,
+    );
+    const payload = JSON.parse(
+      (answered as { content: { text: string }[] }).content[0].text,
+    );
+
+    expect(payload.service_url_source).toBe('system');
+    expect(payload.service_url).toBe(
+      'https://epbyminsd0654.epam.com:44300/sap/opu/odata/sap/ELSEWHERE/',
+    );
+    expect(payload.metadata_url).toBe(`${payload.service_url}$metadata`);
+    expect(payload.annotation_url).toBe('/sap/opu/odata/annotations/X/');
+  });
+
+  it('says the URL was composed when the system names none', async () => {
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.service_url_source).toBe('composed');
+    expect(payload.service_url).toContain('/sap/opu/odata/sap/ZSB_STUDENT_V2/');
   });
 });

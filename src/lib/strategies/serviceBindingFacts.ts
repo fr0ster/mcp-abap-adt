@@ -144,3 +144,57 @@ export function associationsOf(source: string): string[] {
   }
   return [...found];
 }
+
+/** What the protocol-category resource says about a published service. */
+export interface CategoryServiceUrls {
+  /** `…:services/@…:serviceUrl` — the URL the SYSTEM names, often empty. */
+  serviceUrl?: string;
+  /** `…:services/@…:annotationUrl`. */
+  annotationUrl?: string;
+  /** `odatav4:serviceGroup/@odatav4:serviceUrlPrefix` — V4 only. */
+  serviceUrlPrefix?: string;
+  /** `@…:published` on the list (V2) or the group (V4). */
+  published?: boolean;
+}
+
+/**
+ * The service URLs as ADT itself reports them.
+ *
+ * `GET /sap/bc/adt/businessservices/<odatav2|odatav4>/<BINDING>` — with
+ * `servicename` and `serviceversion` as query parameters, without which the V4
+ * resource answers `400` — is what the Service Binding editor reads to fill its
+ * "Service URL" and "Local Service Endpoint" fields. It answers
+ * `odatav2:serviceList` or `odatav4:serviceGroup`, each carrying `serviceUrl` and
+ * `annotationUrl`.
+ *
+ * **Read it, but do not depend on it.** Measured on a trial, 2026-09-29: for a
+ * binding whose service demonstrably answers `200` on `$metadata`, this resource
+ * answered `serviceUrl=""`, `annotationUrl=""` and `published="false"` — for our
+ * own V2 binding and for a SAP-delivered V4 one alike. So an empty answer here is
+ * not evidence that the service is absent, and the constructed URL stays as the
+ * fallback. When the system DOES name a URL, its answer wins: it knows about
+ * prefixes and rewrites that no string composition can.
+ *
+ * The V4 group carries two more things worth having: `atom:link`s to the publish
+ * and unpublish jobs, and an `…/iam/sush` "SU22 Object Reference" — the IAM object
+ * a V4 service is authorised through, which is the first thing to look at when a
+ * published V4 service answers `404` to a caller that holds a valid token.
+ */
+export function categoryServiceUrlsOf(xml: string): CategoryServiceUrls {
+  const value = (name: string): string | undefined => {
+    const found = new RegExp(`(?:odatav2|odatav4):${name}="([^"]*)"`).exec(xml);
+    return found?.[1];
+  };
+  const url = value('serviceUrl');
+  const annotation = value('annotationUrl');
+  const prefix = value('serviceUrlPrefix');
+  const published = value('published');
+  return {
+    serviceUrl: url !== undefined && url !== '' ? url : undefined,
+    annotationUrl:
+      annotation !== undefined && annotation !== '' ? annotation : undefined,
+    serviceUrlPrefix:
+      prefix !== undefined && prefix !== '' ? prefix : undefined,
+    published: published === undefined ? undefined : published === 'true',
+  };
+}

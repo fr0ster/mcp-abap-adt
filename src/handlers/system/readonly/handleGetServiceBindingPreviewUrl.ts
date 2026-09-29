@@ -52,6 +52,7 @@ import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence, succeededWith } from '../../../lib/strategies/sequence';
 import {
   associationsOf,
+  categoryServiceUrlsOf,
   exposedEntitiesOf,
   serviceBindingFactsOf,
 } from '../../../lib/strategies/serviceBindingFacts';
@@ -153,6 +154,7 @@ export async function handleGetServiceBindingPreviewUrl(
     facts: ReturnType<typeof serviceBindingFactsOf>;
     exposed: ReturnType<typeof exposedEntitiesOf>;
     associations: string[];
+    category: ReturnType<typeof categoryServiceUrlsOf>;
   }
 
   return answer(
@@ -174,6 +176,7 @@ export async function handleGetServiceBindingPreviewUrl(
               facts,
               exposed: [],
               associations: [],
+              category: {},
             });
           }
 
@@ -205,28 +208,88 @@ export async function handleGetServiceBindingPreviewUrl(
             }
           }
 
-          return succeededWith<Found>({ facts, exposed, associations });
+          // What ADT itself says the service URL is. The Service Binding editor
+          // reads this resource to fill its own "Service URL" field, so its answer
+          // outranks anything composed from a naming rule — it knows about
+          // prefixes and rewrites that a rule cannot. `servicename` and
+          // `serviceversion` are required: without them the V4 resource answers
+          // `400`. Measured on a trial it comes back EMPTY even for a binding
+          // whose service answers `200`, so this only ever adds information; the
+          // composed URL remains the answer when it says nothing.
+          let category: ReturnType<typeof categoryServiceUrlsOf> = {};
+          if (facts.protocol !== undefined && facts.service !== undefined) {
+            try {
+              const answered = await connection.makeAdtRequest({
+                url:
+                  `/sap/bc/adt/businessservices/${facts.protocol}/` +
+                  `${bindingName}`,
+                method: 'GET',
+                // The contract requires one; this read is an enrichment, so it
+                // gets a short leash rather than the default.
+                timeout: 30_000,
+                params: {
+                  servicename: facts.service,
+                  serviceversion: facts.version ?? '0001',
+                },
+              });
+              category = categoryServiceUrlsOf(String(answered.data ?? ''));
+            } catch {
+              // Absent, refused or shaped otherwise: the composed URL answers.
+            }
+          }
+
+          return succeededWith<Found>({
+            facts,
+            exposed,
+            associations,
+            category,
+          });
         },
       ),
-    ({ facts, exposed, associations }: Found) => {
+    ({ facts, exposed, associations, category }: Found) => {
       const entitySet = args.entity_set ?? exposed[0]?.entitySet;
       const navigation = args.navigation ?? associations[0];
       const target =
         args.target_entity_set ?? exposed[1]?.entitySet ?? entitySet;
 
-      const serviceUrl =
+      const composedUrl =
         facts.protocol === 'odatav2'
           ? `${baseUrl}/sap/opu/odata/sap/${facts.service ?? bindingName}/`
           : `${baseUrl}/sap/opu/odata4/sap/${bindingName.toLowerCase()}` +
             `/srvd/sap/${(facts.serviceDefinition ?? '').toLowerCase()}` +
             `/${facts.version ?? '0001'}/`;
+      // The system's own answer wins when there is one.
+      const serviceUrl =
+        category.serviceUrl === undefined
+          ? composedUrl
+          : category.serviceUrl.startsWith('http')
+            ? category.serviceUrl
+            : `${baseUrl}${category.serviceUrl}`;
 
       // A Fiori preview belongs to the UI variant. A Web API binding has no
       // FEAP page at all, so its entity set and navigation are not "missing" —
       // they are not part of any answer, and the service and `$metadata` URLs
       // are how such a binding is addressed. Building a FEAP URL for it would
       // hand back a link that opens nothing.
-      const previewApplies = facts.category !== 'web_api';
+      // **And only OData V2.** The preview path exists for both protocols —
+      // `/businessservices/odatav4/feap` answers `400` bare, exactly as the V2 one
+      // does — but no descriptor resolves under it. Measured 2026-09-29 against a
+      // PUBLISHED V4 UI binding and against a second, SAP-delivered one that
+      // Eclipse previews: every composition tried answered `404` (the service
+      // name, the binding name, with and without the `_VAN` segment, the service
+      // definition in first and second place, a shortened descriptor), while the
+      // V2 path answered `200` for both `flp.html` and `manifest.json` in the same
+      // run. A V4 binding has no `_VAN` object either — publication creates a
+      // service group (`SCO2`/`SIA6`) and no `IWVB` — so the sixth segment is
+      // probably not what V2 puts there.
+      //
+      // The V2 composition came from a URL Eclipse produced. The V4 one was
+      // EXTRAPOLATED from it by swapping the protocol in the path, and that is
+      // exactly the mistake this repository has a note about: a capture shows what
+      // is sent, not what is required. Until a V4 capture exists, no URL — the
+      // service and `$metadata` URLs are answered, and those are measured.
+      const previewApplies =
+        facts.category !== 'web_api' && facts.protocol === 'odatav2';
 
       const missing: string[] = [];
       if (!facts.service) missing.push('service (srvb:services/@srvb:name)');
@@ -267,10 +330,17 @@ export async function handleGetServiceBindingPreviewUrl(
         facts.published
           ? undefined
           : 'The binding is not published, so neither the service nor the preview answers until it is.',
-        previewApplies
-          ? undefined
-          : 'This is an OData Web API binding, which has no Fiori preview page. ' +
-            'The service and $metadata URLs are how it is addressed.',
+        facts.category === 'web_api'
+          ? 'This is an OData Web API binding, which has no Fiori preview page. ' +
+            'The service and $metadata URLs are how it is addressed.'
+          : undefined,
+        facts.category !== 'web_api' && facts.protocol === 'odatav4'
+          ? 'No preview URL is answered for an OData V4 binding: the descriptor ' +
+            'the V4 preview endpoint expects is not established. The V2 endpoint ' +
+            'answers its page and manifest; the V4 one answered 404 for every ' +
+            'composition tried, including on a published V4 UI service. The ' +
+            'service and $metadata URLs below are measured and usable.'
+          : undefined,
         systemLookupFailed === undefined
           ? undefined
           : `The client and language the system reports could not be read (${systemLookupFailed}), so the preview URL carries only what was passed in.`,
@@ -290,7 +360,10 @@ export async function handleGetServiceBindingPreviewUrl(
         language,
         associations,
         service_url: serviceUrl,
+        service_url_source:
+          category.serviceUrl === undefined ? 'composed' : 'system',
         metadata_url: `${serviceUrl}$metadata`,
+        annotation_url: category.annotationUrl,
         preview_url:
           descriptor === undefined || facts.protocol === undefined
             ? undefined

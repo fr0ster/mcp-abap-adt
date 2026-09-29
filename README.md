@@ -363,11 +363,11 @@ SAP_AUTH_TYPE=kerberos
 
 **Generate .env from Service Key (JWT):**
 ```bash
-# Install the connection package globally (one-time setup)
-npm install -g @mcp-abap-adt/connection
+# Install the auth broker globally (one-time setup) — it ships the mcp-auth CLI
+npm install -g @mcp-abap-adt/auth-broker
 
 # Generate .env file from service key JSON
-mcp-auth auth -k path/to/service-key.json
+mcp-auth --service-key path/to/service-key.json --output .env
 ```
 
 This will automatically create/update `.env` file with JWT tokens and connection details.

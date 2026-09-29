@@ -44,8 +44,8 @@ Inline comments are not parsed, so keep comments on separate lines.
 ### Generate .env from Service Key
 
 ```bash
-npm install -g @mcp-abap-adt/connection
-mcp-auth auth -k path/to/service-key.json
+npm install -g @mcp-abap-adt/auth-broker
+mcp-auth --service-key path/to/service-key.json --output .env
 ```
 
 This writes JWT details to `.env`.

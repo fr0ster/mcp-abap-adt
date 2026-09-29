@@ -48,10 +48,10 @@ After installation, you'll have access to:
 - `mcp-abap-adt --transport=http` - HTTP server transport
 - `mcp-abap-adt --transport=sse` - SSE transport
 
-**For JWT authentication with service keys**, install the connection package separately:
+**For JWT authentication with service keys**, install the auth broker separately:
 ```bash
-npm install -g @mcp-abap-adt/connection
-mcp-auth auth -k path/to/service-key.json
+npm install -g @mcp-abap-adt/auth-broker
+mcp-auth --service-key path/to/service-key.json --output .env
 ```
 
 **Get help on available options:**
@@ -79,11 +79,11 @@ EOF
 
 For JWT authentication (SAP BTP) with service key:
 ```bash
-# Install the connection package globally (one-time setup)
-npm install -g @mcp-abap-adt/connection
+# Install the auth broker globally (one-time setup) — it ships the mcp-auth CLI
+npm install -g @mcp-abap-adt/auth-broker
 
 # Generate .env file from service key JSON
-mcp-auth auth -k path/to/service-key.json
+mcp-auth --service-key path/to/service-key.json --output .env
 
 # This automatically creates/updates .env file with JWT tokens
 ```
@@ -289,8 +289,8 @@ mcp-abap-adt --transport=sse --port=3001
 
 **For JWT authentication with service keys**, install separately:
 ```bash
-npm install -g @mcp-abap-adt/connection
-mcp-auth auth -k path/to/service-key.json
+npm install -g @mcp-abap-adt/auth-broker
+mcp-auth --service-key path/to/service-key.json --output .env
 ```
 
 #### Local Installation (Project-specific)

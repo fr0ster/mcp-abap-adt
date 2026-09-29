@@ -1346,13 +1346,13 @@ SAP CONNECTION (.env file):
 
 GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
   To generate .env file from SAP BTP service key JSON file, install the
-  connection package globally:
+  auth broker globally (it ships mcp-auth):
 
-    npm install -g @mcp-abap-adt/connection
+    npm install -g @mcp-abap-adt/auth-broker
 
-  Then use the sap-abap-auth command:
+  Then use the mcp-auth command:
 
-    sap-abap-auth auth -k path/to/service-key.json
+    mcp-auth --service-key path/to/service-key.json --output .env
 
   This will create/update .env file with JWT tokens and connection details.
 
@@ -1430,8 +1430,8 @@ DOCUMENTATION:
 
 AUTHENTICATION:
   For JWT authentication with SAP BTP service keys:
-  1. Install: npm install -g @mcp-abap-adt/connection
-  2. Run:     sap-abap-auth auth -k path/to/service-key.json
+  1. Install: npm install -g @mcp-abap-adt/auth-broker
+  2. Run:     mcp-auth --service-key path/to/service-key.json --output .env
   3. This generates .env file with JWT tokens automatically
 
 SERVICE KEYS (Destination-Based Authentication):

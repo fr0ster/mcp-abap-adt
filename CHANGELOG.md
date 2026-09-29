@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [14.1.1] - 2026-09-29
+
+### Fixed
+
+- **The documented way to generate a `.env` from a service key did not run.** Four
+  places told a reader to install `@mcp-abap-adt/connection` and then invoke
+  `mcp-auth auth -k <service-key>` — a command from a different package, with flags
+  it does not have. Measured: `mcp-auth auth -k …` answers `Unknown command: auth`.
+  Two more places, the runtime help in `utils.ts` and the launcher's, named
+  `sap-abap-auth` instead, which is coherent — `@mcp-abap-adt/connection` really does
+  ship that bin, and it really does still work — but it is the superseded path: token
+  handling moved to `@mcp-abap-adt/auth-broker`, which is a direct dependency here and
+  ships `mcp-auth` and `mcp-sso`.
+
+  All six now say the same measured thing:
+
+      npm install -g @mcp-abap-adt/auth-broker
+      mcp-auth --service-key path/to/service-key.json --output .env
+
+  Worth naming because half of this was in the RUNTIME help — what a user reads when
+  the connection failed, which is the worst moment to hand them a command that does
+  not exist. Reported from the README; both halves were wrong, in different ways, and
+  neither would have been found by fixing only the name.
+
 ## [14.1.0] - 2026-09-29
 
 ### Added

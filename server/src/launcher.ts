@@ -183,8 +183,8 @@ SAP CONNECTION (.env file):
     x-sap-language                    Per-request master/original language for created objects (overrides SAP_LANGUAGE)
 
 GENERATING .ENV FROM SERVICE KEY:
-  Install connection package: npm install -g @mcp-abap-adt/connection
-  Generate .env: sap-abap-auth auth -k path/to/service-key.json
+  Install the auth broker: npm install -g @mcp-abap-adt/auth-broker
+  Generate .env: mcp-auth --service-key path/to/service-key.json --output .env
 `;
 
 function showHelp(options: LauncherOptions = {}): void {

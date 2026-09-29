@@ -202,6 +202,43 @@ describe('GetServiceBindingPreviewUrl', () => {
     expect(payload.preview_url).toContain('/businessservices/odatav4/feap/');
   });
 
+  it('answers no preview for a Web API binding, because it has none', async () => {
+    // `srvb:category="1"` is the Web API variant. There is no Fiori preview page
+    // for it at all, so the entity set and the navigation are not missing —
+    // they are not part of the answer, and the service URLs are.
+    fakeClient = clientFor({
+      binding: BINDING.replace('srvb:category="0"', 'srvb:category="1"'),
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.binding_category).toBe('web_api');
+    expect(payload.preview_url).toBeUndefined();
+    expect(payload.preview_descriptor).toBeUndefined();
+    expect(payload.missing).toBeUndefined();
+    expect(payload.note).toMatch(/Web API binding, which has no Fiori preview/);
+    // What such a binding IS addressed by:
+    expect(payload.service_url).toBe(
+      'https://epbyminsd0654.epam.com:44300/sap/opu/odata/sap/ZSB_STUDENT_V2/',
+    );
+    expect(payload.metadata_url).toBe(`${payload.service_url}$metadata`);
+  });
+
+  it('reads the UI variant as the one a preview belongs to', async () => {
+    fakeClient = clientFor({
+      binding: BINDING,
+      definition: DEFINITION,
+      view: ROOT_VIEW,
+    });
+
+    const payload = await payloadOf({ service_binding_name: 'ZSB_STUDENT_V2' });
+
+    expect(payload.binding_category).toBe('ui');
+    expect(payload.preview_url).toContain('/feap/');
+  });
+
   it('takes the client and the language from the system when none were given', async () => {
     // What a caller cannot know and does not have to: the same record this
     // server already reads to resolve a request's system.

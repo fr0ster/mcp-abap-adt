@@ -12,6 +12,11 @@
  *   beside it and belong to neither URL.
  * - `srvb:binding/@srvb:version` is the PROTOCOL (`V2`, `V4`), which decides whether
  *   the ADT endpoint is `odatav2` or `odatav4`.
+ * - `srvb:binding/@srvb:category` is UI against Web API — `0` and `1` in
+ *   `SERVICE_BINDING_VARIANT_MAP`. It decides whether a PREVIEW exists at all: the
+ *   FEAP page is the UI variant's, and a Web API binding is addressed by its service
+ *   and `$metadata` instead. Read separately from the protocol because they answer
+ *   different questions and only one of them picks the ADT endpoint.
  * - `srvb:published` says whether the service is in the registry at all. A binding
  *   can be `bindingCreated="true"` and still unpublished, and then no URL works.
  *
@@ -31,6 +36,11 @@ export interface ServiceBindingFacts {
   protocol?: 'odatav2' | 'odatav4';
   /** `srvb:binding/@srvb:type`, normally `ODATA`. */
   bindingType?: string;
+  /**
+   * `srvb:binding/@srvb:category`: `'ui'` from `0`, `'web_api'` from `1`.
+   * `undefined` when the document does not say, which is not the same as UI.
+   */
+  category?: 'ui' | 'web_api';
   /** `srvb:published` — false means nothing below will open. */
   published: boolean;
 }
@@ -49,6 +59,7 @@ const attribute = (
 /** Read the facts the preview URL needs out of a binding document. */
 export function serviceBindingFactsOf(xml: string): ServiceBindingFacts {
   const bindingVersion = attribute(xml, 'srvb:binding', 'srvb:version');
+  const bindingCategory = attribute(xml, 'srvb:binding', 'srvb:category');
   return {
     service: attribute(xml, 'srvb:services', 'srvb:name'),
     serviceDefinition: attribute(xml, 'srvb:serviceDefinition', 'adtcore:name'),
@@ -60,6 +71,12 @@ export function serviceBindingFactsOf(xml: string): ServiceBindingFacts {
           ? 'odatav4'
           : undefined,
     bindingType: attribute(xml, 'srvb:binding', 'srvb:type'),
+    category:
+      bindingCategory === '0'
+        ? 'ui'
+        : bindingCategory === '1'
+          ? 'web_api'
+          : undefined,
     published:
       attribute(xml, 'srvb:serviceBinding', 'srvb:published') === 'true',
   };

@@ -51,6 +51,7 @@ describe('what a service binding document says', () => {
       service: 'ZUI_TRAVEL',
       serviceDefinition: 'ZUI_TRAVEL',
       version: '0001',
+      category: 'ui',
       protocol: 'odatav4',
       bindingType: 'ODATA',
       published: true,

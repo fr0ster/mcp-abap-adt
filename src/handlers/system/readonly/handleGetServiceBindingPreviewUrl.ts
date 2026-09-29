@@ -210,14 +210,24 @@ export async function handleGetServiceBindingPreviewUrl(
             `/srvd/sap/${(facts.serviceDefinition ?? '').toLowerCase()}` +
             `/${facts.version ?? '0001'}/`;
 
+      // A Fiori preview belongs to the UI variant. A Web API binding has no
+      // FEAP page at all, so its entity set and navigation are not "missing" —
+      // they are not part of any answer, and the service and `$metadata` URLs
+      // are how such a binding is addressed. Building a FEAP URL for it would
+      // hand back a link that opens nothing.
+      const previewApplies = facts.category !== 'web_api';
+
       const missing: string[] = [];
       if (!facts.service) missing.push('service (srvb:services/@srvb:name)');
       if (!facts.protocol)
         missing.push('protocol (srvb:binding/@srvb:version)');
-      if (!entitySet) missing.push('entity_set');
-      if (!navigation) missing.push('navigation');
+      if (previewApplies) {
+        if (!entitySet) missing.push('entity_set');
+        if (!navigation) missing.push('navigation');
+      }
 
       const descriptor =
+        previewApplies &&
         facts.service !== undefined &&
         facts.protocol !== undefined &&
         entitySet !== undefined &&
@@ -236,6 +246,10 @@ export async function handleGetServiceBindingPreviewUrl(
         facts.published
           ? undefined
           : 'The binding is not published, so neither the service nor the preview answers until it is.',
+        previewApplies
+          ? undefined
+          : 'This is an OData Web API binding, which has no Fiori preview page. ' +
+            'The service and $metadata URLs are how it is addressed.',
         systemLookupFailed === undefined
           ? undefined
           : `The client and language the system reports could not be read (${systemLookupFailed}), so the preview URL carries only what was passed in.`,
@@ -250,6 +264,7 @@ export async function handleGetServiceBindingPreviewUrl(
         service_definition: facts.serviceDefinition,
         version: facts.version,
         entity_sets: exposed.map((one) => one.entitySet),
+        binding_category: facts.category,
         client,
         language,
         associations,

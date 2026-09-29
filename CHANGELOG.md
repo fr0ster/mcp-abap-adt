@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [14.1.0] - 2026-09-29
 
 ### Added
 
@@ -29,15 +29,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | navigation | an association or composition of the exposed root view |
   | annotation service | `<service>_VAN`, the generated Gateway Vocabulary Annotation (object type `IWVB`) |
 
-  **It refuses to invent the parts it cannot read.** Without an entity set or a
-  navigation there is no `preview_url` — the answer carries `missing`, the entity
-  sets to choose from, the service and `$metadata` URLs, and, when the binding is
-  unpublished, a note saying nothing will answer until it is published. A preview URL
-  with one guessed segment is indistinguishable from a working one until it opens
-  nothing.
+  **Of the segments, the server reads two — and that was measured, not assumed.** The
+  page at `…/feap/<segment>/flp.html` is static; the resource that decodes the
+  descriptor is `<segment>/manifest.json`, reachable with the ordinary ADT token,
+  which is how every claim below was settled without a browser. Asking one descriptor
+  after another on a trial (OData V2): the **service** becomes the manifest's service
+  `uri`; the **entity set** becomes `ListReport|<entitySet>`, and a bogus one answers
+  a list report with no page under it. The navigation, the target entity set and the
+  `_VAN` segment are **not read** — empty, bogus and plain wrong values all answered
+  the same nested page, because the server derives the navigation from the service's
+  metadata, and it normalises the CDS name while doing so (`_children` came back as
+  `to_children`). So only the entity set is required; the other segments are still
+  filled, because that is the shape Eclipse produces.
 
-  The view is read only when a navigation is needed and none was given, so the usual
-  cost is two requests.
+  **It still refuses to invent what it cannot read.** Without an entity set there is
+  no `preview_url` — the answer carries `missing`, the entity sets to choose from, the
+  service and `$metadata` URLs, and, when the binding is unpublished, a note saying
+  nothing answers until it is. A URL with one guessed segment is indistinguishable
+  from a working one until it opens nothing.
+
+  **OData V4 is a different descriptor**, and the first version of this shipped the V2
+  one for both. Seven parts, the service's URL PATH first and the BINDING last:
+
+      /sap/opu/odata4/sap/<binding>/srvd/sap/<service>/<version>/##Root##_children##Child##<service>##<version>##<binding>
+
+  Decoded from two URLs Eclipse produced for one binding — its root entity set and its
+  child — and both are byte-exact fixtures. Part 5 is the service (a wrong one answers
+  `200` with the nested pages gone), part 7 the binding (the service there answers
+  `401`, the authorisation check reads it); the navigation is not read here either. A
+  V4 binding has no `_VAN` object at all: publication creates a service group
+  (`SCO2`/`SIA6`), no `IWVB`.
+
+  **On BTP the preview opens on the browser host.** `<id>.abap.<region>.hana.ondemand.com`
+  serves ADT and answers a browser `401 WWW-Authenticate: Basic` — unanswerable, since
+  the credential is a propagated token and the bearer header a pasted URL cannot carry;
+  `<id>.abap-web.<region>.hana.ondemand.com` serves the BTP logon and then the page.
+  So `preview_url` carries the `abap-web` host and the service URLs keep the ADT one.
+  On premise there is no such split and nothing changes.
+
+  **`client` and `language` are not the caller's to supply.** They come from
+  `/sap/bc/adt/core/http/systeminformation`, which this server already reads for a
+  request's system context, so the URL ends `…&sap-ui-language=EN&sap-client=100` by
+  itself. The parameters remain as overrides and an empty `client` suppresses it. The
+  lookup cannot fail the tool: that endpoint answers `null` where absent but THROWS
+  otherwise, so a failure is reported in `note` beside a URL that is still answered.
+
+  **The service URL is read from ADT when ADT names one.**
+  `…/businessservices/<protocol>/<BINDING>?servicename=…&serviceversion=…` is what the
+  Service Binding editor reads for its own "Service URL" field; when it answers, that
+  answer wins and `service_url_source` says `system`, otherwise the composed URL
+  stays and says `composed`. Measured on a trial it answers empty even for a service
+  whose `$metadata` answers `200`, so it only adds information.
+
+  **A Web API binding has no preview at all** — `srvb:binding/@srvb:category` is `0`
+  for UI and `1` for Web API — and says so, with the service and `$metadata` URLs,
+  instead of carrying a FEAP URL that opens nothing.
+
+  The exposed root view is read only when a navigation is wanted and none was given,
+  so the usual cost is two requests. A projection spells its navigation a third way —
+  `_children : redirected to composition child X` — which the first version did not
+  read, and answered `associations: []` for a view that has one.
 
 - **`part` on the compact `HandlerGet`: `source`, `metadata` or `urls`.** Compact is
   one tool per OPERATION, so "which aspect of this object" is an argument of the read
@@ -60,6 +111,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `@mcp-abap-adt/lib/handlers/read` grew from 35 to 54 exports for this: the metadata
   readers and the preview tool. The read-only half still reaches no write route —
   `compactCapabilitySplit` checks that against the import graph, not the intention.
+
+
+### Fixed
+
+- **Hard mode could not start the server at all.** The integration harness spawned it
+  with `--exposition=readonly,high,low`, and `high` and `low` are mutually exclusive —
+  correctly so — which `validateExposition` refuses, so the launcher exited before
+  serving anything: `Invalid exposition: 'high' and 'low' are mutually exclusive`. Hard
+  mode is the only mode that proves the server starts and registers its tools, so it
+  was the one check that could not run. It went unnoticed because it is opt-in: soft
+  mode, the default for mass regression, calls handlers in-process and never spawns
+  MCP. The exposition is now a config key, `integration_hard_mode.exposition`,
+  defaulting to `readonly,high`; one run covers one tier and `readonly,low` serves the
+  other. Asking for both was never a test of anything.
+
+- **The `--exposition` help advertised a combination the launcher refuses.** The
+  examples listed `readonly,high,low (all handlers)`, so a reader who followed the
+  documentation got a startup error. They now list `readonly,low` and say in one line
+  that no value serves every handler at once.
 
 
 ## [14.0.1] - 2026-09-28

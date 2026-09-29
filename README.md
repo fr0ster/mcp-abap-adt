@@ -183,6 +183,7 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **🔍 Enhancement Analysis**: `GetEnhancements`, `GetEnhancementImpl`, `GetEnhancementSpot` - Enhancement discovery and analysis
 - **📋 Include Management**: `GetIncludesList` - Recursive include discovery
 - **🔍 System Tools**: `GetInactiveObjects` - Monitor inactive objects waiting for activation
+- **🌐 Service Binding Preview**: `GetServiceBindingPreviewUrl` - The browser URL that opens a published service binding's Fiori preview, beside its OData service and `$metadata` URLs. Composed from the binding, its service definition and the exposed root view — no document carries it. OData V2 and V4; a Web API binding has no preview and says so. On SAP BTP the preview URL carries the browser host (`abap-web`), where the BTP logon answers, while the service URLs keep the ADT host
 - **🧪 Runtime Diagnostics**: `RuntimeCreateProfilerTraceParameters`, `RuntimeListProfilerTraceFiles`, `RuntimeGetProfilerTraceData`, `RuntimeGetDumpById` - Profiling and dump analysis with JSON payloads
 - **📡 Runtime Feeds**: `RuntimeListFeeds`, `RuntimeListSystemMessages`, `RuntimeGetGatewayErrorLog` - Feed reader (dumps, system messages, gateway errors), SM02 system messages, Gateway error log
 - **🚀 SAP BTP Support**: JWT/XSUAA authentication with browser-based token helper

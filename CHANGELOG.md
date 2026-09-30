@@ -5,6 +5,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`GetUnitTestResult` in the `readonly` group too.** Fetching an ABAP Unit
+  run's result by its `run_id` only reads, so a read-only caller may do it. It
+  is a copy of the `high` tool — the same name, schema and handler — and stays
+  in `high`.
+
+### Changed
+
+- **A tool present in two groups is exposed once, from `high`.** When a
+  readonly tool shares its exact name with a tool of an exposed `high`/`low`
+  group, `ReadOnlyHandlersGroup` withholds its own copy, whatever dedup
+  strategy is passed — one server cannot register two tools under one name.
+  `readonly` alone → from `readonly`; `readonly` + `high` → once, from `high`.
+  `HandlerExporter` now hands the read-only group the high/low names as well
+  (with `NoDedupStrategy`, so it still lists `Read<X>` beside `Get<X>`), and
+  `tools/generate-tools-docs.js` documents such a copy under Read-Only.
+
 ## [15.0.0] - 2026-09-30
 
 ### Changed — BREAKING

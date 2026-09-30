@@ -311,12 +311,17 @@ const surface: Array<{ group: string; name: string; inputs: string }> =
   );
 
 /** Every tool whose input schema declares the parameter. */
-const toolsDeclaring = (param: string): string[] =>
-  surface
-    .filter((t) =>
-      (t.inputs === '(none)' ? [] : t.inputs.split(', ')).includes(param),
-    )
-    .map((t) => t.name);
+// By tool NAME: a tool that is a copy in two groups (the same definition in
+// readonly and high) is one tool, and appears once here.
+const toolsDeclaring = (param: string): string[] => [
+  ...new Set(
+    surface
+      .filter((t) =>
+        (t.inputs === '(none)' ? [] : t.inputs.split(', ')).includes(param),
+      )
+      .map((t) => t.name),
+  ),
+];
 
 it('declares detail on every JSON-answering tool and on no other', () => {
   expect(toolsDeclaring('detail').sort()).toEqual([...JSON_ANSWERING].sort());

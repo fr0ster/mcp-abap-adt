@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete the ABAP Unit tests of a class: remove its local test classes. The class itself stays.',
+    'Delete the ABAP Unit tests of a class: remove its local test classes, keeping the class.',
   inputSchema: {
     type: 'object',
     properties: {

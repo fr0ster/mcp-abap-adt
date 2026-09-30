@@ -57,6 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Instead of `GetUnitTest`/`GetUnitTestStatus`/`GetCdsUnitTest*`, read the
   `Run*` answer; for a run that had not finished, `GetUnitTestResult` with its
   `run_id`.
+- `GetUnitTestResult` takes `run_id` alone: `with_navigation_uris` and `format`
+  left the tool (the compact result facade still takes them).
 - Compact: `HandlerCreate`/`HandlerUpdate` for `UNIT_TEST` take `class_name`
   and `test_class_source`, and `HandlerDelete` takes `class_name` (they took
   `tests[]` and `run_id`); `HandlerUnitTestRun` and the status and result

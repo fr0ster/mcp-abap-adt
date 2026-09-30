@@ -27,7 +27,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create ABAP Unit tests for a CDS view: a new test class with its local test classes, using CDS test doubles, activated.',
+    'Create ABAP Unit tests for a CDS view: check the view supports CDS test doubles, create a test class holding the local test classes, activate it.',
   inputSchema: {
     type: 'object',
     properties: {

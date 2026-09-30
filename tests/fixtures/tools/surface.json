@@ -626,7 +626,7 @@
   {
     "group": "high",
     "name": "GetUnitTestResult",
-    "inputs": "run_id*, with_navigation_uris, format, detail",
+    "inputs": "run_id*, detail",
     "available_in": "cloud, onprem"
   },
   {

@@ -3294,7 +3294,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create ABAP Unit tests for a CDS view: a new test class with its local test classes, using CDS test doubles, activated.
+**Description:** Create ABAP Unit tests for a CDS view: check the view supports CDS test doubles, create a test class holding the local test classes, activate it.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -3348,19 +3348,19 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Delete a CDS unit test class (global class).
+**Description:** Delete the ABAP Unit tests of a CDS view: delete its test class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Global test class name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
+- `class_name` (string, required) - Test class of the CDS view.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Delete the ABAP Unit tests of a class: remove its local test classes. The class itself stays.
+**Description:** Delete the ABAP Unit tests of a class: remove its local test classes, keeping the class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -3419,14 +3419,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.
+**Description:** Get the result of an ABAP Unit run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
-- `format` (string, optional) - Result format: abapunit or junit.
-- `run_id` (string, required) - Run identifier returned by unit test run.
-- `with_navigation_uris` (boolean, optional (default: false)) - Include navigation URIs in result if supported.
+- `run_id` (string, required) - Run id a unit test run answered.
 
 ---
 
@@ -3499,7 +3497,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update the ABAP Unit tests of a CDS view: replace the test classes in its test class and activate it.
+**Description:** Update the ABAP Unit tests of a CDS view: replace the local test classes in its test class and activate it.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 

@@ -15,23 +15,13 @@ export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.',
+    'Get the result of an ABAP Unit run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.',
   inputSchema: {
     type: 'object',
     properties: {
       run_id: {
         type: 'string',
-        description: 'Run identifier returned by unit test run.',
-      },
-      with_navigation_uris: {
-        type: 'boolean',
-        description: 'Include navigation URIs in result if supported.',
-        default: false,
-      },
-      format: {
-        type: 'string',
-        description: 'Result format: abapunit or junit.',
-        enum: ['abapunit', 'junit'],
+        description: 'Run id a unit test run answered.',
       },
       ...DETAIL_PROPERTY,
     },

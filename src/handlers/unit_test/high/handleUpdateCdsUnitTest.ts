@@ -14,7 +14,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update the ABAP Unit tests of a CDS view: replace the test classes in its test class and activate it.',
+    'Update the ABAP Unit tests of a CDS view: replace the local test classes in its test class and activate it.',
   inputSchema: {
     type: 'object',
     properties: {

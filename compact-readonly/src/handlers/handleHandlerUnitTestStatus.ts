@@ -6,7 +6,7 @@ export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'ABAP Unit status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.',
+    'ABAP Unit test run status. object_type: not used. Required: run_id*. Optional: with_long_polling. Response: JSON.',
   inputSchema: compactUnitTestStatusSchema,
 } as const;
 

@@ -411,12 +411,12 @@ export const compactUnitTestRunSchema = {
     },
     title: {
       type: 'string',
-      description: 'Run title shown in ABAP Unit logs.',
+      description: 'Run title shown in ABAP Unit test logs.',
     },
     context: { type: 'string', description: 'Run context label.' },
     scope: {
       type: 'object',
-      description: 'ABAP Unit scope flags.',
+      description: 'ABAP Unit test scope flags.',
       properties: {
         own_tests: { type: 'boolean', description: 'Include own tests.' },
         foreign_tests: {

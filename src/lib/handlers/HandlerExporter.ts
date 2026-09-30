@@ -11,6 +11,7 @@ import { LowLevelHandlersGroup } from './groups/LowLevelHandlersGroup.js';
 import { ReadOnlyHandlersGroup } from './groups/ReadOnlyHandlersGroup.js';
 import { SearchHandlersGroup } from './groups/SearchHandlersGroup.js';
 import { SystemHandlersGroup } from './groups/SystemHandlersGroup.js';
+import { NoDedupStrategy } from './groups/strategies/index.js';
 import type {
   HandlerEntry,
   IHandlerGroup,
@@ -116,15 +117,35 @@ export class HandlerExporter {
     // Build handler groups based on options
     this.handlerGroups = [];
 
-    if (options?.includeReadOnly !== false) {
-      this.handlerGroups.push(new ReadOnlyHandlersGroup(dummyContext));
-    }
+    // High and low are built first: a readonly tool that is a copy of one of
+    // theirs under the same name is withheld from the readonly group, so a
+    // tool appears once and comes from high. No other readonly tool is hidden
+    // here (NoDedupStrategy) — this exporter has always listed Read<X>
+    // beside Get<X>.
+    const overridingGroups: IHandlerGroup[] = [];
     if (options?.includeHighLevel !== false) {
-      this.handlerGroups.push(new HighLevelHandlersGroup(dummyContext));
+      overridingGroups.push(new HighLevelHandlersGroup(dummyContext));
     }
     if (options?.includeLowLevel !== false) {
-      this.handlerGroups.push(new LowLevelHandlersGroup(dummyContext));
+      overridingGroups.push(new LowLevelHandlersGroup(dummyContext));
     }
+    const overridingToolNames = new Set<string>();
+    for (const g of overridingGroups) {
+      for (const e of g.getHandlers()) {
+        overridingToolNames.add(e.toolDefinition.name);
+      }
+    }
+
+    if (options?.includeReadOnly !== false) {
+      this.handlerGroups.push(
+        new ReadOnlyHandlersGroup(
+          dummyContext,
+          overridingToolNames,
+          new NoDedupStrategy(),
+        ),
+      );
+    }
+    this.handlerGroups.push(...overridingGroups);
     if (options?.includeSystem !== false) {
       this.handlerGroups.push(new SystemHandlersGroup(dummyContext));
     }

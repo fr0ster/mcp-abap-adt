@@ -27,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   All four read, so they live in `compact-readonly` and serve `--exposition=ro`
   as well: compact is 25 tools, 16 of them read-only.
+- **`GetUnitTestResult` in the `readonly` group too.** Fetching an ABAP Unit
+  run's result by its `run_id` only reads, so a read-only caller may do it. It
+  is a copy of the `high` tool — the same name, schema and handler — and stays
+  in `high`.
 
 ### Changed
 
@@ -40,6 +44,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   which an MCP client refused, and `ReadPackage` sent it twice. The same package
   now answers 327 characters (`sub_package_count: 5813`); on premise a
   structure package with 1,222 sub-packages answers 351.
+- **A tool present in two groups is exposed once, from `high`.** When a
+  readonly tool shares its exact name with a tool of an exposed `high`/`low`
+  group, `ReadOnlyHandlersGroup` withholds its own copy, whatever dedup
+  strategy is passed — one server cannot register two tools under one name.
+  `readonly` alone → from `readonly`; `readonly` + `high` → once, from `high`.
+  `HandlerExporter` now hands the read-only group the high/low names as well
+  (with `NoDedupStrategy`, so it still lists `Read<X>` beside `Get<X>`), and
+  `tools/generate-tools-docs.js` documents such a copy under Read-Only.
 
 ## [15.0.0] - 2026-09-30
 

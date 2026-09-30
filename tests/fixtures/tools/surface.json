@@ -216,6 +216,12 @@
     "available_in": "cloud, onprem"
   },
   {
+    "group": "readonly",
+    "name": "GetUnitTestResult",
+    "inputs": "run_id*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
     "group": "high",
     "name": "RunATC",
     "inputs": "objects*, check_variant, max_findings, wait",

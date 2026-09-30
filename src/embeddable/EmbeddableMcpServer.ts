@@ -94,6 +94,10 @@ export interface EmbeddableMcpServerOptions {
    * launcher). Pass `new NoDedupStrategy()` (exported from this package) to
    * expose readonly handlers verbatim, or supply a custom implementation for
    * bespoke role-based rules.
+   *
+   * Whatever the strategy, a readonly tool with the same NAME as a tool of an
+   * exposed high/low group (e.g. GetUnitTestResult) is registered once, from
+   * that group.
    */
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
 
@@ -202,11 +206,9 @@ export class EmbeddableMcpServer extends BaseMcpServer {
     }
 
     const overridingToolNames = new Set<string>();
-    if (readOnlyDedupStrategy) {
-      for (const g of overridingGroups) {
-        for (const e of g.getHandlers()) {
-          overridingToolNames.add(e.toolDefinition.name);
-        }
+    for (const g of overridingGroups) {
+      for (const e of g.getHandlers()) {
+        overridingToolNames.add(e.toolDefinition.name);
       }
     }
 

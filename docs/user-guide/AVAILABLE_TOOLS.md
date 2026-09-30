@@ -4,8 +4,8 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ## Summary
 
-- Total tools: 341
-- Read-only tools: 67
+- Total tools: 342
+- Read-only tools: 68
 - High-level tools: 157
 - Low-level tools: 117
 
@@ -111,6 +111,8 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ListTransports](#listtransports-read-only-transport)
     - [ReadTransportActionLog](#readtransportactionlog-read-only-transport)
     - [ReadTransportObjects](#readtransportobjects-read-only-transport)
+  - [Unit Test](#read-only-unit-test)
+    - [GetUnitTestResult](#getunittestresult-read-only-unit-test)
 - [High-Level Group](#high-level-group)
   - [Atc](#high-level-atc)
     - [GetATCFindings](#getatcfindings-high-level-atc)
@@ -1402,6 +1404,20 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `transport_number` (string, required) - Transport REQUEST or TASK number. Both answer: a request lists the entries of all its tasks, which is how to find WHICH task holds an object; a task lists its own. A removal must then address that task, not the request.
+
+---
+
+<a id="read-only-unit-test"></a>
+### Read-Only / Unit Test
+
+<a id="getunittestresult-read-only-unit-test"></a>
+#### GetUnitTestResult (Read-Only / Unit Test)
+**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
+
+**Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
+
+**Parameters:**
+- `run_id` (string, required) - Run id a unit test run answered.
 
 ---
 

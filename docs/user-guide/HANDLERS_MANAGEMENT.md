@@ -119,6 +119,13 @@ When both `readonly` and `high` are exposed, `Read<X>` readonly handlers duplica
 
 `EmbeddableMcpServer` applies the same dedup by default, so embedders see one tool per operation just like the launcher. Consumers that need both variants can opt out by passing `new NoDedupStrategy()` as `readOnlyDedupStrategy`. See [EmbeddableMcpServer dedup strategies](#embeddablemcpserver-dedup-strategies) below.
 
+**The same tool in two groups.** A few tools are a copy in both `readonly` and `high` — the same name, schema and handler, because the operation only reads (today: `GetUnitTestResult`). The rule:
+
+- `readonly` alone → the tool comes from `readonly`.
+- `readonly` + `high` → the tool appears **once**, from `high`.
+
+`ReadOnlyHandlersGroup` enforces this itself, whatever dedup strategy is passed — a strategy decides about differently named pairs, and one server cannot register two tools under one name. The launcher, `EmbeddableMcpServer` and `HandlerExporter` all hand the group the names of the exposed high/low tools.
+
 ### Config File
 
 If using `--config` parameter, specify in YAML:
@@ -299,7 +306,7 @@ const server = new EmbeddableMcpServer({
 
 | Strategy | Behavior |
 |---|---|
-| `NoDedupStrategy` | Never excludes anything — readonly group is exposed as-is (opt-out). |
+| `NoDedupStrategy` | Never excludes anything — readonly group is exposed as-is (opt-out). A tool with the same *name* as one of an exposed group is still exposed once, from that group (see [Readonly / high-level dedup](#readonly--high-level-dedup)). |
 | `ReadVsGetDedupStrategy` (default) | Hides a `Read<X>` entry when a corresponding `Get<X>` is contributed by another group. |
 
 **Custom strategies**: implement `IReadOnlyDedupStrategy` for role-based or domain-specific rules:

@@ -142,6 +142,10 @@ import {
   handleReadTransportObjects,
   TOOL_DEFINITION as ReadTransportObjects_Tool,
 } from '../../../handlers/transport/readonly/handleReadTransportObjects';
+import {
+  TOOL_DEFINITION as GetUnitTestResult_Tool,
+  handleGetUnitTestResult,
+} from '../../../handlers/unit_test/high/handleGetUnitTestResult';
 import { BaseHandlerGroup } from '../base/BaseHandlerGroup.js';
 import type { HandlerContext, HandlerEntry } from '../interfaces.js';
 import {
@@ -158,6 +162,13 @@ import {
  * (e.g. ReadFunctionModule vs GetFunctionModule). The group hides such
  * duplicates based on the injected override strategy and the set of tool
  * names contributed by the other groups.
+ *
+ * Some tools are a COPY of a high-level tool under the same name, handler and
+ * schema (e.g. GetUnitTestResult — purely a read, so a read-only caller may
+ * use it too). Two tools cannot share one name on one server, so a readonly
+ * entry whose exact name another exposed group contributes is always
+ * withheld, whatever the strategy: a caller granted both groups gets the tool
+ * once, from that other group (high).
  */
 export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
   protected groupName = 'ReadOnlyHandlers';
@@ -179,7 +190,9 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
    */
   getHandlers(): HandlerEntry[] {
     return this.getAllEntries().filter(
-      (e) => !this.dedupStrategy.shouldExclude(e, this.overridingToolNames),
+      (e) =>
+        !this.overridingToolNames.has(e.toolDefinition.name) &&
+        !this.dedupStrategy.shouldExclude(e, this.overridingToolNames),
     );
   }
 
@@ -336,6 +349,12 @@ export class ReadOnlyHandlersGroup extends BaseHandlerGroup {
       {
         toolDefinition: ReadServiceBinding_Tool,
         handler: (args: any) => handleReadServiceBinding(this.context, args),
+      },
+      // Copies of high-level tools: same name, schema and handler. Withheld
+      // by getHandlers() when the high group is exposed alongside.
+      {
+        toolDefinition: GetUnitTestResult_Tool,
+        handler: (args: any) => handleGetUnitTestResult(this.context, args),
       },
     ];
   }

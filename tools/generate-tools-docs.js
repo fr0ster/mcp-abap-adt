@@ -697,6 +697,8 @@ function loadToolsFromHandlers() {
     });
   }
 
+  tools.push(...readOnlyCopies(tools));
+
   tools.sort((a, b) => {
     if (a.level !== b.level)
       return LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level);
@@ -706,6 +708,40 @@ function loadToolsFromHandlers() {
   });
 
   return applyBuiltText(tools);
+}
+
+/**
+ * A read-only tool may be a COPY of a tool whose file sits under another level
+ * (same name, schema and handler — e.g. a pure read kept under `high/`). The
+ * file walk files it under that level only, so the built read-only group is
+ * asked which names it serves, and each one the walk did not place under
+ * `readonly` is documented there as well.
+ */
+function readOnlyCopies(tools) {
+  const distEntry = path.join(
+    __dirname,
+    '..',
+    'dist',
+    'lib',
+    'handlers',
+    'groups',
+    'ReadOnlyHandlersGroup.js',
+  );
+  requireFreshBuild(distEntry);
+  const { ReadOnlyHandlersGroup } = require(distEntry);
+  const names = new ReadOnlyHandlersGroup({ connection: null })
+    .getHandlers()
+    .map((entry) => entry.toolDefinition.name);
+  const placed = new Set(
+    tools.filter((t) => t.level === 'readonly').map((t) => t.name),
+  );
+  const copies = [];
+  for (const name of names) {
+    if (placed.has(name)) continue;
+    const source = tools.find((t) => t.name === name);
+    if (source) copies.push({ ...source, level: 'readonly' });
+  }
+  return copies;
 }
 
 function levelTitle(level) {

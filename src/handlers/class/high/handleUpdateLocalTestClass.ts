@@ -51,7 +51,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.',
+    'Write the local test classes include of a class under the class lock, and optionally activate the class.',
   inputSchema: {
     type: 'object',
     properties: {

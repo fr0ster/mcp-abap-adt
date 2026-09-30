@@ -78,7 +78,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateServiceBinding',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.',
+    'Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.',
   inputSchema: {
     type: 'object',
     properties: {

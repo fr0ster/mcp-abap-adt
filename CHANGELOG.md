@@ -67,6 +67,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`program_unit_test`, `function_group_unit_test`) — copy them from
   `tests/test-config.yaml.template`.
 
+### Changed
+
+- **Eleven tool descriptions say what the tool does, and nothing else** — no
+  denials, no other tools' names, no protocol notes. A description is read by a
+  model and indexed by a tool search, and every word it carries pulls the tool
+  toward queries with that word. `GetWhereUsed`, `ReadFunctionModule`,
+  `GetFunctionModule`, `RuntimeListFeeds`, `CreateServiceBinding`,
+  `CreateServiceDefinition`, `GetLocalTestClass`, `UpdateLocalTestClass`,
+  `DeleteLocalTestClass`, `AddTransportObject`, `RemoveTransportObject`; and the
+  `transport_number`, `object_name` and `position` parameters of the two
+  transport tools. The `…LocalTestClass` tools describe the include they read
+  and write; "the unit tests of a class" belongs to the ABAP Unit test tools.
+  No name, schema or behaviour changed.
+
 ## [14.1.2] - 2026-09-30
 
 ### Fixed

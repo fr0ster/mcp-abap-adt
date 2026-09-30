@@ -332,7 +332,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read ABAP function module source code and metadata. Answers: "show function module code", "display FM source", "view function X", "get function module implementation". Returns source code, package, responsible, description.
+**Description:** [read-only] Read an ABAP function module, BAPI or RFC-enabled ones included: source code with its parameter signature, package, responsible and description.
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -744,7 +744,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getwhereused-read-only-system"></a>
 #### GetWhereUsed (Read-Only / System)
-**Description:** [read-only] Search where-used references — find all objects that reference or depend on a given ABAP object. Answers: "where is X used", "who calls X", "what depends on X", "show usages of X". Returns referencing objects with types and packages. Supports a fixed set of object types (see object_type). Object types outside the supported list (e.g. RAP behavior definitions, service definitions/bindings, BAdI, search helps, message classes, classic DDIC views) are NOT supported and will fail.
+**Description:** [read-only] Where-used list of an ABAP object: every object that uses, calls or references it, with its type and package.
 
 **Source:** `src/handlers/system/readonly/handleGetWhereUsed.ts`
 
@@ -753,7 +753,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `enable_all_types` (boolean, optional (default: false)) - If true, expands the scope to all available object types (Eclipse 'select all' behavior) by flipping every isSelected flag in the scope XML. Default: false (SAP default scope). Note: on large systems this can make the search significantly slower.
 - `enable_only_types` (array, optional) - Restrict the search to ONLY these ADT object types (e.g. ['TABL/DS','TABL/DT'] for structures, ['DDLS/DF'] for CDS sources). SAP applies the selection server-side, so unwanted types (e.g. hundreds of CLAS/OC) are never searched nor returned — use this instead of enable_all_types to avoid huge result sets. Values must be object-type codes from THIS object's where-used scope (the searchable categories, e.g. 'CLAS/OC','INTF/OI','FUGR/FF','DDLS/DF', not result-row codes like 'FUGR/F'). If any value is not searchable for the object the call returns an error listing the supported types — it never falls back to the unfiltered default set. Takes precedence over enable_all_types.
 - `object_name` (string, required) - Name of the ABAP object. For function modules the name MUST be in the form 'GROUP|FM_NAME' (function group name, pipe, function module name).
-- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source only — classic DDIC views are not supported). Any other value throws 'Unsupported object type'.
+- `object_type` (string, required) - Type of the ABAP object. Case-insensitive. Accepts either a human alias or an ADT type code. Supported values: 'class' / 'clas/oc', 'interface' / 'intf/if', 'program' / 'prog/p', 'include', 'function' / 'functiongroup' / 'fugr' (function group), 'functionmodule' / 'function_module' / 'fugr/ff' (function module — see object_name format), 'package' / 'devc/k', 'table' / 'tabl/dt', 'structure' / 'stru/dt', 'domain' / 'doma/dd', 'dataelement' / 'dtel', 'view' / 'ddls/df' (CDS DDL source).
 
 ---
 
@@ -841,7 +841,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] List available ADT runtime feeds or read a specific feed type. Feed types: dumps, system_messages, gateway_errors. Without feed_type returns available feed descriptors.
+**Description:** [runtime] List ABAP short dumps, system messages or SAP Gateway errors from the runtime feeds, filtered by user and time range.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 

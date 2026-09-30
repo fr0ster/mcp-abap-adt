@@ -4,7 +4,10 @@ import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
-import { packageSummary } from '../../../lib/strategies/packageSummary';
+import {
+  packageDetails,
+  packageSummary,
+} from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -71,7 +74,9 @@ export async function handleGetPackage(
       version,
       ...(detail === 'raw'
         ? { package_data: metadata.raw }
-        : { package: packageSummary(metadata.raw) }),
+        : detail === 'full'
+          ? { package: packageDetails(metadata.raw) }
+          : { package: packageSummary(metadata.raw) }),
     }),
   );
 }

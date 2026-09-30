@@ -256,6 +256,14 @@ describe('readonly handlers map a success into the right fields, not swapped', (
     );
     expect(summary.package_data).toBeUndefined();
 
+    const full: any = await handleReadPackage(context as any, {
+      package_name: 'zpkg',
+      detail: 'full',
+    });
+    const fullPackage = JSON.parse(full.content[0].text).package;
+    expect(fullPackage.name).toBe('ZMCP_SHR_PKG');
+    expect(fullPackage.sub_packages).toEqual([]);
+
     const raw: any = await handleReadPackage(context as any, {
       package_name: 'zpkg',
       detail: 'raw',

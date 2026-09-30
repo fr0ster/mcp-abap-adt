@@ -33,7 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`GetPackage` and `ReadPackage` answer a summary of the package** — name,
   description, type, super-package, software and application component,
   transport layer, ABAP language version, responsible, and the number of
-  sub-packages — and the metadata document itself with `detail: raw`. The
+  sub-packages; with `detail: full` every sub-package by name and description
+  as well; and the metadata document itself with `detail: raw`. The
   document carries every sub-package: a top-level package answered about
   950,000 characters on the cloud trial (5,815 sub-packages, no member object),
   which an MCP client refused, and `ReadPackage` sent it twice. The same package

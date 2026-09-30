@@ -74,3 +74,27 @@ export function packageSummary(xml: string): PackageSummary {
         : 0,
   };
 }
+
+export interface PackageDetails extends PackageSummary {
+  sub_packages: Array<{ name?: string; description?: string }>;
+}
+
+/** The summary and, for `detail: full`, every sub-package by name and description. */
+export function packageDetails(xml: string): PackageDetails {
+  const root = (parser.parse(xml) as Record<string, unknown>).package as
+    | Element
+    | undefined;
+  const subPackages = root?.subPackages as Element | string | undefined;
+  const refs =
+    typeof subPackages === 'object' && subPackages !== null
+      ? (subPackages as Element).packageRef
+      : undefined;
+  const list = refs === undefined ? [] : Array.isArray(refs) ? refs : [refs];
+  return {
+    ...packageSummary(xml),
+    sub_packages: list.map((ref) => ({
+      name: orUndefined(attrs(ref).name),
+      description: orUndefined(attrs(ref).description),
+    })),
+  };
+}

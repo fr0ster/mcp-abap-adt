@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   what a `200` means, `position`), about a sibling, or identical to another tool's.
   The first sentence is now *verb + ABAP object + what the caller gets*; the
   operational facts it carried moved into the parameter descriptions they govern.
+  None of them says what the tool is *not* or which sibling to use instead: a
+  denial carries the very words it denies, and pulls the tool toward those
+  queries — as the unsupported-type list did for `GetWhereUsed`.
   No name, schema or behaviour changed.
 
   Measured in a tool-retrieval harness over all tools (86 English query rows) on
@@ -22,10 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snowflake-arctic-embed, OpenAI text-embedding-3-small and -3-large), hybrid and
   cosine-only scoring: required-recall at K5 rose on every one, by +5.8 to +12.8
   points (mean +8.2); on the 42 rows written before the weak spots were known, by
-  +4.1 on average.
+  +4.1 on average. The measured text still carried the denials removed above, and
+  three wording corrections made after it; the release text was not re-measured.
 
-  - Unit tests: `RunUnitTest`, `CreateUnitTest` (now says it is an alias that runs
-    tests and writes none), `UpdateUnitTest` and `DeleteUnitTest` (now say they
+  - Unit tests: `RunUnitTest`, `CreateUnitTest` (now says it is an alias of
+    `RunUnitTest`), `UpdateUnitTest` and `DeleteUnitTest` (now say they
     always fail), `UpdateLocalTestClass`, `GetLocalTestClass`,
     `DeleteLocalTestClass`, and the three CDS unit-test tools, which now start with
     *CDS views only*.
@@ -35,7 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     `object_name` and `position`.
   - `RuntimeListFeeds` names dumps, system messages and gateway errors;
     `ReadFunctionModule` and `GetFunctionModule` name BAPI/RFC and the signature;
-    `GetWhereUsed`'s list of unsupported types moved into `object_type`;
+    `GetWhereUsed` no longer lists the types it does not support — `object_type`
+    lists the ones it does;
     `CreateServiceDefinition` and `CreateServiceBinding` name each other as
     prerequisite and consumer.
 

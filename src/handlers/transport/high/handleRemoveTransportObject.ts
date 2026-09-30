@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'RemoveTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Remove an ABAP object from a transport request by detaching its entry from the transport task that holds it (position from ReadTransportObjects is required). Does not delete the object itself. Confirm with ReadTransportActionLog.',
+    'Remove an ABAP object from a transport request by detaching its entry from the transport task that holds it (position from ReadTransportObjects is required). Confirm with ReadTransportActionLog.',
   inputSchema: {
     type: 'object',
     properties: {

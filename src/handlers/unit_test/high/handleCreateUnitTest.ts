@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Alias of RunUnitTest, kept for compatibility: runs the ABAP Unit tests of a class and returns a run_id. Does not create or write test code — to write tests use UpdateLocalTestClass.',
+    'Alias of RunUnitTest, kept for compatibility: runs the ABAP Unit tests of a class and returns a run_id.',
   inputSchema: {
     type: 'object',
     properties: {

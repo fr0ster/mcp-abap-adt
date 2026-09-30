@@ -493,7 +493,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** Read the ABAP Unit test code of a class: its local test classes (FOR TESTING) in the test include. Not the class's main source — for that use ReadClass or GetClass. Active or inactive version.
+**Description:** Read the ABAP Unit test code of a class: its local test classes (FOR TESTING) in the test include. Active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -2056,7 +2056,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Remove an ABAP object from a transport request by detaching its entry from the transport task that holds it (position from ReadTransportObjects is required). Does not delete the object itself. Confirm with ReadTransportActionLog.
+**Description:** Remove an ABAP object from a transport request by detaching its entry from the transport task that holds it (position from ReadTransportObjects is required). Confirm with ReadTransportActionLog.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -2074,7 +2074,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** CDS views only: create the ABAP Unit test class (with CDS test doubles) for a CDS view (DDL source), in initial state; write the tests with UpdateCdsUnitTest. For unit tests of an ABAP class use UpdateLocalTestClass. Not available below BASIS 7.50.
+**Description:** CDS views only: create the ABAP Unit test class (with CDS test doubles) for a CDS view (DDL source), in initial state; write the tests with UpdateCdsUnitTest. Not available below BASIS 7.50.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
@@ -2089,7 +2089,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Alias of RunUnitTest, kept for compatibility: runs the ABAP Unit tests of a class and returns a run_id. Does not create or write test code — to write tests use UpdateLocalTestClass.
+**Description:** Alias of RunUnitTest, kept for compatibility: runs the ABAP Unit tests of a class and returns a run_id.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -2117,7 +2117,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Unsupported: ADT cannot delete an ABAP Unit test run, so this always fails. To remove test code use DeleteLocalTestClass.
+**Description:** Unsupported: ADT cannot delete an ABAP Unit test run, so this always fails.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -2216,7 +2216,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** CDS views only: write the test code of a CDS view's ABAP Unit test class (created by CreateCdsUnitTest). Manages lock, update and unlock. For ABAP class tests use UpdateLocalTestClass.
+**Description:** CDS views only: write the test code of a CDS view's ABAP Unit test class (created by CreateCdsUnitTest). Manages lock, update and unlock.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -2229,7 +2229,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Unsupported: ADT cannot modify an ABAP Unit test run, so this always fails. To change test code use UpdateLocalTestClass.
+**Description:** Unsupported: ADT cannot modify an ABAP Unit test run, so this always fails.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 

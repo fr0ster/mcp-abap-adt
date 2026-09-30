@@ -58,7 +58,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'CDS views only: create the ABAP Unit test class (with CDS test doubles) for a CDS view (DDL source), in initial state; write the tests with UpdateCdsUnitTest. For unit tests of an ABAP class use UpdateLocalTestClass. Not available below BASIS 7.50.',
+    'CDS views only: create the ABAP Unit test class (with CDS test doubles) for a CDS view (DDL source), in initial state; write the tests with UpdateCdsUnitTest. Not available below BASIS 7.50.',
   inputSchema: {
     type: 'object',
     properties: {

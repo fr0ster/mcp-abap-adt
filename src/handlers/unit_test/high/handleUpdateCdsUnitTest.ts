@@ -53,7 +53,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "CDS views only: write the test code of a CDS view's ABAP Unit test class (created by CreateCdsUnitTest). Manages lock, update and unlock. For ABAP class tests use UpdateLocalTestClass.",
+    "CDS views only: write the test code of a CDS view's ABAP Unit test class (created by CreateCdsUnitTest). Manages lock, update and unlock.",
   inputSchema: {
     type: 'object',
     properties: {

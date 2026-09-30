@@ -27,6 +27,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   All four read, so they live in `compact-readonly` and serve `--exposition=ro`
   as well: compact is 25 tools, 16 of them read-only.
+- **Dumps filtered by what they are about** (#261). `RuntimeListFeeds` with
+  `feed_type: dumps` and compact `HandlerDumpList` take `runtime_error`,
+  `exception`, `object_name`, `package` and `component` (each `contains`)
+  beside `user` (`equals`), `from` and `to` — sent as one `$query` on the
+  attributes the dumps feed's descriptor declares. A value with a blank, a
+  comma or a parenthesis is refused before the request, and a dumps filter on
+  another feed is refused rather than dropped. Needs `@mcp-abap-adt/adt-clients`
+  24.1.0.
+- **Every dump entry carries its `dump_id`**, the id `RuntimeGetDumpById`
+  takes; that tool accepts the entry's URI as well.
 - **`GetUnitTestResult` in the `readonly` group too.** Fetching an ABAP Unit
   run's result by its `run_id` only reads, so a read-only caller may do it. It
   is a copy of the `high` tool — the same name, schema and handler — and stays
@@ -34,6 +44,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A feed list follows SAP's pages** (#261). SAP answers at most 100 entries
+  per feed request whatever `$top` asks (the descriptor declares `paging
+  max="100"`; `$skip` is ignored) and offers the next page as a `rel="next"`
+  link bounded by `to`. `max_results` (compact: `top`) now reads page after
+  page up to the count asked, at most 1000, and answers `next_to` when more
+  remain — pass it back as `to` to read on. Without a count, one page of SAP's
+  default size, as before.
+- **A dump's summary is the dump's own root** (#261). `RuntimeGetDumpById`'s
+  `summary` is read from the default view's `dump:dump` attributes — runtime
+  error, exception, title, terminated program, time, user — and the source
+  position where it terminated. It picked keys by name out of the whole
+  document before, and answered chapter titles. Compact `HandlerDumpView`
+  `view: summary` answers that summary alone; ADT's own summary view answered
+  a document without the root.
 - **`GetPackage` and `ReadPackage` answer a summary of the package** — name,
   description, type, super-package, software and application component,
   transport layer, ABAP language version, responsible, and the number of

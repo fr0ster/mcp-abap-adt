@@ -799,13 +799,13 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimegetdumpbyid-read-only-system"></a>
 #### RuntimeGetDumpById (Read-Only / System)
-**Description:** [runtime] Read a specific ABAP runtime dump by its ID. First use RuntimeListFeeds to find dumps and get their IDs, then pass dump_id here to read the full dump content.
+**Description:** [runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeGetDumpById.ts`
 
 **Parameters:**
-- `dump_id` (string, required) - Full runtime dump ID (e.g. from RuntimeListFeeds).
-- `response_mode` (string, optional (default: both)) - Controls what is returned: "payload" — full parsed dump data, "summary" — compact key facts only (title, exception, program, line, user, date…), "both" — summary + full payload.
+- `dump_id` (string, required) - The dump's id, or its URI as a dumps feed entry carries it.
+- `response_mode` (string, optional (default: both)) - What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.
 - `view` (string, optional (default: default)) - Dump view mode: default payload, summary section, or formatted long text.
 
 ---
@@ -843,16 +843,21 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range. Without a feed type it lists the feeds.
+**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
 **Parameters:**
+- `component` (string, optional) - Dumps whose application component contains this text.
+- `exception` (string, optional) - Dumps whose exception class contains this text.
 - `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
-- `max_results` (number, optional) - Maximum number of entries to return.
-- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format.
-- `user` (string, optional) - Filter feed entries by SAP username.
+- `max_results` (number, optional) - Number of entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. Default: one page of SAP's default size.
+- `object_name` (string, optional) - Dumps whose terminated object name contains this text.
+- `package` (string, optional) - Dumps whose object package contains this text.
+- `runtime_error` (string, optional) - Dumps whose runtime error contains this text.
+- `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format; pass a previous next_to here to read on.
+- `user` (string, optional) - Entries of this SAP user (exact match).
 
 ---
 

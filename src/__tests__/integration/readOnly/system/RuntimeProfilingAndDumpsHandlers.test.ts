@@ -779,4 +779,111 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
     },
     getTimeout('long'),
   );
+
+  it(
+    'should summarise a dump read by its URI, and find it again by what the summary says',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const handlerContext = () =>
+          createHandlerContext({ connection: context.connection, logger });
+        const invoke = async (
+          toolName: string,
+          args: Record<string, any>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+        const listDumps = (args: Record<string, any>) =>
+          invoke('RuntimeListFeeds', { feed_type: 'dumps', ...args }, () =>
+            handleRuntimeListFeeds(handlerContext(), {
+              feed_type: 'dumps',
+              ...args,
+            }),
+          );
+
+        // The newest dump — so a filter that matches it finds it on the
+        // first page, whatever else the system holds.
+        const listed = await listDumps({ max_results: 1 });
+        expect(listed.isError).toBe(false);
+        const newest = parseTextPayload(listed).entries?.[0];
+        if (!newest) {
+          throw new Error('SKIP: this system shows no dumps to read');
+        }
+        expect(typeof newest.dump_id).toBe('string');
+
+        // Read by the entry's URI, not its id: the tool takes either.
+        const readArgs = { dump_id: newest.id, response_mode: 'summary' };
+        const read = await invoke('RuntimeGetDumpById', readArgs, () =>
+          handleRuntimeGetDumpById(handlerContext(), readArgs as any),
+        );
+        if (read.isError) {
+          throw new Error(
+            `RuntimeGetDumpById by URI failed: ${extractHandlerErrorText(read)}`,
+          );
+        }
+        const readData = parseTextPayload(read);
+        expect(readData.dump_id).toBe(newest.dump_id);
+        expect(readData.payload).toBeUndefined();
+        const summary = readData.summary;
+        logger?.info?.(`   • summary: ${JSON.stringify(summary)}`);
+        expect(typeof summary?.runtime_error).toBe('string');
+        expect(typeof summary?.terminated_program).toBe('string');
+
+        // The feed filtered by that runtime error and user holds the dump.
+        const filterArgs: Record<string, any> = {
+          runtime_error: summary.runtime_error,
+          max_results: 20,
+        };
+        if (summary.user) filterArgs.user = summary.user;
+        const filtered = await listDumps(filterArgs);
+        if (filtered.isError) {
+          throw new Error(
+            `RuntimeListFeeds with filters failed: ${extractHandlerErrorText(filtered)}`,
+          );
+        }
+        const filteredIds = (parseTextPayload(filtered).entries ?? []).map(
+          (e: any) => e.dump_id,
+        );
+        expect(filteredIds).toContain(newest.dump_id);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'should read past the 100 entries SAP answers per request',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const wanted = toPositiveInt(context.params?.dump_page_probe, 150);
+        const args = { feed_type: 'dumps' as const, max_results: wanted };
+        const result = await tester.invokeToolOrHandler(
+          'RuntimeListFeeds',
+          args,
+          () =>
+            handleRuntimeListFeeds(
+              createHandlerContext({ connection: context.connection, logger }),
+              args,
+            ),
+        );
+        if (result.isError) {
+          throw new Error(
+            `RuntimeListFeeds(${wanted}) failed: ${extractHandlerErrorText(result)}`,
+          );
+        }
+        const data = parseTextPayload(result);
+        const ids = (data.entries ?? []).map((e: any) => e.dump_id);
+        logger?.info?.(
+          `   • asked ${wanted}, got ${data.count}, next_to ${data.next_to ?? '—'}`,
+        );
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(data.count).toBeLessThanOrEqual(wanted);
+        // Fewer than asked means SAP offered no further page.
+        if (data.count < wanted) expect(data.next_to).toBeUndefined();
+        if (data.count <= 100) {
+          logger?.testSkip?.(
+            `only ${data.count} dumps on this system — paging past 100 was not exercised`,
+          );
+        }
+      });
+    },
+    getTimeout('long'),
+  );
 });

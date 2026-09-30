@@ -398,7 +398,13 @@ describe('RuntimeListFeeds', () => {
   ] as const)(
     'feed_type %s calls feeds.%s',
     async (feedType, member, _options) => {
-      const spy = jest.fn(async () => okResponse([{ id: '1' }]));
+      // The entries readings are wrapped to keep SAP's next page link, so a
+      // feed member answers a page: its entries, and `next_to` when there is
+      // more.
+      const entries = [{ id: '1', transactionId: '1' }];
+      const spy = jest.fn(async () =>
+        okResponse(member === 'list' ? entries : { entries }),
+      );
       feeds = { [member]: spy };
 
       const result: any = await handleRuntimeListFeeds(

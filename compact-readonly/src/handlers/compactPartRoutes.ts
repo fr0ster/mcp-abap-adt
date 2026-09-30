@@ -20,6 +20,7 @@ import {
 } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
 import {
+  handleGetPackageContents,
   handleGetServiceBindingPreviewUrl,
   handleReadBehaviorDefinition,
   handleReadBehaviorImplementation,
@@ -77,7 +78,71 @@ export const compactUrlRoutes: Partial<
     handleGetServiceBindingPreviewUrl as unknown as CompactHandler,
 };
 
-export type CompactReadPart = 'source' | 'metadata' | 'urls';
+/**
+ * `part: 'contents'` — the objects a package contains, as a flat list. A package
+ * has no source, and its metadata carries its sub-packages, not its members.
+ */
+export const compactContentsRoutes: Partial<
+  Record<CompactObjectType, CompactHandler>
+> = {
+  PACKAGE: packageContentsLines as unknown as CompactHandler,
+};
+
+type ContentsAnswer = {
+  isError?: boolean;
+  content?: Array<{ type?: string; text?: string }>;
+};
+
+/**
+ * A package's members, one per line: name, type, description — the shape a
+ * search answers. The core reader answers pretty-printed JSON that repeats the
+ * package's own name and the type's kind on every row; for a package with a few
+ * hundred members that is tens of kilobytes carrying three facts per object.
+ */
+async function packageContentsLines(
+  context: HandlerContext,
+  args: Record<string, unknown>,
+): Promise<unknown> {
+  const answered = (await handleGetPackageContents(
+    context,
+    args as never,
+  )) as ContentsAnswer;
+  const text = answered?.content?.[0]?.text;
+  if (answered?.isError || typeof text !== 'string') return answered;
+  try {
+    const items = JSON.parse(text) as Array<{
+      name?: string;
+      type?: string;
+      description?: string;
+    }>;
+    if (!Array.isArray(items)) return answered;
+    // Capped like a where-used list: a structure package's members are its
+    // sub-packages, and on the cloud trial one had 5,813 of them.
+    const max =
+      typeof args.max_results === 'number' && args.max_results > 0
+        ? args.max_results
+        : 100;
+    const lines = ['name\ttype\tdescription'];
+    for (const item of items.slice(0, max)) {
+      lines.push(
+        `${item.name ?? ''}\t${item.type ?? ''}\t${item.description ?? ''}`,
+      );
+    }
+    if (items.length > max) {
+      lines.push(
+        `(${max} of ${items.length} shown; raise max_results for more)`,
+      );
+    }
+    return {
+      ...answered,
+      content: [{ type: 'text', text: lines.join('\n') }],
+    };
+  } catch {
+    return answered;
+  }
+}
+
+export type CompactReadPart = 'source' | 'metadata' | 'urls' | 'contents';
 
 /** The parts a type can answer, for a refusal that tells the caller what to ask. */
 export function partsFor(
@@ -88,6 +153,7 @@ export function partsFor(
   if (hasSource) parts.push('source');
   if (compactMetadataRoutes[objectType]) parts.push('metadata');
   if (compactUrlRoutes[objectType]) parts.push('urls');
+  if (compactContentsRoutes[objectType]) parts.push('contents');
   return parts;
 }
 
@@ -98,7 +164,12 @@ export async function routeCompactPart(
   args: { object_type: CompactObjectType } & Record<string, unknown>,
   hasSource: boolean,
 ): Promise<unknown> {
-  const routes = part === 'metadata' ? compactMetadataRoutes : compactUrlRoutes;
+  const routes =
+    part === 'metadata'
+      ? compactMetadataRoutes
+      : part === 'contents'
+        ? compactContentsRoutes
+        : compactUrlRoutes;
   if (routes[args.object_type] === undefined) {
     // Answered as a refusal rather than thrown, the way the router answers an
     // unsupported operation: both paths through this surface should have the same

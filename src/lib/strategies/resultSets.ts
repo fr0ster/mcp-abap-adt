@@ -1,10 +1,10 @@
 import {
   atcDocuments,
   classExecutorDocuments,
+  classTestRunnerDocuments,
   feedDocuments,
   profilerDocuments,
   programExecutorDocuments,
-  unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
@@ -64,7 +64,7 @@ import { sqlPreview } from './sqlPreview';
  * `unlock-success--01-unlock`) is a zero-byte body, and nothing in the corpus
  * shows otherwise.
  *
- * `utilDocuments.activation` and `unitTestDocuments.run` are NOT in this
+ * `utilDocuments.activation` and `classTestRunnerDocuments.run` are NOT in this
  * table — they are named in `resultsFor`'s keep-list at their call sites
  * instead, because the reading they need looks at `answer.headers`, and none
  * of `verbatim`, `structured` or `statusOnly` looks anywhere but
@@ -99,6 +99,9 @@ export const READING_BY_SLOT = {
 
   check: structured,
   cdsCheck: structured,
+  // The CDS test-doubles check moved from the unit-test handler's `cdsCheck`
+  // to the DDL set in adt-clients 24; it reads the same answer.
+  testDoubles: structured,
   activation: structured,
   validation: structured,
   deletion: structured,
@@ -247,7 +250,7 @@ type SlotReading<P extends PropertyKey> = P extends keyof typeof READING_BY_SLOT
  * `keep` names the slots to leave exactly as the shipped set has them —
  * for the rare slot whose shipped reading sees something none of `verbatim`,
  * `structured` or `statusOnly` can: a header, not the body. `activation` on
- * `utilDocuments` and `run` on `unitTestDocuments` are the two known cases;
+ * `utilDocuments` and `run` on the ABAP Unit runner documents are the two known cases;
  * see the exceptions documented on `READING_BY_SLOT` above.
  *
  * **The return type is a per-slot map, not `R`.** `K` is a `const` type
@@ -320,11 +323,13 @@ export const ourUtils = {
  * the same reason `ourUtils` keeps `activation`. A later task that calls
  * `getUnitTest`/`getCdsUnitTest` imports this instead of re-deriving the
  * exception: `getClass(resultsFor(classDocuments))`'s pattern, applied to
- * `unitTestDocuments` without a keep-list, would silently discard the run id
+ * the runner documents without a keep-list, would silently discard the run id
  * again.
  */
 export const ourUnitTest = {
-  ...resultsFor(unitTestDocuments, ['run']),
+  // Every ABAP Unit runner in adt-clients 24 shares this one result set; the
+  // class runner's name for it is as good as any.
+  ...resultsFor(classTestRunnerDocuments, ['run']),
   // adt-clients 23 ships the document for `run`; the id is in a header, and
   // `unitTestRunId` reads it (MIGRATION-23 §6).
   run: unitTestRunId,

@@ -554,21 +554,19 @@ describe('DeleteMessageClassMessage: a PUT of the parent class, the message move
 });
 
 describe('DeleteUnitTest', () => {
-  it('never reaches the client: ADT exposes no resource for a test run', async () => {
-    // No mock, no recordingConnection — a real connection that throws on
-    // touch would still pass, since the handler must never call it.
-    const throwingConnection = new Proxy(
-      {},
-      {
-        get() {
-          throw new Error('DeleteUnitTest must not touch the connection');
-        },
-      },
-    ) as IAbapConnection;
-    const result: any = await handleDeleteUnitTest(
-      ctx(throwingConnection) as any,
-      { run_id: 'RUN1' },
-    );
-    expect(result.isError).toBe(true);
+  it("empties the class's testclasses include under the class's lock, and deletes no object", async () => {
+    const connection = recordingConnection();
+    const { requests } = connection;
+
+    const result: any = await handleDeleteUnitTest(ctx(connection) as any, {
+      class_name: 'ZCL_X',
+    });
+
+    expect(result.isError).toBe(false);
+    expect(requests.some((r) => r.method === 'DELETE')).toBe(false);
+    const writes = requestsTo(requests, 'PUT', '/includes/testclasses');
+    expect(writes).toHaveLength(1);
+    expect(String(writes[0].data ?? '')).toBe('');
+    expect(carries(writes[0], `lockHandle=${LOCK_HANDLE}`)).toBe(true);
   });
 });

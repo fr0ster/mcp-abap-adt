@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: High-Level
-- Total tools: 149
+- Total tools: 157
 
 ## Navigation
 
@@ -170,6 +170,8 @@ Generated from code in `src/handlers/**` (not from docs).
     - [RemoveTransportObject](#removetransportobject-high-level-transport)
   - [Unit Test](#high-level-unit-test)
     - [CreateCdsUnitTest](#createcdsunittest-high-level-unit-test)
+    - [CreateFunctionGroupUnitTest](#createfunctiongroupunittest-high-level-unit-test)
+    - [CreateProgramUnitTest](#createprogramunittest-high-level-unit-test)
     - [CreateUnitTest](#createunittest-high-level-unit-test)
     - [DeleteCdsUnitTest](#deletecdsunittest-high-level-unit-test)
     - [DeleteUnitTest](#deleteunittest-high-level-unit-test)
@@ -179,8 +181,14 @@ Generated from code in `src/handlers/**` (not from docs).
     - [GetUnitTest](#getunittest-high-level-unit-test)
     - [GetUnitTestResult](#getunittestresult-high-level-unit-test)
     - [GetUnitTestStatus](#getunitteststatus-high-level-unit-test)
+    - [RunCdsUnitTest](#runcdsunittest-high-level-unit-test)
+    - [RunFunctionGroupUnitTest](#runfunctiongroupunittest-high-level-unit-test)
+    - [RunFunctionModuleUnitTest](#runfunctionmoduleunittest-high-level-unit-test)
+    - [RunProgramUnitTest](#runprogramunittest-high-level-unit-test)
     - [RunUnitTest](#rununittest-high-level-unit-test)
     - [UpdateCdsUnitTest](#updatecdsunittest-high-level-unit-test)
+    - [UpdateFunctionGroupUnitTest](#updatefunctiongroupunittest-high-level-unit-test)
+    - [UpdateProgramUnitTest](#updateprogramunittest-high-level-unit-test)
     - [UpdateUnitTest](#updateunittest-high-level-unit-test)
 
 ---
@@ -2074,61 +2082,85 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
+**Description:** Create ABAP Unit tests for a CDS view: check the view supports CDS test doubles, create a test class holding the local test classes, activate it.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Parameters:**
-- `cds_view_name` (string, required) - CDS view name to check for unit test doubles before creating the class.
-- `class_name` (string, required) - Container class name.
-- `description` (string, optional) - Optional description for the container class.
-- `package_name` (string, required) - Package name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
+- `cds_view_name` (string, required) - CDS view under test (DDL source). Must be active and testable with test doubles.
+- `class_name` (string, required) - Name of the new global class that holds the tests.
+- `package_name` (string, required) - Package of the new test class.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable package.
+
+---
+
+<a id="createfunctiongroupunittest-high-level-unit-test"></a>
+#### CreateFunctionGroupUnitTest (High-Level / Unit Test)
+**Description:** Create ABAP Unit tests for a function group: a test include with its local test classes, activated with the group.
+
+**Source:** `src/handlers/unit_test/high/handleCreateFunctionGroupUnitTest.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group that gets the tests. Must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
+
+---
+
+<a id="createprogramunittest-high-level-unit-test"></a>
+#### CreateProgramUnitTest (High-Level / Unit Test)
+**Description:** Create ABAP Unit tests for a report: a test include with its local test classes, included into the report and activated.
+
+**Source:** `src/handlers/unit_test/high/handleCreateProgramUnitTest.ts`
+
+**Parameters:**
+- `program_name` (string, required) - Report that gets the tests. Must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Create ABAP Unit tests for a class: write its local test classes and activate the class.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
 **Parameters:**
-- `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
-- `tests` (array, required) - List of container/test class pairs to execute.
-- `title` (string, optional) - Optional title for the ABAP Unit run.
+- `class_name` (string, required) - Class that holds the tests. Must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Delete a CDS unit test class (global class).
+**Description:** Delete the ABAP Unit tests of a CDS view: delete its test class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Global test class name.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
+- `class_name` (string, required) - Test class of the CDS view.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Delete an ABAP Unit test run. Note: ADT does not support deleting unit test runs and will return an error.
+**Description:** Delete the ABAP Unit tests of a class: remove its local test classes, keeping the class.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
 **Parameters:**
-- `run_id` (string, required) - Run identifier returned by CreateUnitTest/RunUnitTest.
+- `class_name` (string, required) - Class that holds the tests. Must already exist.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="getcdsunittest-high-level-unit-test"></a>
 #### GetCdsUnitTest (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
+**Description:** Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTest.ts`
 
@@ -2139,7 +2171,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunittestresult-high-level-unit-test"></a>
 #### GetCdsUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
+**Description:** Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestResult.ts`
 
@@ -2152,7 +2184,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getcdsunitteststatus-high-level-unit-test"></a>
 #### GetCdsUnitTestStatus (High-Level / Unit Test)
-**Description:** Retrieve CDS unit test run status for a run_id. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
+**Description:** Retrieve CDS unit test run status for a run_id. 
 
 **Source:** `src/handlers/unit_test/high/handleGetCdsUnitTestStatus.ts`
 
@@ -2175,14 +2207,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getunittestresult-high-level-unit-test"></a>
 #### GetUnitTestResult (High-Level / Unit Test)
-**Description:** Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.
+**Description:** Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.
 
 **Source:** `src/handlers/unit_test/high/handleGetUnitTestResult.ts`
 
 **Parameters:**
-- `format` (string, optional) - Result format: abapunit or junit.
-- `run_id` (string, required) - Run identifier returned by unit test run.
-- `with_navigation_uris` (boolean, optional (default: false)) - Include navigation URIs in result if supported.
+- `run_id` (string, required) - Run id a unit test run answered.
 
 ---
 
@@ -2198,44 +2228,111 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
+<a id="runcdsunittest-high-level-unit-test"></a>
+#### RunCdsUnitTest (High-Level / Unit Test)
+**Description:** Run the ABAP Unit tests of a CDS view and return the result.
+
+**Source:** `src/handlers/unit_test/high/handleRunCdsUnitTest.ts`
+
+**Parameters:**
+- `class_name` (string, required) - Test class of the CDS view.
+
+---
+
+<a id="runfunctiongroupunittest-high-level-unit-test"></a>
+#### RunFunctionGroupUnitTest (High-Level / Unit Test)
+**Description:** Run all ABAP Unit tests of a function group and return the result.
+
+**Source:** `src/handlers/unit_test/high/handleRunFunctionGroupUnitTest.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group whose tests run.
+
+---
+
+<a id="runfunctionmoduleunittest-high-level-unit-test"></a>
+#### RunFunctionModuleUnitTest (High-Level / Unit Test)
+**Description:** Run the ABAP Unit tests of a function module and return the result.
+
+**Source:** `src/handlers/unit_test/high/handleRunFunctionModuleUnitTest.ts`
+
+**Parameters:**
+- `function_module_name` (string, required) - Function module whose tests run.
+
+---
+
+<a id="runprogramunittest-high-level-unit-test"></a>
+#### RunProgramUnitTest (High-Level / Unit Test)
+**Description:** Run the ABAP Unit tests of a report and return the result.
+
+**Source:** `src/handlers/unit_test/high/handleRunProgramUnitTest.ts`
+
+**Parameters:**
+- `program_name` (string, required) - Report whose tests run.
+
+---
+
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Run the ABAP Unit tests of a class and return the result.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
 **Parameters:**
-- `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
-- `tests` (array, required) - List of container/test class pairs to execute.
-- `title` (string, optional) - Optional title for the ABAP Unit run.
+- `class_name` (string, required) - Class whose tests run.
 
 ---
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update a CDS unit test class local test class source code. Manages lock, update, and unlock of the container class.
+**Description:** Update the ABAP Unit tests of a CDS view: replace the local test classes in its test class and activate it.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
 **Parameters:**
-- `class_name` (string, required) - Global test class name.
-- `test_class_source` (string, required) - Updated local test class ABAP source code.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
+- `class_name` (string, required) - Test class of the CDS view. Must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
+
+---
+
+<a id="updatefunctiongroupunittest-high-level-unit-test"></a>
+#### UpdateFunctionGroupUnitTest (High-Level / Unit Test)
+**Description:** Update the ABAP Unit tests of a function group: replace the local test classes in its test include and activate it.
+
+**Source:** `src/handlers/unit_test/high/handleUpdateFunctionGroupUnitTest.ts`
+
+**Parameters:**
+- `function_group_name` (string, required) - Function group whose tests are replaced. Its test include must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
+
+---
+
+<a id="updateprogramunittest-high-level-unit-test"></a>
+#### UpdateProgramUnitTest (High-Level / Unit Test)
+**Description:** Update the ABAP Unit tests of a report: replace the local test classes in its test include and activate it.
+
+**Source:** `src/handlers/unit_test/high/handleUpdateProgramUnitTest.ts`
+
+**Parameters:**
+- `program_name` (string, required) - Report whose tests are replaced. Its test include must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Update an ABAP Unit test run. Note: ADT does not support updating unit test runs and will return an error.
+**Description:** Update the ABAP Unit tests of a class: replace its local test classes and activate the class.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 
 **Parameters:**
-- `run_id` (string, required) - Run identifier returned by CreateUnitTest/RunUnitTest.
+- `class_name` (string, required) - Class that holds the tests. Must already exist.
+- `test_class_source` (string, required) - ABAP source of the local test classes: definitions and implementations, FOR TESTING. Replaces what the include holds.
+- `transport_request` (string, optional) - Transport request, not a task. Required for a transportable object.
 
 ---
 
-*Last updated: 2026-09-29*
+*Last updated: 2026-09-30*

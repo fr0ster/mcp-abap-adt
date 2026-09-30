@@ -1,6 +1,6 @@
 /**
- * RunUnitTest — run every ABAP Unit test of a class and answer the result.
- * Waits for the run within a bound; a run that outlasts it answers its run_id.
+ * RunCdsUnitTest — run the ABAP Unit tests of a CDS view (the tests in its
+ * test class) and answer the result.
  */
 
 import { answer } from '../../../lib/answer';
@@ -10,15 +10,15 @@ import { return_error } from '../../../lib/utils';
 import { projectRun, runAndWait } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
-  name: 'RunUnitTest',
+  name: 'RunCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Run the ABAP Unit tests of a class and return the result.',
+  description: 'Run the ABAP Unit tests of a CDS view and return the result.',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Class whose tests run.',
+        description: 'Test class of the CDS view.',
       },
       ...DETAIL_PROPERTY,
     },
@@ -26,21 +26,21 @@ export const TOOL_DEFINITION = {
   },
 } as const;
 
-interface RunUnitTestArgs {
+interface RunCdsUnitTestArgs {
   class_name: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
-export async function handleRunUnitTest(
+export async function handleRunCdsUnitTest(
   context: HandlerContext,
-  args: RunUnitTestArgs,
+  args: RunCdsUnitTestArgs,
 ) {
   if (!args?.class_name) {
     return return_error(new Error('class_name is required'));
   }
   const detail = detailOf(args);
   return answer(
-    { tool: 'RunUnitTest', detail },
+    { tool: 'RunCdsUnitTest', detail },
     () => runAndWait(context, 'class', args.class_name),
     projectRun(detail),
   );

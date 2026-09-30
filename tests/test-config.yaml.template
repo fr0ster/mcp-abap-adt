@@ -1875,27 +1875,12 @@ cds_unit_test:
     - name: "full_workflow"
       enabled: true
       available_in: ["onprem", "cloud"]
-      description: "Full workflow test for CDS unit test handlers: Create → Update → Run → Get → Delete"
+      description: "A CDS view's ABAP Unit tools: CreateCdsUnitTest → RunCdsUnitTest → UpdateCdsUnitTest → RunCdsUnitTest; DeleteCdsUnitTest as cleanup"
       params:
         class_name: "ZMCP_BLD_CDSUT_H1"
-        test_class_name: "LTC_ZMCP_BLD_CDSV_H1"
         # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
         cds_view_name: "ZMCP_BLD_CDSV_H1"
-        description: "CDS unit test class"
         transport_request: ""
-        class_template: |
-          <abapsource:template abapsource:name="IF_FOR_AUTO_CLASS_GENERATION">
-            <abapsource:property abapsource:key="CCAU_CONTENT">&lt;?xml version="1.0" encoding="UTF-8"?&gt;
-          &lt;cds:cdstobetested xmlns:cds="http://www.sap.com/adt/cdsfrwk/cds"&gt;
-            &lt;cds:cdsundertest api_doc="true" cds_name="ZMCP_BLD_CDSV_H1" cds_test_type="UNIT_TEST"&gt;
-              &lt;cds:testmethods&gt;
-                &lt;cds:testmethod test_method_name="AUNIT_FOR_CDS_METHOD"/&gt;
-              &lt;/cds:testmethods&gt;
-            &lt;/cds:cdsundertest&gt;
-          &lt;/cds:cdstobetested&gt;
-          </abapsource:property>
-            <abapsource:property abapsource:key="Content-Type">application/vnd.sap.adt.oo.cds.codgen.v1+xml</abapsource:property>
-          </abapsource:template>
         test_class_source: |
           CLASS LTC_ZMCP_BLD_CDSV_H1 DEFINITION FINAL
             FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
@@ -1920,37 +1905,109 @@ cds_unit_test:
           ENDCLASS.
 
 # Class Unit Test (Low-Level and High-Level)
+        expected_test_methods: ["TEST_METHOD"]
+
 class_unit_test:
   test_cases:
     - name: "full_workflow"
       enabled: true
-      available_in: ["onprem", "cloud", "legacy"]
-      description: "Full workflow test for unit test handlers: Lock → Update → Unlock → Activate → Run → GetStatus → GetResult (low-level) or RunUnitTest → GetUnitTest (high-level)"
+      available_in: ["onprem", "cloud"]
+      description: "A class's ABAP Unit tools: CreateUnitTest → RunUnitTest → UpdateUnitTest → RunUnitTest → DeleteUnitTest. The suite creates the class and deletes it."
       params:
-        # Low-level suite: its own container class — a test object, created in
-        # the test package on the test request and deleted after — because it
-        # locks and writes the test-classes include. Never the shared one.
-        container_class_name: "ZMCP_BLD_CLSUT_LOW"
-        # Test class name inside the container class's testclasses include
-        test_class_name: "LTC_ZMCP_BLD_CLSUT_LOW"
-        # Optional: test class source code (if not provided, default test class will be used)
-        test_class_source: |
-          CLASS ltc_zmcp_bld_clsut_low DEFINITION FINAL
-            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
-            PRIVATE SECTION.
-              METHODS test_method FOR TESTING.
+        # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
+        class_name: "ZMCP_BLD_CLSUT_H1"
+        class_source: |
+          CLASS zmcp_bld_clsut_h1 DEFINITION PUBLIC FINAL CREATE PUBLIC.
+            PUBLIC SECTION.
+              METHODS double IMPORTING iv TYPE i RETURNING VALUE(rv) TYPE i.
           ENDCLASS.
-          CLASS ltc_zmcp_bld_clsut_low IMPLEMENTATION.
-            METHOD test_method.
-              cl_abap_unit_assert=>assert_true( abap_true ).
+          CLASS zmcp_bld_clsut_h1 IMPLEMENTATION.
+            METHOD double.
+              rv = iv * 2.
             ENDMETHOD.
           ENDCLASS.
-        # For high-level handlers (RunUnitTest, GetUnitTest): they only run
-        # tests, so the shared class and its test class (shared:setup)
-        test_class:
-          container_class: "ZMCP_BLD_CLSUT_L1"
-          name: "LTC_ZMCP_BLD_CLSUT_L1"
-          run_unit_test: true  # Enable unit test run for high-level handlers
+        test_class_source: |
+          CLASS ltc_zmcp_bld_clsut_h1 DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS doubles FOR TESTING.
+          ENDCLASS.
+          CLASS ltc_zmcp_bld_clsut_h1 IMPLEMENTATION.
+            METHOD doubles.
+              cl_abap_unit_assert=>assert_equals(
+                act = NEW zmcp_bld_clsut_h1( )->double( 2 )
+                exp = 4 ).
+            ENDMETHOD.
+          ENDCLASS.
+        expected_test_methods: ["DOUBLES"]
+
+# A report's ABAP Unit tools. The test class goes into a test include the tool
+# creates and pulls into the report. The suite creates the report and deletes
+# it with the include.
+program_unit_test:
+  test_cases:
+    - name: "full_workflow"
+      enabled: true
+      available_in: ["onprem"]
+      description: "A report's ABAP Unit tools: CreateProgramUnitTest → RunProgramUnitTest → UpdateProgramUnitTest → RunProgramUnitTest"
+      params:
+        # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
+        program_name: "ZMCP_BLD_PRGUT_H1"
+        program_source: |
+          REPORT zmcp_bld_prgut_h1.
+        test_class_source: |
+          CLASS ltc_report DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS passes FOR TESTING.
+          ENDCLASS.
+          CLASS ltc_report IMPLEMENTATION.
+            METHOD passes.
+              cl_abap_unit_assert=>assert_equals( act = 1 exp = 1 ).
+            ENDMETHOD.
+          ENDCLASS.
+        expected_test_methods: ["PASSES"]
+
+# A function group's ABAP Unit tools. The test class goes into the group's test
+# include; its INCLUDE is added to the group's main program by ADT. The group
+# run finds every test of the group, the module run the tests that exercise the
+# module. The suite creates the group and its module and deletes the group.
+function_group_unit_test:
+  test_cases:
+    - name: "full_workflow"
+      enabled: true
+      available_in: ["onprem"]
+      description: "A function group's ABAP Unit tools: CreateFunctionGroupUnitTest → RunFunctionGroupUnitTest → RunFunctionModuleUnitTest → UpdateFunctionGroupUnitTest → RunFunctionGroupUnitTest"
+      params:
+        # package_name: "ZMCP_SHR_PKG"  # Uses environment.default_package if omitted
+        function_group_name: "ZMCP_BLD_FGUT_H1"
+        function_module_name: "Z_MCP_BLD_FGUT_H1"
+        function_module_source: |
+          FUNCTION z_mcp_bld_fgut_h1
+            IMPORTING
+              VALUE(iv_in) TYPE i
+            EXPORTING
+              VALUE(ev_out) TYPE i.
+            ev_out = iv_in * 2.
+          ENDFUNCTION.
+        test_class_source: |
+          CLASS ltc_module DEFINITION FINAL
+            FOR TESTING RISK LEVEL HARMLESS DURATION SHORT.
+            PRIVATE SECTION.
+              METHODS doubles FOR TESTING.
+          ENDCLASS.
+          CLASS ltc_module IMPLEMENTATION.
+            METHOD doubles.
+              DATA lv_out TYPE i.
+              CALL FUNCTION 'Z_MCP_BLD_FGUT_H1'
+                EXPORTING
+                  iv_in  = 2
+                IMPORTING
+                  ev_out = lv_out.
+              cl_abap_unit_assert=>assert_equals( act = lv_out exp = 4 ).
+            ENDMETHOD.
+          ENDCLASS.
+        expected_test_methods: ["DOUBLES"]
 
 # ============================================================================
 # READ-ONLY HANDLER TESTS (for mcp-abap-adt integration tests)

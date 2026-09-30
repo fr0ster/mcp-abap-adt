@@ -1,9 +1,9 @@
 import {
   classDocuments,
+  classTestRunnerDocuments,
   domainDocuments,
   packageDocuments,
   tableDocuments,
-  unitTestDocuments,
   utilDocuments,
 } from '@mcp-abap-adt/adt-clients';
 import {
@@ -106,7 +106,7 @@ describe('the slot table', () => {
     expect(ourUtils.activation).toBe(utilActivationRunId);
     expect(ourUnitTest.run).toBe(unitTestRunId);
     expect(ourUtils.activation).not.toBe(utilDocuments.activation);
-    expect(ourUnitTest.run).not.toBe(unitTestDocuments.run);
+    expect(ourUnitTest.run).not.toBe(classTestRunnerDocuments.run);
   });
 
   it('reads the unit-test run id out of the Location header, not the empty body', () => {

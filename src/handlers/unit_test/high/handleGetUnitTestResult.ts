@@ -1,38 +1,27 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
   MAX_STATUS_POLLS,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP Unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead.',
+    'Get the result of an ABAP Unit test run by its run_id, for a run that had not finished when it was started. Waits for it within a bound.',
   inputSchema: {
     type: 'object',
     properties: {
       run_id: {
         type: 'string',
-        description: 'Run identifier returned by unit test run.',
-      },
-      with_navigation_uris: {
-        type: 'boolean',
-        description: 'Include navigation URIs in result if supported.',
-        default: false,
-      },
-      format: {
-        type: 'string',
-        description: 'Result format: abapunit or junit.',
-        enum: ['abapunit', 'junit'],
+        description: 'Run id a unit test run answered.',
       },
       ...DETAIL_PROPERTY,
     },
@@ -51,7 +40,6 @@ export async function handleGetUnitTestResult(
   context: HandlerContext,
   args: GetUnitTestResultArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id, with_navigation_uris, format } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
@@ -62,7 +50,7 @@ export async function handleGetUnitTestResult(
   // via `pollUntilFinished` rather than guessing what `getResult` answers on
   // an unfinished run (uncaptured in the corpus). `getResult` takes
   // `analyseException` since adt-clients 23.
-  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const unitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   return answer(

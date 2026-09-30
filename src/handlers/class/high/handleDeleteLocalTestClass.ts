@@ -31,7 +31,7 @@ export const TOOL_DEFINITION = {
   name: 'DeleteLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Delete a local test class from an ABAP class by clearing the testclasses include. Manages lock, update, unlock, and optional activation of parent class.',
+    'Clear the local test classes include of a class under the class lock, and optionally activate the class.',
   inputSchema: {
     type: 'object',
     properties: {

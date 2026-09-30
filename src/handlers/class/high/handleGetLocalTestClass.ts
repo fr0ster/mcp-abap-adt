@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve local test class source code from a class. Supports reading active or inactive version.',
+    'Read the local test classes include of a class. Active or inactive version.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -30,14 +30,13 @@ export const TOOL_DEFINITION = {
   name: 'AddTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Attach an existing object to a transport task, so it travels with that request. The way back from RemoveTransportObject, which leaves the object in no request at all. Refused when another task holds the object, with SCTS_ADT_MSG 009 naming the holder — that refusal is the server's answer, read it rather than pre-checking. A 200 says the request was understood; confirm with ReadTransportObjects.",
+    "Add an existing ABAP object to a transport task, so it travels with the task's request.",
   inputSchema: {
     type: 'object',
     properties: {
       transport_number: {
         type: 'string',
-        description:
-          'The TASK to attach the object to — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.',
+        description: 'Number of the transport task the object is added to.',
       },
       object_name: {
         type: 'string',

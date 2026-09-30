@@ -439,7 +439,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Delete a local test class from an ABAP class by clearing the testclasses include. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Clear the local test classes include of a class under the class lock, and optionally activate the class.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -501,7 +501,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** Retrieve local test class source code from a class. Supports reading active or inactive version.
+**Description:** Read the local test classes include of a class. Active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -567,7 +567,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Write the local test classes include of a class under the class lock, and optionally activate the class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -1385,7 +1385,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** Retrieve ABAP function module definition. Supports reading active or inactive version.
+**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature. Active or inactive version.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -1715,7 +1715,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
+**Description:** Create an OData service binding (V2 or V4, UI or Web API) for a service definition, in initial state.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -1806,7 +1806,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
+**Description:** Create a service definition that exposes CDS views as an OData service, in initial state.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2023,7 +2023,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Attach an existing object to a transport task, so it travels with that request. The way back from RemoveTransportObject, which leaves the object in no request at all. Refused when another task holds the object, with SCTS_ADT_MSG 009 naming the holder — that refusal is the server's answer, read it rather than pre-checking. A 200 says the request was understood; confirm with ReadTransportObjects.
+**Description:** Add an existing ABAP object to a transport task, so it travels with the task's request.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
@@ -2031,7 +2031,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
-- `transport_number` (string, required) - The TASK to attach the object to — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.
+- `transport_number` (string, required) - Number of the transport task the object is added to.
 
 ---
 
@@ -2064,7 +2064,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Detach one object's entry from a transport TASK, so its name can be used again after the object was deleted. Address the task that holds the entry, not the request above it — a request displays its tasks' entries and refuses to detach one. `position` comes from ReadTransportObjects and is required: without it the server answers 200 and removes nothing. A 200 here is not proof either; confirm with ReadTransportActionLog or by re-reading the objects.
+**Description:** Remove an object's entry from the transport task that holds it.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
@@ -2072,8 +2072,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `object_name` (string, required) - Object name.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
-- `position` (string, required) - The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200.
-- `transport_number` (string, required) - The TASK holding the entry — read it from ReadTransportObjects. Not the request above it: a request displays its tasks' entries and refuses to detach one, answering that the entry "does not exist in request/task".
+- `position` (string, required) - Position of the object's entry in the task's object list.
+- `transport_number` (string, required) - Number of the transport task that holds the entry.
 
 ---
 

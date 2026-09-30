@@ -39,14 +39,13 @@ export const TOOL_DEFINITION = {
   name: 'RemoveTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Detach one object's entry from a transport TASK, so its name can be used again after the object was deleted. Address the task that holds the entry, not the request above it — a request displays its tasks' entries and refuses to detach one. `position` comes from ReadTransportObjects and is required: without it the server answers 200 and removes nothing. A 200 here is not proof either; confirm with ReadTransportActionLog or by re-reading the objects.",
+    "Remove an object's entry from the transport task that holds it.",
   inputSchema: {
     type: 'object',
     properties: {
       transport_number: {
         type: 'string',
-        description:
-          'The TASK holding the entry — read it from ReadTransportObjects. Not the request above it: a request displays its tasks\' entries and refuses to detach one, answering that the entry "does not exist in request/task".',
+        description: 'Number of the transport task that holds the entry.',
       },
       object_name: {
         type: 'string',
@@ -60,7 +59,7 @@ export const TOOL_DEFINITION = {
       position: {
         type: 'string',
         description:
-          "The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200.",
+          "Position of the object's entry in the task's object list.",
       },
       pgmid: {
         type: 'string',

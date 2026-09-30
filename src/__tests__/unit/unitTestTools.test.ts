@@ -163,11 +163,12 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
     // metadata, include create, lock, PUT, unlock, report read, then defaults.
     const connection = recordingConnection([
       { data: METADATA },
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      { data: 'REPORT zr_x.\n' },
+      undefined, // include create
+      undefined, // include lock
+      undefined, // include write
+      undefined, // include unlock
+      undefined, // report lock
+      { data: 'REPORT zr_x.\n' }, // report read, under the lock
     ]);
 
     const result: any = await handleCreateProgramUnitTest(
@@ -192,6 +193,29 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
       '/sap/bc/adt/programs/programs/zr_x/source/main',
     ]);
     expect(String(puts[1].data)).toContain(`INCLUDE ${include}.`);
+    // The report is read under its lock and written under the same one, so
+    // nothing saved in between can be overwritten.
+    const reportRequests = connection.requests
+      .map((r) => line(r).toLowerCase())
+      .filter((l) => l.includes('/programs/programs/zr_x'));
+    // metadata, then lock → read → write → unlock
+    expect(reportRequests).toEqual([
+      'get /sap/bc/adt/programs/programs/zr_x',
+      'post /sap/bc/adt/programs/programs/zr_x',
+      'get /sap/bc/adt/programs/programs/zr_x/source/main',
+      'put /sap/bc/adt/programs/programs/zr_x/source/main',
+      'post /sap/bc/adt/programs/programs/zr_x',
+    ]);
+    const reportLock = connection.requests.findIndex((r) =>
+      r.url.toLowerCase().includes('/programs/programs/zr_x?_action=lock'),
+    );
+    const reportRead = connection.requests.findIndex(
+      (r) =>
+        r.method === 'GET' &&
+        r.url.toLowerCase().includes('/programs/programs/zr_x/source'),
+    );
+    expect(reportLock).toBeGreaterThan(-1);
+    expect(reportRead).toBeGreaterThan(reportLock);
     const activations = connection.requests.filter((r) =>
       r.url.includes('/activation'),
     );
@@ -202,10 +226,11 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
     const include = programTestInclude('zr_x').toLowerCase();
     const connection = recordingConnection([
       { data: METADATA },
-      undefined,
-      undefined,
-      undefined,
-      undefined,
+      undefined, // include create
+      undefined, // include lock
+      undefined, // include write
+      undefined, // include unlock
+      undefined, // report lock
       { data: `REPORT zr_x.\n\nINCLUDE ${include}.\n` },
     ]);
 
@@ -240,6 +265,18 @@ describe('CreateProgramUnitTest: a test include, pulled into the report', () => 
     expect(puts[0].url).toContain(
       `/programs/includes/${programTestInclude('zr_x').toLowerCase()}/`,
     );
+  });
+});
+
+describe('test include names', () => {
+  it("a report's is the report's name with _T99", () => {
+    expect(programTestInclude('zr_x')).toBe('ZR_X_T99');
+    expect(programTestInclude('/ns/zr_x')).toBe('/NS/ZR_X_T99');
+  });
+
+  it("a function group's follows its main program: L<group>, namespace in front", () => {
+    expect(functionGroupTestInclude('zfg_x')).toBe('LZFG_XT99');
+    expect(functionGroupTestInclude('/ns/group')).toBe('/NS/LGROUPT99');
   });
 });
 

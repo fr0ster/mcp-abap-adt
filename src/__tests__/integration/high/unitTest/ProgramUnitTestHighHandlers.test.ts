@@ -16,6 +16,7 @@ import { programTestInclude } from '../../../../handlers/unit_test/shared/writeT
 import { createAdtClient } from '../../../../lib/clients';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
+import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
 import { expectTestsRan, stepsFor } from './unitTestSteps';
@@ -45,14 +46,25 @@ describe('Unit Test High-Level Handlers (report)', () => {
           },
           handleDeleteProgram,
         );
-        // No tool deletes a report include; the suite removes the one it made.
+        // No tool deletes a report include; the suite removes the one it made,
+        // directly — on a connection of its own in hard mode, where the
+        // context carries none (a hard-mode run left the include behind).
         try {
-          await createAdtClient(context.connection)
+          const connection =
+            typeof (context.connection as any)?.makeAdtRequest === 'function'
+              ? context.connection
+              : (await createTestConnectionAndSession()).connection;
+          const deleted = await createAdtClient(connection as any)
             .getInclude()
             .delete({
               includeName: programTestInclude(programName),
               transportRequest: context.transportRequest,
             });
+          if (!deleted.ok) {
+            context.logger?.warn?.(
+              `cleanup include (ignored): ${deleted.getError().message}`,
+            );
+          }
         } catch (error: any) {
           context.logger?.warn?.(
             `cleanup include (ignored): ${error?.message ?? error}`,

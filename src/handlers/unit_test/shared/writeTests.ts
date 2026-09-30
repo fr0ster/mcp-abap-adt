@@ -40,8 +40,20 @@ export function programTestInclude(programName: string): string {
   return `${programName.toUpperCase()}_T99`;
 }
 
+/**
+ * A function group's includes are named after its main program, `SAPL<group>`,
+ * with `SAPL` shortened to `L` — and a namespace stays in front: the group
+ * `/NS/GROUP` has the main program `/NS/SAPLGROUP` and the includes
+ * `/NS/LGROUP…`.
+ */
 export function functionGroupTestInclude(functionGroupName: string): string {
-  return `L${functionGroupName.toUpperCase()}T99`;
+  const name = functionGroupName.toUpperCase();
+  const namespaced = /^(\/[^/]+\/)(.+)$/.exec(name);
+  return namespaced ? `${namespaced[1]}L${namespaced[2]}T99` : `L${name}T99`;
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 /** Write (or, with an empty source, clear) a class's test classes, and activate. */
@@ -142,24 +154,32 @@ export async function writeProgramTests(
 
   return carryCleanup(written, async (): Promise<Answer> => {
     if (!options.create) return activateBoth();
-    const current = await program.read({ programName: name }, 'inactive', {
-      analyse: analyseException,
-    });
-    if (!current.ok) return current as unknown as Answer;
-    const reportSource = current.getResult().value.raw;
-    const pulledIn = new RegExp(`^\\s*INCLUDE\\s+${includeName}\\s*\\.`, 'im');
-    if (pulledIn.test(reportSource)) return activateBoth();
+    // Read and write the report under one lock: a source read before the lock
+    // and written after it would overwrite whatever was saved in between.
+    const pulledIn = new RegExp(
+      `^\\s*INCLUDE\\s+${escapeRegExp(includeName)}\\s*\\.`,
+      'im',
+    );
     const linked = await withLock(
       () => program.lock({ programName: name }, { analyse: analyseLock }),
-      (lockHandle) =>
-        program.update(
+      async (lockHandle): Promise<Answer> => {
+        const current = await program.read({ programName: name }, 'inactive', {
+          analyse: analyseException,
+        });
+        if (!current.ok) return current as unknown as Answer;
+        const reportSource = current.getResult().value.raw;
+        if (pulledIn.test(reportSource)) {
+          return current as unknown as Answer;
+        }
+        return program.update(
           { programName: name, transportRequest },
           {
             source: `${reportSource.replace(/\s*$/, '')}\n\nINCLUDE ${includeName.toLowerCase()}.\n`,
             lockHandle,
             analyse: analyseException,
           },
-        ),
+        ) as Promise<Answer>;
+      },
       (lockHandle) =>
         program.unlock({ programName: name }, lockHandle, {
           analyse: analyseException,

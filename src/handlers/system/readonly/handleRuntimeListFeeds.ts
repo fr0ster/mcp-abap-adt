@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] List ABAP short dumps, system messages or SAP Gateway errors from the runtime feeds, filtered by user and time range.',
+    '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range. Without a feed type it lists the feeds.',
   inputSchema: {
     type: 'object',
     properties: {

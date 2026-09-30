@@ -1385,7 +1385,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included: source code with its parameter signature. Active or inactive version.
+**Description:** Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature. Active or inactive version.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 

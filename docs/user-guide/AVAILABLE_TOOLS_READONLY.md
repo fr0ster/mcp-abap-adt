@@ -332,7 +332,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="readfunctionmodule-read-only-function-module"></a>
 #### ReadFunctionModule (Read-Only / Function Module)
-**Description:** [read-only] Read an ABAP function module, BAPI or RFC-enabled ones included: source code with its parameter signature, package, responsible and description.
+**Description:** [read-only] Read an ABAP function module, BAPI or RFC-enabled ones included: its source code, which declares the parameter signature, and its package, responsible and description.
 
 **Source:** `src/handlers/function_module/readonly/handleReadFunctionModule.ts`
 
@@ -841,7 +841,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] List ABAP short dumps, system messages or SAP Gateway errors from the runtime feeds, filtered by user and time range.
+**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range. Without a feed type it lists the feeds.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 

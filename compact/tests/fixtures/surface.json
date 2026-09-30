@@ -130,5 +130,23 @@
     "name": "HandlerDelete",
     "inputs": "object_type*, class_name, program_name, domain_name, function_module_name, function_group_name, ddl_name, transport_request, table_name, structure_name, data_element_name, interface_name, service_definition_name, service_binding_name, behavior_definition_name, behavior_implementation_name, metadata_extension_name",
     "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerSearch",
+    "inputs": "query*, object_type, max_results",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerWhereUsed",
+    "inputs": "object_type*, object_name*, function_group_name, max_results",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "compact",
+    "name": "HandlerGetData",
+    "inputs": "object_name, sql_query, max_rows",
+    "available_in": "cloud, onprem"
   }
 ]

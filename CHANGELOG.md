@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Compact reads: search, where-used, data and a package's contents** (#259).
+  Compact serves a host without a pipeline of its own, and these are ordinary
+  investigation steps it could not take at all: the command launches without the
+  search group, and nothing routed where-used or data.
+  - `HandlerSearch` — objects by name or mask, optionally by type, capped.
+  - `HandlerWhereUsed` — the objects that use one object, capped with the total
+    kept (on premise, a standard class answered 107,141 references); a function
+    module is addressed under its group.
+  - `HandlerGetData` — rows of a table or CDS view, or what an ABAP SQL
+    `SELECT` names with its columns, conditions and order.
+  - `HandlerGet` `part: contents` for a `PACKAGE` — its members, one line each:
+    name, type, description, capped by `max_results` (default 100) with the
+    total said (a package of 257 members on premise: 11,260 characters, against
+    45,705 as the core reader's JSON; the trial's top-level local package lists
+    11,619 entries and answers 100 of them in 3,491 characters).
+
+  All four read, so they live in `compact-readonly` and serve `--exposition=ro`
+  as well: compact is 25 tools, 16 of them read-only.
 - **`GetUnitTestResult` in the `readonly` group too.** Fetching an ABAP Unit
   run's result by its `run_id` only reads, so a read-only caller may do it. It
   is a copy of the `high` tool — the same name, schema and handler — and stays
@@ -16,6 +34,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`GetPackage` and `ReadPackage` answer a summary of the package** — name,
+  description, type, super-package, software and application component,
+  transport layer, ABAP language version, responsible, and the number of
+  sub-packages; with `detail: full` every sub-package by name and description
+  as well; and the metadata document itself with `detail: raw`. The
+  document carries every sub-package: a top-level package answered about
+  950,000 characters on the cloud trial (5,815 sub-packages, no member object),
+  which an MCP client refused, and `ReadPackage` sent it twice. The same package
+  now answers 327 characters (`sub_package_count: 5813`); on premise a
+  structure package with 1,222 sub-packages answers 351.
 - **A tool present in two groups is exposed once, from `high`.** When a
   readonly tool shares its exact name with a tool of an exposed `high`/`low`
   group, `ReadOnlyHandlersGroup` withholds its own copy, whatever dedup

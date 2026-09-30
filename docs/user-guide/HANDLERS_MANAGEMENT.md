@@ -40,15 +40,16 @@ V2 server supports flexible handler set configuration through the `--exposition`
    - `HandlerTransportCreate`
    - `HandlerCreate`
    - `HandlerGet`
+   - `HandlerSearch`, `HandlerWhereUsed`, `HandlerGetData`
    - `HandlerUpdate`
    - `HandlerDelete`
    - Contract:
      - CRUD via `HandlerCreate|Get|Update|Delete` + required `object_type`
-     - `HandlerGet` also takes `part` — `source` (the default), `metadata`, or
-       `urls`. `metadata` routes to the reader that returns the object's metadata
+     - `HandlerGet` also takes `part` — `source` (the default), `metadata`,
+       `urls`, or `contents`. `metadata` routes to the reader that returns the object's metadata
        document, which sixteen object types have; `urls` answers the service,
        `$metadata` and browser preview URLs and exists for a service binding
-       alone. A part an object type does not offer is refused by name and the
+       alone; `contents` lists a package's members, one line each. A part an object type does not offer is refused by name and the
        refusal says which parts it does offer — never substituted with another.
      - Lifecycle via `HandlerValidate|Activate|Lock|Unlock|CheckRun`
      - Runtime/tests/service-binding/transport via dedicated compact handlers

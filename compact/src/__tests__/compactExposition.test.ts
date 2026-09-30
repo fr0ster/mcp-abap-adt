@@ -3,7 +3,7 @@
  *
  * The command serves the compact facade, so `readonly`/`high`/`low` — sets of the
  * object-oriented surface — mean nothing here. What IS a real choice at startup is
- * which half of the facade to serve: `rw` gives all 22 tools, `ro` the 13 that change
+ * which half of the facade to serve: `rw` gives all 25 tools, `ro` the 16 that change
  * nothing. Locally the default is `rw`, every access; `ro` exists for a host that
  * means to hand out a surface which cannot change the system.
  *

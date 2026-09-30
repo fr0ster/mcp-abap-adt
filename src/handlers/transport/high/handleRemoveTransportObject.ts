@@ -39,7 +39,7 @@ export const TOOL_DEFINITION = {
   name: 'RemoveTransportObject',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Detach one object's entry from a transport TASK, so its name can be used again after the object was deleted. Address the task that holds the entry, not the request above it — a request displays its tasks' entries and refuses to detach one. `position` comes from ReadTransportObjects and is required: without it the server answers 200 and removes nothing. A 200 here is not proof either; confirm with ReadTransportActionLog or by re-reading the objects.",
+    'Remove an ABAP object from a transport request by detaching its entry from the transport task that holds it (position from ReadTransportObjects is required). Does not delete the object itself. Confirm with ReadTransportActionLog.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -50,7 +50,8 @@ export const TOOL_DEFINITION = {
       },
       object_name: {
         type: 'string',
-        description: 'Object name.',
+        description:
+          'Object name. Detaching the entry of a deleted object lets its name be used again.',
       },
       object_type: {
         type: 'string',
@@ -60,7 +61,7 @@ export const TOOL_DEFINITION = {
       position: {
         type: 'string',
         description:
-          "The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200.",
+          "The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200. A 200 is not proof even with it; confirm with ReadTransportActionLog or by re-reading the objects.",
       },
       pgmid: {
         type: 'string',

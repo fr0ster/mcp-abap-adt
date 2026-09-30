@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'GetLocalTestClass',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve local test class source code from a class. Supports reading active or inactive version.',
+    "Read the ABAP Unit test code of a class: its local test classes (FOR TESTING) in the test include. Not the class's main source — for that use ReadClass or GetClass. Active or inactive version.",
   inputSchema: {
     type: 'object',
     properties: {

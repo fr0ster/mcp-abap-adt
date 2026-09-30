@@ -58,8 +58,7 @@ export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. " +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
+    'CDS views only: create the ABAP Unit test class (with CDS test doubles) for a CDS view (DDL source), in initial state; write the tests with UpdateCdsUnitTest. For unit tests of an ABAP class use UpdateLocalTestClass. Not available below BASIS 7.50.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -74,7 +73,7 @@ export const TOOL_DEFINITION = {
       cds_view_name: {
         type: 'string',
         description:
-          'CDS view name to check for unit test doubles before creating the class.',
+          'CDS view under test. It is checked for unit test doubles before the class is created.',
       },
       description: {
         type: 'string',

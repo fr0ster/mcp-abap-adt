@@ -5,6 +5,40 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **18 tool descriptions now say what the tool does to which ABAP object, first.**
+  A consumer that retrieves tools by embedding their descriptions found these 18
+  by the wrong words: the text was about protocol mechanics (`SCTS_ADT_MSG 009`,
+  what a `200` means, `position`), about a sibling, or identical to another tool's.
+  The first sentence is now *verb + ABAP object + what the caller gets*; the
+  operational facts it carried moved into the parameter descriptions they govern.
+  No name, schema or behaviour changed.
+
+  Measured in a tool-retrieval harness over all tools (86 English query rows) on
+  seven embedders (bge-m3, nomic-embed-text, bge-large-en-v1.5, mxbai-embed-large,
+  snowflake-arctic-embed, OpenAI text-embedding-3-small and -3-large), hybrid and
+  cosine-only scoring: required-recall at K5 rose on every one, by +5.8 to +12.8
+  points (mean +8.2); on the 42 rows written before the weak spots were known, by
+  +4.1 on average.
+
+  - Unit tests: `RunUnitTest`, `CreateUnitTest` (now says it is an alias that runs
+    tests and writes none), `UpdateUnitTest` and `DeleteUnitTest` (now say they
+    always fail), `UpdateLocalTestClass`, `GetLocalTestClass`,
+    `DeleteLocalTestClass`, and the three CDS unit-test tools, which now start with
+    *CDS views only*.
+  - Transports: `AddTransportObject`, `RemoveTransportObject`. What a `200` proves,
+    `SCTS_ADT_MSG 009` naming the holder, *the way back from RemoveTransportObject*
+    and *frees the name of a deleted object* moved into `transport_number`,
+    `object_name` and `position`.
+  - `RuntimeListFeeds` names dumps, system messages and gateway errors;
+    `ReadFunctionModule` and `GetFunctionModule` name BAPI/RFC and the signature;
+    `GetWhereUsed`'s list of unsupported types moved into `object_type`;
+    `CreateServiceDefinition` and `CreateServiceBinding` name each other as
+    prerequisite and consumer.
+
 ## [14.1.2] - 2026-09-30
 
 ### Fixed

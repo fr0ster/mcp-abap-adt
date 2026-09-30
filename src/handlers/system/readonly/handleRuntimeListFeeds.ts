@@ -10,7 +10,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] List available ADT runtime feeds or read a specific feed type. Feed types: dumps, system_messages, gateway_errors. Without feed_type returns available feed descriptors.',
+    '[runtime] List ABAP short dumps (ST22 runtime errors), SM02 system messages or SAP Gateway errors from the ADT runtime feeds, filtered by user and time range. Use feed_type=dumps for dumps, then read one with RuntimeGetDumpById.',
   inputSchema: {
     type: 'object',
     properties: {

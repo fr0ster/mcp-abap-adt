@@ -21,7 +21,7 @@ export const TOOL_DEFINITION = {
   name: 'RunUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.',
+    'Run the ABAP Unit tests of a class (its local test classes, FOR TESTING) and return a run_id. Read the outcome with GetUnitTestResult or GetUnitTest.',
   inputSchema: {
     type: 'object',
     properties: {

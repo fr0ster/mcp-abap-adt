@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
   name: 'GetFunctionModule',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve ABAP function module definition. Supports reading active or inactive version.',
+    'Retrieve an ABAP function module (FM, BAPI or RFC function): source code and parameter signature. Active or inactive version.',
   inputSchema: {
     type: 'object',
     properties: {

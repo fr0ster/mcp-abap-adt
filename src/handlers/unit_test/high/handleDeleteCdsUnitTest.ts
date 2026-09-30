@@ -40,7 +40,7 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'Delete a CDS unit test class (global class).',
+  description: 'CDS views only: delete the ABAP Unit test class of a CDS view.',
   inputSchema: {
     type: 'object',
     properties: {

@@ -431,7 +431,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletelocaltestclass-high-level-class"></a>
 #### DeleteLocalTestClass (High-Level / Class)
-**Description:** Delete a local test class from an ABAP class by clearing the testclasses include. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Remove the ABAP Unit test code of a class by clearing its local test classes include. Locks, updates, unlocks and optionally activates the class.
 
 **Source:** `src/handlers/class/high/handleDeleteLocalTestClass.ts`
 
@@ -493,7 +493,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getlocaltestclass-high-level-class"></a>
 #### GetLocalTestClass (High-Level / Class)
-**Description:** Retrieve local test class source code from a class. Supports reading active or inactive version.
+**Description:** Read the ABAP Unit test code of a class: its local test classes (FOR TESTING) in the test include. Not the class's main source — for that use ReadClass or GetClass. Active or inactive version.
 
 **Source:** `src/handlers/class/high/handleGetLocalTestClass.ts`
 
@@ -559,7 +559,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatelocaltestclass-high-level-class"></a>
 #### UpdateLocalTestClass (High-Level / Class)
-**Description:** Update a local test class in an ABAP class. Manages lock, update, unlock, and optional activation of parent class.
+**Description:** Write or replace the ABAP Unit test code of a class: the local test classes (FOR TESTING) in the class's test include. Use it to add or change the unit tests of a class. Locks, updates, unlocks and optionally activates the class.
 
 **Source:** `src/handlers/class/high/handleUpdateLocalTestClass.ts`
 
@@ -1377,7 +1377,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="getfunctionmodule-high-level-function-module"></a>
 #### GetFunctionModule (High-Level / Function Module)
-**Description:** Retrieve ABAP function module definition. Supports reading active or inactive version.
+**Description:** Retrieve an ABAP function module (FM, BAPI or RFC function): source code and parameter signature. Active or inactive version.
 
 **Source:** `src/handlers/function_module/high/handleGetFunctionModule.ts`
 
@@ -1707,7 +1707,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicebinding-high-level-service-binding"></a>
 #### CreateServiceBinding (High-Level / Service Binding)
-**Description:** Create a new ABAP service binding in SAP system. Creates the service binding object in initial state.
+**Description:** Create an OData service binding (V2 or V4, UI or Web API) that publishes an existing service definition, in initial state. Create the service definition first with CreateServiceDefinition.
 
 **Source:** `src/handlers/service_binding/high/handleCreateServiceBinding.ts`
 
@@ -1798,7 +1798,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createservicedefinition-high-level-service-definition"></a>
 #### CreateServiceDefinition (High-Level / Service Definition)
-**Description:** Create a new ABAP service definition in SAP system. Creates the service definition object in initial state.
+**Description:** Create an ABAP service definition that exposes CDS views as an OData service, in initial state. A service binding (CreateServiceBinding) needs one to publish the service.
 
 **Source:** `src/handlers/service_definition/high/handleCreateServiceDefinition.ts`
 
@@ -2015,15 +2015,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="addtransportobject-high-level-transport"></a>
 #### AddTransportObject (High-Level / Transport)
-**Description:** Attach an existing object to a transport task, so it travels with that request. The way back from RemoveTransportObject, which leaves the object in no request at all. Refused when another task holds the object, with SCTS_ADT_MSG 009 naming the holder — that refusal is the server's answer, read it rather than pre-checking. A 200 says the request was understood; confirm with ReadTransportObjects.
+**Description:** Add an existing ABAP object (class, program, table, CDS view, ...) to a transport request, by attaching it to a task of that request so it travels with the request. Refused with SCTS_ADT_MSG 009 when another task already holds the object. Confirm with ReadTransportObjects.
 
 **Source:** `src/handlers/transport/high/handleAddTransportObject.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name.
+- `object_name` (string, required) - Object name. Attaching is also the way back from RemoveTransportObject, which leaves the object in no request at all. When another task already holds the object the call is refused with SCTS_ADT_MSG 009 naming the holder — that refusal is the server's answer, read it rather than pre-checking.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
-- `transport_number` (string, required) - The TASK to attach the object to — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks.
+- `transport_number` (string, required) - The TASK to attach the object to — the one call where a task number is the point of the call rather than an afterthought. An object is created on a REQUEST and moved onto a task here; a request number attaches nothing, because a request holds objects only through its tasks. A 200 says the request was understood, not that the entry is there; confirm with ReadTransportObjects.
 
 ---
 
@@ -2056,15 +2056,15 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="removetransportobject-high-level-transport"></a>
 #### RemoveTransportObject (High-Level / Transport)
-**Description:** Detach one object's entry from a transport TASK, so its name can be used again after the object was deleted. Address the task that holds the entry, not the request above it — a request displays its tasks' entries and refuses to detach one. `position` comes from ReadTransportObjects and is required: without it the server answers 200 and removes nothing. A 200 here is not proof either; confirm with ReadTransportActionLog or by re-reading the objects.
+**Description:** Remove an ABAP object from a transport request by detaching its entry from the transport task that holds it (position from ReadTransportObjects is required). Does not delete the object itself. Confirm with ReadTransportActionLog.
 
 **Source:** `src/handlers/transport/high/handleRemoveTransportObject.ts`
 
 **Parameters:**
-- `object_name` (string, required) - Object name.
+- `object_name` (string, required) - Object name. Detaching the entry of a deleted object lets its name be used again.
 - `object_type` (string, required) - Object-directory type — CLAS, FUGR, TABL, DOMA — not an ADT type code like CLAS/OC.
 - `pgmid` (string, optional (default: R3TR)) - Program id. Defaults to R3TR, a workbench object's.
-- `position` (string, required) - The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200.
+- `position` (string, required) - The entry's `position` as ReadTransportObjects answers it, e.g. 000025. Required: the server removes nothing without it and still answers 200. A 200 is not proof even with it; confirm with ReadTransportActionLog or by re-reading the objects.
 - `transport_number` (string, required) - The TASK holding the entry — read it from ReadTransportObjects. Not the request above it: a request displays its tasks' entries and refuses to detach one, answering that the entry "does not exist in request/task".
 
 ---
@@ -2074,12 +2074,12 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createcdsunittest-high-level-unit-test"></a>
 #### CreateCdsUnitTest (High-Level / Unit Test)
-**Description:** Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).
+**Description:** CDS views only: create the ABAP Unit test class (with CDS test doubles) for a CDS view (DDL source), in initial state; write the tests with UpdateCdsUnitTest. For unit tests of an ABAP class use UpdateLocalTestClass. Not available below BASIS 7.50.
 
 **Source:** `src/handlers/unit_test/high/handleCreateCdsUnitTest.ts`
 
 **Parameters:**
-- `cds_view_name` (string, required) - CDS view name to check for unit test doubles before creating the class.
+- `cds_view_name` (string, required) - CDS view under test. It is checked for unit test doubles before the class is created.
 - `class_name` (string, required) - Container class name.
 - `description` (string, optional) - Optional description for the container class.
 - `package_name` (string, required) - Package name.
@@ -2089,7 +2089,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="createunittest-high-level-unit-test"></a>
 #### CreateUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Alias of RunUnitTest, kept for compatibility: runs the ABAP Unit tests of a class and returns a run_id. Does not create or write test code — to write tests use UpdateLocalTestClass.
 
 **Source:** `src/handlers/unit_test/high/handleCreateUnitTest.ts`
 
@@ -2105,7 +2105,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deletecdsunittest-high-level-unit-test"></a>
 #### DeleteCdsUnitTest (High-Level / Unit Test)
-**Description:** Delete a CDS unit test class (global class).
+**Description:** CDS views only: delete the ABAP Unit test class of a CDS view.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteCdsUnitTest.ts`
 
@@ -2117,7 +2117,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="deleteunittest-high-level-unit-test"></a>
 #### DeleteUnitTest (High-Level / Unit Test)
-**Description:** Delete an ABAP Unit test run. Note: ADT does not support deleting unit test runs and will return an error.
+**Description:** Unsupported: ADT cannot delete an ABAP Unit test run, so this always fails. To remove test code use DeleteLocalTestClass.
 
 **Source:** `src/handlers/unit_test/high/handleDeleteUnitTest.ts`
 
@@ -2200,7 +2200,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="rununittest-high-level-unit-test"></a>
 #### RunUnitTest (High-Level / Unit Test)
-**Description:** Start an ABAP Unit test run for provided class test definitions. Returns run_id for status/result queries.
+**Description:** Run the ABAP Unit tests of a class (its local test classes, FOR TESTING) and return a run_id. Read the outcome with GetUnitTestResult or GetUnitTest.
 
 **Source:** `src/handlers/unit_test/high/handleRunUnitTest.ts`
 
@@ -2216,7 +2216,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updatecdsunittest-high-level-unit-test"></a>
 #### UpdateCdsUnitTest (High-Level / Unit Test)
-**Description:** Update a CDS unit test class local test class source code. Manages lock, update, and unlock of the container class.
+**Description:** CDS views only: write the test code of a CDS view's ABAP Unit test class (created by CreateCdsUnitTest). Manages lock, update and unlock. For ABAP class tests use UpdateLocalTestClass.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateCdsUnitTest.ts`
 
@@ -2229,7 +2229,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="updateunittest-high-level-unit-test"></a>
 #### UpdateUnitTest (High-Level / Unit Test)
-**Description:** Update an ABAP Unit test run. Note: ADT does not support updating unit test runs and will return an error.
+**Description:** Unsupported: ADT cannot modify an ABAP Unit test run, so this always fails. To change test code use UpdateLocalTestClass.
 
 **Source:** `src/handlers/unit_test/high/handleUpdateUnitTest.ts`
 
@@ -2238,4 +2238,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-29*
+*Last updated: 2026-09-30*

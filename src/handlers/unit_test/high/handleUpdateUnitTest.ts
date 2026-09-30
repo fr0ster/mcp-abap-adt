@@ -11,7 +11,7 @@ export const TOOL_DEFINITION = {
   name: 'UpdateUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update an ABAP Unit test run. Note: ADT does not support updating unit test runs and will return an error.',
+    'Unsupported: ADT cannot modify an ABAP Unit test run, so this always fails. To change test code use UpdateLocalTestClass.',
   inputSchema: {
     type: 'object',
     properties: {

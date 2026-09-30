@@ -148,10 +148,10 @@ export const compactCreateSchema = {
  */
 const readPartSchema = {
   type: 'string',
-  enum: ['source', 'metadata', 'urls'],
+  enum: ['source', 'metadata', 'urls', 'contents'],
   default: 'source',
   description:
-    'Which aspect to read: the source, the ADT metadata document, or the service and preview URLs. A part this object type does not offer is refused, naming the parts it does.',
+    'Which aspect to read: the source, the ADT metadata document, the service and preview URLs, or the objects a package contains. A part this object type does not offer is refused, naming the parts it does.',
 } as const;
 
 export const compactGetSchema = {
@@ -917,4 +917,84 @@ export const compactActivateSchema = {
       description: 'Run pre-audit checks before activation.',
     },
   },
+} as const;
+
+/** Object search by name or mask. */
+export const compactSearchSchema = {
+  type: 'object',
+  properties: {
+    query: {
+      type: 'string',
+      description: 'Object name or mask, with * as a wildcard.',
+    },
+    object_type: {
+      type: 'string',
+      description: 'ADT object type to restrict the search to.',
+    },
+    max_results: {
+      type: 'number',
+      default: 100,
+      description: 'Maximum number of objects returned.',
+    },
+  },
+  required: ['query'],
+} as const;
+
+/** Where-used list of one object. */
+export const compactWhereUsedSchema = {
+  type: 'object',
+  properties: {
+    object_type: {
+      type: 'string',
+      enum: [
+        'CLASS',
+        'INTERFACE',
+        'PROGRAM',
+        'INCLUDE',
+        'FUNCTION_GROUP',
+        'FUNCTION_MODULE',
+        'PACKAGE',
+        'TABLE',
+        'STRUCTURE',
+        'DOMAIN',
+        'DATA_ELEMENT',
+        'DDL',
+      ],
+      description: 'Type of the object whose usages are listed.',
+    },
+    object_name: { type: 'string', description: 'Object name.' },
+    function_group_name: {
+      type: 'string',
+      description: 'Function group of the function module (FUNCTION_MODULE).',
+    },
+    max_results: {
+      type: 'number',
+      default: 100,
+      description: 'Maximum number of referencing objects returned.',
+    },
+  },
+  required: ['object_type', 'object_name'],
+} as const;
+
+/** Rows of a table or CDS view, or of an SQL SELECT. */
+export const compactGetDataSchema = {
+  type: 'object',
+  properties: {
+    object_name: {
+      type: 'string',
+      description:
+        'Table or CDS view whose rows are read, all columns. Used when sql_query is absent.',
+    },
+    sql_query: {
+      type: 'string',
+      description:
+        'ABAP SQL SELECT naming the columns, conditions and order to read.',
+    },
+    max_rows: {
+      type: 'number',
+      default: 100,
+      description: 'Maximum number of rows returned.',
+    },
+  },
+  required: [],
 } as const;

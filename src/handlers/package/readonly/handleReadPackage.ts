@@ -3,6 +3,8 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { packageSummary } from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -25,6 +27,7 @@ export const TOOL_DEFINITION = {
         description: 'Version to read: "active" (default) or "inactive".',
         default: 'active',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['package_name'],
   },
@@ -32,13 +35,18 @@ export const TOOL_DEFINITION = {
 
 export async function handleReadPackage(
   context: HandlerContext,
-  args: { package_name: string; version?: 'active' | 'inactive' },
+  args: {
+    package_name: string;
+    version?: 'active' | 'inactive';
+    detail?: 'terse' | 'full' | 'raw';
+  },
 ) {
   const { connection, logger } = context;
   const { package_name, version = 'active' } = args;
   if (!package_name) return return_error(new Error('package_name is required'));
 
   const packageName = package_name.toUpperCase();
+  const detail = detailOf(args);
   const obj = createAdtClient(connection, logger).getPackage(
     resultsFor(packageDocuments),
   );
@@ -56,15 +64,16 @@ export async function handleReadPackage(
   // "inactive" request from silently answering the active document while
   // still claiming to be inactive.
   return answer(
-    { tool: 'ReadPackage', detail: 'terse' },
+    { tool: 'ReadPackage', detail },
     () =>
       obj.readMetadata({ packageName }, { version, analyse: analyseException }),
     (metadata: AdtReading<string>) => ({
       success: true,
       package_name: packageName,
       version,
-      source_code: metadata.raw,
-      metadata: metadata.raw,
+      ...(detail === 'raw'
+        ? { package_data: metadata.raw }
+        : { package: packageSummary(metadata.raw) }),
     }),
   );
 }

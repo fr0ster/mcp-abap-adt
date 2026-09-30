@@ -203,13 +203,6 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       metadata: 'DATA ELEMENT METADATA MARKER (no fixture)',
     },
     {
-      name: 'ReadPackage',
-      handler: handleReadPackage,
-      args: { package_name: 'zpkg' },
-      identity: { package_name: 'ZPKG' },
-      metadata: corpusBody('read-metadata-package--01-packages-zmcpshrpkg'),
-    },
-    {
       name: 'ReadFunctionGroup',
       handler: handleReadFunctionGroup,
       args: { function_group_name: 'zfg' },
@@ -236,6 +229,39 @@ describe('readonly handlers map a success into the right fields, not swapped', (
       }
     },
   );
+
+  // A package's metadata carries every sub-package — about a megabyte for a
+  // top-level package on the cloud trial — so ReadPackage answers a summary,
+  // and the document itself only with detail: raw.
+  it('ReadPackage answers a summary of the package, and the document with detail raw', async () => {
+    const metadata = corpusBody(
+      'read-metadata-package--01-packages-zmcpshrpkg',
+    );
+    fakeClient = fakeClientOf({
+      readMetadata: async () => okResponse(reading(metadata)),
+    });
+
+    const terse: any = await handleReadPackage(context as any, {
+      package_name: 'zpkg',
+    });
+    const summary = JSON.parse(terse.content[0].text);
+    expect(summary.package_name).toBe('ZPKG');
+    expect(summary.package).toEqual(
+      expect.objectContaining({
+        name: 'ZMCP_SHR_PKG',
+        super_package: 'ZADT_BLD_PKG03',
+        software_component: 'ZLOCAL',
+        sub_package_count: 0,
+      }),
+    );
+    expect(summary.package_data).toBeUndefined();
+
+    const raw: any = await handleReadPackage(context as any, {
+      package_name: 'zpkg',
+      detail: 'raw',
+    });
+    expect(JSON.parse(raw.content[0].text).package_data).toBe(metadata);
+  });
 
   // ReadPackage is the one handler in the single-readMetadata-call group
   // where `version` is not inert: AdtPackage forwards it into the query

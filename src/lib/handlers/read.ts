@@ -42,9 +42,11 @@ export { handleReadMessageClass } from '../../handlers/message_class/readonly/ha
 export { handleGetMetadataExtension } from '../../handlers/metadata_extension/high/handleGetMetadataExtension.js';
 export { handleReadMetadataExtension } from '../../handlers/metadata_extension/readonly/handleReadMetadataExtension.js';
 export { handleGetPackage } from '../../handlers/package/high/handleGetPackage.js';
+export { handleGetPackageContents } from '../../handlers/package/readonly/handleGetPackageContents.js';
 export { handleReadPackage } from '../../handlers/package/readonly/handleReadPackage.js';
 export { handleGetProgram } from '../../handlers/program/high/handleGetProgram.js';
 export { handleReadProgram } from '../../handlers/program/readonly/handleReadProgram.js';
+export { handleSearchObject } from '../../handlers/search/readonly/handleSearchObject.js';
 export { handleGetServiceBinding } from '../../handlers/service_binding/high/handleGetServiceBinding.js';
 export { handleListServiceBindingTypes } from '../../handlers/service_binding/high/handleListServiceBindingTypes.js';
 export { handleValidateServiceBinding } from '../../handlers/service_binding/high/handleValidateServiceBinding.js';
@@ -57,12 +59,15 @@ export { handleReadStructure } from '../../handlers/structure/readonly/handleRea
 // routes to these, and a package that carries only read routes must be able to
 // import them without reaching a write handler.
 export { handleGetServiceBindingPreviewUrl } from '../../handlers/system/readonly/handleGetServiceBindingPreviewUrl.js';
+export { handleGetSqlQuery } from '../../handlers/system/readonly/handleGetSqlQuery.js';
+export { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed.js';
 export { handleRuntimeAnalyzeProfilerTrace } from '../../handlers/system/readonly/handleRuntimeAnalyzeProfilerTrace.js';
 export { handleRuntimeGetDumpById } from '../../handlers/system/readonly/handleRuntimeGetDumpById.js';
 export { handleRuntimeGetProfilerTraceData } from '../../handlers/system/readonly/handleRuntimeGetProfilerTraceData.js';
 export { handleRuntimeListFeeds } from '../../handlers/system/readonly/handleRuntimeListFeeds.js';
 export { handleRuntimeListProfilerTraceFiles } from '../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles.js';
 export { handleGetTable } from '../../handlers/table/high/handleGetTable.js';
+export { handleGetTableContents } from '../../handlers/table/readonly/handleGetTableContents.js';
 export { handleReadTable } from '../../handlers/table/readonly/handleReadTable.js';
 export { handleGetCdsUnitTest } from '../../handlers/unit_test/high/handleGetCdsUnitTest.js';
 export { handleGetCdsUnitTestResult } from '../../handlers/unit_test/high/handleGetCdsUnitTestResult.js';

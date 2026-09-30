@@ -48,6 +48,10 @@ import {
   handleHandlerGet,
 } from './handlers/handleHandlerGet';
 import {
+  TOOL_DEFINITION as HandlerGetData_Tool,
+  handleHandlerGetData,
+} from './handlers/handleHandlerGetData';
+import {
   TOOL_DEFINITION as HandlerProfileList_Tool,
   handleHandlerProfileList,
 } from './handlers/handleHandlerProfileList';
@@ -55,6 +59,10 @@ import {
   TOOL_DEFINITION as HandlerProfileView_Tool,
   handleHandlerProfileView,
 } from './handlers/handleHandlerProfileView';
+import {
+  TOOL_DEFINITION as HandlerSearch_Tool,
+  handleHandlerSearch,
+} from './handlers/handleHandlerSearch';
 import {
   TOOL_DEFINITION as HandlerServiceBindingListTypes_Tool,
   handleHandlerServiceBindingListTypes,
@@ -75,6 +83,10 @@ import {
   TOOL_DEFINITION as HandlerValidate_Tool,
   handleHandlerValidate,
 } from './handlers/handleHandlerValidate';
+import {
+  TOOL_DEFINITION as HandlerWhereUsed_Tool,
+  handleHandlerWhereUsed,
+} from './handlers/handleHandlerWhereUsed';
 
 /**
  * The entries, built against a LIVE context rather than a snapshot.
@@ -100,6 +112,18 @@ export function compactReadOnlyEntries(
     {
       toolDefinition: HandlerGet_Tool,
       handler: withContext(handleHandlerGet),
+    },
+    {
+      toolDefinition: HandlerSearch_Tool,
+      handler: withContext(handleHandlerSearch),
+    },
+    {
+      toolDefinition: HandlerWhereUsed_Tool,
+      handler: withContext(handleHandlerWhereUsed),
+    },
+    {
+      toolDefinition: HandlerGetData_Tool,
+      handler: withContext(handleHandlerGetData),
     },
     {
       toolDefinition: HandlerValidate_Tool,

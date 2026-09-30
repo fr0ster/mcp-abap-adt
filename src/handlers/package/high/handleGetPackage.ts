@@ -3,6 +3,8 @@ import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { packageSummary } from '../../../lib/strategies/packageSummary';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
@@ -26,6 +28,7 @@ export const TOOL_DEFINITION = {
           'Version to read: "active" (default) for deployed version, "inactive" for modified but not activated version.',
         default: 'active',
       },
+      ...DETAIL_PROPERTY,
     },
     required: ['package_name'],
   },
@@ -34,6 +37,7 @@ export const TOOL_DEFINITION = {
 interface GetPackageArgs {
   package_name: string;
   version?: 'active' | 'inactive';
+  detail?: 'terse' | 'full' | 'raw';
 }
 
 export async function handleGetPackage(
@@ -45,6 +49,7 @@ export async function handleGetPackage(
   if (!package_name) return return_error(new Error('package_name is required'));
 
   const packageName = package_name.toUpperCase();
+  const detail = detailOf(args);
   const obj = createAdtClient(connection, logger).getPackage(
     resultsFor(packageDocuments),
   );
@@ -57,14 +62,16 @@ export async function handleGetPackage(
   // `options.version` into the query string — so it is passed through here,
   // the same fix `ReadPackage` carries (task 11 fix round 1).
   return answer(
-    { tool: 'GetPackage', detail: 'terse' },
+    { tool: 'GetPackage', detail },
     () =>
       obj.readMetadata({ packageName }, { version, analyse: analyseException }),
     (metadata: AdtReading<string>) => ({
       success: true,
       package_name: packageName,
       version,
-      package_data: metadata.raw,
+      ...(detail === 'raw'
+        ? { package_data: metadata.raw }
+        : { package: packageSummary(metadata.raw) }),
     }),
   );
 }

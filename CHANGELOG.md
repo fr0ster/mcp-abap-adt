@@ -20,8 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `HandlerGetData` — rows of a table or CDS view, or what an ABAP SQL
     `SELECT` names with its columns, conditions and order.
   - `HandlerGet` `part: contents` for a `PACKAGE` — its members, one line each:
-    name, type, description (a package of 257 members on premise: 11,260
-    characters, against 45,705 as the core reader's JSON).
+    name, type, description, capped by `max_results` (default 100) with the
+    total said (a package of 257 members on premise: 11,260 characters, against
+    45,705 as the core reader's JSON; the trial's top-level local package lists
+    11,619 entries and answers 100 of them in 3,491 characters).
 
   All four read, so they live in `compact-readonly` and serve `--exposition=ro`
   as well: compact is 25 tools, 16 of them read-only.
@@ -34,8 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sub-packages — and the metadata document itself with `detail: raw`. The
   document carries every sub-package: a top-level package answered about
   950,000 characters on the cloud trial (5,815 sub-packages, no member object),
-  which an MCP client refused, and `ReadPackage` sent it twice. On premise the
-  summary of a structure package with 1,222 sub-packages is 351 characters.
+  which an MCP client refused, and `ReadPackage` sent it twice. The same package
+  now answers 327 characters (`sub_package_count: 5813`); on premise a
+  structure package with 1,222 sub-packages answers 351.
 
 ## [15.0.0] - 2026-09-30
 

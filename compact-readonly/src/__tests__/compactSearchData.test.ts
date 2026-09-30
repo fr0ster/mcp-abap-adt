@@ -202,6 +202,33 @@ describe('HandlerGet PACKAGE part contents', () => {
     );
   });
 
+  it('caps the list and says how many there are', async () => {
+    contentsAnswer = {
+      isError: false,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            Array.from({ length: 7 }, (_, i) => ({
+              name: `Z${i}`,
+              type: 'DEVC/K',
+              description: '',
+            })),
+          ),
+        },
+      ],
+    };
+    const answered: any = await handleHandlerGet(context, {
+      object_type: 'PACKAGE',
+      part: 'contents',
+      package_name: 'ZPKG',
+      max_results: 3,
+    } as never);
+    const lines = answered.content[0].text.split('\n');
+    expect(lines).toHaveLength(5);
+    expect(lines.at(-1)).toBe('(3 of 7 shown; raise max_results for more)');
+  });
+
   it('is refused for a type that has no contents, naming what it offers', async () => {
     const answered: any = await handleHandlerGet(context, {
       object_type: 'CLASS',

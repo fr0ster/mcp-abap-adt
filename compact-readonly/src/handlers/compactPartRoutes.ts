@@ -116,10 +116,21 @@ async function packageContentsLines(
       description?: string;
     }>;
     if (!Array.isArray(items)) return answered;
+    // Capped like a where-used list: a structure package's members are its
+    // sub-packages, and on the cloud trial one had 5,813 of them.
+    const max =
+      typeof args.max_results === 'number' && args.max_results > 0
+        ? args.max_results
+        : 100;
     const lines = ['name\ttype\tdescription'];
-    for (const item of items) {
+    for (const item of items.slice(0, max)) {
       lines.push(
         `${item.name ?? ''}\t${item.type ?? ''}\t${item.description ?? ''}`,
+      );
+    }
+    if (items.length > max) {
+      lines.push(
+        `(${max} of ${items.length} shown; raise max_results for more)`,
       );
     }
     return {

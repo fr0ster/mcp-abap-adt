@@ -1,19 +1,16 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestStatus',
   available_in: ['onprem', 'cloud'] as const,
-  description:
-    'Retrieve CDS unit test run status for a run_id. ' +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
+  description: 'Retrieve CDS unit test run status for a run_id. ',
   inputSchema: {
     type: 'object',
     properties: {
@@ -42,16 +39,13 @@ export async function handleGetCdsUnitTestStatus(
   context: HandlerContext,
   args: GetCdsUnitTestStatusArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id, with_long_polling = true } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getStatus` unchanged
   // — same v18-convenience departure as `GetUnitTestStatus`, and the same
   // `analyseException` in its options since adt-clients 23.
-  const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
-    ourUnitTest,
-  );
+  const cdsUnitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   // Task 28 fix round 1 — same finding, same fix as `GetUnitTestStatus`:

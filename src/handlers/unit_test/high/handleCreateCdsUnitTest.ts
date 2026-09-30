@@ -1,101 +1,75 @@
 /**
- * CreateCdsUnitTest Handler - Create the container class for a CDS view's
- * ABAP Unit tests
+ * CreateCdsUnitTest — give a CDS view ABAP Unit tests, in one call: check the
+ * view can be tested with test doubles, create the global class that holds the
+ * tests (a view cannot hold one), write the test classes into it, activate it.
  *
- * Uses AdtClient.getCdsUnitTest().checkCdsTestDoubles and
- * AdtClient.getClass().create from @mcp-abap-adt/adt-clients 19.
- *
- * **The class shell is created through `getClass()`, not through
- * `getCdsUnitTest().create()`.** `AdtUnitTest`'s constructor — which
- * `AdtCdsUnitTest` inherits — builds its own inner delegate with no result
- * set of its own: `this.adtClass = new AdtClass(connection, logger)`, no
- * third argument. Whatever result set a caller injects at
- * `getCdsUnitTest(results)` never reaches that inner `AdtClass`, so
- * `create()`'s answer is read through the shipped default reading, not
- * `resultsFor`'s `AdtReading`-producing one — and `project(detail,
- * terseWrite)` then reads `.value`/`.status` off a value that isn't a
- * reading at all, turning every successful create into a local
- * `projection_failed` (`isError: true`, always — confirmed with a real,
- * unmocked `AdtClient` against a recording connection, not a mocked member;
- * mocking the member is exactly what let this reproduce every time and
- * never show up in a test). Calling `getClass(resultsFor(classDocuments))`
- * directly is the same wire request `AdtUnitTest.create()`'s plain path
- * makes (`this.adtClass.create({className, packageName, description,
- * transportRequest}, options)`, with no `classTemplate` since this handler
- * never sets one) — through an accessor that actually honours the injected
- * set.
- *
- * Workflow: checkCdsTestDoubles -> create. No lock: the test-doubles check is
- * a plain GET-shaped request (`checkCdsTestDoubles(cdsViewName, options)`
- * takes no lock; its verdict is `analyseCdsTestDoubles`, which adt-clients 22
- * applied on its own), and `create()` is a bare POST of the class shell.
- *
- * `cds_view_name` is real work here, not a dead parameter: it is what the
- * test-doubles check is about, asked first because a view the doubles
- * framework cannot handle makes everything after it pointless. It does not
- * itself reach `create()`'s request body — so the created class is not
- * otherwise bound to the view; that binding lives in the test source
- * written afterward, via `UpdateCdsUnitTest`.
+ * adt-clients 24 has no CDS unit-test handler: the check is the view's
+ * (`getDdl().checkCdsTestDoubles`), the container is a class (`getClass()`),
+ * the tests its `testclasses` include — composed here.
  */
 
-import { classDocuments } from '@mcp-abap-adt/adt-clients';
+import { classDocuments, ddlDocuments } from '@mcp-abap-adt/adt-clients';
 import {
   analyseCdsTestDoubles,
   analyseException,
 } from '@mcp-abap-adt/adt-strategies';
-import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
-import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { sequence } from '../../../lib/strategies/sequence';
 import { return_error } from '../../../lib/utils';
+import { writeClassTests } from '../shared/writeTests';
 
 export const TOOL_DEFINITION = {
   name: 'CreateCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    "Create the container class for a CDS view's ABAP Unit tests. Checks the view can be tested with test doubles, then creates the container class in initial state — no tests written yet. Use UpdateCdsUnitTest to write the tests. " +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
+    'Create ABAP Unit tests for a CDS view: a new test class with its local test classes, using CDS test doubles, activated.',
   inputSchema: {
     type: 'object',
     properties: {
-      class_name: {
-        type: 'string',
-        description: 'Container class name.',
-      },
-      package_name: {
-        type: 'string',
-        description: 'Package name.',
-      },
       cds_view_name: {
         type: 'string',
         description:
-          'CDS view name to check for unit test doubles before creating the class.',
+          'CDS view under test (DDL source). Must be active and testable with test doubles.',
       },
-      description: {
+      class_name: {
         type: 'string',
-        description: 'Optional description for the container class.',
+        description: 'Name of the new global class that holds the tests.',
+      },
+      package_name: {
+        type: 'string',
+        description: 'Package of the new test class.',
+      },
+      test_class_source: {
+        type: 'string',
+        description:
+          'ABAP source of the local test classes: definitions and implementations, FOR TESTING.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages), not a task.',
+          'Transport request, not a task. Required for a transportable package.',
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'package_name', 'cds_view_name'],
+    required: [
+      'cds_view_name',
+      'class_name',
+      'package_name',
+      'test_class_source',
+    ],
   },
 } as const;
 
 interface CreateCdsUnitTestArgs {
+  cds_view_name: string;
   class_name: string;
   package_name: string;
-  cds_view_name: string;
-  description?: string;
+  test_class_source: string;
   transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
@@ -104,48 +78,45 @@ export async function handleCreateCdsUnitTest(
   context: HandlerContext,
   args: CreateCdsUnitTestArgs,
 ) {
-  const { connection, logger } = context;
-
-  if (!args?.class_name) {
-    return return_error(new Error('class_name is required'));
-  }
-  if (!args?.package_name) {
-    return return_error(new Error('package_name is required'));
-  }
-  if (!args?.cds_view_name) {
-    return return_error(new Error('cds_view_name is required'));
+  for (const required of TOOL_DEFINITION.inputSchema.required) {
+    if (!args?.[required]) {
+      return return_error(new Error(`${required} is required`));
+    }
   }
 
+  const client = createAdtClient(context.connection, context.logger);
   const className = args.class_name.toUpperCase();
-  const cdsViewName = args.cds_view_name.toUpperCase();
   const detail = detailOf(args);
 
   return answer(
     { tool: 'CreateCdsUnitTest', detail },
-    async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
-      const client = createAdtClient(connection, logger);
-      const cdsUnitTest = client.getCdsUnitTest();
-      const classObj = client.getClass(resultsFor(classDocuments));
-
-      return sequence(
-        // The test-doubles verdict adt-clients 22 applied on its own
-        // (MIGRATION-23 §3).
+    () =>
+      sequence(
         () =>
-          cdsUnitTest.checkCdsTestDoubles(cdsViewName, {
-            analyse: analyseCdsTestDoubles,
-          }),
+          client
+            .getDdl(resultsFor(ddlDocuments))
+            .checkCdsTestDoubles(args.cds_view_name.toUpperCase(), {
+              analyse: analyseCdsTestDoubles,
+            }),
         () =>
-          classObj.create(
+          client.getClass(resultsFor(classDocuments)).create(
             {
               className,
               packageName: args.package_name,
-              description: args.description || className,
+              description: `ABAP Unit tests of ${args.cds_view_name.toUpperCase()}`,
+              final: true,
               transportRequest: args.transport_request,
             },
             { analyse: analyseException },
           ),
-      );
-    },
+        () =>
+          writeClassTests(
+            context,
+            className,
+            args.test_class_source,
+            args.transport_request,
+          ),
+      ),
     project(detail, terseWrite),
   );
 }

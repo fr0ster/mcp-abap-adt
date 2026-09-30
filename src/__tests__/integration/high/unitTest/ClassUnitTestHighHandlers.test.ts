@@ -1,37 +1,24 @@
 /**
- * Integration tests for Unit Test High-Level Handlers
+ * Integration tests for a class's ABAP Unit tools: CreateUnitTest, RunUnitTest,
+ * UpdateUnitTest, DeleteUnitTest. The suite builds its own class and deletes it.
  *
- * Tests high-level handlers for Unit Test module:
- * - CreateUnitTest / GetUnitTest / UpdateUnitTest / RunUnitTest / GetUnitTestStatus / GetUnitTestResult / DeleteUnitTest
- *
- * Enable debug logs:
- *   DEBUG_TESTS=true         - Test execution logs
- *   DEBUG_HANDLERS=true     - Handler logs
- *   DEBUG_ADT_LIBS=true      - Library logs
- *   DEBUG_CONNECTORS=true    - Connection logs
- *
- * Run: npm test -- --testPathPattern=integration/high/unitTest/ClassUnitTestHighHandlers
+ * Run: npm test -- --testPathPatterns=integration/high/unitTest/ClassUnitTestHighHandlers
  */
 
+import { handleCreateClass } from '../../../../handlers/class/high/handleCreateClass';
+import { handleDeleteClass } from '../../../../handlers/class/high/handleDeleteClass';
+import { handleUpdateClass } from '../../../../handlers/class/high/handleUpdateClass';
 import { handleCreateUnitTest } from '../../../../handlers/unit_test/high/handleCreateUnitTest';
 import { handleDeleteUnitTest } from '../../../../handlers/unit_test/high/handleDeleteUnitTest';
-import { handleGetUnitTest } from '../../../../handlers/unit_test/high/handleGetUnitTest';
-import { handleGetUnitTestResult } from '../../../../handlers/unit_test/high/handleGetUnitTestResult';
-import { handleGetUnitTestStatus } from '../../../../handlers/unit_test/high/handleGetUnitTestStatus';
 import { handleRunUnitTest } from '../../../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateUnitTest } from '../../../../handlers/unit_test/high/handleUpdateUnitTest';
 import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import {
-  createHandlerContext,
-  delay,
-  extractErrorMessage,
-  parseHandlerResponse,
-} from '../../helpers/testHelpers';
+import { expectTestsRan, stepsFor } from './unitTestSteps';
 
-describe('Unit Test High-Level Handlers Integration', () => {
+describe('Unit Test High-Level Handlers (class)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('unit-test-high');
 
@@ -43,20 +30,24 @@ describe('Unit Test High-Level Handlers Integration', () => {
       'full_workflow',
     );
     await tester.beforeAll(
-      async (_context: LambdaTesterContext) => {
-        // Basic setup - connection is already created in tester
-      },
-      // Cleanup lambda - no cleanup needed for unit test runs
-      async (_context: LambdaTesterContext) => {
-        // Unit test runs don't need cleanup
+      async (_context: LambdaTesterContext) => {},
+      async (context: LambdaTesterContext) => {
+        const className = context.params?.class_name;
+        if (!className) return;
+        await stepsFor(tester, context).cleanup(
+          'DeleteClass',
+          {
+            class_name: className,
+            transport_request: context.transportRequest,
+          },
+          handleDeleteClass,
+        );
       },
     );
   }, getTimeout('long'));
 
   beforeEach(async () => {
-    await tester.beforeEach(async (_context: LambdaTesterContext) => {
-      // No additional setup needed
-    });
+    await tester.beforeEach(async (_context: LambdaTesterContext) => {});
   });
 
   afterEach(async () => {
@@ -64,277 +55,86 @@ describe('Unit Test High-Level Handlers Integration', () => {
   });
 
   afterAll(async () => {
-    await tester.afterAll(async (_context: LambdaTesterContext) => {
-      // No additional cleanup needed
-    });
+    await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
   it(
-    'should test C->R->U->Run->Get status->Get result->D for Class Unit Test high-level handlers',
+    'Unit Test High-Level Handlers: create, run, update, run',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger: contextLogger } = context;
-        const testLogger = contextLogger || logger;
-
-        if (!params) {
-          testLogger?.warn('No test parameters found, skipping test');
+        const { params, packageName, transportRequest } = context;
+        const className: string | undefined = params?.class_name;
+        if (!className || !params?.test_class_source || !packageName) {
+          logger?.warn('class_unit_test not configured, skipping');
           return;
         }
+        const transport = { transport_request: transportRequest };
+        const { step } = stepsFor(tester, context);
+        const expected: string[] = params.expected_test_methods ?? [];
 
-        const testCase = params.test_class;
-        if (!testCase?.run_unit_test) {
-          testLogger?.warn(
-            'Unit test configuration not found in test-config.yaml, skipping test',
-          );
-          return;
-        }
-
-        const containerClass = testCase.container_class;
-        const testClassName = testCase.name;
-
-        if (!containerClass || !testClassName) {
-          testLogger?.warn(
-            'Container class or test class name not found, skipping test',
-          );
-          return;
-        }
-
-        testLogger?.info(
-          `   • create unit test: ${containerClass}/${testClassName}`,
+        // The class under test: tests go into its include once it is active.
+        await step(
+          'CreateClass',
+          {
+            class_name: className,
+            package_name: packageName,
+            description: 'ABAP Unit test class',
+            ...transport,
+          },
+          handleCreateClass,
         );
-        const createResponse = await tester.invokeToolOrHandler(
+        await step(
+          'UpdateClass',
+          {
+            class_name: className,
+            source_code: params.class_source,
+            activate: true,
+            ...transport,
+          },
+          handleUpdateClass,
+        );
+
+        await step(
           'CreateUnitTest',
           {
-            tests: [
-              {
-                container_class: containerClass,
-                test_class: testClassName,
-              },
-            ],
-            title: `Unit test run for ${containerClass}`,
+            class_name: className,
+            test_class_source: params.test_class_source,
+            ...transport,
           },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleCreateUnitTest(handlerContext, {
-              tests: [
-                {
-                  container_class: containerClass,
-                  test_class: testClassName,
-                },
-              ],
-              title: `Unit test run for ${containerClass}`,
-            });
-          },
+          handleCreateUnitTest,
+        );
+        expectTestsRan(
+          await step(
+            'RunUnitTest',
+            { class_name: className },
+            handleRunUnitTest,
+          ),
+          expected,
         );
 
-        if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          throw new Error(`CreateUnitTest failed: ${errorMsg}`);
-        }
-
-        const createData = parseHandlerResponse(createResponse);
-        expect(createData.success).toBe(true);
-        expect(createData.run_id).toBeDefined();
-
-        const runId = createData.run_id;
-        testLogger?.success(
-          `create unit test: ${containerClass}/${testClassName} completed successfully (run_id: ${runId})`,
-        );
-
-        await delay(5000);
-
-        testLogger?.info(`   • read unit test: run_id ${runId}`);
-        const getResponse = await tester.invokeToolOrHandler(
-          'GetUnitTest',
-          {
-            run_id: runId,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleGetUnitTest(handlerContext, {
-              run_id: runId,
-            });
-          },
-        );
-
-        if (getResponse.isError) {
-          const errorMsg = extractErrorMessage(getResponse);
-          testLogger?.warn(
-            `GetUnitTest failed (test might not be ready yet): ${errorMsg}`,
-          );
-        } else {
-          const getData = parseHandlerResponse(getResponse);
-          expect(getData.success).toBe(true);
-          expect(getData.run_id).toBe(runId);
-          testLogger?.success(
-            `get unit test: run_id ${runId} completed successfully`,
-          );
-        }
-
-        testLogger?.info(`   • update unit test: run_id ${runId}`);
-        const updateResponse = await tester.invokeToolOrHandler(
+        await step(
           'UpdateUnitTest',
           {
-            run_id: runId,
+            class_name: className,
+            test_class_source: params.test_class_source,
+            ...transport,
           },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleUpdateUnitTest(handlerContext, {
-              run_id: runId,
-            });
-          },
+          handleUpdateUnitTest,
         );
-        expect(updateResponse.isError).toBe(true);
-
-        testLogger?.info(
-          `   • run unit test: ${containerClass}/${testClassName}`,
-        );
-        const runResponse = await tester.invokeToolOrHandler(
-          'RunUnitTest',
-          {
-            tests: [
-              {
-                container_class: containerClass,
-                test_class: testClassName,
-              },
-            ],
-            title: `Unit test run for ${containerClass}`,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleRunUnitTest(handlerContext, {
-              tests: [
-                {
-                  container_class: containerClass,
-                  test_class: testClassName,
-                },
-              ],
-              title: `Unit test run for ${containerClass}`,
-            });
-          },
+        expectTestsRan(
+          await step(
+            'RunUnitTest',
+            { class_name: className },
+            handleRunUnitTest,
+          ),
+          expected,
         );
 
-        if (runResponse.isError) {
-          const errorMsg = extractErrorMessage(runResponse);
-          throw new Error(`RunUnitTest failed: ${errorMsg}`);
-        }
-
-        const runData = parseHandlerResponse(runResponse);
-        expect(runData.success).toBe(true);
-        expect(runData.run_id).toBeDefined();
-
-        const secondRunId = runData.run_id;
-        testLogger?.success(
-          `run unit test: ${containerClass}/${testClassName} completed successfully (run_id: ${secondRunId})`,
-        );
-
-        await delay(5000);
-
-        testLogger?.info(`   • get unit test status: run_id ${secondRunId}`);
-        const getStatusResponse = await tester.invokeToolOrHandler(
-          'GetUnitTestStatus',
-          {
-            run_id: secondRunId,
-            with_long_polling: true,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleGetUnitTestStatus(handlerContext, {
-              run_id: secondRunId,
-              with_long_polling: true,
-            });
-          },
-        );
-
-        if (getStatusResponse.isError) {
-          const errorMsg = extractErrorMessage(getStatusResponse);
-          testLogger?.warn(
-            `GetUnitTestStatus failed (test might not be ready yet): ${errorMsg}`,
-          );
-        } else {
-          const getStatusData = parseHandlerResponse(getStatusResponse);
-          // GetUnitTestStatus's terse projection no longer answers `success`
-          // — dropped from both status tools at every level (CHANGELOG
-          // Unreleased, "Six unit-test tools gained the `detail`
-          // parameter..."). `run_id`, `finished` and `run_status` (now the
-          // status string itself, e.g. "FINISHED") are what the projection
-          // actually carries — see handleGetUnitTestStatus.ts's
-          // `terseRunStatus`.
-          expect(getStatusData.run_id).toBe(secondRunId);
-          expect(typeof getStatusData.finished).toBe('boolean');
-          expect(typeof getStatusData.run_status).toBe('string');
-          testLogger?.success(
-            `get unit test status: run_id ${secondRunId} completed successfully`,
-          );
-        }
-
-        testLogger?.info(`   • get unit test result: run_id ${secondRunId}`);
-        const getResultResponse = await tester.invokeToolOrHandler(
-          'GetUnitTestResult',
-          {
-            run_id: secondRunId,
-            with_navigation_uris: false,
-            format: 'abapunit',
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleGetUnitTestResult(handlerContext, {
-              run_id: secondRunId,
-              with_navigation_uris: false,
-              format: 'abapunit',
-            });
-          },
-        );
-
-        if (getResultResponse.isError) {
-          const errorMsg = extractErrorMessage(getResultResponse);
-          testLogger?.warn(
-            `GetUnitTestResult failed (test might not be ready yet): ${errorMsg}`,
-          );
-        } else {
-          const getResultData = parseHandlerResponse(getResultResponse);
-          expect(getResultData.success).toBe(true);
-          expect(getResultData.run_id).toBe(secondRunId);
-          testLogger?.success(
-            `get unit test result: run_id ${secondRunId} completed successfully`,
-          );
-        }
-
-        testLogger?.info(`   • delete unit test: run_id ${secondRunId}`);
-        const deleteResponse = await tester.invokeToolOrHandler(
+        await step(
           'DeleteUnitTest',
-          {
-            run_id: secondRunId,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleDeleteUnitTest(handlerContext, {
-              run_id: secondRunId,
-            });
-          },
+          { class_name: className, ...transport },
+          handleDeleteUnitTest,
         );
-        expect(deleteResponse.isError).toBe(true);
       });
     },
     getTimeout('long'),

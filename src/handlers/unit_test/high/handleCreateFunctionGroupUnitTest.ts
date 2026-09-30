@@ -1,5 +1,7 @@
 /**
- * UpdateUnitTest — replace the ABAP Unit tests of a class and activate it.
+ * CreateFunctionGroupUnitTest — give a function group ABAP Unit tests: create
+ * its test include (the group's main program gains the INCLUDE by itself),
+ * write the test classes into it, and activate it and the group.
  */
 
 import { answer } from '../../../lib/answer';
@@ -7,19 +9,19 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
-import { writeClassTests } from '../shared/writeTests';
+import { writeFunctionGroupTests } from '../shared/writeTests';
 
 export const TOOL_DEFINITION = {
-  name: 'UpdateUnitTest',
+  name: 'CreateFunctionGroupUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Update the ABAP Unit tests of a class: replace its local test classes and activate the class.',
+    'Create ABAP Unit tests for a function group: a test include with its local test classes, activated with the group.',
   inputSchema: {
     type: 'object',
     properties: {
-      class_name: {
+      function_group_name: {
         type: 'string',
-        description: 'Class that holds the tests. Must already exist.',
+        description: 'Function group that gets the tests. Must already exist.',
       },
       test_class_source: {
         type: 'string',
@@ -33,36 +35,36 @@ export const TOOL_DEFINITION = {
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'test_class_source'],
+    required: ['function_group_name', 'test_class_source'],
   },
 } as const;
 
-interface UpdateUnitTestArgs {
-  class_name: string;
+interface CreateFunctionGroupUnitTestArgs {
+  function_group_name: string;
   test_class_source: string;
   transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
-export async function handleUpdateUnitTest(
+export async function handleCreateFunctionGroupUnitTest(
   context: HandlerContext,
-  args: UpdateUnitTestArgs,
+  args: CreateFunctionGroupUnitTestArgs,
 ) {
-  if (!args?.class_name) {
-    return return_error(new Error('class_name is required'));
+  if (!args?.function_group_name) {
+    return return_error(new Error('function_group_name is required'));
   }
   if (typeof args.test_class_source !== 'string' || !args.test_class_source) {
     return return_error(new Error('test_class_source is required'));
   }
   const detail = detailOf(args);
   return answer(
-    { tool: 'UpdateUnitTest', detail },
+    { tool: 'CreateFunctionGroupUnitTest', detail },
     () =>
-      writeClassTests(
+      writeFunctionGroupTests(
         context,
-        args.class_name,
+        args.function_group_name,
         args.test_class_source,
-        args.transport_request,
+        { create: true, transportRequest: args.transport_request },
       ),
     project(detail, terseWrite),
   );

@@ -1,16 +1,15 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
   MAX_STATUS_POLLS,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestResult',
@@ -51,7 +50,6 @@ export async function handleGetUnitTestResult(
   context: HandlerContext,
   args: GetUnitTestResultArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id, with_navigation_uris, format } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
@@ -62,7 +60,7 @@ export async function handleGetUnitTestResult(
   // via `pollUntilFinished` rather than guessing what `getResult` answers on
   // an unfinished run (uncaptured in the corpus). `getResult` takes
   // `analyseException` since adt-clients 23.
-  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const unitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   return answer(

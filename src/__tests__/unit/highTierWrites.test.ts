@@ -164,10 +164,17 @@ describe('high-tier creates: no lock, single POST', () => {
     [
       'CreateCdsUnitTest',
       handleCreateCdsUnitTest,
-      { class_name: 'ZCL_X', package_name: 'ZP', cds_view_name: 'ZI_VIEW' },
+      {
+        class_name: 'ZCL_X',
+        package_name: 'ZP',
+        cds_view_name: 'ZI_VIEW',
+        test_class_source: 'x',
+      },
     ],
   ])('%s reports a refused create as an error', async (_n, handler, args) => {
     fakeClient = fakeClientOf({
+      // CreateCdsUnitTest asks the view first; the create under test follows.
+      checkCdsTestDoubles: async () => okResponse(reading('OK', 'OK', 200)),
       create: async () => refusedResponse('Name already taken'),
     });
     const result: any = await (handler as any)(context as any, args);
@@ -314,6 +321,8 @@ describe('high-tier updates that still have a lock to take: they take it themsel
         update,
         updateMetadata: update,
         unlock,
+        // UpdateCdsUnitTest activates the test class after the write.
+        activate: async () => okResponse(reading(undefined, '', 200)),
       });
 
       const result: any = await (handler as any)(context as any, args);

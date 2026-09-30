@@ -1,5 +1,7 @@
 /**
- * UpdateUnitTest — replace the ABAP Unit tests of a class and activate it.
+ * CreateProgramUnitTest — give a report ABAP Unit tests: create its test
+ * include in the report's package, write the test classes into it, pull it
+ * into the report with an INCLUDE, and activate both.
  */
 
 import { answer } from '../../../lib/answer';
@@ -7,19 +9,19 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
-import { writeClassTests } from '../shared/writeTests';
+import { writeProgramTests } from '../shared/writeTests';
 
 export const TOOL_DEFINITION = {
-  name: 'UpdateUnitTest',
-  available_in: ['onprem', 'cloud'] as const,
+  name: 'CreateProgramUnitTest',
+  available_in: ['onprem'] as const,
   description:
-    'Update the ABAP Unit tests of a class: replace its local test classes and activate the class.',
+    'Create ABAP Unit tests for a report: a test include with its local test classes, included into the report and activated.',
   inputSchema: {
     type: 'object',
     properties: {
-      class_name: {
+      program_name: {
         type: 'string',
-        description: 'Class that holds the tests. Must already exist.',
+        description: 'Report that gets the tests. Must already exist.',
       },
       test_class_source: {
         type: 'string',
@@ -33,37 +35,35 @@ export const TOOL_DEFINITION = {
       },
       ...DETAIL_PROPERTY,
     },
-    required: ['class_name', 'test_class_source'],
+    required: ['program_name', 'test_class_source'],
   },
 } as const;
 
-interface UpdateUnitTestArgs {
-  class_name: string;
+interface CreateProgramUnitTestArgs {
+  program_name: string;
   test_class_source: string;
   transport_request?: string;
   detail?: 'terse' | 'full' | 'raw';
 }
 
-export async function handleUpdateUnitTest(
+export async function handleCreateProgramUnitTest(
   context: HandlerContext,
-  args: UpdateUnitTestArgs,
+  args: CreateProgramUnitTestArgs,
 ) {
-  if (!args?.class_name) {
-    return return_error(new Error('class_name is required'));
+  if (!args?.program_name) {
+    return return_error(new Error('program_name is required'));
   }
   if (typeof args.test_class_source !== 'string' || !args.test_class_source) {
     return return_error(new Error('test_class_source is required'));
   }
   const detail = detailOf(args);
   return answer(
-    { tool: 'UpdateUnitTest', detail },
+    { tool: 'CreateProgramUnitTest', detail },
     () =>
-      writeClassTests(
-        context,
-        args.class_name,
-        args.test_class_source,
-        args.transport_request,
-      ),
+      writeProgramTests(context, args.program_name, args.test_class_source, {
+        create: true,
+        transportRequest: args.transport_request,
+      }),
     project(detail, terseWrite),
   );
 }

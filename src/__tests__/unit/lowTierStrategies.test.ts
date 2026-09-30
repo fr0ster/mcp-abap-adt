@@ -57,21 +57,17 @@ import {
 } from '../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
 import { handleValidateBehaviorImplementation } from '../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { handleActivateClass } from '../../handlers/class/low/handleActivateClass';
-import { handleActivateClassTestClasses } from '../../handlers/class/low/handleActivateClassTestClasses';
 import { handleCheckClass } from '../../handlers/class/low/handleCheckClass';
 import { handleDeleteClass } from '../../handlers/class/low/handleDeleteClass';
 import {
   handleLockClass,
   TOOL_DEFINITION as LockClassToolDefinition,
 } from '../../handlers/class/low/handleLockClass';
-import { handleLockClassTestClasses } from '../../handlers/class/low/handleLockClassTestClasses';
 import {
   handleUnlockClass,
   TOOL_DEFINITION as UnlockClassToolDefinition,
 } from '../../handlers/class/low/handleUnlockClass';
-import { handleUnlockClassTestClasses } from '../../handlers/class/low/handleUnlockClassTestClasses';
 import { handleUpdateClass } from '../../handlers/class/low/handleUpdateClass';
-import { handleUpdateClassTestClasses } from '../../handlers/class/low/handleUpdateClassTestClasses';
 import { handleValidateClass } from '../../handlers/class/low/handleValidateClass';
 import { handleActivateDataElement } from '../../handlers/data_element/low/handleActivateDataElement';
 import { handleCheckDataElement } from '../../handlers/data_element/low/handleCheckDataElement';
@@ -530,51 +526,6 @@ describe('class', () => {
 
     expect(result.isError).toBe(false);
     expect(JSON.parse(result.content[0].text)).toEqual({ admissible: true });
-  });
-
-  describe('the test-classes trio shares getClass(), not a family of its own', () => {
-    it('ActivateClassTestClasses activates the parent class, taking analyseActivation like ActivateClass', async () => {
-      await handleActivateClassTestClasses(context as any, {
-        class_name: 'ZCL_X',
-      });
-      const call = callTo('activate');
-      expect(call?.carriedAnalyse).toBe(true);
-      expect(call?.analyse).toBe(analyseActivation);
-      expect(call?.factory).toBe('getClass');
-    });
-
-    it('LockClassTestClasses takes analyseLock and UnlockClassTestClasses analyseException — both answer IAdtResponse since adt-clients 23', async () => {
-      await handleLockClassTestClasses(context as any, { class_name: 'ZCL_X' });
-      const lockCall = callTo('lockTestClasses');
-      expect(lockCall?.carriedAnalyse).toBe(true);
-      expect(lockCall?.analyse).toBe(analyseLock);
-      expect(lockCall?.factory).toBe('getClass');
-
-      await handleUnlockClassTestClasses(context as any, {
-        class_name: 'ZCL_X',
-        lock_handle: 'h',
-      });
-      const unlockCall = callTo('unlockTestClasses');
-      expect(unlockCall?.carriedAnalyse).toBe(true);
-      expect(unlockCall?.analyse).toBe(analyseException);
-      expect(unlockCall?.factory).toBe('getClass');
-      expect(unlockCall?.args).toEqual([{ className: 'ZCL_X' }, 'h']);
-    });
-
-    it('LockClassTestClasses answers the handle itself, not the envelope around it', async () => {
-      // adt-clients 23 answers IAdtResponse here; read through `as any` the
-      // whole envelope became the handle — `lockHandle=[object Object]`, 423.
-      fakeClient = fakeClientOf({
-        lockTestClasses: async () => okResponse('TC_HANDLE'),
-      });
-      const result: any = await handleLockClassTestClasses(context as any, {
-        class_name: 'zcl_x',
-      });
-      expect(result.isError).toBe(false);
-      expect(JSON.parse(result.content[0].text).test_classes_lock_handle).toBe(
-        'TC_HANDLE',
-      );
-    });
   });
 });
 
@@ -3387,21 +3338,6 @@ describe('low-tier writes carry transport_request to config.transportRequest', (
           {
             class_name: 'ZCL_X',
             source_code: 'x',
-            lock_handle: 'h',
-            transport_request: 'SIDK900001',
-          } as any,
-        ),
-      { className: 'ZCL_X' },
-    ],
-    [
-      'UpdateClassTestClassesLow',
-      'getLocalTestClass',
-      () =>
-        handleUpdateClassTestClasses(
-          context as any,
-          {
-            class_name: 'ZCL_X',
-            test_class_source: 'x',
             lock_handle: 'h',
             transport_request: 'SIDK900001',
           } as any,

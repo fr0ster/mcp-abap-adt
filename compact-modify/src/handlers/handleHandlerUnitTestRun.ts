@@ -1,6 +1,6 @@
 import { compactUnitTestRunSchema } from '@mcp-abap-adt/lib/compact-shared';
 import type { HandlerContext } from '@mcp-abap-adt/lib/handlers';
-import { handleRunUnitTest } from '@mcp-abap-adt/lib/handlers/write';
+import { handleStartUnitTestRun } from '@mcp-abap-adt/lib/handlers/write';
 
 export const TOOL_DEFINITION = {
   name: 'HandlerUnitTestRun',
@@ -38,5 +38,5 @@ export async function handleHandlerUnitTestRun(
   context: HandlerContext,
   args: HandlerUnitTestRunArgs,
 ) {
-  return handleRunUnitTest(context, args);
+  return handleStartUnitTestRun(context, args);
 }

@@ -1,33 +1,24 @@
 /**
- * Integration tests for CDS Unit Test High-Level Handlers
+ * Integration tests for a CDS view's ABAP Unit tools: CreateCdsUnitTest,
+ * RunCdsUnitTest, UpdateCdsUnitTest, and DeleteCdsUnitTest as cleanup. The view
+ * must exist; the test class is the suite's own.
  *
- * Tests CDS unit test class lifecycle and run status/result retrieval:
- * - CreateCdsUnitTest / UpdateCdsUnitTest / RunUnitTest / GetCdsUnitTestStatus / GetCdsUnitTestResult / DeleteCdsUnitTest
+ * Run: npm test -- --testPathPatterns=integration/high/unitTest/CdsUnitTestHighHandlers
  */
 
-import { handleGetClass } from '../../../../handlers/class/high/handleGetClass';
-import { handleActivateClass } from '../../../../handlers/class/low/handleActivateClass';
 import { handleCreateCdsUnitTest } from '../../../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleDeleteCdsUnitTest } from '../../../../handlers/unit_test/high/handleDeleteCdsUnitTest';
-import { handleGetCdsUnitTestResult } from '../../../../handlers/unit_test/high/handleGetCdsUnitTestResult';
-import { handleGetCdsUnitTestStatus } from '../../../../handlers/unit_test/high/handleGetCdsUnitTestStatus';
-import { handleRunUnitTest } from '../../../../handlers/unit_test/high/handleRunUnitTest';
+import { handleRunCdsUnitTest } from '../../../../handlers/unit_test/high/handleRunCdsUnitTest';
 import { handleUpdateCdsUnitTest } from '../../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
-import { getCleanupAfter, getTimeout } from '../../helpers/configHelpers';
+import { getTimeout } from '../../helpers/configHelpers';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { LambdaTester } from '../../helpers/testers/LambdaTester';
 import type { LambdaTesterContext } from '../../helpers/testers/types';
-import {
-  createHandlerContext,
-  delay,
-  extractErrorMessage,
-  parseHandlerResponse,
-} from '../../helpers/testHelpers';
+import { expectTestsRan, stepsFor } from './unitTestSteps';
 
-describe('CDS Unit Test High-Level Handlers Integration', () => {
+describe('Unit Test High-Level Handlers (CDS view)', () => {
   let tester: LambdaTester;
   const logger = createTestLogger('cds-unit-test-high');
-  let deletedInTest = false;
 
   beforeAll(async () => {
     tester = new LambdaTester(
@@ -36,70 +27,25 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
       'cds-unit-test-high',
       'full_workflow',
     );
-
     await tester.beforeAll(
-      async (_context: LambdaTesterContext) => {
-        // No additional setup needed
-      },
+      async (_context: LambdaTesterContext) => {},
       async (context: LambdaTesterContext) => {
-        if (deletedInTest) {
-          return;
-        }
-
-        const {
-          connection,
-          params,
-          logger: contextLogger,
-          transportRequest,
-        } = context;
-        const testLogger = contextLogger || logger;
-
-        const className = params?.class_name;
-        if (!className) {
-          return;
-        }
-
-        try {
-          const deleteResponse = await tester.invokeToolOrHandler(
-            'DeleteCdsUnitTest',
-            {
-              class_name: className,
-              transport_request: params?.transport_request || transportRequest,
-            },
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection,
-                logger: testLogger,
-              });
-              return handleDeleteCdsUnitTest(handlerContext, {
-                class_name: className,
-                transport_request:
-                  params?.transport_request || transportRequest,
-              });
-            },
-          );
-
-          if (deleteResponse.isError) {
-            const errorMsg = extractErrorMessage(deleteResponse);
-            testLogger?.warn(
-              `Cleanup delete failed (ignored): ${errorMsg || 'Unknown error'}`,
-            );
-          } else {
-            testLogger?.info(`cleanup: deleted ${className} successfully`);
-          }
-        } catch (error: any) {
-          testLogger?.warn(
-            `Cleanup delete error (ignored): ${error?.message || String(error)}`,
-          );
-        }
+        const className = context.params?.class_name;
+        if (!className) return;
+        await stepsFor(tester, context).cleanup(
+          'DeleteCdsUnitTest',
+          {
+            class_name: className,
+            transport_request: context.transportRequest,
+          },
+          handleDeleteCdsUnitTest,
+        );
       },
     );
   }, getTimeout('long'));
 
   beforeEach(async () => {
-    await tester.beforeEach(async (_context: LambdaTesterContext) => {
-      // No additional setup needed
-    });
+    await tester.beforeEach(async (_context: LambdaTesterContext) => {});
   });
 
   afterEach(async () => {
@@ -107,334 +53,66 @@ describe('CDS Unit Test High-Level Handlers Integration', () => {
   });
 
   afterAll(async () => {
-    await tester.afterAll(async (_context: LambdaTesterContext) => {
-      // No additional cleanup needed
-    });
+    await tester.afterAll(async (_context: LambdaTesterContext) => {});
   });
 
   it(
-    'should test C->R->U->Run->Get status->Get result->D for CDS unit test high-level handlers',
+    'Unit Test High-Level Handlers: create, run, update, run',
     async () => {
       await tester.run(async (context: LambdaTesterContext) => {
-        const { connection, params, logger: contextLogger, testCase } = context;
-        const testLogger = contextLogger || logger;
-
-        if (!params) {
-          testLogger?.warn('No test parameters found, skipping test');
-          return;
-        }
-
-        const className = params.class_name;
-        const packageName = params.package_name;
-        const cdsViewName = params.cds_view_name;
-        const classTemplate = params.class_template;
-        const testClassSource = params.test_class_source;
-        const testClassName = params.test_class_name;
-        const updateTestClassSource = params.update_test_class_source;
-
+        const { params, packageName, transportRequest } = context;
+        const className: string | undefined = params?.class_name;
         if (
           !className ||
-          !packageName ||
-          !cdsViewName ||
-          !classTemplate ||
-          !testClassSource ||
-          !testClassName
+          !params?.cds_view_name ||
+          !params?.test_class_source ||
+          !packageName
         ) {
-          testLogger?.warn(
-            'CDS unit test configuration not found in test-config.yaml, skipping test',
-          );
+          logger?.warn('cds_unit_test not configured, skipping');
           return;
         }
+        const transport = { transport_request: transportRequest };
+        const { step } = stepsFor(tester, context);
+        const expected: string[] = params.expected_test_methods ?? [];
 
-        // Step 1: Create CDS unit test class
-        testLogger?.info(`   • create cds unit test: ${className}`);
-        // `class_template` and `test_class_source` no longer reach
-        // CreateCdsUnitTest — the class shell is a bare `getClass().create`
-        // with no classTemplate (see handleCreateCdsUnitTest's own doc
-        // comment), and the test source is written afterward, under a lock,
-        // by UpdateCdsUnitTest (Step 3 below reads `update_test_class_source`
-        // for exactly that). `classTemplate`/`testClassSource` stay above as
-        // a test-config presence check; they are just not forwarded here.
-        const createResponse = await tester.invokeToolOrHandler(
+        await step(
           'CreateCdsUnitTest',
           {
+            cds_view_name: params.cds_view_name,
             class_name: className,
             package_name: packageName,
-            cds_view_name: cdsViewName,
-            description: params.description,
-            transport_request: params.transport_request,
+            test_class_source: params.test_class_source,
+            ...transport,
           },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleCreateCdsUnitTest(handlerContext, {
-              class_name: className,
-              package_name: packageName,
-              cds_view_name: cdsViewName,
-              description: params.description,
-              transport_request: params.transport_request,
-            });
-          },
+          handleCreateCdsUnitTest,
+        );
+        expectTestsRan(
+          await step(
+            'RunCdsUnitTest',
+            { class_name: className },
+            handleRunCdsUnitTest,
+          ),
+          expected,
         );
 
-        if (createResponse.isError) {
-          const errorMsg = extractErrorMessage(createResponse);
-          throw new Error(`CreateCdsUnitTest failed: ${errorMsg}`);
-        }
-
-        // CreateCdsUnitTest's terse projection is `terseWrite`: on success it
-        // answers the literal text "SUCCESS", not a JSON object — `success`/
-        // `class_name` no longer exist to read (CHANGELOG Unreleased: "Terse
-        // writes answer the literal string `SUCCESS` ... uniformly across
-        // every write tool"; see projections.ts `terseWrite`).
-        expect(createResponse.content[0]?.text).toBe('SUCCESS');
-
-        testLogger?.success(`create cds unit test: ${className} done`);
-
-        // Step 1b: activate the class, as adt-clients' CdsUnitTest suite does
-        // (create → activate → read). A class just created has no version to
-        // read yet: over RFC — one ABAP session for the run — the read in the
-        // creating session answered 400 SADT_RESOURCE 007 "wrong input data"
-        // (on premise, 2026-09-26). HTTP happened to answer a generated shell.
-        testLogger?.info(`   • activate cds unit test class: ${className}`);
-        const activateResponse = await tester.invokeToolOrHandler(
-          'ActivateClassLow',
-          { class_name: className },
-          async () =>
-            handleActivateClass(
-              createHandlerContext({ connection, logger: testLogger }),
-              { class_name: className },
-            ),
-        );
-        if (activateResponse.isError) {
-          throw new Error(
-            `ActivateClass failed: ${extractErrorMessage(activateResponse)}`,
-          );
-        }
-
-        // Step 2: Read CDS unit test class (via GetClass)
-        testLogger?.info(`   • read cds unit test class: ${className}`);
-        const readResponse = await tester.invokeToolOrHandler(
-          'GetClass',
+        await step(
+          'UpdateCdsUnitTest',
           {
             class_name: className,
-            version: 'active',
+            test_class_source:
+              params.update_test_class_source ?? params.test_class_source,
+            ...transport,
           },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleGetClass(handlerContext, {
-              class_name: className,
-              version: 'active',
-            });
-          },
+          handleUpdateCdsUnitTest,
         );
-
-        if (readResponse.isError) {
-          const errorMsg = extractErrorMessage(readResponse);
-          throw new Error(`GetClass failed: ${errorMsg}`);
-        }
-
-        const readData = parseHandlerResponse(readResponse);
-        expect(readData.success).toBe(true);
-        expect(readData.class_name).toBe(className.toUpperCase());
-
-        // Step 3: Update CDS unit test class (optional)
-        if (updateTestClassSource) {
-          testLogger?.info(`   • update cds unit test: ${className}`);
-          const updateResponse = await tester.invokeToolOrHandler(
-            'UpdateCdsUnitTest',
-            {
-              class_name: className,
-              test_class_source: updateTestClassSource,
-              transport_request: params.transport_request,
-            },
-            async () => {
-              const handlerContext = createHandlerContext({
-                connection,
-                logger: testLogger,
-              });
-              return handleUpdateCdsUnitTest(handlerContext, {
-                class_name: className,
-                test_class_source: updateTestClassSource,
-                transport_request: params.transport_request,
-              });
-            },
-          );
-
-          if (updateResponse.isError) {
-            const errorMsg = extractErrorMessage(updateResponse);
-            throw new Error(`UpdateCdsUnitTest failed: ${errorMsg}`);
-          }
-
-          // UpdateCdsUnitTest's terse projection is `terseWrite` too — same
-          // literal "SUCCESS" text, no `success` field (projections.ts
-          // `terseWrite`).
-          expect(updateResponse.content[0]?.text).toBe('SUCCESS');
-          testLogger?.success(`update cds unit test: ${className} done`);
-        } else {
-          testLogger?.warn(
-            'update_test_class_source not provided, skipping update step',
-          );
-        }
-
-        // Step 4: Run unit test by class to obtain run_id
-        testLogger?.info(
-          `   • run cds unit test: ${className}/${testClassName}`,
+        expectTestsRan(
+          await step(
+            'RunCdsUnitTest',
+            { class_name: className },
+            handleRunCdsUnitTest,
+          ),
+          expected,
         );
-        const runResponse = await tester.invokeToolOrHandler(
-          'RunUnitTest',
-          {
-            tests: [
-              {
-                container_class: className,
-                test_class: testClassName,
-              },
-            ],
-            title: `CDS unit test run for ${className}`,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleRunUnitTest(handlerContext, {
-              tests: [
-                {
-                  container_class: className,
-                  test_class: testClassName,
-                },
-              ],
-              title: `CDS unit test run for ${className}`,
-            });
-          },
-        );
-
-        if (runResponse.isError) {
-          const errorMsg = extractErrorMessage(runResponse);
-          throw new Error(`CreateUnitTest failed: ${errorMsg}`);
-        }
-
-        const runData = parseHandlerResponse(runResponse);
-        expect(runData.success).toBe(true);
-        expect(runData.run_id).toBeDefined();
-
-        const runId = runData.run_id;
-        testLogger?.success(
-          `run cds unit test: ${className}/${testClassName} (run_id: ${runId})`,
-        );
-
-        await delay(5000);
-
-        testLogger?.info(`   • get cds unit test status: run_id ${runId}`);
-        const getStatusResponse = await tester.invokeToolOrHandler(
-          'GetCdsUnitTestStatus',
-          {
-            run_id: runId,
-            with_long_polling: true,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleGetCdsUnitTestStatus(handlerContext, {
-              run_id: runId,
-              with_long_polling: true,
-            });
-          },
-        );
-
-        if (getStatusResponse.isError) {
-          const errorMsg = extractErrorMessage(getStatusResponse);
-          testLogger?.warn(
-            `GetCdsUnitTestStatus failed (test might not be ready yet): ${errorMsg}`,
-          );
-        } else {
-          const getStatusData = parseHandlerResponse(getStatusResponse);
-          // GetCdsUnitTestStatus's terse projection no longer answers
-          // `success` — dropped from both status tools at every level
-          // (CHANGELOG Unreleased, "Six unit-test tools gained the `detail`
-          // parameter..."). `run_id`, `finished` and `run_status` (now the
-          // status string itself, e.g. "FINISHED") are what the projection
-          // actually carries — see handleGetCdsUnitTestStatus.ts's
-          // `terseRunStatus`.
-          expect(getStatusData.run_id).toBe(runId);
-          expect(typeof getStatusData.finished).toBe('boolean');
-          expect(typeof getStatusData.run_status).toBe('string');
-          testLogger?.success(`get cds unit test status: run_id ${runId}`);
-        }
-
-        testLogger?.info(`   • get cds unit test result: run_id ${runId}`);
-        const getResultResponse = await tester.invokeToolOrHandler(
-          'GetCdsUnitTestResult',
-          {
-            run_id: runId,
-            with_navigation_uris: false,
-            format: 'abapunit',
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleGetCdsUnitTestResult(handlerContext, {
-              run_id: runId,
-              with_navigation_uris: false,
-              format: 'abapunit',
-            });
-          },
-        );
-
-        if (getResultResponse.isError) {
-          const errorMsg = extractErrorMessage(getResultResponse);
-          testLogger?.warn(
-            `GetCdsUnitTestResult failed (test might not be ready yet): ${errorMsg}`,
-          );
-        } else {
-          const getResultData = parseHandlerResponse(getResultResponse);
-          expect(getResultData.success).toBe(true);
-          expect(getResultData.run_id).toBe(runId);
-          testLogger?.success(`get cds unit test result: run_id ${runId}`);
-        }
-
-        // Step 5: Delete CDS unit test class (final step)
-        testLogger?.info(`   • delete cds unit test: ${className}`);
-        const deleteResponse = await tester.invokeToolOrHandler(
-          'DeleteCdsUnitTest',
-          {
-            class_name: className,
-            transport_request: params.transport_request,
-          },
-          async () => {
-            const handlerContext = createHandlerContext({
-              connection,
-              logger: testLogger,
-            });
-            return handleDeleteCdsUnitTest(handlerContext, {
-              class_name: className,
-              transport_request: params.transport_request,
-            });
-          },
-        );
-
-        if (deleteResponse.isError) {
-          const errorMsg = extractErrorMessage(deleteResponse);
-          throw new Error(`DeleteCdsUnitTest failed: ${errorMsg}`);
-        }
-
-        const deleteData = parseHandlerResponse(deleteResponse);
-        // DeleteCdsUnitTest's terse projection is `terseDeletion`, which
-        // answers `deleted`/`object` from ADT's own `del:deletionResult`
-        // document — it never had a `success` field (projections.ts
-        // `terseDeletion`).
-        expect(deleteData.deleted).toBe(true);
-        deletedInTest = true;
-        testLogger?.success(`delete cds unit test: ${className} done`);
       });
     },
     getTimeout('long'),

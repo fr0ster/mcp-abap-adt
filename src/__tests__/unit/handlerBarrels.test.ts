@@ -64,8 +64,10 @@ describe("lib's read and write handler barrels", () => {
     // and the preview-URL tool joined them when `HandlerGet` gained `part`, which
     // is why this number moves deliberately and in a commit that says so.
     expect(read).toHaveLength(54);
-    // 69 handlers plus TYPE_TO_FAMILY, the activation family map.
-    expect(write).toHaveLength(70);
+    // 78 handlers plus TYPE_TO_FAMILY, the activation family map. 15.0.0
+    // added the eight unit-test tools per carrier (report, function group,
+    // module, CDS run) and the compact facade's run start.
+    expect(write).toHaveLength(79);
   });
 
   it('share not one symbol', () => {

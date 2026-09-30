@@ -1,55 +1,55 @@
 /**
- * DeleteUnitTest Handler - Delete ABAP Unit test run via AdtClient
- *
- * Uses AdtClient.getUnitTest().delete() for high-level delete operation.
- * Note: ADT does not support deleting unit test runs.
+ * DeleteUnitTest — remove every ABAP Unit test of a class: its test include
+ * is written empty and the class activated. The class itself stays.
  */
 
+import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
+import { project, terseWrite } from '../../../lib/strategies/projections';
 import { return_error } from '../../../lib/utils';
+import { writeClassTests } from '../shared/writeTests';
 
 export const TOOL_DEFINITION = {
   name: 'DeleteUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Unsupported: ADT cannot delete an ABAP Unit test run, so this always fails.',
+    'Delete the ABAP Unit tests of a class: remove its local test classes, keeping the class.',
   inputSchema: {
     type: 'object',
     properties: {
-      run_id: {
+      class_name: {
         type: 'string',
-        description: 'Run identifier returned by CreateUnitTest/RunUnitTest.',
+        description: 'Class that holds the tests. Must already exist.',
       },
+      transport_request: {
+        type: 'string',
+        description:
+          'Transport request, not a task. Required for a transportable object.',
+      },
+      ...DETAIL_PROPERTY,
     },
-    required: ['run_id'],
+    required: ['class_name'],
   },
 } as const;
 
 interface DeleteUnitTestArgs {
-  run_id: string;
+  class_name: string;
+  transport_request?: string;
+  detail?: 'terse' | 'full' | 'raw';
 }
 
-/**
- * Main handler for DeleteUnitTest MCP tool
- *
- * ADT exposes no resource for deleting a test run, so this refuses instead of
- * pretending. It used to call `AdtClient.getUnitTest().delete()`, which threw
- * the same refusal from inside the client; adt-clients 9.0.0 dropped the method
- * from the declared contract, which is what surfaced the round trip as pointless.
- */
 export async function handleDeleteUnitTest(
-  _context: HandlerContext,
+  context: HandlerContext,
   args: DeleteUnitTestArgs,
 ) {
-  const { run_id } = (args ?? {}) as DeleteUnitTestArgs;
-
-  if (!run_id) {
-    return return_error(new Error('run_id is required'));
+  if (!args?.class_name) {
+    return return_error(new Error('class_name is required'));
   }
-
-  return return_error(
-    new Error(
-      `Cannot delete unit test run ${run_id}: ADT does not support deleting test runs.`,
-    ),
+  const detail = detailOf(args);
+  return answer(
+    { tool: 'DeleteUnitTest', detail },
+    () => writeClassTests(context, args.class_name, '', args.transport_request),
+    project(detail, terseWrite),
   );
 }

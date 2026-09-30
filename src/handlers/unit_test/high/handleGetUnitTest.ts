@@ -1,16 +1,15 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
   MAX_STATUS_POLLS,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTest',
@@ -39,7 +38,6 @@ export async function handleGetUnitTest(
   context: HandlerContext,
   args: GetUnitTestArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
@@ -51,7 +49,7 @@ export async function handleGetUnitTest(
   // see `pollRun.ts`'s own comment for why a naive `pair()` was wrong here.
   // `getStatus` and `getResult` take the run and, since adt-clients 23,
   // options with `analyse`; `analyseException` is passed to both.
-  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const unitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   return answer(

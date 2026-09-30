@@ -64,7 +64,6 @@ import { handleCreateTable } from '../../handlers/table/high/handleCreateTable';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
-import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import {
   type RecordedRequest,
@@ -385,15 +384,15 @@ const cases: ChannelCase[] = [
     // no `SEVERITY`, which `testDoublesVerdict` treats as a refusal, so a
     // real `OK` verdict is seeded ahead of the class create under test.
     name: 'CreateCdsUnitTest',
-    method: 'POST',
-    urlContains: '/sap/bc/adt/oo/classes',
+    method: 'PUT',
+    urlContains: '/includes/testclasses',
     seedAnswers: [{ data: TEST_DOUBLES_OK }],
     run: (marker, connection) =>
       handleCreateCdsUnitTest(ctx(connection) as any, {
         class_name: 'ZCL_X',
         package_name: 'ZP',
         cds_view_name: 'ZI_VIEW',
-        description: marker,
+        test_class_source: marker,
       }),
   },
   {
@@ -466,29 +465,15 @@ const cases: ChannelCase[] = [
       }),
   },
   {
-    // `startClassUnitTestRun`'s XML carries the caller's `title` verbatim.
-    // `runId` needs a run id in the answer to judge this a success at all
-    // (`startedRun`'s own verdict — no id, no success, regardless of HTTP
-    // status), so a `Location` header naming a run is seeded.
+    // Since 15.0.0 CreateUnitTest writes the class's tests: the test source
+    // is the PUT of its testclasses include.
     name: 'CreateUnitTest',
-    method: 'POST',
-    urlContains: '/sap/bc/adt/abapunit/runs',
-    seedAnswers: [{ headers: { location: '/sap/bc/adt/abapunit/runs/1' } }],
+    method: 'PUT',
+    urlContains: '/includes/testclasses',
     run: (marker, connection) =>
       handleCreateUnitTest(ctx(connection) as any, {
-        tests: [{ container_class: 'ZCL_X', test_class: 'LTCL_X' }],
-        title: marker,
-      }),
-  },
-  {
-    name: 'RunUnitTest',
-    method: 'POST',
-    urlContains: '/sap/bc/adt/abapunit/runs',
-    seedAnswers: [{ headers: { location: '/sap/bc/adt/abapunit/runs/1' } }],
-    run: (marker, connection) =>
-      handleRunUnitTest(ctx(connection) as any, {
-        tests: [{ container_class: 'ZCL_X', test_class: 'LTCL_X' }],
-        title: marker,
+        class_name: 'ZCL_X',
+        test_class_source: marker,
       }),
   },
 ];

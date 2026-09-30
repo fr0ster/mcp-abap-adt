@@ -440,7 +440,7 @@
   {
     "group": "high",
     "name": "CreateTransportTask",
-    "inputs": "transport_number*, target_user*, detail",
+    "inputs": "transport_number*, target_user*, task_type, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -614,67 +614,37 @@
   {
     "group": "high",
     "name": "CreateUnitTest",
-    "inputs": "tests*, title, context, scope, risk_level, duration",
+    "inputs": "class_name*, test_class_source*, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "RunUnitTest",
-    "inputs": "tests*, title, context, scope, risk_level, duration",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "GetUnitTest",
-    "inputs": "run_id*, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "GetUnitTestStatus",
-    "inputs": "run_id*, with_long_polling, detail",
+    "inputs": "class_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "GetUnitTestResult",
-    "inputs": "run_id*, with_navigation_uris, format, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "UpdateUnitTest",
-    "inputs": "run_id*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "DeleteUnitTest",
-    "inputs": "run_id*",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "CreateCdsUnitTest",
-    "inputs": "class_name*, package_name*, cds_view_name*, description, transport_request, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "high",
-    "name": "GetCdsUnitTest",
     "inputs": "run_id*, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
-    "name": "GetCdsUnitTestStatus",
-    "inputs": "run_id*, with_long_polling, detail",
+    "name": "UpdateUnitTest",
+    "inputs": "class_name*, test_class_source*, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
-    "name": "GetCdsUnitTestResult",
-    "inputs": "run_id*, with_navigation_uris, format, detail",
+    "name": "DeleteUnitTest",
+    "inputs": "class_name*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "CreateCdsUnitTest",
+    "inputs": "cds_view_name*, class_name*, package_name*, test_class_source*, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -687,6 +657,54 @@
     "group": "high",
     "name": "DeleteCdsUnitTest",
     "inputs": "class_name*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "RunCdsUnitTest",
+    "inputs": "class_name*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "CreateProgramUnitTest",
+    "inputs": "program_name*, test_class_source*, transport_request, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateProgramUnitTest",
+    "inputs": "program_name*, test_class_source*, transport_request, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "RunProgramUnitTest",
+    "inputs": "program_name*, detail",
+    "available_in": "onprem"
+  },
+  {
+    "group": "high",
+    "name": "CreateFunctionGroupUnitTest",
+    "inputs": "function_group_name*, test_class_source*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "UpdateFunctionGroupUnitTest",
+    "inputs": "function_group_name*, test_class_source*, transport_request, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "RunFunctionGroupUnitTest",
+    "inputs": "function_group_name*, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "high",
+    "name": "RunFunctionModuleUnitTest",
+    "inputs": "function_module_name*, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -950,7 +968,7 @@
   {
     "group": "high",
     "name": "CheckBehaviorDefinition",
-    "inputs": "name*",
+    "inputs": "name*, version",
     "available_in": "cloud, onprem"
   },
   {
@@ -962,19 +980,19 @@
   {
     "group": "high",
     "name": "CheckDataElement",
-    "inputs": "data_element_name*",
+    "inputs": "data_element_name*, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CheckDomain",
-    "inputs": "domain_name*",
+    "inputs": "domain_name*, version",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CheckFunctionGroup",
-    "inputs": "function_group_name*",
+    "inputs": "function_group_name*, version",
     "available_in": "cloud, onprem"
   },
   {
@@ -986,7 +1004,7 @@
   {
     "group": "high",
     "name": "CheckInterface",
-    "inputs": "interface_name*",
+    "inputs": "interface_name*, version",
     "available_in": "cloud, onprem"
   },
   {
@@ -998,13 +1016,13 @@
   {
     "group": "high",
     "name": "CheckPackage",
-    "inputs": "package_name*, super_package*",
+    "inputs": "package_name*, super_package",
     "available_in": "cloud, onprem"
   },
   {
     "group": "high",
     "name": "CheckProgram",
-    "inputs": "program_name*",
+    "inputs": "program_name*, version",
     "available_in": "onprem"
   },
   {
@@ -1196,7 +1214,7 @@
   {
     "group": "low",
     "name": "UpdatePackageLow",
-    "inputs": "package_name*, super_package*, updated_description*, lock_handle*, session_id, session_state",
+    "inputs": "package_name*, super_package*, updated_description*, transport_request, lock_handle*, session_id, session_state",
     "available_in": "cloud, onprem"
   },
   {
@@ -1208,7 +1226,7 @@
   {
     "group": "low",
     "name": "CheckPackageLow",
-    "inputs": "package_name*, super_package*, session_id, session_state, detail",
+    "inputs": "package_name*, super_package, session_id, session_state, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1244,7 +1262,7 @@
   {
     "group": "low",
     "name": "CheckDomainLow",
-    "inputs": "domain_name*, session_id, session_state, detail",
+    "inputs": "domain_name*, session_id, session_state, version, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1292,7 +1310,7 @@
   {
     "group": "low",
     "name": "CheckDataElementLow",
-    "inputs": "data_element_name*, session_id, session_state, detail",
+    "inputs": "data_element_name*, session_id, session_state, version, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1388,7 +1406,7 @@
   {
     "group": "low",
     "name": "UpdateStructureLow",
-    "inputs": "structure_name*, ddl_code*, lock_handle*, session_id, session_state, detail",
+    "inputs": "structure_name*, ddl_code*, lock_handle*, session_id, session_state, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1436,7 +1454,7 @@
   {
     "group": "low",
     "name": "UpdateDdlLow",
-    "inputs": "ddl_name*, ddl_source*, lock_handle*, session_id, session_state, detail",
+    "inputs": "ddl_name*, ddl_source*, lock_handle*, session_id, session_state, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1484,7 +1502,7 @@
   {
     "group": "low",
     "name": "UpdateClassLow",
-    "inputs": "class_name*, source_code*, lock_handle*, detail",
+    "inputs": "class_name*, source_code*, lock_handle*, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1531,56 +1549,14 @@
   },
   {
     "group": "low",
-    "name": "LockClassTestClassesLow",
-    "inputs": "class_name*, session_id, session_state",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
-    "name": "UnlockClassTestClassesLow",
-    "inputs": "class_name*, lock_handle*, session_id, session_state",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
-    "name": "UpdateClassTestClassesLow",
-    "inputs": "class_name*, test_class_source*, lock_handle*, session_id, session_state, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
-    "name": "ActivateClassTestClassesLow",
-    "inputs": "class_name*, test_class_name, session_id, session_state, detail",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
-    "name": "RunClassUnitTestsLow",
-    "inputs": "tests*, title, context, scope, risk_level, duration, session_id, session_state",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
-    "name": "GetClassUnitTestStatusLow",
-    "inputs": "run_id*, with_long_polling, session_id, session_state",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
-    "name": "GetClassUnitTestResultLow",
-    "inputs": "run_id*, with_navigation_uris, format, session_id, session_state",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "low",
     "name": "UpdateProgramLow",
-    "inputs": "program_name*, source_code*, lock_handle*, session_id, session_state, detail",
+    "inputs": "program_name*, source_code*, lock_handle*, session_id, session_state, transport_request, detail",
     "available_in": "onprem"
   },
   {
     "group": "low",
     "name": "CheckProgramLow",
-    "inputs": "program_name*, session_id, session_state, detail",
+    "inputs": "program_name*, session_id, session_state, version, detail",
     "available_in": "onprem"
   },
   {
@@ -1622,13 +1598,13 @@
   {
     "group": "low",
     "name": "UpdateInterfaceLow",
-    "inputs": "interface_name*, source_code*, lock_handle*, session_id, session_state, detail",
+    "inputs": "interface_name*, source_code*, lock_handle*, session_id, session_state, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
     "group": "low",
     "name": "CheckInterfaceLow",
-    "inputs": "interface_name*, session_id, session_state, detail",
+    "inputs": "interface_name*, session_id, session_state, version, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1670,7 +1646,7 @@
   {
     "group": "low",
     "name": "CheckFunctionGroupLow",
-    "inputs": "function_group_name*, session_id, session_state, detail",
+    "inputs": "function_group_name*, session_id, session_state, version, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1760,7 +1736,7 @@
   {
     "group": "low",
     "name": "CheckBdefLow",
-    "inputs": "name*, session_id, session_state, detail",
+    "inputs": "name*, session_id, session_state, version, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1862,7 +1838,7 @@
   {
     "group": "low",
     "name": "UpdateMetadataExtensionLow",
-    "inputs": "name*, source_code*, lock_handle*, session_id, session_state, detail",
+    "inputs": "name*, source_code*, lock_handle*, session_id, session_state, transport_request, detail",
     "available_in": "cloud, onprem"
   },
   {
@@ -1881,6 +1857,12 @@
     "group": "low",
     "name": "ActivateServiceBindingLow",
     "inputs": "name*, session_id, session_state, detail",
+    "available_in": "cloud, onprem"
+  },
+  {
+    "group": "system",
+    "name": "GetServiceBindingPreviewUrl",
+    "inputs": "service_binding_name*, entity_set, navigation, target_entity_set, client, language",
     "available_in": "cloud, onprem"
   },
   {
@@ -2085,12 +2067,6 @@
     "group": "search",
     "name": "GetObjectsByType",
     "inputs": "parent_name*, parent_tech_name*, parent_type*, node_id*, format, with_short_descriptions",
-    "available_in": "cloud, onprem"
-  },
-  {
-    "group": "system",
-    "name": "GetServiceBindingPreviewUrl",
-    "inputs": "service_binding_name*, entity_set, navigation, target_entity_set, client, language",
     "available_in": "cloud, onprem"
   }
 ]

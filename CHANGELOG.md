@@ -7,10 +7,70 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — BREAKING
+
+- **ABAP Unit tools are one simple operation per test carrier.** A tool does one
+  thing to one kind of object, with the fewest parameters that say which; a
+  general tool with an object type and a dozen optional parameters is harder for
+  a model to call right and for a tool search to find. On adt-clients 24, which
+  runs tests per object type.
+
+  | carrier | write the tests | run them |
+  |---|---|---|
+  | class | `CreateUnitTest`, `UpdateUnitTest`, `DeleteUnitTest` (`class_name`, `test_class_source`) | `RunUnitTest` (`class_name`) |
+  | CDS view | `CreateCdsUnitTest` (view check, test class, tests — one call), `UpdateCdsUnitTest`, `DeleteCdsUnitTest` | `RunCdsUnitTest` (`class_name`) |
+  | report | `CreateProgramUnitTest`, `UpdateProgramUnitTest` (`program_name`, `test_class_source`) | `RunProgramUnitTest` (`program_name`) |
+  | function group | `CreateFunctionGroupUnitTest`, `UpdateFunctionGroupUnitTest` (`function_group_name`, `test_class_source`) | `RunFunctionGroupUnitTest`, `RunFunctionModuleUnitTest` |
+
+  Every `Run*` starts the run, waits for it within a bound and answers the
+  result; a run that outlasts the bound answers its `run_id`, and
+  `GetUnitTestResult` fetches the result later. Every write locks, writes,
+  unlocks and activates. A report's tests go into a test include the tool
+  creates in the report's package and pulls into the report; a function
+  group's into a test include whose `INCLUDE` ADT adds to the group itself.
+  Measured on premise (2026-09-30) through all four integration suites, soft
+  and hard mode.
+
+### Removed — BREAKING
+
+- **`GetUnitTest`, `GetUnitTestStatus`, `GetCdsUnitTest`,
+  `GetCdsUnitTestStatus`, `GetCdsUnitTestResult`.** A `Run*` tool answers the
+  result itself; `GetUnitTestResult` answers about any run by its id, whatever
+  started it. The functions stay exported from `@mcp-abap-adt/lib` for the
+  compact facade, which keeps its granular status and result tools.
+- **The low-tier unit-test tools** — `RunClassUnitTestsLow`,
+  `GetClassUnitTestStatusLow`, `GetClassUnitTestResultLow`,
+  `LockClassTestClassesLow`, `UnlockClassTestClassesLow`,
+  `UpdateClassTestClassesLow`, `ActivateClassTestClassesLow`. The lock pair
+  addressed members adt-clients 24 no longer has.
+
+### Migration
+
+- `CreateUnitTest` used to **start a run** (`tests[]`); it now writes a class's
+  tests. To run them call `RunUnitTest` with `class_name`.
+- `RunUnitTest` takes `class_name` instead of `tests[]` and answers the result,
+  not a run id to poll.
+- `UpdateUnitTest` and `DeleteUnitTest` took a `run_id` and always failed; they
+  now take `class_name` (and `test_class_source` for the update).
+- `CreateCdsUnitTest` now also writes the tests (`test_class_source`) and
+  activates the class; `description` is gone.
+- Instead of `GetUnitTest`/`GetUnitTestStatus`/`GetCdsUnitTest*`, read the
+  `Run*` answer; for a run that had not finished, `GetUnitTestResult` with its
+  `run_id`.
+- `GetUnitTestResult` takes `run_id` alone: `with_navigation_uris` and `format`
+  left the tool (the compact result facade still takes them).
+- Compact: `HandlerCreate`/`HandlerUpdate` for `UNIT_TEST` take `class_name`
+  and `test_class_source`, and `HandlerDelete` takes `class_name` (they took
+  `tests[]` and `run_id`); `HandlerUnitTestRun` and the status and result
+  facades are unchanged.
+- Integration config: the unit-test cases changed and two were added
+  (`program_unit_test`, `function_group_unit_test`) — copy them from
+  `tests/test-config.yaml.template`.
+
 ### Changed
 
-- **18 tool descriptions now say what the tool does to which ABAP object, first.**
-  A consumer that retrieves tools by embedding their descriptions found these 18
+- **11 tool descriptions now say what the tool does to which ABAP object, first.**
+  A consumer that retrieves tools by embedding their descriptions found these
   by the wrong words: the text was about protocol mechanics (`SCTS_ADT_MSG 009`,
   what a `200` means, `position`), about a sibling, or identical to another tool's.
   The first sentence is now *verb + ABAP object + what the caller gets*; the
@@ -25,14 +85,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snowflake-arctic-embed, OpenAI text-embedding-3-small and -3-large), hybrid and
   cosine-only scoring: required-recall at K5 rose on every one, by +5.8 to +12.8
   points (mean +8.2); on the 42 rows written before the weak spots were known, by
-  +4.1 on average. The measured text still carried the denials removed above, and
-  three wording corrections made after it; the release text was not re-measured.
+  +4.1 on average — across all 18 descriptions measured, seven of them the ABAP
+  Unit test tools rewritten above. The measured text still carried denials since
+  removed, and three wording corrections made after it; the release text was not
+  re-measured.
 
-  - Unit tests: `RunUnitTest`, `CreateUnitTest` (now says it is an alias of
-    `RunUnitTest`), `UpdateUnitTest` and `DeleteUnitTest` (now say they
-    always fail), `UpdateLocalTestClass`, `GetLocalTestClass`,
-    `DeleteLocalTestClass`, and the three CDS unit-test tools, which now start with
-    *CDS views only*.
+  - A class's test include: `UpdateLocalTestClass`, `GetLocalTestClass`,
+    `DeleteLocalTestClass`. (The ABAP Unit test tools the measurement also
+    covered were rewritten above, with descriptions of their own.)
   - Transports: `AddTransportObject`, `RemoveTransportObject`. What a `200` proves,
     `SCTS_ADT_MSG 009` naming the holder, *the way back from RemoveTransportObject*
     and *frees the name of a deleted object* moved into `transport_number`,

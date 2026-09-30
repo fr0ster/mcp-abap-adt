@@ -40,18 +40,19 @@ import { return_error } from '../../../lib/utils';
 export const TOOL_DEFINITION = {
   name: 'DeleteCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
-  description: 'CDS views only: delete the ABAP Unit test class of a CDS view.',
+  description:
+    'Delete the ABAP Unit tests of a CDS view: delete its test class.',
   inputSchema: {
     type: 'object',
     properties: {
       class_name: {
         type: 'string',
-        description: 'Global test class name.',
+        description: 'Test class of the CDS view.',
       },
       transport_request: {
         type: 'string',
         description:
-          'Transport request number (required for transportable packages), not a task.',
+          'Transport request, not a task. Required for a transportable object.',
       },
       ...DETAIL_PROPERTY,
     },

@@ -1,23 +1,21 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
   MAX_STATUS_POLLS,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTestResult',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. ' +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
+    'Retrieve CDS unit test run result for a run_id. Polls the run status a bounded number of times first — this member has no result of its own to answer for a run that has not finished, and no fixture in the corpus proves what one would look like, so this never guesses: it answers finished:false with the last status seen instead. ',
   inputSchema: {
     type: 'object',
     properties: {
@@ -52,16 +50,13 @@ export async function handleGetCdsUnitTestResult(
   context: HandlerContext,
   args: GetCdsUnitTestResultArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id, with_navigation_uris, format } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
   // `AdtCdsUnitTest extends AdtUnitTest` and inherits `getResult` unchanged
   // — same `pollUntilFinished` reconstruction as `GetUnitTestResult`, for
   // the same reason (no status of its own to poll on this tool's surface).
-  const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
-    ourUnitTest,
-  );
+  const cdsUnitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   return answer(

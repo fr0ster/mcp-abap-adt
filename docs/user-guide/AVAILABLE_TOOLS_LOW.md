@@ -3,7 +3,7 @@
 Generated from code in `src/handlers/**` (not from docs).
 
 - Level: Low-Level
-- Total tools: 124
+- Total tools: 117
 
 ## Navigation
 
@@ -23,19 +23,12 @@ Generated from code in `src/handlers/**` (not from docs).
     - [ValidateBehaviorImplementationLow](#validatebehaviorimplementationlow-low-level-behavior-implementation)
   - [Class](#low-level-class)
     - [ActivateClassLow](#activateclasslow-low-level-class)
-    - [ActivateClassTestClassesLow](#activateclasstestclasseslow-low-level-class)
     - [CheckClassLow](#checkclasslow-low-level-class)
     - [CreateClassLow](#createclasslow-low-level-class)
     - [DeleteClassLow](#deleteclasslow-low-level-class)
-    - [GetClassUnitTestResultLow](#getclassunittestresultlow-low-level-class)
-    - [GetClassUnitTestStatusLow](#getclassunitteststatuslow-low-level-class)
     - [LockClassLow](#lockclasslow-low-level-class)
-    - [LockClassTestClassesLow](#lockclasstestclasseslow-low-level-class)
-    - [RunClassUnitTestsLow](#runclassunittestslow-low-level-class)
     - [UnlockClassLow](#unlockclasslow-low-level-class)
-    - [UnlockClassTestClassesLow](#unlockclasstestclasseslow-low-level-class)
     - [UpdateClassLow](#updateclasslow-low-level-class)
-    - [UpdateClassTestClassesLow](#updateclasstestclasseslow-low-level-class)
     - [ValidateClassLow](#validateclasslow-low-level-class)
   - [Common](#low-level-common)
     - [ActivateObjectLow](#activateobjectlow-low-level-common)
@@ -342,20 +335,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="activateclasstestclasseslow-low-level-class"></a>
-#### ActivateClassTestClassesLow (Low-Level / Class)
-**Description:** [low-level] Activate ABAP Unit test classes include for an existing class. Should be executed after updating and unlocking test classes.
-
-**Source:** `src/handlers/class/low/handleActivateClassTestClasses.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `test_class_name` (string, optional) - Ignored. This activates the whole class, test classes included, without naming one — there is no per-test-class activation to target.
-
----
-
 <a id="checkclasslow-low-level-class"></a>
 #### CheckClassLow (Low-Level / Class)
 **Description:** [low-level] Perform syntax check on an ABAP class. Can check existing class (active/inactive) or hypothetical source code. Returns syntax errors, warnings, and messages. Can use session_id and session_state from GetSession to maintain the same session.
@@ -403,35 +382,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="getclassunittestresultlow-low-level-class"></a>
-#### GetClassUnitTestResultLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run result (ABAPUnit or JUnit XML) for a completed run_id.
-
-**Source:** `src/handlers/class/low/handleGetClassUnitTestResult.ts`
-
-**Parameters:**
-- `format` (string, optional) - Preferred response format. Defaults to 'abapunit'.
-- `run_id` (string, required) - Run identifier returned by RunClassUnitTestsLow.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `with_navigation_uris` (boolean, optional) - Optional flag to request navigation URIs in SAP response (default true).
-
----
-
-<a id="getclassunitteststatuslow-low-level-class"></a>
-#### GetClassUnitTestStatusLow (Low-Level / Class)
-**Description:** [low-level] Retrieve ABAP Unit run status XML for a previously started run_id.
-
-**Source:** `src/handlers/class/low/handleGetClassUnitTestStatus.ts`
-
-**Parameters:**
-- `run_id` (string, required) - Run identifier returned by RunClassUnitTestsLow.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `with_long_polling` (boolean, optional) - Optional flag to enable SAP long-polling (default true).
-
----
-
 <a id="lockclasslow-low-level-class"></a>
 #### LockClassLow (Low-Level / Class)
 **Description:** [low-level] Lock an ABAP class for modification. Uses session from HandlerContext. Returns lock handle that must be used in subsequent update/unlock operations.
@@ -440,37 +390,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 **Parameters:**
 - `class_name` (string, required) - Class name.
-
----
-
-<a id="lockclasstestclasseslow-low-level-class"></a>
-#### LockClassTestClassesLow (Low-Level / Class)
-**Description:** [low-level] Lock ABAP Unit test classes include (CLAS/OC testclasses) for the specified class. Returns a test_classes_lock_handle for subsequent update/unlock operations using the same session.
-
-**Source:** `src/handlers/class/low/handleLockClassTestClasses.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
-<a id="runclassunittestslow-low-level-class"></a>
-#### RunClassUnitTestsLow (Low-Level / Class)
-**Description:** [low-level] Start an ABAP Unit test run for provided class test definitions. Returns run_id extracted from SAP response headers.
-
-**Source:** `src/handlers/class/low/handleRunClassUnitTests.ts`
-
-**Parameters:**
-- `context` (string, optional) - Optional context string shown in SAP tools.
-- `duration` (object, optional) - 
-- `risk_level` (object, optional) - 
-- `scope` (object, optional) - 
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `tests` (array, required) - List of container/test class pairs to execute.
-- `title` (string, optional) - Optional title for the ABAP Unit run.
 
 ---
 
@@ -486,20 +405,6 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-<a id="unlockclasstestclasseslow-low-level-class"></a>
-#### UnlockClassTestClassesLow (Low-Level / Class)
-**Description:** [low-level] Unlock ABAP Unit test classes include for a class using the test_classes_lock_handle obtained from LockClassTestClassesLow.
-
-**Source:** `src/handlers/class/low/handleUnlockClassTestClasses.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `lock_handle` (string, required) - Lock handle returned by LockClassTestClassesLow.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-
----
-
 <a id="updateclasslow-low-level-class"></a>
 #### UpdateClassLow (Low-Level / Class)
 **Description:** [low-level] Update source code of an existing ABAP class. Uses session from HandlerContext. Requires lock handle from LockClass operation. - use UpdateClass (high-level) for full workflow with lock/unlock/activate.
@@ -510,22 +415,6 @@ Generated from code in `src/handlers/**` (not from docs).
 - `class_name` (string, required) - Class name. Class must already exist.
 - `lock_handle` (string, required) - Lock handle from LockClass operation. Required for update operation.
 - `source_code` (string, required) - Complete ABAP class source code including CLASS DEFINITION and IMPLEMENTATION sections.
-- `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
-
----
-
-<a id="updateclasstestclasseslow-low-level-class"></a>
-#### UpdateClassTestClassesLow (Low-Level / Class)
-**Description:** [low-level] Upload ABAP Unit test include source code for an existing class. Requires test_classes_lock_handle from LockClassTestClassesLow.
-
-**Source:** `src/handlers/class/low/handleUpdateClassTestClasses.ts`
-
-**Parameters:**
-- `class_name` (string, required) - Class name.
-- `lock_handle` (string, required) - Test classes lock handle from LockClassTestClassesLow.
-- `session_id` (string, optional) - Session ID from GetSession. If not provided, a new session will be created.
-- `session_state` (object, optional) - Session state from GetSession (cookies, csrf_token, cookie_store). Required if session_id is provided.
-- `test_class_source` (string, required) - Complete ABAP Unit test class source code.
 - `transport_request` (string, optional) - Transport request number (required for transportable packages), not a task.
 
 ---

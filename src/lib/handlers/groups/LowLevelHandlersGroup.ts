@@ -22,20 +22,13 @@ import { handleCreateBehaviorImplementation as handleCreateBehaviorImplementatio
 import { handleLockBehaviorImplementation } from '../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
 import { handleValidateBehaviorImplementation } from '../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { handleActivateClass } from '../../../handlers/class/low/handleActivateClass';
-import { handleActivateClassTestClasses } from '../../../handlers/class/low/handleActivateClassTestClasses';
 import { handleCheckClass } from '../../../handlers/class/low/handleCheckClass';
 import { handleCreateClass as handleCreateClassLow } from '../../../handlers/class/low/handleCreateClass';
 import { handleDeleteClass } from '../../../handlers/class/low/handleDeleteClass';
-import { handleGetClassUnitTestResult } from '../../../handlers/class/low/handleGetClassUnitTestResult';
-import { handleGetClassUnitTestStatus } from '../../../handlers/class/low/handleGetClassUnitTestStatus';
 import { handleLockClass } from '../../../handlers/class/low/handleLockClass';
-import { handleLockClassTestClasses } from '../../../handlers/class/low/handleLockClassTestClasses';
-import { handleRunClassUnitTests } from '../../../handlers/class/low/handleRunClassUnitTests';
 import { handleUnlockClass } from '../../../handlers/class/low/handleUnlockClass';
-import { handleUnlockClassTestClasses } from '../../../handlers/class/low/handleUnlockClassTestClasses';
 // Import low-level handlers - Class
 import { handleUpdateClass as handleUpdateClassLow } from '../../../handlers/class/low/handleUpdateClass';
-import { handleUpdateClassTestClasses } from '../../../handlers/class/low/handleUpdateClassTestClasses';
 import { handleValidateClass } from '../../../handlers/class/low/handleValidateClass';
 // Import TOOL_DEFINITION from common low handlers
 import { TOOL_DEFINITION as ActivateObject_Tool } from '../../../handlers/common/low/handleActivateObject';
@@ -159,20 +152,13 @@ import { TOOL_DEFINITION as CreateBehaviorImplementationLow_Tool } from '../../.
 import { TOOL_DEFINITION as LockBehaviorImplementation_Tool } from '../../../handlers/behavior_implementation/low/handleLockBehaviorImplementation';
 import { TOOL_DEFINITION as ValidateBehaviorImplementation_Tool } from '../../../handlers/behavior_implementation/low/handleValidateBehaviorImplementation';
 import { TOOL_DEFINITION as ActivateClass_Tool } from '../../../handlers/class/low/handleActivateClass';
-import { TOOL_DEFINITION as ActivateClassTestClasses_Tool } from '../../../handlers/class/low/handleActivateClassTestClasses';
 import { TOOL_DEFINITION as CheckClass_Tool } from '../../../handlers/class/low/handleCheckClass';
 import { TOOL_DEFINITION as CreateClassLow_Tool } from '../../../handlers/class/low/handleCreateClass';
 import { TOOL_DEFINITION as DeleteClass_Tool } from '../../../handlers/class/low/handleDeleteClass';
-import { TOOL_DEFINITION as GetClassUnitTestResult_Tool } from '../../../handlers/class/low/handleGetClassUnitTestResult';
-import { TOOL_DEFINITION as GetClassUnitTestStatus_Tool } from '../../../handlers/class/low/handleGetClassUnitTestStatus';
 import { TOOL_DEFINITION as LockClass_Tool } from '../../../handlers/class/low/handleLockClass';
-import { TOOL_DEFINITION as LockClassTestClasses_Tool } from '../../../handlers/class/low/handleLockClassTestClasses';
-import { TOOL_DEFINITION as RunClassUnitTests_Tool } from '../../../handlers/class/low/handleRunClassUnitTests';
 import { TOOL_DEFINITION as UnlockClass_Tool } from '../../../handlers/class/low/handleUnlockClass';
-import { TOOL_DEFINITION as UnlockClassTestClasses_Tool } from '../../../handlers/class/low/handleUnlockClassTestClasses';
 // Import TOOL_DEFINITION from class low handlers
 import { TOOL_DEFINITION as UpdateClass_Tool } from '../../../handlers/class/low/handleUpdateClass';
-import { TOOL_DEFINITION as UpdateClassTestClasses_Tool } from '../../../handlers/class/low/handleUpdateClassTestClasses';
 import { TOOL_DEFINITION as ValidateClass_Tool } from '../../../handlers/class/low/handleValidateClass';
 import { TOOL_DEFINITION as ActivateDataElement_Tool } from '../../../handlers/data_element/low/handleActivateDataElement';
 import { TOOL_DEFINITION as CheckDataElement_Tool } from '../../../handlers/data_element/low/handleCheckDataElement';
@@ -673,48 +659,6 @@ export class LowLevelHandlersGroup extends BaseHandlerGroup {
         toolDefinition: ActivateClass_Tool,
         handler: (args: any) => {
           return handleActivateClass(this.context, args);
-        },
-      },
-      {
-        toolDefinition: LockClassTestClasses_Tool,
-        handler: (args: any) => {
-          return handleLockClassTestClasses(this.context, args);
-        },
-      },
-      {
-        toolDefinition: UnlockClassTestClasses_Tool,
-        handler: (args: any) => {
-          return handleUnlockClassTestClasses(this.context, args);
-        },
-      },
-      {
-        toolDefinition: UpdateClassTestClasses_Tool,
-        handler: (args: any) => {
-          return handleUpdateClassTestClasses(this.context, args);
-        },
-      },
-      {
-        toolDefinition: ActivateClassTestClasses_Tool,
-        handler: (args: any) => {
-          return handleActivateClassTestClasses(this.context, args);
-        },
-      },
-      {
-        toolDefinition: RunClassUnitTests_Tool,
-        handler: (args: any) => {
-          return handleRunClassUnitTests(this.context, args);
-        },
-      },
-      {
-        toolDefinition: GetClassUnitTestStatus_Tool,
-        handler: (args: any) => {
-          return handleGetClassUnitTestStatus(this.context, args);
-        },
-      },
-      {
-        toolDefinition: GetClassUnitTestResult_Tool,
-        handler: (args: any) => {
-          return handleGetClassUnitTestResult(this.context, args);
         },
       },
       // Program low-level handlers

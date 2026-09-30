@@ -495,6 +495,14 @@ import {
   handleCreateCdsUnitTest,
 } from '../../../handlers/unit_test/high/handleCreateCdsUnitTest';
 import {
+  TOOL_DEFINITION as CreateFunctionGroupUnitTest_Tool,
+  handleCreateFunctionGroupUnitTest,
+} from '../../../handlers/unit_test/high/handleCreateFunctionGroupUnitTest';
+import {
+  TOOL_DEFINITION as CreateProgramUnitTest_Tool,
+  handleCreateProgramUnitTest,
+} from '../../../handlers/unit_test/high/handleCreateProgramUnitTest';
+import {
   TOOL_DEFINITION as CreateUnitTest_Tool,
   handleCreateUnitTest,
 } from '../../../handlers/unit_test/high/handleCreateUnitTest';
@@ -507,29 +515,25 @@ import {
   handleDeleteUnitTest,
 } from '../../../handlers/unit_test/high/handleDeleteUnitTest';
 import {
-  TOOL_DEFINITION as GetCdsUnitTest_Tool,
-  handleGetCdsUnitTest,
-} from '../../../handlers/unit_test/high/handleGetCdsUnitTest';
-import {
-  TOOL_DEFINITION as GetCdsUnitTestResult_Tool,
-  handleGetCdsUnitTestResult,
-} from '../../../handlers/unit_test/high/handleGetCdsUnitTestResult';
-import {
-  TOOL_DEFINITION as GetCdsUnitTestStatus_Tool,
-  handleGetCdsUnitTestStatus,
-} from '../../../handlers/unit_test/high/handleGetCdsUnitTestStatus';
-import {
-  TOOL_DEFINITION as GetUnitTest_Tool,
-  handleGetUnitTest,
-} from '../../../handlers/unit_test/high/handleGetUnitTest';
-import {
   TOOL_DEFINITION as GetUnitTestResult_Tool,
   handleGetUnitTestResult,
 } from '../../../handlers/unit_test/high/handleGetUnitTestResult';
 import {
-  TOOL_DEFINITION as GetUnitTestStatus_Tool,
-  handleGetUnitTestStatus,
-} from '../../../handlers/unit_test/high/handleGetUnitTestStatus';
+  handleRunCdsUnitTest,
+  TOOL_DEFINITION as RunCdsUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleRunCdsUnitTest';
+import {
+  handleRunFunctionGroupUnitTest,
+  TOOL_DEFINITION as RunFunctionGroupUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleRunFunctionGroupUnitTest';
+import {
+  handleRunFunctionModuleUnitTest,
+  TOOL_DEFINITION as RunFunctionModuleUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleRunFunctionModuleUnitTest';
+import {
+  handleRunProgramUnitTest,
+  TOOL_DEFINITION as RunProgramUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleRunProgramUnitTest';
 import {
   handleRunUnitTest,
   TOOL_DEFINITION as RunUnitTest_Tool,
@@ -538,6 +542,14 @@ import {
   handleUpdateCdsUnitTest,
   TOOL_DEFINITION as UpdateCdsUnitTest_Tool,
 } from '../../../handlers/unit_test/high/handleUpdateCdsUnitTest';
+import {
+  handleUpdateFunctionGroupUnitTest,
+  TOOL_DEFINITION as UpdateFunctionGroupUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleUpdateFunctionGroupUnitTest';
+import {
+  handleUpdateProgramUnitTest,
+  TOOL_DEFINITION as UpdateProgramUnitTest_Tool,
+} from '../../../handlers/unit_test/high/handleUpdateProgramUnitTest';
 import {
   handleUpdateUnitTest,
   TOOL_DEFINITION as UpdateUnitTest_Tool,
@@ -915,14 +927,6 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleRunUnitTest),
       },
       {
-        toolDefinition: GetUnitTest_Tool,
-        handler: withContext(handleGetUnitTest),
-      },
-      {
-        toolDefinition: GetUnitTestStatus_Tool,
-        handler: withContext(handleGetUnitTestStatus),
-      },
-      {
         toolDefinition: GetUnitTestResult_Tool,
         handler: withContext(handleGetUnitTestResult),
       },
@@ -939,24 +943,44 @@ export class HighLevelHandlersGroup extends BaseHandlerGroup {
         handler: withContext(handleCreateCdsUnitTest),
       },
       {
-        toolDefinition: GetCdsUnitTest_Tool,
-        handler: withContext(handleGetCdsUnitTest),
-      },
-      {
-        toolDefinition: GetCdsUnitTestStatus_Tool,
-        handler: withContext(handleGetCdsUnitTestStatus),
-      },
-      {
-        toolDefinition: GetCdsUnitTestResult_Tool,
-        handler: withContext(handleGetCdsUnitTestResult),
-      },
-      {
         toolDefinition: UpdateCdsUnitTest_Tool,
         handler: withContext(handleUpdateCdsUnitTest),
       },
       {
         toolDefinition: DeleteCdsUnitTest_Tool,
         handler: withContext(handleDeleteCdsUnitTest),
+      },
+      {
+        toolDefinition: RunCdsUnitTest_Tool,
+        handler: withContext(handleRunCdsUnitTest),
+      },
+      {
+        toolDefinition: CreateProgramUnitTest_Tool,
+        handler: withContext(handleCreateProgramUnitTest),
+      },
+      {
+        toolDefinition: UpdateProgramUnitTest_Tool,
+        handler: withContext(handleUpdateProgramUnitTest),
+      },
+      {
+        toolDefinition: RunProgramUnitTest_Tool,
+        handler: withContext(handleRunProgramUnitTest),
+      },
+      {
+        toolDefinition: CreateFunctionGroupUnitTest_Tool,
+        handler: withContext(handleCreateFunctionGroupUnitTest),
+      },
+      {
+        toolDefinition: UpdateFunctionGroupUnitTest_Tool,
+        handler: withContext(handleUpdateFunctionGroupUnitTest),
+      },
+      {
+        toolDefinition: RunFunctionGroupUnitTest_Tool,
+        handler: withContext(handleRunFunctionGroupUnitTest),
+      },
+      {
+        toolDefinition: RunFunctionModuleUnitTest_Tool,
+        handler: withContext(handleRunFunctionModuleUnitTest),
       },
       {
         toolDefinition: GetLocalTestClass_Tool,

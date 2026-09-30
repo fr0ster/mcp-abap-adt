@@ -1,23 +1,21 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import type { AdtReading } from '../../../lib/strategies/reading';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import {
   MAX_STATUS_POLLS,
   pollUntilFinished,
   type RunOutcome,
 } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetCdsUnitTest',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    'Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. ' +
-    'Refused outright on legacy systems (BASIS < 7.50): AdtClientLegacy.getCdsUnitTest() throws — the CDS framework endpoints this needs are not present there (issue #207).',
+    'Retrieve CDS unit test run status and result for a previously started run_id. Polls the run a bounded number of times; if it has not finished within that bound, answers finished:false with the last status seen rather than the result. ',
   inputSchema: {
     type: 'object',
     properties: {
@@ -40,7 +38,6 @@ export async function handleGetCdsUnitTest(
   context: HandlerContext,
   args: GetCdsUnitTestArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
@@ -51,9 +48,7 @@ export async function handleGetCdsUnitTest(
   // `unittest-run-passing`/`refusal-unittest-run-failing` cases are
   // captured), so this handler's tests use synthetic markers, not a claim
   // of CDS-specific corpus evidence.
-  const cdsUnitTest = createAdtClient(connection, logger).getCdsUnitTest(
-    ourUnitTest,
-  );
+  const cdsUnitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   return answer(

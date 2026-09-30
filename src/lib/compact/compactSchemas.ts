@@ -129,23 +129,10 @@ export const compactCreateSchema = {
         required: ['name'],
       },
     },
-    tests: {
-      type: 'array',
-      description: 'Container/test class pairs (for UNIT_TEST create).',
-      items: {
-        type: 'object',
-        properties: {
-          container_class: {
-            type: 'string',
-            description: 'Class that owns the test include.',
-          },
-          test_class: {
-            type: 'string',
-            description: 'Test class inside the include.',
-          },
-        },
-        required: ['container_class', 'test_class'],
-      },
+    test_class_source: {
+      type: 'string',
+      description:
+        'ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST create).',
     },
   },
   required: ['object_type'],
@@ -315,7 +302,8 @@ export const compactUpdateSchema = {
     },
     test_class_source: {
       type: 'string',
-      description: 'Updated local test class source (CDS_UNIT_TEST update).',
+      description:
+        'ABAP source of the local test classes (UNIT_TEST and CDS_UNIT_TEST update).',
     },
     test_class_code: {
       type: 'string',
@@ -332,10 +320,6 @@ export const compactUpdateSchema = {
     macros_code: {
       type: 'string',
       description: 'Updated source for class local macros.',
-    },
-    run_id: {
-      type: 'string',
-      description: 'Unit test run id (UNIT_TEST update).',
     },
     binding_variant: {
       type: 'string',
@@ -403,10 +387,6 @@ export const compactDeleteSchema = {
       type: 'string',
       description: 'Metadata extension name.',
     },
-    run_id: {
-      type: 'string',
-      description: 'Unit test run id (UNIT_TEST delete).',
-    },
   },
   required: ['object_type'],
 } as const;
@@ -431,12 +411,12 @@ export const compactUnitTestRunSchema = {
     },
     title: {
       type: 'string',
-      description: 'Run title shown in ABAP Unit logs.',
+      description: 'Run title shown in ABAP Unit test logs.',
     },
     context: { type: 'string', description: 'Run context label.' },
     scope: {
       type: 'object',
-      description: 'ABAP Unit scope flags.',
+      description: 'ABAP Unit test scope flags.',
       properties: {
         own_tests: { type: 'boolean', description: 'Include own tests.' },
         foreign_tests: {

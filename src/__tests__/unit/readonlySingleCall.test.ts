@@ -83,6 +83,12 @@ import {
 
 let fakeClient: any;
 jest.mock('../../lib/clients', () => ({ createAdtClient: () => fakeClient }));
+// The unit-test Get* functions take their runner from `AdtExecutor` (adt-clients
+// 24), not from `createAdtClient`: route that door to the same double.
+jest.mock('../../handlers/unit_test/shared/runTests', () => ({
+  ...jest.requireActual('../../handlers/unit_test/shared/runTests'),
+  testRunner: () => fakeClient.getClassTestRunner(),
+}));
 
 const context = { connection: {} as any, logger: undefined };
 
@@ -1069,27 +1075,27 @@ describe('the high-tier Get* handlers call the member the brief names, with the 
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('GetUnitTestStatus calls getUnitTest().getStatus(run_id, with_long_polling)', async () => {
+  it('GetUnitTestStatus calls getStatus(run_id, with_long_polling) on the class runner', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
     await handleGetUnitTestStatus(context as any, { run_id: 'r1' });
 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
-    expect(call?.factory).toBe('getUnitTest');
+    expect(call?.factory).toBe('getClassTestRunner');
     expect(call?.args).toEqual(['r1', true]);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
   });
 
-  it('GetCdsUnitTestStatus calls getCdsUnitTest().getStatus(run_id, with_long_polling)', async () => {
+  it('GetCdsUnitTestStatus calls getStatus(run_id, with_long_polling) on the class runner', async () => {
     const seen = recordAnalyse();
     fakeClient = seen.client;
 
     await handleGetCdsUnitTestStatus(context as any, { run_id: 'r1' });
 
     const call = seen.calls.filter((c) => c.member === 'getStatus').at(-1);
-    expect(call?.factory).toBe('getCdsUnitTest');
+    expect(call?.factory).toBe('getClassTestRunner');
     expect(call?.args).toEqual(['r1', true]);
     expect(call?.carriedAnalyse).toBe(true);
     expect(call?.analyse).toBe(analyseException);
@@ -1252,7 +1258,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
   const runningStatus =
     '<?xml version="1.0" encoding="utf-8"?><aunit:run xmlns:aunit="http://www.sap.com/adt/api/aunit"><aunit:progress status="RUNNING" percentage="40"/></aunit:run>';
 
-  it('GetUnitTest answers a real finished run from the captured status+result fixtures, and calls both members through getUnitTest()', async () => {
+  it('GetUnitTest answers a real finished run from the captured status+result fixtures, and calls both members through the class runner', async () => {
     const getStatus = jest.fn(async () =>
       okResponse(structured({ data: passingStatus, status: 200 } as any)),
     );
@@ -1282,7 +1288,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     // Read AFTER invoking the handler — `factory` is a getter on the
     // double, and destructuring it eagerly captures `undefined` (the value
     // before any factory was ever accessed).
-    expect(double.factory).toBe('getUnitTest');
+    expect(double.factory).toBe('getClassTestRunner');
   });
 
   it('GetUnitTest answers finished:false after MAX_STATUS_POLLS status checks, and never calls getResult on a run that has not finished', async () => {
@@ -1393,7 +1399,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
   const cdsResult =
     '<?xml version="1.0" encoding="utf-8"?><aunit:runResult xmlns:aunit="http://www.sap.com/adt/aunit">CDS RESULT MARKER (no fixture)</aunit:runResult>';
 
-  it('GetCdsUnitTest answers finished:true from a synthetic FINISHED status, and calls both members through getCdsUnitTest()', async () => {
+  it('GetCdsUnitTest answers finished:true from a synthetic FINISHED status, and calls both members through the class runner', async () => {
     const getStatus = jest.fn(async () =>
       okResponse(structured({ data: cdsStatus, status: 200 } as any)),
     );
@@ -1412,7 +1418,7 @@ describe('the unit-test Get* handlers reconstruct poll-then-fetch, never masking
     expect(payload.finished).toBe(true);
     // Read AFTER invoking the handler — see the comment on the analogous
     // assertion in `GetUnitTest`'s own test above.
-    expect(double.factory).toBe('getCdsUnitTest');
+    expect(double.factory).toBe('getClassTestRunner');
     expect(getStatus).toHaveBeenCalledWith('r1', true, {
       analyse: analyseException,
     });

@@ -10,13 +10,9 @@
  * Four shapes:
  *  - SHAPE 1 — a rename, still one call. Includes the two function-group
  *    listings (a two-request *walk*, but the refusal test only needs the
- *    first request to fail) and the two unit-test run tools, which were
- *    never migrated to `create()`: `AdtUnitTest.run(tests, options)` is
- *    what "start a run, answer its id" always meant, confirmed against
- *    `AdtUnitTest.d.ts`'s own doc comment ("`create` meant 'start a run'"
- *    only until 12.0.0) and its argument shapes
- *    (`IClassUnitTestDefinition[]`/`IClassUnitTestRunOptions`), which are
- *    exactly what these two handlers already built.
+ *    first request to fail). The unit-test tools left this shape in 15.0.0:
+ *    they run and wait, or write under a lock, and are tested in
+ *    `unitTestTools.test.ts`.
  *  - SHAPE 2 — the two `lib/search-source` files, tested at the module
  *    boundary they actually have (no MCP result).
  *  - SHAPE 3 — the two program-profiling handlers: `new AdtExecutor(...)
@@ -54,8 +50,6 @@ import { handleValidateServiceBinding } from '../../handlers/service_binding/hig
 import { handleGetWhereUsed } from '../../handlers/system/readonly/handleGetWhereUsed';
 import { handleRuntimeRunProgram } from '../../handlers/system/readonly/handleRuntimeRunProgram';
 import { handleRuntimeRunProgramWithProfiling } from '../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
-import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
-import { handleRunUnitTest } from '../../handlers/unit_test/high/handleRunUnitTest';
 import { createPackageContentsFetcher } from '../../lib/search-source/packageEnumerator';
 import { createPackagePatternResolver } from '../../lib/search-source/packageResolver';
 import {
@@ -109,18 +103,6 @@ describe('SHAPE 1 — a rename, still one call', () => {
       handleValidateServiceBinding,
       { service_binding_name: 'ZSB', service_definition_name: 'ZSD' },
       'validate',
-    ],
-    [
-      'CreateUnitTest',
-      handleCreateUnitTest,
-      { tests: [{ container_class: 'ZCL_X', test_class: 'LTCL_X' }] },
-      'run',
-    ],
-    [
-      'RunUnitTest',
-      handleRunUnitTest,
-      { tests: [{ container_class: 'ZCL_X', test_class: 'LTCL_X' }] },
-      'run',
     ],
     [
       'UpdateServiceBinding',

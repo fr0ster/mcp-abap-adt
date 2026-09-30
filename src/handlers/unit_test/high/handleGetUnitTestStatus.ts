@@ -1,12 +1,11 @@
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
 import { answer } from '../../../lib/answer';
-import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, type Terse } from '../../../lib/strategies/projections';
-import { ourUnitTest } from '../../../lib/strategies/resultSets';
 import { return_error } from '../../../lib/utils';
 import { runIsFinished, runProgressStatus } from '../shared/pollRun';
+import { testRunner } from '../shared/runTests';
 
 export const TOOL_DEFINITION = {
   name: 'GetUnitTestStatus',
@@ -40,7 +39,6 @@ export async function handleGetUnitTestStatus(
   context: HandlerContext,
   args: GetUnitTestStatusArgs,
 ) {
-  const { connection, logger } = context;
   const { run_id, with_long_polling = true } = args;
   if (!run_id) return return_error(new Error('run_id is required'));
 
@@ -51,7 +49,7 @@ export async function handleGetUnitTestStatus(
   // withLongPolling?)`, which — confirmed against the shipped
   // `AdtUnitTest.d.ts` — takes NO options object at all, so there is no
   // `analyse` to hand it, unlike `read`/`readMetadata` on this same class.
-  const unitTest = createAdtClient(connection, logger).getUnitTest(ourUnitTest);
+  const unitTest = testRunner(context, 'class');
   const detail = detailOf(args);
 
   // Task 28 fix round 1: this member's result is `structured` in

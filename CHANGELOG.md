@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- **Publishing an OData V2 service binding could not succeed.** `UpdateServiceBinding`
+  took `service_name` and `service_version` — `service_name` is required on the tool
+  surface — and dropped both, because the library had nowhere to put them. A V2
+  publication job resolves the service from them, so the job answered `200` with
+  `SEVERITY ERROR` naming an EMPTY service and version `0000`: *"Activating Local
+  Service Endpoint of service ␠ with version 0000 failed"*. The binding was active and
+  `srvb:allowedAction` named the very action asked for.
+
+  `@mcp-abap-adt/adt-clients` `^23.0.5` (was `^23.0.4`) takes them per protocol, so
+  this handler now passes them for `odatav2` and not for `odatav4`, where the request
+  names its target on its own. Measured there on **all four binding variants**: both
+  V2 ones refuse without the fields and succeed with them, both V4 ones succeed
+  without them — so the axis is the protocol, not the UI/Web API category. See that
+  package's ERRATA, *"A V2 publication job resolves the service by name and version"*.
+
+  The two parameter descriptions said the job "no longer carries" these fields. It
+  carries them again for V2, and they now say which protocol uses them and that V4
+  ignores them.
+
+  Found while removing the probe objects from #248: two V4 bindings unpublished
+  through this tool and the V2 one did not, which made the comparison single-variable.
+
+- **A binding anybody had open could not be published or unpublished at all.**
+  `UpdateServiceBinding` passed `analyseLock` to its LOCK, so the `403` that means
+  *an editing session holds this binding* was a refusal: *"User … is currently
+  editing ZMCP_E2E_V2"*. adt-clients' ERRATA is explicit that this one `403` is to
+  be ignored — the publication job needs no lock of the caller's, and Eclipse posts
+  it after its own LOCK's `403` — and names the strategy for it,
+  `analysePublicationLock`, which answers a lock without a handle instead.
+
+  **But `analysePublicationLock` alone would have opened a second hole**, found in
+  review: it forgives by STATUS — `403` — and is built on `analyseException`, which
+  sees only documents. A `200` naming no lock handle is therefore no failure to it
+  either, and the caller is handed the same empty handle as for the `403`. A login
+  page on an expired session is a `200`, so "publish when there is no handle" would
+  publish after a lock that never happened — exactly the check `analyseLock` had
+  been doing.
+
+  So the handler passes its own composed strategy, `analysePublicationLockAnswer`:
+  `analyseLock` first, so a `2xx` without a handle stays a refusal, and the `403`
+  forgiveness after it. An empty handle then means one thing only, which is what
+  lets the handler publish without a handle and send no UNLOCK — there is nothing to
+  release. `withLock` is untouched.
+
+  Measured the hard way. A publication whose client gave up at 120 s — the job takes
+  ~133 s — left the lock behind, and the unpublish that followed was refused. With
+  the two changes the same call went through, and the wire shows both fixes at once:
+
+      POST …/bindings/zmcp_e2e_v2?_action=LOCK&accessMode=MODIFY  -> threw 403
+      POST …/businessservices/odatav2/unpublishjobs
+      params {"servicename":"ZMCP_E2E_V2","serviceversion":"0001"}
+
 ## [14.1.1] - 2026-09-29
 
 ### Fixed

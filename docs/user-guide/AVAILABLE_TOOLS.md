@@ -2992,8 +2992,8 @@ Generated from code in `src/handlers/**` (not from docs).
 - `desired_publication_state` (string, required) - Target publication state.
 - `response_format` (string, optional (default: xml)) - Accepted for backward compatibility; no longer affects the answer, which is always the structured write result.
 - `service_binding_name` (string, required) - Service binding name to update.
-- `service_name` (string, required) - Published service name. Accepted for backward compatibility; the publication job no longer carries it.
-- `service_version` (string, optional) - Published service version. Accepted for backward compatibility; the publication job no longer carries it.
+- `service_name` (string, required) - Published service name, from the binding. Required: an OData V2 publication job resolves the service by name and version and refuses without them. Ignored for V4, where the request names its target on its own.
+- `service_version` (string, optional) - Published service version. Default 0001. Used by an OData V2 publication job together with the service name; ignored for V4.
 
 ---
 

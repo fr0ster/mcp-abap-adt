@@ -1,4 +1,4 @@
-import { AdtClient } from '@mcp-abap-adt/adt-clients';
+import { AdtClient, AdtClientLegacy } from '@mcp-abap-adt/adt-clients';
 import type { AbapConnection } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
@@ -26,6 +26,10 @@ export function createAdtClient(
           masterLanguage: ctx.masterLanguage,
         }
       : undefined;
+  // EXPERIMENT (E77, BASIS 7.40): the parked legacy selection, back for a live run.
+  if (process.env.SAP_SYSTEM_TYPE === 'legacy') {
+    return new AdtClientLegacy(connection, logger, options);
+  }
   return new AdtClient(connection, logger, options);
 }
 

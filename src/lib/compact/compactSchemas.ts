@@ -602,13 +602,45 @@ export const compactDumpListSchema = {
       description:
         'Which runtime feed to list. Default "dumps" (ABAP short dumps). "system_messages" and "gateway_errors" read the other two ADT runtime feeds through the same call.',
     },
-    user: { type: 'string', description: 'Filter entries by user.' },
-    top: { type: 'number', description: 'Limit number of returned entries.' },
+    user: { type: 'string', description: 'Entries of this user.' },
+    runtime_error: {
+      type: 'string',
+      description: 'Dumps whose runtime error contains this text, in any case.',
+    },
+    exception: {
+      type: 'string',
+      description:
+        'Dumps whose exception class contains this text, in any case.',
+    },
+    object_name: {
+      type: 'string',
+      description:
+        'Dumps whose terminated object name contains this text, in any case.',
+    },
+    package: {
+      type: 'string',
+      description:
+        'Dumps whose object package contains this text, in any case.',
+    },
+    component: {
+      type: 'string',
+      description:
+        'Dumps whose application component contains this text, in any case.',
+    },
+    top: {
+      type: 'number',
+      description:
+        'Most entries, up to 1000 (default 50); SAP answers 100 per request and the pages are read in turn.',
+    },
     from: {
       type: 'string',
       description: 'Start of time range (YYYYMMDDHHMMSS).',
     },
-    to: { type: 'string', description: 'End of time range (YYYYMMDDHHMMSS).' },
+    to: {
+      type: 'string',
+      description:
+        'End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.',
+    },
   },
   required: [],
 } as const;
@@ -616,12 +648,16 @@ export const compactDumpListSchema = {
 export const compactDumpViewSchema = {
   type: 'object',
   properties: {
-    dump_id: { type: 'string', description: 'Runtime dump id.' },
+    dump_id: {
+      type: 'string',
+      description: "The dump's dump_id, or its URI.",
+    },
     view: {
       type: 'string',
       enum: ['default', 'summary', 'formatted'],
       default: 'default',
-      description: 'Dump rendering mode.',
+      description:
+        '"summary" — runtime error, exception, terminated program, time, user and termination position; "default" — that summary and the parsed dump; "formatted" — the dump as formatted text.',
     },
   },
   required: ['dump_id'],

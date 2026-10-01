@@ -1,5 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
+import { XMLParser } from 'fast-xml-parser';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { return_error } from '../../../lib/utils';
@@ -9,13 +10,14 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeGetDumpById',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] Read a specific ABAP runtime dump by its ID. First use RuntimeListFeeds to find dumps and get their IDs, then pass dump_id here to read the full dump content.',
+    '[runtime] Read an ABAP runtime dump by its dump_id or URI. Answers a summary — runtime error, exception, terminated program, time, user, and the source position where it terminated — and the parsed dump.',
   inputSchema: {
     type: 'object',
     properties: {
       dump_id: {
         type: 'string',
-        description: 'Full runtime dump ID (e.g. from RuntimeListFeeds).',
+        description:
+          "The dump's id, or its URI as a dumps feed entry carries it.",
       },
       view: {
         type: 'string',
@@ -28,7 +30,7 @@ export const TOOL_DEFINITION = {
         type: 'string',
         enum: ['payload', 'summary', 'both'],
         description:
-          'Controls what is returned: "payload" — full parsed dump data, "summary" — compact key facts only (title, exception, program, line, user, date…), "both" — summary + full payload.',
+          'What is returned: "payload" — the parsed dump, "summary" — runtime error, exception, terminated program, time, user and termination position, "both" — summary and payload.',
         default: 'both',
       },
     },
@@ -42,63 +44,71 @@ interface RuntimeGetDumpByIdArgs {
   response_mode?: 'payload' | 'summary' | 'both';
 }
 
-function collectKeyFacts(
-  value: unknown,
-  target: Record<string, unknown>,
-  depth: number = 0,
-): void {
-  if (!value || depth > 8 || Object.keys(target).length >= 20) {
-    return;
+const dumpXmlParser = new XMLParser({
+  ignoreAttributes: false,
+  attributeNamePrefix: '',
+  removeNSPrefix: true,
+});
+
+/**
+ * The id `getById` takes. A caller may hold the dump's URI instead — the
+ * entry id of the dumps feed, `/sap/bc/adt/vit/runtime/dumps/<id>`, or its
+ * link — so everything up to `runtime/dumps/` is dropped.
+ */
+export function dumpIdFrom(value: string): string {
+  return value.trim().replace(/^.*\/runtime\/dumps\//, '');
+}
+
+/**
+ * What a dump is about, read from the default view's `dump:dump` root: its
+ * attributes name the runtime error, the exception, the terminated program,
+ * when and whose; the `…/runtime/dump/termination` link is the source
+ * position where it terminated. That link is addressed `adt://<system>/sap/
+ * bc/adt/…#start=<line>,<column>` (BTP ABAP environment, 2026-10-01): the
+ * system part is dropped, so the URI is the ADT path any reader takes.
+ * Nothing when the document has no such root.
+ */
+export function dumpSummaryOf(
+  raw: unknown,
+): Record<string, unknown> | undefined {
+  if (typeof raw !== 'string' || !raw.trim().startsWith('<')) return undefined;
+  let root: Record<string, unknown> | undefined;
+  try {
+    root = dumpXmlParser.parse(raw)?.dump;
+  } catch {
+    return undefined;
   }
+  if (!root || typeof root !== 'object') return undefined;
 
-  if (Array.isArray(value)) {
-    for (const item of value) {
-      collectKeyFacts(item, target, depth + 1);
-    }
-    return;
+  const summary: Record<string, unknown> = {};
+  const take = (attribute: string, as: string) => {
+    const value = root?.[attribute];
+    if (typeof value === 'string' && value !== '') summary[as] = value;
+  };
+  take('error', 'runtime_error');
+  take('exception', 'exception');
+  take('title', 'title');
+  take('terminatedProgram', 'terminated_program');
+  take('datetime', 'datetime');
+  take('author', 'user');
+
+  const linksRaw = (root.links as { link?: unknown } | undefined)?.link;
+  const links = (
+    Array.isArray(linksRaw) ? linksRaw : linksRaw ? [linksRaw] : []
+  ) as Array<{ relation?: string; uri?: string }>;
+  const termination =
+    links.find(
+      (l) => /termination/i.test(l.relation ?? '') && l.uri?.includes('#'),
+    ) ?? links.find((l) => /#start=\d+/.test(l.uri ?? ''));
+  if (termination?.uri) {
+    const [addressed, fragment = ''] = termination.uri.split('#');
+    const uri = addressed.replace(/^adt:\/\/[^/]*/, '');
+    const line = /start=(\d+)/.exec(fragment)?.[1];
+    summary.termination = line
+      ? { uri: decodeURIComponent(uri), line: Number(line) }
+      : { uri: decodeURIComponent(uri) };
   }
-
-  if (typeof value !== 'object') {
-    return;
-  }
-
-  const interestingKeys = [
-    'title',
-    'shorttext',
-    'shortText',
-    'category',
-    'exception',
-    'program',
-    'include',
-    'line',
-    'user',
-    'date',
-    'time',
-    'host',
-    'application',
-    'component',
-    'client',
-  ];
-
-  const obj = value as Record<string, unknown>;
-  for (const [key, nested] of Object.entries(obj)) {
-    const keyNormalized = key.toLowerCase();
-    const isInteresting = interestingKeys.some(
-      (candidate) => keyNormalized === candidate.toLowerCase(),
-    );
-
-    if (
-      isInteresting &&
-      target[key] === undefined &&
-      (typeof nested === 'string' ||
-        typeof nested === 'number' ||
-        typeof nested === 'boolean')
-    ) {
-      target[key] = nested;
-    }
-
-    collectKeyFacts(nested, target, depth + 1);
-  }
+  return Object.keys(summary).length > 0 ? summary : undefined;
 }
 
 export async function handleRuntimeGetDumpById(
@@ -106,7 +116,7 @@ export async function handleRuntimeGetDumpById(
   args: RuntimeGetDumpByIdArgs,
 ) {
   const { connection, logger } = context;
-  const dumpId = args?.dump_id?.trim();
+  const dumpId = dumpIdFrom(args?.dump_id ?? '');
 
   if (!dumpId) {
     return return_error(
@@ -140,9 +150,10 @@ export async function handleRuntimeGetDumpById(
       };
 
       if (responseMode === 'summary' || responseMode === 'both') {
-        const summary: Record<string, unknown> = {};
-        collectKeyFacts(parsedPayload, summary);
-        result.summary = summary;
+        // The summary is the default view's root; the other views answer
+        // a document without one, and then there is none to give.
+        const summary = dumpSummaryOf(raw);
+        if (summary) result.summary = summary;
       }
 
       if (responseMode === 'payload' || responseMode === 'both') {

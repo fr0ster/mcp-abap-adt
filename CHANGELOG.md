@@ -27,6 +27,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   All four read, so they live in `compact-readonly` and serve `--exposition=ro`
   as well: compact is 25 tools, 16 of them read-only.
+- **Dumps filtered by what they are about** (#261). `RuntimeListFeeds` with
+  `feed_type: dumps` and compact `HandlerDumpList` take `runtime_error`,
+  `exception`, `object_name`, `package` and `component` (each `contains`)
+  beside `user` (`equals`), `from` and `to` — sent as one `$query` on the
+  attributes the dumps feed's descriptor declares. `contains` ignores case: on
+  the BTP ABAP environment (2026-10-01) three spellings of one runtime error
+  matched the same dumps, 66 of 200, and an unknown one none. A value with a blank, a
+  comma or a parenthesis is refused before the request, and a dumps filter on
+  another feed is refused rather than dropped. Needs `@mcp-abap-adt/adt-clients`
+  24.1.0.
+- **Every dump entry carries its `dump_id`**, the id `RuntimeGetDumpById`
+  takes; that tool accepts the entry's URI as well.
 - **`GetUnitTestResult` in the `readonly` group too.** Fetching an ABAP Unit
   run's result by its `run_id` only reads, so a read-only caller may do it. It
   is a copy of the `high` tool — the same name, schema and handler — and stays
@@ -34,6 +46,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **A feed list follows SAP's pages** (#261). SAP answers at most 100 entries
+  per feed request whatever `$top` asks (the descriptor declares `paging
+  max="100"`; `$skip` is ignored) and offers the next page as a `rel="next"`
+  link bounded by `to`. `max_results` (compact: `top`) now reads page after
+  page up to the count asked, at most 1000, and answers `next_to` when more
+  remain — pass it back as `to` to read on. Without a count it reads 50, the
+  feed's own page size, the same way. `to` is inclusive: a page starts
+  with the entries of the previous page's last second again (four on one
+  boundary on the BTP ABAP environment, 2026-10-01), so an entry is answered
+  once, and a page asks for its repeats as well as the entries still wanted.
+  Nothing is remembered between calls, so an answer never ends inside a
+  second: it holds entries newer than `next_to`, and reading on from it starts
+  with that second whole — nothing repeats, nothing is skipped. An answer may
+  therefore hold a few entries fewer than asked. A second holding more entries
+  than asked is answered whole instead, more than asked, and reading on starts
+  from the second before it; SAP pages by time alone, so a second holding more
+  than one request's 100 is answered as far as SAP gives it and named in
+  `incomplete_second`.
+- **A dump's summary is the dump's own root** (#261). `RuntimeGetDumpById`'s
+  `summary` is read from the default view's `dump:dump` attributes — runtime
+  error, exception, title, terminated program, time, user — and the source
+  position where it terminated, from the `…/runtime/dump/termination` link,
+  whose `adt://<system>` prefix is dropped so the URI is the ADT path. It picked keys by name out of the whole
+  document before, and answered chapter titles. Compact `HandlerDumpView`
+  `view: summary` answers that summary alone; ADT's own summary view answered
+  a document without the root.
 - **`GetPackage` and `ReadPackage` answer a summary of the package** — name,
   description, type, super-package, software and application component,
   transport layer, ABAP language version, responsible, and the number of

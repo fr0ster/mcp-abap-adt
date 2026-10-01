@@ -779,4 +779,197 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
     },
     getTimeout('long'),
   );
+
+  it(
+    'should summarise a dump read by its URI, and find it again by what the summary says',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const handlerContext = () =>
+          createHandlerContext({ connection: context.connection, logger });
+        const invoke = async (
+          toolName: string,
+          args: Record<string, any>,
+          directCall: () => Promise<any>,
+        ) => tester.invokeToolOrHandler(toolName, args, directCall);
+        const listDumps = (args: Record<string, any>) =>
+          invoke('RuntimeListFeeds', { feed_type: 'dumps', ...args }, () =>
+            handleRuntimeListFeeds(handlerContext(), {
+              feed_type: 'dumps',
+              ...args,
+            }),
+          );
+
+        // The newest dump — so a filter that matches it finds it on the
+        // first page, whatever else the system holds.
+        const listed = await listDumps({ max_results: 1 });
+        expect(listed.isError).toBe(false);
+        const newest = parseTextPayload(listed).entries?.[0];
+        if (!newest) {
+          throw new Error('SKIP: this system shows no dumps to read');
+        }
+        expect(typeof newest.dump_id).toBe('string');
+
+        // Read by the entry's URI, not its id: the tool takes either.
+        const readArgs = { dump_id: newest.id, response_mode: 'summary' };
+        const read = await invoke('RuntimeGetDumpById', readArgs, () =>
+          handleRuntimeGetDumpById(handlerContext(), readArgs as any),
+        );
+        if (read.isError) {
+          throw new Error(
+            `RuntimeGetDumpById by URI failed: ${extractHandlerErrorText(read)}`,
+          );
+        }
+        const readData = parseTextPayload(read);
+        expect(readData.dump_id).toBe(newest.dump_id);
+        expect(readData.payload).toBeUndefined();
+        const summary = readData.summary;
+        logger?.info?.(`   • summary: ${JSON.stringify(summary)}`);
+        expect(typeof summary?.runtime_error).toBe('string');
+        expect(typeof summary?.terminated_program).toBe('string');
+        // The termination link comes as `adt://<system>/sap/bc/adt/…`; the
+        // summary answers the ADT path alone.
+        if (summary?.termination) {
+          expect(summary.termination.uri).toMatch(/^\/sap\/bc\/adt\//);
+        }
+
+        // The feed filtered by that runtime error and user holds the dump.
+        const filterArgs: Record<string, any> = {
+          runtime_error: summary.runtime_error,
+          max_results: 20,
+        };
+        if (summary.user) filterArgs.user = summary.user;
+        const filtered = await listDumps(filterArgs);
+        if (filtered.isError) {
+          throw new Error(
+            `RuntimeListFeeds with filters failed: ${extractHandlerErrorText(filtered)}`,
+          );
+        }
+        const filteredIds = (parseTextPayload(filtered).entries ?? []).map(
+          (e: any) => e.dump_id,
+        );
+        expect(filteredIds).toContain(newest.dump_id);
+      });
+    },
+    getTimeout('long'),
+  );
+
+  it(
+    'should read past the 100 entries SAP answers per request',
+    async () => {
+      await tester.run(async (context: LambdaTesterContext) => {
+        const wanted = toPositiveInt(context.params?.dump_page_probe, 150);
+        const args = { feed_type: 'dumps' as const, max_results: wanted };
+        const result = await tester.invokeToolOrHandler(
+          'RuntimeListFeeds',
+          args,
+          () =>
+            handleRuntimeListFeeds(
+              createHandlerContext({ connection: context.connection, logger }),
+              args,
+            ),
+        );
+        if (result.isError) {
+          throw new Error(
+            `RuntimeListFeeds(${wanted}) failed: ${extractHandlerErrorText(result)}`,
+          );
+        }
+        const data = parseTextPayload(result);
+        const ids = (data.entries ?? []).map((e: any) => e.dump_id);
+        logger?.info?.(
+          `   • asked ${wanted}, got ${data.count}, next_to ${data.next_to ?? '—'}`,
+        );
+        expect(new Set(ids).size).toBe(ids.length);
+        expect(data.count).toBeLessThanOrEqual(wanted);
+        // Fewer than asked is not the end: the entries of the second at the
+        // cut are left whole to the next read, and `next_to` says so.
+
+        // Reading on from `next_to` repeats nothing and skips nothing. SAP's
+        // `to` is inclusive, so an answer that ended inside a second would
+        // hand that second's entries out twice; ours ends before it.
+        const list = async (extra: Record<string, unknown>) => {
+          const listArgs = { feed_type: 'dumps' as const, ...extra };
+          const answered = await tester.invokeToolOrHandler(
+            'RuntimeListFeeds',
+            listArgs,
+            () =>
+              handleRuntimeListFeeds(
+                createHandlerContext({
+                  connection: context.connection,
+                  logger,
+                }),
+                listArgs as any,
+              ),
+          );
+          expect(answered.isError).toBe(false);
+          return parseTextPayload(answered);
+        };
+        const secondOf = (e: any) => String(e.updated).replace(/\D/g, '');
+        if (data.next_to) {
+          const on = await list({ max_results: 50, to: data.next_to });
+          const onIds = (on.entries ?? []).map((e: any) => e.dump_id);
+          logger?.info?.(`   • read on from ${data.next_to}: ${on.count} more`);
+          expect(onIds.filter((id: string) => ids.includes(id))).toEqual([]);
+          for (const e of data.entries) {
+            expect(secondOf(e) > data.next_to).toBe(true);
+          }
+          for (const e of on.entries ?? []) {
+            expect(secondOf(e) <= data.next_to).toBe(true);
+          }
+
+          // One longer read holds nothing between the two that they missed.
+          const longer = await list({ max_results: ids.length + on.count });
+          const both = new Set([...ids, ...onIds]);
+          const oldestOn = secondOf(on.entries[on.entries.length - 1]);
+          const missed = (longer.entries ?? []).filter(
+            (e: any) => secondOf(e) > oldestOn && !both.has(e.dump_id),
+          );
+          expect(missed.map((e: any) => e.dump_id)).toEqual([]);
+        }
+        // A count smaller than one second's entries does not stick on that
+        // second: it is answered whole and the next read starts before it.
+        // `data.next_to` names a second the first read left whole to the next
+        // one, so it holds at least one entry.
+        if (data.next_to) {
+          const tight = await list({ max_results: 1, to: data.next_to });
+          const tightIds = (tight.entries ?? []).map((e: any) => e.dump_id);
+          logger?.info?.(
+            `   • one asked from ${data.next_to}: ${tight.count}, next_to ${tight.next_to ?? '—'}${tight.incomplete_second ? `, incomplete ${tight.incomplete_second}` : ''}`,
+          );
+          expect(tight.count).toBeGreaterThan(0);
+          if (tight.next_to) {
+            expect(tight.next_to < data.next_to).toBe(true);
+            const past = await list({ max_results: 50, to: tight.next_to });
+            expect(
+              (past.entries ?? [])
+                .map((e: any) => e.dump_id)
+                .filter((id: string) => tightIds.includes(id)),
+            ).toEqual([]);
+          }
+        }
+
+        // Without a count the same holds: the default page is read the same
+        // way, so its next_to is ours and not SAP's inclusive link.
+        const unbounded = await list({});
+        if (unbounded.next_to) {
+          const after = await list({ max_results: 50, to: unbounded.next_to });
+          const firstIds = (unbounded.entries ?? []).map((e: any) => e.dump_id);
+          logger?.info?.(
+            `   • no count: ${unbounded.count}, read on from ${unbounded.next_to}: ${after.count} more`,
+          );
+          expect(
+            (after.entries ?? [])
+              .map((e: any) => e.dump_id)
+              .filter((id: string) => firstIds.includes(id)),
+          ).toEqual([]);
+        }
+
+        if (data.count <= 100) {
+          logger?.testSkip?.(
+            `only ${data.count} dumps on this system — paging past 100 was not exercised`,
+          );
+        }
+      });
+    },
+    getTimeout('long'),
+  );
 });

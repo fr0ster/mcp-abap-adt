@@ -158,6 +158,15 @@ describe('the MCP tool surface', () => {
         'compact/HandlerProfileRun': ['profiling'],
         'compact/HandlerProfileView': ['mode', 'top'],
         'compact/HandlerDumpList': ['feed_type'],
+        // Issue #261: the dumps feed filters on the attributes its descriptor
+        // declares; the user filter was the only one reachable before.
+        'system/RuntimeListFeeds': [
+          'runtime_error',
+          'exception',
+          'object_name',
+          'package',
+          'component',
+        ],
         'high/CreateTransportTask': ['task_type'],
         'low/UpdateClassLow': ['transport_request'],
         'low/UpdateClassTestClassesLow': ['transport_request'],

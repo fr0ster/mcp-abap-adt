@@ -2096,6 +2096,9 @@ runtime_readonly_handlers:
         dump_feed_retry_delay_ms: 1500
         # How many recent dumps to request per poll when looking for generated dump
         dump_feed_top: 50
+        # How many dumps the paging test asks for — over 100, the most SAP
+        # answers per request, so the next page is followed
+        dump_page_probe: 150
         # Cheap pre-filter on the feed's own `title` (the exception's short
         # text), so a poll opens only the entries worth opening. The default
         # matches what this test's class throws on an English session; the

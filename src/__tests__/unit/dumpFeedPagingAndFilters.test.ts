@@ -93,9 +93,73 @@ describe('nextToOf', () => {
   });
 });
 
+const byId = {
+  keyOf: (e: any) => e.id as string,
+  stampOf: (e: any) => e.updated as string | undefined,
+};
+
+/** Entries `first`… stamped with the given instants, in order. */
+function stamped(first: number, stamps: string[]) {
+  return stamps.map((updated, i) => ({ id: entryId(first + i), updated }));
+}
+
 // ---------------------------------------------------------------------------
 
 describe('feedPages', () => {
+  it('asks a boundary page for its repeats too — SAP answers the second named by `to` again', async () => {
+    // As the BTP ABAP environment paged (2026-10-01): the first page ends on
+    // four entries of one second, its next link names that second, and the
+    // next page starts with the same four.
+    const boundary = '2026-09-30T05:37:32Z';
+    const first = [
+      ...stamped(0, Array(96).fill('2026-10-01T00:00:00Z')),
+      ...stamped(96, Array(4).fill(boundary)),
+    ];
+    const second = [
+      ...first.slice(96),
+      ...stamped(100, Array(50).fill('2026-09-30T02:00:00Z')),
+    ];
+    const fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        okResponse({ entries: first, next_to: '20260930053732' }),
+      )
+      .mockImplementationOnce(async ({ maxResults }: any) =>
+        okResponse({
+          entries: second.slice(0, maxResults),
+          next_to: '20260930020000',
+        }),
+      );
+
+    const value = pageValue(await feedPages(fetch, { maxResults: 150 }, byId));
+
+    expect(fetch.mock.calls[1][0]).toEqual({
+      maxResults: 54,
+      to: '20260930053732',
+    });
+    expect(value.entries).toHaveLength(150);
+    expect(new Set(value.entries.map((e: any) => e.id)).size).toBe(150);
+    expect(value.next_to).toBe('20260930020000');
+  });
+
+  it('reads on from the last answered second when a page holds more than wanted', async () => {
+    const fetch = jest.fn().mockResolvedValueOnce(
+      okResponse({
+        entries: stamped(0, [
+          '2026-10-01T07:00:03Z',
+          '2026-10-01T07:00:02Z',
+          '2026-10-01T07:00:01Z',
+        ]),
+        next_to: '20261001070001',
+      }),
+    );
+
+    const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
+
+    expect(value.entries).toHaveLength(2);
+    expect(value.next_to).toBe('20261001070002');
+  });
+
   it('follows the next link until the count is reached, and answers where to go on', async () => {
     const fetch = jest
       .fn()
@@ -106,7 +170,7 @@ describe('feedPages', () => {
     const answered = await feedPages(
       fetch,
       { maxResults: 250, to: 'T0' },
-      (e: any) => e.id,
+      byId,
     );
 
     expect(fetch.mock.calls.map(([p]) => p)).toEqual([
@@ -125,9 +189,7 @@ describe('feedPages', () => {
       .mockResolvedValueOnce(page(0, 100, 'T1'))
       .mockResolvedValueOnce(page(100, 30));
 
-    const value = pageValue(
-      await feedPages(fetch, { maxResults: 500 }, (e: any) => e.id),
-    );
+    const value = pageValue(await feedPages(fetch, { maxResults: 500 }, byId));
 
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(value.entries).toHaveLength(130);
@@ -140,9 +202,7 @@ describe('feedPages', () => {
       .mockResolvedValueOnce(page(0, 3, 'T1'))
       .mockResolvedValueOnce(page(2, 3));
 
-    const value = pageValue(
-      await feedPages(fetch, { maxResults: 10 }, (e: any) => e.id),
-    );
+    const value = pageValue(await feedPages(fetch, { maxResults: 10 }, byId));
 
     expect(value.entries.map((e: any) => e.id)).toEqual(
       [0, 1, 2, 3, 4].map(entryId),
@@ -158,7 +218,7 @@ describe('feedPages', () => {
     });
 
     const value = pageValue(
-      await feedPages(fetch as never, { maxResults: 5000 }, (e: any) => e.id),
+      await feedPages(fetch as never, { maxResults: 5000 }, byId),
     );
 
     expect(fetch).toHaveBeenCalledTimes(FEED_ENTRIES_CEILING / 100);
@@ -169,9 +229,7 @@ describe('feedPages', () => {
   it('asks once, with no $top of its own, when no count is given', async () => {
     const fetch = jest.fn().mockResolvedValueOnce(page(0, 50, 'T1'));
 
-    const value = pageValue(
-      await feedPages(fetch, { to: 'T0' }, (e: any) => e.id),
-    );
+    const value = pageValue(await feedPages(fetch, { to: 'T0' }, byId));
 
     expect(fetch.mock.calls).toEqual([[{ to: 'T0' }]]);
     expect(value.next_to).toBe('T1');
@@ -184,9 +242,7 @@ describe('feedPages', () => {
       .mockResolvedValueOnce(page(0, 100, 'T1'))
       .mockResolvedValueOnce(refused);
 
-    expect(await feedPages(fetch, { maxResults: 200 }, (e: any) => e.id)).toBe(
-      refused,
-    );
+    expect(await feedPages(fetch, { maxResults: 200 }, byId)).toBe(refused);
   });
 });
 
@@ -296,8 +352,9 @@ describe('RuntimeListFeeds — dumps', () => {
 
 /**
  * The default view's root: the attributes the BTP ABAP environment answered
- * (2026-09-30), chapters and payload cut. The termination link is shaped as
- * `dumpSummaryOf` reads it — a `#start=` fragment on a source URI.
+ * (2026-09-30), and the termination link as it answered it (2026-10-01) —
+ * `adt://<system>` before the ADT path, `#start=<line>,<column>` after it;
+ * the system is `SID` here. Chapters and payload cut.
  */
 const dumpXml =
   '<?xml version="1.0" encoding="utf-8"?>' +
@@ -308,7 +365,7 @@ const dumpXml =
   '<dump:links>' +
   '<dump:link relation="self" uri="/sap/bc/adt/runtime/dump/ID1"/>' +
   '<dump:link relation="http://www.sap.com/adt/relations/runtime/dump/termination" type="text/plain"' +
-  ' uri="/sap/bc/adt/oo/classes/zcl_placeholder/source/main#start=42,8"/>' +
+  ' uri="adt://SID/sap/bc/adt/oo/classes/zcl_placeholder/source/main#start=42,8"/>' +
   '</dump:links>' +
   '<dump:chapters><dump:chapter name="kap0" title="Short Text" category="ABAP Developer View" line="1"/>' +
   '<dump:chapter name="kap11" title="User and Transaction" category="System Environment" line="40"/></dump:chapters>' +

@@ -62,8 +62,11 @@ export function dumpIdFrom(value: string): string {
 /**
  * What a dump is about, read from the default view's `dump:dump` root: its
  * attributes name the runtime error, the exception, the terminated program,
- * when and whose; the link that carries a `#start=` fragment is the source
- * position where it terminated. Nothing when the document has no such root.
+ * when and whose; the `…/runtime/dump/termination` link is the source
+ * position where it terminated. That link is addressed `adt://<system>/sap/
+ * bc/adt/…#start=<line>,<column>` (BTP ABAP environment, 2026-10-01): the
+ * system part is dropped, so the URI is the ADT path any reader takes.
+ * Nothing when the document has no such root.
  */
 export function dumpSummaryOf(
   raw: unknown,
@@ -98,7 +101,8 @@ export function dumpSummaryOf(
       (l) => /termination/i.test(l.relation ?? '') && l.uri?.includes('#'),
     ) ?? links.find((l) => /#start=\d+/.test(l.uri ?? ''));
   if (termination?.uri) {
-    const [uri, fragment = ''] = termination.uri.split('#');
+    const [addressed, fragment = ''] = termination.uri.split('#');
+    const uri = addressed.replace(/^adt:\/\/[^/]*/, '');
     const line = /start=(\d+)/.exec(fragment)?.[1];
     summary.termination = line
       ? { uri: decodeURIComponent(uri), line: Number(line) }

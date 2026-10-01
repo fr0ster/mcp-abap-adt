@@ -67,12 +67,38 @@ export interface FeedPaging {
   to?: string;
 }
 
+/** How an entry is told apart and when it was stamped. */
+export interface FeedEntryIdentity<T> {
+  keyOf: (entry: T) => string;
+  /** The entry's time as an ISO-8601 instant, or nothing. */
+  stampOf: (entry: T) => string | undefined;
+}
+
+/**
+ * An ISO-8601 instant as a feed's `to` — `YYYYMMDDHHMMSS`, the form of SAP's
+ * own next link, which carries the oldest entry's `atom:updated` in UTC.
+ */
+export function toBoundOf(stamp: string | undefined): string | undefined {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/.exec(
+    stamp ?? '',
+  );
+  return match ? match.slice(1).join('') : undefined;
+}
+
 /**
  * Requests page after page until `maxResults` entries are collected, SAP
  * offers no next page, or {@link FEED_ENTRIES_CEILING} is reached.
  *
- * A page boundary is a timestamp, and an entry stamped with it can come back
- * on the next page too: entries are kept once by `keyOf`.
+ * **`to` is inclusive.** The next page starts with the entries stamped with
+ * the previous page's last second again (BTP ABAP environment, 2026-10-01:
+ * four of them on one boundary). So an entry is kept once, by `keyOf`, and a
+ * page asks for the entries still wanted plus the ones it will repeat: a page
+ * that asked only for what was missing came back as nothing but repeats, its
+ * next link naming the same `to`, and the list stopped short.
+ *
+ * When the count is reached part-way through a page, `next_to` is the last
+ * answered entry's second — inclusive as SAP's own, so reading on repeats the
+ * entries of that second rather than skipping any of them.
  *
  * A failing page answers as itself: what came before it is not a result the
  * caller asked for.
@@ -83,7 +109,7 @@ export async function feedPages<T>(
     to?: string;
   }) => Promise<IAdtResponse<FeedPage<T>, IAdtError>>,
   paging: FeedPaging,
-  keyOf: (entry: T) => string,
+  identity: FeedEntryIdentity<T>,
 ): Promise<IAdtResponse<FeedPage<T>, IAdtError>> {
   if (paging.maxResults === undefined) {
     return fetch({ to: paging.to });
@@ -98,8 +124,11 @@ export async function feedPages<T>(
   let to = paging.to;
 
   while (entries.length < wanted) {
+    const repeats = to
+      ? entries.filter((e) => toBoundOf(identity.stampOf(e)) === to).length
+      : 0;
     const answer = await fetch({
-      maxResults: Math.min(FEED_PAGE_MAX, wanted - entries.length),
+      maxResults: Math.min(FEED_PAGE_MAX, wanted - entries.length + repeats),
       to,
     });
     if (!answer.ok) return answer;
@@ -107,20 +136,27 @@ export async function feedPages<T>(
     const page = answer.getResult().value;
     let added = 0;
     for (const entry of page.entries) {
-      const key = keyOf(entry);
+      const key = identity.keyOf(entry);
       if (seen.has(key)) continue;
+      if (entries.length === wanted) {
+        // More on this page than wanted: read on from the last answered
+        // entry's second.
+        const last = entries[entries.length - 1];
+        const bound = toBoundOf(identity.stampOf(last)) ?? page.next_to;
+        return succeededWith(bound ? { entries, next_to: bound } : { entries });
+      }
       seen.add(key);
       entries.push(entry);
       added++;
     }
 
-    // No next page, a page that moved nothing, or a link back to where this
-    // page started: SAP has nothing further to give on this query.
-    if (!page.next_to || added === 0 || page.next_to === to) {
-      return succeededWith({ entries: entries.slice(0, wanted) });
+    // No next page, or a page that moved nothing: SAP has nothing further
+    // to give on this query.
+    if (!page.next_to || added === 0) {
+      return succeededWith({ entries });
     }
     to = page.next_to;
   }
 
-  return succeededWith({ entries: entries.slice(0, wanted), next_to: to });
+  return succeededWith({ entries, next_to: to });
 }

@@ -31,7 +31,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `feed_type: dumps` and compact `HandlerDumpList` take `runtime_error`,
   `exception`, `object_name`, `package` and `component` (each `contains`)
   beside `user` (`equals`), `from` and `to` — sent as one `$query` on the
-  attributes the dumps feed's descriptor declares. A value with a blank, a
+  attributes the dumps feed's descriptor declares. `contains` ignores case: on
+  the BTP ABAP environment (2026-10-01) three spellings of one runtime error
+  matched the same dumps, 66 of 200, and an unknown one none. A value with a blank, a
   comma or a parenthesis is refused before the request, and a dumps filter on
   another feed is refused rather than dropped. Needs `@mcp-abap-adt/adt-clients`
   24.1.0.
@@ -49,12 +51,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   max="100"`; `$skip` is ignored) and offers the next page as a `rel="next"`
   link bounded by `to`. `max_results` (compact: `top`) now reads page after
   page up to the count asked, at most 1000, and answers `next_to` when more
-  remain — pass it back as `to` to read on. Without a count, one page of SAP's
+  remain — pass it back as `to` to read on. `to` is inclusive: a page starts
+  with the entries of the previous page's last second again (four on one
+  boundary on the BTP ABAP environment, 2026-10-01), so an entry is answered
+  once, and a page asks for its repeats as well as the entries still wanted. Without a count, one page of SAP's
   default size, as before.
 - **A dump's summary is the dump's own root** (#261). `RuntimeGetDumpById`'s
   `summary` is read from the default view's `dump:dump` attributes — runtime
   error, exception, title, terminated program, time, user — and the source
-  position where it terminated. It picked keys by name out of the whole
+  position where it terminated, from the `…/runtime/dump/termination` link,
+  whose `adt://<system>` prefix is dropped so the URI is the ADT path. It picked keys by name out of the whole
   document before, and answered chapter titles. Compact `HandlerDumpView`
   `view: summary` answers that summary alone; ADT's own summary view answered
   a document without the root.

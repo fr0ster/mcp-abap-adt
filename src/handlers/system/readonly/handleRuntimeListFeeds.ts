@@ -45,23 +45,28 @@ export const TOOL_DEFINITION = {
       },
       runtime_error: {
         type: 'string',
-        description: 'Dumps whose runtime error contains this text.',
+        description:
+          'Dumps whose runtime error contains this text, in any case.',
       },
       exception: {
         type: 'string',
-        description: 'Dumps whose exception class contains this text.',
+        description:
+          'Dumps whose exception class contains this text, in any case.',
       },
       object_name: {
         type: 'string',
-        description: 'Dumps whose terminated object name contains this text.',
+        description:
+          'Dumps whose terminated object name contains this text, in any case.',
       },
       package: {
         type: 'string',
-        description: 'Dumps whose object package contains this text.',
+        description:
+          'Dumps whose object package contains this text, in any case.',
       },
       component: {
         type: 'string',
-        description: 'Dumps whose application component contains this text.',
+        description:
+          'Dumps whose application component contains this text, in any case.',
       },
       max_results: {
         type: 'number',
@@ -263,7 +268,7 @@ export async function handleRuntimeListFeeds(
       return answer(
         ctx,
         () =>
-          feedPages<{ id: string }>(
+          feedPages<{ id: string; updated: string }>(
             (page) =>
               dumps.dumps({
                 ...base,
@@ -271,7 +276,7 @@ export async function handleRuntimeListFeeds(
                 analyse: analyseException,
               }) as never,
             paging,
-            (entry) => entry.id,
+            { keyOf: (entry) => entry.id, stampOf: (entry) => entry.updated },
           ),
         (page) =>
           pageOf({
@@ -288,7 +293,7 @@ export async function handleRuntimeListFeeds(
       return answer(
         ctx,
         () =>
-          feedPages<{ id: string }>(
+          feedPages<{ id: string; validFrom: string }>(
             (page) =>
               messages.systemMessages({
                 ...base,
@@ -296,7 +301,10 @@ export async function handleRuntimeListFeeds(
                 analyse: analyseException,
               }) as never,
             paging,
-            (entry) => entry.id,
+            {
+              keyOf: (entry) => entry.id,
+              stampOf: (entry) => entry.validFrom,
+            },
           ),
         pageOf,
       );
@@ -314,7 +322,10 @@ export async function handleRuntimeListFeeds(
                 analyse: analyseException,
               }) as never,
             paging,
-            (entry) => `${entry.transactionId}|${entry.dateTime}`,
+            {
+              keyOf: (entry) => `${entry.transactionId}|${entry.dateTime}`,
+              stampOf: (entry) => entry.dateTime,
+            },
           ),
         pageOf,
       );

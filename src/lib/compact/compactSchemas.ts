@@ -605,23 +605,27 @@ export const compactDumpListSchema = {
     user: { type: 'string', description: 'Entries of this user.' },
     runtime_error: {
       type: 'string',
-      description: 'Dumps whose runtime error contains this text.',
+      description: 'Dumps whose runtime error contains this text, in any case.',
     },
     exception: {
       type: 'string',
-      description: 'Dumps whose exception class contains this text.',
+      description:
+        'Dumps whose exception class contains this text, in any case.',
     },
     object_name: {
       type: 'string',
-      description: 'Dumps whose terminated object name contains this text.',
+      description:
+        'Dumps whose terminated object name contains this text, in any case.',
     },
     package: {
       type: 'string',
-      description: 'Dumps whose object package contains this text.',
+      description:
+        'Dumps whose object package contains this text, in any case.',
     },
     component: {
       type: 'string',
-      description: 'Dumps whose application component contains this text.',
+      description:
+        'Dumps whose application component contains this text, in any case.',
     },
     top: {
       type: 'number',

@@ -226,11 +226,11 @@ per request.
 
 - `feed_type` — Which runtime feed to list. Default "dumps" (ABAP short dumps). "system_messages" and "gateway_errors" read the other two ADT runtime feeds through the same call.
 - `user` — Entries of this user.
-- `runtime_error` — Dumps whose runtime error contains this text.
-- `exception` — Dumps whose exception class contains this text.
-- `object_name` — Dumps whose terminated object name contains this text.
-- `package` — Dumps whose object package contains this text.
-- `component` — Dumps whose application component contains this text.
+- `runtime_error` — Dumps whose runtime error contains this text, in any case.
+- `exception` — Dumps whose exception class contains this text, in any case.
+- `object_name` — Dumps whose terminated object name contains this text, in any case.
+- `package` — Dumps whose object package contains this text, in any case.
+- `component` — Dumps whose application component contains this text, in any case.
 - `top` — Number of entries, up to 1000; SAP answers 100 per request and the pages are read in turn.
 - `from` — Start of time range (YYYYMMDDHHMMSS).
 - `to` — End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.

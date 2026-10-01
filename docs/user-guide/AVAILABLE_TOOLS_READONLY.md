@@ -848,14 +848,14 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
 **Parameters:**
-- `component` (string, optional) - Dumps whose application component contains this text.
-- `exception` (string, optional) - Dumps whose exception class contains this text.
+- `component` (string, optional) - Dumps whose application component contains this text, in any case.
+- `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
 - `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
 - `max_results` (number, optional) - Number of entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. Default: one page of SAP's default size.
-- `object_name` (string, optional) - Dumps whose terminated object name contains this text.
-- `package` (string, optional) - Dumps whose object package contains this text.
-- `runtime_error` (string, optional) - Dumps whose runtime error contains this text.
+- `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
+- `package` (string, optional) - Dumps whose object package contains this text, in any case.
+- `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.
 - `to` (string, optional) - End of time range in YYYYMMDDHHMMSS format; pass a previous next_to here to read on.
 - `user` (string, optional) - Entries of this SAP user (exact match).
 
@@ -1095,4 +1095,4 @@ Generated from code in `src/handlers/**` (not from docs).
 
 ---
 
-*Last updated: 2026-09-30*
+*Last updated: 2026-10-01*

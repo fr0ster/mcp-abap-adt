@@ -826,6 +826,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         logger?.info?.(`   • summary: ${JSON.stringify(summary)}`);
         expect(typeof summary?.runtime_error).toBe('string');
         expect(typeof summary?.terminated_program).toBe('string');
+        // The termination link comes as `adt://<system>/sap/bc/adt/…`; the
+        // summary answers the ADT path alone.
+        if (summary?.termination) {
+          expect(summary.termination.uri).toMatch(/^\/sap\/bc\/adt\//);
+        }
 
         // The feed filtered by that runtime error and user holds the dump.
         const filterArgs: Record<string, any> = {
@@ -877,6 +882,32 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         expect(data.count).toBeLessThanOrEqual(wanted);
         // Fewer than asked means SAP offered no further page.
         if (data.count < wanted) expect(data.next_to).toBeUndefined();
+
+        // A longer read that finds more proves there was more to give: the
+        // first must then have answered the whole count. A page boundary
+        // repeats the entries of its second, and a loop that read those
+        // repeats as the end stopped short (147 of 150) and said nothing
+        // remained.
+        const longerArgs = {
+          feed_type: 'dumps' as const,
+          max_results: wanted + 50,
+        };
+        const longer = await tester.invokeToolOrHandler(
+          'RuntimeListFeeds',
+          longerArgs,
+          () =>
+            handleRuntimeListFeeds(
+              createHandlerContext({ connection: context.connection, logger }),
+              longerArgs,
+            ),
+        );
+        expect(longer.isError).toBe(false);
+        const longerCount = parseTextPayload(longer).count;
+        logger?.info?.(`   • asked ${wanted + 50}, got ${longerCount}`);
+        if (longerCount > data.count) {
+          expect(data.count).toBe(wanted);
+          expect(typeof data.next_to).toBe('string');
+        }
         if (data.count <= 100) {
           logger?.testSkip?.(
             `only ${data.count} dumps on this system — paging past 100 was not exercised`,

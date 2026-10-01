@@ -18,6 +18,13 @@ import { rawOf } from '@mcp-abap-adt/adt-strategies';
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import { succeededWith } from './sequence';
 
+/**
+ * What a request without `$top` answers — the descriptor's `paging size`.
+ * It is the count a caller who names none gets, read the same way as any
+ * other, so its `next_to` is ours and not SAP's inclusive link.
+ */
+export const FEED_PAGE_DEFAULT = 50;
+
 /** The most one request answers — the descriptor's `paging max`. */
 export const FEED_PAGE_MAX = 100;
 
@@ -61,7 +68,7 @@ export function feedPage<T>(
 }
 
 export interface FeedPaging {
-  /** How many entries the caller wants; absent — one page of SAP's size. */
+  /** How many entries the caller wants; absent — {@link FEED_PAGE_DEFAULT}. */
   maxResults?: number;
   /** The upper time bound the first request carries. */
   to?: string;
@@ -116,12 +123,8 @@ export async function feedPages<T>(
   paging: FeedPaging,
   identity: FeedEntryIdentity<T>,
 ): Promise<IAdtResponse<FeedPage<T>, IAdtError>> {
-  if (paging.maxResults === undefined) {
-    return fetch({ to: paging.to });
-  }
-
   const wanted = Math.min(
-    Math.max(1, Math.floor(paging.maxResults)),
+    Math.max(1, Math.floor(paging.maxResults ?? FEED_PAGE_DEFAULT)),
     FEED_ENTRIES_CEILING,
   );
   // One beyond the count: the first entry not answered marks the boundary.

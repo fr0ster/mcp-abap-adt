@@ -22,6 +22,7 @@ import {
 } from '../../handlers/system/readonly/handleRuntimeListFeeds';
 import {
   FEED_ENTRIES_CEILING,
+  FEED_PAGE_DEFAULT,
   feedPage,
   feedPages,
   nextToOf,
@@ -267,13 +268,27 @@ describe('feedPages', () => {
     expect(value.next_to).toBe(`T${FEED_ENTRIES_CEILING + 1}`);
   });
 
-  it('asks once, with no $top of its own, when no count is given', async () => {
-    const fetch = jest.fn().mockResolvedValueOnce(page(0, 50, 'T1'));
+  it("reads the default count the same way when no count is given — its next_to is ours, not SAP's inclusive link", async () => {
+    const all = stamped(0, [
+      ...Array(49).fill('2026-10-01T07:00:09Z'),
+      '2026-10-01T07:00:08Z',
+      '2026-10-01T07:00:08Z',
+      '2026-10-01T07:00:07Z',
+    ]);
+    const fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        okResponse({ entries: all.slice(0, 51), next_to: '20261001070008' }),
+      );
 
     const value = pageValue(await feedPages(fetch, { to: 'T0' }, byId));
 
-    expect(fetch.mock.calls).toEqual([[{ to: 'T0' }]]);
-    expect(value.next_to).toBe('T1');
+    expect(fetch.mock.calls).toEqual([
+      [{ maxResults: FEED_PAGE_DEFAULT + 1, to: 'T0' }],
+    ]);
+    // The second ending at the cut goes whole to the next read.
+    expect(value.entries).toHaveLength(49);
+    expect(value.next_to).toBe('20261001070008');
   });
 
   it('answers a failing page as itself', async () => {

@@ -925,6 +925,22 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
           expect(missed.map((e: any) => e.dump_id)).toEqual([]);
         }
+        // Without a count the same holds: the default page is read the same
+        // way, so its next_to is ours and not SAP's inclusive link.
+        const unbounded = await list({});
+        if (unbounded.next_to) {
+          const after = await list({ max_results: 50, to: unbounded.next_to });
+          const firstIds = (unbounded.entries ?? []).map((e: any) => e.dump_id);
+          logger?.info?.(
+            `   • no count: ${unbounded.count}, read on from ${unbounded.next_to}: ${after.count} more`,
+          );
+          expect(
+            (after.entries ?? [])
+              .map((e: any) => e.dump_id)
+              .filter((id: string) => firstIds.includes(id)),
+          ).toEqual([]);
+        }
+
         if (data.count <= 100) {
           logger?.testSkip?.(
             `only ${data.count} dumps on this system — paging past 100 was not exercised`,

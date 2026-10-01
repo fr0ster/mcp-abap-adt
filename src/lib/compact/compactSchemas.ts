@@ -630,7 +630,7 @@ export const compactDumpListSchema = {
     top: {
       type: 'number',
       description:
-        'Most entries, up to 1000; SAP answers 100 per request and the pages are read in turn.',
+        'Most entries, up to 1000 (default 50); SAP answers 100 per request and the pages are read in turn.',
     },
     from: {
       type: 'string',

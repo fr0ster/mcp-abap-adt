@@ -51,15 +51,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   max="100"`; `$skip` is ignored) and offers the next page as a `rel="next"`
   link bounded by `to`. `max_results` (compact: `top`) now reads page after
   page up to the count asked, at most 1000, and answers `next_to` when more
-  remain — pass it back as `to` to read on. `to` is inclusive: a page starts
+  remain — pass it back as `to` to read on. Without a count it reads 50, the
+  feed's own page size, the same way. `to` is inclusive: a page starts
   with the entries of the previous page's last second again (four on one
   boundary on the BTP ABAP environment, 2026-10-01), so an entry is answered
   once, and a page asks for its repeats as well as the entries still wanted.
   Nothing is remembered between calls, so an answer never ends inside a
   second: it holds entries newer than `next_to`, and reading on from it starts
   with that second whole — nothing repeats, nothing is skipped. An answer may
-  therefore hold a few entries fewer than asked. Without a count, one page of SAP's
-  default size, as before.
+  therefore hold a few entries fewer than asked.
 - **A dump's summary is the dump's own root** (#261). `RuntimeGetDumpById`'s
   `summary` is read from the default view's `dump:dump` attributes — runtime
   error, exception, title, terminated program, time, user — and the source

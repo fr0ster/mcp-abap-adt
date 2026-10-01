@@ -9,6 +9,7 @@ import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import {
   FEED_ENTRIES_CEILING,
+  FEED_PAGE_DEFAULT,
   FEED_PAGE_MAX,
   type FeedPage,
   feedPage,
@@ -70,7 +71,7 @@ export const TOOL_DEFINITION = {
       },
       max_results: {
         type: 'number',
-        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer ends before a second it cannot hold whole. Default: one page of SAP's default size.`,
+        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer ends before a second it cannot hold whole. Default: ${FEED_PAGE_DEFAULT}.`,
       },
       from: {
         type: 'string',

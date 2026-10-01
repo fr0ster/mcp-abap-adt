@@ -232,11 +232,37 @@ function logEnvLoaded(envPath: string): void {
 }
 
 /**
+ * The config file `MCP_TEST_CONFIG` names, resolved against the repository
+ * root when relative; `undefined` when the variable is not set.
+ */
+export function testConfigPathFromEnv(
+  env: NodeJS.ProcessEnv = process.env,
+): string | undefined {
+  const value = env.MCP_TEST_CONFIG?.trim();
+  if (!value) return undefined;
+  return path.resolve(__dirname, '../../../..', value);
+}
+
+/**
  * Load test configuration from YAML
- * Uses test-config.yaml from mcp-abap-adt/tests
+ * Uses test-config.yaml from mcp-abap-adt/tests, or the file MCP_TEST_CONFIG names
  */
 export function loadTestConfig(): any {
   if (cachedConfig) {
+    return cachedConfig;
+  }
+
+  // MCP_TEST_CONFIG names another file, so one checkout can carry a config per
+  // system. It is a statement, not a hint: a file that is not there fails here
+  // rather than falling back to the template and quietly disabling every test.
+  const chosen = testConfigPathFromEnv();
+  if (chosen) {
+    if (!fs.existsSync(chosen)) {
+      throw new Error(`MCP_TEST_CONFIG points to a missing file: ${chosen}`);
+    }
+    cachedConfig =
+      (yaml.load(fs.readFileSync(chosen, 'utf8')) as Record<string, unknown>) ||
+      {};
     return cachedConfig;
   }
 

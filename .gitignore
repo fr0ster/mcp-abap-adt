@@ -22,6 +22,7 @@ coverage/
 
 # Test configuration (contains real transport requests and sensitive data)
 tests/test-config.yaml
+tests/test-config.*.yaml
 
 # Logs
 logs

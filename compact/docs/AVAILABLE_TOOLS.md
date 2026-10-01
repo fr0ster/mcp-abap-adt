@@ -231,7 +231,7 @@ per request.
 - `object_name` — Dumps whose terminated object name contains this text, in any case.
 - `package` — Dumps whose object package contains this text, in any case.
 - `component` — Dumps whose application component contains this text, in any case.
-- `top` — Number of entries, up to 1000; SAP answers 100 per request and the pages are read in turn.
+- `top` — Most entries, up to 1000; SAP answers 100 per request and the pages are read in turn.
 - `from` — Start of time range (YYYYMMDDHHMMSS).
 - `to` — End of time range (YYYYMMDDHHMMSS); a previous next_to reads on.
 

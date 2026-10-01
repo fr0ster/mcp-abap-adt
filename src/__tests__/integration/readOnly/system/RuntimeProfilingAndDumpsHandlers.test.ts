@@ -880,33 +880,50 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         );
         expect(new Set(ids).size).toBe(ids.length);
         expect(data.count).toBeLessThanOrEqual(wanted);
-        // Fewer than asked means SAP offered no further page.
-        if (data.count < wanted) expect(data.next_to).toBeUndefined();
+        // Fewer than asked is not the end: the entries of the second at the
+        // cut are left whole to the next read, and `next_to` says so.
 
-        // A longer read that finds more proves there was more to give: the
-        // first must then have answered the whole count. A page boundary
-        // repeats the entries of its second, and a loop that read those
-        // repeats as the end stopped short (147 of 150) and said nothing
-        // remained.
-        const longerArgs = {
-          feed_type: 'dumps' as const,
-          max_results: wanted + 50,
+        // Reading on from `next_to` repeats nothing and skips nothing. SAP's
+        // `to` is inclusive, so an answer that ended inside a second would
+        // hand that second's entries out twice; ours ends before it.
+        const list = async (extra: Record<string, unknown>) => {
+          const listArgs = { feed_type: 'dumps' as const, ...extra };
+          const answered = await tester.invokeToolOrHandler(
+            'RuntimeListFeeds',
+            listArgs,
+            () =>
+              handleRuntimeListFeeds(
+                createHandlerContext({
+                  connection: context.connection,
+                  logger,
+                }),
+                listArgs as any,
+              ),
+          );
+          expect(answered.isError).toBe(false);
+          return parseTextPayload(answered);
         };
-        const longer = await tester.invokeToolOrHandler(
-          'RuntimeListFeeds',
-          longerArgs,
-          () =>
-            handleRuntimeListFeeds(
-              createHandlerContext({ connection: context.connection, logger }),
-              longerArgs,
-            ),
-        );
-        expect(longer.isError).toBe(false);
-        const longerCount = parseTextPayload(longer).count;
-        logger?.info?.(`   • asked ${wanted + 50}, got ${longerCount}`);
-        if (longerCount > data.count) {
-          expect(data.count).toBe(wanted);
-          expect(typeof data.next_to).toBe('string');
+        const secondOf = (e: any) => String(e.updated).replace(/\D/g, '');
+        if (data.next_to) {
+          const on = await list({ max_results: 50, to: data.next_to });
+          const onIds = (on.entries ?? []).map((e: any) => e.dump_id);
+          logger?.info?.(`   • read on from ${data.next_to}: ${on.count} more`);
+          expect(onIds.filter((id: string) => ids.includes(id))).toEqual([]);
+          for (const e of data.entries) {
+            expect(secondOf(e) > data.next_to).toBe(true);
+          }
+          for (const e of on.entries ?? []) {
+            expect(secondOf(e) <= data.next_to).toBe(true);
+          }
+
+          // One longer read holds nothing between the two that they missed.
+          const longer = await list({ max_results: ids.length + on.count });
+          const both = new Set([...ids, ...onIds]);
+          const oldestOn = secondOf(on.entries[on.entries.length - 1]);
+          const missed = (longer.entries ?? []).filter(
+            (e: any) => secondOf(e) > oldestOn && !both.has(e.dump_id),
+          );
+          expect(missed.map((e: any) => e.dump_id)).toEqual([]);
         }
         if (data.count <= 100) {
           logger?.testSkip?.(

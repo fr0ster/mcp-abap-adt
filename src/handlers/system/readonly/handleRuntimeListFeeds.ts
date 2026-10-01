@@ -70,7 +70,7 @@ export const TOOL_DEFINITION = {
       },
       max_results: {
         type: 'number',
-        description: `Number of entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. Default: one page of SAP's default size.`,
+        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer ends before a second it cannot hold whole. Default: one page of SAP's default size.`,
       },
       from: {
         type: 'string',
@@ -79,7 +79,7 @@ export const TOOL_DEFINITION = {
       to: {
         type: 'string',
         description:
-          'End of time range in YYYYMMDDHHMMSS format; pass a previous next_to here to read on.',
+          'End of time range in YYYYMMDDHHMMSS format, inclusive; pass a previous next_to here to read on.',
       },
     },
     required: [],

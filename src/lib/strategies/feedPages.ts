@@ -91,14 +91,19 @@ export function toBoundOf(stamp: string | undefined): string | undefined {
  *
  * **`to` is inclusive.** The next page starts with the entries stamped with
  * the previous page's last second again (BTP ABAP environment, 2026-10-01:
- * four of them on one boundary). So an entry is kept once, by `keyOf`, and a
- * page asks for the entries still wanted plus the ones it will repeat: a page
- * that asked only for what was missing came back as nothing but repeats, its
- * next link naming the same `to`, and the list stopped short.
+ * four of them on one boundary). Within one call an entry is kept once, by
+ * `keyOf`, and a page asks for the entries still wanted plus the ones it will
+ * repeat: a page that asked only for what was missing came back as nothing
+ * but repeats, its next link naming the same `to`, and the list stopped
+ * short.
  *
- * When the count is reached part-way through a page, `next_to` is the last
- * answered entry's second — inclusive as SAP's own, so reading on repeats the
- * entries of that second rather than skipping any of them.
+ * **Between calls nothing is remembered, so the answer never ends inside a
+ * second.** `next_to` names a second, and the answer holds only entries newer
+ * than it: the entries of that second are left to the next call, whose
+ * `to: next_to` starts with exactly them. To still answer the count, one entry
+ * beyond it is read — where the cut falls tells which second is the boundary.
+ * Only when every wanted entry shares one second (more entries in a second
+ * than were asked for) does the answer keep them and `next_to` repeat them.
  *
  * A failing page answers as itself: what came before it is not a result the
  * caller asked for.
@@ -119,16 +124,20 @@ export async function feedPages<T>(
     Math.max(1, Math.floor(paging.maxResults)),
     FEED_ENTRIES_CEILING,
   );
+  // One beyond the count: the first entry not answered marks the boundary.
+  const reading = wanted + 1;
   const entries: T[] = [];
   const seen = new Set<string>();
   let to = paging.to;
+  let exhausted = false;
+  let lastNext: string | undefined;
 
-  while (entries.length < wanted) {
+  while (entries.length < reading) {
     const repeats = to
       ? entries.filter((e) => toBoundOf(identity.stampOf(e)) === to).length
       : 0;
     const answer = await fetch({
-      maxResults: Math.min(FEED_PAGE_MAX, wanted - entries.length + repeats),
+      maxResults: Math.min(FEED_PAGE_MAX, reading - entries.length + repeats),
       to,
     });
     if (!answer.ok) return answer;
@@ -138,25 +147,42 @@ export async function feedPages<T>(
     for (const entry of page.entries) {
       const key = identity.keyOf(entry);
       if (seen.has(key)) continue;
-      if (entries.length === wanted) {
-        // More on this page than wanted: read on from the last answered
-        // entry's second.
-        const last = entries[entries.length - 1];
-        const bound = toBoundOf(identity.stampOf(last)) ?? page.next_to;
-        return succeededWith(bound ? { entries, next_to: bound } : { entries });
-      }
       seen.add(key);
       entries.push(entry);
       added++;
     }
+    lastNext = page.next_to;
 
     // No next page, or a page that moved nothing: SAP has nothing further
     // to give on this query.
     if (!page.next_to || added === 0) {
-      return succeededWith({ entries });
+      exhausted = true;
+      break;
     }
     to = page.next_to;
   }
 
-  return succeededWith({ entries, next_to: to });
+  if (entries.length <= wanted) {
+    return succeededWith(
+      exhausted || !lastNext ? { entries } : { entries, next_to: lastNext },
+    );
+  }
+
+  const answered = entries.slice(0, wanted);
+  const boundary = toBoundOf(identity.stampOf(entries[wanted]));
+  if (!boundary) {
+    // A feed whose entries carry no time: SAP's own link is all there is.
+    return succeededWith(
+      lastNext
+        ? { entries: answered, next_to: lastNext }
+        : { entries: answered },
+    );
+  }
+  const newer = answered.filter(
+    (e) => toBoundOf(identity.stampOf(e)) !== boundary,
+  );
+  return succeededWith({
+    entries: newer.length > 0 ? newer : answered,
+    next_to: boundary,
+  });
 }

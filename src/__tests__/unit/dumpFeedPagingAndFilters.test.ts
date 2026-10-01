@@ -106,80 +106,35 @@ function stamped(first: number, stamps: string[]) {
 // ---------------------------------------------------------------------------
 
 describe('feedPages', () => {
-  it('asks a boundary page for its repeats too — SAP answers the second named by `to` again', async () => {
-    // As the BTP ABAP environment paged (2026-10-01): the first page ends on
-    // four entries of one second, its next link names that second, and the
-    // next page starts with the same four.
-    const boundary = '2026-09-30T05:37:32Z';
-    const first = [
-      ...stamped(0, Array(96).fill('2026-10-01T00:00:00Z')),
-      ...stamped(96, Array(4).fill(boundary)),
-    ];
-    const second = [
-      ...first.slice(96),
-      ...stamped(100, Array(50).fill('2026-09-30T02:00:00Z')),
-    ];
-    const fetch = jest
-      .fn()
-      .mockResolvedValueOnce(
-        okResponse({ entries: first, next_to: '20260930053732' }),
-      )
-      .mockImplementationOnce(async ({ maxResults }: any) =>
-        okResponse({
-          entries: second.slice(0, maxResults),
-          next_to: '20260930020000',
-        }),
-      );
-
-    const value = pageValue(await feedPages(fetch, { maxResults: 150 }, byId));
-
-    expect(fetch.mock.calls[1][0]).toEqual({
-      maxResults: 54,
-      to: '20260930053732',
-    });
-    expect(value.entries).toHaveLength(150);
-    expect(new Set(value.entries.map((e: any) => e.id)).size).toBe(150);
-    expect(value.next_to).toBe('20260930020000');
-  });
-
-  it('reads on from the last answered second when a page holds more than wanted', async () => {
-    const fetch = jest.fn().mockResolvedValueOnce(
-      okResponse({
-        entries: stamped(0, [
-          '2026-10-01T07:00:03Z',
-          '2026-10-01T07:00:02Z',
-          '2026-10-01T07:00:01Z',
-        ]),
-        next_to: '20261001070001',
-      }),
-    );
-
-    const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
-
-    expect(value.entries).toHaveLength(2);
-    expect(value.next_to).toBe('20261001070002');
-  });
+  /** `n` entries from `first`, one second apart, newest first. */
+  function seconds(first: number, n: number, from = Date.UTC(2026, 9, 1, 7)) {
+    return Array.from({ length: n }, (_, i) => ({
+      id: entryId(first + i),
+      updated: new Date(from - (first + i) * 1000)
+        .toISOString()
+        .replace('.000', ''),
+    }));
+  }
 
   it('follows the next link until the count is reached, and answers where to go on', async () => {
     const fetch = jest
       .fn()
       .mockResolvedValueOnce(page(0, 100, 'T1'))
       .mockResolvedValueOnce(page(100, 100, 'T2'))
-      .mockResolvedValueOnce(page(200, 50, 'T3'));
+      .mockResolvedValueOnce(page(200, 51, 'T3'));
 
-    const answered = await feedPages(
-      fetch,
-      { maxResults: 250, to: 'T0' },
-      byId,
+    const value = pageValue(
+      await feedPages(fetch, { maxResults: 250, to: 'T0' }, byId),
     );
 
+    // One entry beyond the count is read: it marks where the answer ends.
     expect(fetch.mock.calls.map(([p]) => p)).toEqual([
       { maxResults: 100, to: 'T0' },
       { maxResults: 100, to: 'T1' },
-      { maxResults: 50, to: 'T2' },
+      { maxResults: 51, to: 'T2' },
     ]);
-    const value = pageValue(answered);
     expect(value.entries).toHaveLength(250);
+    // Entries without a time: SAP's own link is the continuation.
     expect(value.next_to).toBe('T3');
   });
 
@@ -209,6 +164,92 @@ describe('feedPages', () => {
     );
   });
 
+  it('asks a boundary page for its repeats too — SAP answers the second named by `to` again', async () => {
+    // As the BTP ABAP environment paged (2026-10-01): the first page ends on
+    // four entries of one second, its next link names that second, and the
+    // next page starts with the same four.
+    const boundary = '2026-09-30T05:37:32Z';
+    const first = [
+      ...seconds(0, 96, Date.UTC(2026, 9, 1, 7)),
+      ...stamped(96, Array(4).fill(boundary)),
+    ];
+    const second = [
+      ...first.slice(96),
+      ...seconds(100, 60, Date.UTC(2026, 8, 30, 5, 37, 31) + 100_000),
+    ];
+    const fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        okResponse({ entries: first, next_to: '20260930053732' }),
+      )
+      .mockImplementationOnce(async ({ maxResults }: any) =>
+        okResponse({
+          entries: second.slice(0, maxResults),
+          next_to: '20260930050000',
+        }),
+      );
+
+    const value = pageValue(await feedPages(fetch, { maxResults: 150 }, byId));
+
+    // 151 to read, 100 read, 4 of them to come again.
+    expect(fetch.mock.calls[1][0]).toEqual({
+      maxResults: 55,
+      to: '20260930053732',
+    });
+    expect(value.entries).toHaveLength(150);
+    expect(new Set(value.entries.map((e: any) => e.id)).size).toBe(150);
+  });
+
+  it('never ends an answer inside a second, so reading on repeats nothing and skips nothing', async () => {
+    // Newest first: s3, then two entries of s2, then s1.
+    const all = stamped(0, [
+      '2026-10-01T07:00:03Z',
+      '2026-10-01T07:00:02Z',
+      '2026-10-01T07:00:02Z',
+      '2026-10-01T07:00:01Z',
+    ]);
+    // The feed as SAP answers it: entries at or before `to`, inclusive.
+    const feed = jest.fn(async ({ maxResults, to }: any) => {
+      const from = to
+        ? all.filter((e) => e.updated.replace(/\D/g, '') <= to)
+        : all;
+      const entries = from.slice(0, maxResults);
+      const last = entries[entries.length - 1];
+      return okResponse(
+        entries.length < from.length
+          ? { entries, next_to: last.updated.replace(/\D/g, '') }
+          : { entries },
+      );
+    });
+
+    const first = pageValue(await feedPages(feed, { maxResults: 2 }, byId));
+    // s2's two entries are left whole to the next call.
+    expect(first.entries.map((e: any) => e.id)).toEqual([entryId(0)]);
+    expect(first.next_to).toBe('20261001070002');
+
+    const second = pageValue(
+      await feedPages(feed, { maxResults: 10, to: first.next_to }, byId),
+    );
+    expect(second.entries.map((e: any) => e.id)).toEqual(
+      [1, 2, 3].map(entryId),
+    );
+    expect(second.next_to).toBeUndefined();
+  });
+
+  it('keeps one crowded second whole rather than answer nothing', async () => {
+    const fetch = jest.fn().mockResolvedValueOnce(
+      okResponse({
+        entries: stamped(0, Array(3).fill('2026-10-01T07:00:00Z')),
+        next_to: '20261001070000',
+      }),
+    );
+
+    const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
+
+    expect(value.entries).toHaveLength(2);
+    expect(value.next_to).toBe('20261001070000');
+  });
+
   it(`never collects more than ${FEED_ENTRIES_CEILING}`, async () => {
     let n = 0;
     const fetch = jest.fn(async ({ maxResults }: any) => {
@@ -221,9 +262,9 @@ describe('feedPages', () => {
       await feedPages(fetch as never, { maxResults: 5000 }, byId),
     );
 
-    expect(fetch).toHaveBeenCalledTimes(FEED_ENTRIES_CEILING / 100);
+    expect(fetch).toHaveBeenCalledTimes(FEED_ENTRIES_CEILING / 100 + 1);
     expect(value.entries).toHaveLength(FEED_ENTRIES_CEILING);
-    expect(value.next_to).toBe(`T${FEED_ENTRIES_CEILING}`);
+    expect(value.next_to).toBe(`T${FEED_ENTRIES_CEILING + 1}`);
   });
 
   it('asks once, with no $top of its own, when no count is given', async () => {
@@ -289,7 +330,7 @@ describe('RuntimeListFeeds — dumps', () => {
     const dumpsMember = jest
       .fn()
       .mockResolvedValueOnce(page(0, 100, 'T1'))
-      .mockResolvedValueOnce(page(100, 20, 'T2'));
+      .mockResolvedValueOnce(page(100, 21, 'T2'));
     feeds = { dumps: dumpsMember };
 
     const result: any = await handleRuntimeListFeeds(context as any, {
@@ -311,7 +352,7 @@ describe('RuntimeListFeeds — dumps', () => {
       to: undefined,
     });
     expect(dumpsMember.mock.calls[1][0]).toMatchObject({
-      maxResults: 20,
+      maxResults: 21,
       to: 'T1',
     });
     const answered = body(result);

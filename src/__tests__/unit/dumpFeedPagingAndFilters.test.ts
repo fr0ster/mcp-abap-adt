@@ -26,6 +26,7 @@ import {
   feedPage,
   feedPages,
   nextToOf,
+  secondBefore,
 } from '../../lib/strategies/feedPages';
 import { okResponse, refusedResponse } from '../helpers/fakeClient';
 
@@ -237,18 +238,67 @@ describe('feedPages', () => {
     expect(second.next_to).toBeUndefined();
   });
 
-  it('keeps one crowded second whole rather than answer nothing', async () => {
-    const fetch = jest.fn().mockResolvedValueOnce(
-      okResponse({
-        entries: stamped(0, Array(3).fill('2026-10-01T07:00:00Z')),
-        next_to: '20261001070000',
-      }),
-    );
+  it('answers a second holding more than asked whole, and reads on from the second before it', async () => {
+    const crowded = '2026-10-01T07:00:00Z';
+    const fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        okResponse({
+          entries: stamped(0, Array(3).fill(crowded)),
+          next_to: '20261001070000',
+        }),
+      )
+      .mockResolvedValueOnce(
+        okResponse({
+          entries: stamped(0, [
+            ...Array(4).fill(crowded),
+            '2026-10-01T06:59:59Z',
+          ]),
+          next_to: '20261001065959',
+        }),
+      );
 
     const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
 
-    expect(value.entries).toHaveLength(2);
-    expect(value.next_to).toBe('20261001070000');
+    expect(fetch.mock.calls[1][0]).toEqual({
+      maxResults: 100,
+      to: '20261001070000',
+    });
+    // All four of that second, more than asked; the next read starts past it.
+    expect(value.entries.map((e: any) => e.id)).toEqual(
+      [0, 1, 2, 3].map(entryId),
+    );
+    expect(value.next_to).toBe('20261001065959');
+    expect(value.incomplete_second).toBeUndefined();
+  });
+
+  it('says so when a second holds more than one request answers', async () => {
+    const crowded = '2026-10-01T07:00:00Z';
+    const fetch = jest
+      .fn()
+      .mockResolvedValueOnce(
+        okResponse({
+          entries: stamped(0, Array(3).fill(crowded)),
+          next_to: '20261001070000',
+        }),
+      )
+      .mockResolvedValueOnce(
+        okResponse({
+          entries: stamped(0, Array(100).fill(crowded)),
+          next_to: '20261001070000',
+        }),
+      );
+
+    const value = pageValue(await feedPages(fetch, { maxResults: 2 }, byId));
+
+    expect(value.entries).toHaveLength(100);
+    expect(value.next_to).toBe('20261001065959');
+    expect(value.incomplete_second).toBe('20261001070000');
+  });
+
+  it('steps a bound back one second across a day', () => {
+    expect(secondBefore('20261001000000')).toBe('20260930235959');
+    expect(secondBefore('20261001070000')).toBe('20261001065959');
   });
 
   it(`never collects more than ${FEED_ENTRIES_CEILING}`, async () => {

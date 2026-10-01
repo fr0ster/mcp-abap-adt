@@ -23,7 +23,7 @@ export const TOOL_DEFINITION = {
   name: 'RuntimeListFeeds',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on.',
+    '[runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -71,7 +71,7 @@ export const TOOL_DEFINITION = {
       },
       max_results: {
         type: 'number',
-        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer ends before a second it cannot hold whole. Default: ${FEED_PAGE_DEFAULT}.`,
+        description: `Most entries to return, up to ${FEED_ENTRIES_CEILING}; SAP answers at most ${FEED_PAGE_MAX} per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: ${FEED_PAGE_DEFAULT}.`,
       },
       from: {
         type: 'string',
@@ -215,6 +215,9 @@ export async function handleRuntimeListFeeds(
       entries: page.entries,
     };
     if (page.next_to) answered.next_to = page.next_to;
+    if (page.incomplete_second) {
+      answered.incomplete_second = page.incomplete_second;
+    }
     return answered;
   };
 

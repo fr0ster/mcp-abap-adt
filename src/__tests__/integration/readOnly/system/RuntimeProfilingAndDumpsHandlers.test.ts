@@ -925,6 +925,28 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
           );
           expect(missed.map((e: any) => e.dump_id)).toEqual([]);
         }
+        // A count smaller than one second's entries does not stick on that
+        // second: it is answered whole and the next read starts before it.
+        // `data.next_to` names a second the first read left whole to the next
+        // one, so it holds at least one entry.
+        if (data.next_to) {
+          const tight = await list({ max_results: 1, to: data.next_to });
+          const tightIds = (tight.entries ?? []).map((e: any) => e.dump_id);
+          logger?.info?.(
+            `   • one asked from ${data.next_to}: ${tight.count}, next_to ${tight.next_to ?? '—'}${tight.incomplete_second ? `, incomplete ${tight.incomplete_second}` : ''}`,
+          );
+          expect(tight.count).toBeGreaterThan(0);
+          if (tight.next_to) {
+            expect(tight.next_to < data.next_to).toBe(true);
+            const past = await list({ max_results: 50, to: tight.next_to });
+            expect(
+              (past.entries ?? [])
+                .map((e: any) => e.dump_id)
+                .filter((id: string) => tightIds.includes(id)),
+            ).toEqual([]);
+          }
+        }
+
         // Without a count the same holds: the default page is read the same
         // way, so its next_to is ours and not SAP's inclusive link.
         const unbounded = await list({});

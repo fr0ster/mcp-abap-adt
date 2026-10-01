@@ -1174,7 +1174,7 @@ Generated from code in `src/handlers/**` (not from docs).
 
 <a id="runtimelistfeeds-read-only-system"></a>
 #### RuntimeListFeeds (Read-Only / System)
-**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on.
+**Description:** [runtime] List the ADT runtime feeds and their variants, or read one: ABAP short dumps, system messages or SAP Gateway errors, filtered by user and time range; dumps also by runtime error, exception, object, package and application component. Entries come newest first; each dump carries its dump_id. When more entries remain, next_to is the `to` that reads on; incomplete_second names a second holding more entries than SAP answers in one request.
 
 **Source:** `src/handlers/system/readonly/handleRuntimeListFeeds.ts`
 
@@ -1183,7 +1183,7 @@ Generated from code in `src/handlers/**` (not from docs).
 - `exception` (string, optional) - Dumps whose exception class contains this text, in any case.
 - `feed_type` (string, optional (default: descriptors)) - Feed to read. "descriptors" lists available feeds, "variants" lists feed variants, others read that specific feed. Default: descriptors.
 - `from` (string, optional) - Start of time range in YYYYMMDDHHMMSS format.
-- `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer ends before a second it cannot hold whole. Default: 50.
+- `max_results` (number, optional) - Most entries to return, up to 1000; SAP answers at most 100 per request and the pages are read in turn. An answer holds whole seconds, so it may hold a few entries fewer, or a crowded second more, than asked. Default: 50.
 - `object_name` (string, optional) - Dumps whose terminated object name contains this text, in any case.
 - `package` (string, optional) - Dumps whose object package contains this text, in any case.
 - `runtime_error` (string, optional) - Dumps whose runtime error contains this text, in any case.

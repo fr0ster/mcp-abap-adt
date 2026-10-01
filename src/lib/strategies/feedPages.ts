@@ -35,6 +35,11 @@ export interface FeedPage<T> {
   entries: T[];
   /** The `to` of SAP's next page; absent when SAP offers none. */
   next_to?: string;
+  /**
+   * A second holding more entries than one request answers: SAP pages by
+   * time alone, so the ones beyond these cannot be reached by `to`.
+   */
+  incomplete_second?: string;
 }
 
 /**
@@ -92,6 +97,15 @@ export function toBoundOf(stamp: string | undefined): string | undefined {
   return match ? match.slice(1).join('') : undefined;
 }
 
+/** The second before a `to` bound — `to` is inclusive, so this excludes it. */
+export function secondBefore(bound: string): string {
+  const [y, mo, d, h, mi, se] = [0, 4, 6, 8, 10, 12].map((at, i) =>
+    Number(bound.slice(at, at + (i === 0 ? 4 : 2))),
+  );
+  const before = new Date(Date.UTC(y, mo - 1, d, h, mi, se) - 1000);
+  return before.toISOString().replace(/\D/g, '').slice(0, 14);
+}
+
 /**
  * Requests page after page until `maxResults` entries are collected, SAP
  * offers no next page, or {@link FEED_ENTRIES_CEILING} is reached.
@@ -109,8 +123,15 @@ export function toBoundOf(stamp: string | undefined): string | undefined {
  * than it: the entries of that second are left to the next call, whose
  * `to: next_to` starts with exactly them. To still answer the count, one entry
  * beyond it is read — where the cut falls tells which second is the boundary.
- * Only when every wanted entry shares one second (more entries in a second
- * than were asked for) does the answer keep them and `next_to` repeat them.
+ *
+ * **A second holding more entries than were asked is answered whole.**
+ * Leaving it to the next call would leave it there forever: the next call
+ * starts with the same second and cuts it again. So the second is read on its
+ * own — one request bounded by it, the most SAP answers — and answered whole,
+ * more than asked, with `next_to` the second before it. SAP pages by time
+ * alone, so a second holding more than one request answers cannot be read
+ * past its first {@link FEED_PAGE_MAX}; the answer says so in
+ * `incomplete_second` and reads on from the second before.
  *
  * A failing page answers as itself: what came before it is not a result the
  * caller asked for.
@@ -184,8 +205,24 @@ export async function feedPages<T>(
   const newer = answered.filter(
     (e) => toBoundOf(identity.stampOf(e)) !== boundary,
   );
-  return succeededWith({
-    entries: newer.length > 0 ? newer : answered,
-    next_to: boundary,
-  });
+  if (newer.length > 0) {
+    return succeededWith({ entries: newer, next_to: boundary });
+  }
+
+  // Every wanted entry is of the boundary second: read that second alone.
+  const crowded = await fetch({ maxResults: FEED_PAGE_MAX, to: boundary });
+  if (!crowded.ok) return crowded;
+  const page = crowded.getResult().value;
+  const ofSecond = page.entries.filter(
+    (e) => toBoundOf(identity.stampOf(e)) === boundary,
+  );
+  const whole =
+    ofSecond.length < page.entries.length ||
+    page.entries.length < FEED_PAGE_MAX ||
+    !page.next_to;
+  const more = ofSecond.length < page.entries.length || !!page.next_to;
+  const answeredSecond: FeedPage<T> = { entries: ofSecond };
+  if (more) answeredSecond.next_to = secondBefore(boundary);
+  if (!whole) answeredSecond.incomplete_second = boundary;
+  return succeededWith(answeredSecond);
 }

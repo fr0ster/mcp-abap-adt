@@ -59,7 +59,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Nothing is remembered between calls, so an answer never ends inside a
   second: it holds entries newer than `next_to`, and reading on from it starts
   with that second whole — nothing repeats, nothing is skipped. An answer may
-  therefore hold a few entries fewer than asked.
+  therefore hold a few entries fewer than asked. A second holding more entries
+  than asked is answered whole instead, more than asked, and reading on starts
+  from the second before it; SAP pages by time alone, so a second holding more
+  than one request's 100 is answered as far as SAP gives it and named in
+  `incomplete_second`.
 - **A dump's summary is the dump's own root** (#261). `RuntimeGetDumpById`'s
   `summary` is read from the default view's `dump:dump` attributes — runtime
   error, exception, title, terminated program, time, user — and the source

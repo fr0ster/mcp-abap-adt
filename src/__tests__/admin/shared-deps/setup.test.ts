@@ -370,7 +370,11 @@ describe('Admin: Setup shared dependencies', () => {
       }> = [];
 
       // Collect names for group activation
-      const toActivate: Array<{ name: string; type: string }> = [];
+      const toActivate: Array<{
+        name: string;
+        type: string;
+        parentName?: string;
+      }> = [];
 
       // --- Tables ---
       const tables = sharedConfig.tables || [];
@@ -1226,6 +1230,10 @@ describe('Admin: Setup shared dependencies', () => {
             toActivate.push({
               name: item.name.toUpperCase(),
               type: TYPE_CODES.function_modules,
+              // A module is addressed through its group; without it the
+              // activation URI is built with the module's name in the group's
+              // place, and the whole batch answers 500 invalidFunctionGroup.
+              parentName: item.group.toUpperCase(),
             });
           } catch (error: any) {
             const msg = error instanceof Error ? error.message : String(error);
@@ -1245,6 +1253,7 @@ describe('Admin: Setup shared dependencies', () => {
               toActivate.push({
                 name: item.name.toUpperCase(),
                 type: TYPE_CODES.function_modules,
+                parentName: item.group.toUpperCase(),
               });
             } else {
               testsLogger?.error?.(

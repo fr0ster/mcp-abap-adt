@@ -37,17 +37,37 @@ interface InactiveObjectRef {
  * how many objects are inactive.
  */
 function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
+  const asArray = (v: any): any[] =>
+    Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
+  // BASIS 7.40 answers another document: `adtcore:objectReferences`, one
+  // `adtcore:objectReference` per object (measured 2026-10-01). Read as the
+  // newer shape it gave `count: 0` over eight inactive objects.
+  const legacy = (value as any)?.['adtcore:objectReferences'];
+  if (legacy !== undefined) {
+    return asArray(legacy?.['adtcore:objectReference'])
+      .map((ref) => ref?.['@'] ?? {})
+      .filter((a) => a['adtcore:name'])
+      .map((a) => ({
+        type: a['adtcore:type'] ?? '',
+        name: a['adtcore:name'] ?? '',
+      }));
+  }
   const root = (value as any)?.['ioc:inactiveObjects'];
-  if (!root) return [];
-  const entriesRaw = root['ioc:entry'];
+  if (root === undefined) {
+    // A document neither shape describes is not "nothing is inactive": an
+    // activation is confirmed off this answer, and a 0 read off the wrong
+    // document confirms one that did not happen.
+    throw new Error(
+      `GetInactiveObjects: unrecognised document (root: ${Object.keys((value as object) ?? {}).join(', ') || 'none'})`,
+    );
+  }
+  const entriesRaw = root?.['ioc:entry'];
   const entries = Array.isArray(entriesRaw)
     ? entriesRaw
     : entriesRaw
       ? [entriesRaw]
       : [];
   const objects: InactiveObjectRef[] = [];
-  const asArray = (v: any): any[] =>
-    Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
   // `ioc:object` comes back as an array too — `structured` forces
   // `object` to one. Read as a single element it gave no `ioc:ref`, and
   // every entry was dropped: this tool answered "count: 0" over an

@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
 import type { HandlerSet } from '@mcp-abap-adt/lib/config';
 import {
+  hydrateSystemContextFromEnvFile,
   ServerConfigManager,
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
@@ -20,7 +21,6 @@ import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
-import * as dotenv from 'dotenv';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
 import { StdioServer } from './StdioServer.js';
@@ -49,38 +49,6 @@ let activeServer: StdioServer | SseServer | StreamableHttpServer | undefined;
 
 function hasArg(name: string): boolean {
   return process.argv.includes(name);
-}
-
-/**
- * In v2 flow, .env can be loaded into auth-broker session storage without
- * populating process.env. System context resolver relies on process.env
- * for SAP_MASTER_SYSTEM / SAP_RESPONSIBLE, so bridge these values here.
- */
-function hydrateSystemContextFromEnvFile(envFilePath?: string): void {
-  if (!envFilePath || !fs.existsSync(envFilePath)) {
-    return;
-  }
-
-  try {
-    const parsed = dotenv.parse(fs.readFileSync(envFilePath, 'utf8'));
-    const keys: Array<keyof NodeJS.ProcessEnv> = [
-      'SAP_MASTER_SYSTEM',
-      'SAP_RESPONSIBLE',
-      'SAP_USERNAME',
-      'SAP_CLIENT',
-      'SAP_CONNECTION_TYPE',
-      'SAP_SYSTEM_TYPE',
-    ];
-
-    for (const key of keys) {
-      const value = parsed[key];
-      if (!process.env[key] && value) {
-        process.env[key] = value;
-      }
-    }
-  } catch {
-    // Ignore .env parse errors here; auth-broker initialization handles config validation.
-  }
 }
 
 /**

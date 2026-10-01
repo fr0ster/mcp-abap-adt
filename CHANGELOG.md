@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`SAP_LANGUAGE` from `--env-path` reaches the objects it creates** (#182).
+  The env file goes to the auth broker's session store, which never fills
+  `process.env`; the launcher bridged six system-context keys from it and not
+  the language, so every object created through such a session took the
+  library's default language. The bridge now lives in `@mcp-abap-adt/lib/config`
+  (`hydrateSystemContextFromEnvFile`, `ENV_FILE_CONTEXT_KEYS`) and carries
+  `SAP_LANGUAGE`; a value already in the process environment still wins.
+
 ## [15.1.0] - 2026-10-01
 
 ### Added

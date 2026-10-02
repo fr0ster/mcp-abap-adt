@@ -36,6 +36,12 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # The build compiles `src` without the tests, and Jest strips types
+      # without checking them, so a test that does not type-check still runs
+      # green. This step is the only place its types are checked.
+      - name: Type-check tests
+        run: npm run test:check
+
       # No `continue-on-error` here. It was on this step from the day the
       # workflow was written, so the suite ran on six platform/Node
       # combinations and its verdict was thrown away on all six: a red

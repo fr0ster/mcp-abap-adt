@@ -5,6 +5,8 @@ import {
   makeAdtRequestWithTimeout,
   return_error,
 } from '../../../lib/utils';
+import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
+
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementSpot',
   available_in: ['onprem', 'cloud'] as const,
@@ -177,6 +179,20 @@ export async function handleGetEnhancementSpot(
       );
     }
   } catch (error) {
+    // `enhsxsb` serves BAdI spots. A plain spot is not served at all — its own
+    // collection answers `500 I::000` too — so say what it is rather than pass
+    // that on; any other failure is reported as it came.
+    if (args?.enhancement_spot) {
+      const type = await enhancementTypeOf(
+        connection,
+        String(args.enhancement_spot),
+        'ENHS',
+      );
+      const why = type
+        ? notThroughAdt(String(args.enhancement_spot), type)
+        : undefined;
+      if (why) return return_error(why);
+    }
     return return_error(error);
   }
 }

@@ -5,6 +5,31 @@ import {
   makeAdtRequestWithTimeout,
   return_error,
 } from '../../../lib/utils';
+import { enhancementTypeOf, notThroughAdt } from './enhancementAvailability';
+
+/**
+ * Collections whose objects have no `/source/main`, so asking for one is
+ * answered before any request. A class enhancement is not exposed by ADT at
+ * all; a BAdI implementation has metadata (`enhoxhb/{name}`) but no source —
+ * `enhoxhh`, the source code plugin, is the one collection with source.
+ */
+const NO_SOURCE: Record<string, string> = {
+  enhoxh:
+    'A class enhancement (ENHO/XH) is not available through ADT — Eclipse opens it in SAP GUI.',
+  enhoxhb:
+    'A BAdI implementation (ENHO/XHB) has no source: only a source code plugin (enhancement_spot "enhoxhh") does.',
+};
+
+/** What to tell a caller whose read failed, once the name's type is known. */
+function explainByType(name: string, type: string): string | undefined {
+  const notExposed = notThroughAdt(name, type);
+  if (notExposed) return notExposed;
+  if (type === 'ENHO/XHB') return `${name}: ${NO_SOURCE.enhoxhb}`;
+  if (type === 'ENHO/XHH')
+    return `${name} is a source code plugin (ENHO/XHH): read it with enhancement_spot "enhoxhh".`;
+  return undefined;
+}
+
 export const TOOL_DEFINITION = {
   name: 'GetEnhancementImpl',
   available_in: ['onprem', 'cloud'] as const,
@@ -115,6 +140,9 @@ export async function handleGetEnhancementImpl(
     const enhancementSpot = args.enhancement_spot;
     const enhancementName = args.enhancement_name;
 
+    const noSource = NO_SOURCE[String(enhancementSpot).toLowerCase()];
+    if (noSource) return return_error(noSource);
+
     logger?.info(
       `Getting enhancement: ${enhancementName} from spot: ${enhancementSpot}`,
     );
@@ -203,6 +231,15 @@ export async function handleGetEnhancementImpl(
       }
     }
   } catch (error) {
+    // The read failed: if the name says what it is, say why — a type ADT does
+    // not expose, a BAdI implementation with no source, a source code plugin
+    // asked under a spot name. Anything else is reported as it came.
+    if (args?.enhancement_name) {
+      const name = String(args.enhancement_name);
+      const type = await enhancementTypeOf(connection, name, 'ENHO');
+      const why = type ? explainByType(name, type) : undefined;
+      if (why) return return_error(why);
+    }
     return return_error(error);
   }
 }

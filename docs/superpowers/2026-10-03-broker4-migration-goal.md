@@ -11,9 +11,25 @@ The server (`@mcp-abap-adt/lib` and the `server` package) takes the credential
 for a destination from `@mcp-abap-adt/auth-broker` 4 —
 `await broker.getProvider(destination)`, an `IAuthProvider` — and hands it to a
 `@mcp-abap-adt/connection` 10 connector as it is. Basic over HTTP, basic over
-RFC, every token grant, and SNC over RFC all reach the system through **one
-code path**; renewing a token is the provider's business inside the
-connector, not the server's.
+RFC, a token, and SNC over RFC all reach the system through **one code path**;
+renewing a token is the provider's business inside the connector, not the
+server's.
+
+**Scope is what the server connects to, not what the broker can do**
+(decided 2026-10-03). The systems this server serves authorize with basic, a
+JWT, or SNC — nothing else is in view. So the server supports exactly four:
+
+| Destination states | Comes from | The server supplies |
+|---|---|---|
+| `basic`, over HTTP or RFC | an `.env` file, `x-sap-login` / `x-sap-password` | nothing — the broker builds it |
+| `snc`, over RFC | an `.env` file with `SAP_SNC_*` | nothing; an HTTP connection is refused |
+| `jwt` / `authorization_code` | an ABAP or XSUAA service key, an `.env` file | the browser strategy (`--browser`, `--browser-auth-port`) |
+| `jwt` / `none` | a token in an `.env` file, `x-sap-jwt-token` | nothing |
+
+Another grant a file may state is not supported: no collaborator for it, no
+option, no documentation, no test. Whatever the broker does with it — build
+it, or refuse it with a `DestinationConfigError` naming what is missing — the
+server passes on unchanged; it adds no code to allow or to forbid it.
 
 Dependencies after the change: `auth-broker` ^4, `auth-providers` ^5,
 `auth-stores` ^3.2.0 (from ^1 — two majors), `connection` ^10,
@@ -51,28 +67,17 @@ stated, which the XSUAA fallback below relies on.
   `sessionContext` nothing ever sets.
 - **One broker per destination.** Today `--mcp=X` builds two brokers over the
   same stores (`'default'` and `'X'`); it builds one.
-- **Grants (decided 2026-10-03).** Every grant broker 4 knows except
-  `saml2_pure`: `basic`; `jwt` with `authorization_code`,
-  `client_credentials`, `passcode`, `oidc_authorization_code`, `device_code`,
-  `password`, `token_exchange`, `none`; `saml` with `saml2_bearer`, `none`;
-  `snc`. `saml2_pure` needs the server to deliver a SAMLResponse to the
-  system's ACS — unmeasured, and tied to cookie renewal (auth-broker PR #42,
-  owed item 3); a `saml2_pure` destination is refused with words naming it.
-- **Broker construction passes every collaborator** the grants above need:
-  `authorization` → `browserCallbackStrategy({ browser, port })`;
-  `oidcAuthorization` → `oidcCallbackStrategy`; `deviceCodePresenter` → one
-  that writes to the logger, else stderr; `assertionReplayStore` → an
-  in-memory store. No `samlCookies` (no `saml2_pure`), no `provider`.
-- **`--grant` (decided 2026-10-03).** A service-key destination states no
-  grant; the server states it to the key store
-  (`AbapServiceKeyStore(dir, { grantType })`,
-  `XsuaaServiceKeyStore(dir, { grantType })`). `--grant`, `MCP_GRANT`, and
-  `grant` in YAML; default `authorization_code`, today's behaviour. It applies
-  to service-key destinations only — an `--env` file states its own
-  `SAP_GRANT_TYPE`. The broker judges the value: one it does not allow is a
-  `DestinationConfigError` naming the field.
+- **Broker construction passes the one collaborator the four need:**
+  `authorization` → `browserCallbackStrategy({ browser, port })`, for
+  `authorization_code`. No `provider`, and none of the options of the grants
+  out of scope.
+- **A service key's grant is `authorization_code`.** A SAP service key states
+  no grant; the server states it to the key store
+  (`AbapServiceKeyStore(dir, { grantType: 'authorization_code' })`,
+  likewise `XsuaaServiceKeyStore`) — today's behaviour, now said instead of
+  assumed. No option changes it.
 - **Stores move to auth-stores 3 constructors.**
-  - ABAP service key (`uaa` nested): `AbapServiceKeyStore(dir, { grantType })`.
+  - ABAP service key (`uaa` nested): `AbapServiceKeyStore` as above.
   - XSUAA service key (`url`, `clientid`, `clientsecret` at the root) — kept,
     it is in use (decided 2026-10-03), and made to work: today its session
     store is built with an empty system URL. The system URL is means, stated in
@@ -81,8 +86,8 @@ stated, which the XSUAA fallback below relies on.
     supplies the client. Without a URL the destination is refused, naming the
     field.
   - `--env` / `--env-path` file, and the `.env` in the working directory:
-    `EnvDestinationStore`. A `jwt` / `saml` file without `SAP_GRANT_TYPE` is
-    refused, naming the field and the command that regenerates the file
+    `EnvDestinationStore`. A `jwt` file without `SAP_GRANT_TYPE` is refused,
+    naming the field and the command that regenerates the file
     (`mcp-auth generate-env --grant …`). No support for files written for the
     old stores (decided 2026-10-02: a change of authorization regenerates the
     file).
@@ -91,12 +96,12 @@ stated, which the XSUAA fallback below relies on.
 - **SNC.** A destination stating `authType: snc` and its SNC fields gets
   `SncLogonProvider` from the broker. SNC protects RFC, not HTTP: an SNC
   destination on an HTTP connection is refused, naming `connection-type`.
-- **Every auth and connection parameter in CLI, env and YAML.** Today YAML
-  lacks `browser`, `browser-auth-port` and `connection-type`, and `--browser` /
-  `MCP_BROWSER` is parsed but never reaches the broker. After the change each
-  parameter — old and new — exists in all three forms with one precedence
+- **Every existing auth and connection parameter in CLI, env and YAML.**
+  Today YAML lacks `browser`, `browser-auth-port` and `connection-type`, and
+  `--browser` / `MCP_BROWSER` is parsed but never reaches the broker. After
+  the change each parameter exists in all three forms with one precedence
   (CLI over env over YAML), the template `--config` generates lists them, and
-  `--browser` reaches the strategy.
+  `--browser` reaches the strategy. No new parameter is added.
 - **Shutdown flushes.** Nothing handles `SIGTERM`, `SIGINT` or stdin closing
   today. The server calls `flush()` on every broker it built on those, and
   before a stdio transport closes.
@@ -131,20 +136,24 @@ stated, which the XSUAA fallback below relies on.
 1. **The destination states; the server infers nothing** — no auth type from
    whether a user name is present, no grant from the shape of a key. What is
    not stated is refused, naming the field, before any request.
-2. **No implicit defaults.** The server passes the broker every collaborator
-   the enabled grants need; nothing relies on a library's fallback.
+2. **No implicit defaults.** The server passes the broker the collaborator
+   the four need; nothing relies on a library's fallback.
 3. **Nothing writes to stdout.** Under the stdio transport stdout is protocol
-   traffic; prompts (device code, browser URL) go to the logger, else stderr.
+   traffic; a prompt (the browser URL) goes to the logger, else stderr.
 4. **No secret in a log line or an error message** — tokens, passwords, client
-   secrets, cookies, SNC names.
+   secrets, cookies, SNC names. One deliberate exception (decided
+   2026-10-03): the auth summary printed at startup to stderr shows a value
+   longer than 20 characters as its first and last 4 (`abcd***wxyz`), so a
+   user can tell the right key was picked; a shorter value is masked whole.
+   It stays as it is.
 5. **What a provider obtains or renews reaches the session store**, and is
    flushed before the process exits.
 6. **The embedding surface `cloud-llm-hub` uses does not change:**
    `EmbeddableMcpServer`, `@mcp-abap-adt/lib/handlers`,
    `setSystemContext` / `getSystemContext` / `return_error` from
    `@mcp-abap-adt/lib/utils`, `@mcp-abap-adt/lib/request-context`.
-7. **Every auth and connection parameter has a CLI, an env and a YAML form**,
-   with one precedence.
+7. **Every existing auth and connection parameter has a CLI, an env and a
+   YAML form**, with one precedence.
 8. **Measured:** the four live cases under *Success*, on real systems.
 
 ## Not in this release
@@ -159,7 +168,12 @@ stated, which the XSUAA fallback below relies on.
   mTLS stand (auth-broker PR #42, owed item 4), and the server reaching it
   through `getProvider`. It is also the passwordless HTTP path: Secure Login
   Client issues X.509 certificates. `kerberos` stays as it is too.
-- `saml2_pure` and renewing SAML cookies without the user (owed item 3).
+- Every grant but `authorization_code` and `none`, and `saml` destinations:
+  OIDC, device code, password, token exchange, client credentials, passcode,
+  `saml2_bearer`, `saml2_pure` — no system the server serves uses them. A
+  `--grant` option for service keys goes with them (proposed, then dropped,
+  2026-10-03).
+- Renewing SAML cookies without the user (owed item 3).
 - `mcp-abap-adt-proxy` and `mcp-calm-server` (owed item 2).
 - `scripts/*.ts`, which import `createAbapConnection` from `connection` — gone
   since connection 6, broken before this change.

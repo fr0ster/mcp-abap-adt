@@ -20,12 +20,20 @@ const NO_SOURCE: Record<string, string> = {
     'A BAdI implementation (ENHO/XHB) has no source: only a source code plugin (enhancement_spot "enhoxhh") does.',
 };
 
-/** What to tell a caller whose read failed, once the name's type is known. */
-function explainByType(name: string, type: string): string | undefined {
+/**
+ * What to tell a caller whose read failed, once the name's type is known. A
+ * source code plugin already asked under `enhoxhh` gets nothing: the
+ * collection was right, so the failure itself is the answer.
+ */
+function explainByType(
+  name: string,
+  type: string,
+  collection: string,
+): string | undefined {
   const notExposed = notThroughAdt(name, type);
   if (notExposed) return notExposed;
   if (type === 'ENHO/XHB') return `${name}: ${NO_SOURCE.enhoxhb}`;
-  if (type === 'ENHO/XHH')
+  if (type === 'ENHO/XHH' && collection !== 'enhoxhh')
     return `${name} is a source code plugin (ENHO/XHH): read it with enhancement_spot "enhoxhh".`;
   return undefined;
 }
@@ -237,7 +245,8 @@ export async function handleGetEnhancementImpl(
     if (args?.enhancement_name) {
       const name = String(args.enhancement_name);
       const type = await enhancementTypeOf(connection, name, 'ENHO');
-      const why = type ? explainByType(name, type) : undefined;
+      const collection = String(args.enhancement_spot ?? '').toLowerCase();
+      const why = type ? explainByType(name, type, collection) : undefined;
       if (why) return return_error(why);
     }
     return return_error(error);

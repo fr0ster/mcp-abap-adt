@@ -181,4 +181,21 @@ describe('GetEnhancementImpl', () => {
     expect(r.isError).toBe(true);
     expect(text(r)).toMatch(/enhoxhh/);
   });
+
+  it('keeps the failure of a source code plugin already asked under enhoxhh', async () => {
+    const connection = connectionAnswering([
+      [/\/enhancements\/enhoxhh\//, { status: 403, data: '' }],
+      [
+        /informationsystem\/search/,
+        { status: 200, data: searchHit('ZPLUGIN', 'ENHO/XHH') },
+      ],
+    ]);
+    const r: any = await handleGetEnhancementImpl(ctx(connection), {
+      enhancement_spot: 'enhoxhh',
+      enhancement_name: 'ZPLUGIN',
+    });
+    expect(r.isError).toBe(true);
+    expect(text(r)).toMatch(/403/);
+    expect(text(r)).not.toMatch(/read it with enhancement_spot/);
+  });
 });

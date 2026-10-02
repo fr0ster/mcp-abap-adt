@@ -37,6 +37,12 @@ jobs:
       - name: Build project
         run: npm run build
 
+      # The build compiles `src` without the tests, and Jest strips types
+      # without checking them, so a test that does not type-check still runs
+      # green. This step is the only place its types are checked.
+      - name: Type-check tests
+        run: npm run test:check
+
       - name: Run tests
         run: npm test
 

@@ -14,6 +14,7 @@ import {
   browserHostOf,
   decodeFeapSegment,
   encodeFeapSegment,
+  type FeapV4Descriptor,
   feapDescriptor,
   feapPreviewUrl,
   feapV4Descriptor,

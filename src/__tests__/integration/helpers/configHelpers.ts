@@ -13,6 +13,9 @@ import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
 import { createTestLogger } from './loggerHelpers';
+import { testConfigPathFromEnv } from './testConfigPath';
+
+export { testConfigPathFromEnv };
 
 const configLogger = createTestLogger('config');
 
@@ -229,18 +232,6 @@ function logEnvLoaded(envPath: string): void {
         hasRefreshToken && hasUaaUrl && hasUaaClientId && hasUaaClientSecret,
     })}`,
   );
-}
-
-/**
- * The config file `MCP_TEST_CONFIG` names, resolved against the repository
- * root when relative; `undefined` when the variable is not set.
- */
-export function testConfigPathFromEnv(
-  env: NodeJS.ProcessEnv = process.env,
-): string | undefined {
-  const value = env.MCP_TEST_CONFIG?.trim();
-  if (!value) return undefined;
-  return path.resolve(__dirname, '../../../..', value);
 }
 
 /**

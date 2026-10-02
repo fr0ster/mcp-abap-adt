@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { testConfigPathFromEnv } from '../integration/helpers/configHelpers';
+import { testConfigPathFromEnv } from '../integration/helpers/testConfigPath';
 
 /**
  * One checkout, one config per system: `MCP_TEST_CONFIG` names the file a run

@@ -103,3 +103,4 @@ desktop.ini
 .claude/settings.local.json
 .codex
 .worktrees/
+.mcp.json

@@ -16,8 +16,14 @@ code path**; renewing a token is the provider's business inside the
 connector, not the server's.
 
 Dependencies after the change: `auth-broker` ^4, `auth-providers` ^5,
-`auth-stores` ^3 (from ^1 — two majors), `connection` ^10,
-`interfaces-auth-broker` ^1, `interfaces-auth-sap` ^2.
+`auth-stores` ^3.2.0 (from ^1 — two majors), `connection` ^10,
+`interfaces-auth` ^3 (from ^2.1 — `IAuthProvider`, which broker 4,
+connection 10, auth-providers 5 and auth-stores 3 all speak),
+`interfaces-auth-broker` ^1.1.0, `interfaces-auth-sap` ^2. The floors are
+where the secret binding lives: `issuedFor` / `issuedBy` need
+`interfaces-auth-broker` 1.1.0 and auth-stores 3.1.0 (broker 4's migration
+contract); 3.2.0 answers a client whenever a non-empty `uaaClientId` is
+stated, which the XSUAA fallback below relies on.
 
 **Success:**
 
@@ -108,10 +114,20 @@ Dependencies after the change: `auth-broker` ^4, `auth-providers` ^5,
 
 ## Holds throughout
 
-0. **One path.** Every connection's credential is an `IAuthProvider` handed to
-   a connector. The server has no per-auth-type branch beyond deciding who
-   builds the provider: the broker for a destination, the server for header
-   credentials.
+0. **One connector construction; enumerated provider sources.** Every
+   connection is built the same way: the connection settings, an
+   `IAuthProvider`, a transport, into the connector the system kind selects.
+   Where the provider comes from is a separate choice, and only these sources
+   exist:
+   - the broker, `getProvider(destination)`, for a destination;
+   - the server, for credentials arriving in `x-sap-*` headers
+     (`BasicAuthProvider`, `TokenAuthProvider.fixed`);
+   - the caller's `SapConfig`, for the exported `setSapConfigOverride` path —
+     kept unchanged in this release, client certificates included (see *Not
+     in this release*).
+
+   A new source is a change to this list, in review. Nothing that builds the
+   connector branches on the auth type.
 1. **The destination states; the server infers nothing** — no auth type from
    whether a user name is present, no grant from the shape of a key. What is
    not stated is refused, naming the field, before any request.

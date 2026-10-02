@@ -25,6 +25,25 @@ export const TOOL_DEFINITION = {
 interface InactiveObjectRef {
   type: string;
   name: string;
+  /**
+   * The owning object, where the answer names one — a function module's group.
+   * An activation is addressed through it (`ActivateObjectLow`'s `parentName`);
+   * without it the module's own name lands in the group's place.
+   */
+  parentName?: string;
+}
+
+/** One entry's fields; `adtcore:parentUri`'s last segment is the owner's name. */
+function refOf(a: Record<string, string>): InactiveObjectRef {
+  const parentUri = a['adtcore:parentUri'];
+  const parent = parentUri
+    ? decodeURIComponent(parentUri.split('/').filter(Boolean).pop() ?? '')
+    : '';
+  return {
+    type: a['adtcore:type'] ?? '',
+    name: a['adtcore:name'] ?? '',
+    ...(parent ? { parentName: parent.toUpperCase() } : {}),
+  };
 }
 
 /**
@@ -47,10 +66,7 @@ function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
     return asArray(legacy?.['adtcore:objectReference'])
       .map((ref) => ref?.['@'] ?? {})
       .filter((a) => a['adtcore:name'])
-      .map((a) => ({
-        type: a['adtcore:type'] ?? '',
-        name: a['adtcore:name'] ?? '',
-      }));
+      .map(refOf);
   }
   const root = (value as any)?.['ioc:inactiveObjects'];
   if (root === undefined) {
@@ -78,10 +94,7 @@ function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
       for (const ref of asArray(object?.['ioc:ref'])) {
         const a = ref?.['@'] ?? {};
         if (!a['adtcore:name']) continue;
-        objects.push({
-          type: a['adtcore:type'] ?? '',
-          name: a['adtcore:name'] ?? '',
-        });
+        objects.push(refOf(a));
       }
     }
   }

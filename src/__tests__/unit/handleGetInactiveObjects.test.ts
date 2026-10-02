@@ -68,7 +68,9 @@ describe('GetInactiveObjects', () => {
   it('lists the objects of the older document (BASIS 7.40)', async () => {
     expect((await run(LEGACY_TWO_INACTIVE)).objects).toEqual([
       { type: 'FUGR/F', name: 'ZOBJ_FGRP' },
-      { type: 'FUGR/FF', name: 'Z_OBJ_FM' },
+      // The group travels with the module: an activation is addressed through
+      // it, and without it the module's own name lands in the group's place.
+      { type: 'FUGR/FF', name: 'Z_OBJ_FM', parentName: 'ZOBJ_FGRP' },
     ]);
   });
 

@@ -53,4 +53,41 @@ describe('GetInactiveObjects', () => {
   it('answers none when nothing is inactive', async () => {
     expect(await run(NONE)).toEqual({ success: true, count: 0, objects: [] });
   });
+
+  // BASIS 7.40 answers the same request with another document: a flat
+  // `adtcore:objectReferences`, a function module carrying its group as
+  // `parentUri` (measured 2026-10-01). Read as the newer shape it gave
+  // `count: 0` over eight inactive objects, and an activation was confirmed
+  // off it.
+  const LEGACY_TWO_INACTIVE =
+    '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core">' +
+    '<adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/zobj_fgrp" adtcore:type="FUGR/F" adtcore:name="ZOBJ_FGRP"/>' +
+    '<adtcore:objectReference adtcore:uri="/sap/bc/adt/functions/groups/zobj_fgrp/fmodules/z_obj_fm" adtcore:type="FUGR/FF" adtcore:name="Z_OBJ_FM" adtcore:parentUri="/sap/bc/adt/functions/groups/zobj_fgrp"/>' +
+    '</adtcore:objectReferences>';
+
+  it('lists the objects of the older document (BASIS 7.40)', async () => {
+    expect((await run(LEGACY_TWO_INACTIVE)).objects).toEqual([
+      { type: 'FUGR/F', name: 'ZOBJ_FGRP' },
+      // The group travels with the module: an activation is addressed through
+      // it, and without it the module's own name lands in the group's place.
+      { type: 'FUGR/FF', name: 'Z_OBJ_FM', parentName: 'ZOBJ_FGRP' },
+    ]);
+  });
+
+  it('answers none for an empty older document', async () => {
+    const empty =
+      '<?xml version="1.0" encoding="utf-8"?><adtcore:objectReferences xmlns:adtcore="http://www.sap.com/adt/core"/>';
+    expect(await run(empty)).toEqual({ success: true, count: 0, objects: [] });
+  });
+
+  it('refuses a document it cannot read, rather than answer none', async () => {
+    const conn = recordingConnection([
+      { data: '<?xml version="1.0"?><other:list xmlns:other="urn:x"/>' },
+    ]);
+    const result: any = await handleGetInactiveObjects(
+      { connection: conn, logger: undefined } as any,
+      {},
+    );
+    expect(result.isError).toBe(true);
+  });
 });

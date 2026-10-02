@@ -10,12 +10,18 @@
 
 import * as path from 'node:path';
 import { AuthBrokerFactory } from '../../lib/auth/brokerFactory';
+import { testConfigPathFromEnv } from './helpers/testConfigPath';
 
 function loadTestConfig(): any {
-  const configPaths = [
-    path.resolve(process.cwd(), 'tests', 'test-config.yaml'),
-    path.resolve(__dirname, '../../../../tests/test-config.yaml'),
-  ];
+  // MCP_TEST_CONFIG names the file for this run; resolved in one place with
+  // loadTestConfig, which lives one directory deeper than this file.
+  const chosen = testConfigPathFromEnv();
+  const configPaths = chosen
+    ? [chosen]
+    : [
+        path.resolve(process.cwd(), 'tests', 'test-config.yaml'),
+        path.resolve(__dirname, '../../../../tests/test-config.yaml'),
+      ];
   for (const configPath of configPaths) {
     try {
       const fs = require('node:fs');

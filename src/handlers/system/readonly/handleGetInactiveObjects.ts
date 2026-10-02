@@ -25,6 +25,25 @@ export const TOOL_DEFINITION = {
 interface InactiveObjectRef {
   type: string;
   name: string;
+  /**
+   * The owning object, where the answer names one — a function module's group.
+   * An activation is addressed through it (`ActivateObjectLow`'s `parentName`);
+   * without it the module's own name lands in the group's place.
+   */
+  parentName?: string;
+}
+
+/** One entry's fields; `adtcore:parentUri`'s last segment is the owner's name. */
+function refOf(a: Record<string, string>): InactiveObjectRef {
+  const parentUri = a['adtcore:parentUri'];
+  const parent = parentUri
+    ? decodeURIComponent(parentUri.split('/').filter(Boolean).pop() ?? '')
+    : '';
+  return {
+    type: a['adtcore:type'] ?? '',
+    name: a['adtcore:name'] ?? '',
+    ...(parent ? { parentName: parent.toUpperCase() } : {}),
+  };
 }
 
 /**
@@ -37,17 +56,34 @@ interface InactiveObjectRef {
  * how many objects are inactive.
  */
 function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
+  const asArray = (v: any): any[] =>
+    Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
+  // BASIS 7.40 answers another document: `adtcore:objectReferences`, one
+  // `adtcore:objectReference` per object (measured 2026-10-01). Read as the
+  // newer shape it gave `count: 0` over eight inactive objects.
+  const legacy = (value as any)?.['adtcore:objectReferences'];
+  if (legacy !== undefined) {
+    return asArray(legacy?.['adtcore:objectReference'])
+      .map((ref) => ref?.['@'] ?? {})
+      .filter((a) => a['adtcore:name'])
+      .map(refOf);
+  }
   const root = (value as any)?.['ioc:inactiveObjects'];
-  if (!root) return [];
-  const entriesRaw = root['ioc:entry'];
+  if (root === undefined) {
+    // A document neither shape describes is not "nothing is inactive": an
+    // activation is confirmed off this answer, and a 0 read off the wrong
+    // document confirms one that did not happen.
+    throw new Error(
+      `GetInactiveObjects: unrecognised document (root: ${Object.keys((value as object) ?? {}).join(', ') || 'none'})`,
+    );
+  }
+  const entriesRaw = root?.['ioc:entry'];
   const entries = Array.isArray(entriesRaw)
     ? entriesRaw
     : entriesRaw
       ? [entriesRaw]
       : [];
   const objects: InactiveObjectRef[] = [];
-  const asArray = (v: any): any[] =>
-    Array.isArray(v) ? v : v === undefined || v === null ? [] : [v];
   // `ioc:object` comes back as an array too — `structured` forces
   // `object` to one. Read as a single element it gave no `ioc:ref`, and
   // every entry was dropped: this tool answered "count: 0" over an
@@ -58,10 +94,7 @@ function extractInactiveObjects(value: unknown): InactiveObjectRef[] {
       for (const ref of asArray(object?.['ioc:ref'])) {
         const a = ref?.['@'] ?? {};
         if (!a['adtcore:name']) continue;
-        objects.push({
-          type: a['adtcore:type'] ?? '',
-          name: a['adtcore:name'] ?? '',
-        });
+        objects.push(refOf(a));
       }
     }
   }

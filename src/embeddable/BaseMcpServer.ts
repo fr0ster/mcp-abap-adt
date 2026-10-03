@@ -62,9 +62,10 @@ export abstract class BaseMcpServer extends McpServer {
   protected readonly systemContextResolver: SystemContextResolver | null;
 
   /**
-   * The responsible and master system the destination's own `.env` states
-   * (`IDestinations.systemContextFor`), entered into each call's request
-   * scope below the request's headers. Per server instance: HTTP builds one
+   * The responsible, login and master system the destination's own `.env`
+   * states (`IDestinations.systemContextFor`) — or, for an `x-sap-*` basic
+   * connection, its `x-sap-login` as the login — entered into each call's
+   * request scope below the request's headers. Per server instance: HTTP builds one
    * per request, SSE one per session.
    */
   private destinationSystemContext: DestinationSystemContext | undefined;
@@ -143,7 +144,12 @@ export abstract class BaseMcpServer extends McpServer {
     const { settings, credential } = credentialFromHeaders(headers);
     // No destination: the headers (the request scope), then the process
     // configuration, then — in the cloud only — the connected connection.
-    this.destinationSystemContext = undefined;
+    // A basic connection logs on as x-sap-login: that is this connection's
+    // login, the responsible when none is stated. Only here — on a
+    // destination request x-sap-login logs nobody on (Ruling 19).
+    const login =
+      settings.authType === 'basic' ? getHeader('x-sap-login') : undefined;
+    this.destinationSystemContext = login ? { login } : undefined;
     systemContextFromConfiguration();
     const masterSystem = getHeader('x-sap-master-system');
     const responsible = getHeader('x-sap-responsible');

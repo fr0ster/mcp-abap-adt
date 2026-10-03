@@ -65,6 +65,7 @@ import { project, terseWrite } from '../../../lib/strategies/projections';
 import type { AdtReading } from '../../../lib/strategies/reading';
 import { resultsFor } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
+import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import { restoreSessionInConnection, return_error } from '../../../lib/utils';
 
 export const TOOL_DEFINITION = {
@@ -178,6 +179,10 @@ export async function handleCreateBehaviorImplementation(
   return answer(
     { tool: 'CreateBehaviorImplementationLow', detail },
     async (): Promise<IAdtResponse<AdtReading<unknown>, IAdtError>> => {
+      // adt-clients builds a behavior implementation's inner class with an
+      // empty system context, so the responsible and master system go in the
+      // config — the responsible guarded like every other create.
+      const { responsible, masterSystem } = requireSystemContextForCreate();
       const client = createAdtClient(
         connection,
         logger,
@@ -190,6 +195,8 @@ export async function handleCreateBehaviorImplementation(
           description,
           packageName: package_name.toUpperCase(),
           transportRequest: transport_request,
+          responsible,
+          masterSystem,
         },
         { analyse: analyseException },
       );

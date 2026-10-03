@@ -25,9 +25,16 @@ import { errorClassOf } from './auth/errors';
 import { systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
-import { getEffectiveSystemContext } from './systemContext';
+import {
+  getEffectiveSystemContext,
+  getStatedSystemContext,
+} from './systemContext';
 
-/** Resolved values, or `null` when the system has none to give (on-premise). */
+/**
+ * Resolved values; `null` when the connection is not asked (on-premise — the
+ * login then stands as the responsible). A cloud system that answers nothing
+ * is `{}`: on a cloud connection the login never stands in for its user.
+ */
 export type ResolvedSystemContext = {
   responsible?: string;
   masterSystem?: string;
@@ -39,12 +46,11 @@ export type SystemContextResolver = (
 ) => Promise<ResolvedSystemContext>;
 
 /**
- * Default resolver. The master system is determined from configuration, or by
- * a request in the cloud — there is no other way. On-premise it sends nothing
- * and answers `null` (configuration, the request scope or the tool arguments
- * supply the values); on ABAP Cloud it asks the system's own
- * `systeminformation` — the user name as responsible, the system id as master
- * system — or answers `null` when the system gives none. Which of the two is
+ * Default resolver. On-premise it sends nothing and answers `null`
+ * (configuration, the request scope, the tool arguments or the login supply
+ * the values); on ABAP Cloud it asks the system's own `systeminformation` —
+ * the user name as responsible, the system id as master system — or answers
+ * `{}` when the system gives none. Which of the two is
  * the kind the connection was built for (`systemKindOf`), never a guess from
  * its URL.
  */
@@ -71,7 +77,7 @@ export function systemContextResolverFor(
       return null;
     }
     const info = await getSystemInformation(connection);
-    if (!info) return null;
+    if (!info) return {};
     return { responsible: info.userName, masterSystem: info.systemID };
   };
   resolversByKind.set(systemType, resolver);
@@ -120,7 +126,8 @@ function resolveOnce(
  * enter for the keys the request scope does not carry: the request's headers
  * win over the destination, and the destination over the process
  * configuration (which a key left absent falls back to). The destination's
- * `SAP_USERNAME` enters as the login, ahead of the request's `x-sap-login`.
+ * `SAP_USERNAME` (or an `x-sap-*` basic connection's `x-sap-login`) enters as
+ * the login.
  * Per call, in the request scope — never the process cache — so concurrent
  * requests to different destinations cannot see each other's values.
  */
@@ -166,15 +173,17 @@ export async function withResolvedSystemContext<T>(
 ): Promise<T> {
   if (!resolver || !connection) return fn();
 
+  // What is stated, without the login: on a cloud connection the login is
+  // the system's user (Ruling 18), so the process SAP_USERNAME, a
+  // destination's SAP_USERNAME and x-sap-login do not count there.
+  const stated = getStatedSystemContext();
   const effective = getEffectiveSystemContext();
   // By value (Ruling 17): an empty value is missing, whether the scope
   // carries its key or not. A host that always enters a scope with both keys
   // — values possibly undefined — still gets the cloud system's answer. Key
-  // presence keeps deciding in getEffectiveSystemContext, against the
-  // process cache: that is what stops one user's value reaching another's.
-  const wantsResponsible = !effective.responsible;
-  const wantsMasterSystem = !effective.masterSystem;
-  if (!wantsResponsible && !wantsMasterSystem) return fn();
+  // presence keeps deciding in getStatedSystemContext, against the process
+  // cache: that is what stops one user's value reaching another's.
+  if (stated.responsible && stated.masterSystem) return fn();
 
   let resolved: ResolvedSystemContext;
   try {
@@ -184,19 +193,19 @@ export async function withResolvedSystemContext<T>(
     logger.warn(
       `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
     );
-    return fn();
+    // Only a cloud connection is asked: a login does not stand in for the
+    // system's user, so the call runs with what is stated.
+    resolved = {};
   }
+  // Not a cloud connection: nothing asked, the login applies as it is.
   if (!resolved) return fn();
 
   return runWithRequestContext(
     {
       ...getRequestContext(),
-      responsible: wantsResponsible
-        ? resolved.responsible
-        : effective.responsible,
-      masterSystem: wantsMasterSystem
-        ? resolved.masterSystem
-        : effective.masterSystem,
+      login: undefined,
+      responsible: stated.responsible || resolved.responsible,
+      masterSystem: stated.masterSystem || resolved.masterSystem,
       // The effective value, not the scope's: inside a scope it IS the scope's
       // value, so an outer scope's language is kept; outside any scope it is
       // the process language, which entering this new scope would otherwise

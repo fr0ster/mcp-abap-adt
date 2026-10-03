@@ -57,10 +57,11 @@ export function getSystemContext(): IAdtSystemContext {
  * The responsible is always the first of: what is stated (the request scope's
  * `responsible` — `x-sap-responsible`, the destination's `SAP_RESPONSIBLE` —
  * then the process context's — `SAP_RESPONSIBLE`, `setSystemContext`), else
- * the login (the scope's `login` — the destination's `SAP_USERNAME`,
- * `x-sap-login` — then the process `SAP_USERNAME`). A cloud system fills what
- * is still empty (`withResolvedSystemContext`); a create that finds none is
- * refused (`systemContextGuard.ts`).
+ * the login (the scope's `login` — the destination's `SAP_USERNAME`, or the
+ * `x-sap-login` of an `x-sap-*` basic connection — then the process
+ * `SAP_USERNAME`). On a cloud connection the login is the system's user only:
+ * `withResolvedSystemContext` replaces these login fallbacks there. A create
+ * that finds none is refused (`systemContextGuard.ts`).
  *
  * Outside a request scope (stdio) the process values apply. Inside one:
  * - `masterLanguage` comes only from the scope (#110): a scope without it does
@@ -75,20 +76,31 @@ export function getSystemContext(): IAdtSystemContext {
  *   or the system.
  */
 export function getEffectiveSystemContext(): IAdtSystemContext {
+  const stated = getStatedSystemContext();
+  if (stated.responsible) return stated;
+  const req = getRequestContext();
+  // A scope carrying `responsible` masks the process login too.
+  const login =
+    req && 'responsible' in req ? req.login : req?.login || processLogin;
+  return login ? { ...stated, responsible: login } : stated;
+}
+
+/**
+ * The system context as the current request states it, without the login
+ * fallback: the same rules as `getEffectiveSystemContext`, but a responsible
+ * is only one stated (`x-sap-responsible`, `SAP_RESPONSIBLE`,
+ * `setSystemContext`, a scope's `responsible`). On a cloud connection this is
+ * what `withResolvedSystemContext` keeps; the system's user stands in for the
+ * login there.
+ */
+export function getStatedSystemContext(): IAdtSystemContext {
   const ctx = getSystemContext();
   const req = getRequestContext();
-  if (!req) {
-    const responsible = ctx.responsible || processLogin;
-    return responsible ? { ...ctx, responsible } : ctx;
-  }
-  const responsible =
-    'responsible' in req
-      ? req.responsible || req.login
-      : ctx.responsible || req.login || processLogin;
+  if (!req) return ctx;
   return {
     ...ctx,
     masterLanguage: req.masterLanguage,
-    responsible,
+    responsible: 'responsible' in req ? req.responsible : ctx.responsible,
     masterSystem: 'masterSystem' in req ? req.masterSystem : ctx.masterSystem,
   };
 }

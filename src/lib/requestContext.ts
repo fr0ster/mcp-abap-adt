@@ -23,10 +23,12 @@ export interface RequestContext {
    */
   responsible?: string;
   /**
-   * The login of this request — the destination's `SAP_USERNAME`, else
-   * `x-sap-login`. The responsible when none is stated: after every
-   * `SAP_RESPONSIBLE` (the process one included), before the process
-   * `SAP_USERNAME`.
+   * The login of this request — the destination's `SAP_USERNAME`, or the
+   * `x-sap-login` of an `x-sap-*` basic connection (the server enters it; a
+   * destination request's `x-sap-login` logs nobody on). The responsible when
+   * none is stated: after every `SAP_RESPONSIBLE` (the process one included),
+   * before the process `SAP_USERNAME`. Not on a cloud connection, where the
+   * login is the system's user.
    */
   login?: string;
   /**
@@ -60,23 +62,22 @@ function headerValue(
 /**
  * The request scope an HTTP/SSE request states in its headers:
  * `x-sap-language` as `masterLanguage` (the key always present, as #110
- * established), `x-sap-responsible` / `x-sap-master-system` as
- * `responsible` / `masterSystem`, and `x-sap-login` as `login` — each of
- * these present only when its header carries a value, so a request that
- * states none leaves the destination's `.env`, the process configuration and
- * the cloud lookup to fill it.
+ * established), and `x-sap-responsible` / `x-sap-master-system` as
+ * `responsible` / `masterSystem` — each of these present only when its header
+ * carries a value, so a request that states none leaves the destination's
+ * `.env`, the process configuration, the login and the cloud lookup to fill
+ * it. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
+ * basic connection, which the server enters itself.
  */
 export function requestContextFromHeaders(
   headers: Record<string, string | string[] | undefined>,
 ): RequestContext {
   const responsible = headerValue(headers, 'x-sap-responsible');
   const masterSystem = headerValue(headers, 'x-sap-master-system');
-  const login = headerValue(headers, 'x-sap-login');
   return {
     masterLanguage: headerValue(headers, 'x-sap-language'),
     ...(responsible ? { responsible } : {}),
     ...(masterSystem ? { masterSystem } : {}),
-    ...(login ? { login } : {}),
   };
 }
 

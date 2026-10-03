@@ -153,9 +153,11 @@ describe('defaultSystemContextResolver', () => {
     },
   );
 
-  it('returns null when the system information is null', async () => {
+  it('a cloud system that answers nothing is {} — asked, so no login stands in — not null', async () => {
     lookup.mockResolvedValue(null);
-    await expect(defaultSystemContextResolver(cloudConn())).resolves.toBe(null);
+    await expect(defaultSystemContextResolver(cloudConn())).resolves.toEqual(
+      {},
+    );
   });
 });
 

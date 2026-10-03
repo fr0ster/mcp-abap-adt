@@ -183,11 +183,10 @@ export async function handleListTransports(
   // SAP users from one process does not hand every concurrent request
   // whichever user resolved last. Arrived on `main` while this branch was
   // open (#202, #206); the migrated body below is this branch's.
-  const user =
-    args?.user ||
-    getEffectiveSystemContext().responsible ||
-    process.env.SAP_USERNAME ||
-    '';
+  // The effective context alone: it already falls back to the login
+  // (SAP_USERNAME included) where the login counts, and not on a cloud
+  // connection, where the system's user does.
+  const user = args?.user || getEffectiveSystemContext().responsible || '';
 
   logger?.debug(
     `ListTransports: user=${user}, modifiable_only=${modifiableOnly}`,

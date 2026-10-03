@@ -16,7 +16,10 @@
  * The words are fixed and name only keys: no value reaches them (H4).
  */
 
-import type { IAdtSystemContext } from './systemContext';
+import {
+  getEffectiveSystemContext,
+  type IAdtSystemContext,
+} from './systemContext';
 
 export const MISSING_RESPONSIBLE =
   'No responsible person for this change: set SAP_RESPONSIBLE (the destination .env or the environment), or send the x-sap-responsible header, or pass the tool argument where the tool has one. Without them the login is used (SAP_USERNAME, x-sap-login; on ABAP Cloud the user the system names), and none was found. ADT changes are not made without one';
@@ -51,4 +54,20 @@ export function guardedSystemContext(
       return responsible;
     },
   };
+}
+
+/**
+ * The responsible and master system for a create that adt-clients does not
+ * fill from the client's system context (a behavior implementation builds its
+ * inner class with an empty one): the responsible as the guard would answer
+ * it — `SystemContextMissingError` when none — and the master system when
+ * known, else `undefined` (left out).
+ */
+export function requireSystemContextForCreate(): {
+  responsible: string;
+  masterSystem: string | undefined;
+} {
+  const { responsible, masterSystem } = getEffectiveSystemContext();
+  if (!responsible) throw new SystemContextMissingError();
+  return { responsible, masterSystem: masterSystem || undefined };
 }

@@ -88,7 +88,7 @@ type SessionEntry = {
   transport: SSEServerTransport;
   /**
    * What the session's headers state (x-sap-language, x-sap-responsible,
-   * x-sap-master-system, x-sap-login), scoped around each POST dispatch (#110).
+   * x-sap-master-system), scoped around each POST dispatch (#110).
    */
   requestContext: RequestContext;
 };
@@ -359,7 +359,7 @@ export class SseServer {
       `[SSE GET] Created session ${sessionId} for destination ${destination}`,
     );
     // Capture what the session states (x-sap-language, x-sap-responsible,
-    // x-sap-master-system, x-sap-login) once at connection time; it is scoped around each
+    // x-sap-master-system) once at connection time; it is scoped around each
     // POST dispatch below so it never leaks into other sessions via a
     // process-global cache (#110).
     const requestContext = requestContextFromHeaders(req.headers);

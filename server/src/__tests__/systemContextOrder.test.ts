@@ -288,6 +288,22 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       });
     });
 
+    it('x-sap-login on a destination request is not the login: only an x-sap-url connection logs on with it', async () => {
+      delete process.env.SAP_RESPONSIBLE;
+      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+      await expect(
+        ask({ 'x-mcp-destination': 'bare', 'x-sap-login': 'HEADER_LOGIN' }),
+      ).resolves.toEqual({
+        responsible: 'PROCESS_LOGIN',
+        masterSystem: 'PROCESS_SYS',
+      });
+      // The default destination, with a stray x-sap-login and no x-sap-url.
+      await expect(ask({ 'x-sap-login': 'HEADER_LOGIN' })).resolves.toEqual({
+        responsible: 'PROCESS_LOGIN',
+        masterSystem: 'PROCESS_SYS',
+      });
+    });
+
     it('x-sap-login beats the process SAP_USERNAME; SAP_RESPONSIBLE beats x-sap-login', async () => {
       process.env.SAP_USERNAME = 'PROCESS_LOGIN';
       await expect(ask(direct)).resolves.toEqual({
@@ -395,6 +411,17 @@ describe('SseServer: responsible and master system per session', () => {
       masterSystem: 'PROCESS_SYS',
     });
     await expect(ask({})).resolves.toEqual({
+      responsible: 'PROCESS_LOGIN',
+      masterSystem: 'PROCESS_SYS',
+    });
+  });
+
+  it('x-sap-login on a destination session is not the login', async () => {
+    delete process.env.SAP_RESPONSIBLE;
+    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+    await expect(
+      ask({ 'x-mcp-destination': 'bare', 'x-sap-login': 'HEADER_LOGIN' }),
+    ).resolves.toEqual({
       responsible: 'PROCESS_LOGIN',
       masterSystem: 'PROCESS_SYS',
     });

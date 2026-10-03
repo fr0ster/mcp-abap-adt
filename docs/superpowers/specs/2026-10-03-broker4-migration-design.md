@@ -300,6 +300,16 @@ password, no token (H4).
   the master system and responsible are resolved per call on the connected
   connection (`withResolvedSystemContext`), and a cloud destination without
   `SAP_CLIENT` uses the system's default client.
+- **Master system and responsible** (decided 2026-10-03): from configuration,
+  or by a request in the cloud — nothing else. Configuration first (tool
+  arguments, the request scope, the process configuration); a request
+  (`systeminformation`) only when the connection is to a cloud system. The kind
+  is stated, never guessed from the URL: a connection the factory built
+  follows its recorded settings (`resolveSystemKind`: `--system-type` /
+  `SAP_SYSTEM_TYPE`, else `jwt` is cloud); any other connection takes the
+  server's own `systemType` option (an embedder's `EmbeddableMcpServer`), then
+  `SAP_SYSTEM_TYPE`, else on-premise (controller ruling, for H6: an embedder
+  states `systemType` per server without setting the environment).
 - **`setConnectionContextFromHeaders(headers)`** — `x-sap-url` (+
   `x-sap-client`) as settings, `credentialFromHeaders` as credential; the
   rest unchanged. `authType` in the settings is `jwt` or `basic` by which

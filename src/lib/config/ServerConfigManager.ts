@@ -160,6 +160,7 @@ export class ServerConfigManager {
       connectionType: parsed.connectionType,
       connectionTypeSource: parsed.connectionTypeSource,
       systemType: parsed.systemType,
+      systemTypeSource: parsed.systemTypeSource,
       tls:
         parsed.tlsCert && parsed.tlsKey
           ? {

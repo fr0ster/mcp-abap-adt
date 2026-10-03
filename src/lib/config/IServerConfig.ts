@@ -130,6 +130,12 @@ export interface IServerConfig {
    * on-premise otherwise — stated, never guessed from the URL.
    */
   systemType?: 'onprem' | 'cloud' | 'legacy';
+  /**
+   * The form `systemType` came from: `--system-type`, `SAP_SYSTEM_TYPE`, or
+   * `system-type (config file)`. Only the CLI form beats an `SAP_SYSTEM_TYPE`
+   * the env file brings, as for the connection type.
+   */
+  systemTypeSource?: string;
 
   // ============================================================================
   // LEGACY FIELDS (for v1 backward compatibility)

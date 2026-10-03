@@ -291,30 +291,66 @@ function envFileOf(
 }
 
 /**
- * The connection type: the CLI, then the process environment — which by now
- * holds what the env file states, never over a value set before — then YAML.
- * A config made by hand, with no source, is taken as it is. A word in the
- * environment that is not a connection type is refused naming the key, never
- * quoting it: it may come from a file.
+ * A parameter the env file may state: the CLI, then the process environment
+ * — which by now holds what the env file states, never over a value set
+ * before — then YAML. A config made by hand, with no source, is taken as it
+ * is. A word in the environment that is not one of `values` is refused naming
+ * the key, never quoting it: it may come from a file.
  */
+function effectiveFromEnvironment<T extends string>(
+  value: T | undefined,
+  source: string | undefined,
+  key: string,
+  values: readonly T[],
+  env: NodeJS.ProcessEnv,
+): T | undefined {
+  const overridable =
+    source === key ||
+    (source?.endsWith('(config file)') ?? false) ||
+    value === undefined;
+  if (!overridable) return value;
+  const raw = env[key]?.trim().toLowerCase();
+  if (!raw) return value;
+  if (!(values as readonly string[]).includes(raw)) {
+    const words =
+      values.length === 2
+        ? values.join(' or ')
+        : `${values.slice(0, -1).join(', ')} or ${values[values.length - 1]}`;
+    throw new Error(`${key} (environment or env file) must be ${words}`);
+  }
+  return raw as T;
+}
+
+/** The connection type: see {@link effectiveFromEnvironment}. */
 export function effectiveConnectionType(
   config: IServerConfig,
   env: NodeJS.ProcessEnv,
 ): IServerConfig['connectionType'] {
-  const source = config.connectionTypeSource;
-  const overridable =
-    source === 'SAP_CONNECTION_TYPE' ||
-    (source?.endsWith('(config file)') ?? false) ||
-    config.connectionType === undefined;
-  if (!overridable) return config.connectionType;
-  const raw = env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
-  if (!raw) return config.connectionType;
-  if (raw !== 'http' && raw !== 'rfc') {
-    throw new Error(
-      'SAP_CONNECTION_TYPE (environment or env file) must be http or rfc',
-    );
-  }
-  return raw;
+  return effectiveFromEnvironment(
+    config.connectionType,
+    config.connectionTypeSource,
+    'SAP_CONNECTION_TYPE',
+    ['http', 'rfc'] as const,
+    env,
+  );
+}
+
+/**
+ * The system type: see {@link effectiveFromEnvironment}. The parser no longer
+ * writes it into the environment, where it used to sit before the env file
+ * was read and so beat the file's SAP_SYSTEM_TYPE even from YAML.
+ */
+export function effectiveSystemType(
+  config: IServerConfig,
+  env: NodeJS.ProcessEnv,
+): IServerConfig['systemType'] {
+  return effectiveFromEnvironment(
+    config.systemType,
+    config.systemTypeSource,
+    'SAP_SYSTEM_TYPE',
+    ['onprem', 'cloud', 'legacy'] as const,
+    env,
+  );
 }
 
 /**
@@ -451,20 +487,25 @@ export async function launch(
   deps: LauncherDeps,
 ): Promise<void> {
   // The env file's context joins the process environment first — never over
-  // a value already there — so its SAP_CONNECTION_TYPE counts (as in 15.x).
+  // a value already there — so its SAP_CONNECTION_TYPE and SAP_SYSTEM_TYPE
+  // count (as in 15.x).
   hydrateSystemContextFromEnvFile(config.envFile ?? config.envFilePath);
   let connectionType: IServerConfig['connectionType'];
+  let systemType: IServerConfig['systemType'];
   try {
     connectionType = effectiveConnectionType(config, process.env);
+    systemType = effectiveSystemType(config, process.env);
   } catch (error) {
     deps.stderr(
-      `[MCP] ${error instanceof Error ? error.message : 'SAP_CONNECTION_TYPE: refused'}`,
+      `[MCP] ${error instanceof Error ? error.message : 'SAP_CONNECTION_TYPE or SAP_SYSTEM_TYPE: refused'}`,
     );
     deps.exit(1);
     return;
   }
   if (connectionType) process.env.SAP_CONNECTION_TYPE = connectionType;
-  config = { ...config, connectionType };
+  // The connector reads the system type from the environment.
+  if (systemType) process.env.SAP_SYSTEM_TYPE = systemType;
+  config = { ...config, connectionType, systemType };
 
   const baseContext = {
     connection: undefined as any,

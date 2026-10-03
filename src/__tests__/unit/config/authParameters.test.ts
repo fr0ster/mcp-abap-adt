@@ -371,12 +371,18 @@ describe('through the parser and the manager', () => {
     expect(parsed.connectionType).toBe('http');
   });
 
-  it('--system-type still sets SAP_SYSTEM_TYPE', () => {
+  // The parser states the value and its source and leaves the environment
+  // alone: written there early, it beat the env file's SAP_SYSTEM_TYPE even
+  // from YAML. The launcher sets it after the file (effectiveSystemType).
+  it('--system-type: stated with its source, SAP_SYSTEM_TYPE untouched', () => {
     const before = process.env.SAP_SYSTEM_TYPE;
+    delete process.env.SAP_SYSTEM_TYPE;
     process.argv = ['node', 'server', '--system-type=onprem'];
     try {
-      expect(ArgumentsParser.parse().systemType).toBe('onprem');
-      expect(process.env.SAP_SYSTEM_TYPE).toBe('onprem');
+      const parsed = ArgumentsParser.parse();
+      expect(parsed.systemType).toBe('onprem');
+      expect(parsed.systemTypeSource).toBe('--system-type');
+      expect(process.env.SAP_SYSTEM_TYPE).toBeUndefined();
     } finally {
       if (before === undefined) delete process.env.SAP_SYSTEM_TYPE;
       else process.env.SAP_SYSTEM_TYPE = before;

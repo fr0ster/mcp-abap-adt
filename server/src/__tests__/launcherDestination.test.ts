@@ -617,3 +617,73 @@ describe('the working directory .env is never the destination', () => {
     expect(stdioStart).toHaveBeenCalledWith('default');
   });
 });
+
+/**
+ * The system type, as the connection type: CLI, then the process environment
+ * — which the env file's SAP_SYSTEM_TYPE joins, never over a value set
+ * before — then YAML. The connector reads SAP_SYSTEM_TYPE from the process
+ * environment, so that is where the outcome is checked.
+ */
+describe('SAP_SYSTEM_TYPE inside the env file', () => {
+  const envFile = (lines: string[]) => {
+    const file = path.join(root, 'conn.env');
+    fs.writeFileSync(file, `${lines.join('\n')}\n`);
+    return file;
+  };
+  const yamlWith = (text: string) => {
+    const file = path.join(root, 'config.yaml');
+    fs.writeFileSync(file, text);
+    return file;
+  };
+  async function systemTypeOf(argv: string[]) {
+    const result = await run(['--transport=stdio', ...argv]);
+    expect(result.exits).toEqual([]);
+    return process.env.SAP_SYSTEM_TYPE;
+  }
+
+  it('the file beats YAML system-type', async () => {
+    const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=onprem']);
+    expect(
+      await systemTypeOf([
+        `--env-path=${file}`,
+        `--config=${yamlWith('system-type: cloud\n')}`,
+      ]),
+    ).toBe('onprem');
+  });
+
+  it('--system-type=cloud beats the file', async () => {
+    const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=onprem']);
+    expect(
+      await systemTypeOf([`--env-path=${file}`, '--system-type=cloud']),
+    ).toBe('cloud');
+  });
+
+  it('the process environment beats the file', async () => {
+    const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=onprem']);
+    process.env.SAP_SYSTEM_TYPE = 'legacy';
+    expect(await systemTypeOf([`--env-path=${file}`])).toBe('legacy');
+  });
+
+  it('YAML alone: the YAML value', async () => {
+    const file = envFile(basicLines());
+    expect(
+      await systemTypeOf([
+        `--env-path=${file}`,
+        `--config=${yamlWith('system-type: cloud\n')}`,
+      ]),
+    ).toBe('cloud');
+  });
+
+  it('a word that is not a system type: refused naming the key, not quoting it', async () => {
+    const file = envFile([...basicLines(), 'SAP_SYSTEM_TYPE=mainframe']);
+    const { exits, stderr } = await run([
+      '--transport=stdio',
+      `--env-path=${file}`,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr).toEqual([
+      '[MCP] SAP_SYSTEM_TYPE (environment or env file) must be onprem, cloud or legacy',
+    ]);
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
+});

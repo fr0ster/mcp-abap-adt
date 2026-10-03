@@ -146,6 +146,18 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   `SAP_LANGUAGE`; a value already in the process environment still wins. The
   responsible and master system are no longer among its keys: they are read
   as the file's destination's own (see Breaking).
+- **`SAP_SYSTEM_TYPE` in the `--env` / `--env-path` file beats YAML `system-type`.** The argument
+  parser wrote the YAML (or CLI) system type into the process environment before the env file was
+  read, and the file's value, which never replaces one already set, was lost: YAML `cloud` beside
+  `SAP_SYSTEM_TYPE=onprem` in the file built the cloud connector. The precedence is now resolved after
+  the file joins the environment, as for the connection type: the CLI, then the environment (the file's
+  value included, never over one set before), then YAML. A word in the environment that is not
+  `onprem`, `cloud` or `legacy` stops the start, naming the key without quoting it.
+- **The login URL reaches stderr without `DEBUG_AUTH_LOG`.** The browser strategy prints the URL to
+  open (`--browser=none` / `headless`, or a browser that could not be opened) through the broker's
+  logger, which is silent unless `DEBUG_AUTH_LOG=true`: the user never saw it and the login timed out.
+  The strategy now gets a logger whose prompts are lines on stderr always; its warnings, errors and
+  debug lines stay behind `DEBUG_AUTH_LOG`. Nothing goes to stdout.
 - **`GetInactiveObjects` reads the older document and keeps a function module's group** (#266).
   BASIS 7.40 answers `adtcore:objectReferences`, which the reader did not know: it answered `count: 0`
   over inactive objects. It now reads that document, refuses a root it does not know instead of

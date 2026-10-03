@@ -23,6 +23,8 @@ export interface ParsedArguments {
   connectionType?: 'http' | 'rfc';
   /** SAP system type override: onprem | cloud | legacy */
   systemType?: 'onprem' | 'cloud' | 'legacy';
+  /** The form `systemType` came from (`--system-type`, `SAP_SYSTEM_TYPE`, the YAML key). */
+  systemTypeSource?: string;
   /** Path to YAML config file */
   config?: string;
   /** HTTP port */
@@ -173,11 +175,16 @@ export class ArgumentsParser {
       process.env,
       yaml as Record<string, unknown> | null | undefined,
     );
+    // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins
+    // the environment later, and the launcher resolves the precedence then
+    // (effectiveSystemType), as for the connection type.
     result.systemType = auth.systemType;
-    if (auth.systemType) {
-      // Propagate to env so systemContext.ts detectLegacy() picks it up
-      process.env.SAP_SYSTEM_TYPE = auth.systemType;
-    }
+    result.systemTypeSource = authParameterSource(
+      'systemType',
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
 
     // --env: destination name (resolved to sessions/<name>.env in platform path)
     // --env-path: explicit file path or file name (resolved against cwd if relative)

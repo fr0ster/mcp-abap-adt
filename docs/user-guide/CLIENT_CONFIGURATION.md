@@ -277,7 +277,7 @@ The `SAP_SYSTEM_TYPE` environment variable controls which tools are available an
 
 **Default is `cloud`** — this covers most modern scenarios. On-premise users must set `SAP_SYSTEM_TYPE=onprem` to access on-premise-only tools (e.g., Programs).
 
-You can also set this via CLI: `--system-type=onprem`
+You can also set this via CLI: `--system-type=onprem`, or YAML `system-type: onprem`. Precedence: the CLI flag, then the environment — which the `--env` / `--env-path` `.env` value joins, never over one already set — then YAML.
 
 #### Per-Instance Override (embedders)
 

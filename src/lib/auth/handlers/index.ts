@@ -32,11 +32,7 @@ export function handlerFor(
   destination: string,
   vetted: VettedAuthentication,
 ): AuthenticationHandler {
-  const found =
-    byKey.get(keyOf(vetted.authType, vetted.grantType)) ??
-    (vetted.authType === 'basic' || vetted.authType === 'snc'
-      ? byKey.get(vetted.authType)
-      : undefined);
+  const found = byKey.get(keyOf(vetted.authType, vetted.grantType));
   if (!found) {
     throw new UnsupportedAuthenticationError(
       destination,

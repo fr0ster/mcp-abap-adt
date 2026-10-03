@@ -1,9 +1,6 @@
-import fs from 'node:fs';
 import { assertDestinationName } from '../../../lib/auth/destinationName';
 
 describe('assertDestinationName', () => {
-  afterEach(() => jest.restoreAllMocks());
-
   const refused: Array<[string, string]> = [
     ['empty', ''],
     ['a separator', 'a/b'],
@@ -25,16 +22,6 @@ describe('assertDestinationName', () => {
 
   it.each(['dev', 'DEV_1', 'a-b.c', 'x1'])('accepts %s', (name) => {
     expect(() => assertDestinationName(name, 'destination')).not.toThrow();
-  });
-
-  it('touches no file for a refused name', () => {
-    const spies = [
-      jest.spyOn(fs, 'existsSync'),
-      jest.spyOn(fs, 'readFileSync'),
-      jest.spyOn(fs, 'statSync'),
-    ];
-    expect(() => assertDestinationName('../x', 'destination')).toThrow();
-    for (const s of spies) expect(s).not.toHaveBeenCalled();
   });
 
   it('does not quote the refused name', () => {

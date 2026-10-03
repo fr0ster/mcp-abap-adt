@@ -1023,17 +1023,15 @@ ENVIRONMENT FILE:
   --env=<name>                     Env destination name (resolved to sessions/<name>.env)
   --env <name>                     Alternative syntax for --env
   --env-path=<path|file>           Explicit .env file path (or relative file name)
-  --auth-broker                    Ignore the .env in the current directory
-                                   (without it, and without --mcp, --env or --env-path,
-                                   a .env in the current directory is used if it exists)
+                                   Nothing is looked up in the working directory: a .env
+                                   there is read only when named (--env-path=./.env)
   --auth-broker-path=<path>        Base directory of the service-keys and sessions subdirectories
                                    Example: --auth-broker-path=~/prj/tmp/
                                    This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
   --mcp=<destination>              Default destination: service-keys/<destination>.json and
                                    sessions/<destination>.env, read field by field
                                    Example: --mcp=TRIAL
-                                   Works with every transport; the .env in the current directory
-                                   is not loaded
+                                   Works with every transport
                                    x-mcp-destination overrides it per request, only with
                                    --allow-destination-header
   --allow-destination-header       Honour the x-mcp-destination header (HTTP/SSE, off by default)
@@ -1067,7 +1065,6 @@ ENVIRONMENT VARIABLES:
   MCP_UNSAFE                       Same as --unsafe (true|false)
   MCP_BROWSER                      Same as --browser
   MCP_BROWSER_AUTH_PORT            Same as --browser-auth-port (default: 61001)
-  MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
                                    Default: stdio if not specified

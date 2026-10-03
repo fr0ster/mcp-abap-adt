@@ -57,14 +57,6 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
     help: 'Env file by explicit path (or a file name relative to the working directory)',
   },
   {
-    key: 'useAuthBroker',
-    cli: '--auth-broker',
-    env: 'MCP_USE_AUTH_BROKER',
-    yaml: 'auth-broker',
-    kind: 'flag',
-    help: "Ignore the working directory's .env; serve only --mcp / --env / --env-path",
-  },
-  {
     key: 'authBrokerPath',
     cli: '--auth-broker-path',
     env: 'AUTH_BROKER_PATH',

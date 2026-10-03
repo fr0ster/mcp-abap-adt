@@ -14,7 +14,6 @@ export interface YamlConfig {
   env?: string;
   'env-path'?: string;
   unsafe?: boolean;
-  'auth-broker'?: boolean;
   'auth-broker-path'?: string;
   browser?: string;
   'browser-auth-port'?: number | string;

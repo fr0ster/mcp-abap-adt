@@ -11,7 +11,7 @@ export interface IAuthBrokerFactoryConfig {
   /**
    * The `.env` file served as the destination `default`, and the parameter it
    * came from as the user gave it (`--env`, `--env-path`, `MCP_ENV_PATH`, the
-   * YAML key, `working directory .env`): the source names the refusal of a
+   * YAML key): the source names the refusal of a
    * file that does not exist. No default: whoever sets the path knows where it
    * came from.
    */

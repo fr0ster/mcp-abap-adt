@@ -4,8 +4,6 @@
  * Used by both old server (mcp_abap_adt_server) and new servers
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import { authParameterSource, readAuthParameters } from './authParameters';
 import { resolveEnvFilePath } from './envResolver';
 import type { YamlConfig } from './yamlConfig';
@@ -19,8 +17,6 @@ export interface ParsedArguments {
   authBrokerPath?: string;
   /** Use unsafe mode */
   unsafe: boolean;
-  /** Use auth-broker instead of .env file */
-  useAuthBroker: boolean;
   /** Transport type */
   transport?: string;
   /** SAP connection type: http (default) or rfc */
@@ -63,7 +59,7 @@ export interface ParsedArguments {
   envPath?: string;
   /**
    * Where `env` came from, as the user gave it: `--env`, `--env-path`,
-   * `MCP_ENV_PATH`, the YAML key, or `working directory .env`.
+   * `MCP_ENV_PATH`, or the YAML key.
    */
   envFileSource?: string;
   /** The form `connectionType` came from (`--connection-type`, `SAP_CONNECTION_TYPE`, the YAML key). */
@@ -84,7 +80,6 @@ export class ArgumentsParser {
     const args = process.argv;
     const result: ParsedArguments = {
       unsafe: false,
-      useAuthBroker: false,
     };
 
     // Helper to get argument value
@@ -171,7 +166,6 @@ export class ArgumentsParser {
     result.envDestination = auth.envDestination;
     result.envPath = auth.envPath;
     result.unsafe = auth.unsafe ?? false;
-    result.useAuthBroker = auth.useAuthBroker ?? false;
     result.connectionType = auth.connectionType;
     result.connectionTypeSource = authParameterSource(
       'connectionType',
@@ -200,15 +194,9 @@ export class ArgumentsParser {
       result.envFileSource = auth.envPath
         ? authParameterSource('envPath', args, process.env, yamlRows)
         : authParameterSource('envDestination', args, process.env, yamlRows);
-    } else if (!result.mcp && !result.useAuthBroker) {
-      // Backward-compatible fallback: .env in current directory, unless
-      // --auth-broker says the stores alone (as in 15.x)
-      const cwdEnvPath = path.resolve(process.cwd(), '.env');
-      if (fs.existsSync(cwdEnvPath)) {
-        result.env = cwdEnvPath;
-        result.envFileSource = 'working directory .env';
-      }
     }
+    // Nothing is looked up in the working directory: a .env there is read
+    // only when named (--env-path=./.env).
 
     // Parse --conf / --config
     result.config = getArgValue('--conf') || getArgValue('--config');

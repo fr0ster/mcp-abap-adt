@@ -43,7 +43,7 @@ export interface IServerConfig {
   /**
    * The parameter `envFile` came from, as the user gave it: `--env`,
    * `--env-path`, `MCP_ENV_PATH`, `env (config file)`,
-   * `env-path (config file)`, or `working directory .env`.
+   * or `env-path (config file)`.
    */
   envFileSource?: string;
   /** Alias for envFilePath (v2 compatibility) */
@@ -54,8 +54,6 @@ export interface IServerConfig {
   mcpDestination?: string;
   /** Use unsafe mode (file-based session store) */
   unsafe?: boolean;
-  /** Use auth-broker instead of .env file */
-  useAuthBroker?: boolean;
   /**
    * Browser type for authentication (chrome, edge, firefox, system, headless, none)
    * - 'system' (default): Opens system default browser

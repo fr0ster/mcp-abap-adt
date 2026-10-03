@@ -28,9 +28,12 @@ const typed = (p: (typeof AUTH_PARAMETERS)[number], v: string) =>
   p.kind === 'port' ? Number(v) : v;
 
 const NO_ENV = ['MCP_DESTINATION', 'MCP_ENV', 'MCP_ALLOW_DESTINATION_HEADER'];
+/** Removed in 16.0.0: its only purpose was to switch off the working directory's .env. */
+const REMOVED_ENV = 'MCP_USE_AUTH_BROKER';
 const ENV_NAMES = [
   ...AUTH_PARAMETERS.flatMap((p) => (p.env ? [p.env] : [])),
   ...NO_ENV,
+  REMOVED_ENV,
 ];
 const savedArgv = process.argv;
 const savedEnv: Record<string, string | undefined> = {};
@@ -51,12 +54,11 @@ afterEach(() => {
 });
 
 describe('the table', () => {
-  it('has the eleven rows of the spec', () => {
+  it('has the ten rows of the spec', () => {
     expect(AUTH_PARAMETERS.map((p) => p.cli)).toEqual([
       '--mcp',
       '--env',
       '--env-path',
-      '--auth-broker',
       '--auth-broker-path',
       '--unsafe',
       '--browser',
@@ -72,7 +74,6 @@ describe('the table', () => {
       ['--mcp', undefined, 'mcp'],
       ['--env', undefined, 'env'],
       ['--env-path', 'MCP_ENV_PATH', 'env-path'],
-      ['--auth-broker', 'MCP_USE_AUTH_BROKER', 'auth-broker'],
       ['--auth-broker-path', 'AUTH_BROKER_PATH', 'auth-broker-path'],
       ['--unsafe', 'MCP_UNSAFE', 'unsafe'],
       ['--browser', 'MCP_BROWSER', 'browser'],
@@ -161,12 +162,31 @@ describe('the table', () => {
   );
 });
 
+describe('--auth-broker is gone in every form', () => {
+  it('has no row, no help line, no template key', () => {
+    expect(AUTH_PARAMETERS.map((p) => p.cli)).not.toContain('--auth-broker');
+    expect(AUTH_PARAMETERS.map((p) => p.yaml)).not.toContain('auth-broker');
+    const help = ServerConfigManager.generateHelp();
+    expect(help).not.toMatch(/--auth-broker(?!-path)/);
+    expect(help).not.toContain(REMOVED_ENV);
+    expect(generateYamlConfigTemplate()).not.toMatch(/^auth-broker:/m);
+  });
+
+  it('a leftover form sets nothing', () => {
+    process.env[REMOVED_ENV] = 'true';
+    expect(
+      readAuthParameters(['--auth-broker'], process.env, {
+        'auth-broker': true,
+      }),
+    ).toEqual({});
+  });
+});
+
 describe('the generated template', () => {
   it('is valid YAML config and sets nothing', () => {
     const config = load(generateYamlConfigTemplate()) as never;
     expect(validateYamlConfig(config).errors).toEqual([]);
     expect(readAuthParameters([], {}, config)).toEqual({
-      useAuthBroker: false,
       unsafe: false,
       allowDestinationHeader: false,
     });
@@ -375,22 +395,13 @@ describe('the env file names its source', () => {
     expect(parsed.envFileSource).toBe(source);
   });
 
-  it("the working directory's .env → 'working directory .env'", () => {
-    fs.writeFileSync(
-      path.join(dir, '.env'),
-      'SAP_URL=https://x.example.test\n',
-    );
-    const parsed = parse();
-    expect(parsed.env).toBe(path.resolve(dir, '.env'));
-    expect(parsed.envFileSource).toBe('working directory .env');
-  });
-
   it.each([
+    [[], {}, undefined],
+    // The removed switch is no longer a parameter: it changes nothing.
     [['--auth-broker'], {}, undefined],
     [[], { MCP_USE_AUTH_BROKER: 'true' }, undefined],
-    [[], {}, { 'auth-broker': true }],
   ] as const)(
-    "--auth-broker in any form: the working directory's .env is not used (%j %j %j)",
+    "the working directory's .env is never read (%j %j %j)",
     (argv, env, yaml) => {
       fs.writeFileSync(
         path.join(dir, '.env'),
@@ -404,9 +415,13 @@ describe('the env file names its source', () => {
     },
   );
 
-  it('--auth-broker leaves an explicit --env-path alone', () => {
-    process.argv = ['node', 'server', '--auth-broker', '--env-path=./conn.env'];
-    expect(parse().env).toBe(path.resolve(dir, 'conn.env'));
+  it('a relative --env-path still resolves against the working directory', () => {
+    fs.writeFileSync(
+      path.join(dir, '.env'),
+      'SAP_URL=https://x.example.test\n',
+    );
+    process.argv = ['node', 'server', '--env-path=./.env'];
+    expect(parse().env).toBe(path.resolve(dir, '.env'));
   });
 
   it('no env file → no source', () => {

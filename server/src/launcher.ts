@@ -99,7 +99,6 @@ ENVIRONMENT VARIABLES:
     MCP_SSE_PORT                   SSE server port (default: 3001)
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
-    MCP_USE_AUTH_BROKER            Ignore the .env in the current directory (true|false)
     MCP_BROWSER                    Browser for a login: chrome|edge|firefox|system|headless|none
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
     MCP_TLS_CERT                   Path to TLS certificate file (PEM)

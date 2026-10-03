@@ -151,7 +151,6 @@ export class ServerConfigManager {
       authBrokerPath: parsed.authBrokerPath,
       mcpDestination: parsed.mcp,
       unsafe: parsed.unsafe,
-      useAuthBroker: parsed.useAuthBroker,
       browserAuthPort: parsed.browserAuthPort,
       allowDestinationHeader: parsed.allowDestinationHeader,
       browser: parsed.browser,
@@ -344,8 +343,8 @@ EXAMPLES:
   # Stdio with env destination from sessions store
   mcp-abap-adt --env=trial
 
-  # Stdio with explicit env file
-  mcp-abap-adt --env-path=.env
+  # Stdio with explicit env file (a .env in the working directory is read only when named)
+  mcp-abap-adt --env-path=./.env
 
   # RFC connection (any system with SAP NW RFC SDK)
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)

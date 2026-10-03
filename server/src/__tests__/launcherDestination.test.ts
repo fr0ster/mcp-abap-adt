@@ -67,7 +67,6 @@ beforeEach(() => {
     'MCP_BROWSER_AUTH_PORT',
     'MCP_ENV_PATH',
     'MCP_UNSAFE',
-    'MCP_USE_AUTH_BROKER',
     'AUTH_BROKER_PATH',
     'SAP_CONNECTION_TYPE',
     'SAP_SYSTEM_TYPE',
@@ -530,17 +529,23 @@ describe('SAP_CONNECTION_TYPE inside the env file', () => {
   });
 });
 
-describe('--auth-broker: the working directory .env is not the destination', () => {
-  it('with no --mcp: no default destination from it, inspection-only under stdio', async () => {
+/**
+ * Nothing is looked up in the working directory: a server started inside
+ * someone else's project must not take their settings. A .env there is read
+ * only when named.
+ */
+describe('the working directory .env is never the destination', () => {
+  it('with no --env / --env-path / --mcp: no destination, inspection-only under stdio', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
-    await run(['--transport=stdio', '--auth-broker']);
+    const { exits } = await run(['--transport=stdio']);
+    expect(exits).toEqual([]);
     expect(constructed).not.toHaveBeenCalled();
     expect(stdioStart).toHaveBeenCalledWith('mock');
   });
 
-  it('without it, the same .env is the destination default', async () => {
+  it('named with --env-path=./.env, it is the destination default', async () => {
     fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
-    await run(['--transport=stdio']);
+    await run(['--transport=stdio', '--env-path=./.env']);
     expect(stdioStart).toHaveBeenCalledWith('default');
   });
 });

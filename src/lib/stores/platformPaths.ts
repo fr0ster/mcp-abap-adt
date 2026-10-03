@@ -18,7 +18,11 @@ import * as path from 'node:path';
  * 3. Platform-specific standard paths:
  *    - Unix: ~/.config/mcp-abap-adt/service-keys, ~/.config/mcp-abap-adt/sessions
  *    - Windows: %USERPROFILE%\Documents\mcp-abap-adt\service-keys, %USERPROFILE%\Documents\mcp-abap-adt\sessions
- * 4. Current working directory (process.cwd())
+ *
+ * Never the working directory: nothing is looked up where the process happens
+ * to start (a server started inside someone else's project must not take
+ * their stores). A relative custom path or AUTH_BROKER_PATH entry is named by
+ * the user, so it still resolves against the working directory.
  *
  * @param customPath Optional custom path (highest priority)
  * @param subfolder Subfolder name ('service-keys' or 'sessions')
@@ -106,9 +110,6 @@ export function getPlatformPaths(
       }
     }
   }
-
-  // Priority 4: Current working directory (always added as fallback)
-  paths.push(process.cwd());
 
   // Remove duplicates while preserving order
   const uniquePaths: string[] = [];

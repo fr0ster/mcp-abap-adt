@@ -115,12 +115,24 @@ stated, which the XSUAA fallback below relies on.
 - **SNC.** A destination stating `authType: snc` and its SNC fields gets
   `SncLogonProvider` from the broker. SNC protects RFC, not HTTP: an SNC
   destination on an HTTP connection is refused, naming `connection-type`.
-- **Every existing auth and connection parameter in CLI, env and YAML.**
-  Today YAML lacks `browser`, `browser-auth-port` and `connection-type`, and
+- **Every existing auth and connection parameter in CLI and YAML.** Today
+  YAML lacks `browser`, `browser-auth-port` and `connection-type`, and
   `--browser` / `MCP_BROWSER` is parsed but never reaches the broker. After
-  the change each parameter exists in all three forms with one precedence
-  (CLI over env over YAML), the template `--config` generates lists them, and
-  `--browser` reaches the strategy. No new parameter is added.
+  the change each parameter has a CLI and a YAML form, the template
+  `--config` generates lists them, and `--browser` reaches the strategy. The
+  env forms that exist today stay, for compatibility (container and MCP
+  client configs pass them); none is added. Precedence: CLI, then env, then
+  YAML. No new parameter is added.
+- **Where things live** (decided 2026-10-03). `.env` and environment
+  variables hold secrets and the session — passwords, client secrets, tokens,
+  refresh tokens, expiry, binding — and change often (the server itself
+  writes renewed tokens there). YAML holds configuration only and changes
+  rarely; the server never writes it, and refuses a YAML key that looks like
+  a secret or a session value, naming the key, never the value.
+- **A destination is read once per process** (decided 2026-10-03). A change
+  to a destination's `.env` made from outside — a new password, a token
+  handed over again — takes effect when the server restarts. The server does
+  not watch files.
 - **`DeletePackage` loses `connection_config`.** The argument takes a whole
   `SapConfig` — URL and credentials — from the tool call: a provider source
   outside H0's list, aimed by the model. A fresh session opens from the
@@ -178,8 +190,10 @@ stated, which the XSUAA fallback below relies on.
    `EmbeddableMcpServer`, `@mcp-abap-adt/lib/handlers`,
    `setSystemContext` / `getSystemContext` / `return_error` from
    `@mcp-abap-adt/lib/utils`, `@mcp-abap-adt/lib/request-context`.
-7. **Every existing auth and connection parameter has a CLI, an env and a
-   YAML form**, with one precedence.
+7. **Every existing auth and connection parameter has a CLI and a YAML
+   form**, today's env forms kept and none added, with one precedence.
+   Secrets and the session live in `.env` / environment variables, never in
+   YAML.
 8. **Measured:** the four live cases under *Success*, on real systems.
 
 ## Not in this release

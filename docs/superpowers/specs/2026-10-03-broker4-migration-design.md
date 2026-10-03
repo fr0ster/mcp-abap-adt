@@ -178,6 +178,11 @@ directory). Decisions in the table:
   destination needs `--unsafe` (its token is in `sessionsDir/X.env`).
 - **No seeding, no means written.** The broker writes the secret alone; the
   server writes nothing (goal; broker 4).
+- **Read once per process.** A destination's broker, provider and settings
+  are built from its files once and cached for the life of the process. A
+  change made to its `.env` from outside — a new password, a token handed
+  over again — takes effect on restart (decided 2026-10-03). Nothing watches
+  the files.
 
 ### Authentication handlers
 
@@ -333,27 +338,38 @@ install path) — not by the server.
 ## 6. Parameters: CLI, env, YAML (H7)
 
 One table in code (`src/lib/config/authParameters.ts`) lists each parameter's
-three names; the CLI parser, the env reader, the YAML loader, the template
-`--config` generates and the help text are all read from it. Precedence:
-CLI, then env, then YAML.
+names; the CLI parser, the env reader, the YAML loader, the template
+`--config` generates and the help text are all read from it. Every parameter
+has a CLI and a YAML form; the env forms are the ones that exist today, kept
+for compatibility, and none is added (decided 2026-10-03: environment
+variables, like `.env`, are for secrets and the session; YAML is
+configuration). Precedence: CLI, then env, then YAML.
 
 | Parameter | CLI | env | YAML |
 |---|---|---|---|
-| destination | `--mcp` | `MCP_DESTINATION` (new form) | `mcp` |
-| env file by name | `--env` | `MCP_ENV` (new form) | `env` |
+| destination | `--mcp` | — | `mcp` |
+| env file by name | `--env` | — | `env` |
 | env file by path | `--env-path` | `MCP_ENV_PATH` | `env-path` |
 | ignore the working directory's `.env` | `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` |
 | stores' base directory | `--auth-broker-path` | `AUTH_BROKER_PATH` | `auth-broker-path` |
 | write named sessions to disk | `--unsafe` | `MCP_UNSAFE` | `unsafe` |
 | browser for a login | `--browser` (wired) | `MCP_BROWSER` (wired) | `browser` (new form) |
 | login callback port | `--browser-auth-port` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` (new form) |
-| honour `x-mcp-destination` | `--allow-destination-header` | `MCP_ALLOW_DESTINATION_HEADER` (new form) | `allow-destination-header` (new form) |
+| honour `x-mcp-destination` | `--allow-destination-header` | — | `allow-destination-header` (new form) |
 | HTTP or RFC | `--connection-type` | `SAP_CONNECTION_TYPE` | `connection-type` (new form) |
 | system kind | `--system-type` | `SAP_SYSTEM_TYPE` | `system-type` (new form) |
 
-No new parameter — new forms of existing ones. `--browser` today reaches
+No new parameter — new YAML forms of existing ones. `--browser` today reaches
 nothing (`ServerConfigManager` never sets it); it reaches the strategy.
-`runtimeConfig.ts`'s unused `buildRuntimeConfig` goes.
+`runtimeConfig.ts`'s unused `buildRuntimeConfig` goes, and so does the
+exported `ConfigLoader`, which no caller uses and which merges YAML its own
+way, against this table.
+
+**No secret or session value in YAML.** The YAML validator refuses any key,
+at any depth, whose name says it carries one — it contains `password`,
+`passphrase`, `secret`, `token`, `cookie`, `refresh` or `credential`
+(case-insensitive) — naming the key and never its value. They belong in the
+destination's `.env` or the environment.
 
 ## 7. Shutdown (H5)
 
@@ -418,7 +434,10 @@ Updated, each for what the change touches:
   install `mcp-auth` from `@mcp-abap-adt/auth-broker-cli`; an XSUAA key needs
   `XSUAA_MCP_URL` in `sessions/<dest>.env`; an `--env` file is now written
   back with a renewed token; `DeletePackage` lost `connection_config`; the
-  browser callback port is `61001` unless set; for embedders,
+  browser callback port is `61001` unless set; a changed `.env` takes effect
+  on restart; an invalid port or enum value is now refused at startup
+  instead of ignored; a YAML key that looks like a secret is refused; for
+  embedders,
   `AuthBrokerFactory`'s new methods and `ConnectionContext.credential`.
 - `CHANGELOG.md`.
 
@@ -453,7 +472,8 @@ proven load-bearing by breaking the rule and watching it fail.
 | HTTP: a request whose destination has no handler fails; the next request, to one that has, succeeds | goal |
 | `setConnectionContext` with a broker that has no `getToken` / `createTokenRefresher`: still connects | H0 |
 | SNC on HTTP: refused naming `connection-type` | goal |
-| parameter table: every row's CLI, env and YAML forms yield the same config; precedence CLI > env > YAML; the generated template lists every row | H7 |
+| parameter table: every row's CLI and YAML forms (and its env form, where one exists) yield the same config; precedence CLI > env > YAML; the generated template lists every row; no env form exists for `--mcp`, `--env`, `--allow-destination-header` | H7 |
+| YAML holding a secret- or session-looking key (`password`, `sap-token`, nested `client_secret`, `Refresh_Token`): refused naming the key, the value absent from the message | H4, H7 |
 | `--browser` reaches `browserCallbackStrategy` | goal |
 | shutdown: a trigger settles once; a rejection prints the destinations and classes and exits `1`; nothing on stdout | H3, H5 |
 | shutdown during a refresh held open by the test: the refresh answers, its token is in the session store, then the process exits `0`; with the refresh held past the deadline, exit `1` naming one abandoned call | H5 |

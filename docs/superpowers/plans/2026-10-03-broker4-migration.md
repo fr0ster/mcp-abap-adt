@@ -197,10 +197,24 @@ Inputs the spec implies but no spec test exercises; each has its test in the own
 - [ ] **Step 6: Provider-sources pin** (spec §11, H0): a test over the source tree — every call of `createAbapConnection` outside `connectionFactory.ts` passes a credential from `factory.getProvider`, `credentialFromHeaders` or `credentialFromSapConfig`. Prove load-bearing by adding a stray `new BasicAuthProvider` call site in a scratch edit; revert.
 - [ ] **Step 7:** Commit (`feat(server): connections from getProvider through IDestinations`) and push. Build still red until Task 7.
 
+### Task 6a: Configuration follow-up — secrets stay out of YAML
+
+Added 2026-10-03 after the user's decision (goal: *Where things live*; spec §6). Runs after Task 6, before Task 7.
+
+**Files:**
+- Modify: `src/lib/config/authParameters.ts`, `src/lib/config/yamlConfig.ts`, `src/lib/config/ServerConfigManager.ts` (help)
+- Test: `src/__tests__/unit/config/authParameters.test.ts`, `src/__tests__/unit/config/yamlSecrets.test.ts` (new)
+
+- [ ] **Step 1: Tests.** The rows `--mcp`, `--env`, `--allow-destination-header` have no env form: setting `MCP_DESTINATION`, `MCP_ENV` or `MCP_ALLOW_DESTINATION_HEADER` changes nothing; the help names no such variable. YAML with a secret- or session-looking key at any depth (`password`, `sap-token`, nested `client_secret`, `Refresh_Token`, `cookie`, `passphrase`, `credential`) is refused naming the key; the value is absent from the message; an ordinary YAML file (the generated template) passes.
+- [ ] **Step 2:** Run; fail. Remove the three env forms from the table; add the key check to YAML validation; green.
+- [ ] **Step 3:** Prove load-bearing: drop the key check — the refusal test fails; revert. Commit (`fix(config): no new env forms; YAML refuses secret and session keys`) with `--no-verify` (red window), push.
+
 ### Task 7: The launcher, shutdown, and a green build
 
 **Files:**
 - Modify: `server/src/launcher.ts` (factory construction from `IServerConfig`; one destination for stdio; startup summary through `getConnectionConfig` / `getAuthorizationConfig`, mask unchanged; install shutdown)
+- Delete: `server/src/AuthBrokerConfig.ts`; `src/lib/config/ConfigLoader.ts` and its export (spec §6), trimming `src/lib/config/README.md`
+- Modify: `src/lib/auth/IAuthBrokerFactoryConfig.ts` — `envFilePath?` + `envFileSource?` become one `envFile?: { path: string; source: string }`, no default (controller ruling 6); the launcher passes the source as the user gave it
 - Create: `server/src/shutdown.ts`
 - Test: `server/src/__tests__/shutdown.test.ts`, `server/src/__tests__/launcherDestination.test.ts`
 

@@ -1047,9 +1047,7 @@ TRANSPORT SELECTION:
 
 HTTP/STREAMABLE-HTTP OPTIONS:
   --http-port=<port>               HTTP server port (default: 3000)
-  --http-host=<host>               HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: the default destination is served to any client that
-                                   reaches the port; bind with the host accordingly
+  --http-host=<host>               HTTP server host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   --http-json-response             Enable JSON response format
   --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
                                    Example: --http-allowed-origins=http://localhost:3000,https://example.com
@@ -1058,9 +1056,7 @@ HTTP/STREAMABLE-HTTP OPTIONS:
 
 SSE (SERVER-SENT EVENTS) OPTIONS:
   --sse-port=<port>                SSE server port (default: 3001)
-  --sse-host=<host>                SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: the default destination is served to any client that
-                                   reaches the port; bind with the host accordingly
+  --sse-host=<host>                SSE server host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
                                    Example: --sse-allowed-origins=http://localhost:3000
   --sse-allowed-hosts=<list>       Comma-separated allowed hosts
@@ -1076,13 +1072,13 @@ ENVIRONMENT VARIABLES:
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
                                    Default: stdio if not specified
   MCP_HTTP_PORT                    Default HTTP port (default: 3000)
-  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
   MCP_HTTP_ALLOWED_ORIGINS         Allowed CORS origins (comma-separated)
   MCP_HTTP_ALLOWED_HOSTS           Allowed hosts (comma-separated)
   MCP_HTTP_ENABLE_DNS_PROTECTION   Enable DNS protection (true|false)
   MCP_SSE_PORT                     Default SSE port (default: 3001)
-  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
   MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
   MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
@@ -1150,7 +1146,7 @@ EXAMPLES:
   # HTTP server on custom port, localhost only (default)
   mcp-abap-adt --transport=http --http-port=8080
 
-  # HTTP server accepting connections from all interfaces (less secure)
+  # HTTP server accepting connections from all interfaces
   mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=8080
 
   # Use YAML configuration file
@@ -1485,8 +1481,8 @@ export function parseTransportConfig(transportType: string): TransportConfig {
 
   if (sseRequested) {
     const port = resolvePortOption('--sse-port', 'MCP_SSE_PORT', 3001);
-    // Default to localhost (127.0.0.1) for security - only accepts local connections
-    // Use 0.0.0.0 to accept connections from all interfaces (less secure)
+    // Default to localhost (127.0.0.1)
+    // Use 0.0.0.0 to accept connections from all interfaces
     const host =
       getArgValue('--sse-host') ?? process.env.MCP_SSE_HOST ?? '127.0.0.1';
     const allowedOrigins = resolveListOption(
@@ -1523,8 +1519,8 @@ export function parseTransportConfig(transportType: string): TransportConfig {
 
   if (httpRequested) {
     const port = resolvePortOption('--http-port', 'MCP_HTTP_PORT', 3000);
-    // Default to localhost (127.0.0.1) for security - only accepts local connections
-    // Use 0.0.0.0 to accept connections from all interfaces (less secure)
+    // Default to localhost (127.0.0.1)
+    // Use 0.0.0.0 to accept connections from all interfaces
     const host =
       getArgValue('--http-host') ?? process.env.MCP_HTTP_HOST ?? '127.0.0.1';
     const enableJsonResponse = resolveBooleanOption(

@@ -259,8 +259,8 @@ http:
   port: 3000
 
   # Server host
-  # 127.0.0.1 (default) - localhost only (secure, uses default destination)
-  # 0.0.0.0 - all interfaces (less secure, client must provide all headers)
+  # 127.0.0.1 (default) - localhost only
+  # 0.0.0.0 - all interfaces
   host: 127.0.0.1
 
   # Enable JSON response format
@@ -287,8 +287,8 @@ sse:
   port: 3001
 
   # Server host
-  # 127.0.0.1 (default) - localhost only (secure, uses default destination)
-  # 0.0.0.0 - all interfaces (less secure, client must provide all headers)
+  # 127.0.0.1 (default) - localhost only
+  # 0.0.0.0 - all interfaces
   host: 127.0.0.1
 
   # Allowed CORS origins (comma-separated or array)

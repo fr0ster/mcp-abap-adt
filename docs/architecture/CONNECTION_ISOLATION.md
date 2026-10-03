@@ -57,10 +57,6 @@ Values that belong to one request, such as the master language of created object
 2. **Multi-Tenancy**: clients may connect to different SAP systems at once (by header, or by destination with `--allow-destination-header`)
 3. **One login**: a destination's logins are serialised and its token is shared by the sessions that use it
 
-## Who Reaches a Destination
-
-The transports do not look at a client's address. The default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`) is served to **any client that reaches the port**; bind with `--host` accordingly (the default, `127.0.0.1`, reaches local clients only), and use the DNS-rebinding allowlists (`--http-allowed-hosts`, `--http-allowed-origins`, `--http-enable-dns-protection`) and network controls where clients are not trusted. A client that sends a complete `x-sap-*` connection, or (with `--allow-destination-header`) an `x-mcp-destination`, is served from that instead.
-
 ## Example Flow
 
 ```

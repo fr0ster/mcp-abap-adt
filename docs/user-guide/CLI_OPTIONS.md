@@ -239,24 +239,18 @@ mcp-abap-adt --transport=http --port=8080
 
 **--host=\<host\>**
 
-HTTP server host address (default: 127.0.0.1, localhost only for security).
+HTTP server host address (default: 127.0.0.1).
 
-**Security Note:**
-- **127.0.0.1 (default)**: Server accepts connections only from localhost. The default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`) is reachable by local clients only.
-- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure**: The default destination is served to any client that reaches the port: bind with `--host` accordingly (the default `127.0.0.1` reaches local clients only).
+- **127.0.0.1** (default): the server listens on the loopback interface.
+- **0.0.0.0**: the server listens on all network interfaces.
 
 ```bash
-# Bind to localhost only (default, secure)
+# Bind to localhost only (default)
 mcp-abap-adt --transport=http --host=127.0.0.1
 
-# Bind to all interfaces (less secure, client must provide all headers)
+# Bind to all interfaces
 mcp-abap-adt --transport=http --host=0.0.0.0
 ```
-
-**When using 0.0.0.0:**
-- Client must provide all connection parameters in HTTP headers (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`)
-- Server acts as a simple proxy - no default destination lookup
-- All responsibility for connection configuration is on the client
 
 ### Path Configuration
 
@@ -329,24 +323,18 @@ mcp-abap-adt --transport=sse --port=8081
 
 **--host=\<host\>**
 
-SSE server host address (default: 127.0.0.1, localhost only for security).
+SSE server host address (default: 127.0.0.1).
 
-**Security Note:**
-- **127.0.0.1 (default)**: Server accepts connections only from localhost. The default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`) is reachable by local clients only.
-- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure**: The default destination is served to any client that reaches the port: bind with `--host` accordingly (the default `127.0.0.1` reaches local clients only).
+- **127.0.0.1** (default): the server listens on the loopback interface.
+- **0.0.0.0**: the server listens on all network interfaces.
 
 ```bash
-# Bind to localhost only (default, secure)
+# Bind to localhost only (default)
 mcp-abap-adt --transport=sse --host=127.0.0.1
 
-# Bind to all interfaces (less secure, client must provide all headers)
+# Bind to all interfaces
 mcp-abap-adt --transport=sse --host=0.0.0.0
 ```
-
-**When using 0.0.0.0:**
-- Client must provide all connection parameters in HTTP headers (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`)
-- Server acts as a simple proxy - no default destination lookup
-- All responsibility for connection configuration is on the client
 
 ### Path Configuration
 

@@ -74,8 +74,7 @@ allow-destination-header: false
 # HTTP/StreamableHTTP transport options
 http:
   port: 3000
-  # Host binding: 127.0.0.1 (default, localhost only, secure) or 0.0.0.0 (all interfaces, less secure)
-  # When using 0.0.0.0, client must provide all connection headers - server won't use default destination
+  # Host binding: 127.0.0.1 (default, localhost only) or 0.0.0.0 (all interfaces)
   host: 127.0.0.1
   json-response: false
   allowed-hosts: []          # DNS-rebinding protection: exact Host values incl. port, e.g. ["localhost:3000"]
@@ -85,8 +84,7 @@ http:
 # SSE (Server-Sent Events) transport options
 sse:
   port: 3001
-  # Host binding: 127.0.0.1 (default, localhost only, secure) or 0.0.0.0 (all interfaces, less secure)
-  # When using 0.0.0.0, client must provide all connection headers - server won't use default destination
+  # Host binding: 127.0.0.1 (default, localhost only) or 0.0.0.0 (all interfaces)
   host: 127.0.0.1
   allowed-hosts: []          # DNS-rebinding protection: exact Host values incl. port, e.g. ["localhost:3001"]
   allowed-origins: []        # DNS-rebinding protection: exact Origin values incl. scheme, e.g. ["https://app.example.com"]

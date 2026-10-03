@@ -1,8 +1,4 @@
-import {
-  type AbapConnection,
-  AuthRefusedError,
-  type SapConfig,
-} from '@mcp-abap-adt/connection';
+import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
@@ -20,7 +16,6 @@ import {
   type SystemContextResolver,
   withResolvedSystemContext,
 } from '../lib/requestSystemResolution.js';
-import { resolveSystemContext } from '../lib/systemContext.js';
 import {
   normalizeToolContent,
   type ToolResultLike,
@@ -95,39 +90,16 @@ export abstract class BaseMcpServer extends McpServer {
     const credential = await destinations.getProvider(destination);
     const connectionParams: SapConfig = { ...settings };
 
-    // Resolve masterSystem/responsible early so handlers get proper context:
-    // a temporary connection, built the same way, calls getSystemInformation.
-    let masterSystem: string | undefined;
-    let responsible: string | undefined;
-    try {
-      const tempConn = createAbapConnection(connectionParams, credential);
-      const systemCtx = await resolveSystemContext(tempConn);
-      masterSystem = systemCtx.masterSystem;
-      responsible = systemCtx.responsible;
-      // Use client from system info as fallback when not stated (cloud systems)
-      if (!connectionParams.client && systemCtx.client) {
-        connectionParams.client = systemCtx.client;
-      }
-      this.logger.debug(
-        `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}, client=${systemCtx.client || '(none)'}`,
-      );
-    } catch (error) {
-      // A refused credential is this request's answer: connecting after it
-      // would only present the refused credential again (a second login).
-      if (error instanceof AuthRefusedError) throw error;
-      this.logger.debug(
-        `[BaseMcpServer] Could not resolve systemContext: ${error instanceof Error ? error.constructor.name : typeof error}`,
-      );
-    }
-
+    // No setup-time lookup: the master system and responsible come from the
+    // call or the configuration, else per call on the connected connection
+    // (withResolvedSystemContext). A cloud destination without SAP_CLIENT
+    // uses the system's default client.
     this.connectionContext = {
       sessionId: destination,
       connectionParams,
       credential,
       metadata: {
         destination,
-        masterSystem,
-        responsible,
       },
     };
   }

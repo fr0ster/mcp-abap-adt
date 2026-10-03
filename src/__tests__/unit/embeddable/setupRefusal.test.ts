@@ -1,8 +1,10 @@
 /**
- * A request whose credential refuses: it presents the credential once (the
- * master-system lookup at setup starts no login of its own), answers the
- * refusal in its fixed words, and leaves no partial system context cached
- * for the process — so the next request tries again, once.
+ * Setting a destination's context up builds no connection: there is no
+ * setup-time master-system lookup (the master system and responsible are
+ * resolved per call, on the connected connection). A request whose credential
+ * refuses presents it once, when the request connects, answers the refusal in
+ * its fixed words, and leaves no partial system context cached for the
+ * process — so the next request tries again, once.
  */
 
 import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
@@ -10,6 +12,7 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import { BaseMcpServer } from '../../../embeddable/BaseMcpServer';
 import type { IDestinations } from '../../../lib/auth';
 import { describeAuthError } from '../../../lib/auth/errors';
+import * as connectionFactory from '../../../lib/connectionFactory';
 import {
   getSystemContext,
   resetSystemContextCache,
@@ -92,7 +95,22 @@ afterEach(() => {
   resetSystemContextCache();
 });
 
-describe('a refused master-system lookup', () => {
+describe('setting the context up', () => {
+  it('builds no connection and presents nothing', async () => {
+    const build = jest.spyOn(connectionFactory, 'createAbapConnection');
+    try {
+      const { provider, prepare } = refusingProvider();
+      const server = new TestServer();
+      await server.fromDestination('dest', destinationsOf(provider));
+      expect(build).not.toHaveBeenCalled();
+      expect(prepare).not.toHaveBeenCalled();
+    } finally {
+      build.mockRestore();
+    }
+  });
+});
+
+describe('a refused credential', () => {
   it('one prepare per request, the refusal answered, no context cached', async () => {
     const { provider, prepare } = refusingProvider();
     const destinations = destinationsOf(provider);

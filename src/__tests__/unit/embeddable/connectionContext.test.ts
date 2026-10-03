@@ -5,7 +5,7 @@
  * refresher is looked up, and the settings carry no secret.
  */
 
-import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
@@ -134,48 +134,23 @@ describe('setConnectionContext(destination, destinations)', () => {
       expect(context?.connectionParams).not.toHaveProperty(field);
     }
     expect(context?.sessionId).toBe('dest-a');
-    expect(context?.metadata).toMatchObject({
-      destination: 'dest-a',
-      masterSystem: 'master-placeholder',
-      responsible: 'responsible-placeholder',
-    });
+    expect(context?.metadata).toEqual({ destination: 'dest-a' });
   });
 
-  it('builds the master-system lookup connection with the same credential', async () => {
+  it('builds no connection and looks nothing up: no setup-time master-system lookup', async () => {
     const provider = fakeProvider();
     const server = new TestServer();
     await server.fromDestination('dest-a', stubDestinations(provider));
 
-    expect(build).toHaveBeenCalledTimes(1);
-    const [settings, credential] = build.mock.calls[0];
-    expect(credential).toBe(provider);
-    expect(settings.url).toBe(SETTINGS.url);
-    expect(resolve).toHaveBeenCalledWith(build.mock.results[0].value);
+    expect(build).not.toHaveBeenCalled();
+    expect(resolve).not.toHaveBeenCalled();
+    expect(provider.prepare).not.toHaveBeenCalled();
   });
 
-  it('takes the client from the system when the settings state none', async () => {
+  it('a client the settings do not state stays unstated (the system default applies)', async () => {
     const server = new TestServer();
     await server.fromDestination('dest-a', stubDestinations(fakeProvider()));
-    expect(server.context()?.connectionParams.client).toBe('000');
-  });
-
-  it('a failed lookup leaves the context usable, without system metadata', async () => {
-    resolve.mockRejectedValue(new Error('lookup failed'));
-    const provider = fakeProvider();
-    const server = new TestServer();
-    await server.fromDestination('dest-a', stubDestinations(provider));
-    expect(server.context()?.credential).toBe(provider);
-    expect(server.context()?.metadata?.masterSystem).toBeUndefined();
-  });
-
-  it('a lookup the credential refused: the refusal reaches the caller, no connection after it', async () => {
-    const refusal = new AuthRefusedError({ reason: 'refused' }, 'prepare');
-    resolve.mockRejectedValue(refusal);
-    const server = new TestServer();
-    await expect(
-      server.fromDestination('dest-a', stubDestinations(fakeProvider())),
-    ).rejects.toBe(refusal);
-    expect(build).toHaveBeenCalledTimes(1);
+    expect(server.context()?.connectionParams.client).toBeUndefined();
   });
 
   it('a destination that fails reaches the caller as the error it is', async () => {

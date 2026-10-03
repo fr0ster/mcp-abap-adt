@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/compact",
-  "version": "15.1.0",
+  "version": "16.0.0",
   "description": "The compact MCP server for SAP ABAP ADT: one tool per operation with the object in the arguments \u2014 22 tools instead of 370, for a host that cannot build a retrieval pipeline of its own.",
   "license": "AGPL-3.0-only",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",
@@ -57,10 +57,10 @@
     "docs:tools": "node ./tools/generate-docs.js"
   },
   "dependencies": {
-    "@mcp-abap-adt/compact-modify": "^15.1.0",
-    "@mcp-abap-adt/compact-readonly": "^15.1.0",
-    "@mcp-abap-adt/core": "^15.1.0",
-    "@mcp-abap-adt/lib": "^15.1.0"
+    "@mcp-abap-adt/compact-modify": "^16.0.0",
+    "@mcp-abap-adt/compact-readonly": "^16.0.0",
+    "@mcp-abap-adt/core": "^16.0.0",
+    "@mcp-abap-adt/lib": "^16.0.0"
   },
   "devDependencies": {
     "typescript": "^6.0.2",

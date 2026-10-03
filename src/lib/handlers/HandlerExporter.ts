@@ -70,7 +70,7 @@ export interface HandlerExporterOptions {
    * create without a stated responsible is refused). A resolver that throws is
    * treated like `{}`, and the create is refused as one to retry. The default
    * asks on ABAP Cloud (one lookup per connection) and answers `null`
-   * on-premise. `null` as the option disables it., and
+   * on-premise. `null` as the option disables it, and
    * `getHandlerEntries()` then returns the groups' handlers unwrapped.
    * MIGRATION (16.0.0): the kind of a connection the factory did not build is
    * no longer guessed from its URL — it is `SAP_SYSTEM_TYPE`, on-premise when

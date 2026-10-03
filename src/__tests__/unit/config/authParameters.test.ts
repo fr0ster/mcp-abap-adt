@@ -172,13 +172,46 @@ describe('--auth-broker is gone in every form', () => {
     expect(generateYamlConfigTemplate()).not.toMatch(/^auth-broker:/m);
   });
 
-  it('a leftover form sets nothing', () => {
+  it.each([
+    [['--auth-broker'], {}, undefined, '--auth-broker'],
+    [['--auth-broker=true'], {}, undefined, '--auth-broker'],
+    [[], { [REMOVED_ENV]: 'true' }, undefined, REMOVED_ENV],
+    [[], { [REMOVED_ENV]: 'false' }, undefined, REMOVED_ENV],
+    [[], {}, { 'auth-broker': true }, 'auth-broker (config file)'],
+    [[], {}, { 'auth-broker': false }, 'auth-broker (config file)'],
+  ] as const)(
+    'a leftover form stops the start, naming it (%j %j %j)',
+    (argv, env, yaml, name) => {
+      expect(() => readAuthParameters(argv, { ...env }, yaml as never)).toThrow(
+        `${name} was removed in 16.0.0 — remove it from the configuration`,
+      );
+    },
+  );
+
+  it('the parser refuses a leftover form, so the start stops', () => {
+    process.argv = ['node', 'server', '--auth-broker'];
+    expect(() => ArgumentsParser.parse()).toThrow(
+      '--auth-broker was removed in 16.0.0',
+    );
+    process.argv = ['node', 'server'];
     process.env[REMOVED_ENV] = 'true';
+    expect(() => new ServerConfigManager().getConfigSync()).toThrow(
+      `${REMOVED_ENV} was removed in 16.0.0`,
+    );
+  });
+
+  it('a YAML config with the removed key fails validation, naming it', () => {
+    const result = validateYamlConfig({ 'auth-broker': true } as never);
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(
+      'auth-broker (config file) was removed in 16.0.0 — remove it from the configuration',
+    );
+  });
+
+  it('--auth-broker-path is not mistaken for the removed flag', () => {
     expect(
-      readAuthParameters(['--auth-broker'], process.env, {
-        'auth-broker': true,
-      }),
-    ).toEqual({});
+      readAuthParameters(['--auth-broker-path=/x'], {}, undefined),
+    ).toEqual({ authBrokerPath: '/x' });
   });
 });
 
@@ -395,12 +428,7 @@ describe('the env file names its source', () => {
     expect(parsed.envFileSource).toBe(source);
   });
 
-  it.each([
-    [[], {}, undefined],
-    // The removed switch is no longer a parameter: it changes nothing.
-    [['--auth-broker'], {}, undefined],
-    [[], { MCP_USE_AUTH_BROKER: 'true' }, undefined],
-  ] as const)(
+  it.each([[[], {}, undefined]] as const)(
     "the working directory's .env is never read (%j %j %j)",
     (argv, env, yaml) => {
       fs.writeFileSync(

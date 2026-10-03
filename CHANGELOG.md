@@ -36,8 +36,8 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   YAML); without one there is no default destination (stdio: inspection-only). The working directory is
   gone from `getPlatformPaths` too.
 - **`--auth-broker`, `MCP_USE_AUTH_BROKER` and YAML `auth-broker` are removed**; their only purpose was to
-  switch the working-directory `.env` off. A leftover form is silently ignored — drop it from client
-  configs.
+  switch the working-directory `.env` off. A leftover form stops the start, naming the form used ("was
+  removed in 16.0.0 — remove it from the configuration") — drop it from client configs.
 - **The master system is determined from configuration, or by a request in the cloud.** The setup-time
   master-system lookup is gone (setting a destination's context up builds no connection), and cloud versus
   on-premise is the kind the connection was built for (`SAP_SYSTEM_TYPE`, else `jwt` is cloud), never a

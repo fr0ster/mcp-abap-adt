@@ -117,6 +117,46 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
 
 type Source = 'cli' | 'env' | 'yaml';
 
+/**
+ * Parameters removed in 16.0.0. A leftover one stops the start instead of
+ * being ignored: the user must see that it no longer does anything.
+ */
+const REMOVED_PARAMETERS: readonly {
+  cli: string;
+  env: string;
+  yaml: string;
+}[] = [
+  { cli: '--auth-broker', env: 'MCP_USE_AUTH_BROKER', yaml: 'auth-broker' },
+];
+
+function removedMessage(name: string): string {
+  return `${name} was removed in 16.0.0 — remove it from the configuration`;
+}
+
+/** The removed parameters' forms present in the YAML, as refusals. */
+function removedYamlErrors(yaml?: Record<string, unknown> | null): string[] {
+  if (!yaml) return [];
+  return REMOVED_PARAMETERS.filter((p) => p.yaml in yaml).map((p) =>
+    removedMessage(`${p.yaml} (config file)`),
+  );
+}
+
+/** Throws naming the first removed parameter found, in the form it was used. */
+function refuseRemovedParameters(
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  yaml?: Record<string, unknown> | null,
+): void {
+  for (const p of REMOVED_PARAMETERS) {
+    if (argv.some((arg) => arg === p.cli || arg.startsWith(`${p.cli}=`))) {
+      throw new Error(removedMessage(p.cli));
+    }
+    if (env[p.env] !== undefined) throw new Error(removedMessage(p.env));
+  }
+  const [yamlError] = removedYamlErrors(yaml);
+  if (yamlError) throw new Error(yamlError);
+}
+
 function nameIn(p: AuthParameter, source: Source): string {
   if (source === 'cli') return p.cli;
   if (source === 'env') return p.env ?? p.cli;
@@ -196,13 +236,15 @@ function readCli(
 
 /**
  * Read every row: CLI beats env beats YAML. A parameter set nowhere is absent
- * from the result (the consumer's default applies later).
+ * from the result (the consumer's default applies later). A removed parameter
+ * in any form is refused first.
  */
 export function readAuthParameters(
   argv: readonly string[],
   env: NodeJS.ProcessEnv,
   yaml?: Record<string, unknown> | null,
 ): Partial<IServerConfig> {
+  refuseRemovedParameters(argv, env, yaml);
   const out: Record<string, string | number | boolean> = {};
   for (const p of AUTH_PARAMETERS) {
     const sources: [Source, unknown][] = [
@@ -282,9 +324,12 @@ export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
 
 /** Errors for the YAML forms alone, for `validateYamlConfig`. */
 export function validateAuthYaml(yaml: Record<string, unknown>): string[] {
-  const errors: string[] = findSecretYamlKeys(yaml).map(
-    (key) =>
-      `Config file key "${key}" looks like a secret or a session value. YAML is configuration only: put secrets and the session in .env or the environment`,
+  const errors: string[] = removedYamlErrors(yaml);
+  errors.push(
+    ...findSecretYamlKeys(yaml).map(
+      (key) =>
+        `Config file key "${key}" looks like a secret or a session value. YAML is configuration only: put secrets and the session in .env or the environment`,
+    ),
   );
   for (const p of AUTH_PARAMETERS) {
     try {

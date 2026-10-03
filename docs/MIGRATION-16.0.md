@@ -72,8 +72,9 @@ know some of these; the server does not serve them. What to do instead:
    `--auth-broker-path` / `AUTH_BROKER_PATH` or the platform default only.
 7. **`--auth-broker`, `MCP_USE_AUTH_BROKER` and YAML `auth-broker` are removed** — drop them from client
    configs. Their only purpose was to switch the working-directory `.env` off, and there is nothing left
-   to switch. A leftover form is not a parameter any more and is silently ignored: the CLI flag, the
-   environment variable and the YAML key change nothing and are not refused.
+   to switch. A leftover form stops the start: `--auth-broker`, `MCP_USE_AUTH_BROKER` (whatever its value)
+   or the YAML key `auth-broker` is refused with "<name> was removed in 16.0.0 — remove it from the
+   configuration", naming the form you used.
 8. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
    watches the files: a new password, or a token you hand over again, needs a restart.
 9. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads

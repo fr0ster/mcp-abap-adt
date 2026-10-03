@@ -331,6 +331,17 @@ export function factoryConfigFrom(
   };
 }
 
+/** The source the parser states for the `.env` it found, unnamed, in the working directory. */
+const IMPLICIT_ENV_SOURCE = 'working directory .env';
+
+/**
+ * The env file is the working directory's `.env`, which nobody named: no
+ * --env, --env-path, MCP_ENV_PATH or YAML key, no --mcp, no --auth-broker.
+ */
+function isImplicitEnvFile(config: IServerConfig): boolean {
+  return config.envFileSource === IMPLICIT_ENV_SOURCE && !config.mcpDestination;
+}
+
 /**
  * The words a startup failure is reported in: the error's own vetted words
  * when the server knows them, else the destination and the error's class —
@@ -468,15 +479,14 @@ export async function launch(
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
 
-  const factory = new AuthBrokerFactory(
-    factoryConfigFrom(config, {
-      browserStrategy: deps.browserStrategy,
-      logger: loggerForTransport,
-    }),
-  );
+  const collaborators = {
+    browserStrategy: deps.browserStrategy,
+    logger: loggerForTransport,
+  };
+  let factory = new AuthBrokerFactory(factoryConfigFrom(config, collaborators));
 
   // --mcp=X → X; an --env file → default; neither → none (one destination either way).
-  const destination = factory.defaultDestination;
+  let destination = factory.defaultDestination;
   if (destination) {
     try {
       if (config.mcpDestination) {
@@ -484,9 +494,25 @@ export async function launch(
       }
       await checkAndSummarise(factory, destination, config, deps.stderr);
     } catch (error) {
-      deps.stderr(`[MCP] ${startupWords(error, destination)}`);
-      deps.exit(1);
-      return;
+      if (!isImplicitEnvFile(config)) {
+        deps.stderr(`[MCP] ${startupWords(error, destination)}`);
+        deps.exit(1);
+        return;
+      }
+      // Nobody named the working directory's .env: as in 15.x, it does not
+      // stop the start. The process serves no default destination, and no
+      // name reaches the file.
+      deps.stderr(
+        `[MCP] The ${IMPLICIT_ENV_SOURCE} is not a usable destination and is ignored (${startupWords(error, destination).replace(/\n/g, ' ')}). To skip it, pass --auth-broker (or MCP_USE_AUTH_BROKER=true); to use a file, name it with --env-path.`,
+      );
+      config = {
+        ...config,
+        envFile: undefined,
+        envFilePath: undefined,
+        envFileSource: undefined,
+      };
+      factory = new AuthBrokerFactory(factoryConfigFrom(config, collaborators));
+      destination = undefined;
     }
   }
 

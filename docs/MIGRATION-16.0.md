@@ -62,6 +62,10 @@ know some of these; the server does not serve them. What to do instead:
    destination whose token is in `sessions/X.env` is refused without `--unsafe`
    (`Destination "X" lacks: authorizationToken`, with a hint). Add `--unsafe`, or serve the file with
    `--env=X` or `--env-path`.
+   A working-directory `.env` that is not a usable destination does not stop the start, as in 15.x:
+   one stderr line names it and the way out (`--auth-broker` / `MCP_USE_AUTH_BROKER=true`), and the
+   server runs with no default destination. A file you name (`--env`, `--env-path`, `MCP_ENV_PATH`,
+   YAML) that is not usable stops the start.
 6. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
    watches the files: a new password, or a token you hand over again, needs a restart.
 7. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads

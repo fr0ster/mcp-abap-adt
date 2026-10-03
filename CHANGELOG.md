@@ -41,21 +41,29 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
 - **The master system is determined from configuration, or by a request in the cloud.** The setup-time
   master-system lookup is gone (setting a destination's context up builds no connection), and cloud versus
   on-premise is the kind the connection was built for (`SAP_SYSTEM_TYPE`, else `jwt` is cloud), never a
-  guess from the URL. On-premise nothing is asked: set `SAP_MASTER_SYSTEM`. A cloud destination without
+  guess from the URL. On-premise nothing is asked: the master system is `SAP_MASTER_SYSTEM`, or left out
+  of the request when none is set. A cloud destination without
   `SAP_CLIENT` uses the system's default client.
-- **ADT changes are not made without a responsible person and a master system.** Per request each comes
-  from, first found: the tool's own argument (`CreateTransport`'s `owner`); the `x-sap-responsible` /
-  `x-sap-master-system` headers; the destination's own `.env` (`SAP_RESPONSIBLE`, else its
-  `SAP_USERNAME`; `SAP_MASTER_SYSTEM` — the `--env` / `--env-path` file or `sessions/<destination>.env`);
-  the process environment (`SAP_RESPONSIBLE`, else `SAP_USERNAME`; `SAP_MASTER_SYSTEM`); on a cloud
-  system only, `systeminformation`. A create (or a transport without an owner) that finds one missing is
-  refused before any request — `"error": "system_context_missing"`, naming the key and the header — where
-  it used to be sent without the attribute. Reads are unaffected. On a cloud connection an empty value
-  is filled from `systeminformation` even when a host's request scope carries its key as `undefined`. The `--env` file's `SAP_RESPONSIBLE`,
-  `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the process environment: they are that
-  destination's own, and over HTTP/SSE they had become every other destination's fallback.
+- **A created object always carries a responsible person; the master system only when known.** The
+  responsible comes from, first found: the tool's own argument (`CreateTransport`'s `owner`); the
+  `x-sap-responsible` header; `SAP_RESPONSIBLE` in the destination's own `.env` (the `--env` /
+  `--env-path` file or `sessions/<destination>.env`), then in the process environment; else the login —
+  the destination's `SAP_USERNAME`, the `x-sap-login` header, the process `SAP_USERNAME`; on a cloud
+  system only, `systeminformation`'s user. A create (or a transport without an owner) that finds none
+  (SNC or a token you hold, with no `SAP_RESPONSIBLE`) is refused before any request —
+  `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the header and the login — where it used
+  to be sent with an empty or missing responsible. The master system comes from the argument,
+  `x-sap-master-system`, `SAP_MASTER_SYSTEM` (destination `.env`, then process), else a cloud system's
+  id; otherwise it is left out of the request, as before — never refused. Reads are unaffected. On a
+  cloud connection an empty value is filled from `systeminformation` even when a host's request scope
+  carries its key as `undefined`. `SAP_RESPONSIBLE` from any source now wins over every login. The
+  `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the
+  process environment: they are that destination's own, and over HTTP/SSE they had become every other
+  destination's fallback. `getSystemContext()` no longer reports `SAP_USERNAME` as `responsible`.
 - **`@mcp-abap-adt/adt-clients` is pinned to `~24.1.0`**: the refusal relies on its `protected
-  systemContext` being read where a value is sent, which a minor release could change.
+  systemContext` being read where a value is sent, which a minor release could change. Its service
+  definition, transformation and access control builders write `adtcore:responsible=""` when the value is
+  empty; the refusal is what keeps that from being sent.
 - **An embedder's own cloud connection is no longer recognised by its URL.** A connection the factory did
   not build is cloud only when the server's `systemType` option or `SAP_SYSTEM_TYPE` says so; otherwise
   nothing is asked of the system, and a create without configured values is refused.
@@ -85,8 +93,9 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
 - **One connector construction, three credential sources**: a destination's provider, the request's
   headers, or a credential an embedder hands over.
 - **`requestContextFromHeaders`** (`@mcp-abap-adt/lib/request-context`) and the optional
-  **`IDestinations.systemContextFor`**: the request scope a request's headers state, and the responsible
-  and master system a destination's own `.env` states.
+  **`IDestinations.systemContextFor`**: the request scope a request's headers state, and the responsible,
+  login and master system a destination's own `.env` states. `RequestContext` gains `login`
+  (`x-sap-login`, or the destination's `SAP_USERNAME`): the responsible when none is stated.
 - **Shutdown that settles**: on `SIGTERM`, `SIGINT` or the end of stdin the server stops accepting, waits
   up to 30 s for logins and refreshes in flight, and flushes every session; a secret that could not be
   stored, a login or refresh still running at the deadline, a server that did not close, or a failed settle

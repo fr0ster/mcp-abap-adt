@@ -136,25 +136,33 @@ on-premise-only tools (for example Programs); without it the tools offered are c
 setting picks the connector; without it a `jwt` destination connects as cloud and any other as
 on-premise.
 
-**Responsible and master system.** ADT changes are not made without a responsible person and a master
-system. For each request the server takes each of the two from the first of:
+**Responsible and master system.** A created object always carries its responsible person; its master
+system only when one is known. For each request the server takes each from the first of:
 
-1. the tool's own argument, where the tool has one (`CreateTransport`'s `owner`);
-2. the request's `x-sap-responsible` / `x-sap-master-system` headers (HTTP per request; SSE from the
-   session's opening request) — for a destination request and an `x-sap-*` connection request alike;
-3. the destination's own `.env`: `SAP_RESPONSIBLE` (else that file's `SAP_USERNAME`) and
-   `SAP_MASTER_SYSTEM` in the `--env` / `--env-path` file, or in `sessions/<destination>.env` for a named
-   destination (`--mcp`, `x-mcp-destination`) — read per destination, so one destination never gets
-   another's;
-4. the process environment: `SAP_RESPONSIBLE`, else `SAP_USERNAME`; `SAP_MASTER_SYSTEM`;
-5. for a cloud system only, the system's own `systeminformation` on the connected connection (its user
-   and system id). On-premise nothing is asked of the system.
+| Order | Responsible | Master system |
+|-------|-------------|---------------|
+| 1 | the tool's own argument, where the tool has one (`CreateTransport`'s `owner`) | the tool's own argument, where a tool has one (none does today) |
+| 2 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
+| 3 | `SAP_RESPONSIBLE` in the destination's own `.env` | `SAP_MASTER_SYSTEM` in the destination's own `.env` |
+| 4 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
+| 5 | the login: the destination's own `SAP_USERNAME` | on a cloud system, the system id (`systeminformation`) |
+| 6 | the login: the request's `x-sap-login` | — left out of the request |
+| 7 | the login: the process `SAP_USERNAME` | |
+| 8 | on a cloud system, the system's user (`systeminformation`) | |
 
-An operation that sends them — creating an object, a transport without an `owner` — and finds one
-missing is refused by the server before any request is made: the answer is
-`"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE` or `SAP_MASTER_SYSTEM` and
-the header. Nothing is sent to ADT with an empty value. A read is never refused for them. Which kind a
-system is follows the rule above, never its URL.
+The headers are read per request over HTTP and from the session's opening request over SSE, for a
+destination request and an `x-sap-*` connection request alike. The destination's own `.env` is the
+`--env` / `--env-path` file, or `sessions/<destination>.env` for a named destination (`--mcp`,
+`x-mcp-destination`) — read per destination, so one destination never gets another's. A cloud system is
+asked once per connection, on the connected connection, and only for what is still empty; on-premise
+nothing is asked of the system. Which kind a system is follows the rule above, never its URL.
+
+A create (or a transport without an `owner`) that finds no responsible person — on-premise over SNC or
+with a token you hold, with no `SAP_RESPONSIBLE` anywhere — is refused by the server before any request
+is made: the answer is `"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE`, the
+`x-sap-responsible` header and the login. Nothing is sent with an empty responsible. A missing master
+system is never refused: the attribute is left out and the system applies itself, as in 15.x. A read is
+never refused for either.
 
 ## HTTP/SSE headers
 

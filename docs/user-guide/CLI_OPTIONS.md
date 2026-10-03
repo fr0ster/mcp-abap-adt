@@ -164,7 +164,7 @@ ignored.
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--allow-destination-header` | — | `allow-destination-header` | flag | Honour `x-mcp-destination` (HTTP/SSE, off by default) |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
-| `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type: the tools offered (default `cloud`); the connector and whether the master system is asked of the system (default `cloud` for a `jwt` destination, else `onprem`; never guessed from the URL) |
+| `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type: the tools offered (default `cloud`); the connector and whether the responsible / master system are asked of the system (default `cloud` for a `jwt` destination, else `onprem`; never guessed from the URL) |
 
 The environment forms `MCP_DESTINATION`, `MCP_ENV` and `MCP_ALLOW_DESTINATION_HEADER` do **not**
 exist; use `--mcp`, `--env` and `--allow-destination-header` (or their YAML keys).
@@ -411,13 +411,13 @@ These are typically set in `.env` file:
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X" lacks: authType`). `saml`, `certificate` and `kerberos` are not supported
-- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` or `onprem` (same as `--system-type`). The tools offered default to `cloud` — e.g., Programs require `onprem`; the connector and whether the master system is asked of the system default to `cloud` for a `jwt` destination, else `onprem` (never guessed from the URL). **Set it explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
-- `SAP_USERNAME` - SAP username (for basic auth)
+- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` or `onprem` (same as `--system-type`). The tools offered default to `cloud` — e.g., Programs require `onprem`; the connector and whether the responsible / master system are asked of the system default to `cloud` for a `jwt` destination, else `onprem` (never guessed from the URL). **Set it explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
+- `SAP_USERNAME` - SAP username (for basic auth). Also the login the responsible of created objects falls back to when no `SAP_RESPONSIBLE` / `x-sap-responsible` is stated (the destination's own first, then `x-sap-login`, then the process environment's)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` `.env`)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
-- `SAP_MASTER_SYSTEM` - Master system of created objects (the system id). In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the `x-sap-master-system` header wins over both, the destination's `.env` over the environment. On a cloud system the system is asked when none is configured. A create without one is refused, nothing sent
-- `SAP_RESPONSIBLE` - Responsible person of created objects (else `SAP_USERNAME` of the same source). Same order, with the `x-sap-responsible` header. A create without one is refused, nothing sent
+- `SAP_MASTER_SYSTEM` - Master system of created objects (the system id), optional. In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the `x-sap-master-system` header wins over both, the destination's `.env` over the environment. On a cloud system the system is asked when none is stated; otherwise the attribute is left out of the request and the system applies itself. Never refused
+- `SAP_RESPONSIBLE` - Responsible person of created objects, optional. Same order, with the `x-sap-responsible` header; when none is stated, the login (`SAP_USERNAME` of the destination, `x-sap-login`, `SAP_USERNAME` of the environment; on a cloud system, the system's user). A create that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`, nothing sent
 
 **SNC (RFC only, no user, no password):**
 - `SAP_AUTH_TYPE=snc`; start with `--connection-type=rfc`

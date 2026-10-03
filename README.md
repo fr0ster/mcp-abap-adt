@@ -82,11 +82,14 @@ The server supports exactly four authentications; each is a destination stated i
 A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes such a `.env` comes from
 `@mcp-abap-adt/auth-broker-cli`. The browser login listens on port `61001` unless `--browser-auth-port` says otherwise.
 
-ADT changes are not made without a responsible person and a master system. Per request each comes
-from the tool's own argument, the `x-sap-responsible` / `x-sap-master-system` headers, the destination's
-own `.env` (`SAP_RESPONSIBLE`, else its `SAP_USERNAME`; `SAP_MASTER_SYSTEM`), the process environment, or —
-on a cloud system only — the system itself. A create that lacks either is refused, naming the key to
-set; nothing is sent. Reads are unaffected. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+A created object always carries its responsible person: the first stated of the tool's own argument,
+the `x-sap-responsible` header, `SAP_RESPONSIBLE` in the destination's own `.env`, then in the process
+environment — else the login (the destination's `SAP_USERNAME`, the `x-sap-login` header, the process
+`SAP_USERNAME`; on a cloud system, the system's user). A create that finds none (SNC, a token you hold)
+is refused naming `SAP_RESPONSIBLE`; nothing is sent. The master system comes from the argument,
+`x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process), else from a cloud
+system itself; otherwise it is left out and the system applies itself — never refused. Reads are
+unaffected. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 Coming from 15.x? See the [16.0 migration note](docs/MIGRATION-16.0.md).
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).

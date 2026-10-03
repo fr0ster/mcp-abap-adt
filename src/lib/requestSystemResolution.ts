@@ -114,6 +114,39 @@ function resolveOnce(
 }
 
 /**
+ * Run `fn` with the responsible person and master system a destination's own
+ * `.env` states, for the keys the request scope does not carry: the request's
+ * headers win over the destination, and the destination over the process
+ * configuration (which a key left absent falls back to). Per call, in the
+ * request scope — never the process cache — so concurrent requests to
+ * different destinations cannot see each other's values.
+ */
+export function withDestinationSystemContext<T>(
+  stated: { responsible?: string; masterSystem?: string } | undefined,
+  fn: () => T,
+): T {
+  const scope = getRequestContext();
+  const added: { responsible?: string; masterSystem?: string } = {};
+  if (stated?.responsible && !(scope && 'responsible' in scope)) {
+    added.responsible = stated.responsible;
+  }
+  if (stated?.masterSystem && !(scope && 'masterSystem' in scope)) {
+    added.masterSystem = stated.masterSystem;
+  }
+  if (!added.responsible && !added.masterSystem) return fn();
+  return runWithRequestContext(
+    {
+      ...scope,
+      ...added,
+      // Entering a scope must not change the language the call sees: inside
+      // a scope it is the scope's, outside one the process's.
+      masterLanguage: getEffectiveSystemContext().masterLanguage,
+    },
+    fn,
+  );
+}
+
+/**
  * Run `fn` with the responsible person and master system the request lacks
  * filled from the connection's system. `fn` runs unchanged when there is no
  * resolver, no connection, nothing missing, nothing to fill, or the lookup

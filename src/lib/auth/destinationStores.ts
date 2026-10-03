@@ -22,8 +22,10 @@ import type {
   ISessionStore,
 } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
+import * as dotenv from 'dotenv';
 import { assertDestinationName } from './destinationName';
 import { DestinationRefusal } from './errors';
+import type { DestinationSystemContext } from './IAuthBrokerFactory.js';
 
 export type DestinationMode =
   | {
@@ -52,6 +54,35 @@ export interface DestinationStores {
   urlStore: IServiceKeyStore;
   /** The key the user sets the URL with, for the refusal. */
   urlKey: 'SAP_URL' | 'XSUAA_MCP_URL';
+  /**
+   * The destination's own `.env`: the `--env` file, or
+   * `sessions/<name>.env` — the file its means store reads. Its
+   * `SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM` are read from here
+   * (`readDestinationSystemContext`).
+   */
+  destinationFile: string;
+}
+
+/**
+ * `SAP_RESPONSIBLE` (else `SAP_USERNAME`) and `SAP_MASTER_SYSTEM` of a
+ * destination's own `.env`; a key not stated, or a file that is absent or
+ * unreadable, is absent from the answer. Nothing else in the file is kept.
+ */
+export function readDestinationSystemContext(
+  file: string,
+): DestinationSystemContext {
+  let parsed: Record<string, string>;
+  try {
+    parsed = dotenv.parse(fs.readFileSync(file, 'utf8'));
+  } catch {
+    return {};
+  }
+  const responsible = parsed.SAP_RESPONSIBLE || parsed.SAP_USERNAME;
+  const masterSystem = parsed.SAP_MASTER_SYSTEM;
+  return {
+    ...(responsible ? { responsible } : {}),
+    ...(masterSystem ? { masterSystem } : {}),
+  };
 }
 
 /**
@@ -98,10 +129,12 @@ export function storesFor(
       sessionStore: new EnvFileSessionStore(mode.path, logger),
       urlStore: serviceKeyStore,
       urlKey: 'SAP_URL',
+      destinationFile: path.resolve(mode.path),
     };
   }
 
   assertDestinationName(mode.name, 'destination');
+  const destinationFile = path.join(mode.sessionsDir, `${mode.name}.env`);
   if (keyShapeOf(mode.keysDir, mode.name) === 'xsuaa') {
     return {
       serviceKeyStore: new EnvDestinationStore(mode.sessionsDir, {
@@ -120,6 +153,7 @@ export function storesFor(
         log: logger,
       }),
       urlKey: 'XSUAA_MCP_URL',
+      destinationFile,
     };
   }
   const serviceKeyStore = new EnvDestinationStore(mode.sessionsDir, {
@@ -136,5 +170,6 @@ export function storesFor(
       : new SafeAbapSessionStore(logger),
     urlStore: serviceKeyStore,
     urlKey: 'SAP_URL',
+    destinationFile,
   };
 }

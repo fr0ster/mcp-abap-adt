@@ -29,7 +29,10 @@ import type { ConnectionContext } from '../../../embeddable/ConnectionContext';
 import type { IDestinations } from '../../../lib/auth';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromHeaders } from '../../../lib/credentialSources';
+import type { HandlerEntry } from '../../../lib/handlers/interfaces';
+import { CompositeHandlersRegistry } from '../../../lib/handlers/registry/CompositeHandlersRegistry';
 import {
+  getEffectiveSystemContext,
   getSystemContext,
   resetSystemContextCache,
 } from '../../../lib/systemContext';
@@ -55,9 +58,49 @@ const SECRET_FIELDS = [
 
 const silent = { info() {}, debug() {}, warn() {}, error() {} };
 
+/** One tool that answers the responsible and master system its call sees. */
+const reportingRegistry = new CompositeHandlersRegistry([
+  {
+    getName: () => 'reporting',
+    registerHandlers: () => {},
+    getHandlers: (): HandlerEntry[] => [
+      {
+        toolDefinition: { name: 'Report', description: 'd' } as never,
+        handler: (async () => {
+          const seen = getEffectiveSystemContext();
+          return {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify({
+                  responsible: seen.responsible ?? null,
+                  masterSystem: seen.masterSystem ?? null,
+                }),
+              },
+            ],
+          };
+        }) as never,
+      },
+    ],
+  },
+]);
+
 class TestServer extends BaseMcpServer {
   constructor() {
     super({ name: 'test-server', version: '1.0.0', logger: silent });
+    this.registerHandlers(reportingRegistry);
+  }
+  async report(): Promise<unknown> {
+    const tools = (
+      this as unknown as {
+        _registeredTools: Record<
+          string,
+          { handler: (a: unknown) => Promise<{ content: { text: string }[] }> }
+        >;
+      }
+    )._registeredTools;
+    const result = await tools.Report.handler({});
+    return JSON.parse(result.content[0].text);
   }
   context(): ConnectionContext | null {
     return this.getConnectionContext();
@@ -163,6 +206,29 @@ describe('setConnectionContext(destination, destinations)', () => {
     }
   });
 
+  it("stdio (no request scope): the destination's own .env wins over the process configuration, key by key", async () => {
+    const saved = { ...process.env };
+    try {
+      resetSystemContextCache();
+      process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_PROCESS';
+      process.env.SAP_RESPONSIBLE = 'USER_FROM_PROCESS';
+      const server = new TestServer();
+      await server.fromDestination('dest-a', {
+        ...stubDestinations(fakeProvider()),
+        systemContextFor: jest.fn(async () => ({
+          responsible: 'USER_OF_DESTINATION',
+        })),
+      });
+      await expect(server.report()).resolves.toEqual({
+        responsible: 'USER_OF_DESTINATION',
+        masterSystem: 'SYSTEM_FROM_PROCESS',
+      });
+    } finally {
+      process.env = saved;
+      resetSystemContextCache();
+    }
+  });
+
   it('a client the settings do not state stays unstated (the system default applies)', async () => {
     const server = new TestServer();
     await server.fromDestination('dest-a', stubDestinations(fakeProvider()));
@@ -239,6 +305,27 @@ describe('getConnection()', () => {
 });
 
 describe('setConnectionContextFromHeaders(headers)', () => {
+  it('reads the process configuration: no destination, so it is the fallback', async () => {
+    const saved = { ...process.env };
+    try {
+      resetSystemContextCache();
+      process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_PROCESS';
+      process.env.SAP_RESPONSIBLE = 'USER_FROM_PROCESS';
+      const server = new TestServer();
+      server.fromHeaders({
+        'x-sap-url': 'https://system.example.invalid',
+        'x-sap-jwt-token': 'token-placeholder',
+      });
+      expect(getSystemContext()).toMatchObject({
+        masterSystem: 'SYSTEM_FROM_PROCESS',
+        responsible: 'USER_FROM_PROCESS',
+      });
+    } finally {
+      process.env = saved;
+      resetSystemContextCache();
+    }
+  });
+
   it('a token header: the context is what credentialFromHeaders answered', async () => {
     const headers = {
       'x-sap-url': 'https://system.example.invalid',

@@ -9,7 +9,11 @@ import type {
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+import {
+  type RequestContext,
+  requestContextFromHeaders,
+  runWithRequestContext,
+} from '@mcp-abap-adt/lib/request-context';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
@@ -82,8 +86,11 @@ export interface SseServerOptions {
 type SessionEntry = {
   server: BaseMcpServer;
   transport: SSEServerTransport;
-  /** Per-session master language (x-sap-language), scoped around each POST dispatch (#110). */
-  masterLanguage?: string;
+  /**
+   * What the session's headers state (x-sap-language, x-sap-responsible,
+   * x-sap-master-system), scoped around each POST dispatch (#110).
+   */
+  requestContext: RequestContext;
 };
 
 /**
@@ -351,15 +358,12 @@ export class SseServer {
     console.error(
       `[SSE GET] Created session ${sessionId} for destination ${destination}`,
     );
-    // Capture the per-session master language (x-sap-language) once at
-    // connection time; it is scoped around each POST dispatch below so it
-    // never leaks into other sessions via a process-global cache (#110).
-    const rawSseLang =
-      req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
-    const masterLanguage = Array.isArray(rawSseLang)
-      ? rawSseLang[0]
-      : rawSseLang;
-    this.sessions.set(sessionId, { server, transport, masterLanguage });
+    // Capture what the session states (x-sap-language, x-sap-responsible,
+    // x-sap-master-system) once at connection time; it is scoped around each
+    // POST dispatch below so it never leaks into other sessions via a
+    // process-global cache (#110).
+    const requestContext = requestContextFromHeaders(req.headers);
+    this.sessions.set(sessionId, { server, transport, requestContext });
     console.error(
       `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
     );
@@ -421,9 +425,8 @@ export class SseServer {
     }
 
     try {
-      await runWithRequestContext(
-        { masterLanguage: entry.masterLanguage },
-        () => entry.transport.handlePostMessage(req, res, req.body),
+      await runWithRequestContext({ ...entry.requestContext }, () =>
+        entry.transport.handlePostMessage(req, res, req.body),
       );
       if (!isPing) {
         console.error(

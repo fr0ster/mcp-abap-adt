@@ -7,11 +7,29 @@ import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
+/**
+ * Who creates objects and on which system, as a destination states it in its
+ * own `.env`. A key the destination does not state is absent.
+ */
+export interface DestinationSystemContext {
+  /** `SAP_RESPONSIBLE`, else the destination's own `SAP_USERNAME`. */
+  responsible?: string;
+  /** `SAP_MASTER_SYSTEM`. */
+  masterSystem?: string;
+}
+
 export interface IDestinations {
   /** The connector's settings: URL, client, auth type, connection type — no secret. */
   settingsFor(destination: string): Promise<SapConfig>;
   /** The destination's provider, counted while it works. */
   getProvider(destination: string): Promise<IAuthProvider>;
+  /**
+   * The responsible and master system the destination's own `.env` states
+   * (the `--env` file, or `sessions/<destination>.env`). Optional: a server
+   * whose destinations do not answer it falls back to the process
+   * configuration.
+   */
+  systemContextFor?(destination: string): Promise<DestinationSystemContext>;
 }
 
 /** What `settle` found. */

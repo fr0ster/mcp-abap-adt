@@ -2,7 +2,10 @@ import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
-import type { IDestinations } from '../lib/auth/IAuthBrokerFactory.js';
+import type {
+  DestinationSystemContext,
+  IDestinations,
+} from '../lib/auth/IAuthBrokerFactory.js';
 import { createAbapConnection } from '../lib/connectionFactory.js';
 import { credentialFromHeaders } from '../lib/credentialSources.js';
 import type {
@@ -15,6 +18,7 @@ import {
   defaultSystemContextResolver,
   type SystemContextResolver,
   systemContextResolverFor,
+  withDestinationSystemContext,
   withResolvedSystemContext,
 } from '../lib/requestSystemResolution.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
@@ -57,6 +61,14 @@ export abstract class BaseMcpServer extends McpServer {
    */
   protected readonly systemContextResolver: SystemContextResolver | null;
 
+  /**
+   * The responsible and master system the destination's own `.env` states
+   * (`IDestinations.systemContextFor`), entered into each call's request
+   * scope below the request's headers. Per server instance: HTTP builds one
+   * per request, SSE one per session.
+   */
+  private destinationSystemContext: DestinationSystemContext | undefined;
+
   constructor(options: {
     name: string;
     version?: string;
@@ -94,11 +106,14 @@ export abstract class BaseMcpServer extends McpServer {
     const credential = await destinations.getProvider(destination);
     const connectionParams: SapConfig = { ...settings };
 
-    // No setup-time lookup and no connection: the master system and
-    // responsible come from the configuration (read here, nothing sent), the
-    // call, or — in the cloud only — per call on the connected connection
-    // (withResolvedSystemContext). A cloud destination without SAP_CLIENT
-    // uses the system's default client.
+    // No setup-time lookup and no connection. Per call, in this order: the
+    // tool's arguments, the request's headers, the destination's own .env
+    // (read here, nothing sent), the process configuration (read here into
+    // the process context), and — in the cloud only — the connected
+    // connection (withResolvedSystemContext). A cloud destination without
+    // SAP_CLIENT uses the system's default client.
+    this.destinationSystemContext =
+      await destinations.systemContextFor?.(destination);
     systemContextFromConfiguration();
     this.connectionContext = {
       sessionId: destination,
@@ -124,6 +139,10 @@ export abstract class BaseMcpServer extends McpServer {
     };
 
     const { settings, credential } = credentialFromHeaders(headers);
+    // No destination: the headers (the request scope), then the process
+    // configuration, then — in the cloud only — the connected connection.
+    this.destinationSystemContext = undefined;
+    systemContextFromConfiguration();
     const masterSystem = getHeader('x-sap-master-system');
     const responsible = getHeader('x-sap-responsible');
     const masterLanguage = getHeader('x-sap-language');
@@ -242,12 +261,23 @@ export abstract class BaseMcpServer extends McpServer {
               // Both branches run inside withResolvedSystemContext: a call that
               // lacks responsible/master system gets them from an ABAP Cloud
               // connection (src/lib/requestSystemResolution.ts).
+              // The destination's own .env enters the scope first, below the
+              // request's headers, so the cloud lookup fills only what neither
+              // states.
+              const resolved = <T>(fn: () => Promise<T>) =>
+                withDestinationSystemContext(
+                  this.destinationSystemContext,
+                  () =>
+                    withResolvedSystemContext(
+                      context.connection,
+                      fn,
+                      this.systemContextResolver,
+                    ),
+                );
               let handlerPromise: Promise<unknown>;
               if ((entry.handler as HandlerFnWithContext).length >= 2) {
-                handlerPromise = withResolvedSystemContext(
-                  context.connection,
-                  () => (entry.handler as HandlerFnWithContext)(context, args),
-                  this.systemContextResolver,
+                handlerPromise = resolved(() =>
+                  (entry.handler as HandlerFnWithContext)(context, args),
                 );
               } else {
                 try {
@@ -263,10 +293,8 @@ export abstract class BaseMcpServer extends McpServer {
                 } catch {
                   // ignore if group doesn't expose context setter
                 }
-                handlerPromise = withResolvedSystemContext(
-                  context.connection,
-                  () => (entry.handler as HandlerFnArgsOnly)(args),
-                  this.systemContextResolver,
+                handlerPromise = resolved(() =>
+                  (entry.handler as HandlerFnArgsOnly)(args),
                 );
               }
 

@@ -513,6 +513,68 @@ describe('AuthBrokerFactory', () => {
     });
   });
 
+  /**
+   * The destination's own responsible and master system, from the file the
+   * destination's means are read from: sessions/<name>.env for a named
+   * destination, the --env file for `default`. Never another destination's.
+   */
+  describe('systemContextFor', () => {
+    it("a named destination: its sessions/<name>.env's SAP_RESPONSIBLE and SAP_MASTER_SYSTEM", async () => {
+      basic('dest', [
+        'SAP_RESPONSIBLE=responsible-of-dest',
+        'SAP_MASTER_SYSTEM=system-of-dest',
+      ]);
+      basic('other', ['SAP_MASTER_SYSTEM=system-of-other']);
+      const f = factory();
+      await expect(f.systemContextFor('dest')).resolves.toEqual({
+        responsible: 'responsible-of-dest',
+        masterSystem: 'system-of-dest',
+      });
+      // SAP_RESPONSIBLE unset: the destination's own SAP_USERNAME.
+      await expect(f.systemContextFor('other')).resolves.toEqual({
+        responsible: 'placeholder-user',
+        masterSystem: 'system-of-other',
+      });
+    });
+
+    it('the --env file serves `default`', async () => {
+      const file = path.join(root, 'conn.env');
+      fs.writeFileSync(
+        file,
+        [
+          `SAP_URL=${SYSTEM_URL}`,
+          'SAP_AUTH_TYPE=jwt',
+          'SAP_GRANT_TYPE=none',
+          'SAP_JWT_TOKEN=placeholder-token',
+          'SAP_MASTER_SYSTEM=system-of-file',
+        ].join('\n'),
+      );
+      await expect(
+        factory({
+          envFile: { path: file, source: '--env' },
+        }).systemContextFor('default'),
+      ).resolves.toEqual({ masterSystem: 'system-of-file' });
+    });
+
+    it('a destination that states neither answers nothing — the process environment is not read here', async () => {
+      const saved = process.env.SAP_MASTER_SYSTEM;
+      process.env.SAP_MASTER_SYSTEM = 'system-of-process';
+      try {
+        writeKey('dest', abapKey);
+        await expect(factory().systemContextFor('dest')).resolves.toEqual({});
+      } finally {
+        if (saved === undefined) delete process.env.SAP_MASTER_SYSTEM;
+        else process.env.SAP_MASTER_SYSTEM = saved;
+      }
+    });
+
+    it('a name that is a path is refused before any file is read', async () => {
+      await expect(factory().systemContextFor('../x')).rejects.toThrow(
+        /^destination: /,
+      );
+    });
+  });
+
   describe('getProvider', () => {
     it('a named jwt / none destination without --unsafe: lacks authorizationToken, with the hint', async () => {
       writeSession('dest', [

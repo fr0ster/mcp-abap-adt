@@ -9,7 +9,10 @@ import type {
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+import {
+  requestContextFromHeaders,
+  runWithRequestContext,
+} from '@mcp-abap-adt/lib/request-context';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
@@ -228,14 +231,12 @@ export class StreamableHttpServer extends BaseMcpServer {
         });
 
         await server.connect(transport);
-        // Scope the per-request master language (x-sap-language) to this
-        // request's dispatch so it cannot leak into other requests/modes via
-        // a process-global cache (#110).
-        const rawLang =
-          req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
-        const masterLanguage = Array.isArray(rawLang) ? rawLang[0] : rawLang;
-        await runWithRequestContext({ masterLanguage }, () =>
-          transport.handleRequest(req, res, req.body),
+        // Scope what the request states — x-sap-language, x-sap-responsible,
+        // x-sap-master-system — to this request's dispatch, so it cannot
+        // leak into other requests/modes via a process-global cache (#110).
+        await runWithRequestContext(
+          requestContextFromHeaders(req.headers),
+          () => transport.handleRequest(req, res, req.body),
         );
         if (!isPing) {
           console.error(

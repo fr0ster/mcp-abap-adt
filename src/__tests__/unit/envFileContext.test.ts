@@ -30,9 +30,22 @@ describe('hydrateSystemContextFromEnvFile', () => {
     expect(env).toEqual({
       SAP_LANGUAGE: 'DE',
       SAP_CLIENT: '100',
-      SAP_USERNAME: 'SAPUSER01',
     });
     expect(ENV_FILE_CONTEXT_KEYS).toContain('SAP_LANGUAGE');
+  });
+
+  it("the responsible and master system stay the file's destination's: they are not bridged", () => {
+    // The file is the `default` destination's own .env, read per destination
+    // (IDestinations.systemContextFor). Copied into the process environment
+    // they would become every other destination's fallback over HTTP/SSE.
+    const env: NodeJS.ProcessEnv = {};
+    hydrateSystemContextFromEnvFile(
+      envFile(
+        'SAP_RESPONSIBLE=USER_OF_FILE\nSAP_MASTER_SYSTEM=SYSTEM_OF_FILE\nSAP_USERNAME=SAPUSER01\n',
+      ),
+      env,
+    );
+    expect(env).toEqual({});
   });
 
   it('leaves a value the process already has', () => {

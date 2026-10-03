@@ -14,6 +14,7 @@ export {
   UnsupportedAuthenticationError,
 } from './errors';
 export type {
+  DestinationSystemContext,
   IAuthBrokerFactory,
   IDestinations,
   SettleReport,

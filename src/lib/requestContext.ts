@@ -35,6 +35,39 @@ export function runWithRequestContext<T>(ctx: RequestContext, fn: () => T): T {
   return storage.run(ctx, fn);
 }
 
+/** A header's first value, its name matched case-insensitively. */
+function headerValue(
+  headers: Record<string, string | string[] | undefined>,
+  name: string,
+): string | undefined {
+  for (const [key, raw] of Object.entries(headers)) {
+    if (key.toLowerCase() !== name) continue;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (value) return value;
+  }
+  return undefined;
+}
+
+/**
+ * The request scope an HTTP/SSE request states in its headers:
+ * `x-sap-language` as `masterLanguage` (the key always present, as #110
+ * established), and `x-sap-responsible` / `x-sap-master-system` as
+ * `responsible` / `masterSystem` — each key present only when its header
+ * carries a value, so a request that states none leaves the destination's
+ * `.env`, the process configuration and the cloud lookup to fill it.
+ */
+export function requestContextFromHeaders(
+  headers: Record<string, string | string[] | undefined>,
+): RequestContext {
+  const responsible = headerValue(headers, 'x-sap-responsible');
+  const masterSystem = headerValue(headers, 'x-sap-master-system');
+  return {
+    masterLanguage: headerValue(headers, 'x-sap-language'),
+    ...(responsible ? { responsible } : {}),
+    ...(masterSystem ? { masterSystem } : {}),
+  };
+}
+
 /**
  * The active request/session context, or `undefined` when not inside a
  * request scope (e.g. stdio mode). `undefined` means "no scope" and is

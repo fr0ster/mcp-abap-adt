@@ -20,6 +20,7 @@ import { assertDestinationName } from './destinationName';
 import {
   type DestinationMode,
   type DestinationStores,
+  readDestinationSystemContext,
   storesFor,
 } from './destinationStores';
 import { errorClassOf, SettingsError } from './errors';
@@ -28,7 +29,11 @@ import {
   type AuthHandlerContext,
   handlerFor,
 } from './handlers';
-import type { IAuthBrokerFactory, SettleReport } from './IAuthBrokerFactory.js';
+import type {
+  DestinationSystemContext,
+  IAuthBrokerFactory,
+  SettleReport,
+} from './IAuthBrokerFactory.js';
 import type { IAuthBrokerFactoryConfig } from './IAuthBrokerFactoryConfig.js';
 import { LoginLock } from './loginLock';
 import { type VettedAuthentication, vetMeans } from './vocabulary';
@@ -72,6 +77,10 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   private readonly built = new Map<string, Promise<Built>>();
   private readonly providers = new Map<string, Promise<IAuthProvider>>();
   private readonly settings = new Map<string, Promise<SapConfig>>();
+  private readonly systemContexts = new Map<
+    string,
+    Promise<DestinationSystemContext>
+  >();
 
   constructor(config: IAuthBrokerFactoryConfig) {
     this.config = config;
@@ -149,6 +158,27 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
       throw error;
     }
     return settings;
+  }
+
+  /**
+   * The responsible and master system the destination's own `.env` states,
+   * read once per process like its settings. The process environment is not
+   * read here: it is the server's fallback, after the destination.
+   */
+  systemContextFor(destination: string): Promise<DestinationSystemContext> {
+    const cached = this.systemContexts.get(destination);
+    if (cached) return cached;
+    const context = (async () =>
+      readDestinationSystemContext(
+        (await this.buildOf(destination)).stores.destinationFile,
+      ))();
+    this.systemContexts.set(destination, context);
+    context.catch(() => {
+      if (this.systemContexts.get(destination) === context) {
+        this.systemContexts.delete(destination);
+      }
+    });
+    return context;
   }
 
   getProvider(destination: string): Promise<IAuthProvider> {

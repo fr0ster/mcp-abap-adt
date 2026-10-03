@@ -106,9 +106,8 @@ class AuthBrokerFactory {
   /** The destination's provider, counted while it works (see below). */
   getProvider(destination: string): Promise<IAuthProvider>;
   /**
-   * Waits for every provider call in progress — a login, a refresh — up to
-   * `deadlineMs`, then flush()es every broker built; rejects naming the
-   * destinations whose secret is not stored.
+   * Closes the gate on provider calls, waits for the ones in progress — a
+   * login, a refresh — up to `deadlineMs`, then flush()es every broker built.
    */
   settle(deadlineMs: number): Promise<SettleReport>;
 }
@@ -124,6 +123,18 @@ covers it. The wrapper changes nothing a call returns or throws, and it is the
 same object for every connection of the destination (section 2's sibling rule
 holds). `settle` answers `{ abandoned: number }` — the calls still running at
 the deadline — besides `flush()`'s outcome.
+
+**A gate, closed before the wait.** A count of zero does not mean no renewal
+can start: an ADT request already on the wire may come back `401` after the
+wait has begun, and its `rejected()` would refresh after the flush. So
+`settle` first closes the gate, then waits. Behind a closed gate the wrapper
+starts no new call: each of the four answers `{ ok: false, refusal: {
+reason: 'the server is shutting down' } }` at once, without reaching the
+broker's provider — Oops, never a throw, as the `IAuthProvider` contract
+requires. No renewal, so nothing new to store; the request fails with that
+refusal. A call that passed the gate before it closed runs to its answer and
+is waited for. Ordering: gate closed → wait for zero → `flush()`; nothing
+opens the gate again.
 
 `IAuthBrokerFactoryConfig`: `envFilePath?`, `mcpDestination?`,
 `authBrokerPath?`, `unsafe`, `browser`, `browserAuthPort?`, `logger?`.
@@ -334,10 +345,14 @@ the library, so an embedder's process is never taken over:
   (stdin ends: the client went away).
 - **Once:** the first trigger runs it; later ones wait for it.
 - **What it does, in order:**
-  1. stop taking work: HTTP and SSE servers stop accepting connections
-     (`close()`); stdio has no more input;
-  2. `await factory.settle(30_000)` — every login or refresh in progress
-     answers first, so a token it obtains is submitted before the flush.
+  1. stop taking work where it can be stopped: HTTP and SSE servers stop
+     accepting connections (`close()`). That does not stop requests already
+     running, and under stdio a signal is not the end of input — the gate in
+     step 2 is what holds;
+  2. `await factory.settle(30_000)` — closes the provider gate first, so no
+     login or renewal starts from here (a request answered `401` now gets
+     the shutdown refusal instead of a refresh), then waits for the calls
+     already running, so a token they obtain is submitted before the flush.
      30 s is the callback strategy's login timeout: a login waiting on a
      browser ends by then either way;
   3. exit `0` when everything is stored and nothing was abandoned. Otherwise
@@ -421,6 +436,8 @@ proven load-bearing by breaking the rule and watching it fail.
 | `--browser` reaches `browserCallbackStrategy` | goal |
 | shutdown: a trigger settles once; a rejection prints the destinations and classes and exits `1`; nothing on stdout | H3, H5 |
 | shutdown during a refresh held open by the test: the refresh answers, its token is in the session store, then the process exits `0`; with the refresh held past the deadline, exit `1` naming one abandoned call | H5 |
+| an ADT request answered `401` after shutdown began: `rejected()` gets the shutdown refusal, the underlying provider is never called, nothing is written after the flush, exit `0` | H5 |
+| behind the closed gate each of the four calls answers Oops with the fixed reason and throws nothing | H5 |
 | two destinations' first logins at once: the second `authorize()` starts only after the first settles, and both bind the one port | goal |
 | an `--env` file: a renewed token is written back, other lines untouched | H5 |
 | `DeletePackage` schema has no `connection_config` | H0 |

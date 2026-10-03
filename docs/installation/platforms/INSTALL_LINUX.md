@@ -401,7 +401,6 @@ Server will be available at: `http://localhost:8080/mcp/stream/http`
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
       "x-sap-url": "https://your-sap-system.com:8000",
-      "x-sap-auth-type": "basic",
       "x-sap-login": "your_username",
       "x-sap-password": "your_password",
       "x-sap-client": "100"

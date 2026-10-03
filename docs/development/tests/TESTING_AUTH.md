@@ -64,7 +64,7 @@ x-sap-url: https://your-sap-url.com
 
 Or:
 ```
-x-sap-destination: TRIAL
+x-mcp-destination: TRIAL
 ```
 
 ### 4. Verify that .env file was created:

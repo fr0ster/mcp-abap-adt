@@ -23,7 +23,7 @@ The MCP ABAP ADT server supports YAML configuration files to simplify server set
 Command-line arguments **always override** YAML values. This allows you to:
 - Use YAML as base configuration
 - Override specific values via command-line when needed
-- Keep sensitive values in YAML (not in command history)
+- Keep **configuration** in YAML. **Secrets and the session do not belong there** — see [Configuration only](#configuration-only-no-secrets)
 
 Example:
 ```bash
@@ -38,7 +38,7 @@ mcp-abap-adt --conf=config.yaml --port=8080
 # Default: stdio (for MCP clients)
 transport: stdio
 
-# Default MCP destination (uses auth-broker)
+# Default destination: service-keys/<name>.json + sessions/<name>.env
 mcp: TRIAL
 
 # Env destination name in sessions store (e.g. trial -> trial.env)
@@ -50,14 +50,26 @@ env-path: .env
 # SAP connection type: http (default) or rfc
 connection-type: http
 
-# Use unsafe mode (file-based session store)
+# SAP system type: onprem | cloud (default) | legacy
+system-type: cloud
+
+# Write named destinations' sessions to disk (default: in memory)
 unsafe: false
 
-# Force use of auth-broker
+# Accepted for compatibility; no effect in 16.0
 auth-broker: false
 
-# Custom path for auth-broker storage
+# Base directory of service-keys/ and sessions/
 auth-broker-path: ~/custom/path
+
+# Browser for a login: chrome | edge | firefox | system (default) | headless | none
+browser: system
+
+# Login callback port, 1-65535 (default 61001)
+browser-auth-port: 61001
+
+# Honour the x-mcp-destination header (HTTP/SSE only)
+allow-destination-header: false
 
 # HTTP/StreamableHTTP transport options
 http:
@@ -88,13 +100,25 @@ sse:
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `transport` | string | `stdio` | Transport type: `stdio` (default, for MCP clients), `http`, `streamable-http`, or `sse` |
-| `mcp` | string | - | Default MCP destination name (uses auth-broker) |
+| `mcp` | string | - | Default destination name: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
 | `env` | string | - | Destination name resolved from sessions store (`sessions/<name>.env`) |
 | `env-path` | string | - | Explicit path to `.env` file |
 | `connection-type` | string | `http` | SAP connection transport: `http` (default) or `rfc` |
-| `unsafe` | boolean | `false` | Use file-based session store (persists to disk) |
-| `auth-broker` | boolean | `false` | Force use of auth-broker (service keys) instead of `.env` |
-| `auth-broker-path` | string | - | Custom path for auth-broker storage |
+| `system-type` | string | `cloud` | `onprem`, `cloud` or `legacy`, overriding detection |
+| `unsafe` | boolean | `false` | Write named destinations' sessions to disk instead of keeping them in memory |
+| `auth-broker` | boolean | `false` | Accepted for compatibility; no effect in 16.0 |
+| `auth-broker-path` | string | - | Base directory of `service-keys/` and `sessions/` |
+| `browser` | string | `system` | Browser for a login: `chrome`, `edge`, `firefox`, `system`, `headless`, `none` |
+| `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |
+| `allow-destination-header` | boolean | `false` | Honour the `x-mcp-destination` header (HTTP/SSE only) |
+
+A value that is not valid (a port outside 1-65535, an unknown `connection-type`, `system-type` or flag value) is **refused at startup**, naming the key, instead of being ignored.
+
+### Configuration only (no secrets)
+
+`.env` files and environment variables hold secrets and the session; YAML holds configuration only. The server **refuses a YAML key whose name looks like a secret or a session value** — a name containing `password`, `passphrase`, `secret`, `token`, `cookie`, `refresh` or `credential`, at any depth — and exits with an error that names the key (never a value). Put such values in the destination's `.env` (see [Authentication & Destinations](../user-guide/AUTHENTICATION.md)).
+
+Each parameter above also has a CLI form and, for eight of them, an environment variable; precedence is CLI, then environment, then YAML. See [CLI Options](../user-guide/CLI_OPTIONS.md).
 
 ### HTTP Options
 
@@ -171,13 +195,14 @@ Usage:
 mcp-abap-adt --conf=config.yaml
 ```
 
-### Example 5: HTTP Mode with Auth-Broker
+### Example 5: HTTP Mode with a Named Destination and a Login Port
 
 ```yaml
 transport: http
 mcp: PRODUCTION
-auth-broker: true
 auth-broker-path: ~/custom/auth-broker
+browser-auth-port: 61005
+allow-destination-header: true
 http:
   port: 3000
 ```
@@ -242,7 +267,7 @@ mcp-abap-adt --conf=sse-default.yaml
 
 1. **Cleaner Command-Line**: No need to pass many arguments
 2. **Easy Testing**: Create different YAML files for different test scenarios
-3. **Version Control**: Configuration files can be committed to git (exclude sensitive data)
+3. **Version Control**: Configuration files can be committed to git (it holds no secrets; the server refuses them)
 4. **Template Generation**: Automatic template generation helps understand available options
 5. **Flexibility**: Command-line arguments still override YAML values
 
@@ -276,7 +301,7 @@ mcp-abap-adt --conf=~/config.yaml
 
 ## Error Handling
 
-If the YAML file has syntax errors or invalid values:
+If the YAML file has syntax errors, invalid values or a secret-looking key:
 - An error message is displayed
 - The server exits with code 1
 - Check the file syntax and try again

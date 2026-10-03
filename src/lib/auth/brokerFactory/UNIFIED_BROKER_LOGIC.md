@@ -1,158 +1,101 @@
 # Unified AuthBroker Creation Logic
 
+How `AuthBrokerFactory` (`src/lib/auth/brokerFactory.ts`) builds a destination's broker and
+credential, and which destination a request is served from. The server's connections come from
+`IDestinations`: `settingsFor(destination)` and `getProvider(destination)`. Nothing reads a token
+before connecting: the provider is the credential, and it renews itself.
+
 ## Principles
 
-1. **One broker per destination**: brokers are stored in a map keyed by `destination` (or `'default'` for the default broker).
-2. **Default broker**: a special broker with key `'default'` used when destination is not provided in headers.
-3. **Token retrieval happens only in MCP handlers**: the broker is not invoked by transport/server before a tool executes. The MCP server passes destination/broker to handlers; token is fetched only when a tool runs.
+1. **One broker per destination**, built on first use and cached (a failed build is dropped, so the
+   next request tries again). Two requests to the same new destination at once build one broker.
+2. **One provider per destination**, handed out *counted*: the factory knows how many provider
+   calls are in flight, so shutdown can wait for them. A consumer that connects uses
+   `factory.getProvider`, never the broker's own `getProvider`.
+3. **The destination states its authentication.** The service key store answers the *means*
+   (`authType`, `grantType`, URL, client); the session store holds the *secret* alone. The factory
+   checks them against the vocabulary and picks one of the four handlers.
+4. **Four authentications, exactly**: `basic` (HTTP or RFC), `snc` (RFC only), `jwt` /
+   `authorization_code` (browser login), `jwt` / `none` (a token you hold). Anything else is
+   refused with `Destination "X" uses <type> / <grant>, which this server does not support`.
+5. **A destination is read once per process.** Nothing watches the files; a `.env` change from
+   outside takes effect on restart.
 
-## Default Broker Creation (by transport)
+## The default destination
 
-### Streamable HTTP
-- Start without a mandatory default broker.
-- If `--mcp=destination` → create broker with key `'default'` (or destination), with serviceKeyStore + sessionStore (safe/file depending on `--unsafe`), tokenProvider = `AuthorizationCodeProvider`.
-- If `--env=path/to/.env` → create `'default'` broker without serviceKeyStore, sessionStore from the same directory, tokenProvider = `AuthorizationCodeProvider`.
-- If none of the above, no default broker is created; connection is possible only via headers or destination in request (broker can be created on demand).
+`defaultDestination = --mcp ?? ('default' when an env file was chosen) ?? none`.
 
-### SSE
-- Same as HTTP, but a default broker is useful for local scenarios:
-  - `--mcp=destination` → `'default'` broker with serviceKeyStore + sessionStore.
-  - `.env` in current directory without `--auth-broker` → `'default'` broker without serviceKeyStore, sessionStore from current directory.
-  - `--env=path/to/.env` → `'default'` broker without serviceKeyStore, sessionStore from .env directory.
-  - If none of the above, no default broker is created; connection works only if the client provides destination/headers and the broker is created on demand.
+An env file is chosen by `--env-path` / `MCP_ENV_PATH` / `--env`, or, when none of those and no
+`--mcp` is given, by a `.env` in the working directory. The factory is built once, in the launcher.
 
-### stdio
-- Requires a default broker at startup, otherwise error.
-- Variants:
-  - `--mcp=destination` → `'default'` broker with serviceKeyStore + sessionStore.
-  - `.env` in current directory without `--auth-broker` → `'default'` broker without serviceKeyStore, sessionStore from current directory.
-  - `--env=path/to/.env` → `'default'` broker without serviceKeyStore, sessionStore from .env directory.
-- Other cases: no broker → server does not start (stdio without default source is not allowed).
+## Where a destination lives (`src/lib/auth/destinationStores.ts`)
 
-## Broker Usage (by transport)
+| Mode | Means (service key store) | Secret (session store) |
+|------|---------------------------|------------------------|
+| **Env file** (`--env`, `--env-path`, `MCP_ENV_PATH`, working-directory `.env`) | that file | that file, **written back** with a renewed token, whatever `--unsafe` says |
+| **Named, ABAP key** (`--mcp=X`, `x-mcp-destination: X`) | `sessions/X.env` over `service-keys/X.json`, field by field | `sessions/X.env` with `--unsafe`, else in memory |
+| **Named, XSUAA key** (root `url`, `clientid`, `clientsecret`, no `uaa`) | the same, with the system's URL from `XSUAA_MCP_URL` in `sessions/X.env` only | the same |
 
-### Streamable HTTP
-- **Map key**: `destination` (+ stable client identifier if isolation needed; options: `sessionId` or `clientId:port`).
-- **Behavior**:
-  1. In PUT/POST handler (before MCP server creation), read destination from headers.
-  2. If destination is present: get broker from map, create if missing; if creation fails return error.
-  3. If destination is absent: use default broker; if missing, read direct headers; if also missing, return error.
-  4. Create MCP server instance, pass destination/broker (or direct header params) to handlers. **Token is fetched only in the handler before tool execution.**
+A named destination's name becomes a file name, so it is vetted first (`destinationName.ts`): only
+letters, digits, `_`, `.`, `-`; no separator, no `..`, no leading dot, not empty. A refusal names
+the source (`--mcp`, `x-mcp-destination`, `destination`) and never quotes the name.
 
-### SSE
-- **Map key**: same as Streamable HTTP.
-- **Behavior**:
-  1. In GET handler (before MCP server creation for a session), read destination from headers.
-  2. If destination is present: get/create broker; if fail, return error.
-  3. If destination is absent: try default broker; if missing, read direct headers; if missing, return error.
-  4. Create MCP server for the session, pass destination/broker (or direct header params). **Token is fetched only in the handler.**
+## Broker usage by transport
 
 ### stdio
-- **Map key**: single broker at startup (`default` or destination from `--mcp`).
-- **Behavior**:
-  1. At startup create broker from `--mcp` / config / ENV. If none, error and do not start.
-  2. Create MCP server once.
-  3. Handlers receive destination/broker and fetch token only during tool execution.
+- The launcher builds the factory, checks and summarises the default destination at startup (a
+  destination that cannot be served stops the start, exit 1, with the error's own vetted words).
+- One server instance for the process; its connection is built on the first tool call and kept.
+- With no default destination the server starts in inspection-only mode: the tool list answers, a
+  tool call needs a connection.
 
-## Broker Map Structure
+### Streamable HTTP and SSE
+- Per request (HTTP) or per session (SSE), the destination is chosen in this order:
+  1. `x-mcp-destination`, **only with `--allow-destination-header`**; a value that is not a plain
+     destination name is refused (`400`), naming the header;
+  2. `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`: a direct
+     connection with a credential built from the headers; no broker;
+  3. the default destination;
+  4. otherwise `400`.
+- The first connect of a destination runs inside a per-destination lock, so two first logins do
+  not race for the callback port.
 
-```typescript
-Map<string, AuthBroker> {
-  'default' => AuthBroker {
-    serviceKeyStore?: IServiceKeyStore,
-    sessionStore: ISessionStore,
-    tokenProvider: AuthorizationCodeProvider
-  },
-  'trial' => AuthBroker {
-    serviceKeyStore: IServiceKeyStore,
-    sessionStore: ISessionStore,
-    tokenProvider: AuthorizationCodeProvider
-  },
-  'production' => AuthBroker {
-    serviceKeyStore: IServiceKeyStore,
-    sessionStore: ISessionStore,
-    tokenProvider: AuthorizationCodeProvider
-  }
-}
-```
+## Handlers (`src/lib/auth/handlers/`)
 
-## Shared Stores
+| Handler | `authType` / `grantType` | Needs | Adds |
+|---------|-------------------------|-------|------|
+| `basicHandler` | `basic` | user, password | -- |
+| `sncHandler` | `snc` | `SAP_SNC_PARTNERNAME` | refuses settings whose `connection-type` is not `rfc` |
+| `jwtAuthorizationCodeHandler` | `jwt` / `authorization_code` | a service key or `SAP_UAA_*` | the browser login (`authorization`), one login at a time, on the callback port (default `61001`) |
+| `jwtNoneHandler` | `jwt` / `none` | `SAP_JWT_TOKEN` | -- |
 
-- **ServiceKeyStore**: separate per destination (each destination has its own service key file).
-- **SessionStore**: shared for all destinations with the same directory and type.
-  - Shared store key: `${storeType}::${sessionsDir}::${unsafe}`
-  - Each destination has its own session file in the directory: `{destination}.env`
+The browser strategy is passed in by the launcher (`browserCallbackStrategy` from
+`@mcp-abap-adt/auth-providers`); the library defaults to none.
 
-## Algorithm
+## Shutdown
 
-### Initialization (at server startup):
-
-```
-1. Check CLI parameters:
-   - If --mcp=destination → create default broker with serviceKeyStore for destination
-   - If --env=path → create default broker with sessionStore from path (no serviceKeyStore)
-   - If stdio/sse + .env in current folder + NOT --auth-broker → create default broker with sessionStore (no serviceKeyStore)
-
-2. For stdio:
-   - If default broker is NOT created → error, do not start
-   - If default broker is created → use it for connections
-
-3. For SSE/HTTP:
-   - Server starts regardless
-   - Default broker is used only when destination is not provided in headers
-```
-
-### Request handling (SSE/HTTP):
-
-```
-1. Read destination from headers (x-mcp-destination or X-MCP-Destination).
-2. If destination is provided:
-   a. Get broker from map (destination [+ clientId/sessionId], if used).
-   b. If missing, create and store; if creation fails, return error.
-3. If destination is NOT provided:
-   a. Try default broker.
-   b. If no default broker, read direct headers; if missing, return error.
-4. Create MCP server for the request/session, pass destination/broker to handlers.
-5. Handler calls broker.getToken(destination) before tool execution to create connection.
-```
+`factory.settle(30_000)`: closes the provider gate (a call that arrives later gets the shutdown
+refusal), waits for the calls in flight up to the deadline, then `flush()`es every broker built. A
+secret that could not be stored is reported as `"<destination>": <ErrorClass>`; the program then
+exits `1` with one stderr line, never the secret.
 
 ## Examples
 
-### Example 1: stdio with --mcp=trial
-```bash
-npm run dev -- --mcp=trial
-```
-- Creates default broker with serviceKeyStore for 'trial'
-- Connects via default broker
+### stdio with `--mcp=trial`
+- Default destination `trial`: `service-keys/trial.json` and `sessions/trial.env`, field by field.
+- First tool call: connect, browser login if there is no valid session.
 
-### Example 2: stdio with --env=./.env.local
-```bash
-npm run dev -- --env=./.env.local
-```
-- Creates default broker with sessionStore from ./.env.local (no serviceKeyStore)
-- Connects via default broker
+### stdio with `--env-path=./my.env`
+- Default destination `default`, read from and written back to `./my.env`.
 
-### Example 3: HTTP with --mcp=trial, client does NOT pass destination
-```bash
-npm run dev:http -- --mcp=trial
-```
-- Creates default broker with serviceKeyStore for 'trial'
-- Uses default broker
+### HTTP with `--mcp=trial`, client sends no destination
+- Served from `trial`.
 
-### Example 4: HTTP with --mcp=trial, client passes destination=production
-```bash
-npm run dev:http -- --mcp=trial
-```
-- Creates default broker for 'trial'
-- Creates separate broker for 'production'
-- Uses broker for 'production'
+### HTTP with `--mcp=trial --allow-destination-header`, client sends `x-mcp-destination: production`
+- `production` is built on first use, beside `trial`; the request is served from it.
 
-### Example 5: HTTP without --mcp and without .env, client provides all headers
-```bash
-npm run dev:http
-```
-- No default broker
-- Connection works only via headers (no broker)
+### HTTP without `--mcp` and without `.env`, client sends `x-sap-url` and a credential
+- No broker: the connection is built from the headers.
 
-### Example 6: stdio without parameters and without .env
-- No default broker → server does not start
+### stdio without parameters and without `.env`
+- Inspection-only mode.

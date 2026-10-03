@@ -43,7 +43,7 @@ This means you can query available tools, get tool descriptions, and initialize 
 
 ### Configuration with SAP Connection Headers
 
-When using HTTP transport, you can configure the SAP connection dynamically via HTTP headers:
+When using HTTP transport, a request can carry its own connection. The headers state the system and **one** credential; the authentication is decided by which credential is present, so there is no `x-sap-auth-type`:
 
 ```json
 {
@@ -53,10 +53,9 @@ When using HTTP transport, you can configure the SAP connection dynamically via 
     "type": "streamableHttp",
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
-      "x-sap-url": "https://your-sap-system.abap.us10.hana.ondemand.com",
-      "x-sap-auth-type": "jwt",
-      "x-sap-jwt-token": "your_jwt_token_here",
-      "x-sap-refresh-token": "your_refresh_token_here"
+      "x-sap-url": "https://your-sap-system.example",
+      "x-sap-client": "100",
+      "x-sap-jwt-token": "your_jwt_token_here"
     }
   }
 }
@@ -64,29 +63,25 @@ When using HTTP transport, you can configure the SAP connection dynamically via 
 
 ### Supported HTTP Headers
 
-The server processes the following HTTP headers (as checked in `applyAuthHeaders` method):
-
 | Header | Required | Description | Example |
 |--------|----------|-------------|---------|
-| `x-sap-url` | Yes* | SAP system URL | `https://system.abap.us10.hana.ondemand.com` |
-| `x-sap-auth-type` | Yes* | Authentication type | `jwt`, `xsuaa`, or `basic` |
-| `x-sap-jwt-token` | Yes* (for JWT) | JWT access token | `eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...` |
-| `x-sap-refresh-token` | No | Refresh token for automatic token renewal (JWT only) | `refresh_token_string` |
+| `x-sap-url` | Yes* | SAP system URL | `https://system.example` |
+| `x-sap-client` | No | SAP client | `100` |
+| `x-sap-jwt-token` | Yes* (for a token) | A JWT access token you hold. It is used as it is: the server cannot renew it | `eyJhbGciOiJSUzI1NiIs...` |
 | `x-sap-login` | Yes* (for basic) | Username for basic authentication | `your_username` |
 | `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
-| `x-sap-destination` | No | Destination name for service key-based authentication | `TRIAL`, `DEV`, `PROD` |
-| `x-mcp-destination` | No | Destination name for MCP destination-based authentication | `TRIAL`, `DEV`, `PROD` |
-| `x-sap-master-system` | No | SAP system ID for on-prem transport binding | `DEV`, `QAS` |
-| `x-sap-responsible` | No | Responsible user for transport operations | `DEVELOPER1` |
+| `x-mcp-destination` | No | A destination name; honoured **only** with `--allow-destination-header` | `TRIAL` |
+| `x-sap-master-system` | No | SAP system ID for on-prem transport binding | `<system id>` |
+| `x-sap-responsible` | No | Responsible user for transport operations | `<user>` |
+| `x-sap-language` | No | Master language of created objects | `EN` |
 
-\* Required when not using `.env` file configuration or destination-based authentication. If headers are not provided, the server will use configuration from `.env` file or environment variables.
+\* A request that carries `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password` is a direct connection. A request that carries neither a destination nor such headers is served from the default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`), or answered `400` if there is none.
 
 **Notes:**
-- For **JWT authentication**: `x-sap-url`, `x-sap-auth-type`, and `x-sap-jwt-token` are required. `x-sap-refresh-token` is optional for automatic token refresh.
-- For **basic authentication**: `x-sap-url`, `x-sap-auth-type`, `x-sap-login`, and `x-sap-password` are required.
-- For **destination-based authentication**: Use `x-sap-destination` or `x-mcp-destination` header. URL is automatically derived from the service key, so `x-sap-url` is not required (and will be ignored if provided). Service keys must be stored in platform-specific locations (see [Destination-Based Authentication](#destination-based-authentication) section).
-- For automatic token refresh, you only need `x-sap-refresh-token`. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `mcp-auth` CLI tool (part of `@mcp-abap-adt/connection` package) or service keys.
-
+- **Precedence per request:** `x-mcp-destination` (with `--allow-destination-header`), then the `x-sap-*` connection headers, then the default destination.
+- A destination name is a plain file name (letters, digits, `_`, `.`, `-`; no path, no leading dot). Anything else is refused with `400`, naming the header.
+- For a token that is renewed for you, use a destination with browser login (below), not a header.
+- The headers `x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read in 16.0; see the [migration note](../MIGRATION-16.0.md).
 
 ## Basic Authentication
 
@@ -101,368 +96,117 @@ For on-premise systems using basic authentication:
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
       "x-sap-url": "https://your-onpremise-system.com:8000",
-      "x-sap-auth-type": "basic",
       "x-sap-login": "your_username",
       "x-sap-password": "your_password",
-      "x-sap-master-system": "DEV",
-      "x-sap-responsible": "DEVELOPER1"
+      "x-sap-master-system": "<system id>",
+      "x-sap-responsible": "<user>"
     }
   }
 }
 ```
 
-**Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over `.env` values.
+**Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over the default destination.
 
 **System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When provided, they override `SAP_MASTER_SYSTEM` / `SAP_RESPONSIBLE` from `.env` and the cloud `getSystemInformation()` API. This is useful for on-premise HTTP/SSE setups where no `.env` file is used.
 
-## Destination-Based Authentication
+## Destinations
 
-> **Note:** Destination-based authentication (auth-broker) is available for all transport types:
-> - **HTTP/streamable-http**: Use `--mcp=<destination>` parameter. To allow per-request destination override via `x-mcp-destination` header, add `--allow-destination-header`
-> - **stdio**: Use `--mcp=<destination>` command-line parameter
-> - **SSE**: Use `--mcp=<destination>` parameter. To allow per-request destination override via `x-mcp-destination` header, add `--allow-destination-header`
-> 
-> For **stdio** and **SSE** transports without `--mcp` parameter, use `.env` file configuration instead.
-> 
-> **Important:** When `--mcp` parameter is specified, `.env` file is **not loaded automatically** (even if it exists in current directory). This ensures that auth-broker configuration takes precedence over `.env` file settings.
+The server supports **four authentications** — basic (HTTP or RFC), SNC (RFC only, passwordless), JWT with browser login (`authorization_code`) and JWT you hold (`none`). The full table, with the `.env` keys of each, is in [Authentication & Destinations](AUTHENTICATION.md); this section is about wiring a client to one.
 
-The server supports destination-based authentication using service keys stored locally. This allows you to configure authentication once per destination and reuse it across multiple requests.
+A process serves **one default destination**, chosen by:
 
-### When Auth-Broker is Used
+1. `--mcp=<destination>` — a named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, read field by field (the `.env` wins). The working directory's `.env` is not loaded.
+2. `--env-path=<path|file>` (or `MCP_ENV_PATH`) or `--env=<destination>` (`sessions/<destination>.env`) — one env file, used as it is. A file that does not exist is refused at startup, naming the parameter and the path.
+3. Otherwise a `.env` in the working directory, if there is one.
 
-The server uses auth-broker (service keys) in the following cases:
-
-1. **By default** (when no explicit env file/destination is provided and no `.env` exists in current directory): Auth-broker is used automatically
-2. **When `--auth-broker` flag is specified**: Forces use of auth-broker, ignoring any `.env` file (even if it exists in current directory)
-3. **When `--mcp` parameter is specified**: Uses auth-broker with the specified destination, `.env` file is not loaded automatically
-4. **When `--env=<destination>` is specified**: Uses destination env file from sessions store
-5. **When `--env-path=<path|file>` is specified**: Uses explicit `.env` file instead of auth-broker
-
-**Priority:**
-1. `--env-path=<path|file>` (or `MCP_ENV_PATH`) - explicit `.env` file (highest priority)
-2. `--env=<destination>` - destination env from sessions store
-3. `--mcp=<destination>` - uses auth-broker, skips automatic `.env` loading
-4. `.env` in current directory - used automatically if exists (default behavior)
-5. `--auth-broker` - force auth-broker, ignore `.env`
-6. Auth-broker - used if no `.env` found (fallback)
-
-**Examples:**
 ```bash
-# Default: uses .env from current directory if exists, otherwise auth-broker
-mcp-abap-adt
-
-# Forces auth-broker, ignores .env file even if exists
-mcp-abap-adt --auth-broker
-
-# Uses auth-broker with --mcp parameter (skips .env file)
+# stdio: a named destination
 mcp-abap-adt --transport=stdio --mcp=TRIAL
 
-# Uses destination env from sessions store
-mcp-abap-adt --env=trial
+# stdio: one env file
+mcp-abap-adt --transport=stdio --env-path=/path/to/.env
 
-# Uses explicit .env file from custom path
-mcp-abap-adt --env-path=/path/to/.env
+# HTTP: a default destination, which a client may override per request
+mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header
 ```
+
+Both stdio and the HTTP transports take any of these. Without any of them, stdio starts in inspection-only mode (the tool list answers; a tool call needs a connection) and HTTP/SSE requests need `x-sap-*` headers.
 
 ### How It Works
 
-1. **Service Keys**: Store SAP BTP service keys as JSON files
-2. **Lazy Initialization**: AuthBroker instances are created on-demand when a destination is first used (not at server startup)
-3. **Per-Destination Instances**: Each destination gets its own AuthBroker instance, cached in a map for reuse
-4. **Sessions**: The server automatically manages JWT tokens and refresh tokens in `.env` files
-5. **Automatic Token Management**: Tokens are validated, refreshed, and cached automatically
-
-**Important:** AuthBroker is only initialized when needed:
-- AuthBroker instances are created lazily when a request with destination header arrives
-- Each destination (e.g., "TRIAL", "sk") gets its own AuthBroker instance
-- Instances are cached and reused for subsequent requests to the same destination
-- This reduces memory usage and startup time
+1. **One destination per process by default; more with the header.** A destination named by `x-mcp-destination` is built the first time a request asks for it and kept for the life of the process.
+2. **One login at a time.** Several first requests to the same new destination share one login; destinations logging in at once take turns on the callback port.
+3. **The session is the server's to keep current.** A token obtained or renewed is stored with the secret alone (the token, its expiry and refresh token). An env file you named is written back; a named destination's session is written to `sessions/<destination>.env` only with `--unsafe`, otherwise it is kept in memory and a restart logs in again.
+4. **A destination is read once per process.** A change you make to a `.env` from outside (a new password, a token handed over again) takes effect on restart.
 
 ### Service Key Storage
 
-Service keys are stored in platform-specific locations:
+- Linux/macOS: `~/.config/mcp-abap-adt/service-keys/{destination}.json`
+- Windows: `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\{destination}.json`
+- Sessions: `.../sessions/{destination}.env` (only with `--unsafe`)
+- `--auth-broker-path` / `AUTH_BROKER_PATH` move both directories.
 
-**Unix (Linux/macOS):**
-- Service keys: `~/.config/mcp-abap-adt/service-keys/{destination}.json`
-- Sessions: `~/.config/mcp-abap-adt/sessions/{destination}.env` (only when `--unsafe` is used)
+Download the service key JSON from SAP BTP and save it as `{destination}.json`; the file name without `.json` is the destination name (case-sensitive).
 
-**Windows:**
-- Service keys: `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\{destination}.json`
-- Sessions: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\{destination}.env` (only when `--unsafe` is used)
-
-**Fallback:** The server also searches in the current working directory (where the server is launched from).
+**An XSUAA key** carries the UAA, not the ABAP system. State the system's URL as `XSUAA_MCP_URL` in `sessions/{destination}.env`; without it the destination is refused naming `XSUAA_MCP_URL`.
 
 ### Session Storage
 
-By default, session data (JWT tokens and refresh tokens) is stored **in-memory** using `SafeSessionStore`:
-- **Secure by default**: Session data is not persisted to disk
-- **Data loss on restart**: Session data is lost when the server restarts (requires re-authentication)
-- **No file I/O**: No `.env` files are created for sessions
+By default a named destination's session (JWT and refresh token) is kept **in memory**: nothing is written, and a restart logs in again. With `--unsafe` (or `MCP_UNSAFE=true`) the session is written to `sessions/{destination}.env` in plain text and survives restarts. An env file named with `--env` / `--env-path`, or found in the working directory, is written back whatever `--unsafe` says.
 
-To enable **file-based session storage** (persists tokens to disk), use the `--unsafe` flag:
+### First-Time Authentication (JWT, browser login)
 
-```bash
-# Enable file-based session storage (persists tokens to disk)
-mcp-abap-adt --auth-broker --unsafe
-
-# Or via environment variable
-MCP_UNSAFE=true mcp-abap-adt --auth-broker
-```
-
-**When `--unsafe` is used:**
-- Session data is saved to platform-specific locations (see Service Key Storage above)
-- Tokens persist across server restarts
-- `.env` files are created/updated in the sessions directory
-- **Security consideration**: Tokens are stored in plain text files on disk
-
-**Recommendation**: Use `--unsafe` only if you need session persistence across server restarts. For production environments, consider using the default in-memory storage for better security.
-
-### Service Key Format
-
-Download the service key JSON file from SAP BTP (from the corresponding service instance) and save it as `{destination}.json` (e.g., `TRIAL.json`). The filename without `.json` extension becomes the destination name (case-sensitive).
-
-**Storage locations:**
-- **Linux/macOS:** `~/.config/mcp-abap-adt/service-keys/{destination}.json`
-- **Windows:** `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\{destination}.json`
-- **Fallback:** Server also searches in current working directory (where server is launched)
-
-### Using Destination Headers
-
-#### Option 1: `x-sap-destination` (Highest Priority)
-
-For SAP Cloud systems, use `x-sap-destination`:
-
-```json
-{
-  "local-mcp-http": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http",
-    "headers": {
-      "x-sap-destination": "TRIAL"
-    }
-  }
-}
-```
-
-**Features:**
-- URL is automatically derived from the service key
-- Optional: `x-sap-client` for client number
-- Optional: `x-sap-login` and `x-sap-password` for additional authentication
-- Automatically uses JWT authentication
-
-#### Option 2: `x-mcp-destination`
-
-For MCP-specific destinations, use `x-mcp-destination`:
-
-```json
-{
-  "local-mcp-http": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http",
-    "headers": {
-      "x-mcp-destination": "TRIAL"
-    }
-  }
-}
-```
-
-**Features:**
-- URL is automatically derived from the service key
-- Optional: `x-sap-client` for client number
-- Automatically uses JWT authentication
-- Tokens are retrieved from the service key
-- Note: If `x-sap-url` is provided, it will be ignored (URL comes from destination)
-
-### First-Time Authentication
-
-When using a destination for the first time:
-
-1. The server reads the service key from `{destination}.json`
-2. Opens a browser for OAuth2 authentication (if no valid session exists)
-3. After successful authentication, saves tokens to `{destination}.env`
-4. Subsequent requests use the cached tokens automatically
-
-### Automatic Token Refresh
-
-The server automatically:
-- Validates tokens before use
-- Refreshes expired tokens using refresh tokens
-- Caches valid tokens for performance
-- Falls back to browser authentication if refresh fails
+1. The server reads the destination.
+2. With no valid session it opens the system's login page in the chosen browser (`--browser`) and waits for the redirect on port `61001` (`--browser-auth-port`).
+3. The token is stored (see above) and used from then on; it is renewed with the refresh token, and a new login is the fallback.
 
 ### Example: Complete Setup
 
-1. **Create service key:**
+1. **Create the service key** as `service-keys/TRIAL.json` (an ABAP service key).
+2. **Start the server:**
 ```bash
-# Unix
-mkdir -p ~/.config/mcp-abap-adt/service-keys
-cat > ~/.config/mcp-abap-adt/service-keys/TRIAL.json << 'EOF'
-{
-  "uaa": {
-    "url": "https://your-uaa-url.com",
-    "clientid": "your-client-id",
-    "clientsecret": "your-client-secret"
-  },
-  "url": "https://your-sap-url.com"
-}
-EOF
+mcp-abap-adt --transport=http --mcp=TRIAL
 ```
-
-2. **Configure client:**
+3. **Configure the client** — no credentials in it:
 ```json
 {
   "local-mcp-http": {
     "disabled": false,
     "timeout": 60,
     "type": "streamableHttp",
-    "url": "http://localhost:3000/mcp/stream/http",
-    "headers": {
-      "x-sap-destination": "TRIAL"
-    }
+    "url": "http://localhost:3000/mcp/stream/http"
   }
 }
 ```
+4. **First tool call:** the browser opens for authentication. **Later calls** use the stored token.
 
-3. **First request:** Browser opens for authentication
-4. **Subsequent requests:** Uses cached tokens automatically
-
-### Using --mcp Parameter for stdio and SSE Transports
-
-The `--mcp` parameter allows you to use auth-broker (service keys) with stdio and SSE transports, which previously required `.env` file configuration.
-
-**For stdio transport:**
-```bash
-# Start server with --mcp parameter
-mcp-abap-adt --transport=stdio --mcp=TRIAL
-```
-
-The server will:
-1. Initialize auth-broker with the specified destination at startup
-2. Load service key from `{destination}.json` (e.g., `TRIAL.json`)
-3. Authenticate using OAuth2 if needed
-4. Use the destination for all MCP tool calls
-
-**For SSE transport:**
-```bash
-# Start server with --mcp parameter
-mcp-abap-adt --transport=sse --mcp=TRIAL
-```
-
-The server will use the specified destination for all requests. To allow clients to override via `x-mcp-destination` header, add `--allow-destination-header`.
-
-**Example Cline configuration with stdio:**
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt": {
-      "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--mcp=TRIAL"]
-    }
-  }
-}
-```
-
-**Example SSE client configuration:**
-```json
-{
-  "local-mcp-sse": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "sse",
-    "url": "http://localhost:3001/sse"
-  }
-}
-```
-
-The server will use `TRIAL` destination automatically (from `--mcp=TRIAL`), or you can override it per request:
-```json
-{
-  "local-mcp-sse": {
-    "disabled": false,
-    "timeout": 60,
-    "type": "sse",
-    "url": "http://localhost:3001/sse",
-    "headers": {
-      "x-mcp-destination": "DEV"  // Overrides --mcp parameter
-    }
-  }
-}
-```
+To let the client choose per request, start with `--allow-destination-header` and add `"headers": { "x-mcp-destination": "TRIAL" }`.
 
 ### Custom Paths
 
-You can override default paths using the `AUTH_BROKER_PATH` environment variable or the `--auth-broker-path` command-line option:
-
-**Using Environment Variable:**
-```bash
-# Unix (colon-separated)
-export AUTH_BROKER_PATH="/custom/path:/another/path"
-
-# Windows (semicolon-separated)
-set AUTH_BROKER_PATH=C:\custom\path;C:\another\path
-```
-
-**Using Command-Line Option:**
 ```bash
 # Unix/Linux/macOS
-mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 # Windows
-mcp-abap-adt --auth-broker --auth-broker-path=C:\prj\tmp\
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=C:\prj\tmp\
 ```
 
-**Note:** When using `--auth-broker-path`, the server automatically creates `service-keys` and `sessions` subdirectories in the specified path. For example, `--auth-broker-path=~/prj/tmp/` will use:
-- `~/prj/tmp/service-keys/` for service key files
-- `~/prj/tmp/sessions/` for session files
-
-The directories are created automatically if they don't exist.
+The server uses `service-keys` and `sessions` subdirectories of that path (`~/prj/tmp/service-keys/`, `~/prj/tmp/sessions/`).
 
 ### Server Command-Line Options
 
-When starting the server, you can control whether to use auth-broker or `.env` file:
+| Option | Effect |
+|--------|--------|
+| `--mcp=<destination>` | Named destination; the working directory's `.env` is not loaded |
+| `--env=<destination>` | `sessions/<destination>.env` as one env file |
+| `--env-path=<path\|file>` | One env file; relative paths resolve from the working directory |
+| `--auth-broker-path=<path>` | Base directory of `service-keys/` and `sessions/` |
+| `--unsafe` | Write named destinations' sessions to disk |
+| `--browser`, `--browser-auth-port` | Browser and callback port (default `61001`) of a login |
+| `--allow-destination-header` | Honour `x-mcp-destination` |
+| `--auth-broker` | Accepted for compatibility; no effect in 16.0 |
 
-```bash
-# Uses auth-broker by default (even if .env exists in current directory)
-mcp-abap-adt
-
-# Forces use of auth-broker, ignores .env file
-mcp-abap-adt --auth-broker
-
-# Forces use of auth-broker with custom path (creates service-keys and sessions subdirectories)
-mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-
-# Uses destination env from sessions store
-mcp-abap-adt --env=trial
-mcp-abap-adt --env trial
-
-# Uses explicit .env file from custom path
-mcp-abap-adt --env-path=/path/to/.env
-mcp-abap-adt --env-path /path/to/.env
-```
-
-**Behavior:**
-- **Default (no flags)**: Checks for `.env` in current directory first; if exists, uses it; otherwise uses auth-broker
-- **`--auth-broker`**: Forces use of auth-broker, completely ignores `.env` file (even if exists in current directory)
-- **`--auth-broker-path=<path>`**: Specifies custom path for auth-broker service keys and sessions
-  - Creates `service-keys` and `sessions` subdirectories in the specified path
-  - Directories are created automatically if they don't exist
-  - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
-  - Can be used together with `--auth-broker` flag
-- **`--unsafe`**: Enables file-based session storage (persists tokens to disk)
-  - By default, session data is stored in-memory (secure, lost on restart)
-  - With `--unsafe`, session tokens are saved to `.env` files in the sessions directory
-  - Can be set via environment variable: `MCP_UNSAFE=true`
-  - Use only if you need session persistence across server restarts
-- **`--env=<destination>` or `--env <destination>`**: Uses destination env file from sessions store
-  - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
-  - Windows: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\<destination>.env`
-- **`--env-path=<path|file>`**: Uses specified `.env` file directly, auth-broker is not used
-  - Relative paths are resolved from current working directory
-  - Absolute paths are used as-is
+Every parameter, with its environment and YAML forms, is in [CLI_OPTIONS.md](CLI_OPTIONS.md). An invalid port, enum or flag value is refused at startup.
 
 ## Server Configuration
 
@@ -478,13 +222,31 @@ node dist/index.js --transport streamable-http --port 3000
 
 Alternatively, you can configure the server via environment variables in a `.env` file.
 
-**For JWT authentication:**
+**For a JWT you hold:**
 ```env
-SAP_URL=https://your-sap-system.abap.us10.hana.ondemand.com
+SAP_URL=https://your-sap-system.example
 SAP_AUTH_TYPE=jwt
+SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your_jwt_token_here
-SAP_REFRESH_TOKEN=your_refresh_token_here
 ```
+
+**For JWT with browser login** (the server obtains and renews the token; no token in the file at first):
+```env
+SAP_URL=https://your-sap-system.example
+SAP_AUTH_TYPE=jwt
+SAP_GRANT_TYPE=authorization_code
+SAP_UAA_URL=https://your-uaa.example
+SAP_UAA_CLIENT_ID=your_client_id
+SAP_UAA_CLIENT_SECRET=your_client_secret
+```
+
+**For SNC (passwordless, RFC):**
+```env
+SAP_URL=https://your-onpremise-system.com:8000
+SAP_AUTH_TYPE=snc
+SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
+```
+Start the server with `--connection-type=rfc` (the connection type is not read from the `.env`). No user and no password: the SNC credential is mapped to an ABAP user by its SNC name.
 
 **For basic authentication (on-premise):**
 ```env
@@ -496,7 +258,7 @@ SAP_CLIENT=100
 SAP_SYSTEM_TYPE=onprem
 
 # System context (required for on-prem create/update operations)
-SAP_MASTER_SYSTEM=DEV
+SAP_MASTER_SYSTEM=<system id>
 # SAP_RESPONSIBLE is optional — falls back to SAP_USERNAME
 ```
 
@@ -617,21 +379,20 @@ In Claude Code (`claude_desktop_config.json` or `mcp.json`):
 }
 ```
 
-When using `.env` configuration, HTTP headers in the client configuration are optional and will override the `.env` values if provided.
+With a default destination, `x-sap-*` connection headers in the client configuration are optional; a request that carries a complete set (`x-sap-url` and a credential) uses them instead of the default destination. A `.env` is read once per process: a change to it takes effect on restart.
 
 ## Dynamic Configuration Updates
 
 The server automatically updates the connection configuration when it receives HTTP headers with SAP connection parameters. This allows:
 
 1. **Multi-tenant scenarios**: Different clients can connect to different SAP systems
-2. **Token refresh**: Update JWT tokens dynamically without restarting the server
+2. **Token handover**: A request may carry a different `x-sap-jwt-token`; the server does not renew it
 3. **Runtime configuration**: Configure connections without modifying server files
 
 ### Configuration Priority
 
-1. HTTP headers (if provided) - highest priority
-2. `.env` file configuration
-3. Environment variables
+1. `x-mcp-destination` (with `--allow-destination-header`), then complete `x-sap-*` connection headers
+2. The default destination (`--mcp`, `--env`, `--env-path`, or the working directory's `.env`)
 
 ## SSE Mode Configuration
 
@@ -646,10 +407,8 @@ For Server-Sent Events transport, the configuration is similar:
     "type": "sse",
     "url": "http://localhost:3001/mcp/events",
     "headers": {
-      "x-sap-url": "https://your-sap-system.abap.us10.hana.ondemand.com",
-      "x-sap-auth-type": "jwt",
-      "x-sap-jwt-token": "your_jwt_token_here",
-      "x-sap-refresh-token": "your_refresh_token_here"
+      "x-sap-url": "https://your-sap-system.example",
+      "x-sap-jwt-token": "your_jwt_token_here"
     }
   }
 }
@@ -665,7 +424,6 @@ For Server-Sent Events transport, the configuration is similar:
     "url": "http://localhost:3001/mcp/events",
     "headers": {
       "x-sap-url": "https://your-onpremise-system.com:8000",
-      "x-sap-auth-type": "basic",
       "x-sap-login": "your_username",
       "x-sap-password": "your_password"
     }
@@ -677,14 +435,14 @@ For Server-Sent Events transport, the configuration is similar:
 
 1. **Token Storage**: Never commit tokens to version control. Use environment variables or secure secret management.
 2. **HTTPS**: Always use HTTPS for production deployments.
-3. **Token Refresh**: Use refresh tokens to automatically renew expired JWT tokens without manual intervention.
+3. **Token Refresh**: Use a destination with browser login: the server renews its token with the refresh token. A token passed in a header is used as it is.
 4. **Header Validation**: The server validates header values but does not enforce HTTPS. Ensure your deployment uses HTTPS.
 5. **Connection Isolation**: Starting from version 1.1.10, each client session maintains its own isolated SAP connection. This prevents data mixing between different clients connecting to different SAP systems. Each connection is cached based on a unique combination of `sessionId` + `sapUrl` + authentication parameters.
 6. **Non-Local Connection Restrictions**:
    - **SSE Transport**: Always restricted to localhost connections only (127.0.0.1, ::1, localhost). Remote connections are rejected with a 403 Forbidden error.
    - **HTTP Transport**: Non-local connections are restricted when:
      - `.env` file exists (was found at server startup)
-     - AND request does not include SAP connection headers (`x-sap-url`, `x-sap-auth-type`)
+     - AND request does not include SAP connection headers (`x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`)
    - Non-local connections with SAP headers are allowed (enables multi-tenant scenarios)
    - Local connections are always allowed regardless of `.env` file presence
 
@@ -699,20 +457,16 @@ For Server-Sent Events transport, the configuration is similar:
 ### Authentication Issues
 
 - Ensure JWT token is not expired
-- Verify refresh token is valid if using automatic token renewal
-- Check that `x-sap-auth-type` matches your authentication method (`jwt` or `basic`)
+- A destination refused at startup names the fields it lacks (`Destination "X" lacks: <fields>`) and one hint
+- A `jwt` `.env` must state `SAP_GRANT_TYPE`; regenerate it with `mcp-auth generate-env --grant <grant>` (`@mcp-abap-adt/auth-broker-cli`)
 
 ### Token Refresh
 
-The server supports automatic token refresh when `x-sap-refresh-token` is provided in HTTP headers (or `SAP_REFRESH_TOKEN` in `.env`).
-
-The connection will automatically refresh expired tokens when a 401/403 error is detected. The refresh happens transparently without requiring manual intervention.
-
-**Note:** For automatic token refresh, you only need the refresh token. Client ID and Client Secret are **not needed** for refresh - they are only required for initial token generation via `mcp-auth` CLI tool (part of `@mcp-abap-adt/connection` package).
+A destination with browser login renews its token itself: with the refresh token first, then a new login if the refresh is refused. A token handed over in `x-sap-jwt-token` or `SAP_JWT_TOKEN` with `SAP_GRANT_TYPE=none` is used as it is; when SAP refuses it the request fails and you hand over a new one (a `.env` change takes effect on restart).
 
 ## Examples
 
-### JWT Authentication (with automatic refresh)
+### JWT you hold (sent per request, not renewed)
 
 ```json
 {
@@ -722,10 +476,8 @@ The connection will automatically refresh expired tokens when a 401/403 error is
     "type": "streamableHttp",
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
-      "x-sap-url": "https://5bff2ab7-3ad1-48e3-8980-53a354a1b276.abap.us10.hana.ondemand.com",
-      "x-sap-auth-type": "jwt",
-      "x-sap-jwt-token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ",
-      "x-sap-refresh-token": "refresh_token_value_here"
+      "x-sap-url": "https://your-sap-system.example",
+      "x-sap-jwt-token": "<access token>"
     }
   }
 }
@@ -742,7 +494,6 @@ The connection will automatically refresh expired tokens when a 401/403 error is
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
       "x-sap-url": "https://your-onpremise-system.com:8000",
-      "x-sap-auth-type": "basic",
       "x-sap-login": "your_username",
       "x-sap-password": "your_password"
     }
@@ -750,7 +501,7 @@ The connection will automatically refresh expired tokens when a 401/403 error is
 }
 ```
 
-**Note:** For basic authentication, you can pass username and password via HTTP headers (as shown above) or configure them in the server's `.env` file. Headers take priority over `.env` values:
+**Note:** For basic authentication, you can pass username and password via HTTP headers (as shown above) or configure them in the server's `.env` file. Headers take priority over the default destination:
 
 ```env
 SAP_USERNAME=your_username
@@ -758,9 +509,9 @@ SAP_PASSWORD=your_password
 SAP_CLIENT=100
 ```
 
-### Destination-Based Authentication (HTTP Transport Only)
+### A destination, chosen per request
 
-> **Note:** This feature is only available for **HTTP/streamable-http** transport. For **stdio** and **SSE** transports, use `.env` file configuration instead.
+Start the server with `mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header`, then:
 
 ```json
 {
@@ -770,17 +521,13 @@ SAP_CLIENT=100
     "type": "streamableHttp",
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
-      "x-sap-destination": "TRIAL"
+      "x-mcp-destination": "DEV"
     }
   }
 }
 ```
 
-In this case, the server will:
-1. Look for `TRIAL.json` service key in `~/.config/mcp-abap-adt/service-keys/` (Unix) or `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\` (Windows)
-2. Check for existing session in `TRIAL.env` file
-3. If no valid session exists, open browser for authentication
-4. Save tokens to `TRIAL.env` for future use
+The server reads `DEV` from `service-keys/DEV.json` and `sessions/DEV.env` (field by field), opens the browser for a login if there is no valid session, and stores the token (on disk with `--unsafe`, otherwise in memory).
 
 ### Minimal Configuration (using .env)
 
@@ -795,7 +542,7 @@ In this case, the server will:
 }
 ```
 
-In this case, the server will use configuration from `.env` file.
+In this case, the server uses its default destination: `--mcp`, `--env`, `--env-path`, or the `.env` in its working directory.
 
 ## Related Documentation
 

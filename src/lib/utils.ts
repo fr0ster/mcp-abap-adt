@@ -1023,20 +1023,23 @@ ENVIRONMENT FILE:
   --env=<name>                     Env destination name (resolved to sessions/<name>.env)
   --env <name>                     Alternative syntax for --env
   --env-path=<path|file>           Explicit .env file path (or relative file name)
-  --auth-broker                    Force use of auth-broker (service keys) instead of .env file
-                                   Ignores .env file even if present in current directory
-                                   By default, .env in current directory is used automatically (if exists)
-  --auth-broker-path=<path>        Custom path for auth-broker service keys and sessions
-                                   Creates service-keys and sessions subdirectories in this path
+  --auth-broker                    Accepted for compatibility; no effect
+                                   Without --mcp, --env or --env-path, a .env in the current
+                                   directory is used (if exists)
+  --auth-broker-path=<path>        Base directory of the service-keys and sessions subdirectories
                                    Example: --auth-broker-path=~/prj/tmp/
                                    This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
-  --mcp=<destination>              Default MCP destination name (overrides x-mcp-destination header)
-                                   If specified, this destination will be used when x-mcp-destination
-                                   header is not provided in the request
+  --mcp=<destination>              Default destination: service-keys/<destination>.json and
+                                   sessions/<destination>.env, read field by field
                                    Example: --mcp=TRIAL
-                                   This allows using auth-broker with stdio and SSE transports
-                                   When --mcp is specified, .env file is not loaded automatically
-                                   (even if it exists in current directory)
+                                   Works with every transport; the .env in the current directory
+                                   is not loaded
+                                   x-mcp-destination overrides it per request, only with
+                                   --allow-destination-header
+  --allow-destination-header       Honour the x-mcp-destination header (HTTP/SSE, off by default)
+  --unsafe                         Write named destinations' sessions to disk (default: in memory)
+  --browser=<name>                 Browser for a login: chrome|edge|firefox|system|headless|none
+  --browser-auth-port=<port>       Login callback port, 1-65535 (default: 61001)
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
@@ -1068,6 +1071,9 @@ SSE (SERVER-SENT EVENTS) OPTIONS:
 
 ENVIRONMENT VARIABLES:
   MCP_ENV_PATH                     Explicit .env file path (same as --env-path)
+  MCP_UNSAFE                       Same as --unsafe (true|false)
+  MCP_BROWSER                      Same as --browser
+  MCP_BROWSER_AUTH_PORT            Same as --browser-auth-port (default: 61001)
   MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
@@ -1083,9 +1089,7 @@ ENVIRONMENT VARIABLES:
   MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
   MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
   MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
-  AUTH_BROKER_PATH                 Custom paths for service keys and sessions
-                                   Unix: colon-separated (e.g., /path1:/path2)
-                                   Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
+  AUTH_BROKER_PATH                 Base directory of service-keys/ and sessions/
                                    If not set, uses platform defaults:
                                    Unix: ~/.config/mcp-abap-adt/service-keys
                                    Windows: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys
@@ -1118,27 +1122,26 @@ SAP CONNECTION (.env file):
                                    Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required for basic auth)
                                    Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt|saml|certificate|kerberos (default: basic)
+  SAP_AUTH_TYPE                    Authentication type: basic|snc|jwt (required)
+                                   saml, certificate and kerberos are not supported
+  SAP_GRANT_TYPE                   With jwt (required): authorization_code|none
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
+                                   Read from the process environment, --connection-type or YAML,
+                                   not from the .env file
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
-  SAP_JWT_TOKEN                    JWT token (required for jwt auth)
-  SAP_CERT_PATH / SAP_CERT_KEY_PATH         Client cert + key (PEM) for certificate auth
-  SAP_CERT_PFX_PATH / SAP_CERT_PASSPHRASE   PKCS#12 cert for certificate auth (alternative to PEM)
-  SAP_KERBEROS_SPN                          SPN for kerberos auth (default HTTP@<host>)
-  SAP_KERBEROS_SERVICE                      Service class for SPN derivation when SAP_KERBEROS_SPN unset (default HTTP)
+  SAP_JWT_TOKEN                    JWT token (with SAP_GRANT_TYPE=none)
+  SAP_SNC_PARTNERNAME              snc (RFC only, no user, no password): the system's SNC name
+  SAP_SNC_QOP / SAP_SNC_LIB / SAP_SNC_MYNAME   snc, optional
+  XSUAA_MCP_URL                    An XSUAA service key's system URL, in sessions/<destination>.env
 
-GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
-  To generate .env file from SAP BTP service key JSON file, install the
-  auth broker globally (it ships mcp-auth):
+GENERATING A .ENV (JWT Authentication):
+  The mcp-auth command ships in @mcp-abap-adt/auth-broker-cli:
 
-    npm install -g @mcp-abap-adt/auth-broker
+    npm install -g @mcp-abap-adt/auth-broker-cli
+    mcp-auth generate-env --grant authorization_code
 
-  Then use the mcp-auth command:
-
-    mcp-auth --service-key path/to/service-key.json --output .env
-
-  This will create/update .env file with JWT tokens and connection details.
+  mcp-auth --help lists the other flags. A jwt .env must state SAP_GRANT_TYPE.
 
 EXAMPLES:
   # Default stdio mode (for MCP clients, requires .env file or --mcp parameter)
@@ -1156,19 +1159,16 @@ EXAMPLES:
   # Use YAML configuration file
   mcp-abap-adt --conf=config.yaml
 
-  # Use stdio mode with --mcp parameter (uses auth-broker, skips .env file)
+  # Use stdio mode with --mcp parameter (a named destination, skips .env file)
   mcp-abap-adt --mcp=TRIAL
 
-  # Default: uses .env from current directory if exists, otherwise auth-broker
+  # Default: uses .env from current directory if exists
   mcp-abap-adt
 
-  # Force use of auth-broker (service keys), ignore .env file even if exists
-  mcp-abap-adt --auth-broker
+  # Use custom base directory (service-keys and sessions subdirectories)
+  mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 
-  # Use custom path for auth-broker (creates service-keys and sessions subdirectories)
-  mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-
-  # Use SSE transport with --mcp parameter (allows auth-broker with SSE transport)
+  # Use SSE transport with --mcp parameter
   mcp-abap-adt --transport=sse --mcp=TRIAL
 
   # Use env destination from sessions store
@@ -1203,9 +1203,9 @@ QUICK REFERENCE:
   Common use cases:
     Web interfaces (HTTP):        mcp-abap-adt (default, no .env needed)
     MCP clients (Cline, Cursor):  mcp-abap-adt --transport=stdio
-    MCP clients with auth-broker: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
+    MCP clients with a destination: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
     Web interfaces (SSE):         mcp-abap-adt --transport=sse --sse-port=3001
-    SSE with auth-broker:         mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
+    SSE with a destination:       mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
@@ -1213,17 +1213,14 @@ DOCUMENTATION:
   Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
 
 AUTHENTICATION:
-  For JWT authentication with SAP BTP service keys:
-  1. Install: npm install -g @mcp-abap-adt/auth-broker
-  2. Run:     mcp-auth --service-key path/to/service-key.json --output .env
-  3. This generates .env file with JWT tokens automatically
+  Four authentications: basic, snc (RFC only), jwt/authorization_code (browser login),
+  jwt/none (a token you hold). A jwt .env must state SAP_GRANT_TYPE.
+  To write a .env: npm install -g @mcp-abap-adt/auth-broker-cli, then
+  mcp-auth generate-env --grant authorization_code
 
 SERVICE KEYS (Destination-Based Authentication):
   The server supports destination-based authentication using service keys stored locally.
   This allows you to configure authentication once per destination and reuse it.
-
-  IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
-  For stdio and SSE transports, use .env file instead.
 
   How to Save Service Keys:
 
@@ -1267,17 +1264,14 @@ SERVICE KEYS (Destination-Based Authentication):
       Service keys: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
       Sessions:     %USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\{destination}.env
 
-  Fallback: Server also searches in current working directory (where server is launched)
-
   Service Key:
     Download the service key JSON file from SAP BTP (from the corresponding service instance)
     and save it as {destination}.json (e.g., TRIAL.json).
     The filename without .json extension becomes the destination name (case-sensitive).
 
   Using Destinations:
-    In HTTP headers, use:
-      x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
-      x-mcp-destination: TRIAL    (for MCP destinations, URL derived from service key)
+    --mcp=TRIAL on any transport, or in HTTP headers (with --allow-destination-header):
+      x-mcp-destination: TRIAL    (URL derived from the destination)
 
     The destination name must exactly match the service key filename (without .json extension, case-sensitive).
 
@@ -1319,7 +1313,7 @@ SERVICE KEYS (Destination-Based Authentication):
         }
       }
 
-    4. HTTP with destination (requires proxy server running):
+    4. HTTP with destination (the server runs with --allow-destination-header):
       {
         "mcpServers": {
           "mcp-abap-adt-http": {
@@ -1333,7 +1327,7 @@ SERVICE KEYS (Destination-Based Authentication):
         }
       }
 
-    5. HTTP with direct auth (manual token refresh needed):
+    5. HTTP with a token you hold (the server does not renew it):
       {
         "mcpServers": {
           "mcp-abap-adt-direct": {
@@ -1341,9 +1335,7 @@ SERVICE KEYS (Destination-Based Authentication):
             "url": "http://localhost:3000/mcp/stream/http",
             "headers": {
               "x-sap-url": "https://your-system.com",
-              "x-sap-auth-type": "jwt",
-              "x-sap-jwt-token": "your-token",
-              "x-sap-refresh-token": "your-refresh-token"
+              "x-sap-jwt-token": "your-token"
             },
             "timeout": 60
           }
@@ -1352,9 +1344,9 @@ SERVICE KEYS (Destination-Based Authentication):
 
   First-Time Authentication:
     - Server reads service key from {destination}.json
-    - Opens browser for OAuth2 authentication (if no valid session exists)
-    - Saves tokens to {destination}.env for future use
-    - Subsequent requests use cached tokens automatically
+    - Opens browser for OAuth2 authentication (if no valid session exists), callback port 61001
+    - Keeps the session in memory, or saves it to sessions/{destination}.env with --unsafe
+    - Subsequent requests use the stored token automatically
 
   Automatic Token Management:
     - Validates tokens before use
@@ -1363,15 +1355,15 @@ SERVICE KEYS (Destination-Based Authentication):
     - Falls back to browser authentication if refresh fails
 
   Custom Paths:
-    Set AUTH_BROKER_PATH environment variable to override default paths:
-      Linux/macOS: export AUTH_BROKER_PATH="/custom/path:/another/path"
-      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
+    Set AUTH_BROKER_PATH environment variable to override the default base directory:
+      Linux/macOS: export AUTH_BROKER_PATH="/custom/path"
+      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path
 
     Or use --auth-broker-path command-line option:
-      mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-      This creates service-keys and sessions subdirectories in the specified path.
+      mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
+      This uses the service-keys and sessions subdirectories of the specified path.
 
-  For more details, see: docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
+  For more details, see: docs/user-guide/AUTHENTICATION.md
 
 `;
   console.log(help);

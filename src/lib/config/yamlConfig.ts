@@ -239,6 +239,8 @@ transport: stdio
 
 # Auth and connection parameters. Each one also has a CLI and an environment form;
 # the CLI wins over the environment, which wins over this file.
+# This file is configuration only: secrets and the session belong in .env files or the
+# environment, and a key that looks like a secret is refused.
 ${authParametersTemplate()}
 # Handler sets to expose: readonly, high, low
 # (compact moved to the @mcp-abap-adt/compact command and is refused here)

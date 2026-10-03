@@ -15,9 +15,11 @@ SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
-# or for JWT authentication:
+# or for a JWT you hold:
 # SAP_AUTH_TYPE=jwt
+# SAP_GRANT_TYPE=none
 # SAP_JWT_TOKEN=your-jwt-token
+# or a named destination: start the server with --mcp=<destination>
 ```
 
 ## Configuration Files
@@ -209,7 +211,7 @@ npm run start:http
 
 #### Cline Configuration Options
 
-**Option A: With Destination (Recommended)** - requires proxy server running:
+**Option A: With Destination (Recommended)** - start the server with `--allow-destination-header` (or `--mcp=trial` and no header):
 ```json
 {
   "mcpServers": {
@@ -226,7 +228,7 @@ npm run start:http
 }
 ```
 
-**Option B: Direct Auth** - requires manual token refresh:
+**Option B: Direct Auth** - a token you hold; the server does not renew it:
 ```json
 {
   "mcpServers": {
@@ -235,9 +237,7 @@ npm run start:http
       "url": "http://localhost:3000/mcp/stream/http",
       "headers": {
         "x-sap-url": "https://your-system.com",
-        "x-sap-auth-type": "jwt",
-        "x-sap-jwt-token": "your-jwt-token",
-        "x-sap-refresh-token": "your-refresh-token"
+        "x-sap-jwt-token": "your-jwt-token"
       },
       "timeout": 60,
       "disabled": false

@@ -11,7 +11,7 @@
 - **Full CRUD** (not read-only): create, read, update, and delete ABAP artifacts
 - Works with **On-Premise (ECC/S/4HANA)** and **ABAP Cloud (BTP)** systems
 - Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
-- **JWT/XSUAA**, **service key** (destination-based), and **RFC** authorization
+- Four authentications: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA) and **JWT you already hold**
 - Multiple transports: **stdio**, **HTTP**, **SSE**
 - Rich tool surface for ABAP objects, metadata, transports, and search
 
@@ -69,6 +69,19 @@ mcp-abap-adt --transport=stdio --mcp=TRIAL
 Standard service key paths:
 - Unix (Linux/macOS): `~/.config/mcp-abap-adt/service-keys/<destination>.json`
 - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\<destination>.json`
+
+The server supports exactly four authentications; each is a destination stated in a service key, a `.env`, or both:
+
+| Authentication | `.env` keys |
+|----------------|-------------|
+| Basic (HTTP or RFC) | `SAP_AUTH_TYPE=basic`, `SAP_USERNAME`, `SAP_PASSWORD` |
+| SNC (RFC only, passwordless) | `SAP_AUTH_TYPE=snc`, `SAP_SNC_PARTNERNAME`, optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` — no user, no password |
+| JWT, browser login | `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=authorization_code`, a service key (ABAP or XSUAA) or `SAP_UAA_*` |
+| JWT you hold | `SAP_AUTH_TYPE=jwt`, `SAP_GRANT_TYPE=none`, `SAP_JWT_TOKEN` (or the `x-sap-jwt-token` header) |
+
+A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes such a `.env` comes from
+`@mcp-abap-adt/auth-broker-cli`. The browser login listens on port `61001` unless `--browser-auth-port` says otherwise.
+Coming from 15.x? See the [16.0 migration note](docs/MIGRATION-16.0.md).
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
@@ -291,7 +304,9 @@ Env resolution:
 2. `--env=<destination>` for destination file in standard sessions store:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. Fallback to `.env` in current working directory.
+3. Fallback to `.env` in current working directory (not when `--mcp` is given).
+
+Whichever file is chosen is read **and written back** with a renewed token, whatever `--unsafe` says. A destination is read once per process: a change to its `.env` from outside takes effect on restart. `.env` and environment variables hold secrets and the session; a YAML config file holds configuration only and refuses a secret-looking key.
 
 **Example .env file:**
 ```bash
@@ -302,11 +317,12 @@ SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 ```
 
-For JWT authentication (SAP BTP):
+For a JWT you already hold (SAP BTP):
 ```bash
 SAP_URL=https://your-btp-system.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
+SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your-jwt-token
 ```
 
@@ -317,60 +333,33 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
-SAP_CONNECTION_TYPE=rfc
+# The connection type is not read from this file: start the server with --connection-type=rfc
 ```
 
-See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
+The connection type is a server parameter, not a `.env` key: `--connection-type=rfc` (or `SAP_CONNECTION_TYPE=rfc` in the process environment, or `connection-type: rfc` in YAML). See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
 
-For client certificate (mTLS) authentication — on-prem HTTP only:
+For SNC (passwordless logon over RFC, no user or password):
 ```bash
-SAP_URL=https://your-sap-system.com
-SAP_AUTH_TYPE=certificate
-
-# PEM format (provide both files):
-SAP_CERT_PATH=/path/to/client.crt
-SAP_CERT_KEY_PATH=/path/to/client.key
-
-# Or PKCS#12 format (alternative to PEM):
-# SAP_CERT_PFX_PATH=/path/to/client.pfx
-# SAP_CERT_PASSPHRASE=your-passphrase
+SAP_URL=https://your-onprem-system.com
+SAP_CLIENT=100
+SAP_AUTH_TYPE=snc
+SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
+# Optional: SAP_SNC_QOP, SAP_SNC_LIB, SAP_SNC_MYNAME
 ```
+The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. Start with `--connection-type=rfc`: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
 
-For Kerberos (SPNEGO) authentication — on-prem HTTP only:
+> **Not supported in 16.0:** `SAP_AUTH_TYPE=certificate`, `kerberos` and `saml` in a `.env` or service key are refused at startup, naming the authentication. See the [migration note](docs/MIGRATION-16.0.md).
+
+**Generate a `.env` (JWT):**
 ```bash
-SAP_URL=https://your-sap-system.com
-SAP_AUTH_TYPE=kerberos
+# Install the CLI globally (one-time setup) — it ships mcp-auth and mcp-sso
+npm install -g @mcp-abap-adt/auth-broker-cli
 
-# Optional: explicit SPN (default: HTTP@<host>)
-# SAP_KERBEROS_SPN=HTTP@mysaphost.corp.example
-# Optional: service class used to derive the SPN when SAP_KERBEROS_SPN is unset (default: HTTP)
-# SAP_KERBEROS_SERVICE=HTTP
+# Write a .env that states its authentication and grant
+mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
 ```
 
-**Certificate auth notes:**
-- Identifies the client via mTLS — no `SAP_USERNAME` / `SAP_PASSWORD` required.
-- Provide either PEM files (`SAP_CERT_PATH` + `SAP_CERT_KEY_PATH`) or a PKCS#12 file (`SAP_CERT_PFX_PATH`), not both.
-- On-prem HTTP connections only (`SAP_CONNECTION_TYPE=rfc` is not supported).
-
-**Kerberos auth notes:**
-- Requires a valid Kerberos ticket on the host before starting the server. Obtain one with `kinit` or a keytab.
-- The optional [`kerberos`](https://www.npmjs.com/package/kerberos) npm package must be installed (needs GSSAPI dev libs on Linux / build tools on Windows): `npm i kerberos`.
-- No `SAP_USERNAME` / `SAP_PASSWORD` required — identity comes from the TGT.
-- Both auth types bypass the auth-broker; use `.env` directly.
-- **NTLM is hard-rejected:** if the SAP system offers NTLM instead of Kerberos/SPNEGO, the connection fails with a clear error rather than silently downgrading. Ensure the system accepts Kerberos (SPNEGO) for your user.
-
-> **⚠️ Help wanted — not yet validated on a live system.** Certificate and Kerberos auth pass full unit coverage but have not been tested against a real SAP system. If you have on-prem **client-certificate** or **Kerberos/SPNEGO** SSO, please try it and [open an issue](https://github.com/fr0ster/mcp-abap-adt/issues) with results — especially whether Kerberos succeeds with a single-leg Negotiate token or your system needs mutual-auth continuation.
-
-**Generate .env from Service Key (JWT):**
-```bash
-# Install the auth broker globally (one-time setup) — it ships the mcp-auth CLI
-npm install -g @mcp-abap-adt/auth-broker
-
-# Generate .env file from service key JSON
-mcp-auth --service-key path/to/service-key.json --output .env
-```
-
-This will automatically create/update `.env` file with JWT tokens and connection details.
+The `.env` states `SAP_AUTH_TYPE` and `SAP_GRANT_TYPE`; a `jwt` `.env` without a grant is refused at startup.
 
 **.env comments rule:** only full-line comments are supported (lines that start with `#`).  
 Inline comments are not parsed, so keep comments on separate lines.
@@ -380,24 +369,30 @@ Inline comments are not parsed, so keep comments on separate lines.
 ### Command-Line Options
 
 **Authentication:**
-- `--auth-broker` - Force use of auth-broker (service keys), ignore .env file
+- `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
+- `--auth-broker` - Accepted for compatibility; has no effect in 16.0 (the working directory's `.env` is read when no `--mcp`, `--env` or `--env-path` is given)
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
-- `--browser-auth-port=<port>` - Override OAuth browser callback port (default: 5000 for HTTP, 4000 for SSE, 4001 for stdio)
+- `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` (default), `headless`, `none`
+- `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup
+- `--allow-destination-header` - Honour the `x-mcp-destination` header (HTTP/SSE only, off by default)
 - `--connection-type=<http|rfc>` - SAP connection transport: `http` (default) or `rfc`
-- `--unsafe` - Enable file-based session storage (persists tokens to disk). By default, sessions are stored in-memory (secure, lost on restart)
+- `--unsafe` - Write named destinations' sessions to disk. By default they are kept in memory (one login per process). A `.env` you name is written back either way
 
 When `--mcp=<destination>` is specified, automatic fallback loading of `./.env` is skipped.
 
 **Examples:**
 ```bash
-# Use auth-broker with file-based session storage (persists tokens)
-mcp-abap-adt --auth-broker --unsafe
+# Named destination, session kept in memory (default)
+mcp-abap-adt --mcp=TRIAL
 
-# Use auth-broker with in-memory session storage (default, secure)
-mcp-abap-adt --auth-broker
+# Named destination, session persisted to sessions/TRIAL.env
+mcp-abap-adt --mcp=TRIAL --unsafe
 
-# Custom path for service keys and sessions
-mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/ --unsafe
+# Custom base directory for service-keys/ and sessions/
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/ --unsafe
+
+# Browser login on another callback port
+mcp-abap-adt --mcp=TRIAL --browser-auth-port=61005
 ```
 
 See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md) for complete configuration options.

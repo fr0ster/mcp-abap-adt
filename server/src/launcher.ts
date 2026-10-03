@@ -98,9 +98,10 @@ ENVIRONMENT VARIABLES:
     MCP_SSE_HOST                   SSE server host (default: 127.0.0.1)
     MCP_SSE_PORT                   SSE server port (default: 3001)
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
-    MCP_UNSAFE                     Disable connection validation (true|false)
-    MCP_USE_AUTH_BROKER            Force auth-broker usage (true|false)
-    MCP_BROWSER                    Browser for OAuth2 flow (e.g., chrome, firefox)
+    MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
+    MCP_USE_AUTH_BROKER            Accepted for compatibility; no effect (true|false)
+    MCP_BROWSER                    Browser for a login: chrome|edge|firefox|system|headless|none
+    MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
     MCP_TLS_CERT                   Path to TLS certificate file (PEM)
     MCP_TLS_KEY                    Path to TLS private key file (PEM)
     MCP_TLS_CA                     Path to TLS CA certificate file (PEM, optional)
@@ -108,9 +109,7 @@ ENVIRONMENT VARIABLES:
   Auth-Broker:
     DEBUG_AUTH_LOG                 Enable debug logging for auth-broker (true|false)
     DEBUG_AUTH_BROKER              Alias for DEBUG_AUTH_LOG
-    AUTH_BROKER_PATH               Custom paths for service keys and sessions
-                                   Unix: colon-separated (e.g., /path1:/path2)
-                                   Windows: semicolon-separated (e.g., C:\\\\path1;C:\\\\path2)
+    AUTH_BROKER_PATH               Base directory of service-keys/ and sessions/
 
   Debug Options:
     DEBUG_HANDLERS                 Enable handler debug logging (true|false)
@@ -118,13 +117,21 @@ ENVIRONMENT VARIABLES:
     DEBUG_CONNECTION_MANAGER       Enable connection manager debug logging (true|false)
     HANDLER_LOG_SILENT             Disable all handler logs (true|false)
 
-SAP CONNECTION (.env file):
+AUTHENTICATIONS (exactly four; a .env or service key stating another is refused):
+    basic   SAP_AUTH_TYPE=basic            user and password, HTTP or RFC
+    snc     SAP_AUTH_TYPE=snc              RFC only, no user, no password
+    jwt     SAP_AUTH_TYPE=jwt, SAP_GRANT_TYPE=authorization_code   browser login
+    jwt     SAP_AUTH_TYPE=jwt, SAP_GRANT_TYPE=none                 a token you hold
+
+SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
 
   Basic Authentication (on-premise):
     SAP_URL                        SAP system URL (required)
     SAP_CLIENT                     SAP client number (required for basic auth)
-    SAP_AUTH_TYPE                  Authentication type: basic|jwt (default: basic)
+    SAP_AUTH_TYPE                  Authentication type: basic|snc|jwt (required)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
+                                   Read from the process environment, --connection-type or YAML,
+                                   not from the .env file
     SAP_SYSTEM_TYPE                SAP system type: cloud (default) | onprem | legacy
                                    Controls tool availability (e.g. Programs need onprem)
                                    Set to 'onprem' for on-premise systems
@@ -132,20 +139,28 @@ SAP CONNECTION (.env file):
     SAP_PASSWORD                   SAP password (required for basic auth)
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
 
-  JWT/OAuth2 Authentication:
-    SAP_JWT_TOKEN                  JWT token (required for jwt auth)
-    SAP_REFRESH_TOKEN              Refresh token for token renewal
-    SAP_UAA_URL                    UAA URL for OAuth2 (or UAA_URL)
-    SAP_UAA_CLIENT_ID              UAA Client ID (or UAA_CLIENT_ID)
-    SAP_UAA_CLIENT_SECRET          UAA Client Secret (or UAA_CLIENT_SECRET)
+  SNC (passwordless logon over RFC; no SAP_USERNAME, no SAP_PASSWORD):
+    SAP_AUTH_TYPE=snc; start with --connection-type=rfc
+    SAP_SNC_PARTNERNAME            The system's SNC name (required)
+    SAP_SNC_QOP, SAP_SNC_LIB, SAP_SNC_MYNAME   Optional
+
+  JWT/OAuth2 Authentication (SAP_GRANT_TYPE is required with jwt):
+    SAP_GRANT_TYPE                 authorization_code (browser login) | none (a token you hold)
+    SAP_JWT_TOKEN                  JWT token (with SAP_GRANT_TYPE=none)
+    SAP_REFRESH_TOKEN              Refresh token (the server stores the one it obtains)
+    SAP_UAA_URL                    UAA URL for OAuth2
+    SAP_UAA_CLIENT_ID              UAA Client ID
+    SAP_UAA_CLIENT_SECRET          UAA Client Secret
+    An XSUAA service key needs XSUAA_MCP_URL (the system's URL) in sessions/<destination>.env
 
   RFC Connection (any system with SAP NW RFC SDK):
-    SAP_CONNECTION_TYPE=rfc        Enables RFC transport via SADT_REST_RFC_ENDPOINT
+    --connection-type=rfc          Enables RFC transport via SADT_REST_RFC_ENDPOINT
+                                   (or SAP_CONNECTION_TYPE=rfc in the process environment)
     SAP_URL                        SAP system URL (host:port used to derive RFC params)
     SAP_USERNAME                   SAP username
     SAP_PASSWORD                   SAP password
     SAP_CLIENT                     SAP client number
-    Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite package installed
+    Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency)
 
   System Context (on-premise):
     SAP_MASTER_SYSTEM              SAP system ID (e.g., DEV, QAS). Required for on-prem
@@ -158,9 +173,10 @@ SAP CONNECTION (.env file):
     x-sap-responsible                Per-request responsible user (overrides SAP_RESPONSIBLE)
     x-sap-language                    Per-request master/original language for created objects (overrides SAP_LANGUAGE)
 
-GENERATING .ENV FROM SERVICE KEY:
-  Install the auth broker: npm install -g @mcp-abap-adt/auth-broker
-  Generate .env: mcp-auth --service-key path/to/service-key.json --output .env
+GENERATING A .ENV:
+  Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli
+  Generate .env: mcp-auth generate-env --grant authorization_code   (mcp-auth --help lists the other flags)
+  A jwt .env must state SAP_GRANT_TYPE.
 `;
 
 function showHelp(options: LauncherOptions = {}): void {

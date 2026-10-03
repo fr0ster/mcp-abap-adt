@@ -32,14 +32,15 @@ wget https://github.com/your-org/mcp-abap-adt/releases/download/v1.1.29/mcp-abap
 ```bash
 cd docker
 mkdir -p service-keys
-cp /path/to/your-service-key.json service-keys/default.json
+cp /path/to/your-service-key.json service-keys/trial.json
 ```
 
 ### 2. Configure Environment
 
 ```bash
 cp .env.example .env
-# Edit .env and set MCP_DESTINATION if needed
+# The destination is chosen in docker-compose.package.yml's `command` (--mcp=<name>),
+# not by an environment variable; edit it to match your service key's file name
 ```
 
 ### 3. Build and Start
@@ -93,7 +94,7 @@ docker/
 ├── .env                        # Environment config (not in git)
 ├── .env.example                # Environment template
 ├── service-keys/               # Service keys (not in git)
-│   └── default.json
+│   └── trial.json
 └── sessions/                   # Session storage (not in git)
 ```
 

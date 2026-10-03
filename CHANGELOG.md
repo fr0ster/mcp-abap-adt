@@ -7,6 +7,74 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [16.0.0] - 2026-10-03
+
+Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
+
+### Breaking
+
+- **Authentication runs on `@mcp-abap-adt/auth-broker` 4, `connection` 10, `auth-providers` 5 and
+  `auth-stores` 3, and the server serves exactly four authentications**: basic (HTTP or RFC), SNC
+  (RFC only, no user and no password), `jwt` / `authorization_code` (browser login; an ABAP or XSUAA
+  service key) and `jwt` / `none` (a token you hold). A destination that states anything else —
+  `saml`, `certificate`, `kerberos`, another `jwt` grant — is refused at startup, naming the
+  authentication.
+- **A `.env` states its authentication.** `SAP_AUTH_TYPE` has no default, and a `jwt` `.env` states
+  `SAP_GRANT_TYPE`; without them the destination is refused (`Destination "X" lacks: authType` /
+  `grantType`, with a hint to regenerate it with `mcp-auth generate-env --grant`). The `mcp-auth`
+  command comes from `@mcp-abap-adt/auth-broker-cli`.
+- **An XSUAA service key needs `XSUAA_MCP_URL`** in `sessions/<destination>.env`: the key carries the UAA,
+  not the system.
+- **An `--env` / `--env-path` / working-directory `.env` is read and written back** with a renewed token,
+  whatever `--unsafe` says. A destination is read once per process: a changed `.env` takes effect on
+  restart.
+- **The browser callback port is `61001`** unless `--browser-auth-port` says otherwise (it was `5000`,
+  `4000` and `4001` by transport).
+- **`SAP_CONNECTION_TYPE` inside a `.env` file no longer selects RFC**: use `--connection-type=rfc`, the
+  process environment or YAML.
+- **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct
+  connection is `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`.
+- **`--auth-broker` / `MCP_USE_AUTH_BROKER` have no effect**; `AUTH_BROKER_PATH` is one base directory
+  (the first path), with no fallback to the working directory.
+- **`DeletePackageLow` lost `connection_config`**; a connection comes from the destination alone.
+- **`@mcp-abap-adt/lib` public API**: `registerAuthBroker`, `getAuthBroker`, `ConfigLoader`,
+  `buildRuntimeConfig` and `AuthBrokerConfig` are gone; `AuthBrokerFactory` has a new surface
+  (`defaultDestination`, `getBroker`, `settingsFor`, `getProvider`, `settle`) and needs a
+  `browserStrategy`; `ConnectionContext` carries `credential: IAuthProvider`;
+  `BaseMcpServer.setConnectionContext` and the three transport servers take `IDestinations`.
+  `@mcp-abap-adt/core` no longer depends on `@mcp-abap-adt/auth-broker`.
+
+### Added
+
+- **SNC logon over RFC** (`SAP_AUTH_TYPE=snc`, `SAP_SNC_PARTNERNAME`, optional `SAP_SNC_QOP`,
+  `SAP_SNC_LIB`, `SAP_SNC_MYNAME`): passwordless, through an installed SNC product such as a Secure Login
+  Client. `@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.
+- **Every authentication and connection parameter in three forms, in one table**: CLI, YAML and, for eight
+  of them, an environment variable (`--browser`, `--browser-auth-port`, `--allow-destination-header`,
+  `--system-type` and the rest); precedence CLI, environment, YAML. An invalid port, enum or flag value is
+  refused at startup, naming the parameter. YAML holds configuration only: a key that looks like a secret
+  is refused, naming the key.
+- **One connector construction, three credential sources**: a destination's provider, the request's
+  headers, or a credential an embedder hands over.
+- **Shutdown that settles**: on `SIGTERM`, `SIGINT` or the end of stdin the server stops accepting, waits
+  up to 30 s for logins and refreshes in flight, and flushes every session; a secret that could not be
+  stored exits `1` with one stderr line naming the destination and the error class.
+- **Destination names are vetted** before any file is read (letters, digits, `_`, `.`, `-`), and an env file
+  named with `--env` / `--env-path` that does not exist is refused naming the parameter and the path.
+- **Errors in the server's own words**: `Destination "X" lacks: <fields>` with a hint, and
+  `Destination "X" uses <type> / <grant>, which this server does not support`; never a value read from a
+  file.
+
+### Changed
+
+- **The docker files documented `MCP_DESTINATION`, which no code ever read.** They now show the real ways:
+  `--mcp=<name>` in the container command, YAML `mcp` through `--config`, or `x-mcp-destination` with
+  `--allow-destination-header`; the compose files set `AUTH_BROKER_PATH=/app`.
+- **The documentation describes the four authentications**, the parameter table, the `.env` write-back and
+  the restart rule; the stale `npm install -g @mcp-abap-adt/auth-broker` and the 5000/4000/4001 port
+  defaults are gone, in the help text as well.
+- **The npm tarball carries no working documents**: `docs/superpowers/` is excluded from `files`.
+
 ### Fixed
 
 - **`SAP_LANGUAGE` from `--env-path` reaches the objects it creates** (#182).

@@ -317,7 +317,9 @@ TRANSPORT SELECTION:
 
 AUTHENTICATION AND CONNECTION:
   Each parameter has a CLI, an environment and a YAML form; the CLI wins over the
-  environment, which wins over the YAML file.
+  environment, which wins over the YAML file. An invalid port, enum or flag value is
+  refused at startup. Secrets and the session live in .env or the environment, never
+  in YAML: the server refuses a YAML key that looks like one.
 ${authParametersHelp()}
 
 ${options?.expositionSection ?? ServerConfigManager.getHandlerSetsDescription()}
@@ -335,7 +337,7 @@ YAML CONFIG FILE:
   Template will be generated automatically if file doesn't exist.
 
 EXAMPLES:
-  # Stdio with auth-broker (for MCP clients)
+  # Stdio with a named destination (for MCP clients)
   mcp-abap-adt --mcp=TRIAL
 
   # Stdio with env destination from sessions store
@@ -345,7 +347,7 @@ EXAMPLES:
   mcp-abap-adt --env-path=.env
 
   # RFC connection (any system with SAP NW RFC SDK)
-  # Set SAP_CONNECTION_TYPE=rfc in .env file
+  # (the connection type is not read from the .env file)
   mcp-abap-adt --env-path=my-system.env --connection-type=rfc
 
   # Explicit system type (bypass auto-detection)

@@ -1,5 +1,7 @@
 # Auth Broker Roadmap
 
+> **Archived.** This roadmap describes the authentication wiring of 15.x and earlier. In 16.0.0 it is replaced by `AuthBrokerFactory` on auth-broker 4 (`getProvider`); see [MIGRATION-16.0.md](../../../MIGRATION-16.0.md) and `src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md`. Kept for history only.
+
 **Status:** ✅ Completed  
 **Priority:** High  
 **Created:** 2025-01-27  

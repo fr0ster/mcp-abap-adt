@@ -1,74 +1,163 @@
 # Authentication & Destinations
 
-The server supports multiple auth flows. The primary (and recommended) model is **destination-based authentication** using service keys.
+The server supports **four authentications**. Every one of them is a *destination*: a system
+URL plus how to log on to it, kept in a service key, a `.env` file, or both. Anything else a
+`.env` or a service key states is refused at startup, naming the authentication
+(`Destination "X" uses <type> / <grant>, which this server does not support`).
 
-## Destinations
+| Authentication | `SAP_AUTH_TYPE` | `SAP_GRANT_TYPE` | Connection | What the destination holds |
+|----------------|-----------------|------------------|------------|----------------------------|
+| **Basic** | `basic` | — | HTTP or RFC | `SAP_USERNAME`, `SAP_PASSWORD` |
+| **SNC** (passwordless) | `snc` | — | **RFC only** | `SAP_SNC_PARTNERNAME`; optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME`. **No user, no password** |
+| **JWT, browser login** | `jwt` | `authorization_code` | HTTP | A service key (ABAP or XSUAA), or `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`; the token is obtained and renewed by the server |
+| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (and optionally `SAP_REFRESH_TOKEN`), or the `x-sap-jwt-token` header |
 
-A **destination** is simply the **filename** of a service key stored in the service-keys directory.
+A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
+user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
+states `jwt` / `authorization_code` itself). A `jwt` destination **must state `SAP_GRANT_TYPE`** too. A `.env` that states `jwt` without a grant
+is refused with `Destination "X" lacks: grantType` and a hint to regenerate it with
+`mcp-auth generate-env --grant <grant>` (see [Generate a `.env`](#generate-a-env)).
 
-- Put service keys here:
-  - Linux/macOS: `~/.config/mcp-abap-adt/service-keys`
-  - Windows: `%USERPROFILE%\Documents\mcp-abap-adt\service-keys`
-- The filename (without extension) becomes the destination name.
+Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
+(`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
+broker library knows some of them. A destination that states one is refused; it is never
+silently run as something else.
 
-Example:
+### SNC
 
-```
-~/.config/mcp-abap-adt/service-keys/TRIAL.json
-```
-
-Use it like this:
+SNC logs on over RFC with the credential of an installed SNC product (for example a Secure
+Login Client). The `.env` carries no user and no password: the SAP system maps the client's
+SNC name to an ABAP user.
 
 ```bash
-mcp-abap-adt --transport=stdio --mcp=TRIAL
+SAP_URL=https://your-sap-system.example
+SAP_AUTH_TYPE=snc
+SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
+# Optional:
+SAP_SNC_QOP=9
+SAP_SNC_LIB=/path/to/the/snc/library
+SAP_SNC_MYNAME='p:CN=<client name>'
 ```
 
-The server will load the matching service key and manage tokens automatically.
-When `--mcp=<destination>` is specified, automatic fallback loading of local `./.env` is skipped.
+SNC needs `--connection-type=rfc` (or `SAP_CONNECTION_TYPE=rfc` in the process environment, or YAML
+`connection-type: rfc`; **a `SAP_CONNECTION_TYPE` inside the `.env` file is not read for this**).
+With HTTP the destination is refused naming `connection-type`. RFC needs the SAP NW RFC SDK and the optional dependency
+`@mcp-abap-adt/sap-rfc-lite` — see [RFC Setup](../installation/RFC_SETUP.md).
 
-## .env Authentication
+## Where a destination lives
 
-You can also provide credentials via `.env`:
+A process serves **one default destination**, chosen in this order:
 
-- In the current directory: `.env`
-- By destination: `--env <destination>` (resolved to sessions `<destination>.env`)
-- Or explicitly: `--env-path /path/to/.env`
+1. **`--mcp=<name>`** (or YAML `mcp`) — a *named destination*, below.
+2. **`--env-path=<path|file>`** (or `MCP_ENV_PATH`), **`--env=<name>`** (resolved to
+   `sessions/<name>.env`) — one `.env` file, used as it is.
+3. Without those, a **`.env` in the working directory**, if there is one.
 
-This is useful for quick local testing or when you do not want to store service keys.
+A named destination `X` is read from two places, **field by field**: `sessions/X.env` wins,
+and `service-keys/X.json` fills in what the file does not state.
 
-**Important:** For on-premise systems, add `SAP_SYSTEM_TYPE=onprem` to your `.env` file to enable on-premise-only tools (e.g., Programs). The default is `cloud`.
+- Linux/macOS: `~/.config/mcp-abap-adt/{service-keys,sessions}/`
+- Windows: `%USERPROFILE%\Documents\mcp-abap-adt\{service-keys,sessions}\`
+- `--auth-broker-path` / `AUTH_BROKER_PATH` change the base directory.
 
-**.env comments rule:** only full-line comments are supported (lines that start with `#`).  
+A destination name is a file name: only letters, digits, `_`, `.` and `-` are allowed, and a
+name with a path separator, `..` or a leading dot is refused before any file is read.
+
+**An XSUAA service key** (a key whose root has `url`, `clientid` and `clientsecret`, with no
+`uaa` object) carries the UAA, not the ABAP system. The system's URL must be stated as
+`XSUAA_MCP_URL` in `sessions/X.env`; stating `SAP_URL` there is refused naming
+`XSUAA_MCP_URL`. An ABAP service key carries its own URL.
+
+### What is written back
+
+The session — the token and its refresh token — is the server's to keep current:
+
+- **An `--env` / `--env-path` / working-directory `.env` is read *and written back*** with a
+  renewed token, whatever `--unsafe` says. Only the secret keys are rewritten; the rest of the
+  file stays as it was.
+- **A named destination's session** is written to `sessions/X.env` only with `--unsafe`.
+  Without it the session is kept in memory: one browser login per process, lost on exit.
+
+A destination is **read once per process**. Nothing watches the files: a change you make to a
+`.env` from outside (a new password, a token handed over again) takes effect on **restart**.
+
+### Secrets live in `.env`, configuration in YAML
+
+`.env` files and environment variables hold secrets and the session. A YAML config file holds
+configuration only; the server **refuses a YAML key that looks like a secret** (it names the
+key, never the value). See [YAML Configuration](../configuration/YAML_CONFIG.md).
+
+## Browser login (JWT / `authorization_code`)
+
+When there is no valid token, the server opens the system's login page and waits for the
+redirect on a local callback port.
+
+- `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`): `chrome`, `edge`, `firefox`,
+  `system` (the default), `headless`, `none`.
+- `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
+  the callback port, **default `61001`** for every transport. A value that is not an integer
+  from 1 to 65535 is refused at startup.
+- The login waits up to 30 s. Several destinations logging in at once take turns: one login
+  at a time per process.
+
+```bash
+mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005
+```
+
+## Generate a `.env`
+
+The `mcp-auth` and `mcp-sso` commands live in **`@mcp-abap-adt/auth-broker-cli`**, not in
+`@mcp-abap-adt/auth-broker`:
+
+```bash
+npm install -g @mcp-abap-adt/auth-broker-cli
+mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
+```
+
+The `.env` it writes states `SAP_AUTH_TYPE` and `SAP_GRANT_TYPE`. A `.env` written by an older
+version states no grant: regenerate it, or add `SAP_GRANT_TYPE` by hand.
+
+**.env comments rule:** only full-line comments are supported (lines that start with `#`).
 Inline comments are not parsed, so keep comments on separate lines.
 
-### Generate .env from Service Key
+**On-premise:** add `SAP_SYSTEM_TYPE=onprem` (or `--system-type=onprem`) to enable the
+on-premise-only tools (for example Programs). The default is `cloud`.
 
-```bash
-npm install -g @mcp-abap-adt/auth-broker
-mcp-auth --service-key path/to/service-key.json --output .env
-```
+## HTTP/SSE headers
 
-This writes JWT details to `.env`.
+For HTTP and SSE transports a request may carry its own connection:
 
-**Claude recommendation:** for Claude, prefer service keys in `service-keys` and use `--mcp=<destination>` instead of manual tokens.
-
-If browser-based OAuth callback port is occupied, override it:
-
-```bash
-mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=5100
-```
-
-## HTTP/SSE Headers
-
-For HTTP/SSE transports, you can supply auth per request using headers:
-
-- JWT: `x-sap-url`, `x-sap-client`, `x-sap-auth-type=jwt`, `x-sap-jwt-token`
+- A destination: `x-mcp-destination`, **only with `--allow-destination-header`** (off by
+  default). A value that is not a plain destination name is refused naming the header.
+- A token you hold: `x-sap-url`, `x-sap-client`, `x-sap-jwt-token`
 - Basic: `x-sap-url`, `x-sap-client`, `x-sap-login`, `x-sap-password`
 
-Header-based auth is useful for proxy setups or dynamic routing.
+Precedence: `x-mcp-destination` (when allowed), then `x-sap-*` headers, then the default
+destination. A request with none of them is answered `400`.
+
+## Errors you may meet at startup
+
+- `Destination "X" lacks: <fields>` — the destination states less than its authentication
+  needs, followed by one hint where the server knows the remedy (`grantType`, `SAP_URL`,
+  `XSUAA_MCP_URL`, `connection-type`).
+- `Destination "X" uses <type> / <grant>, which this server does not support` — an
+  authentication outside the four above.
+- `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
+  does not fall back to the working directory.
+
+The server names fields and the words above only; it never prints a value read from a file.
+
+## Shutdown
+
+On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops accepting
+connections, waits up to **30 s** for logins and refreshes in flight, and flushes every
+session. If a secret could not be stored, it exits with code `1` and writes one line to
+stderr naming the destination and the error class (never the secret). Nothing is written to
+stdout.
 
 ## Related Docs
 
-- Client setup: `docs/user-guide/CLIENT_CONFIGURATION.md`
-- Service key example: `docs/installation/examples/SERVICE_KEY_SETUP.md`
-- Server CLI options: `docs/user-guide/CLI_OPTIONS.md`
+- Client setup: [CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md)
+- Every parameter: [CLI_OPTIONS.md](CLI_OPTIONS.md)
+- Service key example: [SERVICE_KEY_SETUP.md](../installation/examples/SERVICE_KEY_SETUP.md)
+- Coming from 15.x: [MIGRATION-16.0.md](../MIGRATION-16.0.md)

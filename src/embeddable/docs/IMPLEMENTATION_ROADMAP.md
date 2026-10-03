@@ -196,12 +196,11 @@ src/lib/servers/v2/
 **Integration with `@mcp-abap-adt/auth-broker`**:
 - [ ] Create `AuthBroker` instances with injected dependencies:
   ```typescript
-  new AuthBroker(
-    serviceKeyStore,  // injected
-    sessionStore,     // injected
-    tokenProvider,    // injected
-    { unsafe: false }
-  )
+  new AuthBroker({
+    serviceKeyStore,  // injected: the means (authType, grantType, URL, client)
+    sessionStore,     // injected: the secret alone
+    authorization,    // injected: the interactive login, for authorization_code
+  })
   ```
 
 #### 3.3 Unit Tests
@@ -242,10 +241,9 @@ src/lib/servers/v2/
 - [ ] `getConnectionParams(request)` method:
   - Extract `destination` from request
   - Get or create AuthBroker via factory
-  - Call `authBroker.getToken(destination)`
-  - Get service key for URL
-  - Return `ConnectionParams` with `sapUrl`, `auth`, `client`
-- [ ] `updateConnectionParams()` - update tokens if needed
+  - Call `destinations.settingsFor(destination)` and `destinations.getProvider(destination)` (no token is read first)
+  - Return the settings (URL, client, authentication type) and the credential (an `IAuthProvider`)
+- [ ] No token update step: the credential renews itself
 
 #### 4.2 Remote Connection Provider
 

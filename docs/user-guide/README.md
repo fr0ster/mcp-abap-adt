@@ -29,6 +29,7 @@ cat > .env << 'EOF'
 SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
+SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your-jwt-token
 EOF
 
@@ -61,7 +62,7 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 - **[AVAILABLE_TOOLS_LOW.md](AVAILABLE_TOOLS_LOW.md)** - Low-level tools (auto-generated)
 - **Compact facade tools** — moved to `@mcp-abap-adt/compact` and documented there (`compact/docs/AVAILABLE_TOOLS.md`) (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
-- **[AUTHENTICATION.md](AUTHENTICATION.md)** - Destination-based auth, service key locations, and header-based auth
+- **[AUTHENTICATION.md](AUTHENTICATION.md)** - The four supported authentications, destinations, service key locations, and header-based auth
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
 

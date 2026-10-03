@@ -17,7 +17,7 @@ Complete installation instructions for different platforms and environments.
 Documentation for end users: configuration, usage, and available tools.
 
 - `CLIENT_CONFIGURATION.md` - How to configure MCP clients to connect to the server
-- `AUTHENTICATION.md` - Destination-based auth, service key locations, and header-based auth
+- `AUTHENTICATION.md` - The four supported authentications, destinations, service key locations, and header-based auth
 - Configurator (auto-config): `@mcp-abap-adt/configurator` (repo: `mcp-abap-adt-conf`)
 - `AVAILABLE_TOOLS.md` - Complete list of available MCP tools and their descriptions
 - `CLI_OPTIONS.md` - Complete command-line options reference
@@ -58,6 +58,7 @@ Documentation for developers: testing, development guides, and internal document
 - **Getting Started**: [Installation Guide](installation/INSTALLATION.md)
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
+- **Upgrading from 15.x**: [Migration to 16.0](MIGRATION-16.0.md)
 - **Terminology**: [Project Terms](user-guide/TERMINOLOGY.md)
 - **Handlers Management**: [Handler Groups](user-guide/HANDLERS_MANAGEMENT.md)
 - **Server Configuration**: [YAML Config](configuration/YAML_CONFIG.md) | [CLI Options](user-guide/CLI_OPTIONS.md)

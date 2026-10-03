@@ -72,7 +72,13 @@ The server resolves env file in this order:
 2. `--env=<destination>` -> platform sessions path:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. `.env` in current working directory (`process.cwd()`)
+3. `.env` in current working directory (`process.cwd()`), not when `--mcp` is given
+
+A file you name that does not exist is refused at startup, naming the parameter and the path;
+the server does not fall back to the working directory's `.env`.
+
+The chosen file is read **and written back** with a renewed token, whatever `--unsafe` says.
+It is read once per process: a change made from outside takes effect on restart.
 
 This allows you to:
 - Have different .env files per project
@@ -148,78 +154,72 @@ mcp-abap-adt --connection-type=rfc --env-path=my-system.env
 
 **Note:** RFC requires the SAP NW RFC SDK installed and configured. See [RFC Setup Guide](../installation/RFC_SETUP.md) for prerequisites.
 
-The same option can be set via environment variable `SAP_CONNECTION_TYPE=rfc` in `.env` file. CLI flag takes precedence.
+The same option can be set via the environment variable `SAP_CONNECTION_TYPE=rfc` in the **process environment** or YAML `connection-type: rfc`; the CLI flag takes precedence. **A `SAP_CONNECTION_TYPE` written inside a `.env` file is not read for this.**
 
-## Auth-Broker Options
+## Authentication and Connection Parameters
+
+Every parameter below has a CLI form, a YAML key and — for eight of them — an environment
+variable. **CLI wins over the environment, which wins over YAML.** `.env` files and environment
+variables hold secrets and the session; YAML holds configuration only. An invalid port, enum
+value or flag value is **refused at startup**, naming the parameter in the form you used
+(`Invalid --browser-auth-port: "abc". Must be a port between 1 and 65535`), instead of being
+ignored.
+
+| CLI | Environment | YAML | Value | Meaning |
+|-----|-------------|------|-------|---------|
+| `--mcp=<name>` | — | `mcp` | name | Default destination: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
+| `--env=<name>` | — | `env` | name | One env file, `sessions/<name>.env` |
+| `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
+| `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` | flag | Accepted for compatibility; no effect in 16.0 |
+| `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
+| `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
+| `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |
+| `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
+| `--allow-destination-header` | — | `allow-destination-header` | flag | Honour `x-mcp-destination` (HTTP/SSE, off by default) |
+| `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
+| `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type, overriding detection (default `cloud`) |
+
+The environment forms `MCP_DESTINATION`, `MCP_ENV` and `MCP_ALLOW_DESTINATION_HEADER` do **not**
+exist; use `--mcp`, `--env` and `--allow-destination-header` (or their YAML keys).
 
 **--mcp=\<destination\>**
 
-Default MCP destination name. Used for all HTTP/SSE requests unless `--allow-destination-header` is enabled and `x-mcp-destination` header is provided.
+Default destination for the process. Used for every request unless `--allow-destination-header`
+is enabled and the request carries `x-mcp-destination`.
 
 ```bash
-# Use stdio with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=stdio --mcp=TRIAL
-
-# Use SSE with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=sse --mcp=TRIAL
-
-# Use HTTP with default destination (fallback when x-mcp-destination is not provided)
 mcp-abap-adt --transport=http --mcp=TRIAL
 ```
 
-**Important:** The `--mcp` parameter enables auth-broker usage with stdio and SSE transports, which previously required `.env` file configuration. When `--mcp` is specified:
-- For **stdio transport**: The server initializes auth-broker with the specified destination at startup
-- For **SSE transport**: The server uses the specified destination for all requests
-- For **HTTP transport**: The server uses the specified destination for all requests
-- To allow clients to override destination via `x-mcp-destination` header, add `--allow-destination-header`
-- If no default destination is configured, HTTP/SSE requests are rejected with `400` (missing SAP connection context)
-- **`.env` file is not loaded automatically** when `--mcp` is specified (even if it exists in current directory)
-- **`.env` file is not considered mandatory** for stdio and SSE transports when `--mcp` is specified
-
-**--auth-broker**
-
-Force use of auth-broker (service keys) instead of `.env` file. Ignores `.env` file even if present in current directory.
-
-```bash
-# Force auth-broker usage
-mcp-abap-adt --auth-broker
-
-# Use auth-broker with custom path
-mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-```
-
-**--auth-broker-path=\<path\>**
-
-Custom path for auth-broker service keys and sessions. Creates `service-keys` and `sessions` subdirectories in the specified path.
-
-```bash
-# Use custom path for auth-broker
-mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-# This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
-```
+- When `--mcp` is given, the working directory's `.env` is not loaded.
+- An XSUAA service key needs `XSUAA_MCP_URL` in `sessions/<name>.env` (the key carries the UAA,
+  not the system).
+- Without `--unsafe` the session is kept in memory: one browser login per process.
+- With no default destination, an HTTP/SSE request without `x-sap-*` headers is answered `400`.
 
 **--browser-auth-port=\<port\>**
 
-Override OAuth browser callback port used by token providers.
-
-Defaults by transport:
-- HTTP: `5000`
-- SSE: `4000`
-- stdio: `4001`
+Callback port of the browser login (JWT / `authorization_code`). The default is **`61001`** for
+every transport; `0`, `70000`, `-1` or `abc` are refused at startup. Set it when the port is
+taken or the redirect is registered elsewhere.
 
 ```bash
-# Avoid callback port collision in HTTP mode
-mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=5100
+mcp-abap-adt --transport=http --mcp=TRIAL --browser-auth-port=61005
 ```
 
 **--allow-destination-header**
 
-Enable processing of `x-mcp-destination` header in HTTP/SSE requests. When enabled, clients can override the default destination by sending this header. Disabled by default for security.
+Lets a client choose the destination per request with `x-mcp-destination`. The header must be a
+plain destination name (letters, digits, `_`, `.`, `-`; no path, no leading dot); anything else
+is refused naming the header.
 
 ```bash
-# Allow clients to specify destination via header
 mcp-abap-adt --transport=http --mcp=TRIAL --allow-destination-header
 ```
+
+See [Authentication & Destinations](AUTHENTICATION.md) for the four supported authentications.
 
 ## HTTP Server Options
 
@@ -254,7 +254,7 @@ mcp-abap-adt --transport=http --host=0.0.0.0
 ```
 
 **When using 0.0.0.0:**
-- Client must provide all connection parameters in HTTP headers (SAP_URL, SAP_JWT_TOKEN, etc.)
+- Client must provide all connection parameters in HTTP headers (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`)
 - Server acts as a simple proxy - no default destination lookup
 - All responsibility for connection configuration is on the client
 
@@ -344,7 +344,7 @@ mcp-abap-adt --transport=sse --host=0.0.0.0
 ```
 
 **When using 0.0.0.0:**
-- Client must provide all connection parameters in HTTP headers (SAP_URL, SAP_JWT_TOKEN, etc.)
+- Client must provide all connection parameters in HTTP headers (`x-sap-url`, `x-sap-client`, and `x-sap-jwt-token` or `x-sap-login` with `x-sap-password`)
 - Server acts as a simple proxy - no default destination lookup
 - All responsibility for connection configuration is on the client
 
@@ -405,9 +405,10 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
 - `MCP_SKIP_AUTO_START` - Skip automatic server start (true|false, for testing)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
-- `MCP_UNSAFE` - Disable connection validation (true|false)
-- `MCP_USE_AUTH_BROKER` - Force auth-broker usage (true|false)
-- `MCP_BROWSER` - Browser for OAuth2 flow (e.g., chrome, firefox)
+- `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
+- `MCP_USE_AUTH_BROKER` - Accepted for compatibility; no effect in 16.0 (true|false)
+- `MCP_BROWSER` - Browser for a login: chrome, edge, firefox, system, headless, none
+- `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
 
 ### HTTP Transport
 
@@ -433,15 +434,21 @@ These are typically set in `.env` file:
 **Basic Authentication:**
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
-- `SAP_AUTH_TYPE` - Authentication type: `basic` or `jwt` (default: basic)
+- `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X" lacks: authType`). `saml`, `certificate` and `kerberos` are not supported
 - `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default) or `onprem`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
-- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc`
+- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment; not read from a `.env` file)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 
+**SNC (RFC only, no user, no password):**
+- `SAP_AUTH_TYPE=snc`; start with `--connection-type=rfc`
+- `SAP_SNC_PARTNERNAME` - The system's SNC name (required)
+- `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` - Optional
+
 **JWT/OAuth2 Authentication:**
-- `SAP_JWT_TOKEN` - JWT token (required for jwt auth)
+- `SAP_GRANT_TYPE` - `authorization_code` or `none` (**required** with `SAP_AUTH_TYPE=jwt`)
+- `SAP_JWT_TOKEN` - The token (with `SAP_GRANT_TYPE=none`; otherwise the server stores the one it obtained)
 - `SAP_REFRESH_TOKEN` - Refresh token for automatic token renewal
 - `SAP_UAA_URL` - UAA URL for OAuth2 (alternative: `UAA_URL`)
 - `SAP_UAA_CLIENT_ID` - UAA Client ID (alternative: `UAA_CLIENT_ID`)
@@ -449,9 +456,7 @@ These are typically set in `.env` file:
 
 ### Auth-Broker
 
-- `AUTH_BROKER_PATH` - Custom paths for service keys and sessions
-  - Unix: colon-separated (e.g., `/path1:/path2`)
-  - Windows: semicolon-separated (e.g., `C:\path1;C:\path2`)
+- `AUTH_BROKER_PATH` - Base directory of `service-keys/` and `sessions/` (see the parameter table above)
 - `DEBUG_AUTH_LOG` - Enable debug logging for auth-broker (true|false)
 - `DEBUG_AUTH_BROKER` - Alias for `DEBUG_AUTH_LOG`
 
@@ -499,7 +504,8 @@ When the same option is specified multiple ways, this is the priority order (hig
 
 1. **Command line arguments** (`--port=8080`)
 2. **Environment variables** (`MCP_HTTP_PORT=8080`)
-3. **Default values**
+3. **YAML config file** (configuration only; secrets are refused there)
+4. **Default values**
 
 Example:
 ```bash
@@ -539,14 +545,13 @@ SAP_AUTH_TYPE=basic
 SAP_SYSTEM_TYPE=onprem
 SAP_USERNAME=developer
 SAP_PASSWORD=dev-password
-SAP_CONNECTION_TYPE=rfc
 EOF
 
 # Run with RFC connection
-mcp-abap-adt --env-path=rfc-system.env
+mcp-abap-adt --connection-type=rfc --env-path=rfc-system.env
 
-# Or use CLI flag instead of env var
-mcp-abap-adt --connection-type=rfc --env-path=.env
+# Or from the process environment
+SAP_CONNECTION_TYPE=rfc mcp-abap-adt --env-path=rfc-system.env
 ```
 
 ### Production Setup
@@ -558,6 +563,7 @@ sudo cat > /etc/mcp-abap-adt/prod.env << EOF
 SAP_URL=https://prod.sap.company.com
 SAP_CLIENT=200
 SAP_AUTH_TYPE=jwt
+SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=production-jwt-token
 EOF
 

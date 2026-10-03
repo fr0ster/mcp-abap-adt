@@ -322,7 +322,7 @@ DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker
   "url": "/",
   "headers": {
     "content-type": "application/json",
-    "x-sap-destination": "TRIAL",
+    "x-mcp-destination": "TRIAL",
     "authorization": "[REDACTED]"
   },
   "remoteAddress": "::1",
@@ -443,7 +443,6 @@ DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_BROKER=true DEBUG_HANDLERS=true DEBUG_CONNEC
 Sensitive data is automatically redacted in logs:
 - `authorization` header → `[REDACTED]`
 - `x-sap-jwt-token` → `[REDACTED]`
-- `x-sap-refresh-token` → `[REDACTED]`
 - `x-sap-password` → `[REDACTED]`
 - `x-sap-uaa-client-secret` → `[REDACTED]`
 - Any param containing `password`, `token`, or `secret` → `[REDACTED]`

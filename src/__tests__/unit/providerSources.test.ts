@@ -30,6 +30,11 @@ const CREDENTIAL_HOMES = [
   path.join(REPO, 'src/lib/auth') + path.sep,
 ];
 
+/** A path relative to the repository, with POSIX separators on every platform. */
+function rel(file: string): string {
+  return path.relative(REPO, file).split(path.sep).join('/');
+}
+
 function tsFiles(dir: string, out: string[] = []): string[] {
   if (!fs.existsSync(dir)) return out;
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -136,7 +141,7 @@ function credentialBindingOffences(
   const offences: string[] = [];
   let bindings = 0;
   const where = (node: ts.Node) =>
-    `${path.relative(REPO, file.fileName)}:${
+    `${rel(file.fileName)}:${
       file.getLineAndCharacterOfPosition(node.getStart()).line + 1
     }`;
 
@@ -188,7 +193,7 @@ function credentialBindingOffences(
   });
   if (requireBinding && bindings === 0) {
     offences.push(
-      `${path.relative(REPO, file.fileName)}: a credential reference with no binding in the file`,
+      `${rel(file.fileName)}: a credential reference with no binding in the file`,
     );
   }
   return offences;
@@ -251,7 +256,7 @@ function callSites(): CallSite[] {
           calleeName(node) === 'createAbapConnection'
         ) {
           sites.push({
-            where: `${path.relative(REPO, fileName)}:${
+            where: `${rel(fileName)}:${
               file.getLineAndCharacterOfPosition(node.getStart()).line + 1
             }`,
             verdict: judge(node.arguments[1], file),
@@ -311,7 +316,7 @@ describe('provider sources (H0)', () => {
             !statement.importClause?.isTypeOnly
           ) {
             offences.push(
-              `${path.relative(REPO, fileName)}: imports @mcp-abap-adt/auth-providers`,
+              `${rel(fileName)}: imports @mcp-abap-adt/auth-providers`,
             );
           }
         }

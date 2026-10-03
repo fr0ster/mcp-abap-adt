@@ -72,7 +72,7 @@ The server resolves env file in this order:
 2. `--env=<destination>` -> platform sessions path:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. `.env` in current working directory (`process.cwd()`), not when `--mcp` is given
+3. `.env` in current working directory (`process.cwd()`), not when `--mcp` or `--auth-broker` is given
 
 A file you name that does not exist is refused at startup, naming the parameter and the path;
 the server does not fall back to the working directory's `.env`.
@@ -154,7 +154,7 @@ mcp-abap-adt --connection-type=rfc --env-path=my-system.env
 
 **Note:** RFC requires the SAP NW RFC SDK installed and configured. See [RFC Setup Guide](../installation/RFC_SETUP.md) for prerequisites.
 
-The same option can be set via the environment variable `SAP_CONNECTION_TYPE=rfc` in the **process environment** or YAML `connection-type: rfc`; the CLI flag takes precedence. **A `SAP_CONNECTION_TYPE` written inside a `.env` file is not read for this.**
+The same option can be set with `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` / working-directory `.env` (which joins the environment, never over a value already set), or YAML `connection-type: rfc`. Precedence: the CLI flag, then the environment, then YAML.
 
 ## Authentication and Connection Parameters
 
@@ -170,7 +170,7 @@ ignored.
 | `--mcp=<name>` | — | `mcp` | name | Default destination: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
 | `--env=<name>` | — | `env` | name | One env file, `sessions/<name>.env` |
 | `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
-| `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` | flag | Accepted for compatibility; no effect in 16.0 |
+| `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` | flag | Ignore the working directory's `.env` |
 | `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
 | `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
 | `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |
@@ -193,7 +193,7 @@ mcp-abap-adt --transport=sse --mcp=TRIAL
 mcp-abap-adt --transport=http --mcp=TRIAL
 ```
 
-- When `--mcp` is given, the working directory's `.env` is not loaded.
+- When `--mcp` or `--auth-broker` is given, the working directory's `.env` is not loaded.
 - An XSUAA service key needs `XSUAA_MCP_URL` in `sessions/<name>.env` (the key carries the UAA,
   not the system).
 - Without `--unsafe` the session is kept in memory: one browser login per process.
@@ -406,7 +406,7 @@ Alternative to command line arguments. Environment variables can be set in shell
 - `MCP_SKIP_AUTO_START` - Skip automatic server start (true|false, for testing)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
-- `MCP_USE_AUTH_BROKER` - Accepted for compatibility; no effect in 16.0 (true|false)
+- `MCP_USE_AUTH_BROKER` - Ignore the working directory's `.env` (true|false)
 - `MCP_BROWSER` - Browser for a login: chrome, edge, firefox, system, headless, none
 - `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
 
@@ -438,7 +438,7 @@ These are typically set in `.env` file:
 - `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default) or `onprem`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
-- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment; not read from a `.env` file)
+- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` / working-directory `.env`)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 
 **SNC (RFC only, no user, no password):**

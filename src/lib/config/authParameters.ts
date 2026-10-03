@@ -62,7 +62,7 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
     env: 'MCP_USE_AUTH_BROKER',
     yaml: 'auth-broker',
     kind: 'flag',
-    help: 'Accepted for compatibility; no effect',
+    help: "Ignore the working directory's .env; serve only --mcp / --env / --env-path",
   },
   {
     key: 'authBrokerPath',

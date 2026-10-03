@@ -94,7 +94,7 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 ```
-Start with `--connection-type=rfc`: SNC logs on over RFC only, and the connection type is not read from the `.env`.
+SNC logs on over RFC only: add `SAP_CONNECTION_TYPE=rfc` to this `.env`, or start with `--connection-type=rfc`.
 
 **Run the server:**
 ```bash
@@ -426,7 +426,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login
 - `--allow-destination-header` - Honour `x-mcp-destination` (HTTP/SSE)
-- `--auth-broker` - Accepted for compatibility; no effect in 16.0
+- `--auth-broker` - Ignore the working directory's `.env`; serve only `--mcp` / `--env` / `--env-path` destinations
 
 **Note:** When no `--mcp`, `--env` or `--env-path` is given, the server uses the `.env` in the current directory if there is one. An invalid port, enum or flag value is refused at startup.
 
@@ -470,7 +470,7 @@ You can also configure the server using environment variables.
 - `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
 - `MCP_SSE_ENABLE_DNS_PROTECTION` - Enable SSE Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 - `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
-- `MCP_USE_AUTH_BROKER` - Accepted for compatibility; no effect in 16.0 (true|false)
+- `MCP_USE_AUTH_BROKER` - Same as `--auth-broker`: ignore the working directory's `.env` (true|false)
 - `MCP_BROWSER` - Browser for a login (chrome, edge, firefox, system, headless, none)
 - `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
 

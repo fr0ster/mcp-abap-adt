@@ -118,6 +118,12 @@ export interface IServerConfig {
 
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
+  /**
+   * The form `connectionType` came from: `--connection-type`,
+   * `SAP_CONNECTION_TYPE`, or `connection-type (config file)`. Only the CLI
+   * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
+   */
+  connectionTypeSource?: string;
 
   /** SAP system type override: onprem | cloud | legacy (overrides auto-detection) */
   systemType?: 'onprem' | 'cloud' | 'legacy';

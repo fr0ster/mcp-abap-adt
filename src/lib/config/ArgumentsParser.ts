@@ -66,6 +66,8 @@ export interface ParsedArguments {
    * `MCP_ENV_PATH`, the YAML key, or `working directory .env`.
    */
   envFileSource?: string;
+  /** The form `connectionType` came from (`--connection-type`, `SAP_CONNECTION_TYPE`, the YAML key). */
+  connectionTypeSource?: string;
   /** TLS certificate file path */
   tlsCert?: string;
   /** TLS private key file path */
@@ -171,6 +173,12 @@ export class ArgumentsParser {
     result.unsafe = auth.unsafe ?? false;
     result.useAuthBroker = auth.useAuthBroker ?? false;
     result.connectionType = auth.connectionType;
+    result.connectionTypeSource = authParameterSource(
+      'connectionType',
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
     result.systemType = auth.systemType;
     if (auth.systemType) {
       // Propagate to env so systemContext.ts detectLegacy() picks it up
@@ -192,8 +200,9 @@ export class ArgumentsParser {
       result.envFileSource = auth.envPath
         ? authParameterSource('envPath', args, process.env, yamlRows)
         : authParameterSource('envDestination', args, process.env, yamlRows);
-    } else if (!result.mcp) {
-      // Backward-compatible fallback: .env in current directory
+    } else if (!result.mcp && !result.useAuthBroker) {
+      // Backward-compatible fallback: .env in current directory, unless
+      // --auth-broker says the stores alone (as in 15.x)
       const cwdEnvPath = path.resolve(process.cwd(), '.env');
       if (fs.existsSync(cwdEnvPath)) {
         result.env = cwdEnvPath;

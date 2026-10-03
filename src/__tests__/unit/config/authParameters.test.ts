@@ -339,7 +339,11 @@ describe('the env file names its source', () => {
   let dir: string;
   const savedCwd = process.cwd();
   beforeEach(() => {
-    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-source-'));
+    // Real path: on macOS the temp dir is under /var, a link to /private/var,
+    // and the parser resolves against the working directory's real path.
+    dir = fs.realpathSync(
+      fs.mkdtempSync(path.join(os.tmpdir(), 'env-source-')),
+    );
     process.chdir(dir);
   });
   afterEach(() => {
@@ -379,6 +383,30 @@ describe('the env file names its source', () => {
     const parsed = parse();
     expect(parsed.env).toBe(path.resolve(dir, '.env'));
     expect(parsed.envFileSource).toBe('working directory .env');
+  });
+
+  it.each([
+    [['--auth-broker'], {}, undefined],
+    [[], { MCP_USE_AUTH_BROKER: 'true' }, undefined],
+    [[], {}, { 'auth-broker': true }],
+  ] as const)(
+    "--auth-broker in any form: the working directory's .env is not used (%j %j %j)",
+    (argv, env, yaml) => {
+      fs.writeFileSync(
+        path.join(dir, '.env'),
+        'SAP_URL=https://x.example.test\n',
+      );
+      process.argv = ['node', 'server', ...argv];
+      Object.assign(process.env, env);
+      const parsed = parse(yaml);
+      expect(parsed.env).toBeUndefined();
+      expect(parsed.envFileSource).toBeUndefined();
+    },
+  );
+
+  it('--auth-broker leaves an explicit --env-path alone', () => {
+    process.argv = ['node', 'server', '--auth-broker', '--env-path=./conn.env'];
+    expect(parse().env).toBe(path.resolve(dir, 'conn.env'));
   });
 
   it('no env file → no source', () => {

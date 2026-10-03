@@ -39,8 +39,9 @@ SAP_SNC_LIB=/path/to/the/snc/library
 SAP_SNC_MYNAME='p:CN=<client name>'
 ```
 
-SNC needs `--connection-type=rfc` (or `SAP_CONNECTION_TYPE=rfc` in the process environment, or YAML
-`connection-type: rfc`; **a `SAP_CONNECTION_TYPE` inside the `.env` file is not read for this**).
+SNC needs RFC: `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` / working-directory `.env`, in the
+process environment, `--connection-type=rfc`, or YAML `connection-type: rfc` (precedence: CLI, environment
+including that `.env`, YAML).
 With HTTP the destination is refused naming `connection-type`. RFC needs the SAP NW RFC SDK and the optional dependency
 `@mcp-abap-adt/sap-rfc-lite` — see [RFC Setup](../installation/RFC_SETUP.md).
 

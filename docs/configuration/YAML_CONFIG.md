@@ -56,7 +56,7 @@ system-type: cloud
 # Write named destinations' sessions to disk (default: in memory)
 unsafe: false
 
-# Accepted for compatibility; no effect in 16.0
+# Ignore the working directory's .env
 auth-broker: false
 
 # Base directory of service-keys/ and sessions/
@@ -106,7 +106,7 @@ sse:
 | `connection-type` | string | `http` | SAP connection transport: `http` (default) or `rfc` |
 | `system-type` | string | `cloud` | `onprem`, `cloud` or `legacy`, overriding detection |
 | `unsafe` | boolean | `false` | Write named destinations' sessions to disk instead of keeping them in memory |
-| `auth-broker` | boolean | `false` | Accepted for compatibility; no effect in 16.0 |
+| `auth-broker` | boolean | `false` | Ignore the working directory's `.env` |
 | `auth-broker-path` | string | - | Base directory of `service-keys/` and `sessions/` |
 | `browser` | string | `system` | Browser for a login: `chrome`, `edge`, `firefox`, `system`, `headless`, `none` |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |

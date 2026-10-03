@@ -51,54 +51,47 @@ some of them; the server does not serve them.
    whatever `--unsafe` says (only the secret keys are rewritten). Keep that file somewhere the server
    may write, and out of version control. Named destinations behave as before: the session is on disk
    only with `--unsafe`, otherwise in memory.
-6. **The connection type is not read from the `.env`.** `SAP_CONNECTION_TYPE=rfc` written inside the
-   file no longer selects RFC; start with `--connection-type=rfc`, put `SAP_CONNECTION_TYPE=rfc` in the
-   process environment, or `connection-type: rfc` in YAML. SNC needs it: an SNC destination with HTTP is
-   refused naming `connection-type`.
-7. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
+6. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
    watches the files: a new password, or a token you hand over again, needs a restart.
-8. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads
+7. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads
    `<base>/service-keys` and `<base>/sessions` of the *first* path only; the colon-separated list and
    the fallback to the working directory are gone.
-9. **`--auth-broker` / `MCP_USE_AUTH_BROKER` have no effect.** In 15.x the flag made the server ignore a
-   `.env` in the working directory. Now a working-directory `.env` is used whenever no `--mcp`, `--env`
-   or `--env-path` is given; to ignore it, run from another directory or name the destination.
 
 ## If you pass parameters
 
-10. **The browser callback port is `61001` unless set** (`--browser-auth-port`, `MCP_BROWSER_AUTH_PORT`,
-    YAML `browser-auth-port`). It was `5000` (HTTP), `4000` (SSE) and `4001` (stdio). Update a firewall
-    rule, or a redirect URI registered with the identity provider.
-11. **An invalid port, enum or flag value is refused at startup**, naming the parameter in the form you
-    used (`Invalid --browser-auth-port: "abc". Must be a port between 1 and 65535`). `--connection-type`
-    takes `http` or `rfc`, `--system-type` `onprem`, `cloud` or `legacy`; a flag takes `true` or `false`.
-    Before, a bad value was ignored.
-12. **A YAML key that looks like a secret is refused.** A key containing `password`, `passphrase`,
+8. **The browser callback port is `61001` unless set** (`--browser-auth-port`, `MCP_BROWSER_AUTH_PORT`,
+   YAML `browser-auth-port`). It was `5000` (HTTP), `4000` (SSE) and `4001` (stdio). Update a firewall
+   rule, or a redirect URI registered with the identity provider.
+9. **An invalid port, enum or flag value is refused at startup**, naming the parameter in the form you
+   used (`Invalid --browser-auth-port: "abc". Must be a port between 1 and 65535`). `--connection-type`
+   takes `http` or `rfc`, `--system-type` `onprem`, `cloud` or `legacy`; a flag takes `true` or `false`.
+   Before, a bad value was ignored.
+10. **A YAML key that looks like a secret is refused.** A key containing `password`, `passphrase`,
     `secret`, `token`, `cookie`, `refresh` or `credential`, at any depth, stops the start with an error
     naming the key (never a value). YAML holds configuration only; secrets and the session live in `.env`
     files and the environment. Move such values out of the file.
-13. **The parameter forms.** Every parameter has a CLI form and a YAML key, and eight have an
+11. **The parameter forms.** Every parameter has a CLI form and a YAML key, and eight have an
     environment variable (`MCP_ENV_PATH`, `MCP_USE_AUTH_BROKER`, `AUTH_BROKER_PATH`, `MCP_UNSAFE`,
     `MCP_BROWSER`, `MCP_BROWSER_AUTH_PORT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`). Precedence is CLI,
     then environment, then YAML. The table is in [CLI_OPTIONS.md](user-guide/CLI_OPTIONS.md).
     `MCP_DESTINATION`, `MCP_ENV` and `MCP_ALLOW_DESTINATION_HEADER` do **not** exist — and never did.
-14. **Destination names are vetted.** A destination name (`--mcp`, `x-mcp-destination`) may use only
+12. **Destination names are vetted.** A destination name (`--mcp`, `x-mcp-destination`) may use only
     letters, digits, `_`, `.` and `-`; no path separator, no `..`, no leading dot, not empty. It is a
     file name, so anything else is refused before a file is read.
 
 ## If you use HTTP or SSE
 
-15. **`x-mcp-destination` is honoured only with `--allow-destination-header`**, as before, and a value
+13. **`x-mcp-destination` is honoured only with `--allow-destination-header`**, as before, and a value
     that is not a plain name is refused with `400` naming the header.
-16. **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read.** A direct
+14. **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read.** A direct
     connection is `x-sap-url` (and `x-sap-client`) with `x-sap-jwt-token`, or with `x-sap-login` and
     `x-sap-password`. A token in a header is used as it is: the server cannot renew it, because it holds
     no client and no refresh token for it.
-17. **No `x-sap-*` headers, no destination, no default** is answered `400`, as before.
+15. **No `x-sap-*` headers, no destination, no default** is answered `400`, as before.
 
 ## If you run in Docker
 
-18. **`MCP_DESTINATION` was never read by the server.** The compose files and the docker READMEs
+16. **`MCP_DESTINATION` was never read by the server.** The compose files and the docker READMEs
     documented it; it chose nothing. The real ways are `--mcp=<name>` in the container command, `mcp:
     <name>` in a YAML file passed with `--config`, or `x-mcp-destination` with `--allow-destination-header`
     (the Dockerfile's default command). The compose files now set `AUTH_BROKER_PATH=/app` (so the server
@@ -107,18 +100,18 @@ some of them; the server does not serve them.
 
 ## Other behaviour that changed
 
-19. **Shutdown settles first.** On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops
+17. **Shutdown settles first.** On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops
     accepting connections, waits up to 30 s for logins and refreshes in flight, and flushes every
     session. If a secret could not be stored, it exits `1` with one line on stderr naming the destination
     and the error class; never the secret. Nothing is written to stdout.
-20. **Errors name fields.** `Destination "X" lacks: <fields>` followed by one hint where the server
+18. **Errors name fields.** `Destination "X" lacks: <fields>` followed by one hint where the server
     knows the remedy; `Destination "X" uses <type> / <grant>, which this server does not support`; `<parameter>:
     the file does not exist: <path>` for an env file you named (the server does not fall back to the working
     directory's `.env`). No message carries a value read from a file.
-21. **`DeletePackageLow` lost `connection_config`.** The argument let a caller hand over a connection
+19. **`DeletePackageLow` lost `connection_config`.** The argument let a caller hand over a connection
     config to build a fresh connection for the deletion; a connection now comes from the destination
     alone. `force_new_connection` stays.
-22. **`@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.** RFC (and so SNC) needs it and the SAP NW
+20. **`@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.** RFC (and so SNC) needs it and the SAP NW
     RFC SDK; see [RFC_SETUP.md](installation/RFC_SETUP.md).
 
 ## If you embed `@mcp-abap-adt/lib` or `@mcp-abap-adt/core`

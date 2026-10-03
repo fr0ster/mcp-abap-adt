@@ -159,6 +159,7 @@ export class ServerConfigManager {
       envPath: parsed.envPath,
       envFileSource: parsed.envFileSource,
       connectionType: parsed.connectionType,
+      connectionTypeSource: parsed.connectionTypeSource,
       systemType: parsed.systemType,
       tls:
         parsed.tlsCert && parsed.tlsKey
@@ -347,7 +348,7 @@ EXAMPLES:
   mcp-abap-adt --env-path=.env
 
   # RFC connection (any system with SAP NW RFC SDK)
-  # (the connection type is not read from the .env file)
+  # (or SAP_CONNECTION_TYPE=rfc in the .env file)
   mcp-abap-adt --env-path=my-system.env --connection-type=rfc
 
   # Explicit system type (bypass auto-detection)

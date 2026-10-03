@@ -333,10 +333,10 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
-# The connection type is not read from this file: start the server with --connection-type=rfc
+SAP_CONNECTION_TYPE=rfc
 ```
 
-The connection type is a server parameter, not a `.env` key: `--connection-type=rfc` (or `SAP_CONNECTION_TYPE=rfc` in the process environment, or `connection-type: rfc` in YAML). See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
+`SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` / working-directory `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
 
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
@@ -370,7 +370,7 @@ Inline comments are not parsed, so keep comments on separate lines.
 
 **Authentication:**
 - `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
-- `--auth-broker` - Accepted for compatibility; has no effect in 16.0 (the working directory's `.env` is read when no `--mcp`, `--env` or `--env-path` is given)
+- `--auth-broker` - Ignore the working directory's `.env` (otherwise it is read when no `--mcp`, `--env` or `--env-path` is given)
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
 - `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` (default), `headless`, `none`
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup

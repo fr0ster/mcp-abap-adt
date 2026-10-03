@@ -30,12 +30,10 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   restart.
 - **The browser callback port is `61001`** unless `--browser-auth-port` says otherwise (it was `5000`,
   `4000` and `4001` by transport).
-- **`SAP_CONNECTION_TYPE` inside a `.env` file no longer selects RFC**: use `--connection-type=rfc`, the
-  process environment or YAML.
 - **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct
   connection is `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`.
-- **`--auth-broker` / `MCP_USE_AUTH_BROKER` have no effect**; `AUTH_BROKER_PATH` is one base directory
-  (the first path), with no fallback to the working directory.
+- **`AUTH_BROKER_PATH` is one base directory** (the first path), with no fallback to the working
+  directory.
 - **`DeletePackageLow` lost `connection_config`**; a connection comes from the destination alone.
 - **`@mcp-abap-adt/lib` public API**: `registerAuthBroker`, `getAuthBroker`, `ConfigLoader`,
   `buildRuntimeConfig` and `AuthBrokerConfig` are gone; `AuthBrokerFactory` has a new surface

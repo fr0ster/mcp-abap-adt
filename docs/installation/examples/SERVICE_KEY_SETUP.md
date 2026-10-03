@@ -36,7 +36,7 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ### Step 2: Start the Server with the Destination
 
-The server serves one default destination, named with `--mcp`. (`--auth-broker` is accepted for compatibility but has no effect in 16.0.)
+The server serves one default destination, named with `--mcp`. (`--auth-broker` makes it ignore a `.env` in the working directory.)
 
 ```bash
 # With NPX (recommended)

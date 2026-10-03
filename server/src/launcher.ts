@@ -99,7 +99,7 @@ ENVIRONMENT VARIABLES:
     MCP_SSE_PORT                   SSE server port (default: 3001)
     MCP_ENV_PATH                   Explicit .env file path (same as --env-path)
     MCP_UNSAFE                     Write named destinations' sessions to disk (true|false)
-    MCP_USE_AUTH_BROKER            Accepted for compatibility; no effect (true|false)
+    MCP_USE_AUTH_BROKER            Ignore the .env in the current directory (true|false)
     MCP_BROWSER                    Browser for a login: chrome|edge|firefox|system|headless|none
     MCP_BROWSER_AUTH_PORT          Login callback port, 1-65535 (default: 61001)
     MCP_TLS_CERT                   Path to TLS certificate file (PEM)
@@ -130,8 +130,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_CLIENT                     SAP client number (required for basic auth)
     SAP_AUTH_TYPE                  Authentication type: basic|snc|jwt (required)
     SAP_CONNECTION_TYPE            Connection type: http|rfc (default: http)
-                                   Read from the process environment, --connection-type or YAML,
-                                   not from the .env file
+                                   Precedence: --connection-type, then the environment
+                                   (this file joins it, never over a value set), then YAML
     SAP_SYSTEM_TYPE                SAP system type: cloud (default) | onprem | legacy
                                    Controls tool availability (e.g. Programs need onprem)
                                    Set to 'onprem' for on-premise systems
@@ -140,7 +140,7 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_LANGUAGE                   SAP language (optional, e.g., EN, DE)
 
   SNC (passwordless logon over RFC; no SAP_USERNAME, no SAP_PASSWORD):
-    SAP_AUTH_TYPE=snc; start with --connection-type=rfc
+    SAP_AUTH_TYPE=snc with SAP_CONNECTION_TYPE=rfc (or --connection-type=rfc)
     SAP_SNC_PARTNERNAME            The system's SNC name (required)
     SAP_SNC_QOP, SAP_SNC_LIB, SAP_SNC_MYNAME   Optional
 
@@ -155,7 +155,7 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
 
   RFC Connection (any system with SAP NW RFC SDK):
     --connection-type=rfc          Enables RFC transport via SADT_REST_RFC_ENDPOINT
-                                   (or SAP_CONNECTION_TYPE=rfc in the process environment)
+                                   (or SAP_CONNECTION_TYPE=rfc in the .env or the environment)
     SAP_URL                        SAP system URL (host:port used to derive RFC params)
     SAP_USERNAME                   SAP username
     SAP_PASSWORD                   SAP password
@@ -277,6 +277,33 @@ function envFileOf(
   };
 }
 
+/**
+ * The connection type: the CLI, then the process environment — which by now
+ * holds what the env file states, never over a value set before — then YAML.
+ * A config made by hand, with no source, is taken as it is. A word in the
+ * environment that is not a connection type is refused naming the key, never
+ * quoting it: it may come from a file.
+ */
+export function effectiveConnectionType(
+  config: IServerConfig,
+  env: NodeJS.ProcessEnv,
+): IServerConfig['connectionType'] {
+  const source = config.connectionTypeSource;
+  const overridable =
+    source === 'SAP_CONNECTION_TYPE' ||
+    (source?.endsWith('(config file)') ?? false) ||
+    config.connectionType === undefined;
+  if (!overridable) return config.connectionType;
+  const raw = env.SAP_CONNECTION_TYPE?.trim().toLowerCase();
+  if (!raw) return config.connectionType;
+  if (raw !== 'http' && raw !== 'rfc') {
+    throw new Error(
+      'SAP_CONNECTION_TYPE (environment or env file) must be http or rfc',
+    );
+  }
+  return raw;
+}
+
 /** The browser of a login when none is given. */
 const DEFAULT_BROWSER = 'system';
 
@@ -374,12 +401,21 @@ export async function launch(
   options: LauncherOptions,
   deps: LauncherDeps,
 ): Promise<void> {
+  // The env file's context joins the process environment first — never over
+  // a value already there — so its SAP_CONNECTION_TYPE counts (as in 15.x).
   hydrateSystemContextFromEnvFile(config.envFile ?? config.envFilePath);
-
-  // CLI --connection-type overrides env var
-  if (config.connectionType && !process.env.SAP_CONNECTION_TYPE) {
-    process.env.SAP_CONNECTION_TYPE = config.connectionType;
+  let connectionType: IServerConfig['connectionType'];
+  try {
+    connectionType = effectiveConnectionType(config, process.env);
+  } catch (error) {
+    deps.stderr(
+      `[MCP] ${error instanceof Error ? error.message : 'SAP_CONNECTION_TYPE: refused'}`,
+    );
+    deps.exit(1);
+    return;
   }
+  if (connectionType) process.env.SAP_CONNECTION_TYPE = connectionType;
+  config = { ...config, connectionType };
 
   const baseContext = {
     connection: undefined as any,

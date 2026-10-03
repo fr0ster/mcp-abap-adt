@@ -1023,9 +1023,9 @@ ENVIRONMENT FILE:
   --env=<name>                     Env destination name (resolved to sessions/<name>.env)
   --env <name>                     Alternative syntax for --env
   --env-path=<path|file>           Explicit .env file path (or relative file name)
-  --auth-broker                    Accepted for compatibility; no effect
-                                   Without --mcp, --env or --env-path, a .env in the current
-                                   directory is used (if exists)
+  --auth-broker                    Ignore the .env in the current directory
+                                   (without it, and without --mcp, --env or --env-path,
+                                   a .env in the current directory is used if it exists)
   --auth-broker-path=<path>        Base directory of the service-keys and sessions subdirectories
                                    Example: --auth-broker-path=~/prj/tmp/
                                    This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
@@ -1126,8 +1126,8 @@ SAP CONNECTION (.env file):
                                    saml, certificate and kerberos are not supported
   SAP_GRANT_TYPE                   With jwt (required): authorization_code|none
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
-                                   Read from the process environment, --connection-type or YAML,
-                                   not from the .env file
+                                   Precedence: --connection-type, then the environment
+                                   (the .env joins it, never over a value set), then YAML
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
   SAP_JWT_TOKEN                    JWT token (with SAP_GRANT_TYPE=none)

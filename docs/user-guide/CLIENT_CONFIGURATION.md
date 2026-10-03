@@ -204,7 +204,7 @@ The server uses `service-keys` and `sessions` subdirectories of that path (`~/pr
 | `--unsafe` | Write named destinations' sessions to disk |
 | `--browser`, `--browser-auth-port` | Browser and callback port (default `61001`) of a login |
 | `--allow-destination-header` | Honour `x-mcp-destination` |
-| `--auth-broker` | Accepted for compatibility; no effect in 16.0 |
+| `--auth-broker` | Ignore the working directory's `.env` |
 
 Every parameter, with its environment and YAML forms, is in [CLI_OPTIONS.md](CLI_OPTIONS.md). An invalid port, enum or flag value is refused at startup.
 
@@ -246,7 +246,7 @@ SAP_URL=https://your-onpremise-system.com:8000
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 ```
-Start the server with `--connection-type=rfc` (the connection type is not read from the `.env`). No user and no password: the SNC credential is mapped to an ABAP user by its SNC name.
+Add `SAP_CONNECTION_TYPE=rfc` to the `.env`, or start the server with `--connection-type=rfc`. No user and no password: the SNC credential is mapped to an ABAP user by its SNC name.
 
 **For basic authentication (on-premise):**
 ```env

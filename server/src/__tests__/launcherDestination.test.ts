@@ -25,6 +25,7 @@ import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
+import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { SseServer } from '../SseServer.js';
@@ -51,7 +52,10 @@ let httpStart: jest.SpyInstance;
 let sseStart: jest.SpyInstance;
 
 beforeEach(() => {
-  root = fs.mkdtempSync(path.join(os.tmpdir(), 'launcher-destination-'));
+  // Real path: on macOS the temp dir is under /var, a link to /private/var.
+  root = fs.realpathSync(
+    fs.mkdtempSync(path.join(os.tmpdir(), 'launcher-destination-')),
+  );
   keysDir = path.join(root, 'service-keys');
   sessionsDir = path.join(root, 'sessions');
   fs.mkdirSync(keysDir);
@@ -431,6 +435,112 @@ describe('factoryConfigFrom: the env file', () => {
       },
     );
     expect(exits).toEqual([]);
+    expect(stdioStart).toHaveBeenCalledWith('default');
+  });
+});
+
+/**
+ * The connection type a destination's .env states, as in 15.x: the file's
+ * SAP_CONNECTION_TYPE joins the process environment (never over a value
+ * already there), and the precedence is CLI, then that environment, then YAML.
+ */
+describe('SAP_CONNECTION_TYPE inside the env file', () => {
+  async function settingsOf(argv: string[]) {
+    const settingsFor = jest.spyOn(AuthBrokerFactory.prototype, 'settingsFor');
+    const result = await run(argv);
+    expect(result.exits).toEqual([]);
+    expect(settingsFor).toHaveBeenCalled();
+    return settingsFor.mock.results[0].value;
+  }
+  const envFile = (lines: string[]) => {
+    const file = path.join(root, 'conn.env');
+    fs.writeFileSync(file, `${lines.join('\n')}\n`);
+    return file;
+  };
+
+  it('basic + rfc in the file: rfc', async () => {
+    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const settings = await settingsOf([
+      '--transport=stdio',
+      `--env-path=${file}`,
+    ]);
+    expect(settings.connectionType).toBe('rfc');
+  });
+
+  it('snc + rfc in the file: not refused, rfc', async () => {
+    const file = envFile([
+      `SAP_URL=${SYSTEM_URL}`,
+      'SAP_AUTH_TYPE=snc',
+      'SAP_SNC_PARTNERNAME=p:placeholder',
+      'SAP_CONNECTION_TYPE=rfc',
+    ]);
+    const settings = await settingsOf([
+      '--transport=stdio',
+      `--env-path=${file}`,
+    ]);
+    expect(settings.authType).toBe('snc');
+    expect(settings.connectionType).toBe('rfc');
+  });
+
+  it('--connection-type=http beats the file', async () => {
+    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const settings = await settingsOf([
+      '--transport=stdio',
+      `--env-path=${file}`,
+      '--connection-type=http',
+    ]);
+    expect(settings.connectionType).toBe('http');
+  });
+
+  it('the file beats YAML connection-type', async () => {
+    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    const yamlFile = path.join(root, 'config.yaml');
+    fs.writeFileSync(yamlFile, 'connection-type: http\n');
+    const settings = await settingsOf([
+      '--transport=stdio',
+      `--env-path=${file}`,
+      `--config=${yamlFile}`,
+    ]);
+    expect(settings.connectionType).toBe('rfc');
+  });
+
+  it('the process environment beats the file', async () => {
+    const file = envFile([...basicLines(), 'SAP_CONNECTION_TYPE=rfc']);
+    process.env.SAP_CONNECTION_TYPE = 'http';
+    const settings = await settingsOf([
+      '--transport=stdio',
+      `--env-path=${file}`,
+    ]);
+    expect(settings.connectionType).toBe('http');
+  });
+
+  it('a word that is not a connection type: refused naming the key, not quoting it', async () => {
+    const file = envFile([
+      ...basicLines(),
+      'SAP_CONNECTION_TYPE=carrier-pigeon',
+    ]);
+    const { exits, stderr } = await run([
+      '--transport=stdio',
+      `--env-path=${file}`,
+    ]);
+    expect(exits).toEqual([1]);
+    expect(stderr.join('\n')).toContain('SAP_CONNECTION_TYPE');
+    expect(stderr.join('\n')).not.toContain('carrier-pigeon');
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
+});
+
+describe('--auth-broker: the working directory .env is not the destination', () => {
+  it('with no --mcp: no default destination from it, inspection-only under stdio', async () => {
+    fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
+    await run(['--transport=stdio', '--auth-broker']);
+    expect(constructed).not.toHaveBeenCalled();
+    expect(stdioStart).toHaveBeenCalledWith('mock');
+  });
+
+  it('without it, the same .env is the destination default', async () => {
+    fs.writeFileSync(path.join(root, '.env'), `${basicLines().join('\n')}\n`);
+    await run(['--transport=stdio']);
     expect(stdioStart).toHaveBeenCalledWith('default');
   });
 });

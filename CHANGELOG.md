@@ -73,6 +73,12 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   the restart rule; the stale `npm install -g @mcp-abap-adt/auth-broker` and the 5000/4000/4001 port
   defaults are gone, in the help text as well.
 - **The npm tarball carries no working documents**: `docs/superpowers/` is excluded from `files`.
+- **The tests are type-checked in CI and in the release workflow** (#268). `npm run test:check` ran
+  nowhere, so a test that used a type it did not import ran green while the type check failed; both
+  workflows now run it after the build.
+- **`MCP_TEST_CONFIG` names the integration-test config a run reads** (#266), so one checkout carries a
+  config per system; a named file that does not exist fails the run instead of falling back to the
+  template.
 
 ### Fixed
 
@@ -83,6 +89,20 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   library's default language. The bridge now lives in `@mcp-abap-adt/lib/config`
   (`hydrateSystemContextFromEnvFile`, `ENV_FILE_CONTEXT_KEYS`) and carries
   `SAP_LANGUAGE`; a value already in the process environment still wins.
+- **`GetInactiveObjects` reads the older document and keeps a function module's group** (#266).
+  BASIS 7.40 answers `adtcore:objectReferences`, which the reader did not know: it answered `count: 0`
+  over inactive objects. It now reads that document, refuses a root it does not know instead of
+  answering an empty list, and gives each entry its `parentName` (the group of a function module, from
+  `adtcore:parentUri`), so the entry can be handed to `ActivateObjectLow` as it is.
+- **The shared test setup activates a function module through its group** (#266). The module's own name
+  stood in the group's place in the address, and the whole activation batch answered
+  `500 invalidFunctionGroup`.
+- **Enhancement types ADT does not expose are named as such** (#267). `GetEnhancementSpot` on a plain
+  enhancement spot, and `GetEnhancementImpl` on a class enhancement, answer that the object is not
+  available through ADT (Eclipse opens it in SAP GUI) instead of passing a raw `500` on; a BAdI
+  implementation is answered as having no source, and a source code plugin asked under a spot name
+  gets the hint to read it with `enhancement_spot "enhoxhh"`. A plugin read under `enhoxhh` that
+  fails keeps its own failure. What worked keeps one request and its answer.
 
 ## [15.1.0] - 2026-10-01
 

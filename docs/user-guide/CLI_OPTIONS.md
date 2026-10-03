@@ -77,11 +77,6 @@ The server resolves env file in this order:
 A file you name that does not exist is refused at startup, naming the parameter and the path;
 the server does not fall back to the working directory's `.env`.
 
-A file you name that is not a usable destination stops the start. The working directory's `.env`,
-which nobody named, does not: as in 15.x, the server writes one stderr line naming it and the way
-out, then runs with no default destination (stdio: inspection-only; HTTP/SSE: `x-sap-*` headers and
-`x-mcp-destination` are still served).
-
 The chosen file is read **and written back** with a renewed token, whatever `--unsafe` says.
 It is read once per process: a change made from outside takes effect on restart.
 
@@ -175,7 +170,7 @@ ignored.
 | `--mcp=<name>` | — | `mcp` | name | Default destination: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
 | `--env=<name>` | — | `env` | name | One env file, `sessions/<name>.env` |
 | `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
-| `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` | flag | Ignore the working directory's `.env` (one that is not usable is ignored anyway, with a stderr line; this silences it) |
+| `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` | flag | Ignore the working directory's `.env` |
 | `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
 | `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
 | `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |

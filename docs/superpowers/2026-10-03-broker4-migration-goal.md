@@ -138,6 +138,16 @@ stated, which the XSUAA fallback below relies on.
   writes renewed tokens there). YAML holds configuration only and changes
   rarely; the server never writes it, and refuses a YAML key that looks like
   a secret or a session value, naming the key, never the value.
+- **Responsible and master system are facts of the connection** (decided
+  2026-10-03): the responsible person is the logged-on user, the master system
+  is the system connected to. Nobody states them. On a cloud system they are
+  read from `systeminformation` (`userName`, `systemID`); on-premise they are
+  not sent, and the system records its logged-on user and itself, as 15.x did.
+  Every way of stating them goes — `SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM`
+  (refused at startup and in a destination's `.env` as removed in 16.0.0),
+  the `x-sap-responsible` / `x-sap-master-system` headers (refused as
+  removed), and the library's request-context / system-context fields for
+  them — and so does any refusal for a missing value.
 - **A destination is read once per process** (decided 2026-10-03). A change
   to a destination's `.env` made from outside — a new password, a token
   handed over again — takes effect when the server restarts. The server does
@@ -195,10 +205,14 @@ stated, which the XSUAA fallback below relies on.
    It stays as it is.
 5. **What a provider obtains or renews reaches the session store**, and is
    flushed before the process exits.
-6. **The embedding surface `cloud-llm-hub` uses does not change:**
-   `EmbeddableMcpServer`, `@mcp-abap-adt/lib/handlers`,
+6. **The embedding surface `cloud-llm-hub` uses does not change without a
+   decision:** `EmbeddableMcpServer`, `@mcp-abap-adt/lib/handlers`,
    `setSystemContext` / `getSystemContext` / `return_error` from
    `@mcp-abap-adt/lib/utils`, `@mcp-abap-adt/lib/request-context`.
+   cloud-llm-hub is taken into account; it does not decide the architecture
+   (the user, 2026-10-03). One decided exception: a caller no longer states
+   the responsible person or the master system (see *Responsible and master
+   system*); the request-context and system-context fields for them go.
 7. **Every existing auth and connection parameter has a CLI and a YAML
    form**, today's env forms kept and none added, with one precedence.
    Secrets and the session live in `.env` / environment variables, never in

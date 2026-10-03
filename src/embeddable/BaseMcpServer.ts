@@ -1,4 +1,8 @@
-import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
+import {
+  type AbapConnection,
+  AuthRefusedError,
+  type SapConfig,
+} from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
@@ -108,6 +112,9 @@ export abstract class BaseMcpServer extends McpServer {
         `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}, client=${systemCtx.client || '(none)'}`,
       );
     } catch (error) {
+      // A refused credential is this request's answer: connecting after it
+      // would only present the refused credential again (a second login).
+      if (error instanceof AuthRefusedError) throw error;
       this.logger.debug(
         `[BaseMcpServer] Could not resolve systemContext: ${error instanceof Error ? error.constructor.name : typeof error}`,
       );

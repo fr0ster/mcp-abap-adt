@@ -4,6 +4,7 @@
  */
 
 import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { DestinationGrant } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { AuthType } from './vocabulary.js';
 
@@ -87,7 +88,8 @@ const HINTS: Readonly<Record<string, string>> = {
  * The words a user reads for an authentication error the server knows:
  * a `DestinationConfigError` (the fields it lacks, then one fixed hint per
  * field with a known remedy), an `UnsupportedAuthenticationError`, or a
- * `DestinationRefusal` (its own vetted words).
+ * `DestinationRefusal` (its own vetted words), or the connector's
+ * `AuthRefusedError` (the provider's fixed wording).
  * `undefined` for anything else — the caller reports it as before. Built from
  * field names and vetted vocabulary only, never a message or a stored value.
  */
@@ -104,6 +106,8 @@ export function describeAuthError(error: unknown): string | undefined {
     return lines.join('\n');
   }
   if (error instanceof DestinationRefusal) return error.message;
+  // The connector's refusal: its wording is fixed by the provider (spec §8).
+  if (error instanceof AuthRefusedError) return error.message;
   if (error instanceof UnsupportedAuthenticationError) {
     const which = error.grantType
       ? `${error.authType} / ${error.grantType}`

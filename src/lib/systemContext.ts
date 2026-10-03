@@ -1,4 +1,5 @@
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { registerConnectionResetHook } from './connectionEvents';
 import { getRequestContext } from './requestContext';
@@ -52,7 +53,10 @@ export async function resolveSystemContext(
     return cached;
   }
 
-  // Cloud: try getSystemInformation API
+  // Cloud: try getSystemInformation API. Only an answer is cached: a lookup
+  // that failed caches nothing, so the next caller asks again instead of the
+  // process keeping a partial context. A refused credential is the caller's
+  // to answer, never a context.
   try {
     const info = await getSystemInformation(connection);
     cached = {
@@ -61,11 +65,11 @@ export async function resolveSystemContext(
       client: info?.client,
       masterLanguage,
     };
-  } catch {
-    cached = { masterLanguage };
+    return cached;
+  } catch (error) {
+    if (error instanceof AuthRefusedError) throw error;
+    return masterLanguage ? { masterLanguage } : {};
   }
-
-  return cached;
 }
 
 export function getSystemContext(): IAdtSystemContext {

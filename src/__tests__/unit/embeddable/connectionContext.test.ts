@@ -5,7 +5,7 @@
  * refresher is looked up, and the settings carry no secret.
  */
 
-import type { SapConfig } from '@mcp-abap-adt/connection';
+import { AuthRefusedError, type SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
@@ -166,6 +166,16 @@ describe('setConnectionContext(destination, destinations)', () => {
     await server.fromDestination('dest-a', stubDestinations(provider));
     expect(server.context()?.credential).toBe(provider);
     expect(server.context()?.metadata?.masterSystem).toBeUndefined();
+  });
+
+  it('a lookup the credential refused: the refusal reaches the caller, no connection after it', async () => {
+    const refusal = new AuthRefusedError({ reason: 'refused' }, 'prepare');
+    resolve.mockRejectedValue(refusal);
+    const server = new TestServer();
+    await expect(
+      server.fromDestination('dest-a', stubDestinations(fakeProvider())),
+    ).rejects.toBe(refusal);
+    expect(build).toHaveBeenCalledTimes(1);
   });
 
   it('a destination that fails reaches the caller as the error it is', async () => {

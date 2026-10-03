@@ -24,7 +24,8 @@ export type AuthParameterKey =
 export interface AuthParameter {
   readonly key: AuthParameterKey;
   readonly cli: string;
-  readonly env: string;
+  /** Absent where the parameter has no environment form (it never had one released). */
+  readonly env?: string;
   readonly yaml: string;
   readonly kind: AuthParameterKind;
   readonly values?: readonly string[];
@@ -36,7 +37,6 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
   {
     key: 'mcpDestination',
     cli: '--mcp',
-    env: 'MCP_DESTINATION',
     yaml: 'mcp',
     kind: 'string',
     help: 'Default destination name (stores under the auth-broker path). Example: TRIAL',
@@ -44,7 +44,6 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
   {
     key: 'envDestination',
     cli: '--env',
-    env: 'MCP_ENV',
     yaml: 'env',
     kind: 'string',
     help: 'Env file by destination name (resolved to sessions/<name>.env)',
@@ -100,7 +99,6 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
   {
     key: 'allowDestinationHeader',
     cli: '--allow-destination-header',
-    env: 'MCP_ALLOW_DESTINATION_HEADER',
     yaml: 'allow-destination-header',
     kind: 'flag',
     help: 'Honour the x-mcp-destination header (HTTP/SSE only, off by default)',
@@ -129,7 +127,7 @@ type Source = 'cli' | 'env' | 'yaml';
 
 function nameIn(p: AuthParameter, source: Source): string {
   if (source === 'cli') return p.cli;
-  if (source === 'env') return p.env;
+  if (source === 'env') return p.env ?? p.cli;
   return `${p.yaml} (config file)`;
 }
 
@@ -217,7 +215,7 @@ export function readAuthParameters(
   for (const p of AUTH_PARAMETERS) {
     const sources: [Source, unknown][] = [
       ['cli', readCli(p, argv)],
-      ['env', env[p.env]],
+      ['env', p.env === undefined ? undefined : env[p.env]],
       ['yaml', yaml?.[p.yaml]],
     ];
     for (const [source, raw] of sources) {
@@ -231,9 +229,47 @@ export function readAuthParameters(
   return out as Partial<IServerConfig>;
 }
 
+/**
+ * A YAML key that names a secret or a session value. YAML is configuration
+ * only: secrets and the session live in .env or the environment.
+ */
+const SECRET_KEY_FRAGMENTS = [
+  'password',
+  'passphrase',
+  'secret',
+  'token',
+  'cookie',
+  'refresh',
+  'credential',
+] as const;
+
+/** Every secret- or session-looking key at any depth, by its dotted path. Never a value. */
+export function findSecretYamlKeys(value: unknown, prefix = ''): string[] {
+  if (value === null || typeof value !== 'object') return [];
+  const found: string[] = [];
+  const entries: [string, unknown][] = Array.isArray(value)
+    ? value.map((v, i) => [String(i), v])
+    : Object.entries(value as Record<string, unknown>);
+  for (const [key, inner] of entries) {
+    const path = prefix ? `${prefix}.${key}` : key;
+    const lower = key.toLowerCase();
+    if (
+      !Array.isArray(value) &&
+      SECRET_KEY_FRAGMENTS.some((f) => lower.includes(f))
+    ) {
+      found.push(path);
+    }
+    found.push(...findSecretYamlKeys(inner, path));
+  }
+  return found;
+}
+
 /** Errors for the YAML forms alone, for `validateYamlConfig`. */
 export function validateAuthYaml(yaml: Record<string, unknown>): string[] {
-  const errors: string[] = [];
+  const errors: string[] = findSecretYamlKeys(yaml).map(
+    (key) =>
+      `Config file key "${key}" looks like a secret or a session value. YAML is configuration only: put secrets and the session in .env or the environment`,
+  );
   for (const p of AUTH_PARAMETERS) {
     try {
       convert(p, 'yaml', yaml[p.yaml]);
@@ -248,7 +284,8 @@ export function validateAuthYaml(yaml: Record<string, unknown>): string[] {
 export function authParametersHelp(): string {
   return AUTH_PARAMETERS.map((p) => {
     const head = `  ${p.cli}${valueHint(p)}`.padEnd(35);
-    return `${head}${p.help}\n${' '.repeat(35)}env: ${p.env}, yaml: ${p.yaml}`;
+    const forms = p.env ? `env: ${p.env}, yaml: ${p.yaml}` : `yaml: ${p.yaml}`;
+    return `${head}${p.help}\n${' '.repeat(35)}${forms}`;
   }).join('\n');
 }
 

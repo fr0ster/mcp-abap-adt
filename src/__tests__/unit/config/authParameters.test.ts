@@ -24,7 +24,11 @@ const other = (p: (typeof AUTH_PARAMETERS)[number]): string => {
 const typed = (p: (typeof AUTH_PARAMETERS)[number], v: string) =>
   p.kind === 'port' ? Number(v) : v;
 
-const ENV_NAMES = AUTH_PARAMETERS.map((p) => p.env);
+const NO_ENV = ['MCP_DESTINATION', 'MCP_ENV', 'MCP_ALLOW_DESTINATION_HEADER'];
+const ENV_NAMES = [
+  ...AUTH_PARAMETERS.flatMap((p) => (p.env ? [p.env] : [])),
+  ...NO_ENV,
+];
 const savedArgv = process.argv;
 const savedEnv: Record<string, string | undefined> = {};
 
@@ -62,19 +66,15 @@ describe('the table', () => {
 
   it('names each form as the spec does (spec section 6)', () => {
     expect(AUTH_PARAMETERS.map((p) => [p.cli, p.env, p.yaml])).toEqual([
-      ['--mcp', 'MCP_DESTINATION', 'mcp'],
-      ['--env', 'MCP_ENV', 'env'],
+      ['--mcp', undefined, 'mcp'],
+      ['--env', undefined, 'env'],
       ['--env-path', 'MCP_ENV_PATH', 'env-path'],
       ['--auth-broker', 'MCP_USE_AUTH_BROKER', 'auth-broker'],
       ['--auth-broker-path', 'AUTH_BROKER_PATH', 'auth-broker-path'],
       ['--unsafe', 'MCP_UNSAFE', 'unsafe'],
       ['--browser', 'MCP_BROWSER', 'browser'],
       ['--browser-auth-port', 'MCP_BROWSER_AUTH_PORT', 'browser-auth-port'],
-      [
-        '--allow-destination-header',
-        'MCP_ALLOW_DESTINATION_HEADER',
-        'allow-destination-header',
-      ],
+      ['--allow-destination-header', undefined, 'allow-destination-header'],
       ['--connection-type', 'SAP_CONNECTION_TYPE', 'connection-type'],
       ['--system-type', 'SAP_SYSTEM_TYPE', 'system-type'],
     ]);
@@ -82,7 +82,9 @@ describe('the table', () => {
 
   describe.each(AUTH_PARAMETERS.map((p) => [p.cli, p] as const))(
     '%s',
-    (_n, p) => {
+    (_n, row) => {
+      const p = row as typeof row & { env: string };
+      const hasEnv = row.env !== undefined;
       const value = p.kind === 'flag' ? true : typed(p, sample(p));
       const cliArgs = p.kind === 'flag' ? [p.cli] : [`${p.cli}=${sample(p)}`];
       const envValue = p.kind === 'flag' ? 'true' : sample(p);
@@ -93,15 +95,19 @@ describe('the table', () => {
           p.kind === 'flag'
             ? fromCli
             : readAuthParameters([p.cli, sample(p)], {}, null);
-        const fromEnv = readAuthParameters([], { [p.env]: envValue }, null);
         const fromYaml = readAuthParameters([], {}, { [p.yaml]: value });
         expect(fromCli).toEqual({ [p.key]: value });
         expect(fromSpace).toEqual(fromCli);
-        expect(fromEnv).toEqual(fromCli);
+        if (hasEnv) {
+          expect(readAuthParameters([], { [p.env]: envValue }, null)).toEqual(
+            fromCli,
+          );
+        }
         expect(fromYaml).toEqual(fromCli);
       });
 
       it('CLI beats env beats YAML', () => {
+        if (!hasEnv) return;
         if (p.kind === 'flag') {
           // a flag can only be true on the CLI; env false/YAML true shows the order
           expect(
@@ -146,7 +152,7 @@ describe('the table', () => {
         );
         const help = ServerConfigManager.generateHelp();
         expect(help).toContain(p.cli);
-        expect(help).toContain(p.env);
+        if (hasEnv) expect(help).toContain(p.env);
       });
     },
   );
@@ -275,14 +281,23 @@ describe('through the parser and the manager', () => {
     expect(new ServerConfigManager().getConfigSync().browser).toBe('edge');
   });
 
-  it('new env forms reach the config', () => {
-    process.env.MCP_DESTINATION = 'DEST';
-    process.env.MCP_ALLOW_DESTINATION_HEADER = 'true';
+  it('env forms reach the config', () => {
     process.env.MCP_BROWSER_AUTH_PORT = '61005';
     const c = new ServerConfigManager().getConfigSync();
-    expect(c.mcpDestination).toBe('DEST');
-    expect(c.allowDestinationHeader).toBe(true);
     expect(c.browserAuthPort).toBe(61005);
+  });
+
+  it('--mcp, --env and --allow-destination-header have no env form', () => {
+    process.env.MCP_DESTINATION = 'DEST';
+    process.env.MCP_ENV = 'ENVDEST';
+    process.env.MCP_ALLOW_DESTINATION_HEADER = 'true';
+    const c = new ServerConfigManager().getConfigSync();
+    expect(c.mcpDestination).toBeUndefined();
+    expect(c.envFile).toBeUndefined();
+    expect(c.allowDestinationHeader).toBeFalsy();
+    expect(readAuthParameters([], process.env, null)).toEqual({});
+    const help = ServerConfigManager.generateHelp();
+    for (const n of NO_ENV) expect(help).not.toMatch(new RegExp(`\\b${n}\\b`));
   });
 
   it('YAML is the lowest source: env beats it, CLI beats env', () => {
@@ -291,13 +306,13 @@ describe('through the parser and the manager', () => {
       browser: 'chrome',
       'connection-type': 'rfc',
     } as const;
-    process.env.MCP_DESTINATION = 'FROM_ENV';
-    process.argv = ['node', 'server', '--browser=none'];
+    process.env.MCP_BROWSER = 'edge';
+    process.argv = ['node', 'server', '--connection-type=http'];
     applyYamlConfigToArgs({ ...yaml });
     const parsed = ArgumentsParser.parse({ ...yaml });
-    expect(parsed.mcp).toBe('FROM_ENV');
-    expect(parsed.browser).toBe('none');
-    expect(parsed.connectionType).toBe('rfc');
+    expect(parsed.mcp).toBe('FROM_YAML');
+    expect(parsed.browser).toBe('edge');
+    expect(parsed.connectionType).toBe('http');
   });
 
   it('--system-type still sets SAP_SYSTEM_TYPE', () => {

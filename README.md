@@ -310,7 +310,7 @@ Whichever file is chosen is read **and written back** with a renewed token, what
 
 **Example .env file:**
 ```bash
-SAP_URL=https://your-sap-system.com
+SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -319,7 +319,7 @@ SAP_PASSWORD=your-password
 
 For a JWT you already hold (SAP BTP):
 ```bash
-SAP_URL=https://your-btp-system.com
+SAP_URL=https://your-btp-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
@@ -328,7 +328,7 @@ SAP_JWT_TOKEN=your-jwt-token
 
 For RFC connection:
 ```bash
-SAP_URL=https://your-onprem-system.com
+SAP_URL=https://your-onprem-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -340,7 +340,7 @@ SAP_CONNECTION_TYPE=rfc
 
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
-SAP_URL=https://your-onprem-system.com
+SAP_URL=https://your-onprem-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
@@ -348,7 +348,7 @@ SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
 ```
 The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. Start with `--connection-type=rfc`: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
 
-> **Not supported in 16.0:** `SAP_AUTH_TYPE=certificate`, `kerberos` and `saml` in a `.env` or service key are refused at startup, naming the authentication. See the [migration note](docs/MIGRATION-16.0.md).
+> **Not supported in 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `lacks: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
 
 **Generate a `.env` (JWT):**
 ```bash

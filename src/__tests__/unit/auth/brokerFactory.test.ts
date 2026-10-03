@@ -287,6 +287,23 @@ describe('AuthBrokerFactory', () => {
       },
     );
 
+    it.each(['certificate', 'kerberos'])(
+      '2b. %s .env: UnsupportedAuthenticationError naming it, no broker, no value',
+      async (authType) => {
+        writeSession('dest', [
+          `SAP_URL=${SYSTEM_URL}`,
+          `SAP_AUTH_TYPE=${authType}`,
+          'SAP_CERT_PATH=/made-up/secret-path',
+        ]);
+        const err = await caught(factory().getBroker('dest'));
+        expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
+        expect(err).toMatchObject({ destination: 'dest', authType });
+        expect((err as Error).message).toContain(authType);
+        expect((err as Error).message).not.toContain('secret-path');
+        expect(constructed).not.toHaveBeenCalled();
+      },
+    );
+
     it('3. basic: the broker gets exactly the stores, no option', async () => {
       basic('dest');
       await factory().getBroker('dest');

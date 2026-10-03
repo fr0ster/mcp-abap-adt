@@ -23,11 +23,19 @@ Exactly four authentications. Every `.env` or service key states one.
 | JWT, browser login | `jwt` | `authorization_code` | HTTP | a service key (ABAP or XSUAA), or `SAP_UAA_*` |
 | JWT you hold | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN`, or the `x-sap-jwt-token` header |
 
-**If you used another authentication, there is no replacement in this server.** A destination that
-states `saml`, `certificate`, `kerberos`, or a `jwt` grant other than `authorization_code` and `none`
-(`client_credentials`, `passcode`, the OIDC and SAML grants) is refused at startup:
-`Destination "X" uses <type> / <grant>, which this server does not support`. The libraries know
-some of them; the server does not serve them.
+**If you used another authentication, this server has no replacement for it.** A destination that
+states `certificate` or `kerberos`, or `saml`/`jwt` with a grant other than the ones above
+(`client_credentials`, `passcode`, the OIDC and SAML grants), is refused at startup:
+`Destination "X" uses <type> / <grant>, which this server does not support` (for `certificate` and
+`kerberos`, which carry no grant, `Destination "X" uses certificate, which this server does not support`).
+A `saml` destination that states no grant is refused with `lacks: grantType`, as a `jwt` one is. The libraries
+know some of these; the server does not serve them. What to do instead:
+
+- stay on 15.x for as long as you need the certificate, Kerberos, SAML or another grant;
+- for passwordless logon to an on-premise system, use **SNC over RFC** (`snc`) in place of certificate or
+  Kerberos single sign-on;
+- obtain a token elsewhere (your own login, `mcp-auth`) and hand it over as `jwt` / `none`
+  (`SAP_JWT_TOKEN`, or `x-sap-jwt-token`), renewing it yourself.
 
 ## If you start the server from a `.env` or a service key
 
@@ -54,8 +62,9 @@ some of them; the server does not serve them.
 6. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
    watches the files: a new password, or a token you hand over again, needs a restart.
 7. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads
-   `<base>/service-keys` and `<base>/sessions` of the *first* path only; the colon-separated list and
-   the fallback to the working directory are gone.
+   `<base>/service-keys` and `<base>/sessions`; the value is not split, so a colon- or
+   semicolon-separated list no longer names several directories, and the fallback to the working
+   directory is gone.
 
 ## If you pass parameters
 
@@ -102,8 +111,9 @@ some of them; the server does not serve them.
 
 17. **Shutdown settles first.** On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops
     accepting connections, waits up to 30 s for logins and refreshes in flight, and flushes every
-    session. If a secret could not be stored, it exits `1` with one line on stderr naming the destination
-    and the error class; never the secret. Nothing is written to stdout.
+    session. It exits `1`, with one stderr line per fact, when a secret could not be stored (the line names the
+    destination and the error class), a login or refresh was still running at the 30 s deadline, a server did not
+    close, or settling itself failed; never a secret or an error's message. Nothing is written to stdout.
 18. **Errors name fields.** `Destination "X" lacks: <fields>` followed by one hint where the server
     knows the remedy; `Destination "X" uses <type> / <grant>, which this server does not support`; `<parameter>:
     the file does not exist: <path>` for an env file you named (the server does not fall back to the working

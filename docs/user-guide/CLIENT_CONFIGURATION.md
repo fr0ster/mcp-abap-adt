@@ -438,13 +438,7 @@ For Server-Sent Events transport, the configuration is similar:
 3. **Token Refresh**: Use a destination with browser login: the server renews its token with the refresh token. A token passed in a header is used as it is.
 4. **Header Validation**: The server validates header values but does not enforce HTTPS. Ensure your deployment uses HTTPS.
 5. **Connection Isolation**: Starting from version 1.1.10, each client session maintains its own isolated SAP connection. This prevents data mixing between different clients connecting to different SAP systems. Each connection is cached based on a unique combination of `sessionId` + `sapUrl` + authentication parameters.
-6. **Non-Local Connection Restrictions**:
-   - **SSE Transport**: Always restricted to localhost connections only (127.0.0.1, ::1, localhost). Remote connections are rejected with a 403 Forbidden error.
-   - **HTTP Transport**: Non-local connections are restricted when:
-     - `.env` file exists (was found at server startup)
-     - AND request does not include SAP connection headers (`x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`)
-   - Non-local connections with SAP headers are allowed (enables multi-tenant scenarios)
-   - Local connections are always allowed regardless of `.env` file presence
+6. **Who reaches the default destination**: The default destination is served to any client that reaches the port: bind with `--host` accordingly (the default `127.0.0.1` reaches local clients only). The server checks nothing by the client's address; use `--http-allowed-hosts`/`--http-allowed-origins` with `--http-enable-dns-protection` (and a network control) where clients are not trusted.
 
 ## Troubleshooting
 

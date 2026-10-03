@@ -67,7 +67,7 @@ For basic authentication:
 # The server automatically looks for .env in your current directory
 cd ~/my-project
 cat > .env << EOF
-SAP_URL=https://your-sap-system.com
+SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -89,7 +89,7 @@ mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the
 
 For SNC (passwordless logon over RFC; no user, no password):
 ```bash
-SAP_URL=https://your-sap-system.com
+SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
@@ -367,7 +367,7 @@ After installation, create a `.env` file with your SAP connection details:
 ```bash
 # Create .env file (a JWT you hold)
 cat > .env << 'EOF'
-SAP_URL=https://your-sap-system.com
+SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none

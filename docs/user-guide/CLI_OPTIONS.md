@@ -90,7 +90,7 @@ This allows you to:
 # Project 1 (development system)
 cd ~/projects/abap-dev
 cat > .env << EOF
-SAP_URL=https://dev.sap.company.com
+SAP_URL=https://dev.sap.company.example
 SAP_CLIENT=100
 EOF
 mcp-abap-adt  # Uses ~/projects/abap-dev/.env
@@ -98,7 +98,7 @@ mcp-abap-adt  # Uses ~/projects/abap-dev/.env
 # Project 2 (production system)
 cd ~/projects/abap-prod
 cat > .env << EOF
-SAP_URL=https://prod.sap.company.com
+SAP_URL=https://prod.sap.company.example
 SAP_CLIENT=200
 EOF
 mcp-abap-adt  # Uses ~/projects/abap-prod/.env
@@ -242,8 +242,8 @@ mcp-abap-adt --transport=http --port=8080
 HTTP server host address (default: 127.0.0.1, localhost only for security).
 
 **Security Note:**
-- **127.0.0.1 (default)**: Server accepts connections only from localhost. Safe to use default destination from auth-broker or .env file.
-- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure** - client must provide all connection headers. Server will not use default destination for non-local connections.
+- **127.0.0.1 (default)**: Server accepts connections only from localhost. The default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`) is reachable by local clients only.
+- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure**: The default destination is served to any client that reaches the port: bind with `--host` accordingly (the default `127.0.0.1` reaches local clients only).
 
 ```bash
 # Bind to localhost only (default, secure)
@@ -332,8 +332,8 @@ mcp-abap-adt --transport=sse --port=8081
 SSE server host address (default: 127.0.0.1, localhost only for security).
 
 **Security Note:**
-- **127.0.0.1 (default)**: Server accepts connections only from localhost. Safe to use default destination from auth-broker or .env file.
-- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure** - client must provide all connection headers. Server will not use default destination for non-local connections.
+- **127.0.0.1 (default)**: Server accepts connections only from localhost. The default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`) is reachable by local clients only.
+- **0.0.0.0**: Server accepts connections from all network interfaces. **Less secure**: The default destination is served to any client that reaches the port: bind with `--host` accordingly (the default `127.0.0.1` reaches local clients only).
 
 ```bash
 # Bind to localhost only (default, secure)
@@ -522,7 +522,7 @@ mcp-abap-adt --transport=http --port=9000
 # Create dev environment
 cd ~/dev/my-abap-project
 cat > .env << EOF
-SAP_URL=https://dev.sap.company.com
+SAP_URL=https://dev.sap.company.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_SYSTEM_TYPE=onprem
@@ -539,7 +539,7 @@ mcp-abap-adt
 ```bash
 # Create RFC environment
 cat > rfc-system.env << EOF
-SAP_URL=https://sap.company.com
+SAP_URL=https://sap.company.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_SYSTEM_TYPE=onprem
@@ -560,7 +560,7 @@ SAP_CONNECTION_TYPE=rfc mcp-abap-adt --env-path=rfc-system.env
 # Centralized config
 sudo mkdir -p /etc/mcp-abap-adt
 sudo cat > /etc/mcp-abap-adt/prod.env << EOF
-SAP_URL=https://prod.sap.company.com
+SAP_URL=https://prod.sap.company.example
 SAP_CLIENT=200
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none

@@ -57,31 +57,9 @@ Values that belong to one request, such as the master language of created object
 2. **Multi-Tenancy**: clients may connect to different SAP systems at once (by header, or by destination with `--allow-destination-header`)
 3. **One login**: a destination's logins are serialised and its token is shared by the sessions that use it
 
-## Non-Local Connection Restrictions
+## Who Reaches a Destination
 
-### SSE Transport
-
-SSE transport is **always** restricted to localhost connections only:
-- Allowed: `127.0.0.1`, `::1`, `localhost`
-- Rejected: Any other IP address (403 Forbidden)
-
-This restriction ensures SSE is only used for local development/testing.
-
-### HTTP Transport
-
-HTTP transport has conditional restrictions based on `.env` file presence:
-
-**When `.env` file exists:**
-- Local connections: Always allowed
-- Non-local connections: Allowed only if SAP headers are provided (`x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`)
-
-**When `.env` file does not exist:**
-- All connections: Allowed (enables multi-tenant scenarios)
-
-### Rationale
-
-- **With `.env` file**: Server is configured for a specific SAP system. Non-local connections without headers could be unauthorized access attempts.
-- **Without `.env` file**: Server expects configuration via headers. All connections are allowed to support multi-tenant scenarios.
+The transports do not look at a client's address. The default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`) is served to **any client that reaches the port**; bind with `--host` accordingly (the default, `127.0.0.1`, reaches local clients only), and use the DNS-rebinding allowlists (`--http-allowed-hosts`, `--http-allowed-origins`, `--http-enable-dns-protection`) and network controls where clients are not trusted. A client that sends a complete `x-sap-*` connection, or (with `--allow-destination-header`) an `x-mcp-destination`, is served from that instead.
 
 ## Example Flow
 

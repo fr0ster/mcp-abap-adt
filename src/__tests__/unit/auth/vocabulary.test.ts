@@ -88,6 +88,17 @@ describe('vetMeans', () => {
   );
 });
 
+describe('known but unsupported types', () => {
+  it.each(['certificate', 'kerberos'] as const)(
+    '%s is vetted (so the server can name it), without a grant',
+    (authType) => {
+      expect(
+        vetMeans('dest', { authType, grantType: 'passcode' } as never),
+      ).toEqual({ authType });
+    },
+  );
+});
+
 describe('GRANTS', () => {
   it('lists every DestinationGrant (compile-time: test:check fails on a missing member)', () => {
     type Missing = Exclude<DestinationGrant, (typeof GRANTS)[number]>;

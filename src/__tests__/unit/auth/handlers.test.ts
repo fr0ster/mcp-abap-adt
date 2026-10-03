@@ -64,6 +64,26 @@ describe('handlerFor', () => {
   });
 });
 
+describe('certificate and kerberos', () => {
+  it.each(['certificate', 'kerberos'] as const)(
+    '%s is refused as unsupported, named, without a grant',
+    (authType) => {
+      let err: unknown;
+      try {
+        handlerFor('dest', { authType });
+      } catch (e) {
+        err = e;
+      }
+      expect(err).toBeInstanceOf(UnsupportedAuthenticationError);
+      const u = err as UnsupportedAuthenticationError;
+      expect(u.authType).toBe(authType);
+      expect(u.message).toBe(
+        `Destination 'dest' uses the authentication '${authType}', which this server does not support.`,
+      );
+    },
+  );
+});
+
 describe('brokerOptions', () => {
   it.each([
     [{ authType: 'basic' as const }],

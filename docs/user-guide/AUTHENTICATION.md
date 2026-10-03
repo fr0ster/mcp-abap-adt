@@ -2,15 +2,16 @@
 
 The server supports **four authentications**. Every one of them is a *destination*: a system
 URL plus how to log on to it, kept in a service key, a `.env` file, or both. Anything else a
-`.env` or a service key states is refused at startup, naming the authentication
-(`Destination "X" uses <type> / <grant>, which this server does not support`).
+`.env` or a service key states is refused at startup: `Destination "X" uses <type> / <grant>, which this
+server does not support` (for `certificate` and `kerberos`: `... uses certificate, which this server does
+not support`).
 
 | Authentication | `SAP_AUTH_TYPE` | `SAP_GRANT_TYPE` | Connection | What the destination holds |
 |----------------|-----------------|------------------|------------|----------------------------|
 | **Basic** | `basic` | — | HTTP or RFC | `SAP_USERNAME`, `SAP_PASSWORD` |
 | **SNC** (passwordless) | `snc` | — | **RFC only** | `SAP_SNC_PARTNERNAME`; optional `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME`. **No user, no password** |
 | **JWT, browser login** | `jwt` | `authorization_code` | HTTP | A service key (ABAP or XSUAA), or `SAP_UAA_URL`, `SAP_UAA_CLIENT_ID`, `SAP_UAA_CLIENT_SECRET`; the token is obtained and renewed by the server |
-| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (and optionally `SAP_REFRESH_TOKEN`), or the `x-sap-jwt-token` header |
+| **JWT, a token you hold** | `jwt` | `none` | HTTP | `SAP_JWT_TOKEN` (used as it is, never renewed), or the `x-sap-jwt-token` header |
 
 A `.env` that is a destination by itself **must state `SAP_AUTH_TYPE`** (there is no default: a `.env` with a
 user and a password but no type is refused with `Destination "X" lacks: authType`; an ABAP service key
@@ -20,8 +21,9 @@ is refused with `Destination "X" lacks: grantType` and a hint to regenerate it w
 
 Other grants (`client_credentials`, `passcode`, the OIDC and SAML grants) and other types
 (`saml`, `certificate`, `kerberos`) are **not supported** by this server, even though the
-broker library knows some of them. A destination that states one is refused; it is never
-silently run as something else.
+libraries know some of them. A destination that states one is refused, naming it; it is never
+silently run as something else. (A `saml` destination that states no grant gets `lacks: grantType`,
+like a `jwt` one.)
 
 ### SNC
 
@@ -52,7 +54,8 @@ A process serves **one default destination**, chosen in this order:
 1. **`--mcp=<name>`** (or YAML `mcp`) — a *named destination*, below.
 2. **`--env-path=<path|file>`** (or `MCP_ENV_PATH`), **`--env=<name>`** (resolved to
    `sessions/<name>.env`) — one `.env` file, used as it is.
-3. Without those, a **`.env` in the working directory**, if there is one.
+3. Without those, a **`.env` in the working directory**, if there is one and `--auth-broker` is not given
+   (`--auth-broker` / `MCP_USE_AUTH_BROKER` ignore it).
 
 A named destination `X` is read from two places, **field by field**: `sessions/X.env` wins,
 and `service-keys/X.json` fills in what the file does not state.
@@ -142,7 +145,7 @@ destination. A request with none of them is answered `400`.
   needs, followed by one hint where the server knows the remedy (`grantType`, `SAP_URL`,
   `XSUAA_MCP_URL`, `connection-type`).
 - `Destination "X" uses <type> / <grant>, which this server does not support` — an
-  authentication outside the four above.
+  authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
   does not fall back to the working directory.
 
@@ -152,9 +155,16 @@ The server names fields and the words above only; it never prints a value read f
 
 On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops accepting
 connections, waits up to **30 s** for logins and refreshes in flight, and flushes every
-session. If a secret could not be stored, it exits with code `1` and writes one line to
-stderr naming the destination and the error class (never the secret). Nothing is written to
-stdout.
+session. It exits `0` when everything is stored. It exits `1`, with one stderr line per fact
+(never a secret, an error's message or anything read from a file), when:
+
+- a secret could not be stored (`Session secrets not stored: "<destination>": <ErrorClass>`);
+- a login or refresh was still running at the 30 s deadline (`N authorizations still running at
+  shutdown, their results are lost`);
+- a server did not close (`A server did not close at shutdown: <ErrorClass>`);
+- settling itself failed (`Shutdown did not settle: <ErrorClass>`).
+
+Nothing is written to stdout.
 
 ## Related Docs
 

@@ -1044,15 +1044,12 @@ ENVIRONMENT FILE:
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
                                    Default: stdio (for MCP clients)
-                                   Shortcuts: --http (same as --transport=http)
-                                             --sse (same as --transport=sse)
-                                             --stdio (same as --transport=stdio)
 
 HTTP/STREAMABLE-HTTP OPTIONS:
   --http-port=<port>               HTTP server port (default: 3000)
   --http-host=<host>               HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: When listening on 0.0.0.0, client must provide all connection headers
-                                   Server will not use default destination for non-local connections
+                                   Security: the default destination is served to any client that
+                                   reaches the port; bind with the host accordingly
   --http-json-response             Enable JSON response format
   --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
                                    Example: --http-allowed-origins=http://localhost:3000,https://example.com
@@ -1062,8 +1059,8 @@ HTTP/STREAMABLE-HTTP OPTIONS:
 SSE (SERVER-SENT EVENTS) OPTIONS:
   --sse-port=<port>                SSE server port (default: 3001)
   --sse-host=<host>                SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: When listening on 0.0.0.0, client must provide all connection headers
-                                   Server will not use default destination for non-local connections
+                                   Security: the default destination is served to any client that
+                                   reaches the port; bind with the host accordingly
   --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
                                    Example: --sse-allowed-origins=http://localhost:3000
   --sse-allowed-hosts=<list>       Comma-separated allowed hosts
@@ -1188,10 +1185,6 @@ EXAMPLES:
   mcp-abap-adt --transport=sse --sse-port=3001 \\
                 --sse-allowed-origins=http://localhost:3000 \\
                 --sse-enable-dns-protection
-
-  # Using shortcuts
-  mcp-abap-adt --http --http-port=8080
-  mcp-abap-adt --sse --sse-port=3001
 
 QUICK REFERENCE:
   Transport types:

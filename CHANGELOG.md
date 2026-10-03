@@ -17,8 +17,8 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   `auth-stores` 3, and the server serves exactly four authentications**: basic (HTTP or RFC), SNC
   (RFC only, no user and no password), `jwt` / `authorization_code` (browser login; an ABAP or XSUAA
   service key) and `jwt` / `none` (a token you hold). A destination that states anything else —
-  `saml`, `certificate`, `kerberos`, another `jwt` grant — is refused at startup, naming the
-  authentication.
+  `certificate`, `kerberos`, `saml` or another `jwt` grant — is refused at startup, naming the
+  authentication (a `saml` destination with no grant is refused with `lacks: grantType`).
 - **A `.env` states its authentication.** `SAP_AUTH_TYPE` has no default, and a `jwt` `.env` states
   `SAP_GRANT_TYPE`; without them the destination is refused (`Destination "X" lacks: authType` /
   `grantType`, with a hint to regenerate it with `mcp-auth generate-env --grant`). The `mcp-auth`
@@ -32,7 +32,7 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   `4000` and `4001` by transport).
 - **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct
   connection is `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`.
-- **`AUTH_BROKER_PATH` is one base directory** (the first path), with no fallback to the working
+- **`AUTH_BROKER_PATH` is one base directory** (the value is not split), with no fallback to the working
   directory.
 - **`DeletePackageLow` lost `connection_config`**; a connection comes from the destination alone.
 - **`@mcp-abap-adt/lib` public API**: `registerAuthBroker`, `getAuthBroker`, `ConfigLoader`,
@@ -56,7 +56,8 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   headers, or a credential an embedder hands over.
 - **Shutdown that settles**: on `SIGTERM`, `SIGINT` or the end of stdin the server stops accepting, waits
   up to 30 s for logins and refreshes in flight, and flushes every session; a secret that could not be
-  stored exits `1` with one stderr line naming the destination and the error class.
+  stored, a login or refresh still running at the deadline, a server that did not close, or a failed settle
+  exits `1` with one stderr line per fact (the destination and the error class, never a secret).
 - **Destination names are vetted** before any file is read (letters, digits, `_`, `.`, `-`), and an env file
   named with `--env` / `--env-path` that does not exist is refused naming the parameter and the path.
 - **Errors in the server's own words**: `Destination "X" lacks: <fields>` with a hint, and

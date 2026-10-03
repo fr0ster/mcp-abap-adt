@@ -12,7 +12,19 @@ import type {
   IConnectionConfig,
 } from '@mcp-abap-adt/interfaces-auth-broker';
 
-export const AUTH_TYPES = ['basic', 'jwt', 'saml', 'snc'] as const;
+/**
+ * `certificate` and `kerberos` are known and unsupported: vetted, so the
+ * refusal can name them (`UnsupportedAuthenticationError`) instead of calling
+ * them an unknown type. Neither reads a grant.
+ */
+export const AUTH_TYPES = [
+  'basic',
+  'jwt',
+  'saml',
+  'snc',
+  'certificate',
+  'kerberos',
+] as const;
 export type AuthType = (typeof AUTH_TYPES)[number];
 
 /**
@@ -34,7 +46,7 @@ export const GRANTS = [
 ] as const satisfies readonly DestinationGrant[];
 
 const AUTH_TYPE_REASON =
-  'authType is missing or not one of: basic, jwt, saml, snc.';
+  'authType is missing or not one of: basic, jwt, saml, snc, certificate, kerberos.';
 const GRANT_REASON = 'grantType is missing or not a known grant.';
 
 function isAuthType(value: unknown): value is AuthType {
@@ -69,7 +81,7 @@ export function vetMeans(
     );
   }
   // The broker reads a grant for `jwt` and `saml` only.
-  if (authType === 'basic' || authType === 'snc') return { authType };
+  if (authType !== 'jwt' && authType !== 'saml') return { authType };
   const grantType: unknown = means?.grantType;
   if (!isGrant(grantType)) {
     throw new DestinationConfigError(destination, ['grantType'], GRANT_REASON);

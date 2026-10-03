@@ -26,7 +26,7 @@ services:
       - MCP_HTTP_HOST=0.0.0.0
 
       # Base directory of service-keys/ and sessions/ inside the container.
-      # The server reads the first directory only: set it, or it reads the home directory's.
+      # One directory (a list is not split): set it, or the server reads the home directory's.
       - AUTH_BROKER_PATH=/app
     # The destination is chosen by the command, not by an environment variable:
     #   --mcp=<name>                an own default destination (service-keys/<name>.json)

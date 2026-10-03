@@ -200,6 +200,7 @@
   "files": [
     "dist/",
     "docs/",
+    "!docs/superpowers/",
     "README.md",
     "LICENSE",
     "NOTICE",

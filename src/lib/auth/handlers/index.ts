@@ -3,12 +3,12 @@
  * means a handler here, the docs' table and a test; nothing else.
  */
 
-import { UnsupportedAuthenticationError } from '../errors.js';
+import { UnsupportedAuthenticationError } from '../errors';
 import type { VettedAuthentication } from '../vocabulary.js';
-import { basicHandler } from './basic.js';
-import { jwtAuthorizationCodeHandler } from './jwtAuthorizationCode.js';
-import { jwtNoneHandler } from './jwtNone.js';
-import { sncHandler } from './snc.js';
+import { basicHandler } from './basic';
+import { jwtAuthorizationCodeHandler } from './jwtAuthorizationCode';
+import { jwtNoneHandler } from './jwtNone';
+import { sncHandler } from './snc';
 import type { AuthenticationHandler } from './types.js';
 
 export type { AuthenticationHandler, AuthHandlerContext } from './types.js';

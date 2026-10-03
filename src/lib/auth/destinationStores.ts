@@ -42,6 +42,14 @@ export type DestinationMode =
 export interface DestinationStores {
   serviceKeyStore: IServiceKeyStore;
   sessionStore: ISessionStore;
+  /**
+   * Where the connector's URL is read. An XSUAA destination's URL comes only
+   * from `XSUAA_MCP_URL` in `sessions/<name>.env`, never from the key: the
+   * key's root `url` is the UAA, which XsuaaServiceKeyStore may answer as
+   * `serviceUrl`. Every other mode reads it from `serviceKeyStore`.
+   */
+  urlStore: IServiceKeyStore;
+  /** The key the user sets the URL with, for the refusal. */
   urlKey: 'SAP_URL' | 'XSUAA_MCP_URL';
 }
 
@@ -79,9 +87,13 @@ export function storesFor(
     if (!fs.existsSync(mode.path)) {
       throw new Error(`${mode.source}: the file does not exist: ${mode.path}`);
     }
+    const serviceKeyStore = EnvDestinationStore.forFile(mode.path, {
+      log: logger,
+    });
     return {
-      serviceKeyStore: EnvDestinationStore.forFile(mode.path, { log: logger }),
+      serviceKeyStore,
       sessionStore: new EnvFileSessionStore(mode.path, logger),
+      urlStore: serviceKeyStore,
       urlKey: 'SAP_URL',
     };
   }
@@ -100,20 +112,26 @@ export function storesFor(
       sessionStore: mode.unsafe
         ? new XsuaaSessionStore(mode.sessionsDir, logger)
         : new SafeXsuaaSessionStore(logger),
+      urlStore: new EnvDestinationStore(mode.sessionsDir, {
+        variables: XSUAA_DESTINATION_VARS,
+        log: logger,
+      }),
       urlKey: 'XSUAA_MCP_URL',
     };
   }
-  return {
-    serviceKeyStore: new EnvDestinationStore(mode.sessionsDir, {
-      fallback: new AbapServiceKeyStore(mode.keysDir, {
-        grantType: 'authorization_code',
-        log: logger,
-      }),
+  const serviceKeyStore = new EnvDestinationStore(mode.sessionsDir, {
+    fallback: new AbapServiceKeyStore(mode.keysDir, {
+      grantType: 'authorization_code',
       log: logger,
     }),
+    log: logger,
+  });
+  return {
+    serviceKeyStore,
     sessionStore: mode.unsafe
       ? new AbapSessionStore(mode.sessionsDir, logger)
       : new SafeAbapSessionStore(logger),
+    urlStore: serviceKeyStore,
     urlKey: 'SAP_URL',
   };
 }

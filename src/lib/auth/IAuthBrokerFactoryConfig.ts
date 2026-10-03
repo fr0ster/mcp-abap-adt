@@ -1,40 +1,44 @@
 /**
- * Configuration interface for AuthBrokerFactory
- * Different server versions can implement their own config that conforms to this
+ * Configuration of `AuthBrokerFactory`: where destinations live and what an
+ * interactive login needs. The launcher builds it from the parameters; the
+ * library adds no default collaborator (H2).
  */
 
+import type { IAuthorizationStrategy } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface IAuthBrokerFactoryConfig {
-  /** Default MCP destination from --mcp parameter */
-  defaultMcpDestination?: string;
-  /** Default destination (from --mcp or .env) */
-  defaultDestination?: string;
-  /** Path to .env file */
-  envFilePath?: string;
-  /** Custom path for auth broker storage */
-  authBrokerPath?: string;
-  /** Use unsafe mode (file-based session store) */
-  unsafe: boolean;
-  /** Transport type */
-  transportType: string;
-  /** Use auth-broker instead of .env file */
-  useAuthBroker?: boolean;
-  /** Port for browser auth callback server (to avoid conflicts with SSE/HTTP servers) */
-  browserAuthPort?: number;
   /**
-   * Browser type for authentication (chrome, edge, firefox, system, headless, none)
-   * - 'system' (default): Opens system default browser
-   * - 'headless': Logs URL and waits for manual callback (SSH/remote sessions)
-   * - 'none': Logs URL and rejects immediately (automated tests)
+   * The `.env` file served as the destination `default`
+   * (`--env`, `--env-path`, `MCP_ENV_PATH`, or the working directory's `.env`).
    */
-  browser?: string;
-  /** Logger instance (used as fallback if specific loggers are not provided) */
+  envFilePath?: string;
+  /**
+   * The parameter `envFilePath` came from, as the user gave it (`--env`,
+   * `--env-path`, `MCP_ENV_PATH`, `working directory .env`): it names the
+   * refusal of a file that does not exist. `'--env'` when not given.
+   */
+  envFileSource?: string;
+  /** `--mcp=X`: the destination served when a request names none. */
+  mcpDestination?: string;
+  /** Base of `service-keys/` and `sessions/` (`--auth-broker-path`). */
+  authBrokerPath?: string;
+  /** Whether a named destination's secret is written to `sessions/`. */
+  unsafe: boolean;
+  /** The browser of an interactive login (`--browser`). */
+  browser: string;
+  /** The callback port of an interactive login; the strategy's default when absent. */
+  browserAuthPort?: number;
+  /** How the connector reaches the system (`--connection-type`). */
+  connectionType?: 'http' | 'rfc';
+  /**
+   * Builds the browser strategy of the `authorization_code` handler. The
+   * launcher passes auth-providers' `browserCallbackStrategy`; there is no
+   * default here.
+   */
+  browserStrategy: (options: {
+    browser: string;
+    port?: number;
+  }) => IAuthorizationStrategy<string>;
   logger?: ILogger;
-  /** Optional logger for stores (service key store, session store) */
-  storeLogger?: ILogger;
-  /** Optional logger for token provider */
-  providerLogger?: ILogger;
-  /** Optional logger for auth broker */
-  brokerLogger?: ILogger;
 }

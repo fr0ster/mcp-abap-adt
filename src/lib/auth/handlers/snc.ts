@@ -1,4 +1,4 @@
-import { SettingsError } from '../errors.js';
+import { SettingsError } from '../errors';
 import type { AuthenticationHandler } from './types.js';
 
 export const sncHandler: AuthenticationHandler = {

@@ -1,4 +1,4 @@
-import { oneLoginAtATime } from '../loginLock.js';
+import { oneLoginAtATime } from '../loginLock';
 import type { AuthenticationHandler } from './types.js';
 
 export const jwtAuthorizationCodeHandler: AuthenticationHandler = {

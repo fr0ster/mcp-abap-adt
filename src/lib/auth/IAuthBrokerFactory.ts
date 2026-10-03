@@ -1,21 +1,35 @@
 /**
- * Interface for AuthBrokerFactory
- * Allows different implementations for different server versions
+ * What a session's server needs from the destinations, and the factory's
+ * whole surface.
  */
 
 import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
-export interface IAuthBrokerFactory {
-  /**
-   * Initialize default broker based on CLI args and .env file presence
-   * Called once at server startup
-   */
-  initializeDefaultBroker(): Promise<void>;
+export interface IDestinations {
+  /** The connector's settings: URL, client, auth type, connection type — no secret. */
+  settingsFor(destination: string): Promise<SapConfig>;
+  /** The destination's provider, counted while it works. */
+  getProvider(destination: string): Promise<IAuthProvider>;
+}
 
+/** What `settle` found. */
+export interface SettleReport {
+  /** Provider calls still running at the deadline: their result is lost. */
+  abandoned: number;
+  /** `"<destination>": <ErrorClass>` for each session secret not stored. */
+  notStored: string[];
+}
+
+export interface IAuthBrokerFactory extends IDestinations {
+  /** The destination the process serves when a request names none. */
+  readonly defaultDestination: string | undefined;
+  /** One broker per destination, built on first use, then cached. */
+  getBroker(destination: string): Promise<AuthBroker>;
   /**
-   * Get or create auth broker for specific destination
-   * If destination already has broker, returns existing one
-   * Otherwise creates new broker with serviceKeyStore
+   * Closes the gate on provider calls, waits for the ones in progress up to
+   * `deadlineMs`, then flush()es every broker built.
    */
-  getOrCreateAuthBroker(destination?: string): Promise<AuthBroker | undefined>;
+  settle(deadlineMs: number): Promise<SettleReport>;
 }

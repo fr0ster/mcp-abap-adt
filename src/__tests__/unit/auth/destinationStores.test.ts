@@ -209,6 +209,72 @@ describe('destination stores', () => {
       expect(cfg?.serviceUrl).toBeFalsy();
     });
 
+    describe('urlStore: where the connector URL is read', () => {
+      // XsuaaServiceKeyStore answers the key's root url as serviceUrl unless
+      // it contains "authentication"; the URL store must not depend on that.
+      const keyUrls = [
+        ['a UAA url', 'https://tenant.authentication.example.test'],
+        ['a url without "authentication"', 'https://tenant.example.test'],
+      ] as const;
+
+      it.each(keyUrls)(
+        'XSUAA key with %s: answers XSUAA_MCP_URL',
+        async (_label, keyUrl) => {
+          writeKey('x', { ...xsuaaKey, url: keyUrl });
+          writeSession('x', [`XSUAA_MCP_URL=${XSUAA_URL}`]);
+          const s = storesFor(named('x'));
+          expect((await s.urlStore.getConnectionConfig('x'))?.serviceUrl).toBe(
+            XSUAA_URL,
+          );
+        },
+      );
+
+      it.each(keyUrls)(
+        'XSUAA key with %s and SAP_URL instead: answers no url, never the key url',
+        async (_label, keyUrl) => {
+          writeKey('x', { ...xsuaaKey, url: keyUrl });
+          writeSession('x', [`SAP_URL=${URL_}`]);
+          const cfg = await storesFor(named('x')).urlStore.getConnectionConfig(
+            'x',
+          );
+          expect(cfg?.serviceUrl).toBeUndefined();
+        },
+      );
+
+      it.each(keyUrls)(
+        'XSUAA key with %s and no session file: answers no url',
+        async (_label, keyUrl) => {
+          writeKey('x', { ...xsuaaKey, url: keyUrl });
+          const cfg = await storesFor(named('x')).urlStore.getConnectionConfig(
+            'x',
+          );
+          expect(cfg?.serviceUrl).toBeUndefined();
+        },
+      );
+
+      it('ABAP key: the url the key store answers (key, or SAP_URL over it)', async () => {
+        writeKey('x', abapKey());
+        expect(
+          (await storesFor(named('x')).urlStore.getConnectionConfig('x'))
+            ?.serviceUrl,
+        ).toBe(URL_);
+        writeSession('x', ['SAP_URL=https://other.example.test']);
+        expect(
+          (await storesFor(named('x')).urlStore.getConnectionConfig('x'))
+            ?.serviceUrl,
+        ).toBe('https://other.example.test');
+      });
+
+      it('an --env file: its SAP_URL', async () => {
+        const file = path.join(root, 'conn.env');
+        fs.writeFileSync(file, `SAP_URL=${URL_}\nSAP_AUTH_TYPE=basic\n`);
+        const s = storesFor({ kind: 'envFile', path: file, source: '--env' });
+        expect(
+          (await s.urlStore.getConnectionConfig('default'))?.serviceUrl,
+        ).toBe(URL_);
+      });
+    });
+
     it('unsafe: a saved secret lands in sessions/X.env', async () => {
       writeKey('x', abapKey());
       const s = storesFor(named('x', true));

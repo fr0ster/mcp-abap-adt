@@ -136,10 +136,25 @@ on-premise-only tools (for example Programs); without it the tools offered are c
 setting picks the connector; without it a `jwt` destination connects as cloud and any other as
 on-premise.
 
-**Master system and responsible** come from configuration (`SAP_MASTER_SYSTEM`, `SAP_RESPONSIBLE`,
-else `SAP_USERNAME`; the `x-sap-*` headers; the tool's arguments) or, for a cloud system only, by asking
-the system (`systeminformation`) on the connected connection. On-premise nothing is asked: set
-`SAP_MASTER_SYSTEM`. Which of the two a system is follows the rule above, never its URL.
+**Responsible and master system.** ADT changes are not made without a responsible person and a master
+system. For each request the server takes each of the two from the first of:
+
+1. the tool's own argument, where the tool has one (`CreateTransport`'s `owner`);
+2. the request's `x-sap-responsible` / `x-sap-master-system` headers (HTTP per request; SSE from the
+   session's opening request) — for a destination request and an `x-sap-*` connection request alike;
+3. the destination's own `.env`: `SAP_RESPONSIBLE` (else that file's `SAP_USERNAME`) and
+   `SAP_MASTER_SYSTEM` in the `--env` / `--env-path` file, or in `sessions/<destination>.env` for a named
+   destination (`--mcp`, `x-mcp-destination`) — read per destination, so one destination never gets
+   another's;
+4. the process environment: `SAP_RESPONSIBLE`, else `SAP_USERNAME`; `SAP_MASTER_SYSTEM`;
+5. for a cloud system only, the system's own `systeminformation` on the connected connection (its user
+   and system id). On-premise nothing is asked of the system.
+
+An operation that sends them — creating an object, a transport without an `owner` — and finds one
+missing is refused by the server before any request is made: the answer is
+`"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE` or `SAP_MASTER_SYSTEM` and
+the header. Nothing is sent to ADT with an empty value. A read is never refused for them. Which kind a
+system is follows the rule above, never its URL.
 
 ## HTTP/SSE headers
 

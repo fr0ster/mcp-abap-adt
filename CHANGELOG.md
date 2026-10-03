@@ -43,6 +43,19 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   on-premise is the kind the connection was built for (`SAP_SYSTEM_TYPE`, else `jwt` is cloud), never a
   guess from the URL. On-premise nothing is asked: set `SAP_MASTER_SYSTEM`. A cloud destination without
   `SAP_CLIENT` uses the system's default client.
+- **ADT changes are not made without a responsible person and a master system.** Per request each comes
+  from, first found: the tool's own argument (`CreateTransport`'s `owner`); the `x-sap-responsible` /
+  `x-sap-master-system` headers; the destination's own `.env` (`SAP_RESPONSIBLE`, else its
+  `SAP_USERNAME`; `SAP_MASTER_SYSTEM` — the `--env` / `--env-path` file or `sessions/<destination>.env`);
+  the process environment (`SAP_RESPONSIBLE`, else `SAP_USERNAME`; `SAP_MASTER_SYSTEM`); on a cloud
+  system only, `systeminformation`. A create (or a transport without an owner) that finds one missing is
+  refused before any request — `"error": "system_context_missing"`, naming the key and the header — where
+  it used to be sent without the attribute. Reads are unaffected. The `--env` file's `SAP_RESPONSIBLE`,
+  `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the process environment: they are that
+  destination's own, and over HTTP/SSE they had become every other destination's fallback.
+- **An embedder's own cloud connection is no longer recognised by its URL.** A connection the factory did
+  not build is cloud only when the server's `systemType` option or `SAP_SYSTEM_TYPE` says so; otherwise
+  nothing is asked of the system, and a create without configured values is refused.
 - **The browser callback port is `61001`** unless `--browser-auth-port` says otherwise (it was `5000`,
   `4000` and `4001` by transport).
 - **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct
@@ -68,6 +81,9 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   is refused, naming the key.
 - **One connector construction, three credential sources**: a destination's provider, the request's
   headers, or a credential an embedder hands over.
+- **`requestContextFromHeaders`** (`@mcp-abap-adt/lib/request-context`) and the optional
+  **`IDestinations.systemContextFor`**: the request scope a request's headers state, and the responsible
+  and master system a destination's own `.env` states.
 - **Shutdown that settles**: on `SIGTERM`, `SIGINT` or the end of stdin the server stops accepting, waits
   up to 30 s for logins and refreshes in flight, and flushes every session; a secret that could not be
   stored, a login or refresh still running at the deadline, a server that did not close, or a failed settle
@@ -97,13 +113,19 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
 
 ### Fixed
 
+- **`x-sap-responsible` and `x-sap-master-system` are read.** They were written to the connection's
+  metadata and read by nothing; they now enter the request scope over HTTP and SSE, for destination and
+  `x-sap-*` connection requests alike, and a request with `x-sap-*` connection headers reads the process
+  configuration too.
 - **`SAP_LANGUAGE` from `--env-path` reaches the objects it creates** (#182).
   The env file goes to the auth broker's session store, which never fills
   `process.env`; the launcher bridged six system-context keys from it and not
   the language, so every object created through such a session took the
   library's default language. The bridge now lives in `@mcp-abap-adt/lib/config`
   (`hydrateSystemContextFromEnvFile`, `ENV_FILE_CONTEXT_KEYS`) and carries
-  `SAP_LANGUAGE`; a value already in the process environment still wins.
+  `SAP_LANGUAGE`; a value already in the process environment still wins. The
+  responsible and master system are no longer among its keys: they are read
+  as the file's destination's own (see Breaking).
 - **`GetInactiveObjects` reads the older document and keeps a function module's group** (#266).
   BASIS 7.40 answers `adtcore:objectReferences`, which the reader did not know: it answered `count: 0`
   over inactive objects. It now reads that document, refuses a root it does not know instead of

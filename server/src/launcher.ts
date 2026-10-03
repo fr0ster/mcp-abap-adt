@@ -162,16 +162,18 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_CLIENT                     SAP client number
     Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency)
 
-  System Context (on-premise):
-    SAP_MASTER_SYSTEM              SAP system ID (e.g., DEV, QAS). Required for on-prem
-                                   create/update — ensures correct transport request binding.
-                                   Cloud systems resolve this automatically via API.
-    SAP_RESPONSIBLE                Responsible user (optional, falls back to SAP_USERNAME)
+  System Context (a create is refused without both; reads are unaffected):
+    SAP_MASTER_SYSTEM              Master system of created objects (the system id)
+    SAP_RESPONSIBLE                Responsible person (else SAP_USERNAME of the same source)
+                                   Per request, first found wins: the tool's argument; the
+                                   x-sap-* headers below; the destination's own .env (--env /
+                                   --env-path file, or sessions/<destination>.env); the process
+                                   environment; on a cloud system only, the system itself
 
-  HTTP/SSE Headers (System Context):
-    x-sap-master-system              Per-request SAP system ID (overrides SAP_MASTER_SYSTEM)
-    x-sap-responsible                Per-request responsible user (overrides SAP_RESPONSIBLE)
-    x-sap-language                    Per-request master/original language for created objects (overrides SAP_LANGUAGE)
+  HTTP/SSE Headers (System Context; SSE: the session's opening request):
+    x-sap-master-system            Master system for this request (wins over the .env and env)
+    x-sap-responsible              Responsible for this request (wins over the .env and env)
+    x-sap-language                 Master/original language for created objects (overrides SAP_LANGUAGE)
 
 GENERATING A .ENV:
   Install the CLI: npm install -g @mcp-abap-adt/auth-broker-cli

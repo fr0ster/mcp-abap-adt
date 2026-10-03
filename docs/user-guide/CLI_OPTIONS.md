@@ -169,6 +169,10 @@ ignored.
 The environment forms `MCP_DESTINATION`, `MCP_ENV` and `MCP_ALLOW_DESTINATION_HEADER` do **not**
 exist; use `--mcp`, `--env` and `--allow-destination-header` (or their YAML keys).
 
+**Removed in 16.0.0:** `--auth-broker`, `MCP_USE_AUTH_BROKER` and the YAML key `auth-broker`. A
+leftover one stops the start: `<name> was removed in 16.0.0 — remove it from the configuration`,
+naming the form you used.
+
 **--mcp=\<destination\>**
 
 Default destination for the process. Used for every request unless `--allow-destination-header`
@@ -407,11 +411,13 @@ These are typically set in `.env` file:
 - `SAP_URL` - SAP system URL (required)
 - `SAP_CLIENT` - SAP client number (required)
 - `SAP_AUTH_TYPE` - Authentication type: `basic`, `snc` or `jwt` (**required**: a `.env` without it is refused with `Destination "X" lacks: authType`). `saml`, `certificate` and `kerberos` are not supported
-- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default) or `onprem`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
+- `SAP_SYSTEM_TYPE` - SAP system type: `cloud` or `onprem` (same as `--system-type`). The tools offered default to `cloud` — e.g., Programs require `onprem`; the connector and whether the master system is asked of the system default to `cloud` for a `jwt` destination, else `onprem` (never guessed from the URL). **Set it explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
 - `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` `.env`)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
+- `SAP_MASTER_SYSTEM` - Master system of created objects (the system id). In the destination's own `.env` (the `--env` / `--env-path` file, or `sessions/<destination>.env`) or the process environment; the `x-sap-master-system` header wins over both, the destination's `.env` over the environment. On a cloud system the system is asked when none is configured. A create without one is refused, nothing sent
+- `SAP_RESPONSIBLE` - Responsible person of created objects (else `SAP_USERNAME` of the same source). Same order, with the `x-sap-responsible` header. A create without one is refused, nothing sent
 
 **SNC (RFC only, no user, no password):**
 - `SAP_AUTH_TYPE=snc`; start with `--connection-type=rfc`

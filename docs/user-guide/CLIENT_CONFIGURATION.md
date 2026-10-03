@@ -71,8 +71,8 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-login` | Yes* (for basic) | Username for basic authentication | `your_username` |
 | `x-sap-password` | Yes* (for basic) | Password for basic authentication | `your_password` |
 | `x-mcp-destination` | No | A destination name; honoured **only** with `--allow-destination-header` | `TRIAL` |
-| `x-sap-master-system` | No | SAP system ID for on-prem transport binding | `<system id>` |
-| `x-sap-responsible` | No | Responsible user for transport operations | `<user>` |
+| `x-sap-master-system` | No | Master system of created objects; wins over the destination's `.env` and the environment | `<system id>` |
+| `x-sap-responsible` | No | Responsible person of created objects; wins over the destination's `.env` and the environment | `<user>` |
 | `x-sap-language` | No | Master language of created objects | `EN` |
 
 \* A request that carries `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password` is a direct connection. A request that carries neither a destination nor such headers is served from the default destination (`--mcp`, `--env` or `--env-path`), or answered `400` if there is none.
@@ -107,7 +107,7 @@ For on-premise systems using basic authentication:
 
 **Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over the default destination.
 
-**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When provided, they override `SAP_MASTER_SYSTEM` / `SAP_RESPONSIBLE` from `.env` and, for a cloud system, the `getSystemInformation()` API. This is useful for on-premise HTTP/SSE setups where no `.env` file is used.
+**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When present, they win over the destination's `.env`, the process environment and, for a cloud system, the `systeminformation` lookup — for this request only (SSE: for the session the headers opened), whether the request names a destination or carries `x-sap-*` connection headers. A change that ends up without either is refused; see [System context](#system-context-for-on-premise-systems).
 
 ## Destinations
 
@@ -257,9 +257,9 @@ SAP_PASSWORD=your_password
 SAP_CLIENT=100
 SAP_SYSTEM_TYPE=onprem
 
-# System context (required for on-prem create/update operations)
+# System context: a create is refused without both
 SAP_MASTER_SYSTEM=<system id>
-# SAP_RESPONSIBLE is optional — falls back to SAP_USERNAME
+# SAP_RESPONSIBLE is optional — falls back to this file's SAP_USERNAME
 ```
 
 ### SAP System Type
@@ -298,28 +298,35 @@ Use this when one host serves multiple SAP systems per request — for example, 
 
 ### System Context for On-Premise Systems
 
-When creating or updating ABAP objects on on-premise systems, SAP ADT requires `masterSystem` and `responsible` attributes in the XML request body. These ensure that objects are correctly bound to transport requests.
+When creating ABAP objects, SAP ADT takes `masterSystem` and `responsible` attributes in the XML request body (a transport takes its owner); they bind the object to the right system and transport request. The server sends a change only with both.
 
-**How system context is resolved:**
+**How system context is resolved**, per request, each of the two from the first that has it:
 
-| Variable | Purpose | Resolution order |
-|----------|---------|-----------------|
-| `SAP_MASTER_SYSTEM` | SAP system ID (the three-character SID) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only, per call) |
-| `SAP_RESPONSIBLE` | Responsible user for the object | 1. Env var `SAP_RESPONSIBLE` → 2. Env var `SAP_USERNAME` → 3. `getSystemInformation()` API (cloud only, per call) |
+| Order | Source | `responsible` | `masterSystem` |
+|---|---|---|---|
+| 1 | The tool's own argument | `owner` (`CreateTransport`) | — |
+| 2 | Request headers (HTTP/SSE) | `x-sap-responsible` | `x-sap-master-system` |
+| 3 | The destination's own `.env` (`--env` / `--env-path` file, or `sessions/<destination>.env`) | `SAP_RESPONSIBLE`, else that file's `SAP_USERNAME` | `SAP_MASTER_SYSTEM` |
+| 4 | The process environment | `SAP_RESPONSIBLE`, else `SAP_USERNAME` | `SAP_MASTER_SYSTEM` |
+| 5 | Cloud only: `systeminformation` on the connected connection | the system's user | the system id |
+
+The values of steps 2 and 3 live in the request's scope, never in a process-wide cache: two concurrent requests to different destinations, or with different headers, each see their own. The `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are read as that destination's own (step 3) and are not copied into the process environment, so they never become another destination's fallback.
 
 The master system is determined from configuration, or by a request in the cloud — there is no other way. Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type`, else a `jwt` destination is cloud and any other on-premise. It is never guessed from the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: the server's `systemType` option states its kind, then `SAP_SYSTEM_TYPE`, else on-premise.
 
-**On-premise systems**: nothing is asked of the system, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.
+**A change without them is refused.** An operation that sends a responsible or a master system — creating an object, a transport without an `owner` — and finds one missing after all five steps is answered `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE` or `SAP_MASTER_SYSTEM` and the header, and no request is made. Reads are never refused for them.
 
-**Cloud systems** (ABAP Cloud / BTP) resolve the system context per call via the `getSystemInformation()` API on the connected connection — no additional configuration is needed. A cloud destination without `SAP_CLIENT` uses the system's default client.
+**On-premise systems**: nothing is asked of the system, so set `SAP_MASTER_SYSTEM` (and `SAP_RESPONSIBLE`, or rely on `SAP_USERNAME`) in the destination's `.env` or the environment, or send the headers.
+
+**Cloud systems** (ABAP Cloud / BTP) fill what steps 1–4 left out per call from `systeminformation` on the connected connection — no additional configuration is needed. A cloud destination without `SAP_CLIENT` uses the system's default client.
 
 #### Per-request responsible and master system (embedding hosts)
 
 **TL;DR:** a host that serves several SAP users from one process sets the responsible person per request, not in the process context.
 
-The values above live in one process-wide cache. That is right for one MCP session per process. It is wrong for a host that runs requests from different SAP users side by side: every concurrent create would use whichever user wrote the cache last.
+The server's own transports already scope the headers and the destination's `.env` per request (steps 2 and 3 above). An embedding host has its own transport: the process environment (step 4) is one process-wide value, right for one MCP session per process and wrong for a host that runs requests from different SAP users side by side — every concurrent create would use the same user.
 
-Wrap each request in a request scope instead:
+Wrap each request in a request scope instead (`requestContextFromHeaders(headers)` from the same entry point builds one from `x-sap-language`, `x-sap-responsible` and `x-sap-master-system`):
 
 ```typescript
 import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
@@ -335,7 +342,7 @@ How the scope combines with the process context:
 | Key in the scope | Result for this request |
 |---|---|
 | `responsible` / `masterSystem` present (even `undefined`) | The scope's value |
-| `responsible` / `masterSystem` absent | The process value (env / `getSystemInformation()`) |
+| `responsible` / `masterSystem` absent | The process value (the environment, or what `setSystemContext` / `systemContext` stated) |
 | `masterLanguage` | Always the scope's value inside a scope, never the process value |
 
 Outside any scope (stdio) nothing changes.
@@ -345,7 +352,7 @@ Outside any scope (stdio) nothing changes.
 - `responsible` ← the system's user name, `masterSystem` ← its system id.
 - One lookup per connection, only when a call lacks a value. On-premise: no lookup, nothing filled.
 - Only a key that is **absent** counts as missing. A scope carrying `responsible: undefined` has said this request has no responsible, and nothing fills it.
-- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs.
+- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs — and a create that still lacks either value is then refused (`system_context_missing`), nothing sent. A scope that deliberately carries `undefined` is refused the same way when it creates.
 
 Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
 

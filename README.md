@@ -81,6 +81,12 @@ The server supports exactly four authentications; each is a destination stated i
 
 A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes such a `.env` comes from
 `@mcp-abap-adt/auth-broker-cli`. The browser login listens on port `61001` unless `--browser-auth-port` says otherwise.
+
+ADT changes are not made without a responsible person and a master system. Per request each comes
+from the tool's own argument, the `x-sap-responsible` / `x-sap-master-system` headers, the destination's
+own `.env` (`SAP_RESPONSIBLE`, else its `SAP_USERNAME`; `SAP_MASTER_SYSTEM`), the process environment, or —
+on a cloud system only — the system itself. A create that finds neither is refused, naming the key to
+set; nothing is sent. Reads are unaffected. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 Coming from 15.x? See the [16.0 migration note](docs/MIGRATION-16.0.md).
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).

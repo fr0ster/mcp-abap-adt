@@ -6,8 +6,9 @@ for a destination's *credential* (`getProvider`) and gives it to the connector; 
 token first and branches on the authentication type.
 
 **If you only use the tools — read, create, update, activate and the rest — nothing changed in a
-tool name, a parameter or an answer**, with one exception: `DeletePackageLow` lost its
-`connection_config` argument (below). What changed is how a destination is stated, where its session
+tool name, a parameter or an answer**, with two exceptions: `DeletePackageLow` lost its
+`connection_config` argument, and a create that finds no responsible person or no master system is
+refused instead of being sent without them (both below). What changed is how a destination is stated, where its session
 lives and which authentications the server serves. Go through the list that fits you.
 
 All five packages (`lib`, `core`, `compact`, `compact-readonly`, `compact-modify`) are **16.0.0**.
@@ -143,13 +144,28 @@ know some of these; the server does not serve them. What to do instead:
 
 23. **The master system is determined from configuration, or by a request in the cloud — nothing else.**
     The setup-time master-system lookup is gone: setting a destination's context up builds no connection.
-    `SAP_MASTER_SYSTEM`, `SAP_RESPONSIBLE` (else `SAP_USERNAME`) are read from the configuration; for a
-    cloud system the missing ones are asked of the system per call, on the connected connection. Whether a
-    system is cloud is the kind its connection was built for (`SAP_SYSTEM_TYPE` / `--system-type`, else a
-    `jwt` destination is cloud and any other on-premise) — no longer guessed from the URL
-    (`*.hana.ondemand.com`, `http` with a port, else asking the system). On-premise nothing is asked: set
-    `SAP_MASTER_SYSTEM`. A cloud destination without `SAP_CLIENT` uses the system's default client (the
-    lookup no longer fills it in).
+    Whether a system is cloud is the kind its connection was built for (`SAP_SYSTEM_TYPE` /
+    `--system-type`, else a `jwt` destination is cloud and any other on-premise) — no longer guessed from
+    the URL (`*.hana.ondemand.com`, `http` with a port, else asking the system). On-premise nothing is
+    asked. A cloud destination without `SAP_CLIENT` uses the system's default client (the lookup no
+    longer fills it in). **A cloud system on a `basic` destination loses the URL guess:** set
+    `SAP_MASTER_SYSTEM` and `SAP_RESPONSIBLE` (or rely on `SAP_USERNAME`), or start with
+    `--system-type=cloud` — which also switches the connector to the cloud one.
+24. **ADT changes are not made without a responsible person and a master system.** Per request each
+    comes from the first of: the tool's own argument (`CreateTransport`'s `owner`); the
+    `x-sap-responsible` / `x-sap-master-system` headers (now read — they were inert before; SSE: the
+    session's opening request); the destination's own `.env` — `SAP_RESPONSIBLE` (else that file's
+    `SAP_USERNAME`) and `SAP_MASTER_SYSTEM` in the `--env` / `--env-path` file or in
+    `sessions/<destination>.env`, read per destination; the process environment (`SAP_RESPONSIBLE`, else
+    `SAP_USERNAME`; `SAP_MASTER_SYSTEM`); on a cloud system only, `systeminformation`. A create (or a
+    transport without an `owner`) that finds one missing is **refused before any request**:
+    `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE` or `SAP_MASTER_SYSTEM` and the header.
+    In 15.x it was sent without the attribute. Reads are unaffected. **What to do on-premise:** put
+    `SAP_MASTER_SYSTEM` (and `SAP_RESPONSIBLE` unless `SAP_USERNAME` is the right person) in the
+    destination's `.env` — for `--mcp=<name>` that is `sessions/<name>.env`, which 15.x never read for
+    these keys — or in the environment, or send the headers. The `--env` file's `SAP_RESPONSIBLE`,
+    `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the process environment: another
+    destination served by the same process (`x-mcp-destination`) no longer inherits them.
 
 ## If you embed `@mcp-abap-adt/lib` or `@mcp-abap-adt/core`
 
@@ -183,4 +199,12 @@ connection, and never decides cloud from the URL: a connection the server's fact
 settings it was built from; a connection you built yourself (`EmbeddableMcpServer`'s `connection`) takes
 the server's `systemType` option, then `SAP_SYSTEM_TYPE`, else on-premise. A host that passes
 `systemType: 'cloud'` keeps the lookup without setting `SAP_SYSTEM_TYPE`; `systemContextResolver` still
-replaces the resolver (`null` disables it).
+replaces the resolver (`null` disables it). `HandlerExporter` has no `systemType`: its default resolver
+asks a connection you built only under `SAP_SYSTEM_TYPE=cloud`, or pass your own `systemContextResolver`.
+
+`createAdtClient` refuses a change without a responsible or a master system (item 24): an embedder that
+creates objects must state both — `runWithRequestContext({ responsible, masterSystem })` per request,
+`systemContext` / `setSystemContext` for the process, the environment, or a cloud connection the lookup
+can ask. `requestContextFromHeaders(headers)` builds the scope from the `x-sap-*` headers. A custom
+`IDestinations` may implement the optional `systemContextFor(destination)` to supply a destination's own
+values.

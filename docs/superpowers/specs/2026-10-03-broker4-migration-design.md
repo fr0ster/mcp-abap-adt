@@ -206,12 +206,31 @@ interface AuthenticationHandler {
 
 **Building a destination's broker.** The factory composes the destination's
 stores (table above), reads `getConnectionConfig` from the key store, and
-looks up the handler for the stated `authType` / `grantType`. None → an
-`UnsupportedAuthenticationError` (`destination`, `authType`, `grantType` —
-names from the stores' fixed vocabulary, no value): no broker, no provider,
-no login. Found → `new AuthBroker({ serviceKeyStore, sessionStore,
+decides in three steps, each before anything is built:
+
+1. **Is what it states well formed?** The stores answer `authType` and
+   `grantType` as the strings the file holds, unchecked. The factory checks
+   them against the vocabulary broker 4 accepts, held in code:
+   `authType` one of `basic`, `jwt`, `saml`, `snc`; for `jwt` and `saml`,
+   `grantType` one of the `DestinationGrant` names (a list typed
+   `satisfies readonly DestinationGrant[]` and checked exhaustive against
+   the type at compile time, so a contract change breaks the build). A field
+   absent, `''`, or outside the vocabulary is a `DestinationConfigError`
+   (auth-broker's own class: `destination`, `missingFields: ['authType']` or
+   `['grantType']`) — the case section 8's `mcp-auth generate-env --grant`
+   hint is for. The value itself is never quoted: an unknown string reaches
+   no message (H4).
+2. **Is there a handler for it?** Only now, with both names from the
+   vocabulary, the handler is looked up. None → an
+   `UnsupportedAuthenticationError` (`destination`, `authType`, `grantType` —
+   both vetted names): a well-formed authentication this server does not
+   serve.
+3. **Found → `new AuthBroker({ serviceKeyStore, sessionStore,
 ...handler.brokerOptions(context) }, brokerLogger)`, cached for the
-destination with its handler. `settingsFor` calls `handler.checkSettings`.
+   destination with its handler. `settingsFor` calls `handler.checkSettings`.
+
+No broker, no provider and no login exists for a destination that fails step
+1 or 2.
 
 This runs where a session's server is set up (section 4): once under stdio,
 per SSE session, per HTTP request — the first request to a destination
@@ -427,10 +446,12 @@ proven load-bearing by breaking the rule and watching it fail.
 | a named destination's `.env` overrides its key field by field; an XSUAA key without `XSUAA_MCP_URL` is refused naming it | goal |
 | `--mcp=X` builds one broker (count constructor calls) | goal |
 | each handler: the broker it builds gets exactly its `brokerOptions` (the `authorization_code` one: the browser strategy under the login lock; the others: none) | H2 |
-| a destination stating what no handler serves (`saml`, `jwt` / `passcode`, `jwt` / `client_credentials`): `UnsupportedAuthenticationError` naming them; no broker constructed, no `getProvider` | goal |
+| a `jwt` destination without `SAP_GRANT_TYPE`, with `''`, and with an unknown grant: `DestinationConfigError` naming `grantType`, the `mcp-auth` hint, the unknown string absent from the message | H1, H4 |
+| `SAP_AUTH_TYPE` absent and unknown (a made-up string): `DestinationConfigError` naming `authType`, the string absent from the message | H1, H4 |
+| a well-formed destination no handler serves (`saml` / `saml2_bearer`, `jwt` / `passcode`, `jwt` / `client_credentials`): `UnsupportedAuthenticationError` naming them; no broker constructed, no `getProvider` | goal |
+| the grant list is exhaustive over `DestinationGrant` (a type-level check in `test:check`) | H1 |
 | HTTP: a request whose destination has no handler fails; the next request, to one that has, succeeds | goal |
 | `setConnectionContext` with a broker that has no `getToken` / `createTokenRefresher`: still connects | H0 |
-| a `jwt` `.env` without `SAP_GRANT_TYPE`: refused naming `grantType` and the `mcp-auth` hint, no value in the message | H1, H4 |
 | SNC on HTTP: refused naming `connection-type` | goal |
 | parameter table: every row's CLI, env and YAML forms yield the same config; precedence CLI > env > YAML; the generated template lists every row | H7 |
 | `--browser` reaches `browserCallbackStrategy` | goal |

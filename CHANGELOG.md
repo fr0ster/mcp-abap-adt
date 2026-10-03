@@ -48,15 +48,19 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   responsible comes from, first found: the tool's own argument (`CreateTransport`'s `owner`); the
   `x-sap-responsible` header; `SAP_RESPONSIBLE` in the destination's own `.env` (the `--env` /
   `--env-path` file or `sessions/<destination>.env`), then in the process environment; else the login —
-  the destination's `SAP_USERNAME`, the `x-sap-login` header, the process `SAP_USERNAME`; on a cloud
-  system only, `systeminformation`'s user. A create (or a transport without an owner) that finds none
+  on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an `x-sap-url` connection (not of a
+  destination request), the process `SAP_USERNAME`; on a cloud system only `systeminformation`'s user. A create (or a transport without an owner) that finds none
   (SNC or a token you hold, with no `SAP_RESPONSIBLE`) is refused before any request —
   `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the header and the login — where it used
-  to be sent with an empty or missing responsible. The master system comes from the argument,
-  `x-sap-master-system`, `SAP_MASTER_SYSTEM` (destination `.env`, then process), else a cloud system's
+  to be sent with an empty or missing responsible. `CreateBehaviorImplementation`, whose adt-clients class
+  is built with an empty system context, now passes the responsible and master system itself. The one
+  exception is a message class: it is created with the system's own default responsible (adt-clients'
+  message class create takes none, as in 15.x). The master system comes from `x-sap-master-system` (no
+  tool takes it as an argument), `SAP_MASTER_SYSTEM` (destination `.env`, then process), else a cloud system's
   id; otherwise it is left out of the request, as before — never refused. Reads are unaffected. On a
   cloud connection an empty value is filled from `systeminformation` even when a host's request scope
-  carries its key as `undefined`. `SAP_RESPONSIBLE` from any source now wins over every login. The
+  carries its key as `undefined`. `SAP_RESPONSIBLE` from any source now wins over every login, outside a request scope that carries
+  `responsible`. The process environment is read once: a change while the server runs is not picked up. The
   `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the
   process environment: they are that destination's own, and over HTTP/SSE they had become every other
   destination's fallback. `getSystemContext()` no longer reports `SAP_USERNAME` as `responsible`.
@@ -94,8 +98,11 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   headers, or a credential an embedder hands over.
 - **`requestContextFromHeaders`** (`@mcp-abap-adt/lib/request-context`) and the optional
   **`IDestinations.systemContextFor`**: the request scope a request's headers state, and the responsible,
-  login and master system a destination's own `.env` states. `RequestContext` gains `login`
-  (`x-sap-login`, or the destination's `SAP_USERNAME`): the responsible when none is stated.
+  login and master system a destination's own `.env` states. `RequestContext` gains `login` (the
+  destination's `SAP_USERNAME`, or an `x-sap-url` basic connection's `x-sap-login`): the responsible when
+  none is stated, on a connection that is not cloud. A resolver's `{}` means a cloud system that gave
+  nothing; `null` means not asked.
+- **`ListTransports`** filters by the effective responsible alone, no longer by a raw `SAP_USERNAME`.
 - **Shutdown that settles**: on `SIGTERM`, `SIGINT` or the end of stdin the server stops accepting, waits
   up to 30 s for logins and refreshes in flight, and flushes every session; a secret that could not be
   stored, a login or refresh still running at the deadline, a server that did not close, or a failed settle

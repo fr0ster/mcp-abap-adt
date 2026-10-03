@@ -84,12 +84,14 @@ A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes s
 
 A created object always carries its responsible person: the first stated of the tool's own argument,
 the `x-sap-responsible` header, `SAP_RESPONSIBLE` in the destination's own `.env`, then in the process
-environment — else the login (the destination's `SAP_USERNAME`, the `x-sap-login` header, the process
-`SAP_USERNAME`; on a cloud system, the system's user). A create that finds none (SNC, a token you hold)
-is refused naming `SAP_RESPONSIBLE`; nothing is sent. The master system comes from the argument,
-`x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process), else from a cloud
-system itself; otherwise it is left out and the system applies itself — never refused. Reads are
-unaffected. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
+environment — else the login: on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an
+`x-sap-url` connection, the process `SAP_USERNAME`; on a cloud system only the system's user. A create
+that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent. A message
+class is the one exception: it is created with the system's own default responsible. The master system
+comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process) — no tool
+takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
+applies itself — never refused. Reads are unaffected. The process environment is read once: a change
+made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 Coming from 15.x? See the [16.0 migration note](docs/MIGRATION-16.0.md).
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).

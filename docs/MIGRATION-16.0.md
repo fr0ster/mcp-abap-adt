@@ -158,11 +158,15 @@ know some of these; the server does not serve them. What to do instead:
     the `x-sap-responsible` header (now read — it was inert before; SSE: the session's opening request);
     `SAP_RESPONSIBLE` in the destination's own `.env` (the `--env` / `--env-path` file or
     `sessions/<destination>.env`, read per destination), then in the process environment; else the
-    login — the destination's own `SAP_USERNAME`, the `x-sap-login` header, the process `SAP_USERNAME`;
-    on a cloud system only, `systeminformation`'s user. A create (or a transport without an `owner`)
+    login — on-premise the destination's own `SAP_USERNAME`, the `x-sap-login` of an `x-sap-url`
+    connection (a destination request's `x-sap-login` is not read), the process `SAP_USERNAME`; on a
+    cloud system only `systeminformation`'s user, never `SAP_USERNAME` or `x-sap-login`.
+    A create (or a transport without an `owner`)
     that finds none is **refused before any request**: `"error": "system_context_missing"`, naming
     `SAP_RESPONSIBLE`, the header and the login. 15.x sent such a create with an empty or missing
-    responsible. The master system comes from the argument, `x-sap-master-system` (now read),
+    responsible. **The one exception:** a message class is created with the system's own default
+    responsible — adt-clients' message class create takes none (15.x the same) — and is never refused.
+    The master system comes from `x-sap-master-system` (now read; no tool takes it as an argument),
     `SAP_MASTER_SYSTEM` (destination `.env`, then process), else a cloud system's id; otherwise it is
     left out of the request, as in 15.x — never refused. Reads are unaffected.
     **What to do:** on-premise with `basic`, nothing — the login is the responsible. On-premise over SNC
@@ -171,7 +175,9 @@ know some of these; the server does not serve them. What to do instead:
     `x-sap-responsible`. On a cloud system, nothing. The `--env` file's `SAP_RESPONSIBLE`,
     `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the process environment: another
     destination served by the same process (`x-mcp-destination`) no longer inherits them. A
-    `SAP_RESPONSIBLE` set anywhere now wins over every login, the destination's `SAP_USERNAME` included.
+    `SAP_RESPONSIBLE` set anywhere now wins over every login, the destination's `SAP_USERNAME` included
+    (outside a request scope that carries `responsible`). The process environment is read once: a change
+    made to it while the server runs is not picked up.
 
 ## If you embed `@mcp-abap-adt/lib` or `@mcp-abap-adt/core`
 
@@ -211,17 +217,20 @@ asks a connection you built only under `SAP_SYSTEM_TYPE=cloud`, or pass your own
 `createAdtClient` refuses a change without a responsible (item 24); a missing master system is left out.
 The rule an embedder meets:
 
-- **Cloud** (the connection is cloud by the rule above): a responsible or master system that is empty —
+- **Cloud** (the connection is cloud by the rule above): a responsible or master system not stated —
   absent, or carried in your scope as `undefined` — is filled per call from the system's
-  `systeminformation`. A scope that always carries both keys, values possibly `undefined`, still gets the
+  `systeminformation`; a `login` or `SAP_USERNAME` does not stand in for the system's user, and a system
+  that answers no user leaves the create refused. A custom `systemContextResolver` answers `null` for a
+  connection it does not ask (the login then applies) and `{}` for a cloud system that gave nothing. A scope that always carries both keys, values possibly `undefined`, still gets the
   system's values.
 - **On-premise**: nothing is asked of the system. A create needs a responsible, from the tool's
   arguments, your request scope (`runWithRequestContext({ responsible })`, its new `login` field, or the
   `x-sap-*` headers), a destination's `.env`, or the process (`systemContext` / `setSystemContext`,
   `SAP_RESPONSIBLE`, else `SAP_USERNAME`); else it is refused, naming `SAP_RESPONSIBLE`, and nothing is
   sent. The master system is sent when stated and otherwise left out.
-- `RequestContext` gains `login` (the destination's `SAP_USERNAME`, else `x-sap-login`), the responsible
-  when none is stated; `IDestinations.systemContextFor` answers it as `login`, and its `responsible` is
+- `RequestContext` gains `login` (the destination's `SAP_USERNAME`, or the `x-sap-login` of an
+  `x-sap-url` basic connection — `requestContextFromHeaders` does not read it), the responsible when none
+  is stated, on a connection that is not cloud; `IDestinations.systemContextFor` answers it as `login`, and its `responsible` is
   `SAP_RESPONSIBLE` alone. `getSystemContext()` no longer reports `SAP_USERNAME` as `responsible`: the
   login is a fallback the effective context applies, not a stated value.
 - A key your scope carries keeps the process value out, even as `undefined`: one user's process-wide

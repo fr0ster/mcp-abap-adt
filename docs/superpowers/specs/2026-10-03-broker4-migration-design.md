@@ -306,9 +306,11 @@ password, no token (H4).
   `SAP_SYSTEM_TYPE`, else on-premise).
   - *Responsible* — always sent. Its own variable first: the tool argument,
     the request's `x-sap-responsible`, `SAP_RESPONSIBLE` in the destination's
-    own `.env`, then in the process environment. Else the login: the
-    destination's `SAP_USERNAME`, the request's `x-sap-login`, the process
-    `SAP_USERNAME`; on a cloud system, `systeminformation`'s `userName`. A
+    own `.env`, then in the process environment. Else the login: on-premise
+    the destination's `SAP_USERNAME`, the `x-sap-login` of an `x-sap-*`
+    connection (not of a destination request), the process `SAP_USERNAME`;
+    on a cloud system `systeminformation`'s `userName` alone — none of the
+    others counts as a login there. A
     create that finds none (SNC or a handed-over token on-premise, with no
     variable) is refused naming `SAP_RESPONSIBLE` — no empty value is sent.
   - *Master system* — its own variable first: the argument,

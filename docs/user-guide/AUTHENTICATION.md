@@ -145,17 +145,21 @@ system only when one is known. For each request the server takes each from the f
 | 2 | the request's `x-sap-responsible` header | the request's `x-sap-master-system` header |
 | 3 | `SAP_RESPONSIBLE` in the destination's own `.env` | `SAP_MASTER_SYSTEM` in the destination's own `.env` |
 | 4 | `SAP_RESPONSIBLE` in the process environment | `SAP_MASTER_SYSTEM` in the process environment |
-| 5 | the login: the destination's own `SAP_USERNAME` | on a cloud system, the system id (`systeminformation`) |
-| 6 | the login: the request's `x-sap-login` | — left out of the request |
-| 7 | the login: the process `SAP_USERNAME` | |
-| 8 | on a cloud system, the system's user (`systeminformation`) | |
+| 5 | on-premise, the login: the destination's own `SAP_USERNAME` | on a cloud system, the system id (`systeminformation`) |
+| 6 | on-premise, the login: `x-sap-login` of an `x-sap-url` connection | — left out of the request |
+| 7 | on-premise, the login: the process `SAP_USERNAME` | |
+| 8 | on a cloud system, the login is the system's user (`systeminformation`) alone | |
 
 The headers are read per request over HTTP and from the session's opening request over SSE, for a
 destination request and an `x-sap-*` connection request alike. The destination's own `.env` is the
 `--env` / `--env-path` file, or `sessions/<destination>.env` for a named destination (`--mcp`,
 `x-mcp-destination`) — read per destination, so one destination never gets another's. A cloud system is
-asked once per connection, on the connected connection, and only for what is still empty; on-premise
-nothing is asked of the system. Which kind a system is follows the rule above, never its URL.
+asked once per connection, on the connected connection, and only for what is not stated; on-premise
+nothing is asked of the system. Which kind a system is follows the rule above, never its URL. On a cloud
+system steps 5–7 do not count: `SAP_USERNAME` and `x-sap-login` are not its login. `x-sap-login` is the
+login only of an `x-sap-url` basic connection, which logs on with it; on a destination request it is not
+read. The process environment (`SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM`, `SAP_USERNAME`) is read once: a
+change made to it while the server runs is not picked up.
 
 A create (or a transport without an `owner`) that finds no responsible person — on-premise over SNC or
 with a token you hold, with no `SAP_RESPONSIBLE` anywhere — is refused by the server before any request
@@ -163,6 +167,10 @@ is made: the answer is `"error": "system_context_missing"` with words naming `SA
 `x-sap-responsible` header and the login. Nothing is sent with an empty responsible. A missing master
 system is never refused: the attribute is left out and the system applies itself, as in 15.x. A read is
 never refused for either.
+
+**The one exception: a message class.** adt-clients' message class create takes no responsible (15.x the
+same), so a message class is created with the system's own default responsible, whatever is stated, and
+is never refused for a missing one.
 
 ## HTTP/SSE headers
 

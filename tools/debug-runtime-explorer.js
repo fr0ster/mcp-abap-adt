@@ -12,8 +12,12 @@ const { stdin, stdout } = require('node:process');
 // stopped resolving the moment the tree changed.
 const yaml = require('js-yaml');
 const { XMLParser } = require('fast-xml-parser');
-const { createAbapConnection } = require('@mcp-abap-adt/connection');
-const { AuthBrokerFactory } = require('../dist/lib/auth/brokerFactory.js');
+const { createAbapConnection } = require('../dist/lib/connectionFactory.js');
+const { credentialFromSapConfig } = require('../dist/lib/credentialSources.js');
+const {
+  AuthBrokerFactory,
+  browserCallbackStrategy,
+} = require('../dist/lib/auth/index.js');
 const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
@@ -198,6 +202,11 @@ function getDefaultPackageFromTestConfig() {
   return undefined;
 }
 
+/** A config read from the environment, and the credential it describes. */
+function withCredential(settings) {
+  return { settings, credential: credentialFromSapConfig(settings) };
+}
+
 async function buildConnectionConfigFromDestination(destination, logger) {
   const testAuth = getAuthFromTestConfig();
   const browserAuthPortRaw =
@@ -206,7 +215,7 @@ async function buildConnectionConfigFromDestination(destination, logger) {
     (testAuth?.browserAuthPort ? String(testAuth.browserAuthPort) : undefined);
   const browserAuthPort = browserAuthPortRaw
     ? Number.parseInt(browserAuthPortRaw, 10)
-    : 4001;
+    : undefined;
   const authBrokerPath =
     getArgValue('--auth-broker-path') ||
     process.env.AUTH_BROKER_PATH ||
@@ -214,71 +223,23 @@ async function buildConnectionConfigFromDestination(destination, logger) {
     path.join(os.homedir(), '.config', 'mcp-abap-adt');
   const resolvedAuthBrokerPath = path.resolve(resolveHomePath(authBrokerPath));
 
+  // One destination, as the server's launcher builds it: its settings and its
+  // provider. The callback port is the strategy's own (61001) when none is given.
   const factory = new AuthBrokerFactory({
-    defaultMcpDestination: destination,
+    mcpDestination: destination,
     authBrokerPath: resolvedAuthBrokerPath,
     unsafe: false,
-    transportType: 'stdio',
-    useAuthBroker: true,
     browser: getArgValue('--browser') || process.env.MCP_BROWSER || 'system',
-    browserAuthPort:
-      Number.isInteger(browserAuthPort) && browserAuthPort > 0
-        ? browserAuthPort
-        : undefined,
+    ...(Number.isInteger(browserAuthPort) &&
+      browserAuthPort > 0 && { browserAuthPort }),
+    browserStrategy: browserCallbackStrategy,
     logger,
-    storeLogger: logger,
-    brokerLogger: logger,
-    providerLogger: logger,
   });
 
   logger.info(`Using auth broker path: ${resolvedAuthBrokerPath}`);
-
-  await factory.initializeDefaultBroker();
-  const broker =
-    factory.getDefaultBroker?.() ||
-    (await factory.getOrCreateAuthBroker(destination));
-  if (!broker) {
-    throw new Error(`Auth broker not available for destination: ${destination}`);
-  }
-
-  const connectionConfig = await broker.getConnectionConfig(destination);
-  if (!connectionConfig?.serviceUrl) {
-    throw new Error(
-      `Connection config not found for destination: ${destination}`,
-    );
-  }
-
-  let token = connectionConfig.authorizationToken;
-  try {
-    token = await broker.getToken(destination);
-  } catch (error) {
-    logger.warn(
-      `Token refresh skipped for ${destination}: ${error?.message || String(error)}`,
-    );
-  }
-
-  if (connectionConfig.authType === 'basic') {
-    if (!connectionConfig.username || !connectionConfig.password) {
-      throw new Error(`Missing basic auth credentials for destination: ${destination}`);
-    }
-    return {
-      url: connectionConfig.serviceUrl,
-      client: connectionConfig.sapClient || '',
-      authType: 'basic',
-      username: connectionConfig.username,
-      password: connectionConfig.password,
-    };
-  }
-
-  if (!token) {
-    throw new Error(`Missing JWT token for destination: ${destination}`);
-  }
-  return {
-    url: connectionConfig.serviceUrl,
-    client: connectionConfig.sapClient || '',
-    authType: 'jwt',
-    jwtToken: token,
-  };
+  const settings = await factory.settingsFor(destination);
+  const credential = await factory.getProvider(destination);
+  return { settings, credential };
 }
 
 function getProbeNames() {
@@ -753,10 +714,10 @@ async function main() {
   const logger = makeLogger(verbose);
   const testAuth = getAuthFromTestConfig();
   const mcpDestination = getArgValue('--mcp') || testAuth?.destination;
-  const connectionConfig = mcpDestination
+  const { settings: connectionConfig, credential } = mcpDestination
     ? await buildConnectionConfigFromDestination(mcpDestination, logger)
-    : buildConnectionConfig();
-  const connection = createAbapConnection(connectionConfig, logger);
+    : withCredential(buildConnectionConfig());
+  const connection = createAbapConnection(connectionConfig, credential, logger);
   const runtimeContext = {
     connection,
     adt: new AdtClient(connection, logger),

@@ -8,14 +8,18 @@ const { stdin, stdout } = require('node:process');
 
 const dotenv = require('dotenv');
 const { XMLParser } = require('fast-xml-parser');
-const { createAbapConnection } = require('@mcp-abap-adt/connection');
+const { createAbapConnection } = require('../dist/lib/connectionFactory.js');
+const { credentialFromSapConfig } = require('../dist/lib/credentialSources.js');
 const { AdtObjectErrorCodes } = require('@mcp-abap-adt/interfaces-adt');
 const {
   AdtClient,
   AdtRuntimeClient,
   AdtExecutor,
 } = require('@mcp-abap-adt/adt-clients');
-const { AuthBrokerFactory } = require('../dist/lib/auth/brokerFactory.js');
+const {
+  AuthBrokerFactory,
+  browserCallbackStrategy,
+} = require('../dist/lib/auth/index.js');
 
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
@@ -284,6 +288,11 @@ function buildConnectionConfigFromEnv() {
   return cfg;
 }
 
+/** A config read from the environment, and the credential it describes. */
+function withCredential(settings) {
+  return { settings, credential: credentialFromSapConfig(settings) };
+}
+
 async function buildConnectionConfigFromMcpDestination(destination, logger) {
   const authBrokerPath =
     getArgValue('--auth-broker-path') ||
@@ -294,72 +303,25 @@ async function buildConnectionConfigFromMcpDestination(destination, logger) {
     getArgValue('--browser-auth-port') || process.env.MCP_BROWSER_AUTH_PORT;
   const browserAuthPort = browserAuthPortRaw
     ? Number.parseInt(browserAuthPortRaw, 10)
-    : 4001;
+    : undefined;
 
+  // One destination, as the server's launcher builds it: its settings and its
+  // provider. The callback port is the strategy's own (61001) when none is given.
   const factory = new AuthBrokerFactory({
-    defaultMcpDestination: destination,
+    mcpDestination: destination,
     authBrokerPath: resolvedAuthBrokerPath,
     unsafe: false,
-    transportType: 'stdio',
-    useAuthBroker: true,
     browser: getArgValue('--browser') || process.env.MCP_BROWSER || 'system',
-    browserAuthPort:
-      Number.isInteger(browserAuthPort) && browserAuthPort > 0
-        ? browserAuthPort
-        : undefined,
+    ...(Number.isInteger(browserAuthPort) &&
+      browserAuthPort > 0 && { browserAuthPort }),
+    browserStrategy: browserCallbackStrategy,
     logger,
-    storeLogger: logger,
-    brokerLogger: logger,
-    providerLogger: logger,
   });
 
   logger.info(`Using auth broker path: ${resolvedAuthBrokerPath}`);
-  await factory.initializeDefaultBroker();
-  const broker =
-    factory.getDefaultBroker?.() ||
-    (await factory.getOrCreateAuthBroker(destination));
-  if (!broker) {
-    throw new Error(`Auth broker not available for destination: ${destination}`);
-  }
-
-  const connectionConfig = await broker.getConnectionConfig(destination);
-  if (!connectionConfig?.serviceUrl) {
-    throw new Error(
-      `Connection config not found for destination: ${destination}`,
-    );
-  }
-
-  let token = connectionConfig.authorizationToken;
-  try {
-    token = await broker.getToken(destination);
-  } catch (error) {
-    logger.warn(
-      `Token refresh skipped for ${destination}: ${error?.message || String(error)}`,
-    );
-  }
-
-  if (connectionConfig.authType === 'basic') {
-    if (!connectionConfig.username || !connectionConfig.password) {
-      throw new Error(`Missing basic auth credentials for ${destination}`);
-    }
-    return {
-      url: connectionConfig.serviceUrl,
-      client: connectionConfig.sapClient || '',
-      authType: 'basic',
-      username: connectionConfig.username,
-      password: connectionConfig.password,
-    };
-  }
-
-  if (!token) {
-    throw new Error(`Missing JWT token for destination: ${destination}`);
-  }
-  return {
-    url: connectionConfig.serviceUrl,
-    client: connectionConfig.sapClient || '',
-    authType: 'jwt',
-    jwtToken: token,
-  };
+  const settings = await factory.settingsFor(destination);
+  const credential = await factory.getProvider(destination);
+  return { settings, credential };
 }
 
 function parsePayload(data) {
@@ -1070,10 +1032,10 @@ async function main() {
   const packageFromArg = (getArgValue('--package') || '').trim().toUpperCase();
   loadEnvFromArgs(logger);
 
-  const connectionConfig = mcpDestination
+  const { settings: connectionConfig, credential } = mcpDestination
     ? await buildConnectionConfigFromMcpDestination(mcpDestination, logger)
-    : buildConnectionConfigFromEnv();
-  const connection = createAbapConnection(connectionConfig, logger);
+    : withCredential(buildConnectionConfigFromEnv());
+  const connection = createAbapConnection(connectionConfig, credential, logger);
   const userFromSystem = await resolveAbapUserFromSystem(connection, logger);
   const defaultAbapUser =
     userFromSystem || extractDefaultDumpUser(connectionConfig);

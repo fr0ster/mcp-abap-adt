@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
+import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -245,9 +245,9 @@ export class StreamableHttpServer extends BaseMcpServer {
       } catch (err) {
         const answer = destinationFailureAnswer(err);
         if (!answer.known) {
+          // No words for it: its class only — a message may quote a file (H4).
           console.error(
-            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED:`,
-            err,
+            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED: ${errorClassOf(err)}`,
           );
         } else {
           console.error(

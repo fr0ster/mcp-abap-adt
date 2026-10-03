@@ -23,6 +23,7 @@ import type {
 } from '@mcp-abap-adt/interfaces-auth-broker';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { assertDestinationName } from './destinationName';
+import { DestinationRefusal } from './errors';
 
 export type DestinationMode =
   | {
@@ -85,7 +86,9 @@ export function storesFor(
 ): DestinationStores {
   if (mode.kind === 'envFile') {
     if (!fs.existsSync(mode.path)) {
-      throw new Error(`${mode.source}: the file does not exist: ${mode.path}`);
+      throw new DestinationRefusal(
+        `${mode.source}: the file does not exist: ${mode.path}`,
+      );
     }
     const serviceKeyStore = EnvDestinationStore.forFile(mode.path, {
       log: logger,

@@ -33,6 +33,32 @@ export class UnsupportedAuthenticationError extends Error {
   }
 }
 
+/**
+ * A refusal whose words are vetted: built from a parameter label and the
+ * user's own input (a path they gave), never from a file's content. Its
+ * message may be shown as it is.
+ */
+export class DestinationRefusal extends Error {
+  readonly code = 'DESTINATION_REFUSED' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DestinationRefusal';
+  }
+}
+
+/**
+ * A thrown value's class, never its message: what a log line or an answer
+ * may say about an error the server has no words for (H4).
+ */
+export function errorClassOf(error: unknown): string {
+  if (error instanceof Error) {
+    const name = error.constructor?.name;
+    return name && /^[A-Za-z_$][\w$]*$/.test(name) ? name : 'Error';
+  }
+  return typeof error;
+}
+
 /** Settings an authentication cannot use; `setting` names the parameter. */
 export class SettingsError extends Error {
   readonly code = 'UNSUPPORTED_SETTINGS' as const;
@@ -58,7 +84,8 @@ const HINTS: Readonly<Record<string, string>> = {
 /**
  * The words a user reads for an authentication error the server knows:
  * a `DestinationConfigError` (the fields it lacks, then one fixed hint per
- * field with a known remedy) or an `UnsupportedAuthenticationError`.
+ * field with a known remedy), an `UnsupportedAuthenticationError`, or a
+ * `DestinationRefusal` (its own vetted words).
  * `undefined` for anything else — the caller reports it as before. Built from
  * field names and vetted vocabulary only, never a message or a stored value.
  */
@@ -74,6 +101,7 @@ export function describeAuthError(error: unknown): string | undefined {
     }
     return lines.join('\n');
   }
+  if (error instanceof DestinationRefusal) return error.message;
   if (error instanceof UnsupportedAuthenticationError) {
     const which = error.grantType
       ? `${error.authType} / ${error.grantType}`

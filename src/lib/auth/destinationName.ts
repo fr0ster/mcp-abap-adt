@@ -4,6 +4,8 @@
  * before any file is touched. The name is not quoted: it may be a path.
  */
 
+import { DestinationRefusal } from './errors';
+
 const ALLOWED = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
 
 /**
@@ -12,18 +14,22 @@ const ALLOWED = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
  */
 export function assertDestinationName(name: string, source: string): void {
   if (typeof name !== 'string' || name.length === 0) {
-    throw new Error(`${source}: a destination name must not be empty.`);
+    throw new DestinationRefusal(
+      `${source}: a destination name must not be empty.`,
+    );
   }
   if (/[\\/]/.test(name) || name.includes('..')) {
-    throw new Error(
+    throw new DestinationRefusal(
       `${source}: a destination name must not contain a path separator or "..".`,
     );
   }
   if (name.startsWith('.')) {
-    throw new Error(`${source}: a destination name must not start with a dot.`);
+    throw new DestinationRefusal(
+      `${source}: a destination name must not start with a dot.`,
+    );
   }
   if (!ALLOWED.test(name)) {
-    throw new Error(
+    throw new DestinationRefusal(
       `${source}: a destination name may use only letters, digits, "_", "." and "-".`,
     );
   }

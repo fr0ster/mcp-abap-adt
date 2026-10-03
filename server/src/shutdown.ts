@@ -17,7 +17,7 @@
  */
 
 import type { EventEmitter } from 'node:events';
-import type { SettleReport } from '@mcp-abap-adt/lib/auth';
+import { errorClassOf, type SettleReport } from '@mcp-abap-adt/lib/auth';
 
 /** The callback strategy's login timeout: a login waiting on a browser ends by then. */
 export const SHUTDOWN_DEADLINE_MS = 30_000;
@@ -37,15 +37,6 @@ export interface ShutdownOptions {
   exit: (code: number) => void;
   stderr: (line: string) => void;
   processLike: ShutdownProcess;
-}
-
-/** A thrown value's class, never its message. */
-function classOf(error: unknown): string {
-  if (error instanceof Error) {
-    const name = error.constructor?.name;
-    return name && /^[A-Za-z_$][\w$]*$/.test(name) ? name : 'Error';
-  }
-  return typeof error;
 }
 
 function abandonedLine(count: number): string {
@@ -70,7 +61,9 @@ export function installShutdown(options: ShutdownOptions): () => Promise<void> {
           await server.close();
         } catch (error) {
           failed = true;
-          stderr(`[MCP] A server did not close at shutdown: ${classOf(error)}`);
+          stderr(
+            `[MCP] A server did not close at shutdown: ${errorClassOf(error)}`,
+          );
         }
       }),
     );
@@ -83,7 +76,7 @@ export function installShutdown(options: ShutdownOptions): () => Promise<void> {
       if (report.notStored.length > 0 || report.abandoned > 0) failed = true;
     } catch (error) {
       failed = true;
-      stderr(`[MCP] Shutdown did not settle: ${classOf(error)}`);
+      stderr(`[MCP] Shutdown did not settle: ${errorClassOf(error)}`);
     }
     exit(failed ? 1 : 0);
   };

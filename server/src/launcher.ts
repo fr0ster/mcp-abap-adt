@@ -5,6 +5,7 @@ import {
   assertDestinationName,
   browserCallbackStrategy,
   describeAuthError,
+  errorClassOf,
   type IAuthBrokerFactoryConfig,
   type IDestinations,
 } from '@mcp-abap-adt/lib/auth';
@@ -238,6 +239,28 @@ export interface LauncherDeps {
   processLike: ShutdownProcess;
 }
 
+/**
+ * The env file and the parameter it came from. `envFilePath` is
+ * `IServerConfig`'s alias of `envFile`; ServerConfigManager sets both and
+ * states the source. A config made by hand names the field it set.
+ */
+function envFileOf(
+  config: IServerConfig,
+): Pick<IAuthBrokerFactoryConfig, 'envFile'> {
+  const field = config.envFile
+    ? 'envFile'
+    : config.envFilePath
+      ? 'envFilePath'
+      : undefined;
+  if (!field) return {};
+  return {
+    envFile: {
+      path: config[field] as string,
+      source: config.envFileSource ?? `IServerConfig.${field}`,
+    },
+  };
+}
+
 /** The browser of a login when none is given. */
 const DEFAULT_BROWSER = 'system';
 
@@ -251,13 +274,7 @@ export function factoryConfigFrom(
   collaborators: Pick<IAuthBrokerFactoryConfig, 'browserStrategy' | 'logger'>,
 ): IAuthBrokerFactoryConfig {
   return {
-    ...(config.envFile && {
-      envFile: {
-        path: config.envFile,
-        // ServerConfigManager always states it; a hand-made config names the field.
-        source: config.envFileSource ?? 'envFile',
-      },
-    }),
+    ...envFileOf(config),
     ...(config.mcpDestination && { mcpDestination: config.mcpDestination }),
     ...(config.authBrokerPath && { authBrokerPath: config.authBrokerPath }),
     unsafe: config.unsafe ?? false,
@@ -271,11 +288,15 @@ export function factoryConfigFrom(
   };
 }
 
-/** The words a startup failure is reported in: the vetted ones when known. */
-function startupWords(error: unknown): string {
+/**
+ * The words a startup failure is reported in: the error's own vetted words
+ * when the server knows them, else the destination and the error's class —
+ * never its message, which may quote a file it could not parse (H4).
+ */
+function startupWords(error: unknown, destination: string): string {
   return (
     describeAuthError(error) ??
-    (error instanceof Error ? error.message : String(error))
+    `Destination "${destination}" cannot be read: ${errorClassOf(error)}`
   );
 }
 
@@ -316,12 +337,12 @@ async function checkAndSummarise(
     }
     const source = config.mcpDestination
       ? `service-key: ${config.mcpDestination}`
-      : (config.envFile ?? 'unknown');
+      : (config.envFile ?? config.envFilePath ?? 'unknown');
     stderr(formatAuthConfigForDisplay(displayConfig, source));
   } catch (error) {
     // The summary is information: it never stops a start the settings allowed.
     stderr(
-      `[MCP] Warning: Could not display auth config: ${startupWords(error)}`,
+      `[MCP] Warning: Could not display auth config: ${startupWords(error, destination)}`,
     );
   }
 }
@@ -337,7 +358,7 @@ export async function launch(
   options: LauncherOptions,
   deps: LauncherDeps,
 ): Promise<void> {
-  hydrateSystemContextFromEnvFile(config.envFile);
+  hydrateSystemContextFromEnvFile(config.envFile ?? config.envFilePath);
 
   // CLI --connection-type overrides env var
   if (config.connectionType && !process.env.SAP_CONNECTION_TYPE) {
@@ -411,7 +432,7 @@ export async function launch(
       }
       await checkAndSummarise(factory, destination, config, deps.stderr);
     } catch (error) {
-      deps.stderr(`[MCP] ${startupWords(error)}`);
+      deps.stderr(`[MCP] ${startupWords(error, destination)}`);
       deps.exit(1);
       return;
     }

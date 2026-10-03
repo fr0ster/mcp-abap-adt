@@ -22,7 +22,7 @@ import {
   type DestinationStores,
   storesFor,
 } from './destinationStores';
-import { SettingsError } from './errors';
+import { errorClassOf, SettingsError } from './errors';
 import {
   type AuthenticationHandler,
   type AuthHandlerContext,
@@ -43,15 +43,6 @@ interface Built {
   stores: DestinationStores;
 }
 
-/** A thrown value's class, never its message. */
-function classOf(error: unknown): string {
-  if (error instanceof Error) {
-    const name = error.constructor?.name;
-    return name && /^[A-Za-z_$][\w$]*$/.test(name) ? name : 'Error';
-  }
-  return typeof error;
-}
-
 const ENTRY = /^"[^"\n]*": [A-Za-z_$][\w$]*$/;
 
 /**
@@ -64,11 +55,11 @@ function notStoredOf(destination: string, error: unknown): string[] {
     const lines = error.errors.map((entry: unknown) =>
       entry instanceof Error && ENTRY.test(entry.message)
         ? entry.message
-        : `"${destination}": ${classOf(entry)}`,
+        : `"${destination}": ${errorClassOf(entry)}`,
     );
     if (lines.length > 0) return lines;
   }
-  return [`"${destination}": ${classOf(error)}`];
+  return [`"${destination}": ${errorClassOf(error)}`];
 }
 
 export class AuthBrokerFactory implements IAuthBrokerFactory {

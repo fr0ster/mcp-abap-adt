@@ -7,7 +7,12 @@ export { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 export { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 export { AuthBrokerFactory } from './brokerFactory';
 export { assertDestinationName } from './destinationName';
-export { describeAuthError, UnsupportedAuthenticationError } from './errors';
+export {
+  DestinationRefusal,
+  describeAuthError,
+  errorClassOf,
+  UnsupportedAuthenticationError,
+} from './errors';
 export type {
   IAuthBrokerFactory,
   IDestinations,

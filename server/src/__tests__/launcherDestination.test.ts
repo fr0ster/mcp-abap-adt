@@ -26,7 +26,7 @@ import type {
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
-import { launch } from '../launcher.js';
+import { factoryConfigFrom, launch } from '../launcher.js';
 import { SseServer } from '../SseServer.js';
 import { StdioServer } from '../StdioServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
@@ -291,6 +291,28 @@ describe('a destination that cannot be served stops the start', () => {
     },
   );
 
+  it('a key that does not parse: its class, never a slice of the file (H4)', async () => {
+    fs.writeFileSync(
+      path.join(keysDir, 'dest.json'),
+      '{"uaa":{"clientsecret":PLACEHOLDERSECRET}}',
+    );
+    const { stderr, exits } = await run([
+      '--transport=stdio',
+      '--mcp=dest',
+      `--auth-broker-path=${root}`,
+    ]);
+    expect(exits).toEqual([1]);
+    const said = stderr.join('\n');
+    expect(said).toMatch(
+      /^\[MCP\] Destination "dest" cannot be read: [A-Za-z]*Error$/,
+    );
+    for (let i = 0; i + 4 <= 'PLACEHOLDERSECRET'.length; i++) {
+      expect(said).not.toContain('PLACEHOLDERSECRET'.slice(i, i + 4));
+    }
+    expect(said).not.toContain('clientsecret');
+    expect(stdioStart).not.toHaveBeenCalled();
+  });
+
   it('an --env-path file that does not exist: the parameter and the path', async () => {
     const missing = path.join(root, 'nope.env');
     const { stderr, exits } = await run([
@@ -359,5 +381,56 @@ describe('the shutdown is installed for every transport', () => {
     processLike.emit('SIGTERM');
     await new Promise((r) => setTimeout(r, 20));
     expect(exits).toEqual([0]);
+  });
+});
+
+describe('factoryConfigFrom: the env file', () => {
+  const browserStrategy = recordingStrategy().browserStrategy;
+
+  it("envFilePath, IServerConfig's alias, is read too, naming the field", () => {
+    expect(
+      factoryConfigFrom({ envFilePath: '/x/conn.env' }, { browserStrategy })
+        .envFile,
+    ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFilePath' });
+  });
+
+  it('envFile by hand: named by its field', () => {
+    expect(
+      factoryConfigFrom({ envFile: '/x/conn.env' }, { browserStrategy })
+        .envFile,
+    ).toEqual({ path: '/x/conn.env', source: 'IServerConfig.envFile' });
+  });
+
+  it('the source the parser stated wins', () => {
+    expect(
+      factoryConfigFrom(
+        {
+          envFile: '/x/conn.env',
+          envFilePath: '/x/conn.env',
+          envFileSource: 'MCP_ENV_PATH',
+        },
+        { browserStrategy },
+      ).envFile,
+    ).toEqual({ path: '/x/conn.env', source: 'MCP_ENV_PATH' });
+  });
+
+  it('a config with envFilePath alone serves the destination default', async () => {
+    const file = path.join(root, 'conn.env');
+    fs.writeFileSync(file, `${basicLines().join('\n')}\n`);
+    const exits: number[] = [];
+    await launch(
+      { transport: 'stdio', envFilePath: file },
+      { exposition: ['readonly'], includeSearch: false },
+      {
+        browserStrategy,
+        stderr: () => {},
+        exit: (code) => exits.push(code),
+        processLike: Object.assign(new EventEmitter(), {
+          stdin: new EventEmitter(),
+        }),
+      },
+    );
+    expect(exits).toEqual([]);
+    expect(stdioStart).toHaveBeenCalledWith('default');
   });
 });

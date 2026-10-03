@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { IDestinations } from '@mcp-abap-adt/lib/auth';
+import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -447,7 +447,8 @@ export class SseServer {
     if (answer.known) {
       console.error(`[SSE GET] FAILED: ${answer.text}`);
     } else {
-      console.error(`[SSE GET] FAILED:`, error);
+      // No words for it: its class only — a message may quote a file (H4).
+      console.error(`[SSE GET] FAILED: ${errorClassOf(error)}`);
     }
     if (!res.headersSent) {
       res.status(answer.status).send(answer.text);

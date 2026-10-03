@@ -6,6 +6,7 @@
  */
 
 import type { Server } from 'node:http';
+import { inspect } from 'node:util';
 
 // The connector, without a wire: connect() presents the credential it was
 // built with, which is what a first login is.
@@ -35,6 +36,17 @@ import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
 const emptyRegistry = new CompositeHandlersRegistry([]);
 
+/** A value read from a file: it must reach neither an answer nor a log line (H4). */
+const LEAKED = 'PLACEHOLDERSECRET';
+
+/** Everything the transports wrote to console.error, objects inspected whole. */
+const logged = (spy: jest.SpyInstance) =>
+  spy.mock.calls
+    .map((args: unknown[]) =>
+      args.map((a) => (typeof a === 'string' ? a : inspect(a))).join(' '),
+    )
+    .join('\n');
+
 const PATH_LIKE = ['../../etc/x', 'a/b', '.hidden', ''];
 
 function fakeProvider(): IAuthProvider {
@@ -62,6 +74,12 @@ function stubDestinations() {
           'unsupported',
           'saml',
           'saml2_bearer',
+        );
+      }
+      if (destination === 'leaky') {
+        // A store's parse error: V8 quotes the source text it choked on.
+        throw new SyntaxError(
+          `Invalid JSON in file "leaky.json": Unexpected token 'P', ..."ntsecret":${LEAKED}"... is not valid JSON`,
         );
       }
       if (destination === 'misconfigured') {
@@ -188,6 +206,17 @@ describe('StreamableHttpServer: destinations', () => {
     expect(text).not.toContain('Internal Server Error');
   });
 
+  it('an error the server has no words for: answered generically, logged by class only', async () => {
+    await start({ defaultDestination: 'leaky' });
+    const refused = await post();
+    const text = await refused.text();
+    expect(refused.status).toBe(500);
+    expect(text).toBe('Internal Server Error');
+    expect(logged(errorSpy)).toContain('SyntaxError');
+    expect(logged(errorSpy)).not.toContain(LEAKED);
+    expect(logged(errorSpy)).not.toContain('ntsecret');
+  });
+
   it('the default destination is served through settingsFor and getProvider', async () => {
     await start({ defaultDestination: 'good' });
     const served = await post();
@@ -259,6 +288,17 @@ describe('SseServer: destinations, per session', () => {
     expect(served.status).toBe(200);
     expect(served.headers.get('content-type')).toContain('text/event-stream');
     expect(destinations.getProvider).toHaveBeenCalledWith('good');
+  });
+
+  it('an error the server has no words for: answered generically, logged by class only', async () => {
+    await start({ defaultDestination: 'leaky' });
+    const refused = await get();
+    const text = await refused.text();
+    expect(refused.status).toBe(500);
+    expect(text).toBe('Internal Server Error');
+    expect(logged(errorSpy)).toContain('SyntaxError');
+    expect(logged(errorSpy)).not.toContain(LEAKED);
+    expect(logged(errorSpy)).not.toContain('ntsecret');
   });
 
   it('a DestinationConfigError is answered with its fields', async () => {

@@ -310,6 +310,18 @@ password, no token (H4).
   server's own `systemType` option (an embedder's `EmbeddableMcpServer`), then
   `SAP_SYSTEM_TYPE`, else on-premise (controller ruling, for H6: an embedder
   states `systemType` per server without setting the environment).
+  Order (decided 2026-10-03): the tool's arguments; the request's
+  `x-sap-responsible` / `x-sap-master-system` headers; the destination's own
+  `.env` (`SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM`, read per destination — an
+  `--env` file or `sessions/<destination>.env` — not only through the process
+  environment); the process environment (`SAP_RESPONSIBLE`, else
+  `SAP_USERNAME`; `SAP_MASTER_SYSTEM`); for a cloud system, `systeminformation`.
+  An operation that needs either and finds neither is refused by the server,
+  naming the key to set — never sent to ADT with an empty value: ADT changes
+  are not made without them.
+- **Removed parameters are refused** (decided 2026-10-03): `--auth-broker`,
+  `MCP_USE_AUTH_BROKER` and YAML `auth-broker` stop the start, saying they
+  were removed in 16.0.0 and must be dropped from the configuration.
 - **`setConnectionContextFromHeaders(headers)`** — `x-sap-url` (+
   `x-sap-client`) as settings, `credentialFromHeaders` as credential; the
   rest unchanged. `authType` in the settings is `jwt` or `basic` by which

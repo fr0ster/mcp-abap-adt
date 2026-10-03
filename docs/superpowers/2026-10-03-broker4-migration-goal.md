@@ -138,16 +138,15 @@ stated, which the XSUAA fallback below relies on.
   writes renewed tokens there). YAML holds configuration only and changes
   rarely; the server never writes it, and refuses a YAML key that looks like
   a secret or a session value, naming the key, never the value.
-- **Responsible and master system are facts of the connection** (decided
-  2026-10-03): the responsible person is the logged-on user, the master system
-  is the system connected to. Nobody states them. On a cloud system they are
-  read from `systeminformation` (`userName`, `systemID`); on-premise they are
-  not sent, and the system records its logged-on user and itself, as 15.x did.
-  Every way of stating them goes — `SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM`
-  (refused at startup and in a destination's `.env` as removed in 16.0.0),
-  the `x-sap-responsible` / `x-sap-master-system` headers (refused as
-  removed), and the library's request-context / system-context fields for
-  them — and so does any refusal for a missing value.
+- **Responsible and master system** (decided 2026-10-03). The responsible
+  person is always sent: its own variable when stated (tool argument,
+  `x-sap-responsible`, `SAP_RESPONSIBLE` in the destination's `.env` then the
+  process environment), else the login (`SAP_USERNAME` of the destination,
+  `x-sap-login`; on a cloud system `systeminformation`'s `userName`); a
+  create that can find none is refused naming `SAP_RESPONSIBLE`. The master
+  system: its own variable when stated (argument, `x-sap-master-system`,
+  `SAP_MASTER_SYSTEM`), else the system (`systeminformation`'s `systemID` on a
+  cloud system); otherwise it is left out, as 15.x did — never refused.
 - **A destination is read once per process** (decided 2026-10-03). A change
   to a destination's `.env` made from outside — a new password, a token
   handed over again — takes effect when the server restarts. The server does
@@ -210,9 +209,7 @@ stated, which the XSUAA fallback below relies on.
    `setSystemContext` / `getSystemContext` / `return_error` from
    `@mcp-abap-adt/lib/utils`, `@mcp-abap-adt/lib/request-context`.
    cloud-llm-hub is taken into account; it does not decide the architecture
-   (the user, 2026-10-03). One decided exception: a caller no longer states
-   the responsible person or the master system (see *Responsible and master
-   system*); the request-context and system-context fields for them go.
+   (the user, 2026-10-03).
 7. **Every existing auth and connection parameter has a CLI and a YAML
    form**, today's env forms kept and none added, with one precedence.
    Secrets and the session live in `.env` / environment variables, never in

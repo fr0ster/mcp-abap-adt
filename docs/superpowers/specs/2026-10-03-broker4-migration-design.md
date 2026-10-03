@@ -300,25 +300,27 @@ password, no token (H4).
   the master system and responsible are resolved per call on the connected
   connection (`withResolvedSystemContext`), and a cloud destination without
   `SAP_CLIENT` uses the system's default client.
-- **Responsible and master system** (decided 2026-10-03, replacing the
-  earlier configuration order): facts of the connection — the logged-on user
-  and the connected system. On a cloud system (the kind stated, never guessed:
-  a factory-built connection follows `resolveSystemKind`; any other takes the
-  server's `systemType` option, then `SAP_SYSTEM_TYPE`, else on-premise) both
-  come from `systeminformation` on the connected connection, once per
-  connection. On-premise neither is sent; the system applies its logged-on user
-  and itself (15.x behaviour). No configuration, header, tool argument or
-  library call states them; `SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM` (process
-  environment or a destination's `.env`) and the `x-sap-responsible` /
-  `x-sap-master-system` headers are refused as removed in 16.0.0; the
-  `responsible` / `masterSystem` fields leave the request context
-  (`runWithRequestContext`) and the system context (`setSystemContext` /
-  `getSystemContext`); nothing is refused for a missing value.
+- **Responsible and master system** (decided 2026-10-03). The kind of system
+  is stated, never guessed (a factory-built connection follows
+  `resolveSystemKind`; any other takes the server's `systemType` option, then
+  `SAP_SYSTEM_TYPE`, else on-premise).
+  - *Responsible* — always sent. Its own variable first: the tool argument,
+    the request's `x-sap-responsible`, `SAP_RESPONSIBLE` in the destination's
+    own `.env`, then in the process environment. Else the login: the
+    destination's `SAP_USERNAME`, the request's `x-sap-login`, the process
+    `SAP_USERNAME`; on a cloud system, `systeminformation`'s `userName`. A
+    create that finds none (SNC or a handed-over token on-premise, with no
+    variable) is refused naming `SAP_RESPONSIBLE` — no empty value is sent.
+  - *Master system* — its own variable first: the argument,
+    `x-sap-master-system`, `SAP_MASTER_SYSTEM` (destination `.env`, then
+    process). Else the system: `systeminformation`'s `systemID` on a cloud
+    system. Otherwise it is left out of the request, as 15.x did, and the
+    system applies itself — never refused.
+  - Per request, in the request scope; a cloud lookup fills empty values by
+    value, once per connection.
 - **Removed parameters are refused** (decided 2026-10-03): `--auth-broker`,
-  `MCP_USE_AUTH_BROKER`, YAML `auth-broker`, `SAP_RESPONSIBLE` and
-  `SAP_MASTER_SYSTEM` stop the start (or the destination, when found in its
-  `.env`), and the `x-sap-responsible` / `x-sap-master-system` headers fail
-  their request, each saying it was removed in 16.0.0 and must be dropped.
+  `MCP_USE_AUTH_BROKER` and YAML `auth-broker` stop the start, saying they
+  were removed in 16.0.0 and must be dropped from the configuration.
 - **`setConnectionContextFromHeaders(headers)`** — `x-sap-url` (+
   `x-sap-client`) as settings, `credentialFromHeaders` as credential; the
   rest unchanged. `authType` in the settings is `jwt` or `basic` by which

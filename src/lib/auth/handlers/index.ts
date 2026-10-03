@@ -1,0 +1,48 @@
+/**
+ * The authentications this server supports — exactly these four. Adding one
+ * means a handler here, the docs' table and a test; nothing else.
+ */
+
+import { UnsupportedAuthenticationError } from '../errors.js';
+import type { VettedAuthentication } from '../vocabulary.js';
+import { basicHandler } from './basic.js';
+import { jwtAuthorizationCodeHandler } from './jwtAuthorizationCode.js';
+import { jwtNoneHandler } from './jwtNone.js';
+import { sncHandler } from './snc.js';
+import type { AuthenticationHandler } from './types.js';
+
+export type { AuthenticationHandler, AuthHandlerContext } from './types.js';
+
+export const HANDLERS: readonly AuthenticationHandler[] = [
+  basicHandler,
+  sncHandler,
+  jwtAuthorizationCodeHandler,
+  jwtNoneHandler,
+];
+
+const keyOf = (authType: string, grantType?: string) =>
+  grantType ? `${authType}/${grantType}` : authType;
+
+const byKey = new Map(
+  HANDLERS.map((h) => [keyOf(h.authType, h.grantType), h] as const),
+);
+
+/** The handler for a vetted authentication; throws `UnsupportedAuthenticationError`. */
+export function handlerFor(
+  destination: string,
+  vetted: VettedAuthentication,
+): AuthenticationHandler {
+  const found =
+    byKey.get(keyOf(vetted.authType, vetted.grantType)) ??
+    (vetted.authType === 'basic' || vetted.authType === 'snc'
+      ? byKey.get(vetted.authType)
+      : undefined);
+  if (!found) {
+    throw new UnsupportedAuthenticationError(
+      destination,
+      vetted.authType,
+      vetted.grantType,
+    );
+  }
+  return found;
+}

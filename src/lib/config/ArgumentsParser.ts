@@ -6,7 +6,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { readAuthParameters } from './authParameters';
+import { authParameterSource, readAuthParameters } from './authParameters';
 import { resolveEnvFilePath } from './envResolver';
 import type { YamlConfig } from './yamlConfig';
 
@@ -61,6 +61,11 @@ export interface ParsedArguments {
   envDestination?: string;
   /** --env-path as the user gave it */
   envPath?: string;
+  /**
+   * Where `env` came from, as the user gave it: `--env`, `--env-path`,
+   * `MCP_ENV_PATH`, the YAML key, or `working directory .env`.
+   */
+  envFileSource?: string;
   /** TLS certificate file path */
   tlsCert?: string;
   /** TLS private key file path */
@@ -182,11 +187,17 @@ export class ArgumentsParser {
 
     if (resolvedEnv) {
       result.env = resolvedEnv;
+      // The resolver prefers the path over the name; so does the source.
+      const yamlRows = yaml as Record<string, unknown> | null | undefined;
+      result.envFileSource = auth.envPath
+        ? authParameterSource('envPath', args, process.env, yamlRows)
+        : authParameterSource('envDestination', args, process.env, yamlRows);
     } else if (!result.mcp) {
       // Backward-compatible fallback: .env in current directory
       const cwdEnvPath = path.resolve(process.cwd(), '.env');
       if (fs.existsSync(cwdEnvPath)) {
         result.env = cwdEnvPath;
+        result.envFileSource = 'working directory .env';
       }
     }
 

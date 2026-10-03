@@ -9,16 +9,13 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 
 export interface IAuthBrokerFactoryConfig {
   /**
-   * The `.env` file served as the destination `default`
-   * (`--env`, `--env-path`, `MCP_ENV_PATH`, or the working directory's `.env`).
+   * The `.env` file served as the destination `default`, and the parameter it
+   * came from as the user gave it (`--env`, `--env-path`, `MCP_ENV_PATH`, the
+   * YAML key, `working directory .env`): the source names the refusal of a
+   * file that does not exist. No default: whoever sets the path knows where it
+   * came from.
    */
-  envFilePath?: string;
-  /**
-   * The parameter `envFilePath` came from, as the user gave it (`--env`,
-   * `--env-path`, `MCP_ENV_PATH`, `working directory .env`): it names the
-   * refusal of a file that does not exist. `'--env'` when not given.
-   */
-  envFileSource?: string;
+  envFile?: { path: string; source: string };
   /** `--mcp=X`: the destination served when a request names none. */
   mcpDestination?: string;
   /** Base of `service-keys/` and `sessions/` (`--auth-broker-path`). */

@@ -4,7 +4,6 @@
  */
 
 export { ArgumentsParser, type ParsedArguments } from './ArgumentsParser.js';
-export { ConfigLoader } from './ConfigLoader.js';
 export {
   ENV_FILE_CONTEXT_KEYS,
   hydrateSystemContextFromEnvFile,

@@ -247,6 +247,19 @@ export class SseServer {
     });
   }
 
+  /**
+   * Stops taking connections (shutdown, step 1). Requests already running are
+   * not waited for, nor is an open stream: the factory's gate holds them.
+   * Embedded on an external app, there is no listener of its own to stop.
+   */
+  async stop(): Promise<void> {
+    const server = this.standaloneServer;
+    if (!server) return;
+    this.standaloneServer = undefined;
+    server.close();
+    server.closeIdleConnections();
+  }
+
   private async handleGet(req: any, res: any): Promise<void> {
     let destination: string | undefined;
     let fromHeaders = false;

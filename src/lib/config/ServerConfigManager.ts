@@ -157,6 +157,7 @@ export class ServerConfigManager {
       browser: parsed.browser,
       envDestination: parsed.envDestination,
       envPath: parsed.envPath,
+      envFileSource: parsed.envFileSource,
       connectionType: parsed.connectionType,
       systemType: parsed.systemType,
       tls:

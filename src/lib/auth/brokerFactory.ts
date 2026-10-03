@@ -85,7 +85,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     this.config = config;
     this.defaultDestination =
       config.mcpDestination ??
-      (config.envFilePath ? ENV_FILE_DESTINATION : undefined);
+      (config.envFile ? ENV_FILE_DESTINATION : undefined);
     this.context = {
       browser: config.browser,
       ...(config.browserAuthPort !== undefined && {
@@ -220,13 +220,9 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   }
 
   private modeOf(destination: string): DestinationMode {
-    const { envFilePath } = this.config;
-    if (envFilePath && destination === ENV_FILE_DESTINATION) {
-      return {
-        kind: 'envFile',
-        path: envFilePath,
-        source: this.config.envFileSource ?? '--env',
-      };
+    const { envFile } = this.config;
+    if (envFile && destination === ENV_FILE_DESTINATION) {
+      return { kind: 'envFile', path: envFile.path, source: envFile.source };
     }
     return {
       kind: 'named',

@@ -51,6 +51,14 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # The server package's own tests: the root Jest's roots are `src` and
+      # `compact*`, so `server/src/__tests__` never ran in CI before.
+      - name: Type-check server tests
+        run: npm --prefix server run test:check
+
+      - name: Run server tests
+        run: npm --prefix server test
+
       - name: Security audit (production deps, high+)
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high

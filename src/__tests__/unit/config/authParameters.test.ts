@@ -1,3 +1,6 @@
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { load } from 'js-yaml';
 import { ArgumentsParser } from '../../../lib/config/ArgumentsParser';
 import {
@@ -325,5 +328,67 @@ describe('through the parser and the manager', () => {
       if (before === undefined) delete process.env.SAP_SYSTEM_TYPE;
       else process.env.SAP_SYSTEM_TYPE = before;
     }
+  });
+});
+
+/**
+ * The env file's source, as the user gave it: it names the refusal of a file
+ * that does not exist (Ruling 3), so it must be the form actually used.
+ */
+describe('the env file names its source', () => {
+  let dir: string;
+  const savedCwd = process.cwd();
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'env-source-'));
+    process.chdir(dir);
+  });
+  afterEach(() => {
+    process.chdir(savedCwd);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  const parse = (yaml?: Record<string, unknown>) =>
+    ArgumentsParser.parse(yaml as never);
+
+  it.each([
+    [['--env-path=./conn.env'], {}, undefined, '--env-path'],
+    [['--env=./conn.env'], {}, undefined, '--env'],
+    [[], { MCP_ENV_PATH: './conn.env' }, undefined, 'MCP_ENV_PATH'],
+    [[], {}, { 'env-path': './conn.env' }, 'env-path (config file)'],
+    [[], {}, { env: './conn.env' }, 'env (config file)'],
+    // --env-path wins over --env, as the resolver does
+    [
+      ['--env=./other.env', '--env-path=./conn.env'],
+      {},
+      undefined,
+      '--env-path',
+    ],
+  ] as const)('%j %j %j → %s', (argv, env, yaml, source) => {
+    process.argv = ['node', 'server', ...argv];
+    Object.assign(process.env, env);
+    const parsed = parse(yaml);
+    expect(parsed.env).toBe(path.resolve(dir, 'conn.env'));
+    expect(parsed.envFileSource).toBe(source);
+  });
+
+  it("the working directory's .env → 'working directory .env'", () => {
+    fs.writeFileSync(
+      path.join(dir, '.env'),
+      'SAP_URL=https://x.example.test\n',
+    );
+    const parsed = parse();
+    expect(parsed.env).toBe(path.resolve(dir, '.env'));
+    expect(parsed.envFileSource).toBe('working directory .env');
+  });
+
+  it('no env file → no source', () => {
+    expect(parse().envFileSource).toBeUndefined();
+  });
+
+  it('reaches IServerConfig through the manager', () => {
+    process.argv = ['node', 'server', '--env-path=./conn.env'];
+    expect(new ServerConfigManager().getConfigSync().envFileSource).toBe(
+      '--env-path',
+    );
   });
 });

@@ -230,6 +230,30 @@ export function readAuthParameters(
 }
 
 /**
+ * The form a parameter was read from, named as a refusal names it: `--env`,
+ * `MCP_ENV_PATH`, `env-path (config file)`. Undefined when it is set nowhere.
+ * Same precedence as `readAuthParameters`.
+ */
+export function authParameterSource(
+  key: AuthParameterKey,
+  argv: readonly string[],
+  env: NodeJS.ProcessEnv,
+  yaml?: Record<string, unknown> | null,
+): string | undefined {
+  const p = AUTH_PARAMETERS.find((row) => row.key === key);
+  if (!p) return undefined;
+  const sources: [Source, unknown][] = [
+    ['cli', readCli(p, argv)],
+    ['env', p.env === undefined ? undefined : env[p.env]],
+    ['yaml', yaml?.[p.yaml]],
+  ];
+  for (const [source, raw] of sources) {
+    if (convert(p, source, raw) !== undefined) return nameIn(p, source);
+  }
+  return undefined;
+}
+
+/**
  * A YAML key that names a secret or a session value. YAML is configuration
  * only: secrets and the session live in .env or the environment.
  */

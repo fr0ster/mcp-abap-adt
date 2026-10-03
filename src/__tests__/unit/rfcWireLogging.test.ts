@@ -1,5 +1,6 @@
 import { RfcTransport } from '@mcp-abap-adt/connection';
 import { createAbapConnection } from '../../lib/connectionFactory';
+import { credentialFromSapConfig } from '../../lib/credentialSources';
 
 /**
  * Whether the RFC wire logs what it carries, and who decides.
@@ -33,6 +34,9 @@ const rfcConfig = {
   sysnr: '00',
 };
 
+/** The destination's credential: the connector's second argument. */
+const credential = credentialFromSapConfig(rfcConfig as never);
+
 /** The third argument `RfcTransport` was constructed with. */
 const optionsFromLastCall = () =>
   (RfcTransport as unknown as jest.Mock).mock.calls.at(-1)?.[2];
@@ -59,7 +63,7 @@ describe('the RFC wire logs only when asked', () => {
   });
 
   const connect = () =>
-    createAbapConnection(rfcConfig as never, undefined, undefined);
+    createAbapConnection(rfcConfig as never, credential, undefined);
 
   it('stays off when nothing asked for it', () => {
     delete process.env.DEBUG_RFC_WIRE;
@@ -128,13 +132,13 @@ describe('the RFC wire logs only when asked', () => {
    */
   it('brings a logger when the caller has none and the wire was asked for', () => {
     process.env.DEBUG_RFC_WIRE = 'true';
-    createAbapConnection(rfcConfig as never, undefined, undefined);
+    createAbapConnection(rfcConfig as never, credential, undefined);
     expect(loggerFromLastCall()).toBeDefined();
   });
 
   it('leaves the caller without one when the wire was not asked for', () => {
     delete process.env.DEBUG_RFC_WIRE;
-    createAbapConnection(rfcConfig as never, undefined, undefined);
+    createAbapConnection(rfcConfig as never, credential, undefined);
     expect(loggerFromLastCall()).toBeUndefined();
   });
 
@@ -148,7 +152,7 @@ describe('the RFC wire logs only when asked', () => {
    */
   it('writes to stderr, never to the stream JSON-RPC uses', () => {
     process.env.DEBUG_RFC_WIRE = 'true';
-    createAbapConnection(rfcConfig as never, undefined, undefined);
+    createAbapConnection(rfcConfig as never, credential, undefined);
     const supplied = loggerFromLastCall() as {
       debug: (m: string) => void;
       info: (m: string) => void;
@@ -184,7 +188,7 @@ describe('the RFC wire logs only when asked', () => {
   it("never replaces the caller's own logger", () => {
     process.env.DEBUG_RFC_WIRE = 'true';
     const mine = { debug() {}, info() {}, warn() {}, error() {} };
-    createAbapConnection(rfcConfig as never, mine as never, undefined);
+    createAbapConnection(rfcConfig as never, credential, mine as never);
     expect(loggerFromLastCall()).toBe(mine);
   });
 

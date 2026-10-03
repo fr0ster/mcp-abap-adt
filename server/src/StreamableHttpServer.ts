@@ -360,6 +360,19 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
+   * Stops taking connections (shutdown, step 1). Requests already running are
+   * not waited for, nor is an open stream: the factory's gate holds them.
+   * Embedded on an external app, there is no listener of its own to stop.
+   */
+  async stop(): Promise<void> {
+    const server = this.standaloneServer;
+    if (!server) return;
+    this.standaloneServer = undefined;
+    server.close();
+    server.closeIdleConnections();
+  }
+
+  /**
    * Check if request has SAP connection headers
    */
   private hasSapConnectionHeaders(

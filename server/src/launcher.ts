@@ -1,7 +1,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AuthBrokerFactory, type IDestinations } from '@mcp-abap-adt/lib/auth';
-import type { HandlerSet } from '@mcp-abap-adt/lib/config';
+import {
+  AuthBrokerFactory,
+  assertDestinationName,
+  browserCallbackStrategy,
+  describeAuthError,
+  type IAuthBrokerFactoryConfig,
+  type IDestinations,
+} from '@mcp-abap-adt/lib/auth';
+import type { HandlerSet, IServerConfig } from '@mcp-abap-adt/lib/config';
 import {
   hydrateSystemContextFromEnvFile,
   ServerConfigManager,
@@ -21,10 +28,10 @@ import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
-import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
+import { installShutdown, type ShutdownProcess } from './shutdown.js';
 
 const stderrLogger = {
   info: (...args: any[]) => console.error(...args),
@@ -212,6 +219,124 @@ export async function main(options: LauncherOptions = {}) {
   // Use ServerConfigManager for all config parsing
   const configManager = new ServerConfigManager();
   const config = await configManager.getConfig();
+  await launch(config, options, {
+    browserStrategy: browserCallbackStrategy,
+    stderr: (line) => process.stderr.write(`${line}\n`),
+    exit: (code) => process.exit(code),
+    processLike: process,
+  });
+}
+
+/** What the launcher takes from the program: the process's edges, and the login strategy. */
+export interface LauncherDeps {
+  /** auth-providers' `browserCallbackStrategy` in the program (Ruling 1). */
+  browserStrategy: IAuthBrokerFactoryConfig['browserStrategy'];
+  /** One line to stderr; nothing the launcher says goes to stdout (H3). */
+  stderr: (line: string) => void;
+  exit: (code: number) => void;
+  /** Where the shutdown listens: `process` in the program. */
+  processLike: ShutdownProcess;
+}
+
+/** The browser of a login when none is given. */
+const DEFAULT_BROWSER = 'system';
+
+/**
+ * The factory's configuration, read from the parameters alone. The callback
+ * port is left to the strategy (61001) when none is given; the env file
+ * carries the parameter it came from, as the user gave it.
+ */
+export function factoryConfigFrom(
+  config: IServerConfig,
+  collaborators: Pick<IAuthBrokerFactoryConfig, 'browserStrategy' | 'logger'>,
+): IAuthBrokerFactoryConfig {
+  return {
+    ...(config.envFile && {
+      envFile: {
+        path: config.envFile,
+        // ServerConfigManager always states it; a hand-made config names the field.
+        source: config.envFileSource ?? 'envFile',
+      },
+    }),
+    ...(config.mcpDestination && { mcpDestination: config.mcpDestination }),
+    ...(config.authBrokerPath && { authBrokerPath: config.authBrokerPath }),
+    unsafe: config.unsafe ?? false,
+    browser: config.browser ?? DEFAULT_BROWSER,
+    ...(config.browserAuthPort !== undefined && {
+      browserAuthPort: config.browserAuthPort,
+    }),
+    ...(config.connectionType && { connectionType: config.connectionType }),
+    browserStrategy: collaborators.browserStrategy,
+    ...(collaborators.logger && { logger: collaborators.logger }),
+  };
+}
+
+/** The words a startup failure is reported in: the vetted ones when known. */
+function startupWords(error: unknown): string {
+  return (
+    describeAuthError(error) ??
+    (error instanceof Error ? error.message : String(error))
+  );
+}
+
+/**
+ * The startup summary: the destination's settings, then what its stores
+ * hold, masked as before (H4's one exception). The settings are read first
+ * and their failure is the caller's: a destination that cannot be served
+ * stops the start.
+ */
+async function checkAndSummarise(
+  factory: AuthBrokerFactory,
+  destination: string,
+  config: IServerConfig,
+  stderr: (line: string) => void,
+): Promise<void> {
+  const settings = await factory.settingsFor(destination);
+  try {
+    const broker = await factory.getBroker(destination);
+    const connConfig = await broker.getConnectionConfig(destination);
+    const displayConfig: AuthDisplayConfig = {
+      serviceUrl: settings.url,
+      sapClient: settings.client,
+      authType: settings.authType,
+      username: connConfig?.username,
+      password: connConfig?.password,
+      jwtToken: connConfig?.authorizationToken,
+    };
+    try {
+      const authConfig = await broker.getAuthorizationConfig(destination);
+      if (authConfig) {
+        displayConfig.uaaUrl = authConfig.uaaUrl;
+        displayConfig.uaaClientId = authConfig.uaaClientId;
+        displayConfig.uaaClientSecret = authConfig.uaaClientSecret;
+        displayConfig.refreshToken = authConfig.refreshToken;
+      }
+    } catch {
+      // The client is optional: a destination without one shows none.
+    }
+    const source = config.mcpDestination
+      ? `service-key: ${config.mcpDestination}`
+      : (config.envFile ?? 'unknown');
+    stderr(formatAuthConfigForDisplay(displayConfig, source));
+  } catch (error) {
+    // The summary is information: it never stops a start the settings allowed.
+    stderr(
+      `[MCP] Warning: Could not display auth config: ${startupWords(error)}`,
+    );
+  }
+}
+
+/**
+ * Everything after the parameters are read: the tool list, one factory, the
+ * destination the process serves checked and summarised, the transport, and
+ * the shutdown. A destination that cannot be served stops the start before
+ * any transport does.
+ */
+export async function launch(
+  config: IServerConfig,
+  options: LauncherOptions,
+  deps: LauncherDeps,
+): Promise<void> {
   hydrateSystemContextFromEnvFile(config.envFile);
 
   // CLI --connection-type overrides env var
@@ -270,93 +395,42 @@ export async function main(options: LauncherOptions = {}) {
 
   const handlersRegistry = new CompositeHandlersRegistry(handlerGroups);
 
-  // Create auth broker config using adapter
-  const brokerConfig = AuthBrokerConfig.fromServerConfig(
-    config,
-    loggerForTransport,
+  const factory = new AuthBrokerFactory(
+    factoryConfigFrom(config, {
+      browserStrategy: deps.browserStrategy,
+      logger: loggerForTransport,
+    }),
   );
-  const authBrokerFactory = new AuthBrokerFactory(brokerConfig);
 
-  // Initialize default broker (important for .env file support)
-  await authBrokerFactory.initializeDefaultBroker();
-
-  // Display auth configuration at startup (always show for transparency)
-  const defaultBroker = authBrokerFactory.getDefaultBroker();
-  if (defaultBroker) {
+  // --mcp=X → X; an --env file → default; neither → none (one destination either way).
+  const destination = factory.defaultDestination;
+  if (destination) {
     try {
-      // Get connection config from broker to display
-      const connConfig = await defaultBroker.getConnectionConfig(
-        config.mcpDestination || 'default',
-      );
-
-      if (connConfig) {
-        const displayConfig: AuthDisplayConfig = {
-          serviceUrl: connConfig.serviceUrl,
-          sapClient: connConfig.sapClient,
-          authType: connConfig.authType,
-          username: connConfig.username,
-          password: connConfig.password,
-          jwtToken: connConfig.authorizationToken,
-        };
-
-        // Try to get auth config for UAA details
-        try {
-          const authConfig = await (
-            defaultBroker as any
-          ).sessionStore?.getAuthorizationConfig?.(
-            config.mcpDestination || 'default',
-          );
-          if (authConfig) {
-            displayConfig.uaaUrl = authConfig.uaaUrl;
-            displayConfig.uaaClientId = authConfig.uaaClientId;
-            displayConfig.uaaClientSecret = authConfig.uaaClientSecret;
-            displayConfig.refreshToken = authConfig.refreshToken;
-          }
-        } catch {
-          // Ignore - auth config is optional
-        }
-
-        // Determine source
-        let source = 'unknown';
-        if (config.mcpDestination) {
-          source = `service-key: ${config.mcpDestination}`;
-        } else if (config.envFile) {
-          source = config.envFile;
-        }
-
-        console.error(formatAuthConfigForDisplay(displayConfig, source));
+      if (config.mcpDestination) {
+        assertDestinationName(config.mcpDestination, '--mcp');
       }
+      await checkAndSummarise(factory, destination, config, deps.stderr);
     } catch (error) {
-      // Don't fail startup if we can't display config
-      console.error(
-        `[MCP] Warning: Could not display auth config: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      deps.stderr(`[MCP] ${startupWords(error)}`);
+      deps.exit(1);
+      return;
     }
-  } else if (config.envFile || config.mcpDestination) {
-    // Broker not created but config was expected
-    console.error(
-      `[MCP] Warning: Auth broker not initialized. Config source: ${config.envFile || config.mcpDestination}`,
-    );
   }
 
   if (config.transport === 'stdio') {
-    // For .env file, use 'default'; for --mcp, use specified destination
-    const configuredDestination =
-      config.mcpDestination ?? (config.envFile ? 'default' : undefined);
+    let destinations: IDestinations = factory;
+    let served: string;
 
-    let destinations: IDestinations = authBrokerFactory;
-    let destination: string;
-
-    if (configuredDestination) {
-      destination = configuredDestination;
+    if (destination) {
+      served = destination;
     } else {
       // Inspection-only mode: no connection parameters provided
       destinations = inspectionOnlyDestinations();
-      destination = 'mock';
-      console.error(
+      served = 'mock';
+      deps.stderr(
         '[MCP] Starting in inspection-only mode (no connection parameters).',
       );
-      console.error(
+      deps.stderr(
         '[MCP] To connect to SAP system, use --mcp=<destination> or --env-path=<path>',
       );
     }
@@ -365,18 +439,26 @@ export async function main(options: LauncherOptions = {}) {
       logger: loggerForTransport,
     });
     activeServer = server;
-    await server.start(destination);
+    // Under stdio a signal is not the end of input: the factory's gate holds.
+    installShutdown({
+      factory,
+      servers: [],
+      onStdinEnd: true,
+      exit: deps.exit,
+      stderr: deps.stderr,
+      processLike: deps.processLike,
+    });
+    await server.start(served);
     return;
   }
 
   if (config.transport === 'sse') {
-    const server = new SseServer(handlersRegistry, authBrokerFactory, {
+    const server = new SseServer(handlersRegistry, factory, {
       host: config.host,
       port: config.port,
       ssePath: config.ssePath,
       postPath: config.postPath,
-      defaultDestination:
-        config.mcpDestination ?? (config.envFile ? 'default' : undefined),
+      defaultDestination: destination,
       logger: loggerForTransport,
       tls: config.tls,
       allowDestinationHeader: config.allowDestinationHeader,
@@ -385,18 +467,24 @@ export async function main(options: LauncherOptions = {}) {
       enableDnsRebindingProtection: config.enableDnsRebindingProtection,
     });
     activeServer = server;
+    installShutdown({
+      factory,
+      servers: [{ close: () => server.stop() }],
+      exit: deps.exit,
+      stderr: deps.stderr,
+      processLike: deps.processLike,
+    });
     await server.start();
     return;
   }
 
   // http
-  const server = new StreamableHttpServer(handlersRegistry, authBrokerFactory, {
+  const server = new StreamableHttpServer(handlersRegistry, factory, {
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,
     path: config.httpPath,
-    defaultDestination:
-      config.mcpDestination ?? (config.envFile ? 'default' : undefined),
+    defaultDestination: destination,
     logger: loggerForTransport,
     tls: config.tls,
     allowDestinationHeader: config.allowDestinationHeader,
@@ -405,6 +493,13 @@ export async function main(options: LauncherOptions = {}) {
     enableDnsRebindingProtection: config.enableDnsRebindingProtection,
   });
   activeServer = server;
+  installShutdown({
+    factory,
+    servers: [{ close: () => server.stop() }],
+    exit: deps.exit,
+    stderr: deps.stderr,
+    processLike: deps.processLike,
+  });
   await server.start();
 }
 

@@ -314,7 +314,9 @@ describe('AuthBrokerFactory', () => {
           'SAP_JWT_TOKEN=placeholder-token',
         ].join('\n'),
       );
-      await factory({ envFilePath: file }).getBroker('default');
+      await factory({ envFile: { path: file, source: '--env' } }).getBroker(
+        'default',
+      );
       const config = constructed.mock.calls[0][0];
       expect(Object.keys(config).sort()).toEqual([
         'serviceKeyStore',
@@ -370,9 +372,9 @@ describe('AuthBrokerFactory', () => {
           'SAP_REFRESH_TOKEN=placeholder-refresh',
         ].join('\n'),
       );
-      const settings = await factory({ envFilePath: file }).settingsFor(
-        'default',
-      );
+      const settings = await factory({
+        envFile: { path: file, source: '--env' },
+      }).settingsFor('default');
       expect(settings).toEqual({
         url: SYSTEM_URL,
         authType: 'jwt',
@@ -586,8 +588,9 @@ describe('AuthBrokerFactory', () => {
     });
     it('an env file → default', () => {
       expect(
-        factory({ envFilePath: path.join(root, 'conn.env') })
-          .defaultDestination,
+        factory({
+          envFile: { path: path.join(root, 'conn.env'), source: '--env' },
+        }).defaultDestination,
       ).toBe('default');
     });
     it('neither → undefined', () => {
@@ -600,8 +603,7 @@ describe('AuthBrokerFactory', () => {
       const missing = path.join(root, 'nope.env');
       const err = await caught(
         factory({
-          envFilePath: missing,
-          envFileSource: '--env-path',
+          envFile: { path: missing, source: '--env-path' },
         }).getBroker('default'),
       );
       expect((err as Error).message).toBe(
@@ -613,7 +615,7 @@ describe('AuthBrokerFactory', () => {
       const file = path.join(root, 'conn.env');
       fs.writeFileSync(file, `SAP_URL=${SYSTEM_URL}\nSAP_AUTH_TYPE=basic\n`);
       basic('dest');
-      const f = factory({ envFilePath: file });
+      const f = factory({ envFile: { path: file, source: '--env' } });
       expect((await f.settingsFor('dest')).client).toBe('100');
       expect((await f.settingsFor('default')).client).toBeUndefined();
     });
@@ -717,7 +719,7 @@ describe('AuthBrokerFactory', () => {
     }
 
     it('a refresh held while settle(30_000) runs: it answers, its token is stored, abandoned 0', async () => {
-      const f = factory({ envFilePath: envFile });
+      const f = factory({ envFile: { path: envFile, source: '--env' } });
       const { answered } = await refreshing(f);
       let settled = false;
       const settling = f.settle(30_000).then((r) => {
@@ -737,7 +739,7 @@ describe('AuthBrokerFactory', () => {
     });
 
     it('a refresh held past a short deadline: abandoned 1', async () => {
-      const f = factory({ envFilePath: envFile });
+      const f = factory({ envFile: { path: envFile, source: '--env' } });
       const { answered } = await refreshing(f);
       await expect(f.settle(50)).resolves.toEqual({
         abandoned: 1,
@@ -748,7 +750,7 @@ describe('AuthBrokerFactory', () => {
     });
 
     it('a 401 after settle began: the shutdown refusal, the inner provider never called, nothing written after the flush', async () => {
-      const f = factory({ envFilePath: envFile });
+      const f = factory({ envFile: { path: envFile, source: '--env' } });
       const { provider, answered } = await refreshing(f);
       const broker = await f.getBroker('default');
       const inner = await broker.getProvider('default');

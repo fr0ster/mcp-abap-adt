@@ -63,6 +63,7 @@
     "prebuild": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "build": "npx tsc -p tsconfig.json",
     "test": "jest --passWithNoTests",
+    "test:check": "npx tsc --noEmit -p tsconfig.test.json",
     "lint:check": "npx biome check src",
     "prepublishOnly": "npm run build",
     "start": "node ./bin/mcp-abap-adt.js",

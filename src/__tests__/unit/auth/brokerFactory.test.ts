@@ -479,6 +479,21 @@ describe('AuthBrokerFactory', () => {
   });
 
   describe('getProvider', () => {
+    it('a named jwt / none destination without --unsafe: lacks authorizationToken, with the hint', async () => {
+      writeSession('dest', [
+        `SAP_URL=${SYSTEM_URL}`,
+        'SAP_AUTH_TYPE=jwt',
+        'SAP_GRANT_TYPE=none',
+        'SAP_JWT_TOKEN=placeholder-token',
+      ]);
+      const err = await caught(factory({ unsafe: false }).getProvider('dest'));
+      expect(err).toBeInstanceOf(DestinationConfigError);
+      const text = describeAuthError(err);
+      expect(text).toContain('Destination "dest" lacks: authorizationToken');
+      expect(text).toContain('is read only with --unsafe');
+      expect(text).not.toContain('placeholder-token');
+    });
+
     it('the same counted object for every call on a destination', async () => {
       basic('dest');
       const f = factory();
@@ -810,6 +825,8 @@ describe('describeAuthError', () => {
     XSUAA_MCP_URL:
       "Set XSUAA_MCP_URL in the destination's sessions/<destination>.env to the system's URL.",
     'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
+    authorizationToken:
+      'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
   } as const;
 
   it.each(Object.keys(HINTS) as Array<keyof typeof HINTS>)(

@@ -58,7 +58,10 @@ know some of these; the server does not serve them. What to do instead:
 5. **An `--env` / `--env-path` / working-directory `.env` is now written back** with a renewed token,
    whatever `--unsafe` says (only the secret keys are rewritten). Keep that file somewhere the server
    may write, and out of version control. Named destinations behave as before: the session is on disk
-   only with `--unsafe`, otherwise in memory.
+   only with `--unsafe`, otherwise in memory. That holds for reading too: a named `jwt` / `none`
+   destination whose token is in `sessions/X.env` is refused without `--unsafe`
+   (`Destination "X" lacks: authorizationToken`, with a hint). Add `--unsafe`, or serve the file with
+   `--env=X` or `--env-path`.
 6. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
    watches the files: a new password, or a token you hand over again, needs a restart.
 7. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads

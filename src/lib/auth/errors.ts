@@ -79,6 +79,8 @@ const HINTS: Readonly<Record<string, string>> = {
   XSUAA_MCP_URL:
     "Set XSUAA_MCP_URL in the destination's sessions/<destination>.env to the system's URL.",
   'connection-type': 'SNC logs on over RFC: set --connection-type=rfc.',
+  authorizationToken:
+    'A token in sessions/<destination>.env is read only with --unsafe: start with --unsafe, or serve the file with --env=<destination> or --env-path.',
 };
 
 /**

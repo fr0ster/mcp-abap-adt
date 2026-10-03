@@ -81,6 +81,10 @@ The session — the token and its refresh token — is the server's to keep curr
   file stays as it was.
 - **A named destination's session** is written to `sessions/X.env` only with `--unsafe`.
   Without it the session is kept in memory: one browser login per process, lost on exit.
+  The session is also *read* from `sessions/X.env` only with `--unsafe`: a `jwt` / `none`
+  destination whose token (`SAP_JWT_TOKEN`) is in that file is refused without it, as
+  `Destination "X" lacks: authorizationToken`. Start with `--unsafe`, or serve the file with
+  `--env=X` or `--env-path`, which read it whatever `--unsafe` says.
 
 A destination is **read once per process**. Nothing watches the files: a change you make to a
 `.env` from outside (a new password, a token handed over again) takes effect on **restart**.

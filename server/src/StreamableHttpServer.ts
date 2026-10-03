@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -13,6 +13,10 @@ import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
+import {
+  destinationFailureAnswer,
+  destinationFromHeader,
+} from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
@@ -97,12 +101,13 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
-  /** Per-destination lock to serialize token acquisition (prevents concurrent OAuth flows) */
+  /** Per-destination lock around the first connect: it serialises the first login. */
   private readonly authLocks = new Map<string, Promise<void>>();
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    private readonly authBrokerFactory: AuthBrokerFactory,
+    /** The destinations: settings and the counted provider, nothing else. */
+    private readonly destinations: IDestinations,
     opts?: StreamableHttpServerOptions,
   ) {
     super({
@@ -155,27 +160,21 @@ export class StreamableHttpServer extends BaseMcpServer {
       try {
         const server = this.createPerRequestServer();
         let destination: string | undefined;
-        let broker: Awaited<
-          ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>
-        >;
 
-        // Priority 1: Check x-mcp-destination header (only when --allow-destination-header)
-        const destinationHeader = this.allowDestinationHeader
-          ? ((req.headers['x-mcp-destination'] as string | undefined) ??
-            (req.headers['X-MCP-Destination'] as string | undefined))
-          : undefined;
+        // Priority 1: x-mcp-destination (only with --allow-destination-header),
+        // refused when it is not a destination name
+        const destinationHeader = destinationFromHeader(
+          req.headers,
+          this.allowDestinationHeader,
+        );
 
-        if (destinationHeader) {
+        if (destinationHeader !== undefined) {
           destination = destinationHeader;
-          broker =
-            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
         // Priority 2: Check SAP connection headers (x-sap-url + auth params)
-        // Headers will be passed directly to handlers, no broker needed
+        // The settings and the credential come from the headers, no destination
         else if (this.hasSapConnectionHeaders(req.headers)) {
-          // No destination, no broker - create connection directly from headers
           destination = undefined;
-          broker = undefined;
           if (!isPing) {
             server.setConnectionContextFromHeadersPublic(req.headers);
           }
@@ -183,9 +182,6 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
           destination = this.defaultDestination;
-          // Initialize broker for the selected default destination
-          broker =
-            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
         // Priority 4: No auth params at all -> reject request
         else {
@@ -197,29 +193,24 @@ export class StreamableHttpServer extends BaseMcpServer {
           return;
         }
 
-        if (destination && !broker) {
-          throw new Error(
-            `Auth broker not initialized for destination: ${destination}`,
-          );
-        }
-
         // Skip SAP connection setup for ping — it's a protocol-level check,
         // no need to acquire JWT tokens or contact the SAP system
-        if (!isPing && destination && broker) {
-          // Serialize token acquisition per destination to prevent concurrent
-          // OAuth flows from racing for the same callback port
+        if (!isPing && destination) {
+          // Serialize the first connect per destination: two first logins
+          // must not race for the same callback port
           const existingLock = this.authLocks.get(destination);
           if (existingLock) {
-            await existingLock;
+            await existingLock.catch(() => {});
           }
+          const lockedDestination = destination;
           const authPromise = server
-            .setConnectionContextPublic(destination, broker)
+            .setConnectionContextPublic(lockedDestination, this.destinations)
             .finally(() => {
-              if (this.authLocks.get(destination) === authPromise) {
-                this.authLocks.delete(destination);
+              if (this.authLocks.get(lockedDestination) === authPromise) {
+                this.authLocks.delete(lockedDestination);
               }
             });
-          this.authLocks.set(destination, authPromise);
+          this.authLocks.set(lockedDestination, authPromise);
           await authPromise;
         }
 
@@ -259,12 +250,19 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
       } catch (err) {
-        console.error(
-          `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED:`,
-          err,
-        );
+        const answer = destinationFailureAnswer(err);
+        if (!answer.known) {
+          console.error(
+            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED:`,
+            err,
+          );
+        } else {
+          console.error(
+            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED: ${answer.text}`,
+          );
+        }
         if (!res.headersSent) {
-          res.status(500).send('Internal Server Error');
+          res.status(answer.status).send(answer.text);
         }
       }
     };
@@ -387,7 +385,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     connect: BaseMcpServer['connect'];
     setConnectionContextPublic: (
       destination: string,
-      broker: Awaited<ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>>,
+      destinations: IDestinations,
     ) => Promise<void>;
     setConnectionContextFromHeadersPublic: (
       headers: Record<string, string | string[] | undefined>,
@@ -405,12 +403,9 @@ export class StreamableHttpServer extends BaseMcpServer {
 
       public setConnectionContextPublic(
         destination: string,
-        broker: Awaited<ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>>,
+        destinations: IDestinations,
       ): Promise<void> {
-        if (!broker) {
-          return Promise.resolve();
-        }
-        return this.setConnectionContext(destination, broker);
+        return this.setConnectionContext(destination, destinations);
       }
 
       public setConnectionContextFromHeadersPublic(

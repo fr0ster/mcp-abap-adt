@@ -1,9 +1,13 @@
 /**
  * Authentication helpers for integration tests
- * Uses AuthBrokerFactory to create broker and load tokens into process.env for tests
+ * Uses AuthBrokerFactory for the configured destination: its settings and
+ * its provider, the same two things the server's transports use.
  */
 
 import * as path from 'node:path';
+import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   DefaultLogger,
@@ -143,101 +147,111 @@ export function createConnectionLogger(): ILogger | undefined {
   return undefined;
 }
 
+/** The configured destination, as a connection needs it. */
+export interface TestDestination {
+  destination: string;
+  factory: AuthBrokerFactory;
+  settings: SapConfig;
+  credential: IAuthProvider;
+}
+
+/** The destination the test config names, or undefined. */
+function configuredDestination(config: any): string | undefined {
+  return (
+    config?.auth_broker?.abap?.destination ||
+    config?.abap?.destination ||
+    config?.environment?.destination ||
+    undefined
+  );
+}
+
 /**
- * Create AuthBroker using AuthBrokerFactory and load tokens into process.env for tests
- * Simple logic:
- * - If destination is specified → use factory to create broker
+ * The factory for the test config's destination: its stores under
+ * `auth_broker.paths.service_keys_dir`, its interactive login through the
+ * browser strategy (opened only when the destination needs a login).
+ */
+export function createTestFactory(
+  config: any,
+  destination: string,
+): AuthBrokerFactory {
+  // service_keys_dir is ALWAYS a base path - factory adds service-keys/sessions
+  const serviceKeysDir = config?.auth_broker?.paths?.service_keys_dir;
+  const basePath = serviceKeysDir
+    ? path.resolve(serviceKeysDir.replace(/^~/, require('node:os').homedir()))
+    : undefined;
+  const useUnsafe =
+    process.env.MCP_UNSAFE === 'true' ||
+    config?.auth_broker?.unsafe === true ||
+    config?.auth_broker?.unsafe_session_store === true;
+
+  return new AuthBrokerFactory({
+    mcpDestination: destination,
+    authBrokerPath: basePath,
+    unsafe: useUnsafe,
+    browser: config?.auth_broker?.browser ?? 'system',
+    ...(config?.auth_broker?.browser_auth_port !== undefined && {
+      browserAuthPort: Number(config.auth_broker.browser_auth_port),
+    }),
+    ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
+      connectionType: 'rfc' as const,
+    }),
+    browserStrategy: ({ browser, port }) =>
+      browserCallbackStrategy({
+        browser,
+        ...(port !== undefined && { port }),
+      }),
+    // Only when DEBUG_BROKER is set — no default logger
+    logger: createBrokerLogger(),
+  });
+}
+
+let testDestinationPromise: Promise<TestDestination | null> | undefined;
+
+/**
+ * The test config's destination — one factory per process, so every test
+ * suite in it shares the destination's one provider. `null` when the config
+ * names no destination.
+ */
+export function getTestDestination(): Promise<TestDestination | null> {
+  if (!testDestinationPromise) {
+    testDestinationPromise = (async () => {
+      const config = loadTestConfig();
+      const destination = configuredDestination(config);
+      if (!destination) return null;
+      const factory = createTestFactory(config, destination);
+      const settings = await factory.settingsFor(destination);
+      const credential = await factory.getProvider(destination);
+      return { destination, factory, settings, credential };
+    })();
+    testDestinationPromise.catch(() => {
+      testDestinationPromise = undefined;
+    });
+  }
+  return testDestinationPromise;
+}
+
+/**
+ * Make the configured destination available to the tests: its system URL
+ * and client go into process.env (SAP_URL, SAP_CLIENT). The credential stays
+ * in the provider — there is no token to copy; a connection gets it from
+ * `getTestDestination()`.
+ * - If destination is specified → use the factory
  * - If destination is not specified → skip (tests will use .env directly)
- * Provider handles token refresh automatically - we just get token via broker.getToken()
  */
 export async function setupAuthBrokerForTests(_options?: {
   force?: boolean;
 }): Promise<void> {
   try {
-    const config = loadTestConfig();
-
-    // Get destination from config
-    const destination =
-      config?.auth_broker?.abap?.destination ||
-      config?.abap?.destination ||
-      config?.environment?.destination;
-
-    // If no destination, skip (tests will use .env)
-    if (!destination) {
+    const target = await getTestDestination();
+    if (!target) {
       authLogger?.debug(
         '[setupAuthBrokerForTests] No destination found, skipping (tests will use .env)',
       );
       return;
     }
-
-    // Get paths from config
-    // service_keys_dir is ALWAYS a base path - factory will add service-keys/sessions subfolders
-    const serviceKeysDir = config?.auth_broker?.paths?.service_keys_dir;
-    const useUnsafe =
-      process.env.MCP_UNSAFE === 'true' ||
-      config?.auth_broker?.unsafe === true ||
-      config?.auth_broker?.unsafe_session_store === true;
-
-    // Create factory config - basePath is the parent directory for service-keys and sessions
-    const basePath = serviceKeysDir
-      ? path.resolve(serviceKeysDir.replace(/^~/, require('node:os').homedir()))
-      : undefined;
-
-    // Create loggers based on environment variables
-    // Only pass loggers if DEBUG variables are set - no default logger to prevent unwanted logs
-    const storeLogger = createStoreLogger();
-    const providerLogger = createProviderLogger();
-    const brokerLogger = createBrokerLogger();
-
-    const factory = new AuthBrokerFactory({
-      defaultMcpDestination: destination,
-      defaultDestination: destination,
-      authBrokerPath: basePath,
-      unsafe: useUnsafe,
-      transportType: 'stdio', // Tests use stdio transport
-      useAuthBroker: true,
-      browserAuthPort:
-        config?.auth_broker?.browser_auth_port ??
-        30000 + Math.floor(Math.random() * 10000),
-      browser: 'system',
-      // Don't pass default logger - only pass specific loggers if DEBUG vars are set
-      logger: undefined,
-      storeLogger, // Only if DEBUG_STORES is set
-      providerLogger, // Only if DEBUG_PROVIDER is set
-      brokerLogger, // Only if DEBUG_BROKER is set
-    });
-
-    // Get or create broker for destination
-    const authBroker = await factory.getOrCreateAuthBroker(destination);
-    if (!authBroker) {
-      throw new Error(
-        `Failed to create AuthBroker for destination "${destination}".`,
-      );
-    }
-
-    // Get token via broker (provider handles refresh automatically)
-    const token = await authBroker.getToken(destination);
-    const connConfigResult = await authBroker.getConnectionConfig(destination);
-
-    // Update process.env with tokens from broker
-    if (token && connConfigResult?.serviceUrl) {
-      process.env.SAP_URL = connConfigResult.serviceUrl;
-      process.env.SAP_JWT_TOKEN = connConfigResult.authorizationToken || token;
-
-      const authConfigResult =
-        await authBroker.getAuthorizationConfig(destination);
-      if (authConfigResult?.refreshToken) {
-        process.env.SAP_REFRESH_TOKEN = authConfigResult.refreshToken;
-      }
-      if (authConfigResult?.uaaUrl) {
-        process.env.SAP_UAA_URL = authConfigResult.uaaUrl;
-      }
-      if (authConfigResult?.uaaClientId) {
-        process.env.SAP_UAA_CLIENT_ID = authConfigResult.uaaClientId;
-      }
-      if (authConfigResult?.uaaClientSecret) {
-        process.env.SAP_UAA_CLIENT_SECRET = authConfigResult.uaaClientSecret;
-      }
+    process.env.SAP_URL = target.settings.url;
+    if (target.settings.client) {
+      process.env.SAP_CLIENT = target.settings.client;
     }
   } catch (error: any) {
     authLogger?.warn(

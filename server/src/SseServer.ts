@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import type { IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -13,6 +13,10 @@ import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
+import {
+  destinationFailureAnswer,
+  destinationFromHeader,
+} from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
@@ -107,7 +111,8 @@ export class SseServer {
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    private readonly authBrokerFactory: AuthBrokerFactory,
+    /** The destinations: settings and the counted provider, nothing else. */
+    private readonly destinations: IDestinations,
     opts?: SseServerOptions,
   ) {
     this.host = opts?.host ?? '127.0.0.1';
@@ -241,37 +246,40 @@ export class SseServer {
 
   private async handleGet(req: any, res: any): Promise<void> {
     let destination: string | undefined;
-    let broker: any;
+    let fromHeaders = false;
 
-    // Priority 1: Check x-mcp-destination header (only when --allow-destination-header)
-    const destinationHeader = this.allowDestinationHeader
-      ? ((req.headers['x-mcp-destination'] as string | undefined) ??
-        (req.headers['X-MCP-Destination'] as string | undefined))
-      : undefined;
+    try {
+      // Priority 1: x-mcp-destination (only with --allow-destination-header),
+      // refused when it is not a destination name
+      const destinationHeader = destinationFromHeader(
+        req.headers,
+        this.allowDestinationHeader,
+      );
 
-    if (destinationHeader) {
-      destination = destinationHeader;
-      broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
-    }
-    // Priority 2: Check SAP connection headers (x-sap-url + auth params)
-    // Headers will be passed directly to handlers, no broker needed
-    else if (this.hasSapConnectionHeaders(req.headers)) {
-      // No destination, no broker - handlers will use headers directly
-      destination = undefined;
-      broker = undefined;
-    }
-    // Priority 3: Use default destination
-    else if (this.defaultDestination) {
-      destination = this.defaultDestination;
-      broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
-    }
-    // Priority 4: No auth params at all -> reject request
-    else {
-      res
-        .status(400)
-        .send(
-          'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
-        );
+      if (destinationHeader !== undefined) {
+        destination = destinationHeader;
+      }
+      // Priority 2: Check SAP connection headers (x-sap-url + auth params)
+      // The settings and the credential come from the headers, no destination
+      else if (this.hasSapConnectionHeaders(req.headers)) {
+        destination = undefined;
+        fromHeaders = true;
+      }
+      // Priority 3: Use default destination
+      else if (this.defaultDestination) {
+        destination = this.defaultDestination;
+      }
+      // Priority 4: No auth params at all -> reject request
+      else {
+        res
+          .status(400)
+          .send(
+            'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
+          );
+        return;
+      }
+    } catch (error) {
+      this.answerFailure(res, error);
       return;
     }
 
@@ -285,9 +293,13 @@ export class SseServer {
       ) {
         super({ name: 'mcp-abap-adt-sse', version: ver, logger: loggerImpl });
       }
-      async init(dest: string | undefined, b: any, hdrs?: any) {
-        if (dest && b) {
-          await this.setConnectionContext(dest, b);
+      async init(
+        dest: string | undefined,
+        destinations: IDestinations,
+        hdrs?: any,
+      ) {
+        if (dest) {
+          await this.setConnectionContext(dest, destinations);
         } else if (hdrs) {
           this.setConnectionContextFromHeaders(hdrs);
         }
@@ -300,11 +312,16 @@ export class SseServer {
       this.logger,
       this.version,
     );
-    await server.init(
-      destination,
-      broker,
-      this.hasSapConnectionHeaders(req.headers) ? req.headers : undefined,
-    );
+    try {
+      await server.init(
+        destination,
+        this.destinations,
+        fromHeaders ? req.headers : undefined,
+      );
+    } catch (error) {
+      this.answerFailure(res, error);
+      return;
+    }
 
     const transport = new SSEServerTransport(this.postPath, res);
     const sessionId = transport.sessionId;
@@ -399,6 +416,19 @@ export class SseServer {
       if (!res.headersSent) {
         res.writeHead(500).end('Internal Server Error');
       }
+    }
+  }
+
+  /** A session whose destination failed: the error's words, or as before. */
+  private answerFailure(res: any, error: unknown): void {
+    const answer = destinationFailureAnswer(error);
+    if (answer.known) {
+      console.error(`[SSE GET] FAILED: ${answer.text}`);
+    } else {
+      console.error(`[SSE GET] FAILED:`, error);
+    }
+    if (!res.headersSent) {
+      res.status(answer.status).send(answer.text);
     }
   }
 

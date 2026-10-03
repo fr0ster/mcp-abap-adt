@@ -25,7 +25,11 @@ export interface SettleReport {
 export interface IAuthBrokerFactory extends IDestinations {
   /** The destination the process serves when a request names none. */
   readonly defaultDestination: string | undefined;
-  /** One broker per destination, built on first use, then cached. */
+  /**
+   * One broker per destination, built on first use, then cached.
+   * A consumer that connects must use `getProvider` instead: the broker's own
+   * `getProvider` is not counted and bypasses the shutdown gate.
+   */
   getBroker(destination: string): Promise<AuthBroker>;
   /**
    * Closes the gate on provider calls, waits for the ones in progress up to

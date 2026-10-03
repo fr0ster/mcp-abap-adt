@@ -1,9 +1,10 @@
-import type { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import type { AbapConnection } from '@mcp-abap-adt/connection';
+import type { AbapConnection, SapConfig } from '@mcp-abap-adt/connection';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { HandlerContext } from '../handlers/interfaces.js';
+import type { IDestinations } from '../lib/auth/IAuthBrokerFactory.js';
 import { createAbapConnection } from '../lib/connectionFactory.js';
+import { credentialFromHeaders } from '../lib/credentialSources.js';
 import type {
   IHandlersRegistry,
   SapEnvironment,
@@ -20,7 +21,7 @@ import {
   normalizeToolContent,
   type ToolResultLike,
 } from '../lib/toolResult.js';
-import { registerAuthBroker, return_error } from '../lib/utils.js';
+import { return_error } from '../lib/utils.js';
 import type { ConnectionContext } from './ConnectionContext.js';
 
 /**
@@ -37,11 +38,6 @@ export abstract class BaseMcpServer extends McpServer {
    * Connection context (set per request for SSE/HTTP, once for stdio)
    */
   protected connectionContext: ConnectionContext | null = null;
-
-  /**
-   * Auth broker for token and service key management
-   */
-  protected authBroker?: AuthBroker;
 
   /**
    * Cached connection for stdio mode (created once, reused for all requests)
@@ -77,131 +73,50 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Sets connection context using auth broker
-   * For stdio: called once on startup
-   * For SSE/HTTP: called per-request
+   * Sets the connection context of a destination: its settings
+   * (`settingsFor`) and its provider (`getProvider`, the counted one). No
+   * token is read here and no auth type is branched on: the credential is
+   * the destination's, and it renews itself.
+   * For stdio: called once on startup. For SSE/HTTP: per request or session.
    */
   protected async setConnectionContext(
     destination: string,
-    authBroker: AuthBroker,
+    destinations: IDestinations,
   ): Promise<void> {
-    this.authBroker = authBroker;
-    // Register broker so destination-aware connections can refresh tokens
-    registerAuthBroker(destination, authBroker);
-
     this.logger.debug(
-      `[BaseMcpServer] Getting connection config for destination: ${destination}`,
+      `[BaseMcpServer] Getting connection settings for destination: ${destination}`,
     );
 
-    // Get connection parameters from broker
-    // AuthBroker.getConnectionConfig() automatically checks session store first, then service key store
-    const connectionConfig = await authBroker.getConnectionConfig(destination);
+    const settings = await destinations.settingsFor(destination);
+    const credential = await destinations.getProvider(destination);
+    const connectionParams: SapConfig = { ...settings };
 
-    this.logger.debug(`[BaseMcpServer] Connection config result:`, {
-      found: !!connectionConfig,
-      destination,
-      hasServiceUrl: !!connectionConfig?.serviceUrl,
-    });
-
-    if (!connectionConfig) {
-      throw new Error(
-        `Connection config not found for destination: ${destination}`,
-      );
-    }
-
-    // Try to get fresh token from broker
-    // If broker can't refresh (no UAA credentials), use existing token from connectionConfig
-    let freshToken: string | undefined;
-    let tokenError: unknown;
-    try {
-      freshToken = await authBroker.getToken(destination);
-    } catch (error) {
-      // Broker can't provide/refresh token (e.g., no UAA credentials for .env-only setup)
-      // Use existing token from connectionConfig - user is responsible for token management
-      this.logger.debug(
-        `Broker can't refresh token, using existing token from session: ${error instanceof Error ? error.message : String(error)}`,
-      );
-      tokenError = error;
-      freshToken = connectionConfig.authorizationToken;
-    }
-    const tokenToUse = freshToken || connectionConfig.authorizationToken || '';
-
-    // Determine auth type from connection config
-    const authType =
-      connectionConfig.authType ||
-      (connectionConfig.username && connectionConfig.password
-        ? 'basic'
-        : 'jwt');
-
-    if (authType === 'jwt' && !tokenToUse) {
-      const reason =
-        tokenError instanceof Error ? tokenError.message : String(tokenError);
-      throw new Error(
-        `JWT token is missing for destination "${destination}". ${reason ? `Token provider error: ${reason}. ` : ''}Provide a valid session token (or refresh token) for this destination, or use --env-path with SAP_JWT_TOKEN.`,
-      );
-    }
-
-    // Connection type from env (http or rfc) — not stored in broker/session
-    const connectionType =
-      process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc'
-        ? ('rfc' as const)
-        : undefined;
-
-    // Resolve masterSystem/responsible early so handlers get proper context
-    // Create a temporary connection to call getSystemInformation
+    // Resolve masterSystem/responsible early so handlers get proper context:
+    // a temporary connection, built the same way, calls getSystemInformation.
     let masterSystem: string | undefined;
     let responsible: string | undefined;
     try {
-      const tempParams =
-        authType === 'jwt'
-          ? {
-              url: connectionConfig.serviceUrl || '',
-              authType: 'jwt' as const,
-              jwtToken: tokenToUse,
-              client: connectionConfig.sapClient || '',
-            }
-          : {
-              url: connectionConfig.serviceUrl || '',
-              authType: 'basic' as const,
-              username: connectionConfig.username || '',
-              password: connectionConfig.password || '',
-              client: connectionConfig.sapClient || '',
-            };
-      const tempConn = createAbapConnection(tempParams);
+      const tempConn = createAbapConnection(connectionParams, credential);
       const systemCtx = await resolveSystemContext(tempConn);
       masterSystem = systemCtx.masterSystem;
       responsible = systemCtx.responsible;
-      // Use client from system info as fallback when not in .env (cloud systems)
-      if (!connectionConfig.sapClient && systemCtx.client) {
-        connectionConfig.sapClient = systemCtx.client;
+      // Use client from system info as fallback when not stated (cloud systems)
+      if (!connectionParams.client && systemCtx.client) {
+        connectionParams.client = systemCtx.client;
       }
       this.logger.debug(
         `[BaseMcpServer] Resolved systemContext: masterSystem=${masterSystem}, responsible=${responsible}, client=${systemCtx.client || '(none)'}`,
       );
     } catch (error) {
       this.logger.debug(
-        `[BaseMcpServer] Could not resolve systemContext: ${error instanceof Error ? error.message : String(error)}`,
+        `[BaseMcpServer] Could not resolve systemContext: ${error instanceof Error ? error.constructor.name : typeof error}`,
       );
     }
 
     this.connectionContext = {
       sessionId: destination,
-      connectionParams:
-        authType === 'basic'
-          ? {
-              url: connectionConfig.serviceUrl || '',
-              authType: 'basic',
-              username: connectionConfig.username || '',
-              password: connectionConfig.password || '',
-              client: connectionConfig.sapClient || '',
-              ...(connectionType && { connectionType }),
-            }
-          : {
-              url: connectionConfig.serviceUrl || '',
-              authType: 'jwt',
-              jwtToken: tokenToUse, // broker keeps it fresh
-              client: connectionConfig.sapClient || '',
-            },
+      connectionParams,
+      credential,
       metadata: {
         destination,
         masterSystem,
@@ -212,7 +127,8 @@ export abstract class BaseMcpServer extends McpServer {
 
   /**
    * Sets connection context from HTTP headers (direct SAP connection, no broker)
-   * Used when x-sap-url + auth headers are provided
+   * Used when x-sap-url + auth headers are provided: the settings and the
+   * credential are what `credentialFromHeaders` answers.
    */
   protected setConnectionContextFromHeaders(
     headers: Record<string, string | string[] | undefined>,
@@ -222,18 +138,10 @@ export abstract class BaseMcpServer extends McpServer {
       return Array.isArray(value) ? value[0] : value;
     };
 
-    const url = getHeader('x-sap-url');
-    const jwtToken = getHeader('x-sap-jwt-token');
-    const username = getHeader('x-sap-login');
-    const password = getHeader('x-sap-password');
-    const client = getHeader('x-sap-client') || '';
+    const { settings, credential } = credentialFromHeaders(headers);
     const masterSystem = getHeader('x-sap-master-system');
     const responsible = getHeader('x-sap-responsible');
     const masterLanguage = getHeader('x-sap-language');
-
-    if (!url) {
-      throw new Error('x-sap-url header is required for direct SAP connection');
-    }
 
     const metadata: Record<string, string> = {};
     if (masterSystem) metadata.masterSystem = masterSystem;
@@ -247,36 +155,12 @@ export abstract class BaseMcpServer extends McpServer {
     // written to the process-global system-context cache, which would leak the
     // value across requests, sessions, and connection modes (#110).
 
-    if (jwtToken) {
-      // JWT auth
-      this.connectionContext = {
-        sessionId: 'direct-jwt',
-        connectionParams: {
-          url,
-          authType: 'jwt',
-          jwtToken,
-          client,
-        },
-        metadata,
-      };
-    } else if (username && password) {
-      // Basic auth
-      this.connectionContext = {
-        sessionId: 'direct-basic',
-        connectionParams: {
-          url,
-          authType: 'basic',
-          username,
-          password,
-          client,
-        },
-        metadata,
-      };
-    } else {
-      throw new Error(
-        'Either x-sap-jwt-token or x-sap-login+x-sap-password headers are required',
-      );
-    }
+    this.connectionContext = {
+      sessionId: settings.authType === 'jwt' ? 'direct-jwt' : 'direct-basic',
+      connectionParams: settings,
+      credential,
+      metadata,
+    };
   }
 
   /**
@@ -287,9 +171,10 @@ export abstract class BaseMcpServer extends McpServer {
   }
 
   /**
-   * Gets ABAP connection from connection context
-   * Creates connection using connectionParams from context
-   * Automatically refreshes token via AuthBroker if available (inside makeAdtRequest)
+   * Gets ABAP connection from connection context: the connector built from
+   * the context's settings and credential, then connected. The credential
+   * renews itself (a 401 reaches its `rejected()`), so nothing is looked up
+   * here for refreshing.
    * For stdio mode: caches connection and reuses it for all requests (like v1)
    * For SSE/HTTP: creates new connection per request
    */
@@ -313,24 +198,9 @@ export abstract class BaseMcpServer extends McpServer {
       return this.cachedConnection;
     }
 
-    // Create tokenRefresher from AuthBroker for automatic JWT token refresh on 401
-    let tokenRefresher: any;
-    if (
-      destination &&
-      this.authBroker &&
-      this.connectionContext.connectionParams.authType === 'jwt' &&
-      typeof (this.authBroker as any).createTokenRefresher === 'function'
-    ) {
-      tokenRefresher = (this.authBroker as any).createTokenRefresher(
-        destination,
-      );
-    }
-
     const connection = createAbapConnection(
       this.connectionContext.connectionParams,
-      undefined,
-      undefined,
-      tokenRefresher,
+      this.connectionContext.credential,
     );
 
     // Establish session (CSRF token + cookies) before first request.

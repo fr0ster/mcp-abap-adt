@@ -2,14 +2,22 @@
  * Jest Global Setup for Integration Tests
  *
  * Runs ONCE before all test suites to ensure a valid session exists.
- * Authenticates via AuthBroker and writes tokens to the session file (unsafe store).
- * All subsequent test suites read the fresh token from the file — no browser needed.
+ * Without a test config (tests/test-config.yaml, or MCP_TEST_CONFIG) it
+ * returns at once: nothing is built, nothing logs on, no browser opens.
+ *
+ * With one, it builds the destination's factory and logs on once through a
+ * connection holding the destination's provider (`getProvider`) — cached
+ * token, refresh, or an interactive login — then settles the factory, which
+ * writes the session (unsafe store) for the test suites to reuse.
  *
  * Requires: auth_broker.unsafe: true in test-config.yaml
  */
 
 import * as path from 'node:path';
+import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import { AuthBrokerFactory } from '../../lib/auth/brokerFactory';
+import { describeAuthError } from '../../lib/auth/errors';
+import { createAbapConnection } from '../../lib/connectionFactory';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';
 
 function loadTestConfig(): any {
@@ -66,42 +74,47 @@ export default async function globalSetup(): Promise<void> {
     ? path.resolve(serviceKeysDir.replace(/^~/, require('node:os').homedir()))
     : undefined;
 
+  const factory = new AuthBrokerFactory({
+    mcpDestination: destination,
+    authBrokerPath: basePath,
+    unsafe: useUnsafe,
+    browser: config?.auth_broker?.browser ?? 'system',
+    ...(config?.auth_broker?.browser_auth_port !== undefined && {
+      browserAuthPort: Number(config.auth_broker.browser_auth_port),
+    }),
+    ...(process.env.SAP_CONNECTION_TYPE?.trim().toLowerCase() === 'rfc' && {
+      connectionType: 'rfc' as const,
+    }),
+    browserStrategy: ({ browser, port }) =>
+      browserCallbackStrategy({
+        browser,
+        ...(port !== undefined && { port }),
+      }),
+  });
+
   try {
-    const factory = new AuthBrokerFactory({
-      defaultMcpDestination: destination,
-      defaultDestination: destination,
-      authBrokerPath: basePath,
-      unsafe: useUnsafe,
-      transportType: 'stdio',
-      useAuthBroker: true,
-      browserAuthPort:
-        config?.auth_broker?.browser_auth_port ??
-        30000 + Math.floor(Math.random() * 10000),
-      browser: 'system',
-    });
-
-    const authBroker = await factory.getOrCreateAuthBroker(destination);
-    if (!authBroker) {
-      console.log(
-        `[globalSetup] Failed to create AuthBroker for "${destination}"`,
-      );
-      return;
-    }
-
-    // This triggers the full auth flow: cached token → refresh → browser (if needed)
-    // With unsafe store, the result is saved to the session file
-    const token = await authBroker.getToken(destination);
-    if (token) {
-      console.log(
-        `[globalSetup] Session ready for "${destination}" (token: ${token.substring(0, 20)}...)`,
-      );
-    } else {
-      console.log(`[globalSetup] No token obtained for "${destination}"`);
-    }
-  } catch (error: any) {
+    const settings = await factory.settingsFor(destination);
+    const provider = await factory.getProvider(destination);
+    // connect() logs on: cached token → refresh → browser (if needed).
+    const connection = createAbapConnection(settings, provider);
+    await connection.connect();
+    console.log(`[globalSetup] Session ready for "${destination}"`);
+    await (connection as { disconnect?: () => Promise<void> }).disconnect?.();
+  } catch (error: unknown) {
     console.log(
-      `[globalSetup] Auth failed: ${error?.message || String(error)}`,
+      `[globalSetup] Auth failed: ${
+        describeAuthError(error) ??
+        (error instanceof Error ? error.constructor.name : typeof error)
+      }`,
     );
     // Don't throw — let tests handle missing auth gracefully (skip)
+  } finally {
+    // Writes the session the login produced (unsafe store).
+    const report = await factory.settle(30_000);
+    if (report.notStored.length > 0) {
+      console.log(
+        `[globalSetup] Session not stored: ${report.notStored.join(', ')}`,
+      );
+    }
   }
 }

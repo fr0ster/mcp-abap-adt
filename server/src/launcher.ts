@@ -1,6 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import { AuthBrokerFactory, type IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { HandlerSet } from '@mcp-abap-adt/lib/config';
 import {
   hydrateSystemContextFromEnvFile,
@@ -23,7 +23,7 @@ import {
 } from '@mcp-abap-adt/lib/utils';
 import { AuthBrokerConfig } from './AuthBrokerConfig.js';
 import { SseServer } from './SseServer.js';
-import { StdioServer } from './StdioServer.js';
+import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 
 const stderrLogger = {
@@ -340,41 +340,19 @@ export async function main(options: LauncherOptions = {}) {
   }
 
   if (config.transport === 'stdio') {
-    // For .env file, use 'default' broker; for --mcp, use specified destination
-    const configuredBrokerKey =
+    // For .env file, use 'default'; for --mcp, use specified destination
+    const configuredDestination =
       config.mcpDestination ?? (config.envFile ? 'default' : undefined);
-    const configuredBroker = configuredBrokerKey
-      ? await authBrokerFactory.getOrCreateAuthBroker(configuredBrokerKey)
-      : undefined;
 
-    let broker: typeof configuredBroker;
-    let brokerKey: string;
+    let destinations: IDestinations = authBrokerFactory;
+    let destination: string;
 
-    if (configuredBroker) {
-      broker = configuredBroker;
-      brokerKey = configuredBrokerKey!;
+    if (configuredDestination) {
+      destination = configuredDestination;
     } else {
       // Inspection-only mode: no connection parameters provided
-      const { MockAbapConnection } = await import(
-        '@mcp-abap-adt/lib/embeddable'
-      );
-      const mockConnection = new MockAbapConnection();
-      broker = {
-        getSession: async () => ({
-          connection: mockConnection as any,
-          client: {} as any,
-          config: { url: 'http://mock', authType: 'basic' } as any,
-          getHeaders: () => ({}),
-        }),
-        getConnectionConfig: async () => ({
-          serviceUrl: 'http://mock',
-          authType: 'basic',
-          username: 'mock',
-          password: 'mock',
-        }),
-        getToken: async () => undefined,
-      } as any;
-      brokerKey = 'mock';
+      destinations = inspectionOnlyDestinations();
+      destination = 'mock';
       console.error(
         '[MCP] Starting in inspection-only mode (no connection parameters).',
       );
@@ -383,11 +361,11 @@ export async function main(options: LauncherOptions = {}) {
       );
     }
 
-    const server = new StdioServer(handlersRegistry, broker!, {
+    const server = new StdioServer(handlersRegistry, destinations, {
       logger: loggerForTransport,
     });
     activeServer = server;
-    await server.start(brokerKey);
+    await server.start(destination);
     return;
   }
 

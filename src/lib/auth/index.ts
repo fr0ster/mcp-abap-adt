@@ -3,6 +3,7 @@
  */
 
 export { AuthBrokerFactory } from './brokerFactory';
+export { assertDestinationName } from './destinationName';
 export { describeAuthError, UnsupportedAuthenticationError } from './errors';
 export type {
   IAuthBrokerFactory,

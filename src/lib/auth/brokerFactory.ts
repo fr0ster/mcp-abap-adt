@@ -96,6 +96,11 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     };
   }
 
+  /**
+   * The destination's broker. A consumer that connects must use
+   * `getProvider` instead: the broker's own provider is not counted and
+   * bypasses the shutdown gate that `settle` closes.
+   */
   async getBroker(destination: string): Promise<AuthBroker> {
     return (await this.buildOf(destination)).broker;
   }

@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import * as crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import {
   getTimeout,
@@ -16,6 +15,7 @@ import {
   registerConnectionResetHook,
 } from './connectionEvents';
 import { createAbapConnection } from './connectionFactory.js';
+import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 import { getSystemContext } from './systemContext';
@@ -27,59 +27,12 @@ let overrideConnection: IAbapConnection | undefined;
 let cachedConnection: IAbapConnection | undefined;
 let cachedConfigSignature: string | undefined;
 
-// Connection cache per session + config hash
-interface ConnectionCacheEntry {
-  connection: IAbapConnection;
-  configSignature: string;
-  sessionId: string;
-  lastUsed: Date;
-}
-
-const connectionCache = new Map<string, ConnectionCacheEntry>();
-
 // AsyncLocalStorage for storing session context
 export const sessionContext = new AsyncLocalStorage<{
   sessionId?: string;
   sapConfig?: SapConfig;
-  destination?: string; // Store destination for AuthBroker-based token refresh
+  destination?: string;
 }>();
-
-// Fixed session ID for server connection (allows session persistence across requests)
-const _SERVER_SESSION_ID = 'mcp-abap-adt-session';
-
-// Global AuthBroker registry for destination-based authentication
-// This allows JwtAbapConnection to access AuthBroker instances for token refresh
-// Store in global object so it can be accessed from @mcp-abap-adt/connection package
-declare global {
-  // eslint-disable-next-line no-var
-  var __mcpAbapAdtAuthBrokerRegistry: Map<string, any> | undefined;
-}
-
-if (!global.__mcpAbapAdtAuthBrokerRegistry) {
-  global.__mcpAbapAdtAuthBrokerRegistry = new Map<string, any>();
-}
-
-const authBrokerRegistry = global.__mcpAbapAdtAuthBrokerRegistry;
-
-/**
- * Register AuthBroker instance for a destination
- * This allows JwtAbapConnection to use AuthBroker for token refresh when destination is set
- */
-export function registerAuthBroker(destination: string, authBroker: any): void {
-  authBrokerRegistry.set(destination, authBroker);
-  connectionManagerLogger?.debug(
-    `[DEBUG] registerAuthBroker - Registered AuthBroker for destination "${destination}"`,
-  );
-}
-
-/**
- * Get AuthBroker instance for a destination
- * Returns undefined if not registered
- * This function can be called from @mcp-abap-adt/connection package via global registry
- */
-export function getAuthBroker(destination: string): any | undefined {
-  return authBrokerRegistry.get(destination);
-}
 
 // Compatibility re-export: `@mcp-abap-adt/lib/utils` exposes the SDK's McpError /
 // ErrorCode before #155. Internal code no longer throws McpError (enforced by
@@ -430,150 +383,17 @@ export function return_error(error: any) {
   };
 }
 
-/**
- * Generate cache key for connection based on sessionId, config signature, and destination
- * This ensures each client session with different SAP config or destination gets its own connection
- *
- * Example scenarios:
- * - 4 clients, each with 2 destinations = up to 8 different connections
- * - Each combination of (sessionId, config, destination) gets its own isolated connection
- */
-function generateConnectionCacheKey(
-  sessionId: string,
-  configSignature: string,
-  destination?: string,
-): string {
-  const hash = crypto.createHash('sha256');
-  hash.update(sessionId);
-  hash.update(configSignature);
-  // Include destination in cache key to ensure different destinations get different connections
-  // This is critical for multi-tenant scenarios where same sessionId might use different destinations
-  hash.update(destination || '');
-  return hash.digest('hex');
-}
-
-/**
- * Clean up old connections from cache (older than 1 hour)
- */
-function cleanupConnectionCache() {
-  const now = new Date();
-  const maxAge = 60 * 60 * 1000; // 1 hour
-
-  for (const [key, entry] of connectionCache.entries()) {
-    const age = now.getTime() - entry.lastUsed.getTime();
-    if (age > maxAge) {
-      connectionManagerLogger?.debug(
-        `[DEBUG] Cleaning up old connection cache entry: ${key.substring(0, 16)}...`,
-      );
-      connectionCache.delete(key);
-    }
-  }
-}
-
-/**
- * Get or create connection for a specific session and config
- */
-function getConnectionForSession(
-  sessionId: string,
-  config: SapConfig,
-  destination?: string,
-): IAbapConnection {
-  const configSignature = sapConfigSignature(config);
-  const cacheKey = generateConnectionCacheKey(
-    sessionId,
-    configSignature,
-    destination,
-  );
-
-  // Clean up old entries periodically
-  if (connectionCache.size > 100) {
-    cleanupConnectionCache();
-  }
-
-  let entry = connectionCache.get(cacheKey);
-
-  if (!entry || entry.configSignature !== configSignature) {
-    connectionManagerLogger?.debug(
-      `[DEBUG] getManagedConnection - Creating new connection for session ${sessionId.substring(0, 8)}... (cache key: ${cacheKey.substring(0, 16)}...)`,
-    );
-
-    // Dispose old connection if exists
-    if (entry) {
-      /* cleanup */
-    }
-
-    // Create new connection with unique session ID per client session
-    const connectionSessionId = `mcp-abap-adt-session-${sessionId}`;
-
-    // Get tokenRefresher from AuthBroker if destination is provided (for JWT connections)
-    let tokenRefresher: any;
-    if (destination && config.authType === 'jwt') {
-      const authBroker = getAuthBroker(destination);
-      if (authBroker?.createTokenRefresher) {
-        tokenRefresher = authBroker.createTokenRefresher(destination);
-        connectionManagerLogger?.debug(
-          `[DEBUG] Created tokenRefresher for destination "${destination}"`,
-        );
-      }
-    }
-
-    // Create connection with optional tokenRefresher for automatic token refresh
-    const connection = createAbapConnection(
-      config,
-      loggerAdapter,
-      connectionSessionId,
-      tokenRefresher,
-    );
-
-    // Don't call enableStatefulSession during module import - it may trigger connection attempts
-    // Session ID is already set via createAbapConnection() constructor
-    // enableStatefulSession() will be called lazily when first request is made (if needed)
-
-    // Don't call connect() here - it will be called lazily on first request
-    // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
-    // The retry logic in makeAdtRequest will handle connection establishment automatically
-
-    entry = {
-      connection,
-      configSignature,
-      sessionId,
-      lastUsed: new Date(),
-    };
-
-    connectionCache.set(cacheKey, entry);
-  } else {
-    entry.lastUsed = new Date();
-    connectionManagerLogger?.debug(
-      `[DEBUG] getManagedConnection - Reusing cached connection for session ${sessionId.substring(0, 8)}...`,
-    );
-  }
-
-  return entry.connection;
-}
-
 export function getManagedConnection(): IAbapConnection {
   // If override connection is set, use it (for backward compatibility)
   if (overrideConnection) {
     return overrideConnection;
   }
 
-  // Try to get session context from AsyncLocalStorage
-  const context = sessionContext.getStore();
-
-  if (context?.sessionId && context?.sapConfig) {
-    // Use session-specific connection with destination for AuthBroker-based token refresh
-    return getConnectionForSession(
-      context.sessionId,
-      context.sapConfig,
-      context.destination,
-    );
-  }
-
   // Config must be provided via overrideConfig (from connection provider/broker)
   // No fallback to getConfig() - incompatible with broker-based architecture
   if (!overrideConfig) {
     throw new Error(
-      'Connection config must be provided via overrideConfig or session context. In v2 architecture, config comes from connection provider (broker), not from environment variables.',
+      'Connection config must be provided via overrideConfig. In v2 architecture, config comes from connection provider (broker), not from environment variables.',
     );
   }
   const config = overrideConfig;
@@ -671,6 +491,7 @@ export function getManagedConnection(): IAbapConnection {
 
     cachedConnection = createAbapConnection(
       config,
+      credentialFromSapConfig(config),
       loggerAdapter,
       fallbackSessionId,
     );
@@ -712,47 +533,6 @@ export function getManagedConnection(): IAbapConnection {
   }
 
   return cachedConnection;
-}
-
-/**
- * Remove connection from cache for a specific session
- * Called when session is closed
- *
- * If destination is provided, removes only the connection for that specific destination.
- * If destination is not provided, removes all connections for the session (all destinations).
- */
-export function removeConnectionForSession(
-  sessionId: string,
-  config?: SapConfig,
-  destination?: string,
-) {
-  if (config) {
-    const configSignature = sapConfigSignature(config);
-    const cacheKey = generateConnectionCacheKey(
-      sessionId,
-      configSignature,
-      destination,
-    );
-    const entry = connectionCache.get(cacheKey);
-    if (entry) {
-      connectionManagerLogger?.debug(
-        `[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}... (destination: ${destination || 'none'})`,
-      );
-      /* cleanup */
-      connectionCache.delete(cacheKey);
-    }
-  } else {
-    // Remove all entries for this sessionId (all destinations and configs)
-    for (const [key, entry] of connectionCache.entries()) {
-      if (entry.sessionId === sessionId) {
-        connectionManagerLogger?.debug(
-          `[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`,
-        );
-        /* cleanup */
-        connectionCache.delete(key);
-      }
-    }
-  }
 }
 
 /**
@@ -799,7 +579,11 @@ export function setConfigOverride(override?: SapConfig) {
   overrideConfig = override;
   /* cleanup */
   overrideConnection = override
-    ? createAbapConnection(override, loggerAdapter, undefined)
+    ? createAbapConnection(
+        override,
+        credentialFromSapConfig(override),
+        loggerAdapter,
+      )
     : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config

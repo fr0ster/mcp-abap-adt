@@ -107,7 +107,26 @@
     ],
     "testMatch": [
       "**/__tests__/**/*.test.ts"
-    ]
+    ],
+    "transform": {
+      "^.+\\.ts$": [
+        "ts-jest",
+        {
+          "tsconfig": "tsconfig.test.json"
+        }
+      ]
+    },
+    "moduleNameMapper": {
+      "^@mcp-abap-adt/lib$": "<rootDir>/../src/index.ts",
+      "^@mcp-abap-adt/lib/handlers$": "<rootDir>/../src/lib/handlers/index.ts",
+      "^@mcp-abap-adt/lib/utils$": "<rootDir>/../src/lib/utils.ts",
+      "^@mcp-abap-adt/lib/embeddable$": "<rootDir>/../src/embeddable/index.ts",
+      "^@mcp-abap-adt/lib/config$": "<rootDir>/../src/lib/config/index.ts",
+      "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
+      "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
+      "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
+      "^(\\.{1,2}/.*)\\.js$": "$1"
+    }
   },
   "devDependencies": {
     "@types/express": "*",

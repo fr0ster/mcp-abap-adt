@@ -399,6 +399,41 @@ describe('AuthBrokerFactory', () => {
       });
     });
 
+    it('read once per process: a changed file after the first call changes nothing', async () => {
+      basic('dest');
+      const f = factory();
+      const first = await f.settingsFor('dest');
+      writeSession('dest', [
+        'SAP_URL=https://changed.example.test',
+        'SAP_CLIENT=200',
+        'SAP_AUTH_TYPE=basic',
+        'SAP_USERNAME=placeholder-user',
+        'SAP_PASSWORD=placeholder-password',
+      ]);
+      expect(await f.settingsFor('dest')).toEqual(first);
+      expect(first.url).toBe(SYSTEM_URL);
+      expect(first.client).toBe('100');
+    });
+
+    it('XSUAA_MCP_URL is read once too', async () => {
+      writeKey('dest', xsuaaKey('https://tenant.example.test'));
+      writeSession('dest', [`XSUAA_MCP_URL=${XSUAA_SYSTEM_URL}`]);
+      const f = factory();
+      await f.settingsFor('dest');
+      writeSession('dest', ['XSUAA_MCP_URL=https://changed.example.test']);
+      expect((await f.settingsFor('dest')).url).toBe(XSUAA_SYSTEM_URL);
+    });
+
+    it('a failed read is not cached: fixing the file lets the next call answer', async () => {
+      writeKey('dest', xsuaaKey('https://tenant.example.test'));
+      const f = factory();
+      await expect(f.settingsFor('dest')).rejects.toBeInstanceOf(
+        DestinationConfigError,
+      );
+      writeSession('dest', [`XSUAA_MCP_URL=${XSUAA_SYSTEM_URL}`]);
+      expect((await f.settingsFor('dest')).url).toBe(XSUAA_SYSTEM_URL);
+    });
+
     it('no URL: DestinationConfigError naming SAP_URL', async () => {
       writeSession('dest', ['SAP_AUTH_TYPE=basic', 'SAP_USERNAME=u']);
       const err = await caught(factory().settingsFor('dest'));

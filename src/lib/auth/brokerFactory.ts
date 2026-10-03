@@ -71,6 +71,7 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   /** The build of each destination, set before its first await. */
   private readonly built = new Map<string, Promise<Built>>();
   private readonly providers = new Map<string, Promise<IAuthProvider>>();
+  private readonly settings = new Map<string, Promise<SapConfig>>();
 
   constructor(config: IAuthBrokerFactoryConfig) {
     this.config = config;
@@ -96,7 +97,25 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
     return (await this.buildOf(destination)).broker;
   }
 
-  async settingsFor(destination: string): Promise<SapConfig> {
+  /**
+   * The destination's settings, read once per process like its provider:
+   * a change to the files applies on restart. A failed read is dropped, so
+   * fixing the file lets the next call answer.
+   */
+  settingsFor(destination: string): Promise<SapConfig> {
+    const cached = this.settings.get(destination);
+    if (cached) return cached;
+    const settings = this.readSettings(destination);
+    this.settings.set(destination, settings);
+    settings.catch(() => {
+      if (this.settings.get(destination) === settings) {
+        this.settings.delete(destination);
+      }
+    });
+    return settings;
+  }
+
+  private async readSettings(destination: string): Promise<SapConfig> {
     const { broker, handler, vetted, stores } = await this.buildOf(destination);
     const means = await broker.getConnectionConfig(destination);
     // An XSUAA destination's URL is XSUAA_MCP_URL alone, never the key's url.

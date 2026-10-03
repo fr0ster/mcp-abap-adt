@@ -5,8 +5,9 @@
  * **Where it runs.** Only where `MCP_LIVE_ENV_PATHS` names one or more `.env`
  * files (separated by the platform's path delimiter: `:` on Linux and macOS,
  * `;` on Windows). Each file is one destination; the server is started once per
- * file. `MCP_LIVE_ARGS` adds launcher arguments to every start (whitespace
- * separated, e.g. `--connection-type=rfc`). Without `MCP_LIVE_ENV_PATHS` the
+ * file (a path containing the delimiter is not supported). `MCP_LIVE_ARGS`
+ * adds launcher arguments to every start, split on whitespace with no quoting
+ * (e.g. `--connection-type=rfc`). Without `MCP_LIVE_ENV_PATHS` the
  * suite skips and its test name says why — the default `npm test` and CI never
  * reach a system.
  *
@@ -62,6 +63,11 @@ class ChildStdioTransport implements Transport {
   constructor(private readonly child: ChildProcess) {}
 
   async start(): Promise<void> {
+    // A broken pipe would otherwise be an unhandled 'error' event; its message
+    // is the system's, so only a fixed text goes on.
+    this.child.stdin?.on('error', () =>
+      this.onerror?.(new Error('writing to the server stdin failed')),
+    );
     this.child.stdout?.on('data', (chunk: Buffer) => {
       this.buffer.append(chunk);
       for (;;) {
@@ -79,14 +85,36 @@ class ChildStdioTransport implements Transport {
     this.child.on('exit', () => this.onclose?.());
   }
 
-  async send(message: JSONRPCMessage): Promise<void> {
-    this.child.stdin?.write(serializeMessage(message));
+  send(message: JSONRPCMessage): Promise<void> {
+    const failed = () => new Error('writing to the server stdin failed');
+    const stdin = this.child.stdin;
+    if (!stdin?.writable) return Promise.reject(failed());
+    return new Promise((resolve, reject) => {
+      stdin.write(serializeMessage(message), (error) =>
+        error ? reject(failed()) : resolve(),
+      );
+    });
   }
 
   async close(): Promise<void> {
     // The test triggers the shutdown itself and asserts on it.
   }
 }
+
+/**
+ * Runs one protocol step and, if it throws, fails with a fixed text: a JSON-RPC
+ * error carries the server's message, which may quote what the .env holds.
+ */
+async function step<T>(label: string, run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch {
+    throw new Error(`${label} failed (the error's message is not reported)`);
+  }
+}
+
+/** Startup may log on, so every request gets the same generous bound. */
+const REQUEST = { timeout: 180_000 };
 
 /** Every non-empty stdout line must be a JSON-RPC 2.0 frame. */
 const strayLines = (stdout: string): number =>
@@ -124,7 +152,13 @@ if (ENV_PATHS.length === 0) {
 
     afterAll(() => {
       if (workdir !== undefined)
-        rmSync(workdir, { recursive: true, force: true });
+        // Retried: on Windows a just-exited child can hold a file for a moment.
+        rmSync(workdir, {
+          recursive: true,
+          force: true,
+          maxRetries: 5,
+          retryDelay: 500,
+        });
     });
 
     ENV_PATHS.forEach((envPath, index) => {
@@ -145,8 +179,10 @@ if (ENV_PATHS.length === 0) {
         child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk));
         // Drained, never printed: it may carry what the .env holds.
         child.stderr.resume();
-        const exited = new Promise<number | null>((resolve) =>
-          child.on('exit', (code) => resolve(code)),
+        // 'close', not 'exit': it fires once stdout has drained too, so the
+        // stray-line count below sees every byte the server wrote.
+        const closed = new Promise<number | null>((resolve) =>
+          child.on('close', (code) => resolve(code)),
         );
 
         const client = new Client({
@@ -154,15 +190,22 @@ if (ENV_PATHS.length === 0) {
           version: '1',
         });
         try {
-          await client.connect(new ChildStdioTransport(child));
+          await step('initialize', () =>
+            client.connect(new ChildStdioTransport(child), REQUEST),
+          );
 
-          const tools = (await client.listTools()).tools.map((t) => t.name);
+          const listed = await step('tools/list', () =>
+            client.listTools(undefined, REQUEST),
+          );
+          const tools = listed.tools.map((t) => t.name);
           expect(tools).toContain('GetAdtTypes');
 
-          const result = await client.callTool(
-            { name: 'GetAdtTypes', arguments: {} },
-            undefined,
-            { timeout: 180_000 },
+          const result = await step('tools/call GetAdtTypes', () =>
+            client.callTool(
+              { name: 'GetAdtTypes', arguments: {} },
+              undefined,
+              REQUEST,
+            ),
           );
           const content = Array.isArray(result.content) ? result.content : [];
           expect({
@@ -178,7 +221,7 @@ if (ENV_PATHS.length === 0) {
         }
 
         const code = await Promise.race([
-          exited,
+          closed,
           new Promise<string>((resolve) =>
             setTimeout(() => resolve('no exit within 60 s'), 60_000).unref(),
           ),

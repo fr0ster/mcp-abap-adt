@@ -81,7 +81,7 @@ stated, which the XSUAA fallback below relies on.
   - XSUAA service key (`url`, `clientid`, `clientsecret` at the root) — kept,
     it is in use (decided 2026-10-03), and made to work: today its session
     store is built with an empty system URL. The system URL is means, stated in
-    `sessions/<dest>.env` (`XSUAA_MCP_URL` or `SAP_URL`) through an
+    `sessions/<dest>.env` (`XSUAA_MCP_URL`) through an
     `EnvDestinationStore` whose `fallback` is the XSUAA key store, which
     supplies the client. Without a URL the destination is refused, naming the
     field.
@@ -91,8 +91,12 @@ stated, which the XSUAA fallback below relies on.
     (`mcp-auth generate-env --grant …`). No support for files written for the
     old stores (decided 2026-10-02: a change of authorization regenerates the
     file).
-  - No session seeding from service keys. The safe (in-memory) session stores
-    stay the default; `--unsafe` keeps the file-backed ones.
+  - No session seeding from service keys. For named destinations the safe
+    (in-memory) session stores stay the default and `--unsafe` keeps the
+    file-backed ones. An `--env` file is the user's own store: its secret is
+    read from it and a renewed one written back to it (auth-stores 3's
+    `EnvFileSessionStore`), whatever `--unsafe` says — today the server never
+    writes it.
 - **SNC.** A destination stating `authType: snc` and its SNC fields gets
   `SncLogonProvider` from the broker. SNC protects RFC, not HTTP: an SNC
   destination on an HTTP connection is refused, naming `connection-type`.
@@ -102,6 +106,13 @@ stated, which the XSUAA fallback below relies on.
   the change each parameter exists in all three forms with one precedence
   (CLI over env over YAML), the template `--config` generates lists them, and
   `--browser` reaches the strategy. No new parameter is added.
+- **`DeletePackage` loses `connection_config`.** The argument takes a whole
+  `SapConfig` — URL and credentials — from the tool call: a provider source
+  outside H0's list, aimed by the model. A fresh session opens from the
+  current connection's settings and provider instead.
+- **The login callback port** defaults to auth-providers' `61001` instead of
+  a random port in 30000–39999, which no identity provider could have
+  registered as a redirect URI.
 - **Shutdown flushes.** Nothing handles `SIGTERM`, `SIGINT` or stdin closing
   today. The server calls `flush()` on every broker it built on those, and
   before a stdio transport closes.

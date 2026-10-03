@@ -452,7 +452,7 @@ describe('cloud', () => {
     },
   );
 
-  it('a lookup that fails: the create is refused as a retry, not as SAP_RESPONSIBLE missing; nothing sent', async () => {
+  it('a lookup that fails: the create is refused as an unreachable system, not as SAP_RESPONSIBLE missing; nothing sent', async () => {
     process.env.SAP_USERNAME = 'PROCESS_LOGIN';
     systemContextFromConfiguration();
     lookup.mockRejectedValue(new Error('placeholder failure'));
@@ -466,6 +466,8 @@ describe('cloud', () => {
     expect(textOf(result)).toContain(RESPONSIBLE_LOOKUP_FAILED);
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(textOf(result)).not.toContain('placeholder failure');
+    expect(textOf(result)).not.toContain('SAP_RESPONSIBLE');
+    expect(textOf(result)).not.toContain('x-sap-responsible');
     expect(JSON.parse(textOf(result))).toMatchObject({
       error: 'system_context_missing',
     });

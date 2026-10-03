@@ -361,7 +361,7 @@ Outside any scope (stdio) the process values apply: `SAP_RESPONSIBLE` (or `setSy
 - `responsible` ← the system's user name, `masterSystem` ← its system id.
 - One lookup per connection, only when a call lacks a value. On-premise: no lookup, nothing filled.
 - An **empty value** counts as missing, whether the scope carries its key or not: a scope carrying `responsible: undefined` gets the system's user on a cloud connection. (The key still keeps the process value out: a scope carrying it never inherits another user's process-wide value.)
-- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs — a create that still lacks a responsible is then refused (`system_context_missing`), nothing sent; after a lookup that threw the refusal says to retry. A missing master system is left out. On-premise nothing is asked, so a scope carrying `responsible: undefined` and no `login` is refused when it creates.
+- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs — a create that still lacks a responsible is then refused (`system_context_missing`), nothing sent; after a lookup that threw the refusal says the system could not be reached and to retry when it is available (it does not advise a key). A missing master system is left out. On-premise nothing is asked, so a scope carrying `responsible: undefined` and no `login` is refused when it creates.
 
 Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
 

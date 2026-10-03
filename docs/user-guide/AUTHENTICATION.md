@@ -164,8 +164,9 @@ change made to it while the server runs is not picked up.
 A create (or a transport without an `owner`) that finds no responsible person — on-premise over SNC or
 with a token you hold, with no `SAP_RESPONSIBLE` anywhere — is refused by the server before any request
 is made: the answer is `"error": "system_context_missing"` with words naming `SAP_RESPONSIBLE`, the
-`x-sap-responsible` header and the login. When a cloud system could not be asked for its user (the
-lookup failed), the same error carries other fixed words: retry, or state `SAP_RESPONSIBLE`. Nothing is
+`x-sap-responsible` header and the login. When a cloud system could not be reached to name the user (the
+lookup failed), the same error carries other fixed words: the system is unreachable, retry when it is
+available. It does not advise `SAP_RESPONSIBLE` — the create would fail on an unreachable system anyway. Nothing is
 sent with an empty responsible. A missing master
 system is never refused: the attribute is left out and the system applies itself, as in 15.x. A read is
 never refused for either.

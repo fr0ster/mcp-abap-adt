@@ -115,7 +115,7 @@ export interface EmbeddableMcpServerOptions {
    * answer is a cloud system's — the login does not count, and only what the
    * call does not state is taken from it (`{}`: the system named nothing, so a
    * create without a stated responsible is refused). A resolver that throws is
-   * treated like `{}`, and the create is refused as one to retry. The default
+   * treated like `{}`, and the create is refused as the system being unreachable, to retry later. The default
    * asks on ABAP Cloud (one lookup per connection) and answers `null`
    * on-premise. `null` as the option disables it.
    * @default defaultSystemContextResolver

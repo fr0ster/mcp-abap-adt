@@ -58,3 +58,39 @@ export function destinationFailureAnswer(error: unknown): {
   if (words !== undefined) return { status: 500, text: words, known: true };
   return { status: 500, text: 'Internal Server Error', known: false };
 }
+
+/**
+ * Per destination, one request at a time sets its connection context, and
+ * the first one also connects — presents the credential, which is the first
+ * login — before the next starts. Two first logins never run at once.
+ * A failed first connect leaves the next request to connect again.
+ */
+export class FirstConnectLock {
+  private readonly queues = new Map<string, Promise<void>>();
+  private readonly connected = new Set<string>();
+
+  run(
+    destination: string,
+    setContext: () => Promise<void>,
+    connect: () => Promise<unknown>,
+  ): Promise<void> {
+    const previous = this.queues.get(destination) ?? Promise.resolve();
+    const work = previous
+      .catch(() => {})
+      .then(async () => {
+        await setContext();
+        if (!this.connected.has(destination)) {
+          await connect();
+          this.connected.add(destination);
+        }
+      });
+    const settled = work.finally(() => {
+      if (this.queues.get(destination) === settled) {
+        this.queues.delete(destination);
+      }
+    });
+    // Set before any await: the next request queues behind this one.
+    this.queues.set(destination, settled);
+    return settled;
+  }
+}

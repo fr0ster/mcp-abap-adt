@@ -6,10 +6,23 @@
  */
 
 import type { Server } from 'node:http';
+
+// The connector, without a wire: connect() presents the credential it was
+// built with, which is what a first login is.
+jest.mock('../../../src/lib/connectionFactory', () => ({
+  createAbapConnection: (_settings: unknown, credential: any) => ({
+    connect: async () => {
+      const prepared = await credential.prepare();
+      if (!prepared.ok) throw new Error('refused');
+      await credential.establish({});
+    },
+  }),
+}));
+
 import type { AddressInfo } from 'node:net';
-import { DestinationConfigError } from '@mcp-abap-adt/auth-broker';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import {
+  DestinationConfigError,
   type IDestinations,
   UnsupportedAuthenticationError,
 } from '@mcp-abap-adt/lib/auth';
@@ -114,7 +127,11 @@ afterAll(() => {
 beforeEach(() => {
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 });
-afterEach(() => errorSpy.mockRestore());
+afterEach(async () => {
+  // An SSE session logs its close after the socket goes; let it.
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  errorSpy.mockRestore();
+});
 
 describe('StreamableHttpServer: destinations', () => {
   let server: Server;
@@ -305,5 +322,122 @@ describe('stdio inspection-only mode: the stand-in destinations', () => {
         expect(outcome.refusal.reason).toContain('--env-path');
       }
     }
+  });
+});
+
+/**
+ * Two first requests to one destination at once: the first login is the
+ * first connect, and the second request starts only after it settles.
+ */
+function heldDestinations() {
+  const events: string[] = [];
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  let prepares = 0;
+  const provider: IAuthProvider = {
+    kind: 'test',
+    prepare: async () => {
+      prepares += 1;
+      events.push(`prepare ${prepares} start`);
+      if (prepares === 1) await held;
+      events.push(`prepare ${prepares} end`);
+      return { ok: true };
+    },
+    establish: async () => ({ ok: true }),
+    authorize: async () => ({ ok: true }),
+    rejected: async () => ({ ok: true }),
+  };
+  let settings = 0;
+  const destinations: IDestinations = {
+    settingsFor: async () => {
+      settings += 1;
+      events.push(`settingsFor ${settings}`);
+      return { url: 'https://system.example.invalid', authType: 'jwt' };
+    },
+    getProvider: async () => provider,
+  };
+  return { destinations, events, release, prepared: () => prepares };
+}
+
+async function until(check: () => boolean): Promise<void> {
+  for (let i = 0; i < 200 && !check(); i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
+
+describe('the first login to a destination is serialised', () => {
+  let server: Server;
+  const open: AbortController[] = [];
+
+  afterEach(async () => {
+    for (const controller of open.splice(0)) controller.abort();
+    await close(server);
+  });
+
+  it('HTTP: the second first request starts only after the first connect settles', async () => {
+    const { destinations, events, release, prepared } = heldDestinations();
+    const mcp = new StreamableHttpServer(emptyRegistry, destinations, {
+      defaultDestination: 'good',
+    });
+    let baseUrl: string;
+    ({ server, baseUrl } = await listen((app) => mcp.registerRoutes(app)));
+    const post = () =>
+      fetch(`${baseUrl}/mcp/stream/http`, {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          accept: 'application/json, text/event-stream',
+        },
+        body: JSON.stringify(INITIALIZE),
+      });
+
+    const first = post();
+    await until(() => prepared() === 1);
+    const second = post();
+    // The first login is held open: the second has not started.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(events).toEqual(['settingsFor 1', 'prepare 1 start']);
+
+    release();
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    expect(events.slice(0, 3)).toEqual([
+      'settingsFor 1',
+      'prepare 1 start',
+      'prepare 1 end',
+    ]);
+    expect(events).toContain('settingsFor 2');
+  });
+
+  it('SSE: the second first session starts only after the first connect settles', async () => {
+    const { destinations, events, release, prepared } = heldDestinations();
+    const sse = new SseServer(emptyRegistry, destinations, {
+      defaultDestination: 'good',
+    });
+    let baseUrl: string;
+    ({ server, baseUrl } = await listen((app) => sse.registerRoutes(app)));
+    const get = () => {
+      const controller = new AbortController();
+      open.push(controller);
+      return fetch(`${baseUrl}/sse`, { signal: controller.signal });
+    };
+
+    const first = get();
+    await until(() => prepared() === 1);
+    const second = get();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(events).toEqual(['settingsFor 1', 'prepare 1 start']);
+
+    release();
+    expect((await first).status).toBe(200);
+    expect((await second).status).toBe(200);
+    expect(events.slice(0, 3)).toEqual([
+      'settingsFor 1',
+      'prepare 1 start',
+      'prepare 1 end',
+    ]);
+    expect(events).toContain('settingsFor 2');
   });
 });

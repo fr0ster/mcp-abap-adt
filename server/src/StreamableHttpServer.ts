@@ -16,6 +16,7 @@ import express, { type Request, type Response } from 'express';
 import {
   destinationFailureAnswer,
   destinationFromHeader,
+  FirstConnectLock,
 } from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
@@ -102,7 +103,7 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
   /** Per-destination lock around the first connect: it serialises the first login. */
-  private readonly authLocks = new Map<string, Promise<void>>();
+  private readonly firstConnect = new FirstConnectLock();
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
@@ -196,22 +197,14 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Skip SAP connection setup for ping — it's a protocol-level check,
         // no need to acquire JWT tokens or contact the SAP system
         if (!isPing && destination) {
-          // Serialize the first connect per destination: two first logins
-          // must not race for the same callback port
-          const existingLock = this.authLocks.get(destination);
-          if (existingLock) {
-            await existingLock.catch(() => {});
-          }
-          const lockedDestination = destination;
-          const authPromise = server
-            .setConnectionContextPublic(lockedDestination, this.destinations)
-            .finally(() => {
-              if (this.authLocks.get(lockedDestination) === authPromise) {
-                this.authLocks.delete(lockedDestination);
-              }
-            });
-          this.authLocks.set(lockedDestination, authPromise);
-          await authPromise;
+          // The first request of a destination connects inside the lock:
+          // two first logins must not race for the same callback port
+          const chosen = destination;
+          await this.firstConnect.run(
+            chosen,
+            () => server.setConnectionContextPublic(chosen, this.destinations),
+            () => server.connectPublic(),
+          );
         }
 
         const authSource = destination
@@ -390,6 +383,7 @@ export class StreamableHttpServer extends BaseMcpServer {
     setConnectionContextFromHeadersPublic: (
       headers: Record<string, string | string[] | undefined>,
     ) => void;
+    connectPublic: () => Promise<unknown>;
   } {
     class PerRequestServer extends BaseMcpServer {
       constructor(
@@ -406,6 +400,11 @@ export class StreamableHttpServer extends BaseMcpServer {
         destinations: IDestinations,
       ): Promise<void> {
         return this.setConnectionContext(destination, destinations);
+      }
+
+      /** The context's connection, connected (cached for this request). */
+      public connectPublic(): Promise<unknown> {
+        return this.getConnection();
       }
 
       public setConnectionContextFromHeadersPublic(

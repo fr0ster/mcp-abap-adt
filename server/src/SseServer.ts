@@ -16,6 +16,7 @@ import express from 'express';
 import {
   destinationFailureAnswer,
   destinationFromHeader,
+  FirstConnectLock,
 } from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
@@ -99,6 +100,8 @@ export class SseServer {
   private readonly postPath: string;
   private readonly defaultDestination?: string;
   private readonly sessions = new Map<string, SessionEntry>();
+  /** Per-destination lock around the first connect: it serialises the first login. */
+  private readonly firstConnect = new FirstConnectLock();
   private readonly logger: Logger;
   private readonly version: string;
   private readonly externalApp?: IHttpApplication;
@@ -296,10 +299,15 @@ export class SseServer {
       async init(
         dest: string | undefined,
         destinations: IDestinations,
+        firstConnect: FirstConnectLock,
         hdrs?: any,
       ) {
         if (dest) {
-          await this.setConnectionContext(dest, destinations);
+          await firstConnect.run(
+            dest,
+            () => this.setConnectionContext(dest, destinations),
+            () => this.getConnection(),
+          );
         } else if (hdrs) {
           this.setConnectionContextFromHeaders(hdrs);
         }
@@ -316,6 +324,7 @@ export class SseServer {
       await server.init(
         destination,
         this.destinations,
+        this.firstConnect,
         fromHeaders ? req.headers : undefined,
       );
     } catch (error) {

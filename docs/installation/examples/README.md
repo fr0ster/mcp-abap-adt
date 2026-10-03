@@ -32,10 +32,10 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 **Setup**:
 1. Start server in separate terminal:
    ```bash
-   # With NPX (recommended); a .env in the working directory is the default destination
-   npx @mcp-abap-adt/core --transport=http --port=3000
+   # With NPX (recommended); a .env you name is the default destination
+   npx @mcp-abap-adt/core --transport=http --port=3000 --env-path=./.env
    
-   # Or a named destination (the .env is not loaded)
+   # Or a named destination
    npx @mcp-abap-adt/core --transport=http --port=3000 --mcp=TRIAL
    
    # Or with global install
@@ -81,7 +81,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
    
    **Note**: 
    - `x-mcp-destination` is honoured only with `--allow-destination-header`; use `--mcp=TRIAL` instead to serve one destination without a header
-   - Without `--mcp`, `--env` or `--env-path`, the server uses the `.env` in the working directory if there is one
+   - Without `--mcp`, `--env` or `--env-path` there is no default destination: nothing is looked up in the working directory
    - An XSUAA service key needs `XSUAA_MCP_URL` in `sessions/TRIAL.env`
 
 3. **Use config** with destination header:

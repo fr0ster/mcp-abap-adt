@@ -75,7 +75,7 @@ SAP_AUTH_TYPE=basic
 Start the server with `--connection-type=rfc`.
 
 - `SAP_AUTH_TYPE` — authentication (`basic` or `snc` over RFC; the JWT authentications are HTTP).
-- The transport layer (`http` or `rfc`): `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` / working-directory `.env` or the process environment, `--connection-type=rfc`, or YAML `connection-type: rfc`. Precedence: CLI, then the environment (the `.env` value joins it, never over one already set), then YAML.
+- The transport layer (`http` or `rfc`): `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` or the process environment, `--connection-type=rfc`, or YAML `connection-type: rfc`. Precedence: CLI, then the environment (the `.env` value joins it, never over one already set), then YAML.
 
 ## SNC (passwordless logon)
 

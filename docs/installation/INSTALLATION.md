@@ -64,7 +64,7 @@ mcp-abap-adt --help
 
 For basic authentication:
 ```bash
-# The server automatically looks for .env in your current directory
+# The server reads only a file you name: start it with --env-path=~/my-project/.env
 cd ~/my-project
 cat > .env << EOF
 SAP_URL=https://your-sap-system.example
@@ -72,7 +72,7 @@ SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
-# System type: cloud (default), onprem, or legacy
+# System type: cloud (default for tools), onprem, or legacy
 # Controls tool availability (e.g. Programs require onprem)
 SAP_SYSTEM_TYPE=onprem
 EOF
@@ -123,9 +123,9 @@ mcp-abap-adt --transport=http --port=8080
 2. Destination file via `--env=<destination>`:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. `.env` in current working directory (where you run the command)
 
-This means you can have different `.env` files for different projects and the server will automatically use the one in your current directory.
+Nothing is looked up in the working directory: a server started inside someone else's project must not take
+their settings. A `.env` there is read only when you name it (`--env-path=./.env`).
 
 See [Package Installation Guide](#package-installation-details) below for detailed instructions.
 
@@ -318,7 +318,7 @@ npx mcp-abap-adt --transport=http --port=3000
 The server supports **four authentications** — basic (HTTP or RFC), SNC (RFC, passwordless), JWT with browser login and JWT you hold — see [Authentication & Destinations](../user-guide/AUTHENTICATION.md). A destination lives in one of two places:
 
 1. **Named destination** (`--mcp=<destination>`): `service-keys/<destination>.json` and `sessions/<destination>.env`, read field by field
-2. **A `.env` file** (`--env`, `--env-path`, or the working directory's `.env`): one file, read and written back with a renewed token
+2. **A `.env` file** (`--env` or `--env-path`): one file, read and written back with a renewed token
 
 ##### Option 1: Service Key (named destination)
 
@@ -418,7 +418,7 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 
 **General Options:**
 - `--help` - Show complete help message with all available options
-- `--mcp=<destination>` - Named destination (`service-keys/<destination>.json` + `sessions/<destination>.env`); the working directory's `.env` is not loaded
+- `--mcp=<destination>` - Named destination (`service-keys/<destination>.json` + `sessions/<destination>.env`)
 - `--auth-broker-path=<path>` - Base directory of the `service-keys` and `sessions` subdirectories
   - Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
 - `--env=<destination>` - Destination env file from sessions store (`<destination>.env`)
@@ -426,9 +426,8 @@ All server commands (`mcp-abap-adt`, `mcp-abap-adt --transport=http`, `mcp-abap-
 - `--unsafe` - Write named destinations' sessions to disk (default: in memory)
 - `--browser=<name>`, `--browser-auth-port=<port>` - Browser and callback port (default `61001`) of a login
 - `--allow-destination-header` - Honour `x-mcp-destination` (HTTP/SSE)
-- `--auth-broker` - Ignore the working directory's `.env`; serve only `--mcp` / `--env` / `--env-path` destinations
 
-**Note:** When no `--mcp`, `--env` or `--env-path` is given, the server uses the `.env` in the current directory if there is one. An invalid port, enum or flag value is refused at startup.
+**Note:** When no `--mcp`, `--env` or `--env-path` is given, there is no default destination: nothing is looked up in the working directory (`--env-path=./.env` names a `.env` there). An invalid port, enum or flag value is refused at startup.
 
 **Transport Selection:**
 - `--transport=<type>` - Transport type: `stdio`, `http`, `streamable-http`, or `sse`
@@ -457,7 +456,6 @@ You can also configure the server using environment variables.
 
 *MCP Server Configuration:*
 - `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`)
-- `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_HTTP_PORT` - Default HTTP port
 - `MCP_HTTP_HOST` - Default HTTP host (default: 127.0.0.1)
@@ -470,7 +468,6 @@ You can also configure the server using environment variables.
 - `MCP_SSE_ALLOWED_ORIGINS` - Comma-separated exact Origin header values (DNS-rebinding protection; includes scheme)
 - `MCP_SSE_ENABLE_DNS_PROTECTION` - Enable SSE Host/Origin allowlist validation (true|false; NOT browser CORS — no Access-Control-Allow-Origin headers are emitted)
 - `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
-- `MCP_USE_AUTH_BROKER` - Same as `--auth-broker`: ignore the working directory's `.env` (true|false)
 - `MCP_BROWSER` - Browser for a login (chrome, edge, firefox, system, headless, none)
 - `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
 

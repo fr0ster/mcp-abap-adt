@@ -72,39 +72,27 @@ The server resolves env file in this order:
 2. `--env=<destination>` -> platform sessions path:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. `.env` in current working directory (`process.cwd()`), not when `--mcp` or `--auth-broker` is given
 
-A file you name that does not exist is refused at startup, naming the parameter and the path;
-the server does not fall back to the working directory's `.env`.
+**Nothing is looked up in the working directory.** A server started inside someone else's project
+must not take their settings, so a `.env` there is read only when you name it
+(`--env-path=./.env`). Without `--env`, `--env-path` or `--mcp` there is no default destination.
+
+A file you name that does not exist is refused at startup, naming the parameter and the path.
 
 The chosen file is read **and written back** with a renewed token, whatever `--unsafe` says.
 It is read once per process: a change made from outside takes effect on restart.
 
-This allows you to:
-- Have different .env files per project
-- Override with `--env` when needed
-- Use global default as fallback
-
 **Example workflow:**
 ```bash
-# Project 1 (development system)
-cd ~/projects/abap-dev
-cat > .env << EOF
-SAP_URL=https://dev.sap.company.example
-SAP_CLIENT=100
-EOF
-mcp-abap-adt  # Uses ~/projects/abap-dev/.env
+# One file per system, each named explicitly
+mcp-abap-adt --env-path=~/configs/abap-dev.env
+mcp-abap-adt --env-path=~/configs/abap-prod.env
 
-# Project 2 (production system)
-cd ~/projects/abap-prod
-cat > .env << EOF
-SAP_URL=https://prod.sap.company.example
-SAP_CLIENT=200
-EOF
-mcp-abap-adt  # Uses ~/projects/abap-prod/.env
+# Or keep them in the sessions directory and name them
+mcp-abap-adt --env=abap-dev   # sessions/abap-dev.env
 
-# Override for testing
-mcp-abap-adt --env-path=/tmp/test.env
+# A .env in the current directory is read only when named
+mcp-abap-adt --env-path=./.env
 ```
 
 ## Transport Selection
@@ -154,11 +142,11 @@ mcp-abap-adt --connection-type=rfc --env-path=my-system.env
 
 **Note:** RFC requires the SAP NW RFC SDK installed and configured. See [RFC Setup Guide](../installation/RFC_SETUP.md) for prerequisites.
 
-The same option can be set with `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` / working-directory `.env` (which joins the environment, never over a value already set), or YAML `connection-type: rfc`. Precedence: the CLI flag, then the environment, then YAML.
+The same option can be set with `SAP_CONNECTION_TYPE=rfc` in the process environment or in the `--env` / `--env-path` `.env` (which joins the environment, never over a value already set), or YAML `connection-type: rfc`. Precedence: the CLI flag, then the environment, then YAML.
 
 ## Authentication and Connection Parameters
 
-Every parameter below has a CLI form, a YAML key and — for eight of them — an environment
+Every parameter below has a CLI form, a YAML key and — for seven of them — an environment
 variable. **CLI wins over the environment, which wins over YAML.** `.env` files and environment
 variables hold secrets and the session; YAML holds configuration only. An invalid port, enum
 value or flag value is **refused at startup**, naming the parameter in the form you used
@@ -170,14 +158,13 @@ ignored.
 | `--mcp=<name>` | — | `mcp` | name | Default destination: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
 | `--env=<name>` | — | `env` | name | One env file, `sessions/<name>.env` |
 | `--env-path=<path>` | `MCP_ENV_PATH` | `env-path` | path | One env file by path or file name (relative to the working directory) |
-| `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` | flag | Ignore the working directory's `.env` |
 | `--auth-broker-path=<dir>` | `AUTH_BROKER_PATH` | `auth-broker-path` | path | Base directory of `service-keys/` and `sessions/` (default: the platform paths) |
 | `--unsafe` | `MCP_UNSAFE` | `unsafe` | flag | Write named destinations' sessions to disk instead of keeping them in memory |
 | `--browser=<name>` | `MCP_BROWSER` | `browser` | `chrome`, `edge`, `firefox`, `system`, `headless`, `none` | Browser for a login (default `system`) |
 | `--browser-auth-port=<port>` | `MCP_BROWSER_AUTH_PORT` | `browser-auth-port` | 1-65535 | Login callback port (default `61001`) |
 | `--allow-destination-header` | — | `allow-destination-header` | flag | Honour `x-mcp-destination` (HTTP/SSE, off by default) |
 | `--connection-type=<type>` | `SAP_CONNECTION_TYPE` | `connection-type` | `http`, `rfc` | SAP connection type (default `http`) |
-| `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type, overriding detection (default `cloud`) |
+| `--system-type=<type>` | `SAP_SYSTEM_TYPE` | `system-type` | `onprem`, `cloud`, `legacy` | SAP system type: the tools offered (default `cloud`); the connector and whether the master system is asked of the system (default `cloud` for a `jwt` destination, else `onprem`; never guessed from the URL) |
 
 The environment forms `MCP_DESTINATION`, `MCP_ENV` and `MCP_ALLOW_DESTINATION_HEADER` do **not**
 exist; use `--mcp`, `--env` and `--allow-destination-header` (or their YAML keys).
@@ -193,7 +180,6 @@ mcp-abap-adt --transport=sse --mcp=TRIAL
 mcp-abap-adt --transport=http --mcp=TRIAL
 ```
 
-- When `--mcp` or `--auth-broker` is given, the working directory's `.env` is not loaded.
 - An XSUAA service key needs `XSUAA_MCP_URL` in `sessions/<name>.env` (the key carries the UAA,
   not the system).
 - Without `--unsafe` the session is kept in memory: one browser login per process.
@@ -390,11 +376,9 @@ Alternative to command line arguments. Environment variables can be set in shell
 ### General
 
 - `MCP_ENV_PATH` - Explicit path to `.env` file (same as `--env-path`)
-- `MCP_SKIP_ENV_LOAD` - Skip automatic .env loading (true|false)
 - `MCP_SKIP_AUTO_START` - Skip automatic server start (true|false, for testing)
 - `MCP_TRANSPORT` - Default transport type (stdio|http|sse)
 - `MCP_UNSAFE` - Write named destinations' sessions to disk (true|false)
-- `MCP_USE_AUTH_BROKER` - Ignore the working directory's `.env` (true|false)
 - `MCP_BROWSER` - Browser for a login: chrome, edge, firefox, system, headless, none
 - `MCP_BROWSER_AUTH_PORT` - Login callback port (default 61001)
 
@@ -426,7 +410,7 @@ These are typically set in `.env` file:
 - `SAP_SYSTEM_TYPE` - SAP system type: `cloud` (default) or `onprem`. Controls which tools are available — e.g., Programs require `onprem`. **Must be set explicitly for on-premise systems.** `legacy` is accepted as a value but no tool declares that environment: support for legacy systems (BASIS < 7.50) is parked on the `parked/legacy-support` branch until it can be tried against a live one.
 - `SAP_USERNAME` - SAP username (for basic auth)
 - `SAP_PASSWORD` - SAP password (for basic auth)
-- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` / working-directory `.env`)
+- `SAP_CONNECTION_TYPE` - Connection transport: `http` (default) or `rfc` (process environment, or the `--env` / `--env-path` `.env`)
 - `SAP_LANGUAGE` - SAP language (optional, e.g., EN, DE)
 
 **SNC (RFC only, no user, no password):**
@@ -584,16 +568,10 @@ mcp-prod
 
 ### Server Won't Start
 
-Check if .env file exists and is readable:
+Check that the file you named exists and is readable (a named file that does not exist is
+refused at startup, naming the parameter and the path):
 ```bash
-# Check current directory
-ls -la .env
-
-# Check specified path
 ls -la ~/configs/sap.env
-
-# Verify environment loading (stderr output)
-mcp-abap-adt 2>&1 | grep MCP-ENV
 ```
 
 ### Port Already in Use
@@ -606,31 +584,12 @@ lsof -i :3000
 mcp-abap-adt --transport=http --port=3001
 ```
 
-### Can't Find .env File
+### No Destination, or the Wrong One
 
-The server shows where it's looking:
-```bash
-mcp-abap-adt 2>&1 | head -10
-# Look for [MCP-ENV] messages
-```
-
-Output will show:
-- Current working directory
-- Whether .env was found
-- Which .env file is being used
-- Full path being tried
-
-### Wrong Environment Loaded
-
-Check which .env is being used:
-```bash
-# Server shows this on startup
-[MCP-ENV] Found .env file: /home/user/project/.env
-[MCP-ENV] ✓ Successfully loaded: /home/user/project/.env
-
-# Or use explicit path
-mcp-abap-adt --env-path=/correct/path/.env
-```
+The server reads only the file you name — never a `.env` it happens to find in the working
+directory. Name it with `--env-path=<path>` (`--env-path=./.env` for the current directory),
+`--env=<name>` (`sessions/<name>.env`), or use `--mcp=<name>`. The startup summary on stderr names
+the destination and the file it serves.
 
 ## See Also
 

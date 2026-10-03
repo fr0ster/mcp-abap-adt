@@ -50,14 +50,12 @@ env-path: .env
 # SAP connection type: http (default) or rfc
 connection-type: http
 
-# SAP system type: onprem | cloud (default) | legacy
+# SAP system type: onprem | cloud | legacy
+# (tools default to cloud; the connector to cloud for a jwt, else onprem)
 system-type: cloud
 
 # Write named destinations' sessions to disk (default: in memory)
 unsafe: false
-
-# Ignore the working directory's .env
-auth-broker: false
 
 # Base directory of service-keys/ and sessions/
 auth-broker-path: ~/custom/path
@@ -100,11 +98,10 @@ sse:
 | `transport` | string | `stdio` | Transport type: `stdio` (default, for MCP clients), `http`, `streamable-http`, or `sse` |
 | `mcp` | string | - | Default destination name: `service-keys/<name>.json` and `sessions/<name>.env`, field by field |
 | `env` | string | - | Destination name resolved from sessions store (`sessions/<name>.env`) |
-| `env-path` | string | - | Explicit path to `.env` file |
+| `env-path` | string | - | Explicit path to `.env` file. Nothing is looked up in the working directory: a `.env` there is read only when named (`env-path: ./.env`) |
 | `connection-type` | string | `http` | SAP connection transport: `http` (default) or `rfc` |
-| `system-type` | string | `cloud` | `onprem`, `cloud` or `legacy`, overriding detection |
+| `system-type` | string | tools: `cloud`; connector: `cloud` for a `jwt`, else `onprem` | `onprem`, `cloud` or `legacy`; never guessed from the URL |
 | `unsafe` | boolean | `false` | Write named destinations' sessions to disk instead of keeping them in memory |
-| `auth-broker` | boolean | `false` | Ignore the working directory's `.env` |
 | `auth-broker-path` | string | - | Base directory of `service-keys/` and `sessions/` |
 | `browser` | string | `system` | Browser for a login: `chrome`, `edge`, `firefox`, `system`, `headless`, `none` |
 | `browser-auth-port` | number | `61001` | Login callback port, 1-65535 |

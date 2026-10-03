@@ -1152,8 +1152,8 @@ EXAMPLES:
   # Use stdio mode with --mcp parameter (a named destination, skips .env file)
   mcp-abap-adt --mcp=TRIAL
 
-  # Default: uses .env from current directory if exists
-  mcp-abap-adt
+  # A .env in the current directory is read only when named
+  mcp-abap-adt --env-path=./.env
 
   # Use custom base directory (service-keys and sessions subdirectories)
   mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/

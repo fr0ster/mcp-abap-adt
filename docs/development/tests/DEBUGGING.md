@@ -308,7 +308,7 @@ Enables logging of all incoming HTTP requests and MCP JSON-RPC calls. Shows:
 
 **Usage:**
 ```bash
-DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker
+DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL
 ```
 
 **Example output:**
@@ -358,7 +358,7 @@ Enables all connection-level debugging, including:
 
 **Usage:**
 ```bash
-DEBUG_CONNECTORS=true mcp-abap-adt --auth-broker
+DEBUG_CONNECTORS=true mcp-abap-adt --mcp=TRIAL
 ```
 
 **Note:** `DEBUG_CONNECTORS=true` automatically enables `DEBUG_HTTP_REQUESTS=true`.
@@ -374,10 +374,10 @@ Enables debug logging for `auth-broker` package. Shows:
 **Usage:**
 ```bash
 # Using DEBUG_AUTH_LOG (original)
-DEBUG_AUTH_LOG=true mcp-abap-adt --auth-broker
+DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL
 
 # Using DEBUG_AUTH_BROKER (alias, recommended)
-DEBUG_AUTH_BROKER=true mcp-abap-adt --auth-broker
+DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL
 ```
 
 **Note:** `DEBUG_AUTH_BROKER=true` automatically sets `DEBUG_AUTH_LOG=true` for the auth-broker package.
@@ -393,7 +393,7 @@ Enables detailed logging in MCP handler functions. Shows:
 
 **Usage:**
 ```bash
-DEBUG_HANDLERS=true mcp-abap-adt --auth-broker
+DEBUG_HANDLERS=true mcp-abap-adt --mcp=TRIAL
 ```
 
 ### DEBUG_CONNECTION_MANAGER=true
@@ -406,7 +406,7 @@ Enables logging for connection manager (`getManagedConnection`). Shows:
 
 **Usage:**
 ```bash
-DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
 ```
 
 ## Combined Debugging
@@ -414,28 +414,28 @@ DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
 Enable all debug flags for maximum visibility:
 
 ```bash
-DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_LOG=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_LOG=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
 ```
 
 **Common combinations:**
 
 ```bash
 # HTTP requests and MCP calls only
-DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker
+DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL
 
 # Connection-level debugging (HTTP, sessions, connection management)
-DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
 
 # Authentication debugging
-DEBUG_AUTH_BROKER=true mcp-abap-adt --auth-broker
+DEBUG_AUTH_BROKER=true mcp-abap-adt --mcp=TRIAL
 # or
-DEBUG_AUTH_LOG=true mcp-abap-adt --auth-broker
+DEBUG_AUTH_LOG=true mcp-abap-adt --mcp=TRIAL
 
 # Handler debugging
-DEBUG_HANDLERS=true mcp-abap-adt --auth-broker
+DEBUG_HANDLERS=true mcp-abap-adt --mcp=TRIAL
 
 # Full visibility (everything)
-DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_BROKER=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --auth-broker
+DEBUG_HTTP_REQUESTS=true DEBUG_AUTH_BROKER=true DEBUG_HANDLERS=true DEBUG_CONNECTORS=true DEBUG_CONNECTION_MANAGER=true mcp-abap-adt --mcp=TRIAL
 ```
 
 ## Security Note
@@ -453,16 +453,16 @@ All debug logs are written to `stderr` in JSON format to avoid interfering with 
 
 1. **View logs in terminal:**
    ```bash
-   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker 2>&1 | jq
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL 2>&1 | jq
    ```
 
 2. **Save logs to file:**
    ```bash
-   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker 2>debug.log
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL 2>debug.log
    ```
 
 3. **Filter specific log types:**
    ```bash
-   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --auth-broker 2>&1 | grep "HTTP_REQUEST"
+   DEBUG_HTTP_REQUESTS=true mcp-abap-adt --mcp=TRIAL 2>&1 | grep "HTTP_REQUEST"
    ```
 

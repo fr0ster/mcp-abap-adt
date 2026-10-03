@@ -75,7 +75,7 @@ When using HTTP transport, a request can carry its own connection. The headers s
 | `x-sap-responsible` | No | Responsible user for transport operations | `<user>` |
 | `x-sap-language` | No | Master language of created objects | `EN` |
 
-\* A request that carries `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password` is a direct connection. A request that carries neither a destination nor such headers is served from the default destination (`--mcp`, `--env`, `--env-path` or the working directory's `.env`), or answered `400` if there is none.
+\* A request that carries `x-sap-url` and either `x-sap-jwt-token` or both `x-sap-login` and `x-sap-password` is a direct connection. A request that carries neither a destination nor such headers is served from the default destination (`--mcp`, `--env` or `--env-path`), or answered `400` if there is none.
 
 **Notes:**
 - **Precedence per request:** `x-mcp-destination` (with `--allow-destination-header`), then the `x-sap-*` connection headers, then the default destination.
@@ -107,7 +107,7 @@ For on-premise systems using basic authentication:
 
 **Note:** For basic authentication, you can pass username and password via HTTP headers (`x-sap-login` and `x-sap-password`) or configure them in the server's `.env` file (`SAP_USERNAME`, `SAP_PASSWORD`). Headers take priority over the default destination.
 
-**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When provided, they override `SAP_MASTER_SYSTEM` / `SAP_RESPONSIBLE` from `.env` and the cloud `getSystemInformation()` API. This is useful for on-premise HTTP/SSE setups where no `.env` file is used.
+**System context headers** (`x-sap-master-system`, `x-sap-responsible`) are optional. When provided, they override `SAP_MASTER_SYSTEM` / `SAP_RESPONSIBLE` from `.env` and, for a cloud system, the `getSystemInformation()` API. This is useful for on-premise HTTP/SSE setups where no `.env` file is used.
 
 ## Destinations
 
@@ -115,9 +115,10 @@ The server supports **four authentications** — basic (HTTP or RFC), SNC (RFC o
 
 A process serves **one default destination**, chosen by:
 
-1. `--mcp=<destination>` — a named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, read field by field (the `.env` wins). The working directory's `.env` is not loaded.
+1. `--mcp=<destination>` — a named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, read field by field (the `.env` wins).
 2. `--env-path=<path|file>` (or `MCP_ENV_PATH`) or `--env=<destination>` (`sessions/<destination>.env`) — one env file, used as it is. A file that does not exist is refused at startup, naming the parameter and the path.
-3. Otherwise a `.env` in the working directory, if there is one.
+
+Otherwise there is no default destination. Nothing is looked up in the working directory: a `.env` there is read only when you name it (`--env-path=./.env`).
 
 ```bash
 # stdio: a named destination
@@ -152,7 +153,7 @@ Download the service key JSON from SAP BTP and save it as `{destination}.json`; 
 
 ### Session Storage
 
-By default a named destination's session (JWT and refresh token) is kept **in memory**: nothing is written, and a restart logs in again. With `--unsafe` (or `MCP_UNSAFE=true`) the session is written to `sessions/{destination}.env` in plain text and survives restarts. An env file named with `--env` / `--env-path`, or found in the working directory, is written back whatever `--unsafe` says.
+By default a named destination's session (JWT and refresh token) is kept **in memory**: nothing is written, and a restart logs in again. With `--unsafe` (or `MCP_UNSAFE=true`) the session is written to `sessions/{destination}.env` in plain text and survives restarts. An env file named with `--env` / `--env-path` is written back whatever `--unsafe` says.
 
 ### First-Time Authentication (JWT, browser login)
 
@@ -197,14 +198,13 @@ The server uses `service-keys` and `sessions` subdirectories of that path (`~/pr
 
 | Option | Effect |
 |--------|--------|
-| `--mcp=<destination>` | Named destination; the working directory's `.env` is not loaded |
+| `--mcp=<destination>` | Named destination |
 | `--env=<destination>` | `sessions/<destination>.env` as one env file |
 | `--env-path=<path\|file>` | One env file; relative paths resolve from the working directory |
 | `--auth-broker-path=<path>` | Base directory of `service-keys/` and `sessions/` |
 | `--unsafe` | Write named destinations' sessions to disk |
 | `--browser`, `--browser-auth-port` | Browser and callback port (default `61001`) of a login |
 | `--allow-destination-header` | Honour `x-mcp-destination` |
-| `--auth-broker` | Ignore the working directory's `.env` |
 
 Every parameter, with its environment and YAML forms, is in [CLI_OPTIONS.md](CLI_OPTIONS.md). An invalid port, enum or flag value is refused at startup.
 
@@ -304,12 +304,14 @@ When creating or updating ABAP objects on on-premise systems, SAP ADT requires `
 
 | Variable | Purpose | Resolution order |
 |----------|---------|-----------------|
-| `SAP_MASTER_SYSTEM` | SAP system ID (the three-character SID) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only) |
-| `SAP_RESPONSIBLE` | Responsible user for the object | 1. Env var `SAP_RESPONSIBLE` → 2. Env var `SAP_USERNAME` → 3. `getSystemInformation()` API (cloud only) |
+| `SAP_MASTER_SYSTEM` | SAP system ID (the three-character SID) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only, per call) |
+| `SAP_RESPONSIBLE` | Responsible user for the object | 1. Env var `SAP_RESPONSIBLE` → 2. Env var `SAP_USERNAME` → 3. `getSystemInformation()` API (cloud only, per call) |
 
-**On-premise systems** do not support the `getSystemInformation()` API endpoint, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.
+The master system is determined from configuration, or by a request in the cloud — there is no other way. Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type`, else a `jwt` destination is cloud and any other on-premise. It is never guessed from the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: `SAP_SYSTEM_TYPE` alone states its kind, on-premise when unset.
 
-**Cloud systems** (ABAP Cloud / BTP) resolve system context automatically via the `getSystemInformation()` API — no additional configuration is needed.
+**On-premise systems**: nothing is asked of the system, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.
+
+**Cloud systems** (ABAP Cloud / BTP) resolve the system context per call via the `getSystemInformation()` API on the connected connection — no additional configuration is needed. A cloud destination without `SAP_CLIENT` uses the system's default client.
 
 #### Per-request responsible and master system (embedding hosts)
 
@@ -392,7 +394,7 @@ The server automatically updates the connection configuration when it receives H
 ### Configuration Priority
 
 1. `x-mcp-destination` (with `--allow-destination-header`), then complete `x-sap-*` connection headers
-2. The default destination (`--mcp`, `--env`, `--env-path`, or the working directory's `.env`)
+2. The default destination (`--mcp`, `--env` or `--env-path`)
 
 ## SSE Mode Configuration
 
@@ -535,7 +537,7 @@ The server reads `DEV` from `service-keys/DEV.json` and `sessions/DEV.env` (fiel
 }
 ```
 
-In this case, the server uses its default destination: `--mcp`, `--env`, `--env-path`, or the `.env` in its working directory.
+In this case, the server uses its default destination: `--mcp`, `--env` or `--env-path`.
 
 ## Related Documentation
 

@@ -41,7 +41,7 @@ SAP_SNC_LIB=/path/to/the/snc/library
 SAP_SNC_MYNAME='p:CN=<client name>'
 ```
 
-SNC needs RFC: `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` / working-directory `.env`, in the
+SNC needs RFC: `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env`, in the
 process environment, `--connection-type=rfc`, or YAML `connection-type: rfc` (precedence: CLI, environment
 including that `.env`, YAML).
 With HTTP the destination is refused naming `connection-type`. RFC needs the SAP NW RFC SDK and the optional dependency
@@ -54,8 +54,11 @@ A process serves **one default destination**, chosen in this order:
 1. **`--mcp=<name>`** (or YAML `mcp`) — a *named destination*, below.
 2. **`--env-path=<path|file>`** (or `MCP_ENV_PATH`), **`--env=<name>`** (resolved to
    `sessions/<name>.env`) — one `.env` file, used as it is.
-3. Without those, a **`.env` in the working directory**, if there is one and `--auth-broker` is not given
-   (`--auth-broker` / `MCP_USE_AUTH_BROKER` ignore it).
+
+Without those there is no default destination (stdio runs inspection-only; HTTP/SSE serve
+`x-sap-*` headers and, with `--allow-destination-header`, `x-mcp-destination`). **Nothing is looked
+up in the working directory**: a server started inside someone else's project must not take their
+settings. A `.env` there is read only when you name it: `--env-path=./.env`.
 
 A named destination `X` is read from two places, **field by field**: `sessions/X.env` wins,
 and `service-keys/X.json` fills in what the file does not state.
@@ -76,7 +79,7 @@ name with a path separator, `..` or a leading dot is refused before any file is 
 
 The session — the token and its refresh token — is the server's to keep current:
 
-- **An `--env` / `--env-path` / working-directory `.env` is read *and written back*** with a
+- **An `--env` / `--env-path` `.env` is read *and written back*** with a
   renewed token, whatever `--unsafe` says. Only the secret keys are rewritten; the rest of the
   file stays as it was.
 - **A named destination's session** is written to `sessions/X.env` only with `--unsafe`.
@@ -129,7 +132,14 @@ version states no grant: regenerate it, or add `SAP_GRANT_TYPE` by hand.
 Inline comments are not parsed, so keep comments on separate lines.
 
 **On-premise:** add `SAP_SYSTEM_TYPE=onprem` (or `--system-type=onprem`) to enable the
-on-premise-only tools (for example Programs). The default is `cloud`.
+on-premise-only tools (for example Programs); without it the tools offered are cloud's. The same
+setting picks the connector; without it a `jwt` destination connects as cloud and any other as
+on-premise.
+
+**Master system and responsible** come from configuration (`SAP_MASTER_SYSTEM`, `SAP_RESPONSIBLE`,
+else `SAP_USERNAME`; the `x-sap-*` headers; the tool's arguments) or, for a cloud system only, by asking
+the system (`systeminformation`) on the connected connection. On-premise nothing is asked: set
+`SAP_MASTER_SYSTEM`. Which of the two a system is follows the rule above, never its URL.
 
 ## HTTP/SSE headers
 
@@ -151,7 +161,7 @@ destination. A request with none of them is answered `400`.
 - `Destination "X" uses <type> / <grant>, which this server does not support` — an
   authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
-  does not fall back to the working directory.
+  falls back to nothing.
 
 The server names fields and the words above only; it never prints a value read from a file.
 

@@ -55,55 +55,67 @@ know some of these; the server does not serve them. What to do instead:
 4. **An XSUAA service key needs `XSUAA_MCP_URL`** in `sessions/<destination>.env`. The key carries the
    UAA, not the ABAP system; without the variable the destination is refused naming `XSUAA_MCP_URL`.
    Stating `SAP_URL` there does not help.
-5. **An `--env` / `--env-path` / working-directory `.env` is now written back** with a renewed token,
+5. **An `--env` / `--env-path` `.env` is now written back** with a renewed token,
    whatever `--unsafe` says (only the secret keys are rewritten). Keep that file somewhere the server
    may write, and out of version control. Named destinations behave as before: the session is on disk
    only with `--unsafe`, otherwise in memory. That holds for reading too: a named `jwt` / `none`
    destination whose token is in `sessions/X.env` is refused without `--unsafe`
    (`Destination "X" lacks: authorizationToken`, with a hint). Add `--unsafe`, or serve the file with
    `--env=X` or `--env-path`.
-6. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
+6. **A `.env` in the working directory is no longer read.** Finding configuration where the process
+   happens to start is a vulnerability: a server started inside someone else's project took their
+   settings and credentials. Name the file: `--env-path=./.env` (or `--env=<name>` for
+   `sessions/<name>.env`, `--mcp=<name>`, or YAML `env` / `env-path` / `mcp`). Without any of them there
+   is no default destination: stdio runs inspection-only, HTTP/SSE answer a request without
+   `x-sap-*` headers (or, with `--allow-destination-header`, `x-mcp-destination`) with `400`. The working
+   directory is also gone from the stores' search list: `service-keys/` and `sessions/` are read from
+   `--auth-broker-path` / `AUTH_BROKER_PATH` or the platform default only.
+7. **`--auth-broker`, `MCP_USE_AUTH_BROKER` and YAML `auth-broker` are removed** — drop them from client
+   configs. Their only purpose was to switch the working-directory `.env` off, and there is nothing left
+   to switch. A leftover form is not a parameter any more and is silently ignored: the CLI flag, the
+   environment variable and the YAML key change nothing and are not refused.
+8. **A changed `.env` takes effect on restart.** A destination is read once per process, and nothing
    watches the files: a new password, or a token you hand over again, needs a restart.
-7. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads
+9. **`AUTH_BROKER_PATH` / `--auth-broker-path` is one base directory.** The server reads
    `<base>/service-keys` and `<base>/sessions`; the value is not split, so a colon- or
    semicolon-separated list no longer names several directories, and the fallback to the working
    directory is gone.
 
 ## If you pass parameters
 
-8. **The browser callback port is `61001` unless set** (`--browser-auth-port`, `MCP_BROWSER_AUTH_PORT`,
+10. **The browser callback port is `61001` unless set** (`--browser-auth-port`, `MCP_BROWSER_AUTH_PORT`,
    YAML `browser-auth-port`). It was `5000` (HTTP), `4000` (SSE) and `4001` (stdio). Update a firewall
    rule, or a redirect URI registered with the identity provider.
-9. **An invalid port, enum or flag value is refused at startup**, naming the parameter in the form you
+11. **An invalid port, enum or flag value is refused at startup**, naming the parameter in the form you
    used (`Invalid --browser-auth-port: "abc". Must be a port between 1 and 65535`). `--connection-type`
    takes `http` or `rfc`, `--system-type` `onprem`, `cloud` or `legacy`; a flag takes `true` or `false`.
    Before, a bad value was ignored.
-10. **A YAML key that looks like a secret is refused.** A key containing `password`, `passphrase`,
+12. **A YAML key that looks like a secret is refused.** A key containing `password`, `passphrase`,
     `secret`, `token`, `cookie`, `refresh` or `credential`, at any depth, stops the start with an error
     naming the key (never a value). YAML holds configuration only; secrets and the session live in `.env`
     files and the environment. Move such values out of the file.
-11. **The parameter forms.** Every parameter has a CLI form and a YAML key, and eight have an
-    environment variable (`MCP_ENV_PATH`, `MCP_USE_AUTH_BROKER`, `AUTH_BROKER_PATH`, `MCP_UNSAFE`,
+13. **The parameter forms.** Every parameter has a CLI form and a YAML key, and seven have an
+    environment variable (`MCP_ENV_PATH`, `AUTH_BROKER_PATH`, `MCP_UNSAFE`,
     `MCP_BROWSER`, `MCP_BROWSER_AUTH_PORT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE`). Precedence is CLI,
     then environment, then YAML. The table is in [CLI_OPTIONS.md](user-guide/CLI_OPTIONS.md).
     `MCP_DESTINATION`, `MCP_ENV` and `MCP_ALLOW_DESTINATION_HEADER` do **not** exist — and never did.
-12. **Destination names are vetted.** A destination name (`--mcp`, `x-mcp-destination`) may use only
+14. **Destination names are vetted.** A destination name (`--mcp`, `x-mcp-destination`) may use only
     letters, digits, `_`, `.` and `-`; no path separator, no `..`, no leading dot, not empty. It is a
     file name, so anything else is refused before a file is read.
 
 ## If you use HTTP or SSE
 
-13. **`x-mcp-destination` is honoured only with `--allow-destination-header`**, as before, and a value
+15. **`x-mcp-destination` is honoured only with `--allow-destination-header`**, as before, and a value
     that is not a plain name is refused with `400` naming the header.
-14. **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read.** A direct
+16. **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read.** A direct
     connection is `x-sap-url` (and `x-sap-client`) with `x-sap-jwt-token`, or with `x-sap-login` and
     `x-sap-password`. A token in a header is used as it is: the server cannot renew it, because it holds
     no client and no refresh token for it.
-15. **No `x-sap-*` headers, no destination, no default** is answered `400`, as before.
+17. **No `x-sap-*` headers, no destination, no default** is answered `400`, as before.
 
 ## If you run in Docker
 
-16. **`MCP_DESTINATION` was never read by the server.** The compose files and the docker READMEs
+18. **`MCP_DESTINATION` was never read by the server.** The compose files and the docker READMEs
     documented it; it chose nothing. The real ways are `--mcp=<name>` in the container command, `mcp:
     <name>` in a YAML file passed with `--config`, or `x-mcp-destination` with `--allow-destination-header`
     (the Dockerfile's default command). The compose files now set `AUTH_BROKER_PATH=/app` (so the server
@@ -112,20 +124,31 @@ know some of these; the server does not serve them. What to do instead:
 
 ## Other behaviour that changed
 
-17. **Shutdown settles first.** On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops
+19. **Shutdown settles first.** On `SIGTERM`, `SIGINT` (and, for stdio, the end of stdin) the server stops
     accepting connections, waits up to 30 s for logins and refreshes in flight, and flushes every
     session. It exits `1`, with one stderr line per fact, when a secret could not be stored (the line names the
     destination and the error class), a login or refresh was still running at the 30 s deadline, a server did not
     close, or settling itself failed; never a secret or an error's message. Nothing is written to stdout.
-18. **Errors name fields.** `Destination "X" lacks: <fields>` followed by one hint where the server
+20. **Errors name fields.** `Destination "X" lacks: <fields>` followed by one hint where the server
     knows the remedy; `Destination "X" uses <type> / <grant>, which this server does not support`; `<parameter>:
-    the file does not exist: <path>` for an env file you named (the server does not fall back to the working
-    directory's `.env`). No message carries a value read from a file.
-19. **`DeletePackageLow` lost `connection_config`.** The argument let a caller hand over a connection
+    the file does not exist: <path>` for an env file you named. No message carries a value read from a file.
+    Under HTTP and SSE a refused credential is answered with the provider's own fixed words (status `500`)
+    instead of `Internal Server Error`.
+21. **`DeletePackageLow` lost `connection_config`.** The argument let a caller hand over a connection
     config to build a fresh connection for the deletion; a connection now comes from the destination
     alone. `force_new_connection` stays.
-20. **`@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.** RFC (and so SNC) needs it and the SAP NW
+22. **`@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.** RFC (and so SNC) needs it and the SAP NW
     RFC SDK; see [RFC_SETUP.md](installation/RFC_SETUP.md).
+
+23. **The master system is determined from configuration, or by a request in the cloud — nothing else.**
+    The setup-time master-system lookup is gone: setting a destination's context up builds no connection.
+    `SAP_MASTER_SYSTEM`, `SAP_RESPONSIBLE` (else `SAP_USERNAME`) are read from the configuration; for a
+    cloud system the missing ones are asked of the system per call, on the connected connection. Whether a
+    system is cloud is the kind its connection was built for (`SAP_SYSTEM_TYPE` / `--system-type`, else a
+    `jwt` destination is cloud and any other on-premise) — no longer guessed from the URL
+    (`*.hana.ondemand.com`, `http` with a port, else asking the system). On-premise nothing is asked: set
+    `SAP_MASTER_SYSTEM`. A cloud destination without `SAP_CLIENT` uses the system's default client (the
+    lookup no longer fills it in).
 
 ## If you embed `@mcp-abap-adt/lib` or `@mcp-abap-adt/core`
 
@@ -138,7 +161,7 @@ Public API removed in 16.0.0:
 | `ConfigLoader`, `buildRuntimeConfig` (`lib/config`) | `ServerConfigManager` (CLI, environment and YAML in one table) |
 | `AuthBrokerConfig` (`@mcp-abap-adt/core`) | gone: the launcher builds an `IAuthBrokerFactoryConfig` |
 | `AuthBrokerFactory.initializeDefaultBroker`, `getOrCreateAuthBroker`, `getDefaultBroker`, `getAuthBroker`, `clear`; `IAuthBrokerFactory` with those two methods | `defaultDestination`, `getBroker(destination)`, `settingsFor(destination)`, `getProvider(destination)`, `settle(deadlineMs)`; `IDestinations` is `settingsFor` and `getProvider` |
-| `IAuthBrokerFactoryConfig` with `transportType`, `defaultMcpDestination`, `envFilePath`, `useAuthBroker` | `envFile: { path, source }`, `mcpDestination`, `authBrokerPath`, `unsafe`, `browser`, `browserAuthPort`, `connectionType`, and a required **`browserStrategy`** (the library has no default; pass `browserCallbackStrategy` from `@mcp-abap-adt/auth-providers`) |
+| `IAuthBrokerFactoryConfig` with `transportType`, `defaultMcpDestination`, `envFilePath`, `useAuthBroker`; `IServerConfig.useAuthBroker` | `envFile: { path, source }`, `mcpDestination`, `authBrokerPath`, `unsafe`, `browser`, `browserAuthPort`, `connectionType`, and a required **`browserStrategy`** (the library has no default; pass `browserCallbackStrategy` from `@mcp-abap-adt/auth-providers`) |
 | `BaseMcpServer.setConnectionContext(destination, authBroker)` | `setConnectionContext(destination, destinations: IDestinations)` |
 | `StdioServer`, `SseServer`, `StreamableHttpServer` taking an `AuthBroker` or a factory | they take `IDestinations` |
 | `ConnectionContext` with `connectionParams` per authentication type | `connectionParams` holds the settings (no secret) and **`credential: IAuthProvider`** holds the credential |
@@ -150,5 +173,11 @@ from a broker uses the broker's own token API with a provider of its own. The ne
 `@mcp-abap-adt/interfaces-auth-broker` contract (the secret alone, with `issuedFor` and `issuedBy`).
 
 An embedder that has its own credential passes it as `ConnectionContext.credential`; the server builds
-nothing from `settings.authType`. See [UNIFIED_BROKER_LOGIC.md](../src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
+nothing from `settings.authType`.
+
+`getPlatformPaths` no longer returns the working directory. `BaseMcpServer.setConnectionContext` builds no
+connection and calls no `getSystemInformation`; the per-call resolver (`defaultSystemContextResolver`,
+`resolveSystemContext`) asks the system only for a cloud connection — the kind the server's factory built
+it for, or, for a connection you built yourself, `SAP_SYSTEM_TYPE` alone (on-premise when unset). An
+embedder with its own cloud connection sets `SAP_SYSTEM_TYPE=cloud`, or passes a `systemContextResolver`. See [UNIFIED_BROKER_LOGIC.md](../src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
 and [CONNECTION_ISOLATION.md](architecture/CONNECTION_ISOLATION.md).

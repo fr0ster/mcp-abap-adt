@@ -111,7 +111,7 @@ export const AUTH_PARAMETERS: readonly AuthParameter[] = [
     yaml: 'system-type',
     kind: 'enum',
     values: ['onprem', 'cloud', 'legacy'],
-    help: 'SAP system type: decides the connector, and whether the master system is asked of the system (cloud only). Default: cloud for a jwt, else onprem',
+    help: 'SAP system type: the tools offered (default cloud), the connector and whether the master system is asked of the system (default: cloud for a jwt, else onprem)',
   },
 ];
 

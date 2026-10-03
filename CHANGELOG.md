@@ -25,19 +25,29 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   command comes from `@mcp-abap-adt/auth-broker-cli`.
 - **An XSUAA service key needs `XSUAA_MCP_URL`** in `sessions/<destination>.env`: the key carries the UAA,
   not the system.
-- **An `--env` / `--env-path` / working-directory `.env` is read and written back** with a renewed token,
+- **An `--env` / `--env-path` `.env` is read and written back** with a renewed token,
   whatever `--unsafe` says. A destination is read once per process: a changed `.env` takes effect on
   restart. A named destination's session is read from `sessions/<destination>.env` only with
   `--unsafe`: a `jwt` / `none` token there is refused without it (`lacks: authorizationToken`, with a
-  hint). A working-directory `.env` that is not a usable destination does not stop the start, as in
-  15.x: one stderr line names it and the way out, and the server runs with no default destination; a
-  file you name still stops it.
+  hint).
+- **Nothing is looked up in the working directory.** Finding configuration where the process happens to
+  start is a vulnerability: a server started inside someone else's project took their settings and
+  credentials. A `.env` there is no longer read — pass `--env-path=./.env` (or `--env=<name>`, `--mcp`,
+  YAML); without one there is no default destination (stdio: inspection-only). The working directory is
+  gone from `getPlatformPaths` too.
+- **`--auth-broker`, `MCP_USE_AUTH_BROKER` and YAML `auth-broker` are removed**; their only purpose was to
+  switch the working-directory `.env` off. A leftover form is silently ignored — drop it from client
+  configs.
+- **The master system is determined from configuration, or by a request in the cloud.** The setup-time
+  master-system lookup is gone (setting a destination's context up builds no connection), and cloud versus
+  on-premise is the kind the connection was built for (`SAP_SYSTEM_TYPE`, else `jwt` is cloud), never a
+  guess from the URL. On-premise nothing is asked: set `SAP_MASTER_SYSTEM`. A cloud destination without
+  `SAP_CLIENT` uses the system's default client.
 - **The browser callback port is `61001`** unless `--browser-auth-port` says otherwise (it was `5000`,
   `4000` and `4001` by transport).
 - **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct
   connection is `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`.
-- **`AUTH_BROKER_PATH` is one base directory** (the value is not split), with no fallback to the working
-  directory.
+- **`AUTH_BROKER_PATH` is one base directory** (the value is not split).
 - **`DeletePackageLow` lost `connection_config`**; a connection comes from the destination alone.
 - **`@mcp-abap-adt/lib` public API**: `registerAuthBroker`, `getAuthBroker`, `ConfigLoader`,
   `buildRuntimeConfig` and `AuthBrokerConfig` are gone; `AuthBrokerFactory` has a new surface
@@ -51,7 +61,7 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
 - **SNC logon over RFC** (`SAP_AUTH_TYPE=snc`, `SAP_SNC_PARTNERNAME`, optional `SAP_SNC_QOP`,
   `SAP_SNC_LIB`, `SAP_SNC_MYNAME`): passwordless, through an installed SNC product such as a Secure Login
   Client. `@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.
-- **Every authentication and connection parameter in three forms, in one table**: CLI, YAML and, for eight
+- **Every authentication and connection parameter in three forms, in one table**: CLI, YAML and, for seven
   of them, an environment variable (`--browser`, `--browser-auth-port`, `--allow-destination-header`,
   `--system-type` and the rest); precedence CLI, environment, YAML. An invalid port, enum or flag value is
   refused at startup, naming the parameter. YAML holds configuration only: a key that looks like a secret
@@ -66,7 +76,8 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   named with `--env` / `--env-path` that does not exist is refused naming the parameter and the path.
 - **Errors in the server's own words**: `Destination "X" lacks: <fields>` with a hint, and
   `Destination "X" uses <type> / <grant>, which this server does not support`; never a value read from a
-  file.
+  file. Under HTTP and SSE a refused credential is answered with the provider's own fixed words (status
+  `500`) instead of `Internal Server Error`.
 
 ### Changed
 

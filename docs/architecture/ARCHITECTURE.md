@@ -116,7 +116,7 @@ Per request, in this order:
 | 3 (highest) | A named destination, only with `--allow-destination-header` | `x-mcp-destination` (a plain name; anything else is refused with `400`, naming the header) |
 | 2 | A token you hold | `x-sap-url` + `x-sap-jwt-token` |
 | 1 | Basic | `x-sap-url` + `x-sap-login` + `x-sap-password` |
-| 0 | The default destination (`--mcp`, `--env`, `--env-path`, working-directory `.env`) | none; with no default, `400` |
+| 0 | The default destination (`--mcp`, `--env`, `--env-path`) | none; with no default, `400` |
 
 A header connection gets a fixed credential (`TokenAuthProvider.fixed`, `BasicAuthProvider`); nothing renews it.
 

@@ -36,7 +36,7 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ### Step 2: Start the Server with the Destination
 
-The server serves one default destination, named with `--mcp`. (`--auth-broker` makes it ignore a `.env` in the working directory.)
+The server serves one default destination, named with `--mcp`.
 
 ```bash
 # With NPX (recommended)
@@ -51,7 +51,6 @@ mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL --auth-broker-path=~/prj/t
 
 **What `--mcp=TRIAL` does:**
 - The destination is read field by field from `sessions/TRIAL.env` (wins) and `service-keys/TRIAL.json`
-- The working directory's `.env` is not loaded
 - Without `--unsafe` the session is kept in memory: one browser login per process. With `--unsafe` it is written to `sessions/TRIAL.env`
 
 **An XSUAA service key** (a key whose root has `url`, `clientid` and `clientsecret`) carries the UAA, not the ABAP system. State the system's URL as `XSUAA_MCP_URL` in `sessions/TRIAL.env`.

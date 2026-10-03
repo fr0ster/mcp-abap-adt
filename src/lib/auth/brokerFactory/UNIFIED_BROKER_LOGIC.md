@@ -25,14 +25,14 @@ before connecting: the provider is the credential, and it renews itself.
 
 `defaultDestination = --mcp ?? ('default' when an env file was chosen) ?? none`.
 
-An env file is chosen by `--env-path` / `MCP_ENV_PATH` / `--env`, or, when none of those and no
-`--mcp` is given, by a `.env` in the working directory. The factory is built once, in the launcher.
+An env file is chosen by `--env-path` / `MCP_ENV_PATH` / `--env` (or their YAML keys) only: nothing
+is looked up in the working directory. The factory is built once, in the launcher.
 
 ## Where a destination lives (`src/lib/auth/destinationStores.ts`)
 
 | Mode | Means (service key store) | Secret (session store) |
 |------|---------------------------|------------------------|
-| **Env file** (`--env`, `--env-path`, `MCP_ENV_PATH`, working-directory `.env`) | that file | that file, **written back** with a renewed token, whatever `--unsafe` says |
+| **Env file** (`--env`, `--env-path`, `MCP_ENV_PATH`) | that file | that file, **written back** with a renewed token, whatever `--unsafe` says |
 | **Named, ABAP key** (`--mcp=X`, `x-mcp-destination: X`) | `sessions/X.env` over `service-keys/X.json`, field by field | `sessions/X.env` with `--unsafe`, else in memory |
 | **Named, XSUAA key** (root `url`, `clientid`, `clientsecret`, no `uaa`) | the same, with the system's URL from `XSUAA_MCP_URL` in `sessions/X.env` only | the same |
 

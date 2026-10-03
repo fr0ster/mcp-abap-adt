@@ -304,7 +304,9 @@ Env resolution:
 2. `--env=<destination>` for destination file in standard sessions store:
    - Unix: `~/.config/mcp-abap-adt/sessions/<destination>.env`
    - Windows: `%USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\<destination>.env`
-3. Fallback to `.env` in current working directory (not when `--mcp` is given).
+
+Nothing is looked up in the working directory: a server started inside someone else's project must not
+take their settings. A `.env` there is read only when you name it (`--env-path=./.env`).
 
 Whichever file is chosen is read **and written back** with a renewed token, whatever `--unsafe` says. A destination is read once per process: a change to its `.env` from outside takes effect on restart. `.env` and environment variables hold secrets and the session; a YAML config file holds configuration only and refuses a secret-looking key.
 
@@ -336,7 +338,7 @@ SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
 ```
 
-`SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` / working-directory `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
+`SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
 
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
@@ -370,7 +372,6 @@ Inline comments are not parsed, so keep comments on separate lines.
 
 **Authentication:**
 - `--mcp=<destination>` - Named destination: `service-keys/<destination>.json` and `sessions/<destination>.env`, field by field
-- `--auth-broker` - Ignore the working directory's `.env` (otherwise it is read when no `--mcp`, `--env` or `--env-path` is given)
 - `--auth-broker-path=<path>` - Custom path for auth-broker service keys and sessions
 - `--browser=<name>` - Browser for a login: `chrome`, `edge`, `firefox`, `system` (default), `headless`, `none`
 - `--browser-auth-port=<port>` - Browser login callback port, 1-65535 (default: `61001`); an invalid value is refused at startup

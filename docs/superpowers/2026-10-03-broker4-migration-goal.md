@@ -100,8 +100,17 @@ stated, which the XSUAA fallback below relies on.
     `EnvDestinationStore` whose `fallback` is the XSUAA key store, which
     supplies the client. Without a URL the destination is refused, naming the
     field.
-  - `--env` / `--env-path` file, and the `.env` in the working directory:
-    `EnvDestinationStore`. A `jwt` file without `SAP_GRANT_TYPE` is refused,
+  - `--env` / `--env-path` file: `EnvDestinationStore`. **Nothing is looked
+    up in the working directory** (decided 2026-10-03): finding configuration
+    where the process happens to start is a vulnerability — a server started
+    inside someone else's project takes their settings and credentials.
+    Configuration is named explicitly (`--env-path`, `--env=<name>` from the
+    sessions directory, `--mcp`, YAML) or comes from a predefined directory
+    (`--auth-broker-path`, `AUTH_BROKER_PATH`, the platform default). The
+    working-directory `.env` fallback goes, and with it `--auth-broker` /
+    `MCP_USE_AUTH_BROKER` / YAML `auth-broker`, whose only purpose was to
+    switch that fallback off: a parameter without effect misleads and promises
+    a fix (decided 2026-10-03). A `jwt` file without `SAP_GRANT_TYPE` is refused,
     naming the field and the command that regenerates the file
     (`mcp-auth generate-env --grant …`). No support for files written for the
     old stores (decided 2026-10-02: a change of authorization regenerates the

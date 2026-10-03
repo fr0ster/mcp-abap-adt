@@ -147,13 +147,15 @@ Removed: `initializeDefaultBroker`, `getOrCreateAuthBroker` (which returned
 
 | Mode | Destination name | Means (`serviceKeyStore`) | Secret (`sessionStore`) |
 |---|---|---|---|
-| `--env` / `--env-path` / `MCP_ENV_PATH`, or the working directory's `.env` (no `--mcp`, no `--auth-broker`) | `default` | `EnvDestinationStore.forFile(path)` | `EnvFileSessionStore(path)` |
+| `--env` / `--env-path` / `MCP_ENV_PATH` / YAML `env` / `env-path` | `default` | `EnvDestinationStore.forFile(path)` | `EnvFileSessionStore(path)` |
 | named, ABAP key or none (`--mcp=X`, `x-mcp-destination: X`) | `X` | `new EnvDestinationStore(sessionsDir, { fallback: new AbapServiceKeyStore(keysDir, { grantType: 'authorization_code' }) })` | `--unsafe`: `AbapSessionStore(sessionsDir)`; else `SafeAbapSessionStore()` |
 | named, XSUAA key | `X` | `new EnvDestinationStore(sessionsDir, { variables: XSUAA_DESTINATION_VARS, fallback: new XsuaaServiceKeyStore(keysDir, { grantType: 'authorization_code' }) })` | `--unsafe`: `XsuaaSessionStore(sessionsDir)`; else `SafeXsuaaSessionStore()` |
 
 `keysDir` / `sessionsDir` come from `getPlatformPaths` as today
-(`--auth-broker-path`, `AUTH_BROKER_PATH`, the platform default, the working
-directory). Decisions in the table:
+(`--auth-broker-path`, `AUTH_BROKER_PATH`, the platform default) — never the
+working directory: nothing is looked up where the process happens to start
+(decided 2026-10-03), so the working directory leaves `getPlatformPaths`' list
+and the working-directory `.env` fallback goes. Decisions in the table:
 
 - **The key's shape picks which store reads it, never the auth type or grant
   (H1).** `keysDir/X.json` with `url` + `clientid` + `clientsecret` at the
@@ -293,7 +295,11 @@ password, no token (H4).
   It reads `settingsFor(destination)` (section 3), then
   `credential = await destinations.getProvider(destination)`. No `getToken`, no
   `authType` branch, no `connectionParams` per auth type (H0, H1). The
-  temporary connection that resolves the master system is built the same way.
+  setup-time master-system lookup goes (decided 2026-10-03): under
+  connection 10 its temporary connection is never connected, so it never ran;
+  the master system and responsible are resolved per call on the connected
+  connection (`withResolvedSystemContext`), and a cloud destination without
+  `SAP_CLIENT` uses the system's default client.
 - **`setConnectionContextFromHeaders(headers)`** — `x-sap-url` (+
   `x-sap-client`) as settings, `credentialFromHeaders` as credential; the
   rest unchanged. `authType` in the settings is `jwt` or `basic` by which
@@ -350,7 +356,6 @@ configuration). Precedence: CLI, then env, then YAML.
 | destination | `--mcp` | — | `mcp` |
 | env file by name | `--env` | — | `env` |
 | env file by path | `--env-path` | `MCP_ENV_PATH` | `env-path` |
-| ignore the working directory's `.env` | `--auth-broker` | `MCP_USE_AUTH_BROKER` | `auth-broker` |
 | stores' base directory | `--auth-broker-path` | `AUTH_BROKER_PATH` | `auth-broker-path` |
 | write named sessions to disk | `--unsafe` | `MCP_UNSAFE` | `unsafe` |
 | browser for a login | `--browser` (wired) | `MCP_BROWSER` (wired) | `browser` (new form) |

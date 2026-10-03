@@ -26,17 +26,19 @@ JWT, or SNC — nothing else is in view. So the server supports exactly four:
 | `jwt` / `authorization_code` | an ABAP or XSUAA service key, an `.env` file | the browser strategy (`--browser`, `--browser-auth-port`) |
 | `jwt` / `none` | a token in an `.env` file; `x-sap-jwt-token` | nothing for a file; for the header, `TokenAuthProvider.fixed` |
 
-**The table is checked when a destination's server is set up** (decided
-2026-10-03). A destination is a name for a configuration, and its
+**A handler per authentication, looked up when a destination's server is set
+up** (decided 2026-10-03). The table above is what the server ships as
+handlers, not a list kept beside them: the factory holds one handler for each
+row, keyed by the type and grant, and support is a handler being there. A destination is a name for a configuration, and its
 authentication is a property of that configuration, known before anything
 connects. MCP builds a server per session, one destination each: under stdio
 once, at start; under SSE per session; under HTTP per request, the
 destination named by `x-mcp-destination` or the default. Setting that server
-up reads the destination and checks what it states against the table; a
-destination stating anything else gets an error naming the type and grant it
-states, before any connection or login. That request fails; no other session
-is touched. Adding an authentication is a row here and its collaborator — not
-a refusal at login.
+up reads the destination and looks up the handler for what it states; with
+none, the destination gets an error naming the type and grant it states,
+before any connection or login. That request fails; no other session is
+touched. Adding an authentication is adding its handler — not a refusal at
+login, and not a list to keep in step.
 
 This is **this server's** choice, not a rule for the family. When an ABAP
 system the server must reach authorizes another way, that way is added here

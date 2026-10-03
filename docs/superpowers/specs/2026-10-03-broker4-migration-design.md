@@ -168,37 +168,59 @@ directory). Decisions in the table:
 - **No seeding, no means written.** The broker writes the secret alone; the
   server writes nothing (goal; broker 4).
 
-### The broker each destination gets
+### Authentication handlers
+
+The factory's one decision about authentication: which handler serves the
+destination. `src/lib/auth/handlers/` holds one handler per authentication
+the server supports, and the factory keeps them in a map keyed by
+`authType` and, for `jwt`, `grantType`:
 
 ```ts
-new AuthBroker(
-  {
-    serviceKeyStore,
-    sessionStore,
-    authorization: () =>
-      oneLoginAtATime(browserCallbackStrategy({ browser, port: browserAuthPort })),
-  },
-  brokerLogger,
-);
+interface AuthenticationHandler {
+  readonly authType: 'basic' | 'jwt' | 'snc';
+  readonly grantType?: DestinationGrant;
+  /** The broker options this authentication needs — nothing else. */
+  brokerOptions(context: HandlerContext): Partial<AuthBrokerConfig>;
+  /** Refuses settings this authentication cannot use; most accept all. */
+  checkSettings?(settings: SapConfig): void;
+}
 ```
 
+| Handler | `brokerOptions` | `checkSettings` |
+|---|---|---|
+| `basic` | none | none |
+| `snc` | none | `connectionType` must be `rfc`, else refused naming `connection-type` |
+| `jwt` / `authorization_code` | `authorization: () => oneLoginAtATime(browserCallbackStrategy({ browser, port }))` | none |
+| `jwt` / `none` | none | none |
+
+**Building a destination's broker.** The factory composes the destination's
+stores (table above), reads `getConnectionConfig` from the key store, and
+looks up the handler for the stated `authType` / `grantType`. None → an
+`UnsupportedAuthenticationError` (`destination`, `authType`, `grantType` —
+names from the stores' fixed vocabulary, no value): no broker, no provider,
+no login. Found → `new AuthBroker({ serviceKeyStore, sessionStore,
+...handler.brokerOptions(context) }, brokerLogger)`, cached for the
+destination with its handler. `settingsFor` calls `handler.checkSettings`.
+
+This runs where a session's server is set up (section 4): once under stdio,
+per SSE session, per HTTP request — the first request to a destination
+builds its broker, a later one finds it cached. A destination with no handler
+fails that request; other sessions are untouched.
+
+- **No implicit defaults (H2):** a broker gets exactly its handler's options.
+  `context` carries `browser` (`--browser` / `MCP_BROWSER` / YAML `browser`,
+  default `system`), `browserAuthPort` (default the library's `61001`;
+  today's random 30000–39999 port in `server/src/AuthBrokerConfig.ts` goes —
+  a random port cannot be registered as a redirect URI) and the process's
+  login lock.
 - **One interactive login at a time, across destinations.** Every
   strategy's callback listens on the same port, so two first logins — `X`
-  and `Y` over HTTP with `x-mcp-destination` — would race for it and one
-  would fail on a busy port. The factory holds one lock for the process:
-  the strategy `authorization` returns runs `authorize()` under it, and a
-  second login waits for the first to settle. A settled login has released
-  the port (auth-providers' callback scope settles only once the socket is
-  free), so the next one binds it. The per-destination lock of section 4
-  stays: it keeps one destination from starting two logins at all.
-- One collaborator (H2). `browser` is `--browser` / `MCP_BROWSER` / YAML
-  `browser`, default `system`; `port` is `--browser-auth-port`, default the
-  library's `61001` (today's random 30000–39999 port in
-  `server/src/AuthBrokerConfig.ts` goes: a random port cannot be registered as
-  a redirect URI, and the library's default sits clear of the server ranges).
-- `authorization` does not look at the grant: only `authorization_code`
-  reaches it, because the table check (below) has already turned away every
-  destination stating another.
+  and `Y` in two sessions — would race for it and one would fail on a busy
+  port. `oneLoginAtATime` runs `authorize()` under the one process-wide
+  lock; a second login waits for the first to settle. A settled login has
+  released the port (auth-providers' callback scope settles only once the
+  socket is free), so the next one binds it. The per-destination lock of
+  section 4 stays: it keeps one destination from starting two logins at all.
 - No `provider` option: the token API is not used by the server.
 
 ### Adding an authentication later
@@ -206,31 +228,16 @@ new AuthBroker(
 The four are this server's choice (goal). When a system it must reach
 authorizes another way, the change touches these places and no others:
 
-- the broker options above — a branch of `authorization` for a grant that
-  needs a login, or the option its row needs (`oidcAuthorization`,
-  `deviceCodePresenter`, …), built from the parameter table (section 6) if
-  the user must choose something;
-- a row in `SUPPORTED_AUTHENTICATIONS`, and in `settingsFor` a connection-type
-  rule only if the new type limits it, as SNC does;
+- a new handler in `src/lib/auth/handlers/`: its key, the broker options its
+  grant needs (`authorization`, `oidcAuthorization`, `deviceCodePresenter`,
+  …) built from the parameter table (section 6) if the user must choose
+  something, and `checkSettings` only if it limits the connection, as SNC
+  does;
 - the docs' table of supported authentications and the migration note;
 - a test for the new row, and a live check on the system that needs it.
 
 The connector construction and the provider sources (section 2) do not change:
 a new authentication is a new provider from the broker, not a new source.
-
-### The table check
-
-`SUPPORTED_AUTHENTICATIONS` (`src/lib/auth/supportedAuthentications.ts`) is
-the goal's table in code: `basic`, `snc` (RFC only), `jwt` with
-`authorization_code` or `none`. `settingsFor(destination)` reads
-`getConnectionConfig` and checks `authType` and `grantType` against it before
-anything else; a destination outside it is refused with
-`UnsupportedAuthenticationError` (`destination`, `authType`, `grantType` —
-names from the store's fixed vocabulary, no value). `settingsFor` runs where a
-server for a session is set up (section 4), so the check runs once per stdio
-process, per SSE session and per HTTP request, before `getProvider` — no
-provider is built and no login starts for a destination the server does not
-serve.
 
 ### The URL a connector needs
 
@@ -285,9 +292,11 @@ password, no token (H4).
 
 A destination stating `SAP_AUTH_TYPE=snc` and `SAP_SNC_PARTNERNAME` (with
 `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` when set) gets
-`SncLogonProvider` from the broker; the server adds nothing for it. SNC
-protects RFC, not HTTP: `settingsFor` refuses `authType: 'snc'` with a
-connection type other than `rfc`, naming `connection-type`. The SNC library is
+`SncLogonProvider` from the broker; its handler adds no broker option. No
+user and no password: the user is whoever the Secure Login Client holds a
+credential for, mapped to an ABAP user by its SNC name. SNC protects RFC, not
+HTTP: the `snc` handler's `checkSettings` refuses a connection type other than
+`rfc`, naming `connection-type`. The SNC library is
 found by the provider (`SNC_LIB_64`, `SNC_LIB`, the Secure Login Client's
 install path) — not by the server.
 
@@ -402,9 +411,9 @@ proven load-bearing by breaking the rule and watching it fail.
 | `AuthBrokerFactory`, temp directories: each mode of the table builds the stores it names — observed through `getConnectionConfig` / `getProvider`'s class, not by inspecting fields | H1, goal |
 | a named destination's `.env` overrides its key field by field; an XSUAA key without `XSUAA_MCP_URL` is refused naming it | goal |
 | `--mcp=X` builds one broker (count constructor calls) | goal |
-| `authorization` returns the browser strategy under the login lock; no other option is passed | H2 |
-| a destination stating a type or grant outside the table (`saml`, `jwt` / `passcode`, `jwt` / `client_credentials`): `UnsupportedAuthenticationError` naming them, raised by `settingsFor`, and `getProvider` never called | goal |
-| HTTP: a request whose destination is outside the table fails; the next request, to a supported destination, succeeds | goal |
+| each handler: the broker it builds gets exactly its `brokerOptions` (the `authorization_code` one: the browser strategy under the login lock; the others: none) | H2 |
+| a destination stating what no handler serves (`saml`, `jwt` / `passcode`, `jwt` / `client_credentials`): `UnsupportedAuthenticationError` naming them; no broker constructed, no `getProvider` | goal |
+| HTTP: a request whose destination has no handler fails; the next request, to one that has, succeeds | goal |
 | `setConnectionContext` with a broker that has no `getToken` / `createTokenRefresher`: still connects | H0 |
 | a `jwt` `.env` without `SAP_GRANT_TYPE`: refused naming `grantType` and the `mcp-auth` hint, no value in the message | H1, H4 |
 | SNC on HTTP: refused naming `connection-type` | goal |

@@ -27,7 +27,11 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   not the system.
 - **An `--env` / `--env-path` / working-directory `.env` is read and written back** with a renewed token,
   whatever `--unsafe` says. A destination is read once per process: a changed `.env` takes effect on
-  restart.
+  restart. A named destination's session is read from `sessions/<destination>.env` only with
+  `--unsafe`: a `jwt` / `none` token there is refused without it (`lacks: authorizationToken`, with a
+  hint). A working-directory `.env` that is not a usable destination does not stop the start, as in
+  15.x: one stderr line names it and the way out, and the server runs with no default destination; a
+  file you name still stops it.
 - **The browser callback port is `61001`** unless `--browser-auth-port` says otherwise (it was `5000`,
   `4000` and `4001` by transport).
 - **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct

@@ -50,9 +50,12 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   the process environment (`SAP_RESPONSIBLE`, else `SAP_USERNAME`; `SAP_MASTER_SYSTEM`); on a cloud
   system only, `systeminformation`. A create (or a transport without an owner) that finds one missing is
   refused before any request — `"error": "system_context_missing"`, naming the key and the header — where
-  it used to be sent without the attribute. Reads are unaffected. The `--env` file's `SAP_RESPONSIBLE`,
+  it used to be sent without the attribute. Reads are unaffected. On a cloud connection an empty value
+  is filled from `systeminformation` even when a host's request scope carries its key as `undefined`. The `--env` file's `SAP_RESPONSIBLE`,
   `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the process environment: they are that
   destination's own, and over HTTP/SSE they had become every other destination's fallback.
+- **`@mcp-abap-adt/adt-clients` is pinned to `~24.1.0`**: the refusal relies on its `protected
+  systemContext` being read where a value is sent, which a minor release could change.
 - **An embedder's own cloud connection is no longer recognised by its URL.** A connection the factory did
   not build is cloud only when the server's `systemType` option or `SAP_SYSTEM_TYPE` says so; otherwise
   nothing is asked of the system, and a create without configured values is refused.

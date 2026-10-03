@@ -177,6 +177,9 @@ destination. A request with none of them is answered `400`.
   authentication outside the four above (`certificate` and `kerberos` have no grant: `uses certificate`).
 - `--env-path: the file does not exist: <path>` — an env file you named is missing; the server
   falls back to nothing.
+- `--auth-broker was removed in 16.0.0 — remove it from the configuration` (likewise
+  `MCP_USE_AUTH_BROKER` and `auth-broker (config file)`) — a parameter 16.0.0 removed is still
+  set; the start stops, naming the form you used.
 
 The server names fields and the words above only; it never prints a value read from a file.
 

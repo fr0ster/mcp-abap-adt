@@ -17,8 +17,11 @@ let cached: IAdtSystemContext | undefined;
 
 /**
  * The system context the configuration states — `SAP_MASTER_SYSTEM`,
- * `SAP_RESPONSIBLE` (else `SAP_USERNAME`), `SAP_LANGUAGE` — cached for the
- * process, or `undefined` when it states none. Sends nothing.
+ * `SAP_RESPONSIBLE` (else `SAP_USERNAME`), `SAP_LANGUAGE` — merged into the
+ * process context, or `undefined` when it states none. It fills only what
+ * the process context lacks: a value an embedder stated (`setSystemContext`,
+ * `systemContext`) survives every request that sets a context up. Sends
+ * nothing.
  */
 export function systemContextFromConfiguration():
   | IAdtSystemContext
@@ -27,7 +30,12 @@ export function systemContextFromConfiguration():
   const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
   const masterLanguage = process.env.SAP_LANGUAGE;
   if (!masterSystem && !responsible && !masterLanguage) return undefined;
-  cached = { masterSystem, responsible, masterLanguage };
+  cached = {
+    ...cached,
+    masterSystem: cached?.masterSystem || masterSystem,
+    responsible: cached?.responsible || responsible,
+    masterLanguage: cached?.masterLanguage || masterLanguage,
+  };
   return cached;
 }
 

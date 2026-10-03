@@ -341,7 +341,7 @@ How the scope combines with the process context:
 
 | Key in the scope | Result for this request |
 |---|---|
-| `responsible` / `masterSystem` present (even `undefined`) | The scope's value |
+| `responsible` / `masterSystem` present (even `undefined`) | The scope's value — never the process value; on a cloud connection an empty one is still filled from the system (below) |
 | `responsible` / `masterSystem` absent | The process value (the environment, or what `setSystemContext` / `systemContext` stated) |
 | `masterLanguage` | Always the scope's value inside a scope, never the process value |
 
@@ -351,8 +351,8 @@ Outside any scope (stdio) nothing changes.
 
 - `responsible` ← the system's user name, `masterSystem` ← its system id.
 - One lookup per connection, only when a call lacks a value. On-premise: no lookup, nothing filled.
-- Only a key that is **absent** counts as missing. A scope carrying `responsible: undefined` has said this request has no responsible, and nothing fills it.
-- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs — and a create that still lacks either value is then refused (`system_context_missing`), nothing sent. A scope that deliberately carries `undefined` is refused the same way when it creates.
+- An **empty value** counts as missing, whether the scope carries its key or not: a scope carrying `responsible: undefined` gets the system's user on a cloud connection. (The key still keeps the process value out: a scope carrying it never inherits another user's process-wide value.)
+- A lookup that answers nothing is remembered as nothing for that connection; only one that throws is retried. Either way the call runs — and a create that still lacks either value is then refused (`system_context_missing`), nothing sent. On-premise nothing is asked, so a scope carrying `undefined` for a key the configuration does not reach is refused when it creates.
 
 Turn it off with `systemContextResolver: null` on `EmbeddableMcpServer` or `HandlerExporter` (or pass your own resolver).
 

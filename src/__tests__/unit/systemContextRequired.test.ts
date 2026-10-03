@@ -21,6 +21,7 @@ import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
+import { runWithRequestContext } from '../../lib/requestContext';
 import {
   resetSystemContextCache,
   setSystemContext,
@@ -187,6 +188,44 @@ describe('cloud', () => {
     expect(String(create?.data)).toContain('adtcore:masterSystem="CLD"');
     expect(String(create?.data)).toContain('adtcore:responsible="CB_USER"');
   });
+
+  it.each([
+    ['cloud', true],
+    ['onprem', false],
+  ] as const)(
+    'a host scope carrying both keys as undefined (%s): cloud asks the system, on-premise is refused',
+    async (systemType, filled) => {
+      lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+      const connection = recordingConnection();
+      const server = new EmbeddableMcpServer({
+        connection: connection as never,
+        handlersRegistry: registry,
+        systemType,
+      });
+      const tools = (
+        server as unknown as {
+          _registeredTools: Record<
+            string,
+            { handler: (a: unknown) => Promise<unknown> }
+          >;
+        }
+      )._registeredTools;
+      const result = await runWithRequestContext(
+        { responsible: undefined, masterSystem: undefined },
+        () => tools.CreateClassLow.handler(CLASS_ARGS),
+      );
+      if (filled) {
+        expect(lookup).toHaveBeenCalledTimes(1);
+        const create = connection.requests.find((r) => r.method === 'POST');
+        expect(String(create?.data)).toContain('adtcore:masterSystem="CLD"');
+        expect(String(create?.data)).toContain('adtcore:responsible="CB_USER"');
+      } else {
+        expect(lookup).not.toHaveBeenCalled();
+        expect(textOf(result)).toContain(MISSING_MASTER_SYSTEM);
+        expect(connection.requests).toEqual([]);
+      }
+    },
+  );
 
   it('a system that answers nothing leaves the create refused, nothing sent', async () => {
     lookup.mockResolvedValue(null);

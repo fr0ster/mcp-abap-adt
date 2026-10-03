@@ -232,23 +232,23 @@ describe('withResolvedSystemContext', () => {
     });
   });
 
-  it('a scope carrying responsible as undefined keeps it empty, and still fills the master system', async () => {
-    // 10.1.0's rule, which this must not quietly overturn: a key the scope
-    // carries has answered the question, even when its value is `undefined`.
-    // Deciding by truthiness instead would fill exactly the case a host
-    // deliberately emptied, and would make CLIENT_CONFIGURATION.md's
-    // "present (even `undefined`) → the scope's value" row false on cloud.
+  it('a scope carrying responsible as undefined is filled from the system, like an absent one', async () => {
+    // Ruling 17: a host that always enters a scope with both keys — values
+    // possibly undefined (cloud-llm-hub) — must still get the cloud values.
+    // An empty value is missing, whether its key is present or not.
     const conn = cloudConn();
     await runWithRequestContext({ responsible: undefined }, () =>
       withResolvedSystemContext(conn, () => {
         createAdtClient(conn);
       }),
     );
-    expect(lastOptions()?.responsible).toBeUndefined();
-    expect(lastOptions()).toMatchObject({ masterSystem: 'CLD' });
+    expect(lastOptions()).toMatchObject({
+      responsible: 'CB_USER',
+      masterSystem: 'CLD',
+    });
   });
 
-  it('a scope carrying both keys as undefined asks the system nothing', async () => {
+  it('a scope carrying both keys as undefined asks the system and fills both', async () => {
     const conn = cloudConn();
     await runWithRequestContext(
       { responsible: undefined, masterSystem: undefined },
@@ -257,9 +257,23 @@ describe('withResolvedSystemContext', () => {
           createAdtClient(conn);
         }),
     );
-    expect(lookup).not.toHaveBeenCalled();
-    expect(lastOptions()?.responsible).toBeUndefined();
-    expect(lastOptions()?.masterSystem).toBeUndefined();
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lastOptions()).toMatchObject({
+      responsible: 'CB_USER',
+      masterSystem: 'CLD',
+    });
+  });
+
+  it('a scope carrying both keys as undefined does not inherit the process values', async () => {
+    // Key presence still decides against the process cache: what stops one
+    // user's process-wide value reaching another user's scope.
+    setSystemContext({ responsible: 'PROC_USER', masterSystem: 'PROC_SYS' });
+    const result = await runWithRequestContext(
+      { responsible: undefined, masterSystem: undefined },
+      () => withResolvedSystemContext(onPremConn(), seen),
+    );
+    expect(result.responsible).toBeUndefined();
+    expect(result.masterSystem).toBeUndefined();
   });
 
   it('with no scope and an empty process context, fills and keeps the process language', async () => {
@@ -297,6 +311,9 @@ describe('withResolvedSystemContext', () => {
     lookup.mockRejectedValue(new Error('ICM down'));
     const result = await withResolvedSystemContext(cloudConn(), seen);
     expect(warn).toHaveBeenCalledTimes(1);
+    // The class only: a lookup's message may quote what the system answered (H4).
+    expect(String(warn.mock.calls[0][0])).toContain('Error');
+    expect(String(warn.mock.calls[0][0])).not.toContain('ICM down');
     expect(result.responsible).toBeUndefined();
     warn.mockRestore();
   });

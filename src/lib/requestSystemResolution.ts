@@ -21,6 +21,7 @@
  */
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { errorClassOf } from './auth/errors';
 import { systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
@@ -160,25 +161,22 @@ export async function withResolvedSystemContext<T>(
   if (!resolver || !connection) return fn();
 
   const effective = getEffectiveSystemContext();
-  // Key presence, not truthiness — the same rule 10.1.0 established and
-  // documents: a scope that carries the key, even as `undefined`, has said
-  // "this request has no responsible", and that answer wins over every other
-  // source. Deciding by truthiness instead would fill exactly the case a host
-  // deliberately emptied, and would make `CLIENT_CONFIGURATION.md`'s
-  // "present (even `undefined`) → the scope's value" row false on cloud.
-  const scope = getRequestContext();
-  const wantsResponsible =
-    !effective.responsible && !(scope && 'responsible' in scope);
-  const wantsMasterSystem =
-    !effective.masterSystem && !(scope && 'masterSystem' in scope);
+  // By value (Ruling 17): an empty value is missing, whether the scope
+  // carries its key or not. A host that always enters a scope with both keys
+  // — values possibly undefined — still gets the cloud system's answer. Key
+  // presence keeps deciding in getEffectiveSystemContext, against the
+  // process cache: that is what stops one user's value reaching another's.
+  const wantsResponsible = !effective.responsible;
+  const wantsMasterSystem = !effective.masterSystem;
   if (!wantsResponsible && !wantsMasterSystem) return fn();
 
   let resolved: ResolvedSystemContext;
   try {
     resolved = await resolveOnce(resolver, connection);
   } catch (error) {
+    // The class only: a lookup's message may quote what the system answered (H4).
     logger.warn(
-      `Could not resolve responsible/master system from the connection: ${error instanceof Error ? error.message : String(error)}`,
+      `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
     );
     return fn();
   }

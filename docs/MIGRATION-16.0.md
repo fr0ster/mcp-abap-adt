@@ -202,9 +202,19 @@ the server's `systemType` option, then `SAP_SYSTEM_TYPE`, else on-premise. A hos
 replaces the resolver (`null` disables it). `HandlerExporter` has no `systemType`: its default resolver
 asks a connection you built only under `SAP_SYSTEM_TYPE=cloud`, or pass your own `systemContextResolver`.
 
-`createAdtClient` refuses a change without a responsible or a master system (item 24): an embedder that
-creates objects must state both — `runWithRequestContext({ responsible, masterSystem })` per request,
-`systemContext` / `setSystemContext` for the process, the environment, or a cloud connection the lookup
-can ask. `requestContextFromHeaders(headers)` builds the scope from the `x-sap-*` headers. A custom
+`createAdtClient` refuses a change without a responsible or a master system (item 24). The rule an
+embedder meets:
+
+- **Cloud** (the connection is cloud by the rule above): a responsible or master system that is empty —
+  absent, or carried in your scope as `undefined` — is filled per call from the system's
+  `systeminformation`. A scope that always carries both keys, values possibly `undefined`, still gets the
+  system's values.
+- **On-premise**: nothing is asked of the system. A create needs both, from the tool's arguments, your
+  request scope (`runWithRequestContext({ responsible, masterSystem })`, or the `x-sap-*` headers), a
+  destination's `.env`, or the process (`systemContext` / `setSystemContext`, the environment); else it is
+  refused, naming `SAP_RESPONSIBLE` or `SAP_MASTER_SYSTEM`, and nothing is sent.
+- A key your scope carries keeps the process value out, even as `undefined`: one user's process-wide
+  value never reaches another user's request. A value you set with `setSystemContext` / `systemContext`
+  is kept: the environment fills only what you left unset. `requestContextFromHeaders(headers)` builds the scope from the `x-sap-*` headers. A custom
 `IDestinations` may implement the optional `systemContextFor(destination)` to supply a destination's own
 values.

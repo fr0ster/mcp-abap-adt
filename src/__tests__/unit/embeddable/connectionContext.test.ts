@@ -35,6 +35,7 @@ import {
   getEffectiveSystemContext,
   getSystemContext,
   resetSystemContextCache,
+  setSystemContext,
 } from '../../../lib/systemContext';
 
 const build = createAbapConnection as jest.MockedFunction<
@@ -302,6 +303,40 @@ describe('getConnection()', () => {
       /Connection context not set/,
     );
   });
+});
+
+describe("an embedder's setSystemContext survives a request", () => {
+  it.each(['destination', 'headers'] as const)(
+    'setting the context up from %s fills only what the embedder left unset',
+    async (from) => {
+      const saved = { ...process.env };
+      try {
+        resetSystemContextCache();
+        setSystemContext({ masterSystem: 'SYSTEM_OF_EMBEDDER' });
+        process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_PROCESS';
+        process.env.SAP_RESPONSIBLE = 'USER_FROM_PROCESS';
+        const server = new TestServer();
+        if (from === 'destination') {
+          await server.fromDestination(
+            'dest-a',
+            stubDestinations(fakeProvider()),
+          );
+        } else {
+          server.fromHeaders({
+            'x-sap-url': 'https://system.example.invalid',
+            'x-sap-jwt-token': 'token-placeholder',
+          });
+        }
+        expect(getSystemContext()).toMatchObject({
+          masterSystem: 'SYSTEM_OF_EMBEDDER',
+          responsible: 'USER_FROM_PROCESS',
+        });
+      } finally {
+        process.env = saved;
+        resetSystemContextCache();
+      }
+    },
+  );
 });
 
 describe('setConnectionContextFromHeaders(headers)', () => {

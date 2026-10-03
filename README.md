@@ -85,7 +85,7 @@ A `jwt` `.env` must state `SAP_GRANT_TYPE`. The `mcp-auth` command that writes s
 ADT changes are not made without a responsible person and a master system. Per request each comes
 from the tool's own argument, the `x-sap-responsible` / `x-sap-master-system` headers, the destination's
 own `.env` (`SAP_RESPONSIBLE`, else its `SAP_USERNAME`; `SAP_MASTER_SYSTEM`), the process environment, or —
-on a cloud system only — the system itself. A create that finds neither is refused, naming the key to
+on a cloud system only — the system itself. A create that lacks either is refused, naming the key to
 set; nothing is sent. Reads are unaffected. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 Coming from 15.x? See the [16.0 migration note](docs/MIGRATION-16.0.md).
 

@@ -6,6 +6,7 @@
 
 import { EventEmitter } from 'node:events';
 import * as fs from 'node:fs';
+import * as net from 'node:net';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
@@ -25,7 +26,10 @@ import type {
   AuthorizationRequest,
   IAuthorizationStrategy,
 } from '@mcp-abap-adt/interfaces-auth';
-import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import {
+  AuthBrokerFactory,
+  browserCallbackStrategy,
+} from '@mcp-abap-adt/lib/auth';
 import { ServerConfigManager } from '@mcp-abap-adt/lib/config';
 import { factoryConfigFrom, launch } from '../launcher.js';
 import { SseServer } from '../SseServer.js';
@@ -110,7 +114,10 @@ function recordingStrategy() {
 }
 
 /** Parses `argv` as the program does, then launches with stand-in edges. */
-async function run(argv: string[]) {
+async function run(
+  argv: string[],
+  browserStrategy?: ReturnType<typeof recordingStrategy>['browserStrategy'],
+) {
   process.argv = ['node', 'mcp-abap-adt', ...argv];
   const config = await new ServerConfigManager().getConfig();
   const strategy = recordingStrategy();
@@ -125,7 +132,7 @@ async function run(argv: string[]) {
       config,
       { exposition: ['readonly'], includeSearch: false },
       {
-        browserStrategy: strategy.browserStrategy,
+        browserStrategy: browserStrategy ?? strategy.browserStrategy,
         stderr: (line) => stderr.push(line),
         exit: (code) => exits.push(code),
         processLike,
@@ -227,6 +234,67 @@ describe('the browser reaches the login strategy', () => {
       port: 61005,
     });
   });
+});
+
+/**
+ * A login with no browser to open: the URL to open is the only way in, so it
+ * reaches stderr whatever DEBUG_AUTH_LOG says — and never stdout (H3). Run
+ * through the real strategy and the real provider, whose logger is the
+ * broker's: silent without DEBUG_AUTH_LOG.
+ */
+describe('the manual-login prompt reaches stderr without DEBUG_AUTH_LOG', () => {
+  const freePort = () =>
+    new Promise<number>((resolve, reject) => {
+      const probe = net.createServer();
+      probe.once('error', reject);
+      probe.listen(0, '127.0.0.1', () => {
+        const { port } = probe.address() as net.AddressInfo;
+        probe.close(() => resolve(port));
+      });
+    });
+
+  it.each(['none', 'headless'])(
+    '--browser=%s: the URL and the callback on stderr, nothing on stdout',
+    async (browser) => {
+      expect(process.env.DEBUG_AUTH_LOG).not.toBe('true');
+      writeKey('dest', abapKey);
+      const port = await freePort();
+      const { stderr } = await run(
+        [
+          '--transport=stdio',
+          '--mcp=dest',
+          `--auth-broker-path=${root}`,
+          `--browser=${browser}`,
+          `--browser-auth-port=${port}`,
+        ],
+        browserCallbackStrategy,
+      );
+      const stdout = jest.spyOn(process.stdout, 'write');
+      const broker = constructed.mock.results[0].value;
+      const login = broker.getToken('dest');
+      const failed = expect(login).rejects.toThrow();
+      const redirect = `http://localhost:${port}/callback`;
+      const url =
+        'https://uaa.example.test/oauth/authorize?client_id=client-id' +
+        `&redirect_uri=${encodeURIComponent(redirect)}&response_type=code`;
+      for (let i = 0; i < 100 && !stderr.join('\n').includes(url); i++) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+      try {
+        const said = stderr.join('\n');
+        expect(said).toContain('Open this URL in your browser to authenticate');
+        expect(said).toContain(url);
+        expect(said).toContain(`Waiting for callback on ${redirect}`);
+        expect(said).not.toContain('client-secret');
+      } finally {
+        // End the login: the identity provider says no.
+        await fetch(`${redirect}?error=access_denied`).catch(() => undefined);
+        await failed;
+        expect(stdout).not.toHaveBeenCalled();
+        stdout.mockRestore();
+      }
+    },
+  );
 });
 
 describe('one destination per process', () => {

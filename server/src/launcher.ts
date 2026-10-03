@@ -16,6 +16,7 @@ import {
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
 import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   CompositeHandlersRegistry,
   HighLevelHandlersGroup,
@@ -34,14 +35,14 @@ import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
 
-const stderrLogger = {
+const stderrLogger: ILogger = {
   info: (...args: any[]) => console.error(...args),
   warn: (...args: any[]) => console.error(...args),
   error: (...args: any[]) => console.error(...args),
   debug: (...args: any[]) => console.error(...args),
 };
 
-const silentLogger = {
+const silentLogger: ILogger = {
   info: () => {},
   warn: () => {},
   error: () => {},
@@ -316,6 +317,42 @@ export function effectiveConnectionType(
   return raw;
 }
 
+/**
+ * The login strategy, with prompts that reach the user. auth-providers'
+ * strategy speaks to the user through the request's logger — the URL to open
+ * under `--browser=none`/`headless`, or when no browser could be opened — and
+ * that logger is the broker's, silent unless DEBUG_AUTH_LOG is set. A prompt
+ * the user cannot see makes the login impassable: it times out.
+ *
+ * So the strategy gets its own logger: `info`, the level the strategy prompts
+ * at, is a line on stderr always; `warn`, `error` and `debug` stay the
+ * broker's — diagnostics, gated, and they may quote an error's message (H4).
+ * Not "no logger" (auth-providers then writes prompts to stderr itself): that
+ * would also drop those diagnostics under DEBUG_AUTH_LOG. Never stdout (H3).
+ */
+export function promptsOnStderr(
+  browserStrategy: IAuthBrokerFactoryConfig['browserStrategy'],
+  stderr: (line: string) => void,
+  diagnostics: ILogger,
+): IAuthBrokerFactoryConfig['browserStrategy'] {
+  const logger: ILogger = {
+    info: (message: string) => stderr(message),
+    warn: (message, meta) => diagnostics.warn(message, meta),
+    error: (message, meta) => diagnostics.error(message, meta),
+    debug: (message, meta) => diagnostics.debug(message, meta),
+  };
+  return (options) => {
+    const strategy = browserStrategy(options);
+    const prompting: ReturnType<typeof browserStrategy> = {
+      authorize: (request) => strategy.authorize({ ...request, logger }),
+    };
+    if (strategy.dispose) {
+      prompting.dispose = () => strategy.dispose?.() ?? Promise.resolve();
+    }
+    return prompting;
+  };
+}
+
 /** The browser of a login when none is given. */
 const DEFAULT_BROWSER = 'system';
 
@@ -482,7 +519,11 @@ export async function launch(
 
   const factory = new AuthBrokerFactory(
     factoryConfigFrom(config, {
-      browserStrategy: deps.browserStrategy,
+      browserStrategy: promptsOnStderr(
+        deps.browserStrategy,
+        deps.stderr,
+        loggerForTransport,
+      ),
       logger: loggerForTransport,
     }),
   );

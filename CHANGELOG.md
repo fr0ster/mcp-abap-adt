@@ -153,8 +153,11 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   the file joins the environment, as for the connection type: the CLI, then the environment (the file's
   value included, never over one set before), then YAML. A word in the environment that is not
   `onprem`, `cloud` or `legacy` stops the start, naming the key without quoting it.
+  `ArgumentsParser.parse()` and `ServerConfigManager` (`@mcp-abap-adt/lib/config`) no longer write
+  `SAP_SYSTEM_TYPE` into `process.env`: an embedder that parses the configuration itself reads
+  `systemType` / `systemTypeSource` from the parsed config.
 - **The login URL reaches stderr without `DEBUG_AUTH_LOG`.** The browser strategy prints the URL to
-  open (`--browser=none` / `headless`, or a browser that could not be opened) through the broker's
+  open (`--browser=none` / `headless`, or `auto` when it could not open one) through the broker's
   logger, which is silent unless `DEBUG_AUTH_LOG=true`: the user never saw it and the login timed out.
   The strategy now gets a logger whose prompts are lines on stderr always; its warnings, errors and
   debug lines stay behind `DEBUG_AUTH_LOG`. Nothing goes to stdout.

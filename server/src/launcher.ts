@@ -356,7 +356,7 @@ export function effectiveSystemType(
 /**
  * The login strategy, with prompts that reach the user. auth-providers'
  * strategy speaks to the user through the request's logger — the URL to open
- * under `--browser=none`/`headless`, or when no browser could be opened — and
+ * under `--browser=none`/`headless`, or `auto` when it could not open one — and
  * that logger is the broker's, silent unless DEBUG_AUTH_LOG is set. A prompt
  * the user cannot see makes the login impassable: it times out.
  *

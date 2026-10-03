@@ -104,7 +104,8 @@ When there is no valid token, the server opens the system's login page and waits
 redirect on a local callback port.
 
 - `--browser=<name>` (or `MCP_BROWSER`, YAML `browser`): `chrome`, `edge`, `firefox`,
-  `system` (the default), `headless`, `none`.
+  `system` (the default), `headless`, `none`. With `none` or `headless` the URL to open is printed
+  on stderr (never stdout), whatever `DEBUG_AUTH_LOG` says.
 - `--browser-auth-port=<port>` (or `MCP_BROWSER_AUTH_PORT`, YAML `browser-auth-port`):
   the callback port, **default `61001`** for every transport. A value that is not an integer
   from 1 to 65535 is refused at startup.

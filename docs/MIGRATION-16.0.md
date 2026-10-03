@@ -215,6 +215,10 @@ the server's `systemType` option, then `SAP_SYSTEM_TYPE`, else on-premise. A hos
 replaces the resolver (`null` disables it). `HandlerExporter` has no `systemType`: its default resolver
 asks a connection you built only under `SAP_SYSTEM_TYPE=cloud`, or pass your own `systemContextResolver`.
 
+`ArgumentsParser.parse()` and `ServerConfigManager` no longer write `SAP_SYSTEM_TYPE` into `process.env`;
+the launcher sets it after the `.env` file is read. If you parse the configuration yourself, read
+`systemType` / `systemTypeSource` from the parsed config.
+
 `createAdtClient` refuses a change without a responsible (item 24); a missing master system is left out.
 The rule an embedder meets:
 

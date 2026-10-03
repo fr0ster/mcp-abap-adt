@@ -177,6 +177,23 @@ new AuthBroker(
   filter: nothing branches on the grant before the broker does.
 - No `provider` option: the token API is not used by the server.
 
+### Adding an authentication later
+
+The four are this server's choice (goal). When a system it must reach
+authorizes another way, the change touches these places and no others:
+
+- the broker options above — a branch of `authorization` for a grant that
+  needs a login, or the option its row needs (`oidcAuthorization`,
+  `deviceCodePresenter`, …), built from the parameter table (section 6) if
+  the user must choose something;
+- `settingsFor` (section 3), only if the new type limits the connection type,
+  as SNC does;
+- the docs' table of supported authentications and the migration note;
+- a test for the new row, and a live check on the system that needs it.
+
+The connector construction and the provider sources (section 2) do not change:
+a new authentication is a new provider from the broker, not a new source.
+
 ### The URL a connector needs
 
 `getProvider` does not require `serviceUrl`; a connector does. Before the

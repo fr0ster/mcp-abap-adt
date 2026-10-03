@@ -212,8 +212,9 @@ Inputs the spec implies but no spec test exercises; each has its test in the own
 - [ ] **Step 2:** Implement `shutdown.ts`; green. Prove load-bearing: drop the once-guard — the double-trigger test fails; revert.
 - [ ] **Step 3: Launcher tests:** `--browser=<name>` (and `MCP_BROWSER`, and YAML `browser`) reaches the factory config and from there the `authorization_code` handler's strategy (observe the browser name the injected strategy factory receives); `--mcp=X` under stdio constructs one broker for `X` (no `'default'` broker beside it); an `--env` file → destination `default`; a factory error at startup (a malformed destination) prints its words to stderr and exits non-zero before any transport starts; the startup summary for a basic destination prints the masked password exactly as today.
 - [ ] **Step 4:** Implement the launcher changes and install the shutdown for every transport.
-- [ ] **Step 5: Green gate:** `npm run build`, `npm run test:check`, `npm run lint:check`, `npm test`, `npm --prefix server test` — all pass in the worktree. Fix what is left of the red window here, nowhere else.
-- [ ] **Step 6:** Commit (`feat(server): one destination per process, shutdown settles and flushes`) and push.
+- [ ] **Step 5: The server's tests join CI.** Today neither workflow runs them: the root Jest's `roots` are `src` and `compact*`, so `server/src/__tests__` (the existing `healthEndpoint.test.ts` included) never runs in CI. Add `server/tsconfig.test.json` (the server's sources plus its `__tests__`, `noEmit`, as the root's `tsconfig.test.json` does), a `test:check` script in `server/package.json`, and to both `.github/workflows/ci.yml` and `release.yml`, after the root test steps: `npm --prefix server run test:check` and `npm --prefix server test`. Prove they gate: a deliberately failing assertion in `shutdown.test.ts` turns the server test step red locally; revert.
+- [ ] **Step 6: Green gate:** `npm run build`, `npm run test:check`, `npm run lint:check`, `npm test`, `npm --prefix server run test:check`, `npm --prefix server test` — all pass in the worktree. Fix what is left of the red window here, nowhere else.
+- [ ] **Step 7:** Commit (`feat(server): one destination per process, shutdown settles and flushes; server tests in CI`) and push.
 
 ### Task 8: Documentation, versions, changelog
 
@@ -225,13 +226,14 @@ Inputs the spec implies but no spec test exercises; each has its test in the own
 - [ ] **Step 1:** Each doc per spec §9: the four supported authentications with their `.env` keys (an SNC `.env` has no user or password), `mcp-auth` from `@mcp-abap-adt/auth-broker-cli`, the parameter table, port `61001`, `XSUAA_MCP_URL`, the `--env` write-back, `sap-rfc-lite` as an optional dependency. Remove the stale `npm install -g @mcp-abap-adt/auth-broker` and the 5000/4000/4001 defaults wherever they occur (grep the tree, in-code help included).
 - [ ] **Step 2:** `docs/MIGRATION-16.0.md` with every item of spec §9's list; `CHANGELOG.md` 16.0.0 entry with *Breaking* first, linking the migration note.
 - [ ] **Step 3:** Versions and ranges; `npm install`; lockfile check as in Task 1.
-- [ ] **Step 4: Checks:** `grep -rn` for `getOrCreateAuthBroker`, `createTokenRefresher`, `initializeDefaultBroker`, `registerAuthBroker`, `connection_config`, `npm install -g @mcp-abap-adt/auth-broker` over `docs/`, `README.md`, `src/`, `server/src/` — none left outside the changelog and the migration note; `toolDescriptionsCarryNoLiterals.test.ts` green; full gate of Task 7 Step 5 green.
-- [ ] **Step 5:** Commit (`docs: 16.0.0 — authentication on broker 4, migration note`) and push.
+- [ ] **Step 4: Working documents never ship.** `package.json`'s `files` lists `docs/` whole, and a root `.npmignore` does not override `files`, so today's tarball carries every file under `docs/superpowers/` — this PR's three and an unrelated `plans/compact-package.md`. Add `"!docs/superpowers/"` to `files`; `npm pack --dry-run --json` lists no path containing `docs/superpowers` while the files are still in the tree. The same check for `server/`, `compact*` if their `files` reach `docs/`.
+- [ ] **Step 5: Checks:** `grep -rn` for `getOrCreateAuthBroker`, `createTokenRefresher`, `initializeDefaultBroker`, `registerAuthBroker`, `connection_config`, `npm install -g @mcp-abap-adt/auth-broker` over `docs/`, `README.md`, `src/`, `server/src/` — none left outside the changelog and the migration note; `toolDescriptionsCarryNoLiterals.test.ts` green; full gate of Task 7 Step 5 green.
+- [ ] **Step 6:** Commit (`docs: 16.0.0 — authentication on broker 4, migration note`) and push.
 
 ### Task 9: Release gate in the worktree
 
-- [ ] **Step 1:** `npm run build`, `npm run test:check`, `npm run lint:check`, `npm test`, `npm --prefix server test`; record the counts in the PR.
-- [ ] **Step 2:** Pack the five packages; `binSmoke.test.ts` against the packed tarballs (repository rule: a release is verified when an installed copy runs); `npm pack --dry-run` lists no `docs/superpowers` file.
+- [ ] **Step 1:** `npm run build`, `npm run test:check`, `npm run lint:check`, `npm test`, `npm --prefix server run test:check`, `npm --prefix server test`; record the counts in the PR.
+- [ ] **Step 2:** Pack the five packages; `binSmoke.test.ts` against the packed tarballs (repository rule: a release is verified when an installed copy runs); `npm pack --dry-run --json` lists no `docs/superpowers` path (the exclusion of Task 8 Step 4, which holds whether or not the files are still in the tree). Repeated after Task 11's deletion, below.
 - [ ] **Step 3:** Update the PR description: stages, the gate's results.
 
 ### Task 10: Live checks (H8)
@@ -247,4 +249,5 @@ Run with the built server from the worktree, after Task 9; each result recorded 
 
 - [ ] **Step 1:** External review of the whole branch; fixes pushed to the PR.
 - [ ] **Step 2:** Delete `docs/superpowers/2026-10-03-broker4-migration-goal.md`, `docs/superpowers/specs/2026-10-03-broker4-migration-design.md` and this plan; anything they still owe the future (certificates from both sides; proxy and calm decide their own scope) goes into the PR description first.
-- [ ] **Step 3:** Merge and tag only on the user's word; the user publishes.
+- [ ] **Step 3:** After the deletion, rerun Task 9 (build, tests, pack, bin smoke) on the final head; the packed file lists match Task 9's except for nothing under `docs/superpowers`.
+- [ ] **Step 4:** Merge and tag only on the user's word; the user publishes.

@@ -26,10 +26,17 @@ JWT, or SNC — nothing else is in view. So the server supports exactly four:
 | `jwt` / `authorization_code` | an ABAP or XSUAA service key, an `.env` file | the browser strategy (`--browser`, `--browser-auth-port`) |
 | `jwt` / `none` | a token in an `.env` file; `x-sap-jwt-token` | nothing for a file; for the header, `TokenAuthProvider.fixed` |
 
-Another grant a file may state is not supported: no collaborator for it, no
-option, no documentation, no test. Whatever the broker does with it — build
-it, or refuse it with a `DestinationConfigError` naming what is missing — the
-server passes on unchanged; it adds no code to allow or to forbid it.
+**The table is checked when a destination's server is set up** (decided
+2026-10-03). A destination is a name for a configuration, and its
+authentication is a property of that configuration, known before anything
+connects. MCP builds a server per session, one destination each: under stdio
+once, at start; under SSE per session; under HTTP per request, the
+destination named by `x-mcp-destination` or the default. Setting that server
+up reads the destination and checks what it states against the table; a
+destination stating anything else gets an error naming the type and grant it
+states, before any connection or login. That request fails; no other session
+is touched. Adding an authentication is a row here and its collaborator — not
+a refusal at login.
 
 This is **this server's** choice, not a rule for the family. When an ABAP
 system the server must reach authorizes another way, that way is added here

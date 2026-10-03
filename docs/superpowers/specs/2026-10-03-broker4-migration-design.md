@@ -175,10 +175,8 @@ new AuthBroker(
   {
     serviceKeyStore,
     sessionStore,
-    authorization: (_destination, grant) =>
-      grant === 'authorization_code'
-        ? browserCallbackStrategy({ browser, port: browserAuthPort })
-        : refuseGrant(grant),
+    authorization: () =>
+      oneLoginAtATime(browserCallbackStrategy({ browser, port: browserAuthPort })),
   },
   brokerLogger,
 );
@@ -198,12 +196,9 @@ new AuthBroker(
   library's `61001` (today's random 30000–39999 port in
   `server/src/AuthBrokerConfig.ts` goes: a random port cannot be registered as
   a redirect URI, and the library's default sits clear of the server ranges).
-- `refuseGrant` returns a strategy whose `authorize` throws
-  `Error('grant <name> is not supported by this server')` — the broker calls
-  `authorization` for `passcode` and the SAML grants too, and the goal keeps
-  them out without code that forbids them (they fail at login, with the
-  provider's fixed refusal, not earlier). It is a refusing strategy, not a
-  filter: nothing branches on the grant before the broker does.
+- `authorization` does not look at the grant: only `authorization_code`
+  reaches it, because the table check (below) has already turned away every
+  destination stating another.
 - No `provider` option: the token API is not used by the server.
 
 ### Adding an authentication later
@@ -215,13 +210,27 @@ authorizes another way, the change touches these places and no others:
   needs a login, or the option its row needs (`oidcAuthorization`,
   `deviceCodePresenter`, …), built from the parameter table (section 6) if
   the user must choose something;
-- `settingsFor` (section 3), only if the new type limits the connection type,
-  as SNC does;
+- a row in `SUPPORTED_AUTHENTICATIONS`, and in `settingsFor` a connection-type
+  rule only if the new type limits it, as SNC does;
 - the docs' table of supported authentications and the migration note;
 - a test for the new row, and a live check on the system that needs it.
 
 The connector construction and the provider sources (section 2) do not change:
 a new authentication is a new provider from the broker, not a new source.
+
+### The table check
+
+`SUPPORTED_AUTHENTICATIONS` (`src/lib/auth/supportedAuthentications.ts`) is
+the goal's table in code: `basic`, `snc` (RFC only), `jwt` with
+`authorization_code` or `none`. `settingsFor(destination)` reads
+`getConnectionConfig` and checks `authType` and `grantType` against it before
+anything else; a destination outside it is refused with
+`UnsupportedAuthenticationError` (`destination`, `authType`, `grantType` —
+names from the store's fixed vocabulary, no value). `settingsFor` runs where a
+server for a session is set up (section 4), so the check runs once per stdio
+process, per SSE session and per HTTP request, before `getProvider` — no
+provider is built and no login starts for a destination the server does not
+serve.
 
 ### The URL a connector needs
 
@@ -393,7 +402,9 @@ proven load-bearing by breaking the rule and watching it fail.
 | `AuthBrokerFactory`, temp directories: each mode of the table builds the stores it names — observed through `getConnectionConfig` / `getProvider`'s class, not by inspecting fields | H1, goal |
 | a named destination's `.env` overrides its key field by field; an XSUAA key without `XSUAA_MCP_URL` is refused naming it | goal |
 | `--mcp=X` builds one broker (count constructor calls) | goal |
-| `authorization` returns the browser strategy for `authorization_code`, a refusing one otherwise; no other option is passed | H2 |
+| `authorization` returns the browser strategy under the login lock; no other option is passed | H2 |
+| a destination stating a type or grant outside the table (`saml`, `jwt` / `passcode`, `jwt` / `client_credentials`): `UnsupportedAuthenticationError` naming them, raised by `settingsFor`, and `getProvider` never called | goal |
+| HTTP: a request whose destination is outside the table fails; the next request, to a supported destination, succeeds | goal |
 | `setConnectionContext` with a broker that has no `getToken` / `createTokenRefresher`: still connects | H0 |
 | a `jwt` `.env` without `SAP_GRANT_TYPE`: refused naming `grantType` and the `mcp-auth` hint, no value in the message | H1, H4 |
 | SNC on HTTP: refused naming `connection-type` | goal |

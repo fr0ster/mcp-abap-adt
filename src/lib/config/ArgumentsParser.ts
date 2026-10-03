@@ -6,7 +6,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { readAuthParameters } from './authParameters';
 import { resolveEnvFilePath } from './envResolver';
+import type { YamlConfig } from './yamlConfig';
 
 export interface ParsedArguments {
   /** Default MCP destination from --mcp parameter */
@@ -53,6 +55,12 @@ export interface ParsedArguments {
   browserAuthPort?: number;
   /** Allow x-mcp-destination header to override default destination */
   allowDestinationHeader?: boolean;
+  /** Browser for a login */
+  browser?: string;
+  /** --env as the user gave it: a destination name or a path */
+  envDestination?: string;
+  /** --env-path as the user gave it */
+  envPath?: string;
   /** TLS certificate file path */
   tlsCert?: string;
   /** TLS private key file path */
@@ -65,7 +73,7 @@ export class ArgumentsParser {
   /**
    * Parse command-line arguments and environment variables
    */
-  static parse(): ParsedArguments {
+  static parse(yaml?: YamlConfig | null): ParsedArguments {
     const args = process.argv;
     const result: ParsedArguments = {
       unsafe: false,
@@ -142,37 +150,33 @@ export class ArgumentsParser {
       return defaultValue;
     };
 
-    // Parse --mcp
-    result.mcp = getArgValue('--mcp');
-
-    // Parse --auth-broker-path
-    result.authBrokerPath = getArgValue('--auth-broker-path');
-
-    // Parse browser auth callback port
-    {
-      const raw =
-        getArgValue('--browser-auth-port') || process.env.MCP_BROWSER_AUTH_PORT;
-      if (raw) {
-        const port = parseInt(raw, 10);
-        if (!Number.isNaN(port) && port > 0 && port <= 65535) {
-          result.browserAuthPort = port;
-        }
-      }
+    // The auth and connection parameters: CLI, then env, then YAML (authParameters.ts)
+    const auth = readAuthParameters(
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
+    result.mcp = auth.mcpDestination;
+    result.authBrokerPath = auth.authBrokerPath;
+    result.browserAuthPort = auth.browserAuthPort;
+    result.allowDestinationHeader = auth.allowDestinationHeader ?? false;
+    result.browser = auth.browser;
+    result.envDestination = auth.envDestination;
+    result.envPath = auth.envPath;
+    result.unsafe = auth.unsafe ?? false;
+    result.useAuthBroker = auth.useAuthBroker ?? false;
+    result.connectionType = auth.connectionType;
+    result.systemType = auth.systemType;
+    if (auth.systemType) {
+      // Propagate to env so systemContext.ts detectLegacy() picks it up
+      process.env.SAP_SYSTEM_TYPE = auth.systemType;
     }
 
-    // Parse --allow-destination-header
-    result.allowDestinationHeader = hasFlag('--allow-destination-header');
-
-    // Parse --env and --env-path
     // --env: destination name (resolved to sessions/<name>.env in platform path)
     // --env-path: explicit file path or file name (resolved against cwd if relative)
-    const envDestination = getArgValue('--env');
-    const envPathArg = getArgValue('--env-path');
-    const envPathFromEnv = process.env.MCP_ENV_PATH;
-
     const resolvedEnv = resolveEnvFilePath({
-      envDestination,
-      envPath: envPathArg || envPathFromEnv,
+      envDestination: auth.envDestination,
+      envPath: auth.envPath,
       authBrokerPath: result.authBrokerPath,
     });
 
@@ -184,32 +188,6 @@ export class ArgumentsParser {
       if (fs.existsSync(cwdEnvPath)) {
         result.env = cwdEnvPath;
       }
-    }
-
-    // Parse --unsafe
-    result.unsafe = hasFlag('--unsafe') || process.env.MCP_UNSAFE === 'true';
-
-    // Parse --auth-broker
-    result.useAuthBroker =
-      hasFlag('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true';
-
-    // Parse --connection-type (http or rfc)
-    const connType =
-      getArgValue('--connection-type') || process.env.SAP_CONNECTION_TYPE;
-    if (connType?.trim().toLowerCase() === 'rfc') {
-      result.connectionType = 'rfc';
-    }
-
-    // Parse --system-type (onprem | cloud | legacy)
-    const sysType = (
-      getArgValue('--system-type') || process.env.SAP_SYSTEM_TYPE
-    )
-      ?.trim()
-      .toLowerCase();
-    if (sysType === 'onprem' || sysType === 'cloud' || sysType === 'legacy') {
-      result.systemType = sysType;
-      // Propagate to env so systemContext.ts detectLegacy() picks it up
-      process.env.SAP_SYSTEM_TYPE = sysType;
     }
 
     // Parse --conf / --config

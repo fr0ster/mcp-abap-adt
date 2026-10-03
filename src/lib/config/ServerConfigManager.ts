@@ -12,12 +12,14 @@
  */
 
 import { ArgumentsParser } from './ArgumentsParser.js';
+import { authParametersHelp } from './authParameters.js';
 import type { HandlerSet, IServerConfig, Transport } from './IServerConfig.js';
 import {
   applyYamlConfigToArgs,
   generateConfigTemplateIfNeeded,
   loadYamlConfig,
   parseConfigArg,
+  type YamlConfig,
 } from './yamlConfig.js';
 
 export type { HandlerSet, Transport } from './IServerConfig.js';
@@ -31,6 +33,7 @@ export type { HandlerSet, Transport } from './IServerConfig.js';
  */
 export class ServerConfigManager {
   private config: IServerConfig | null = null;
+  private yamlConfig: YamlConfig | null = null;
 
   // --------------------------------------------------------------------------
   // PUBLIC API - Configuration Access
@@ -88,6 +91,8 @@ export class ServerConfigManager {
     // Load YAML config and apply to process.argv
     const yamlConfig = loadYamlConfig(configPath);
     if (yamlConfig) {
+      // The auth parameters stay out of argv, so env still beats YAML for them
+      this.yamlConfig = yamlConfig;
       applyYamlConfigToArgs(yamlConfig);
     }
   }
@@ -103,7 +108,7 @@ export class ServerConfigManager {
    */
   private parseCommandLine(): IServerConfig {
     // Use unified ArgumentsParser for CLI args
-    const parsed = ArgumentsParser.parse();
+    const parsed = ArgumentsParser.parse(this.yamlConfig);
 
     const transport = this.parseTransport();
     const exposition = this.parseExposition();
@@ -149,6 +154,9 @@ export class ServerConfigManager {
       useAuthBroker: parsed.useAuthBroker,
       browserAuthPort: parsed.browserAuthPort,
       allowDestinationHeader: parsed.allowDestinationHeader,
+      browser: parsed.browser,
+      envDestination: parsed.envDestination,
+      envPath: parsed.envPath,
       connectionType: parsed.connectionType,
       systemType: parsed.systemType,
       tls:
@@ -306,25 +314,10 @@ TRANSPORT SELECTION:
   --sse-path=<path>                SSE connection path (default: /sse)
   --post-path=<path>               SSE message post path (default: /messages)
 
-AUTHENTICATION:
-  --env=<name>                     Env destination name (resolved to sessions/<name>.env)
-                                   Uses platform default sessions directory
-  --env-path=<path|file>           Explicit .env file path (or relative file name)
-  --mcp=<destination>              Default MCP destination name (for auth-broker mode)
-                                   Example: --mcp=TRIAL
-  --connection-type=<type>         SAP connection type: http (default) or rfc
-                                   RFC requires SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite installed
-                                   Alternative: SAP_CONNECTION_TYPE env var in .env
-  --system-type=<type>             SAP system type: cloud (default) | onprem | legacy
-                                   Controls which tools are available
-                                   Set to 'onprem' for on-premise systems (enables Programs etc.)
-                                   Alternative: SAP_SYSTEM_TYPE env var in .env
-  --auth-broker-path=<path>        Custom path for auth-broker storage
-                                   Example: --auth-broker-path=~/prj/tmp/
-  --browser-auth-port=<port>       OAuth callback port for browser authentication
-                                   (default: 5000 http, 4000 sse, 4001 stdio)
-  --allow-destination-header       Allow x-mcp-destination header to override
-                                   default destination (HTTP/SSE only, disabled by default)
+AUTHENTICATION AND CONNECTION:
+  Each parameter has a CLI, an environment and a YAML form; the CLI wins over the
+  environment, which wins over the YAML file.
+${authParametersHelp()}
 
 ${options?.expositionSection ?? ServerConfigManager.getHandlerSetsDescription()}
 HTTP OPTIONS:

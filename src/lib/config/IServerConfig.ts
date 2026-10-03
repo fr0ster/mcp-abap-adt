@@ -36,6 +36,10 @@ export interface IServerConfig {
 
   /** Path to .env file */
   envFilePath?: string;
+  /** `--env` / `MCP_ENV` / `env` as the user gave it: a destination name or a path */
+  envDestination?: string;
+  /** `--env-path` / `MCP_ENV_PATH` / `env-path` as the user gave it */
+  envPath?: string;
   /** Alias for envFilePath (v2 compatibility) */
   envFile?: string;
   /** Custom path for auth broker storage */

@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { load as parseYaml } from 'js-yaml';
+import { authParametersTemplate, validateAuthYaml } from './authParameters.js';
 
 export interface YamlConfig {
   transport?: string;
@@ -15,6 +16,11 @@ export interface YamlConfig {
   unsafe?: boolean;
   'auth-broker'?: boolean;
   'auth-broker-path'?: string;
+  browser?: string;
+  'browser-auth-port'?: number | string;
+  'allow-destination-header'?: boolean;
+  'connection-type'?: string;
+  'system-type'?: string;
   // Handler sets: readonly, high, low. `compact` is recognised and refused —
   // that facade is the @mcp-abap-adt/compact command.
   exposition?: string | string[];
@@ -73,7 +79,9 @@ export function validateYamlConfig(config: YamlConfig): {
   valid: boolean;
   errors: string[];
 } {
-  const errors: string[] = [];
+  const errors: string[] = [
+    ...validateAuthYaml(config as Record<string, unknown>),
+  ];
 
   // Validate transport
   if (config.transport) {
@@ -229,29 +237,9 @@ export function generateYamlConfigTemplate(): string {
 # Default: stdio (for MCP clients)
 transport: stdio
 
-# Default MCP destination (uses auth-broker)
-# If not specified, will use .env file if available
-mcp:
-
-# Env destination name (resolved in sessions store, e.g. "trial" -> trial.env)
-env:
-
-# Explicit path to .env file (recommended when using file-based config)
-# Example: env-path: .env
-env-path:
-
-# Use unsafe mode (file-based session store instead of in-memory)
-# Default: false
-unsafe: false
-
-# Force use of auth-broker (service keys) instead of .env file
-# Default: false
-auth-broker: false
-
-# Custom path for auth-broker storage
-# If not specified, uses platform-specific default paths
-auth-broker-path:
-
+# Auth and connection parameters. Each one also has a CLI and an environment form;
+# the CLI wins over the environment, which wins over this file.
+${authParametersTemplate()}
 # Handler sets to expose: readonly, high, low
 # (compact moved to the @mcp-abap-adt/compact command and is refused here)
 # Default: readonly,high
@@ -390,35 +378,8 @@ export function applyYamlConfigToArgs(config: YamlConfig): void {
     addArg('--transport', config.transport);
   }
 
-  // Apply mcp destination
-  if (config.mcp && !hasArg('--mcp')) {
-    addArg('--mcp', config.mcp);
-  }
-
-  // Apply env destination
-  if (config.env && !hasArg('--env')) {
-    addArg('--env', config.env);
-  }
-
-  // Apply explicit env file path
-  if (config['env-path'] && !hasArg('--env-path')) {
-    addArg('--env-path', config['env-path']);
-  }
-
-  // Apply unsafe flag
-  if (config.unsafe && !hasArg('--unsafe')) {
-    addArg('--unsafe', true);
-  }
-
-  // Apply auth-broker flag
-  if (config['auth-broker'] && !hasArg('--auth-broker')) {
-    addArg('--auth-broker', true);
-  }
-
-  // Apply auth-broker-path
-  if (config['auth-broker-path'] && !hasArg('--auth-broker-path')) {
-    addArg('--auth-broker-path', config['auth-broker-path']);
-  }
+  // The auth and connection parameters (authParameters.ts) are not written to
+  // argv: ArgumentsParser reads them from the YAML directly, so env beats YAML.
 
   // Apply exposition
   if (config.exposition && !hasArg('--exposition')) {

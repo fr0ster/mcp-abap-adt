@@ -15,8 +15,6 @@ export type {
   TlsConfig,
   Transport,
 } from './IServerConfig.js';
-// Runtime configuration
-export { buildRuntimeConfig } from './runtimeConfig.js';
 // Server configuration manager
 export { ServerConfigManager } from './ServerConfigManager.js';
 export { validateExposition } from './validateExposition.js';

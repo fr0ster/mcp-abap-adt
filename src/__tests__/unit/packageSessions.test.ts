@@ -7,23 +7,40 @@ const opened: Array<{
   connect: jest.Mock;
   disconnect: jest.Mock;
   getConfig: () => { connectionType: string };
+  credential: unknown;
+  settings: unknown;
 }> = [];
-jest.mock('../../lib/connectionFactory', () => ({
-  createAbapConnection: () => {
-    const fresh = {
-      connect: jest.fn(async () => {}),
-      disconnect: jest.fn(async () => {}),
-      getConfig: () => ({ connectionType: 'rfc' }),
-    };
-    opened.push(fresh);
-    return fresh;
-  },
-}));
+let useRealFactory = false;
+jest.mock('../../lib/connectionFactory', () => {
+  const actual = jest.requireActual('../../lib/connectionFactory');
+  return {
+    ...actual,
+    createAbapConnection: (settings: unknown, credential: unknown) => {
+      if (useRealFactory) {
+        return (actual.createAbapConnection as (...a: unknown[]) => unknown)(
+          settings,
+          credential,
+        );
+      }
+      const fresh = {
+        connect: jest.fn(async () => {}),
+        disconnect: jest.fn(async () => {}),
+        getConfig: () => ({ connectionType: 'rfc' }),
+        credential,
+        settings,
+      };
+      opened.push(fresh);
+      return fresh;
+    },
+  };
+});
 
+import { BasicAuthProvider } from '@mcp-abap-adt/auth-providers';
 import {
   connectionForPackageLock,
   connectionHoldingPackageLock,
   inOwnSessionOverRfc,
+  openFreshConnection,
   releasePackageLockSession,
 } from '../../lib/packageSessions';
 
@@ -102,5 +119,60 @@ describe('package sessions', () => {
     lockOn.keep('HANDLE2');
     expect(connectionHoldingPackageLock(caller, 'HANDLE2')).toBe(caller);
     expect(opened).toHaveLength(0);
+  });
+});
+
+/**
+ * A fresh session is opened from the record the factory kept for the
+ * connection it built: the same settings and the same credential object.
+ */
+describe('openFreshConnection', () => {
+  afterEach(() => {
+    useRealFactory = false;
+    delete process.env.SAP_SYSTEM_TYPE;
+  });
+
+  it('opens a sibling holding the same credential object and the same settings', async () => {
+    const { createAbapConnection } = jest.requireActual(
+      '../../lib/connectionFactory',
+    ) as typeof import('../../lib/connectionFactory');
+    const credential = new BasicAuthProvider('user', 'secret');
+    const settings = {
+      url: 'https://sap.example.invalid',
+      client: '000',
+      authType: 'basic' as const,
+    };
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    useRealFactory = true;
+    const original = createAbapConnection(settings, credential) as any;
+    const connect = jest
+      .spyOn(Object.getPrototypeOf(Object.getPrototypeOf(original)), 'connect')
+      .mockResolvedValue(undefined);
+
+    const fresh = (await openFreshConnection(original, undefined)) as any;
+
+    expect(fresh).not.toBe(original);
+    expect(fresh.credential).toBe(credential);
+    expect(fresh.getConfig()).toEqual(settings);
+    expect(connect).toHaveBeenCalled();
+    connect.mockRestore();
+  });
+
+  it('falls back to getConfig() through credentialFromSapConfig for a connection the factory did not build', async () => {
+    opened.length = 0;
+    const config = {
+      url: 'https://sap.example.invalid',
+      client: '000',
+      authType: 'basic',
+      username: 'u',
+      password: 'p',
+    };
+    const foreign = { getConfig: () => config } as any;
+
+    await openFreshConnection(foreign, undefined);
+
+    expect(opened).toHaveLength(1);
+    expect(opened[0].settings).toBe(config);
+    expect(opened[0].credential).toBeInstanceOf(BasicAuthProvider);
   });
 });

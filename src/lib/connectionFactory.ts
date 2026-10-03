@@ -1,37 +1,27 @@
 /**
- * Builds an ABAP connection from a `SapConfig`.
+ * Builds an ABAP connection from settings and a credential.
  *
- * `@mcp-abap-adt/connection` 6.0 removed its factory on purpose: which system a
- * deployment dials, which credential it presents and which wire it uses are
- * three independent facts, and the old factory guessed the first from the third
- * — a bearer token against an on-premise system is ordinary, and inferring
- * "cloud" from it was wrong. The library now requires the caller to state all
- * three.
- *
- * We are that caller, and this is the one place in the server that decides.
- * Everything else keeps calling `createAbapConnection(config, logger, sessionId,
- * refresher)` exactly as before.
- *
- * See the library's `docs/MIGRATION-6.0.md`.
+ * Which system a deployment dials, which credential it presents and which wire
+ * it uses are three independent facts. This is the one place in the server
+ * that builds a connector: the system kind and the wire follow from the
+ * settings (`resolveSystemKind`, `connectionType`); the credential is the one
+ * the caller hands in, and is never built here from `settings.authType`.
+ * Where a credential comes from is `credentialSources.ts` and the broker's
+ * `getProvider`.
  */
 
 import {
   AdtCloudConnector,
   AdtOnPremConnector,
-  BasicAuthProvider,
-  CertificateAuthProvider,
   CloudHttpTransport,
-  FileCertificateMaterialLoader,
   type ILogger,
   OnPremHttpTransport,
   RfcTransport,
   rfcConversationFrom,
-  SamlAuthProvider,
   type SapConfig,
-  TokenAuthProvider,
 } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type { ITokenRefresher } from '@mcp-abap-adt/interfaces-auth';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 export type AbapSystemKind = 'onprem' | 'cloud';
 
@@ -55,44 +45,6 @@ export function resolveSystemKind(
   if (declared === 'cloud') return 'cloud';
   if (declared === 'onprem' || declared === 'legacy') return 'onprem';
   return config.authType === 'jwt' ? 'cloud' : 'onprem';
-}
-
-/** Kerberos has no credential provider in connection 6.x — see the upstream issue. */
-function refuseKerberos(): never {
-  throw new Error(
-    'Kerberos authentication is not available: @mcp-abap-adt/connection 6.0 removed ' +
-      'KerberosAbapConnection without a replacement (it was single-leg and untested ' +
-      'against a live KDC — fr0ster/mcp-abap-adt-connection#35). Use basic, jwt, saml ' +
-      'or certificate authentication.',
-  );
-}
-
-function onPremCredential(config: SapConfig) {
-  switch (config.authType) {
-    case 'basic':
-      return new BasicAuthProvider(
-        config.username ?? '',
-        config.password ?? '',
-      );
-    case 'jwt':
-      // Legitimate: a token against an on-premise system is ordinary, and the
-      // system kind is stated separately.
-      return new TokenAuthProvider(config.jwtToken ?? '');
-    case 'saml':
-      return new SamlAuthProvider(config.sessionCookies ?? '');
-    case 'certificate':
-      return new CertificateAuthProvider(
-        new FileCertificateMaterialLoader(),
-        config,
-      );
-    case 'kerberos':
-      return refuseKerberos();
-    default:
-      return new BasicAuthProvider(
-        config.username ?? '',
-        config.password ?? '',
-      );
-  }
 }
 
 /**
@@ -318,59 +270,70 @@ function withHttpWireLog<T>(connection: T): T {
   return connection;
 }
 
+/** How a connection was built, so a sibling can be opened exactly like it. */
+export interface ConnectionRecord {
+  settings: SapConfig;
+  credential: IAuthProvider;
+  logger?: ILogger | null;
+}
+
+const records = new WeakMap<object, ConnectionRecord>();
+
+/** The record of a connection this factory built; undefined for any other. */
+export function siblingRecordOf(
+  connection: object,
+): ConnectionRecord | undefined {
+  return records.get(connection);
+}
+
 export function createAbapConnection(
-  config: SapConfig,
+  settings: SapConfig,
+  credential: IAuthProvider,
   logger?: ILogger | null,
   sessionId?: string,
-  tokenRefresher?: ITokenRefresher,
 ): IAbapConnection {
-  const transportOptions = { client: config.client, baseUrl: config.url };
+  const transportOptions = { client: settings.client, baseUrl: settings.url };
 
-  if (resolveSystemKind(config) === 'cloud') {
-    // The refresher is the credential now, not a constructor slot beside it. A
-    // bare token still works and is honest about having no renewal behind it.
-    const credential = new TokenAuthProvider(
-      tokenRefresher ?? config.jwtToken ?? '',
-    );
-    return withHttpWireLog(
-      new AdtCloudConnector(
-        config,
+  const built = ((): IAbapConnection => {
+    if (resolveSystemKind(settings) === 'cloud') {
+      return withHttpWireLog(
+        new AdtCloudConnector(
+          settings,
+          credential,
+          new CloudHttpTransport(() => ({}), logger, transportOptions),
+          logger,
+          sessionId,
+        ) as unknown as IAbapConnection,
+      );
+    }
+
+    if (settings.connectionType === 'rfc') {
+      return new AdtOnPremConnector(
+        settings,
         credential,
-        new CloudHttpTransport(() => ({}), logger, transportOptions),
+        new RfcTransport(
+          rfcConversationFrom(settings),
+          wireLogger(logger),
+          rfcWireOptions(),
+        ),
+        logger,
+        sessionId,
+      ) as unknown as IAbapConnection;
+    }
+
+    // TLS material reaches the wire through the logon, not through the
+    // transport's options.
+    return withHttpWireLog(
+      new AdtOnPremConnector(
+        settings,
+        credential,
+        new OnPremHttpTransport(() => ({}), logger, transportOptions),
         logger,
         sessionId,
       ) as unknown as IAbapConnection,
     );
-  }
+  })();
 
-  const credential = onPremCredential(config);
-
-  if (config.connectionType === 'rfc') {
-    return new AdtOnPremConnector(
-      config,
-      credential,
-      new RfcTransport(
-        rfcConversationFrom(config),
-        wireLogger(logger),
-        rfcWireOptions(),
-      ),
-      logger,
-      sessionId,
-    ) as unknown as IAbapConnection;
-  }
-
-  // A thunk, not a value: certificate material is loaded during connect(), so a
-  // wire that read it at construction would read nothing and mTLS would
-  // silently not happen.
-  const agentOptions = () => credential.transportMaterial?.() ?? {};
-
-  return withHttpWireLog(
-    new AdtOnPremConnector(
-      config,
-      credential,
-      new OnPremHttpTransport(agentOptions, logger, transportOptions),
-      logger,
-      sessionId,
-    ) as unknown as IAbapConnection,
-  );
+  records.set(built as unknown as object, { settings, credential, logger });
+  return built;
 }

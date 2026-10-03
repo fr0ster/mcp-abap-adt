@@ -23,31 +23,36 @@
  *   releases it and closes it. The handle belongs to the session that took
  *   it, so the whole lock → update → unlock chain has to share that session.
  */
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import { createAbapConnection } from './connectionFactory';
+import { createAbapConnection, siblingRecordOf } from './connectionFactory';
 import { isRfcConnection } from './connectionKind';
+import { credentialFromSapConfig } from './credentialSources';
 import type { HandlerContext } from './handlers/interfaces';
 
 type Logger = HandlerContext['logger'];
 
 /**
- * A connection of its own, connected: on `config` when given, on the caller's
- * configuration otherwise.
+ * A connection of its own, connected: from the record the factory kept when it
+ * built `connection` — the same settings and the same credential object — or,
+ * for a connection it did not build, from the connection's own configuration.
  */
 export async function openFreshConnection(
   connection: IAbapConnection,
   logger: Logger,
-  config: unknown = (
-    connection as { getConfig?: () => unknown }
-  ).getConfig?.() ?? (connection as { config?: unknown }).config,
 ): Promise<IAbapConnection> {
-  if (!config) {
+  const record = siblingRecordOf(connection);
+  const settings = (record?.settings ??
+    (connection as { getConfig?: () => unknown }).getConfig?.() ??
+    (connection as { config?: unknown }).config) as SapConfig | undefined;
+  if (!settings) {
     throw new Error(
       'A fresh connection was needed, but the connection carries no configuration to open one from',
     );
   }
   const fresh = createAbapConnection(
-    config as Parameters<typeof createAbapConnection>[0],
+    settings,
+    record?.credential ?? credentialFromSapConfig(settings),
     logger ?? null,
   ) as IAbapConnection & { connect?: () => Promise<void> };
   // RFC connections need an explicit connect(); createAbapConnection does not.

@@ -81,6 +81,12 @@ export interface EmbeddableMcpServerOptions {
    * Use this when a single host serves multiple SAP systems (e.g., a proxy
    * that handles both OnPremise and cloud destinations per request) —
    * mutating `process.env.SAP_SYSTEM_TYPE` per instance is not safe.
+   *
+   * It also states the injected connection's kind for the responsible /
+   * master-system lookup: `'cloud'` asks the system's `systeminformation`
+   * for what the call lacks; anything else — and, when omitted,
+   * `SAP_SYSTEM_TYPE`, else on-premise — asks nothing. The URL is never
+   * consulted.
    */
   systemType?: SapEnvironment;
 

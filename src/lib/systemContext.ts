@@ -1,8 +1,4 @@
-import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
-import { AuthRefusedError } from '@mcp-abap-adt/connection';
-import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { registerConnectionResetHook } from './connectionEvents';
-import { systemKindOf } from './connectionFactory';
 import { getRequestContext } from './requestContext';
 
 export interface IAdtSystemContext {
@@ -13,66 +9,11 @@ export interface IAdtSystemContext {
   masterLanguage?: string;
 }
 
-// Singleton cache is sufficient: one MCP session always maps to one SAP system.
-// For HTTP/SSE the cache is reset before each request as a safety measure.
+// The process-wide context: the configuration (`systemContextFromConfiguration`)
+// or what an embedder states (`setSystemContext`). Per-request values — headers,
+// a destination's own .env, a cloud system's answer — live in the request scope
+// (requestContext.ts), never here, so they cannot leak between requests.
 let cached: IAdtSystemContext | undefined;
-
-/**
- * The system context: who the caller is, which system, which language.
- *
- * **Legacy (BASIS < 7.50) is not resolved here any more, and no tool declares
- * it.** Support for it is parked on `parked/legacy-support` until it can be
- * tried against a live legacy system: nothing in this repository ever was,
- * and an `available_in` that named an environment nobody had verified is a
- * claim rather than a fact. `SAP_SYSTEM_TYPE=legacy` now resolves like any
- * other unknown value — the context carries no legacy flag and
- * `createAdtClient` builds the ordinary `AdtClient`.
- */
-export async function resolveSystemContext(
-  connection: IAbapConnection,
-  overrides?: Partial<IAdtSystemContext>,
-): Promise<IAdtSystemContext> {
-  // Priority 1: explicit overrides (from HTTP headers)
-  if (overrides && (overrides.masterSystem || overrides.responsible)) {
-    cached = {
-      masterSystem: overrides.masterSystem,
-      responsible: overrides.responsible,
-      masterLanguage: overrides.masterLanguage ?? process.env.SAP_LANGUAGE,
-    };
-    return cached;
-  }
-
-  if (cached) return cached;
-
-  // Priority 2: the configuration.
-  const configured = systemContextFromConfiguration();
-  if (configured) return configured;
-
-  // The master system is determined from configuration, or by a request in
-  // the cloud — there is no other way. On-premise nothing is sent.
-  const masterLanguage = process.env.SAP_LANGUAGE;
-  if (systemKindOf(connection) !== 'cloud') {
-    return masterLanguage ? { masterLanguage } : {};
-  }
-
-  // Cloud: the getSystemInformation API. Only an answer is cached: a lookup
-  // that failed caches nothing, so the next caller asks again instead of the
-  // process keeping a partial context. A refused credential is the caller's
-  // to answer, never a context.
-  try {
-    const info = await getSystemInformation(connection);
-    cached = {
-      masterSystem: info?.systemID,
-      responsible: info?.userName,
-      client: info?.client,
-      masterLanguage,
-    };
-    return cached;
-  } catch (error) {
-    if (error instanceof AuthRefusedError) throw error;
-    return masterLanguage ? { masterLanguage } : {};
-  }
-}
 
 /**
  * The system context the configuration states — `SAP_MASTER_SYSTEM`,

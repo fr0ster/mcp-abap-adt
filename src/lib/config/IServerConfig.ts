@@ -123,7 +123,12 @@ export interface IServerConfig {
    */
   connectionTypeSource?: string;
 
-  /** SAP system type override: onprem | cloud | legacy (overrides auto-detection) */
+  /**
+   * SAP system type: onprem | cloud | legacy (`--system-type`, `SAP_SYSTEM_TYPE`).
+   * The tools offered default to cloud. The connector, and whether the master
+   * system is asked of the system, default to cloud for a jwt destination and
+   * on-premise otherwise — stated, never guessed from the URL.
+   */
   systemType?: 'onprem' | 'cloud' | 'legacy';
 
   // ============================================================================

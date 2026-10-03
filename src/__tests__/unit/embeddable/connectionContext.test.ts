@@ -5,16 +5,17 @@
  * refresher is looked up, and the settings carry no secret.
  */
 
+import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 
 jest.mock('../../../lib/connectionFactory', () => ({
   createAbapConnection: jest.fn(),
 }));
-jest.mock('../../../lib/systemContext', () => {
-  const actual = jest.requireActual('../../../lib/systemContext');
-  return { ...actual, resolveSystemContext: jest.fn() };
-});
+jest.mock('@mcp-abap-adt/adt-clients', () => ({
+  ...jest.requireActual('@mcp-abap-adt/adt-clients'),
+  getSystemInformation: jest.fn(),
+}));
 jest.mock('../../../lib/credentialSources', () => {
   const actual = jest.requireActual('../../../lib/credentialSources');
   return {
@@ -31,15 +32,12 @@ import { credentialFromHeaders } from '../../../lib/credentialSources';
 import {
   getSystemContext,
   resetSystemContextCache,
-  resolveSystemContext,
 } from '../../../lib/systemContext';
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
 >;
-const resolve = resolveSystemContext as jest.MockedFunction<
-  typeof resolveSystemContext
->;
+const lookup = getSystemInformation as jest.Mock;
 const fromHeaders = credentialFromHeaders as jest.MockedFunction<
   typeof credentialFromHeaders
 >;
@@ -106,12 +104,7 @@ function stubDestinations(provider: IAuthProvider) {
 beforeEach(() => {
   build.mockReset();
   build.mockImplementation(() => fakeConnection());
-  resolve.mockReset();
-  resolve.mockResolvedValue({
-    masterSystem: 'master-placeholder',
-    responsible: 'responsible-placeholder',
-    client: '000',
-  });
+  lookup.mockReset();
   fromHeaders.mockClear();
 });
 
@@ -147,7 +140,7 @@ describe('setConnectionContext(destination, destinations)', () => {
     await server.fromDestination('dest-a', stubDestinations(provider));
 
     expect(build).not.toHaveBeenCalled();
-    expect(resolve).not.toHaveBeenCalled();
+    expect(lookup).not.toHaveBeenCalled();
     expect(provider.prepare).not.toHaveBeenCalled();
   });
 

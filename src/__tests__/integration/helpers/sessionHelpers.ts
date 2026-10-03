@@ -15,7 +15,6 @@ import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { generateSessionId } from '../../../lib/sessionUtils';
-import { resolveSystemContext } from '../../../lib/systemContext';
 import { createConnectionLogger, getTestDestination } from './authHelpers';
 import {
   getSapConfigFromEnv,
@@ -24,6 +23,7 @@ import {
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
 import { trackConnection } from './openConnections';
+import { primeSystemContext } from './primeSystemContext';
 import { extractSessionState } from './testHelpers';
 
 /**
@@ -210,7 +210,7 @@ export async function createTestConnectionAndSession(): Promise<{
     }
 
     // Resolve system context (legacy detection) so createAdtClient() picks the correct client
-    await resolveSystemContext(connection);
+    await primeSystemContext(connection);
 
     // Generate session ID
     const sessionId = generateSessionId();

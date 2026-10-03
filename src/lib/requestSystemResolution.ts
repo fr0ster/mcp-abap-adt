@@ -47,19 +47,25 @@ export type SystemContextResolver = (
  * the kind the connection was built for (`systemKindOf`), never a guess from
  * its URL.
  */
-export const defaultSystemContextResolver: SystemContextResolver =
-  systemContextResolverFor(undefined);
+/**
+ * One resolver per stated kind, for the process: `resolveOnce` memoises per
+ * resolver, so a host that builds a server per request still makes one
+ * lookup per connection.
+ */
+const resolversByKind = new Map<string | undefined, SystemContextResolver>();
 
 /**
  * The default resolver for a server that states its system kind
  * (`systemType`): for a connection the factory did not build, that kind wins
  * over `SAP_SYSTEM_TYPE`. A connection the factory built follows its
- * recorded settings either way.
+ * recorded settings either way. The same kind answers the same resolver.
  */
 export function systemContextResolverFor(
   systemType: string | undefined,
 ): SystemContextResolver {
-  return async (connection) => {
+  const known = resolversByKind.get(systemType);
+  if (known) return known;
+  const resolver: SystemContextResolver = async (connection) => {
     if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
       return null;
     }
@@ -67,7 +73,12 @@ export function systemContextResolverFor(
     if (!info) return null;
     return { responsible: info.userName, masterSystem: info.systemID };
   };
+  resolversByKind.set(systemType, resolver);
+  return resolver;
 }
+
+export const defaultSystemContextResolver: SystemContextResolver =
+  systemContextResolverFor(undefined);
 
 const memo = new WeakMap<
   SystemContextResolver,

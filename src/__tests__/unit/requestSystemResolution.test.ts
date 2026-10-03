@@ -508,6 +508,25 @@ describe('BaseMcpServer.registerHandlers', () => {
     },
   );
 
+  it("two servers stating systemType 'cloud' over one connection make one lookup", async () => {
+    // A host builds a server per request: the memo must span server instances.
+    const connection = foreignConn(
+      'https://system.abap.example.hana.ondemand.com',
+    );
+    for (let i = 0; i < 2; i++) {
+      const server = new EmbeddableMcpServer({
+        connection: connection as never,
+        handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+        systemType: 'cloud',
+      });
+      expect(textOf(await callTool(server, 'WithContext'))).toMatchObject({
+        responsible: 'CB_USER',
+        masterSystem: 'CLD',
+      });
+    }
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
   it("a factory-built connection follows its recorded settings, not the server's systemType", async () => {
     const server = new EmbeddableMcpServer({
       connection: onPremConn() as never,

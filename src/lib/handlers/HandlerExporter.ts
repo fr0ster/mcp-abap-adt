@@ -66,6 +66,10 @@ export interface HandlerExporterOptions {
    * system. The default resolves them on ABAP Cloud (one lookup per
    * connection) and does nothing on-premise. `null` disables it, and
    * `getHandlerEntries()` then returns the groups' handlers unwrapped.
+   * MIGRATION (16.0.0): the kind of a connection the factory did not build is
+   * no longer guessed from its URL — it is `SAP_SYSTEM_TYPE`, on-premise when
+   * unset; a cloud host sets `SAP_SYSTEM_TYPE=cloud` or passes its own
+   * `systemContextResolver`.
    * @default defaultSystemContextResolver
    */
   systemContextResolver?: SystemContextResolver | null;

@@ -45,10 +45,7 @@ import {
 } from '../../../lib/strategies/activationRun';
 import { ourUtils } from '../../../lib/strategies/resultSets';
 import { withLock } from '../../../lib/strategies/withLock';
-import {
-  getSystemContext,
-  resolveSystemContext,
-} from '../../../lib/systemContext';
+import { getSystemContext } from '../../../lib/systemContext';
 import {
   getSharedDependenciesConfig,
   getTimeout,
@@ -56,6 +53,7 @@ import {
   loadTestConfig,
 } from '../../integration/helpers/configHelpers';
 import { createTestLogger } from '../../integration/helpers/loggerHelpers';
+import { primeSystemContext } from '../../integration/helpers/primeSystemContext';
 import { stillInactive } from '../../integration/helpers/rapFixtures';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
 import { ensureSharedPackage } from '../../integration/helpers/sharedObjects';
@@ -329,7 +327,7 @@ describe('Admin: Setup shared dependencies', () => {
     try {
       const result = await createTestConnectionAndSession();
       connection = result.connection;
-      await resolveSystemContext(connection);
+      await primeSystemContext(connection);
       const systemCtx = getSystemContext();
       client = strictClient(createAdtClient(connection));
       hasConfig = true;

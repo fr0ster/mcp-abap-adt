@@ -162,17 +162,23 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_CLIENT                     SAP client number
     Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency)
 
-  System Context (a create is refused without both; reads are unaffected):
-    SAP_MASTER_SYSTEM              Master system of created objects (the system id)
-    SAP_RESPONSIBLE                Responsible person (else SAP_USERNAME of the same source)
-                                   Per request, first found wins: the tool's argument; the
-                                   x-sap-* headers below; the destination's own .env (--env /
-                                   --env-path file, or sessions/<destination>.env); the process
-                                   environment; on a cloud system only, the system itself
+  System Context (per request, first found wins; reads are unaffected):
+    SAP_RESPONSIBLE                Responsible person of created objects, always sent. First
+                                   found: the tool's argument; x-sap-responsible; SAP_RESPONSIBLE
+                                   in the destination's own .env (--env / --env-path file, or
+                                   sessions/<destination>.env), then in the environment. Else
+                                   the login: the destination's SAP_USERNAME; x-sap-login; the
+                                   environment's SAP_USERNAME; on a cloud system, the system's
+                                   user. A create that finds none is refused (SNC, a token).
+    SAP_MASTER_SYSTEM              Master system of created objects. First found: the tool's
+                                   argument; x-sap-master-system; the destination's .env; the
+                                   environment; on a cloud system, the system id. Otherwise left
+                                   out of the request (the system applies itself), never refused
 
   HTTP/SSE Headers (System Context; SSE: the session's opening request):
     x-sap-master-system            Master system for this request (wins over the .env and env)
     x-sap-responsible              Responsible for this request (wins over the .env and env)
+    x-sap-login                    With x-sap-url: the login, the responsible when none is stated
     x-sap-language                 Master/original language for created objects (overrides SAP_LANGUAGE)
 
 GENERATING A .ENV:

@@ -528,11 +528,13 @@ describe('AuthBrokerFactory', () => {
       const f = factory();
       await expect(f.systemContextFor('dest')).resolves.toEqual({
         responsible: 'responsible-of-dest',
+        login: 'placeholder-user',
         masterSystem: 'system-of-dest',
       });
-      // SAP_RESPONSIBLE unset: the destination's own SAP_USERNAME.
+      // SAP_RESPONSIBLE unset: no responsible; the login is a fallback the
+      // request resolves after every SAP_RESPONSIBLE (process included).
       await expect(f.systemContextFor('other')).resolves.toEqual({
-        responsible: 'placeholder-user',
+        login: 'placeholder-user',
         masterSystem: 'system-of-other',
       });
     });

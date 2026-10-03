@@ -57,14 +57,14 @@ export interface DestinationStores {
   /**
    * The destination's own `.env`: the `--env` file, or
    * `sessions/<name>.env` — the file its means store reads. Its
-   * `SAP_RESPONSIBLE` / `SAP_MASTER_SYSTEM` are read from here
+   * `SAP_RESPONSIBLE` / `SAP_USERNAME` / `SAP_MASTER_SYSTEM` are read from here
    * (`readDestinationSystemContext`).
    */
   destinationFile: string;
 }
 
 /**
- * `SAP_RESPONSIBLE` (else `SAP_USERNAME`) and `SAP_MASTER_SYSTEM` of a
+ * `SAP_RESPONSIBLE`, `SAP_USERNAME` (the login) and `SAP_MASTER_SYSTEM` of a
  * destination's own `.env`; a key not stated, or a file that is absent or
  * unreadable, is absent from the answer. Nothing else in the file is kept.
  */
@@ -77,10 +77,12 @@ export function readDestinationSystemContext(
   } catch {
     return {};
   }
-  const responsible = parsed.SAP_RESPONSIBLE || parsed.SAP_USERNAME;
+  const responsible = parsed.SAP_RESPONSIBLE;
+  const login = parsed.SAP_USERNAME;
   const masterSystem = parsed.SAP_MASTER_SYSTEM;
   return {
     ...(responsible ? { responsible } : {}),
+    ...(login ? { login } : {}),
     ...(masterSystem ? { masterSystem } : {}),
   };
 }

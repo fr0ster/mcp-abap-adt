@@ -161,8 +161,8 @@ export class AuthBrokerFactory implements IAuthBrokerFactory {
   }
 
   /**
-   * The responsible and master system the destination's own `.env` states,
-   * read once per process like its settings. The process environment is not
+   * The responsible, the login and the master system the destination's own
+   * `.env` states, read once per process like its settings. The process environment is not
    * read here: it is the server's fallback, after the destination.
    */
   systemContextFor(destination: string): Promise<DestinationSystemContext> {

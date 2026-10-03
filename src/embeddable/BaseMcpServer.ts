@@ -109,7 +109,9 @@ export abstract class BaseMcpServer extends McpServer {
     // No setup-time lookup and no connection. Per call, in this order: the
     // tool's arguments, the request's headers, the destination's own .env
     // (read here, nothing sent), the process configuration (read here into
-    // the process context), and — in the cloud only — the connected
+    // the process context); for the responsible then the login (the
+    // destination's SAP_USERNAME, x-sap-login, the process SAP_USERNAME);
+    // and — in the cloud only — the connected
     // connection (withResolvedSystemContext). A cloud destination without
     // SAP_CLIENT uses the system's default client.
     this.destinationSystemContext =

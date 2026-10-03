@@ -12,8 +12,14 @@ import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
  * own `.env`. A key the destination does not state is absent.
  */
 export interface DestinationSystemContext {
-  /** `SAP_RESPONSIBLE`, else the destination's own `SAP_USERNAME`. */
+  /** `SAP_RESPONSIBLE`. */
   responsible?: string;
+  /**
+   * The destination's own `SAP_USERNAME` — the login, which is the
+   * responsible only when no `SAP_RESPONSIBLE` is stated anywhere (the
+   * request, the destination, the process).
+   */
+  login?: string;
   /** `SAP_MASTER_SYSTEM`. */
   masterSystem?: string;
 }

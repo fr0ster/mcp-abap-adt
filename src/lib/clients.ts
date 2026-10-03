@@ -12,8 +12,8 @@ let adtClientConnection: AbapConnection | undefined;
 
 /**
  * The AdtClient this server builds: its system context refuses an empty
- * responsible or master system where adt-clients is about to send one
- * (`guardedSystemContext`), so a change is never sent without them.
+ * responsible where adt-clients is about to send one (`guardedSystemContext`),
+ * so a change is never sent without one. An empty master system is left out.
  */
 class GuardedAdtClient extends AdtClient {
   constructor(

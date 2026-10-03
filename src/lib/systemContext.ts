@@ -15,20 +15,28 @@ export interface IAdtSystemContext {
 // (requestContext.ts), never here, so they cannot leak between requests.
 let cached: IAdtSystemContext | undefined;
 
+// The process login (`SAP_USERNAME`), kept apart from `cached.responsible`:
+// it is the responsible only after every stated one — the request's, the
+// destination's, the process's own `SAP_RESPONSIBLE` — and after the
+// request's own login.
+let processLogin: string | undefined;
+
 /**
  * The system context the configuration states — `SAP_MASTER_SYSTEM`,
- * `SAP_RESPONSIBLE` (else `SAP_USERNAME`), `SAP_LANGUAGE` — merged into the
- * process context, or `undefined` when it states none. It fills only what
- * the process context lacks: a value an embedder stated (`setSystemContext`,
- * `systemContext`) survives every request that sets a context up. Sends
- * nothing.
+ * `SAP_RESPONSIBLE`, `SAP_LANGUAGE` — merged into the process context, or
+ * `undefined` when it states none; and `SAP_USERNAME`, the process login, kept
+ * as the last fallback for the responsible (`getEffectiveSystemContext`). It
+ * fills only what the process context lacks: a value an embedder stated
+ * (`setSystemContext`, `systemContext`) survives every request that sets a
+ * context up. Sends nothing.
  */
 export function systemContextFromConfiguration():
   | IAdtSystemContext
   | undefined {
   const masterSystem = process.env.SAP_MASTER_SYSTEM;
-  const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
+  const responsible = process.env.SAP_RESPONSIBLE;
   const masterLanguage = process.env.SAP_LANGUAGE;
+  processLogin = processLogin || process.env.SAP_USERNAME || undefined;
   if (!masterSystem && !responsible && !masterLanguage) return undefined;
   cached = {
     ...cached,
@@ -46,13 +54,22 @@ export function getSystemContext(): IAdtSystemContext {
 /**
  * The system context as the current request sees it.
  *
- * Outside a request scope (stdio) this is the process context. Inside one:
+ * The responsible is always the first of: what is stated (the request scope's
+ * `responsible` — `x-sap-responsible`, the destination's `SAP_RESPONSIBLE` —
+ * then the process context's — `SAP_RESPONSIBLE`, `setSystemContext`), else
+ * the login (the scope's `login` — the destination's `SAP_USERNAME`,
+ * `x-sap-login` — then the process `SAP_USERNAME`). A cloud system fills what
+ * is still empty (`withResolvedSystemContext`); a create that finds none is
+ * refused (`systemContextGuard.ts`).
+ *
+ * Outside a request scope (stdio) the process values apply. Inside one:
  * - `masterLanguage` comes only from the scope (#110): a scope without it does
  *   not inherit the process value.
  * - `responsible` and `masterSystem` come from the scope when the scope carries
- *   the key, an explicit `undefined` included. That lets a host serving several
- *   SAP users from one process give each request its own, where the process
- *   cache would hand every concurrent request whichever user wrote last. A scope
+ *   the key, an explicit `undefined` included — and a scope carrying
+ *   `responsible` also masks the process login. That lets a host serving
+ *   several SAP users from one process give each request its own, where the
+ *   process values would hand every concurrent request the same user. A scope
  *   that does not carry the key keeps the process value, so a host that only
  *   scopes the language keeps the responsible it resolved from its environment
  *   or the system.
@@ -60,11 +77,18 @@ export function getSystemContext(): IAdtSystemContext {
 export function getEffectiveSystemContext(): IAdtSystemContext {
   const ctx = getSystemContext();
   const req = getRequestContext();
-  if (!req) return ctx;
+  if (!req) {
+    const responsible = ctx.responsible || processLogin;
+    return responsible ? { ...ctx, responsible } : ctx;
+  }
+  const responsible =
+    'responsible' in req
+      ? req.responsible || req.login
+      : ctx.responsible || req.login || processLogin;
   return {
     ...ctx,
     masterLanguage: req.masterLanguage,
-    responsible: 'responsible' in req ? req.responsible : ctx.responsible,
+    responsible,
     masterSystem: 'masterSystem' in req ? req.masterSystem : ctx.masterSystem,
   };
 }
@@ -82,6 +106,7 @@ export function setSystemContext(context: Partial<IAdtSystemContext>): void {
 
 export function resetSystemContextCache() {
   cached = undefined;
+  processLogin = undefined;
 }
 
 registerConnectionResetHook(resetSystemContextCache);

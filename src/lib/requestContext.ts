@@ -15,15 +15,24 @@ export interface RequestContext {
   /** Master/original language for created objects (adtcore:masterLanguage), from x-sap-language. */
   masterLanguage?: string;
   /**
-   * Responsible person for created objects (adtcore:responsible), e.g. from
-   * `x-sap-responsible` or the caller's own SAP user. When the key is present —
-   * even as `undefined` — it replaces the process value for this request. When
-   * it is absent, the process value stays.
+   * Responsible person for created objects (adtcore:responsible), as stated:
+   * `x-sap-responsible`, or `SAP_RESPONSIBLE` of the request's destination.
+   * When the key is present — even as `undefined` — it replaces the process
+   * value (and the process login) for this request. When it is absent, the
+   * process value stays.
    */
   responsible?: string;
   /**
+   * The login of this request — the destination's `SAP_USERNAME`, else
+   * `x-sap-login`. The responsible when none is stated: after every
+   * `SAP_RESPONSIBLE` (the process one included), before the process
+   * `SAP_USERNAME`.
+   */
+  login?: string;
+  /**
    * Master system for created objects (adtcore:masterSystem), e.g. from
-   * `x-sap-master-system`. Same presence rule as `responsible`.
+   * `x-sap-master-system`. Same presence rule as `responsible`. When none is
+   * known it is left out of the request.
    */
   masterSystem?: string;
 }
@@ -51,20 +60,23 @@ function headerValue(
 /**
  * The request scope an HTTP/SSE request states in its headers:
  * `x-sap-language` as `masterLanguage` (the key always present, as #110
- * established), and `x-sap-responsible` / `x-sap-master-system` as
- * `responsible` / `masterSystem` — each key present only when its header
- * carries a value, so a request that states none leaves the destination's
- * `.env`, the process configuration and the cloud lookup to fill it.
+ * established), `x-sap-responsible` / `x-sap-master-system` as
+ * `responsible` / `masterSystem`, and `x-sap-login` as `login` — each of
+ * these present only when its header carries a value, so a request that
+ * states none leaves the destination's `.env`, the process configuration and
+ * the cloud lookup to fill it.
  */
 export function requestContextFromHeaders(
   headers: Record<string, string | string[] | undefined>,
 ): RequestContext {
   const responsible = headerValue(headers, 'x-sap-responsible');
   const masterSystem = headerValue(headers, 'x-sap-master-system');
+  const login = headerValue(headers, 'x-sap-login');
   return {
     masterLanguage: headerValue(headers, 'x-sap-language'),
     ...(responsible ? { responsible } : {}),
     ...(masterSystem ? { masterSystem } : {}),
+    ...(login ? { login } : {}),
   };
 }
 

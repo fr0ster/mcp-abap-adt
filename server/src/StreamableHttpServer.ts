@@ -232,7 +232,7 @@ export class StreamableHttpServer extends BaseMcpServer {
 
         await server.connect(transport);
         // Scope what the request states — x-sap-language, x-sap-responsible,
-        // x-sap-master-system — to this request's dispatch, so it cannot
+        // x-sap-master-system, x-sap-login — to this request's dispatch, so it cannot
         // leak into other requests/modes via a process-global cache (#110).
         await runWithRequestContext(
           requestContextFromHeaders(req.headers),

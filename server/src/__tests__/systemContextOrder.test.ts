@@ -1,9 +1,11 @@
 /**
  * Who creates objects (responsible) and on which system (master system), per
- * request, over HTTP and SSE. The order: the request's `x-sap-responsible` /
- * `x-sap-master-system` headers; the destination's own `.env`
- * (`IDestinations.systemContextFor`); the process environment. Each request
- * sees its own values — two concurrent requests never see each other's.
+ * request, over HTTP and SSE. Each its own variable first: the request's
+ * `x-sap-responsible` / `x-sap-master-system` headers; the destination's own
+ * `.env` (`IDestinations.systemContextFor`); the process environment. Then,
+ * for the responsible only, the login: the destination's `SAP_USERNAME`, the
+ * request's `x-sap-login`, the process `SAP_USERNAME`. Each request sees its
+ * own values — two concurrent requests never see each other's.
  */
 
 import type { Server } from 'node:http';
@@ -27,7 +29,10 @@ import {
   type IHandlerGroup,
 } from '@mcp-abap-adt/lib/handlers';
 import express from 'express';
-import { getEffectiveSystemContext } from '../../../src/lib/systemContext';
+import {
+  getEffectiveSystemContext,
+  resetSystemContextCache,
+} from '../../../src/lib/systemContext';
 import { SseServer } from '../SseServer.js';
 import { StreamableHttpServer } from '../StreamableHttpServer.js';
 
@@ -68,6 +73,8 @@ const registry = new CompositeHandlersRegistry([whoAmI]);
 const DESTINATION_CONTEXT: Record<string, DestinationSystemContext> = {
   alpha: { responsible: 'ALPHA_USER', masterSystem: 'ALPHA_SYS' },
   beta: { responsible: 'BETA_USER', masterSystem: 'BETA_SYS' },
+  // A basic destination stating no SAP_RESPONSIBLE: its login.
+  gamma: { login: 'GAMMA_LOGIN' },
   bare: {},
 };
 
@@ -139,6 +146,7 @@ beforeEach(() => {
   }
   process.env.SAP_RESPONSIBLE = 'PROCESS_USER';
   process.env.SAP_MASTER_SYSTEM = 'PROCESS_SYS';
+  resetSystemContextCache();
   errorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 });
 afterEach(async () => {
@@ -251,6 +259,50 @@ describe('StreamableHttpServer: responsible and master system per request', () =
       masterSystem: 'PROCESS_SYS',
     });
   });
+
+  describe('the login, when no SAP_RESPONSIBLE / x-sap-responsible is stated', () => {
+    const direct = {
+      'x-sap-url': 'https://system.example.invalid',
+      'x-sap-login': 'HEADER_LOGIN',
+      'x-sap-password': 'placeholder-password',
+    };
+
+    it("the process SAP_RESPONSIBLE beats the destination's login", async () => {
+      await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
+        responsible: 'PROCESS_USER',
+        masterSystem: 'PROCESS_SYS',
+      });
+    });
+
+    it("the destination's SAP_USERNAME beats the process SAP_USERNAME", async () => {
+      delete process.env.SAP_RESPONSIBLE;
+      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+      await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
+        responsible: 'GAMMA_LOGIN',
+        masterSystem: 'PROCESS_SYS',
+      });
+      // A destination stating no login: the process SAP_USERNAME.
+      await expect(ask({ 'x-mcp-destination': 'bare' })).resolves.toEqual({
+        responsible: 'PROCESS_LOGIN',
+        masterSystem: 'PROCESS_SYS',
+      });
+    });
+
+    it('x-sap-login beats the process SAP_USERNAME; SAP_RESPONSIBLE beats x-sap-login', async () => {
+      process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+      await expect(ask(direct)).resolves.toEqual({
+        responsible: 'PROCESS_USER',
+        masterSystem: 'PROCESS_SYS',
+      });
+      delete process.env.SAP_RESPONSIBLE;
+      delete process.env.SAP_MASTER_SYSTEM;
+      resetSystemContextCache();
+      await expect(ask(direct)).resolves.toEqual({
+        responsible: 'HEADER_LOGIN',
+        masterSystem: null,
+      });
+    });
+  });
 });
 
 describe('SseServer: responsible and master system per session', () => {
@@ -321,6 +373,29 @@ describe('SseServer: responsible and master system per session', () => {
     });
     await expect(ask({})).resolves.toEqual({
       responsible: 'PROCESS_USER',
+      masterSystem: 'PROCESS_SYS',
+    });
+  });
+
+  it("the login: the destination's SAP_USERNAME, x-sap-login, the process SAP_USERNAME", async () => {
+    delete process.env.SAP_RESPONSIBLE;
+    process.env.SAP_USERNAME = 'PROCESS_LOGIN';
+    await expect(ask({ 'x-mcp-destination': 'gamma' })).resolves.toEqual({
+      responsible: 'GAMMA_LOGIN',
+      masterSystem: 'PROCESS_SYS',
+    });
+    await expect(
+      ask({
+        'x-sap-url': 'https://system.example.invalid',
+        'x-sap-login': 'HEADER_LOGIN',
+        'x-sap-password': 'placeholder-password',
+      }),
+    ).resolves.toEqual({
+      responsible: 'HEADER_LOGIN',
+      masterSystem: 'PROCESS_SYS',
+    });
+    await expect(ask({})).resolves.toEqual({
+      responsible: 'PROCESS_LOGIN',
       masterSystem: 'PROCESS_SYS',
     });
   });

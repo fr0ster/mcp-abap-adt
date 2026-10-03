@@ -1,10 +1,15 @@
 /**
- * ADT changes are not made without a responsible person and a master system.
- * An operation that sends them and finds neither — not in the tool's
- * arguments, the request's headers, the destination's .env, the process
- * configuration, nor (cloud only) the system's `systeminformation` — is
- * refused by the server, naming the key to set, and nothing is sent to ADT
- * with an empty value. A read is never refused for them.
+ * The responsible person is always sent; the master system only when known.
+ *
+ * Responsible: its own variable (the tool argument, `x-sap-responsible`,
+ * `SAP_RESPONSIBLE` of the destination then of the process), else the login
+ * (the destination's `SAP_USERNAME`, `x-sap-login`, the process
+ * `SAP_USERNAME`; on a cloud system `systeminformation`'s `userName`). A
+ * create that finds none is refused naming `SAP_RESPONSIBLE`, and nothing is
+ * sent — so no empty `adtcore:responsible=""` ever leaves the server.
+ *
+ * Master system: its own variable, else the cloud system's `systemID`;
+ * otherwise it is left out of the request — never refused.
  */
 jest.mock('@mcp-abap-adt/adt-clients', () => ({
   ...jest.requireActual('@mcp-abap-adt/adt-clients'),
@@ -18,6 +23,7 @@ import {
   handleCreateClass as handleCreateClassLow,
 } from '../../handlers/class/low/handleCreateClass';
 import { handleReadClass } from '../../handlers/class/readonly/handleReadClass';
+import { handleCreateServiceDefinition } from '../../handlers/service_definition/high/handleCreateServiceDefinition';
 import { handleCreateTransport } from '../../handlers/transport/high/handleCreateTransport';
 import type { HandlerEntry } from '../../lib/handlers/interfaces';
 import { CompositeHandlersRegistry } from '../../lib/handlers/registry/CompositeHandlersRegistry';
@@ -25,11 +31,9 @@ import { runWithRequestContext } from '../../lib/requestContext';
 import {
   resetSystemContextCache,
   setSystemContext,
+  systemContextFromConfiguration,
 } from '../../lib/systemContext';
-import {
-  MISSING_MASTER_SYSTEM,
-  MISSING_RESPONSIBLE,
-} from '../../lib/systemContextGuard';
+import { MISSING_RESPONSIBLE } from '../../lib/systemContextGuard';
 import { recordingConnection } from '../helpers/recordingConnection';
 
 const lookup = getSystemInformation as jest.Mock;
@@ -67,17 +71,67 @@ const CLASS_ARGS = {
   package_name: 'ZPACKAGE_PLACEHOLDER',
 };
 
-describe('on-premise, nothing configured', () => {
-  it('a creating tool is refused naming SAP_MASTER_SYSTEM, and nothing is sent', async () => {
-    const connection = recordingConnection();
-    const result = (await handleCreateClassLow(
-      { connection, logger: undefined } as never,
-      CLASS_ARGS,
-    )) as { isError?: boolean };
-    expect(result.isError).toBe(true);
-    expect(textOf(result)).toContain(MISSING_MASTER_SYSTEM);
-    expect(textOf(result)).toContain('SAP_MASTER_SYSTEM');
-    expect(textOf(result)).toContain('x-sap-master-system');
+const createBody = (connection: ReturnType<typeof recordingConnection>) =>
+  String(connection.requests.find((r) => r.method === 'POST')?.data);
+
+const createClass = async () => {
+  const connection = recordingConnection();
+  const result = await handleCreateClassLow(
+    { connection, logger: undefined } as never,
+    CLASS_ARGS,
+  );
+  return { connection, result };
+};
+
+describe('on-premise', () => {
+  it('basic: the login is the responsible, no master system is sent, nothing is refused', async () => {
+    process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+    systemContextFromConfiguration();
+    const { connection, result } = await createClass();
+    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="LOGIN_PLACEHOLDER"',
+    );
+    expect(createBody(connection)).not.toContain('adtcore:masterSystem');
+  });
+
+  it('SAP_RESPONSIBLE beats the login', async () => {
+    process.env.SAP_USERNAME = 'LOGIN_PLACEHOLDER';
+    process.env.SAP_RESPONSIBLE = 'RESPONSIBLE_PLACEHOLDER';
+    systemContextFromConfiguration();
+    const { connection } = await createClass();
+    expect(createBody(connection)).toContain(
+      'adtcore:responsible="RESPONSIBLE_PLACEHOLDER"',
+    );
+  });
+
+  it('a stated master system is sent; none stated is left out, never refused', async () => {
+    setSystemContext({
+      masterSystem: 'SYSTEM_PLACEHOLDER',
+      responsible: 'USER_PLACEHOLDER',
+    });
+    const stated = await createClass();
+    expect(createBody(stated.connection)).toContain(
+      'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
+    );
+
+    resetSystemContextCache();
+    setSystemContext({ responsible: 'USER_PLACEHOLDER' });
+    const unstated = await createClass();
+    expect(textOf(unstated.result)).not.toContain(MISSING_RESPONSIBLE);
+    expect(createBody(unstated.connection)).toContain(
+      'adtcore:responsible="USER_PLACEHOLDER"',
+    );
+    expect(createBody(unstated.connection)).not.toContain(
+      'adtcore:masterSystem',
+    );
+  });
+
+  it('SNC / a handed-over token with nothing stated: refused naming SAP_RESPONSIBLE, nothing sent', async () => {
+    const { connection, result } = await createClass();
+    expect((result as { isError?: boolean }).isError).toBe(true);
+    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
+    expect(textOf(result)).toContain('SAP_RESPONSIBLE');
     // The server's own refusal, not a claim about the connection.
     expect(JSON.parse(textOf(result))).toMatchObject({
       error: 'system_context_missing',
@@ -86,17 +140,20 @@ describe('on-premise, nothing configured', () => {
     expect(connection.requests).toEqual([]);
   });
 
-  it('with the master system only: refused naming SAP_RESPONSIBLE, nothing sent', async () => {
-    setSystemContext({ masterSystem: 'SYSTEM_PLACEHOLDER' });
+  it('a service definition (whose builder would send responsible="") is refused, no empty attribute sent', async () => {
     const connection = recordingConnection();
-    const result = await handleCreateClassLow(
+    const result = await handleCreateServiceDefinition(
       { connection, logger: undefined } as never,
-      CLASS_ARGS,
+      {
+        service_definition_name: 'ZSD_PLACEHOLDER',
+        package_name: 'ZPACKAGE_PLACEHOLDER',
+      },
     );
     expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
-    expect(textOf(result)).toContain('SAP_RESPONSIBLE');
-    expect(textOf(result)).toContain('x-sap-responsible');
-    expect(connection.requests).toEqual([]);
+    for (const request of connection.requests) {
+      expect(String(request.data)).not.toContain('adtcore:responsible=""');
+    }
+    expect(connection.requests.filter((r) => r.method === 'POST')).toEqual([]);
   });
 
   it('a transport without an owner is refused naming SAP_RESPONSIBLE; the owner argument is enough', async () => {
@@ -108,7 +165,6 @@ describe('on-premise, nothing configured', () => {
     expect(textOf(refused)).toContain(MISSING_RESPONSIBLE);
     expect(refusedConnection.requests).toEqual([]);
 
-    // The tool's own argument comes first: nothing else is needed.
     const sentConnection = recordingConnection();
     await handleCreateTransport(
       { connection: sentConnection, logger: undefined } as never,
@@ -120,32 +176,12 @@ describe('on-premise, nothing configured', () => {
     );
   });
 
-  it('with both configured, the create is sent carrying them', async () => {
-    setSystemContext({
-      masterSystem: 'SYSTEM_PLACEHOLDER',
-      responsible: 'USER_PLACEHOLDER',
-    });
-    const connection = recordingConnection();
-    await handleCreateClassLow(
-      { connection, logger: undefined } as never,
-      CLASS_ARGS,
-    );
-    const create = connection.requests.find((r) => r.method === 'POST');
-    expect(String(create?.data)).toContain(
-      'adtcore:masterSystem="SYSTEM_PLACEHOLDER"',
-    );
-    expect(String(create?.data)).toContain(
-      'adtcore:responsible="USER_PLACEHOLDER"',
-    );
-  });
-
   it('a read-only tool is not refused', async () => {
     const connection = recordingConnection();
     const result = await handleReadClass(
       { connection, logger: undefined } as never,
       { class_name: 'ZCL_PLACEHOLDER' },
     );
-    expect(textOf(result)).not.toContain(MISSING_MASTER_SYSTEM);
     expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
     expect(connection.requests.length).toBeGreaterThan(0);
   });
@@ -164,16 +200,8 @@ describe('cloud', () => {
       ],
     },
   ]);
-
-  it('systeminformation fills both, and the create carries them', async () => {
-    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
-    const connection = recordingConnection();
-    const server = new EmbeddableMcpServer({
-      connection: connection as never,
-      handlersRegistry: registry,
-      systemType: 'cloud',
-    });
-    const tools = (
+  const toolsOf = (server: EmbeddableMcpServer) =>
+    (
       server as unknown as {
         _registeredTools: Record<
           string,
@@ -181,12 +209,20 @@ describe('cloud', () => {
         >;
       }
     )._registeredTools;
-    const result = await tools.CreateClassLow.handler(CLASS_ARGS);
+
+  it('nothing stated: both from systeminformation, and the create carries them', async () => {
+    lookup.mockResolvedValue({ systemID: 'CLD', userName: 'CB_USER' });
+    const connection = recordingConnection();
+    const server = new EmbeddableMcpServer({
+      connection: connection as never,
+      handlersRegistry: registry,
+      systemType: 'cloud',
+    });
+    const result = await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
     expect(lookup).toHaveBeenCalledTimes(1);
-    expect(textOf(result)).not.toContain(MISSING_MASTER_SYSTEM);
-    const create = connection.requests.find((r) => r.method === 'POST');
-    expect(String(create?.data)).toContain('adtcore:masterSystem="CLD"');
-    expect(String(create?.data)).toContain('adtcore:responsible="CB_USER"');
+    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
+    expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
+    expect(createBody(connection)).toContain('adtcore:responsible="CB_USER"');
   });
 
   it.each([
@@ -202,26 +238,19 @@ describe('cloud', () => {
         handlersRegistry: registry,
         systemType,
       });
-      const tools = (
-        server as unknown as {
-          _registeredTools: Record<
-            string,
-            { handler: (a: unknown) => Promise<unknown> }
-          >;
-        }
-      )._registeredTools;
       const result = await runWithRequestContext(
         { responsible: undefined, masterSystem: undefined },
-        () => tools.CreateClassLow.handler(CLASS_ARGS),
+        () => toolsOf(server).CreateClassLow.handler(CLASS_ARGS),
       );
       if (filled) {
         expect(lookup).toHaveBeenCalledTimes(1);
-        const create = connection.requests.find((r) => r.method === 'POST');
-        expect(String(create?.data)).toContain('adtcore:masterSystem="CLD"');
-        expect(String(create?.data)).toContain('adtcore:responsible="CB_USER"');
+        expect(createBody(connection)).toContain('adtcore:masterSystem="CLD"');
+        expect(createBody(connection)).toContain(
+          'adtcore:responsible="CB_USER"',
+        );
       } else {
         expect(lookup).not.toHaveBeenCalled();
-        expect(textOf(result)).toContain(MISSING_MASTER_SYSTEM);
+        expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
         expect(connection.requests).toEqual([]);
       }
     },
@@ -235,16 +264,8 @@ describe('cloud', () => {
       handlersRegistry: registry,
       systemType: 'cloud',
     });
-    const tools = (
-      server as unknown as {
-        _registeredTools: Record<
-          string,
-          { handler: (a: unknown) => Promise<unknown> }
-        >;
-      }
-    )._registeredTools;
-    const result = await tools.CreateClassLow.handler(CLASS_ARGS);
-    expect(textOf(result)).toContain(MISSING_MASTER_SYSTEM);
+    const result = await toolsOf(server).CreateClassLow.handler(CLASS_ARGS);
+    expect(textOf(result)).toContain(MISSING_RESPONSIBLE);
     expect(connection.requests).toEqual([]);
   });
 });

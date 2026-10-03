@@ -4,8 +4,8 @@
  *
  * An embedding host that serves several SAP users from one process scopes the
  * responsible person and master system per request (`runWithRequestContext`).
- * On-premise they come from the caller's request or the configuration, and
- * nothing is sent. For an ABAP Cloud system the host often does not know them,
+ * On-premise they come from the caller's request, the configuration or the
+ * login, and nothing is sent to find them. For an ABAP Cloud system the host often does not know them,
  * and the process-wide context holds one user for the whole process. So a
  * cloud request that does not carry them gets them here, from the system,
  * inside the library — no host has to repeat the lookup or import adt-clients
@@ -115,26 +115,32 @@ function resolveOnce(
 }
 
 /**
- * Run `fn` with the responsible person and master system a destination's own
- * `.env` states, for the keys the request scope does not carry: the request's
- * headers win over the destination, and the destination over the process
- * configuration (which a key left absent falls back to). Per call, in the
- * request scope — never the process cache — so concurrent requests to
- * different destinations cannot see each other's values.
+ * Run `fn` with the responsible person, login and master system a
+ * destination's own `.env` states. `SAP_RESPONSIBLE` and `SAP_MASTER_SYSTEM`
+ * enter for the keys the request scope does not carry: the request's headers
+ * win over the destination, and the destination over the process
+ * configuration (which a key left absent falls back to). The destination's
+ * `SAP_USERNAME` enters as the login, ahead of the request's `x-sap-login`.
+ * Per call, in the request scope — never the process cache — so concurrent
+ * requests to different destinations cannot see each other's values.
  */
 export function withDestinationSystemContext<T>(
-  stated: { responsible?: string; masterSystem?: string } | undefined,
+  stated:
+    | { responsible?: string; login?: string; masterSystem?: string }
+    | undefined,
   fn: () => T,
 ): T {
   const scope = getRequestContext();
-  const added: { responsible?: string; masterSystem?: string } = {};
+  const added: { responsible?: string; login?: string; masterSystem?: string } =
+    {};
   if (stated?.responsible && !(scope && 'responsible' in scope)) {
     added.responsible = stated.responsible;
   }
   if (stated?.masterSystem && !(scope && 'masterSystem' in scope)) {
     added.masterSystem = stated.masterSystem;
   }
-  if (!added.responsible && !added.masterSystem) return fn();
+  if (stated?.login) added.login = stated.login;
+  if (!added.responsible && !added.masterSystem && !added.login) return fn();
   return runWithRequestContext(
     {
       ...scope,

@@ -31,6 +31,12 @@ option, no documentation, no test. Whatever the broker does with it — build
 it, or refuse it with a `DestinationConfigError` naming what is missing — the
 server passes on unchanged; it adds no code to allow or to forbid it.
 
+This is **this server's** choice, not a rule for the family. When an ABAP
+system the server must reach authorizes another way, that way is added here
+— a row in the table and whatever collaborator it needs — in its own change.
+The proxy and calm-server have requirements of their own and decide their
+scope themselves; nothing here binds them.
+
 Dependencies after the change: `auth-broker` ^4, `auth-providers` ^5,
 `auth-stores` ^3.2.0 (from ^1 — two majors), `connection` ^10,
 `interfaces-auth` ^3 (from ^2.1 — `IAuthProvider`, which broker 4,
@@ -185,7 +191,9 @@ stated, which the XSUAA fallback below relies on.
   `--grant` option for service keys goes with them (proposed, then dropped,
   2026-10-03).
 - Renewing SAML cookies without the user (owed item 3).
-- `mcp-abap-adt-proxy` and `mcp-calm-server` (owed item 2).
+- `mcp-abap-adt-proxy` and `mcp-calm-server` (owed item 2): out of scope,
+  with requirements of their own — this goal's scope does not carry over to
+  them.
 - `scripts/*.ts`, which import `createAbapConnection` from `connection` — gone
   since connection 6, broken before this change.
 

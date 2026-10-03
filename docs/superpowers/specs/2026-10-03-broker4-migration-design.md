@@ -63,7 +63,8 @@ createAbapConnection(
 
 Exactly three, each its own function, none inside the connector construction:
 
-1. **A destination** — `await broker.getProvider(destination)` (section 3).
+1. **A destination** — `await factory.getProvider(destination)`: the
+   broker's `getProvider`, counted (section 3).
 2. **Request headers** — `credentialFromHeaders(headers)` (section 4):
    `x-sap-jwt-token` → `TokenAuthProvider.fixed(token)`;
    `x-sap-login` + `x-sap-password` → `new BasicAuthProvider(user, password)`.
@@ -100,10 +101,29 @@ class AuthBrokerFactory {
   readonly defaultDestination: string | undefined;
   /** One broker per destination, built on first use, then cached. */
   getBroker(destination: string): Promise<AuthBroker>;
-  /** flush() every broker built; rejects naming the destinations that failed. */
-  flush(): Promise<void>;
+  /** The connector's settings: URL, client, auth type, connection type — no secret. */
+  settingsFor(destination: string): Promise<SapConfig>;
+  /** The destination's provider, counted while it works (see below). */
+  getProvider(destination: string): Promise<IAuthProvider>;
+  /**
+   * Waits for every provider call in progress — a login, a refresh — up to
+   * `deadlineMs`, then flush()es every broker built; rejects naming the
+   * destinations whose secret is not stored.
+   */
+  settle(deadlineMs: number): Promise<SettleReport>;
 }
 ```
+
+**Work in progress is counted at the provider.** `getProvider` hands out the
+broker's provider behind a thin wrapper that forwards each of the four calls
+(`prepare`, `establish`, `authorize`, `rejected`) unchanged and counts the
+ones not yet answered. A renewal happens inside one of those calls and its
+`onTokens` write is submitted before the call answers (broker 4), so once the
+count is zero every renewal has reached the broker's writer, and `flush()`
+covers it. The wrapper changes nothing a call returns or throws, and it is the
+same object for every connection of the destination (section 2's sibling rule
+holds). `settle` answers `{ abandoned: number }` — the calls still running at
+the deadline — besides `flush()`'s outcome.
 
 `IAuthBrokerFactoryConfig`: `envFilePath?`, `mcpDestination?`,
 `authBrokerPath?`, `unsafe`, `browser`, `browserAuthPort?`, `logger?`.
@@ -164,6 +184,15 @@ new AuthBroker(
 );
 ```
 
+- **One interactive login at a time, across destinations.** Every
+  strategy's callback listens on the same port, so two first logins — `X`
+  and `Y` over HTTP with `x-mcp-destination` — would race for it and one
+  would fail on a busy port. The factory holds one lock for the process:
+  the strategy `authorization` returns runs `authorize()` under it, and a
+  second login waits for the first to settle. A settled login has released
+  the port (auth-providers' callback scope settles only once the socket is
+  free), so the next one binds it. The per-destination lock of section 4
+  stays: it keeps one destination from starting two logins at all.
 - One collaborator (H2). `browser` is `--browser` / `MCP_BROWSER` / YAML
   `browser`, default `system`; `port` is `--browser-auth-port`, default the
   library's `61001` (today's random 30000–39999 port in
@@ -197,7 +226,7 @@ a new authentication is a new provider from the broker, not a new source.
 ### The URL a connector needs
 
 `getProvider` does not require `serviceUrl`; a connector does. Before the
-first connect, `settingsFor(destination)` reads `broker.getConnectionConfig`
+first connect, `factory.settingsFor(destination)` reads `getConnectionConfig`
 and refuses a destination without `serviceUrl` with a `DestinationConfigError`
 naming the key the user must set: `SAP_URL` (an ABAP destination or an
 `--env` file) or `XSUAA_MCP_URL` (an XSUAA key). `settings` is
@@ -206,9 +235,12 @@ password, no token (H4).
 
 ## 4. `BaseMcpServer` and the transports
 
-- **`setConnectionContext(destination, broker)`** — same name, `AuthBroker`
-  of broker 4. It reads `settingsFor(destination)` (section 3), then
-  `credential = await broker.getProvider(destination)`. No `getToken`, no
+- **`setConnectionContext(destination, destinations)`** — same name; the
+  second argument is no longer an `AuthBroker` but the factory, through a
+  small interface it implements (`IDestinations`: `settingsFor`,
+  `getProvider`), so every provider a connection holds is the counted one.
+  It reads `settingsFor(destination)` (section 3), then
+  `credential = await destinations.getProvider(destination)`. No `getToken`, no
   `authType` branch, no `connectionParams` per auth type (H0, H1). The
   temporary connection that resolves the master system is built the same way.
 - **`setConnectionContextFromHeaders(headers)`** — `x-sap-url` (+
@@ -223,13 +255,13 @@ password, no token (H4).
   Stdio keeps its cached connection; HTTP and SSE keep a connection per
   request or session, now sharing the provider the broker caches per
   destination, so a token obtained once serves every request.
-- **HTTP / SSE**: `authBrokerFactory.getBroker(destination)` in place of
-  `getOrCreateAuthBroker`; a failure answers the request with the error's
+- **HTTP / SSE**: the factory itself in place of
+  `getOrCreateAuthBroker(destination)`; a failure answers the request with the error's
   words (a `DestinationConfigError` names the destination and fields) instead
   of "Auth broker not initialized". The per-destination lock around the first
   connect stays: it serialises the first login.
-- **stdio**: `--mcp=X` → `getBroker('X')`; an `--env` file → `getBroker
-  ('default')`; one broker either way (goal). Inspection-only mode (no
+- **stdio**: `--mcp=X` → destination `X`; an `--env` file → `default`; one
+  broker either way (goal). Inspection-only mode (no
   destination) keeps its mock, minus the `getToken` stub.
 - **Startup summary** (`launcher.ts`): read through `getConnectionConfig`
   and `getAuthorizationConfig` — no `(broker as any).sessionStore`. The mask
@@ -283,12 +315,20 @@ the library, so an embedder's process is never taken over:
 - **Triggers:** `SIGTERM`, `SIGINT`, and — for stdio — the transport closing
   (stdin ends: the client went away).
 - **Once:** the first trigger runs it; later ones wait for it.
-- **What it does:** `await factory.flush()`. Resolved → exit `0`. Rejected →
-  one stderr line, `[MCP] Session secrets not stored: "X": StorageError` (the
-  `AggregateError`'s entries, which name the destination and an error class
-  only — broker 4), and exit `1`. Nothing is written to stdout (H3).
-- HTTP and SSE servers are not drained first: an in-flight request may be cut,
-  as today.
+- **What it does, in order:**
+  1. stop taking work: HTTP and SSE servers stop accepting connections
+     (`close()`); stdio has no more input;
+  2. `await factory.settle(30_000)` — every login or refresh in progress
+     answers first, so a token it obtains is submitted before the flush.
+     30 s is the callback strategy's login timeout: a login waiting on a
+     browser ends by then either way;
+  3. exit `0` when everything is stored and nothing was abandoned. Otherwise
+     one stderr line per fact — `[MCP] Session secrets not stored: "X":
+     StorageError` (the `AggregateError`'s entries: destination and error
+     class only — broker 4), `[MCP] 1 authorization still running at
+     shutdown, its result is lost` — and exit `1`. Nothing on stdout (H3).
+- A request that is not a provider call (a tool's ADT request in flight) is
+  not waited for: it may be cut, as today.
 
 ## 8. Errors and messages (H1, H4)
 
@@ -359,7 +399,9 @@ proven load-bearing by breaking the rule and watching it fail.
 | SNC on HTTP: refused naming `connection-type` | goal |
 | parameter table: every row's CLI, env and YAML forms yield the same config; precedence CLI > env > YAML; the generated template lists every row | H7 |
 | `--browser` reaches `browserCallbackStrategy` | goal |
-| shutdown: a trigger calls `flush()` once; a rejection prints the destinations and classes and exits `1`; nothing on stdout | H3, H5 |
+| shutdown: a trigger settles once; a rejection prints the destinations and classes and exits `1`; nothing on stdout | H3, H5 |
+| shutdown during a refresh held open by the test: the refresh answers, its token is in the session store, then the process exits `0`; with the refresh held past the deadline, exit `1` naming one abandoned call | H5 |
+| two destinations' first logins at once: the second `authorize()` starts only after the first settles, and both bind the one port | goal |
 | an `--env` file: a renewed token is written back, other lines untouched | H5 |
 | `DeletePackage` schema has no `connection_config` | H0 |
 

@@ -21,10 +21,10 @@ JWT, or SNC — nothing else is in view. So the server supports exactly four:
 
 | Destination states | Comes from | The server supplies |
 |---|---|---|
-| `basic`, over HTTP or RFC | an `.env` file, `x-sap-login` / `x-sap-password` | nothing — the broker builds it |
+| `basic`, over HTTP or RFC | an `.env` file; `x-sap-login` / `x-sap-password` | nothing for a file — the broker builds it; for the headers, `BasicAuthProvider` |
 | `snc`, over RFC | an `.env` file with `SAP_SNC_*` | nothing; an HTTP connection is refused |
 | `jwt` / `authorization_code` | an ABAP or XSUAA service key, an `.env` file | the browser strategy (`--browser`, `--browser-auth-port`) |
-| `jwt` / `none` | a token in an `.env` file, `x-sap-jwt-token` | nothing |
+| `jwt` / `none` | a token in an `.env` file; `x-sap-jwt-token` | nothing for a file; for the header, `TokenAuthProvider.fixed` |
 
 Another grant a file may state is not supported: no collaborator for it, no
 option, no documentation, no test. Whatever the broker does with it — build

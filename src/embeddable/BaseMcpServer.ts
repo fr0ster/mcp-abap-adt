@@ -16,6 +16,7 @@ import {
   type SystemContextResolver,
   withResolvedSystemContext,
 } from '../lib/requestSystemResolution.js';
+import { systemContextFromConfiguration } from '../lib/systemContext.js';
 import {
   normalizeToolContent,
   type ToolResultLike,
@@ -90,10 +91,12 @@ export abstract class BaseMcpServer extends McpServer {
     const credential = await destinations.getProvider(destination);
     const connectionParams: SapConfig = { ...settings };
 
-    // No setup-time lookup: the master system and responsible come from the
-    // call or the configuration, else per call on the connected connection
+    // No setup-time lookup and no connection: the master system and
+    // responsible come from the configuration (read here, nothing sent), the
+    // call, or — in the cloud only — per call on the connected connection
     // (withResolvedSystemContext). A cloud destination without SAP_CLIENT
     // uses the system's default client.
+    systemContextFromConfiguration();
     this.connectionContext = {
       sessionId: destination,
       connectionParams,

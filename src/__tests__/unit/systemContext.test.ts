@@ -1,3 +1,5 @@
+import type { SapConfig } from '@mcp-abap-adt/connection';
+import { createAbapConnection } from '../../lib/connectionFactory';
 import {
   getSystemContext,
   resetSystemContextCache,
@@ -16,6 +18,20 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 const mockConnection = {
   makeAdtRequest: jest.fn(),
 } as any;
+
+const credential = {
+  kind: 'test',
+  prepare: async () => ({ ok: true as const }),
+  establish: async () => ({ ok: true as const }),
+  authorize: async () => ({ ok: true as const }),
+  rejected: async () => ({ ok: true as const }),
+};
+/** Built by the factory: the kind is the one it was built for, never the URL's. */
+const built = (authType: string) =>
+  createAbapConnection(
+    { url: 'https://system.example.invalid', authType } as SapConfig,
+    credential,
+  );
 
 describe('resolveSystemContext', () => {
   const originalEnv = process.env;
@@ -134,6 +150,45 @@ describe('resolveSystemContext', () => {
     });
 
     expect(result.masterSystem).toBe('OVERRIDE');
+  });
+
+  describe('the master system comes from configuration, or by a request in the cloud', () => {
+    beforeEach(() => {
+      mockGetSystemInformation.mockReset();
+      mockGetSystemInformation.mockResolvedValue({
+        systemID: 'SYSTEM_FROM_REQUEST',
+        userName: 'USER_FROM_REQUEST',
+      });
+    });
+
+    it('on-premise with an https URL without a port: no request', async () => {
+      const result = await resolveSystemContext(built('basic'));
+      expect(mockGetSystemInformation).not.toHaveBeenCalled();
+      expect(result.masterSystem).toBeUndefined();
+      expect(result.responsible).toBeUndefined();
+    });
+
+    it('cloud: the system is asked', async () => {
+      const result = await resolveSystemContext(built('jwt'));
+      expect(mockGetSystemInformation).toHaveBeenCalledTimes(1);
+      expect(result.masterSystem).toBe('SYSTEM_FROM_REQUEST');
+      expect(result.responsible).toBe('USER_FROM_REQUEST');
+    });
+
+    it('cloud with SAP_MASTER_SYSTEM: the configuration wins, no request', async () => {
+      process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_CONFIG';
+      const result = await resolveSystemContext(built('jwt'));
+      expect(mockGetSystemInformation).not.toHaveBeenCalled();
+      expect(result.masterSystem).toBe('SYSTEM_FROM_CONFIG');
+    });
+
+    it('a connection the factory did not build: SAP_SYSTEM_TYPE alone decides', async () => {
+      await resolveSystemContext(mockConnection);
+      expect(mockGetSystemInformation).not.toHaveBeenCalled();
+      process.env.SAP_SYSTEM_TYPE = 'cloud';
+      await resolveSystemContext(mockConnection);
+      expect(mockGetSystemInformation).toHaveBeenCalledTimes(1);
+    });
   });
 
   /**

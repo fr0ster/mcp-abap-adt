@@ -2,6 +2,7 @@ import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import { AuthRefusedError } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { registerConnectionResetHook } from './connectionEvents';
+import { systemKindOf } from './connectionFactory';
 import { getRequestContext } from './requestContext';
 
 export interface IAdtSystemContext {
@@ -43,17 +44,18 @@ export async function resolveSystemContext(
 
   if (cached) return cached;
 
-  // Priority 2: env vars (on-prem or explicitly configured)
-  const masterSystem = process.env.SAP_MASTER_SYSTEM;
-  const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
-  const masterLanguage = process.env.SAP_LANGUAGE;
+  // Priority 2: the configuration.
+  const configured = systemContextFromConfiguration();
+  if (configured) return configured;
 
-  if (masterSystem || responsible || masterLanguage) {
-    cached = { masterSystem, responsible, masterLanguage };
-    return cached;
+  // The master system is determined from configuration, or by a request in
+  // the cloud — there is no other way. On-premise nothing is sent.
+  const masterLanguage = process.env.SAP_LANGUAGE;
+  if (systemKindOf(connection) !== 'cloud') {
+    return masterLanguage ? { masterLanguage } : {};
   }
 
-  // Cloud: try getSystemInformation API. Only an answer is cached: a lookup
+  // Cloud: the getSystemInformation API. Only an answer is cached: a lookup
   // that failed caches nothing, so the next caller asks again instead of the
   // process keeping a partial context. A refused credential is the caller's
   // to answer, never a context.
@@ -70,6 +72,22 @@ export async function resolveSystemContext(
     if (error instanceof AuthRefusedError) throw error;
     return masterLanguage ? { masterLanguage } : {};
   }
+}
+
+/**
+ * The system context the configuration states — `SAP_MASTER_SYSTEM`,
+ * `SAP_RESPONSIBLE` (else `SAP_USERNAME`), `SAP_LANGUAGE` — cached for the
+ * process, or `undefined` when it states none. Sends nothing.
+ */
+export function systemContextFromConfiguration():
+  | IAdtSystemContext
+  | undefined {
+  const masterSystem = process.env.SAP_MASTER_SYSTEM;
+  const responsible = process.env.SAP_RESPONSIBLE || process.env.SAP_USERNAME;
+  const masterLanguage = process.env.SAP_LANGUAGE;
+  if (!masterSystem && !responsible && !masterLanguage) return undefined;
+  cached = { masterSystem, responsible, masterLanguage };
+  return cached;
 }
 
 export function getSystemContext(): IAdtSystemContext {

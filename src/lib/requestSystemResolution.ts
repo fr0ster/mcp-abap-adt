@@ -4,11 +4,12 @@
  *
  * An embedding host that serves several SAP users from one process scopes the
  * responsible person and master system per request (`runWithRequestContext`).
- * On-premise it knows them from the caller's request. For an ABAP Cloud system
- * it often does not, and the process-wide cache that `resolveSystemContext`
- * fills at server init holds one user for the whole process. So a request that
- * does not carry them gets them here, from the system, inside the library —
- * no host has to repeat the lookup or import adt-clients itself.
+ * On-premise they come from the caller's request or the configuration, and
+ * nothing is sent. For an ABAP Cloud system the host often does not know them,
+ * and the process-wide context holds one user for the whole process. So a
+ * cloud request that does not carry them gets them here, from the system,
+ * inside the library — no host has to repeat the lookup or import adt-clients
+ * itself.
  *
  * Resolution is keyed by the connection object: one connection belongs to one
  * user on one system, so its answer is the same for every request on it and
@@ -20,6 +21,7 @@
  */
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import { systemKindOf } from './connectionFactory';
 import { logger } from './logger';
 import { getRequestContext, runWithRequestContext } from './requestContext';
 import { getEffectiveSystemContext } from './systemContext';
@@ -36,42 +38,19 @@ export type SystemContextResolver = (
 ) => Promise<ResolvedSystemContext>;
 
 /**
- * Whether the connection points at an ABAP Cloud system.
- *
- * The same rule as adt-clients' `isCloudEnvironment`, which the package does
- * not export from any entry point: a `*.hana.ondemand.com` URL is cloud; plain
- * `http` with an explicit port is on-premise; anything else is decided by
- * whether the system answers `systeminformation`. Kept here so that last case
- * reuses the one lookup instead of making it twice.
- */
-async function urlVerdict(
-  connection: IAbapConnection,
-): Promise<boolean | undefined> {
-  try {
-    const baseUrl = await connection.getBaseUrl();
-    if (!baseUrl) return undefined;
-    if (/\.hana\.ondemand\.com/i.test(baseUrl)) return true;
-    try {
-      const parsed = new URL(baseUrl);
-      if (parsed.protocol === 'http:' && parsed.port) return false;
-    } catch {
-      // Not a parsable URL: let the system decide.
-    }
-  } catch {
-    // No base URL: let the system decide.
-  }
-  return undefined;
-}
-
-/**
- * Default resolver: `null` on-premise; on ABAP Cloud the system's own
+ * Default resolver. The master system is determined from configuration, or by
+ * a request in the cloud — there is no other way. On-premise it sends nothing
+ * and answers `null` (configuration, the request scope or the tool arguments
+ * supply the values); on ABAP Cloud it asks the system's own
  * `systeminformation` — the user name as responsible, the system id as master
- * system — or `null` when the system gives none.
+ * system — or answers `null` when the system gives none. Which of the two is
+ * the kind the connection was built for (`systemKindOf`), never a guess from
+ * its URL.
  */
 export const defaultSystemContextResolver: SystemContextResolver = async (
   connection,
 ) => {
-  if ((await urlVerdict(connection)) === false) return null;
+  if (systemKindOf(connection) !== 'cloud') return null;
   const info = await getSystemInformation(connection);
   if (!info) return null;
   return { responsible: info.userName, masterSystem: info.systemID };

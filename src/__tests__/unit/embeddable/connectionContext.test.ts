@@ -28,7 +28,11 @@ import type { ConnectionContext } from '../../../embeddable/ConnectionContext';
 import type { IDestinations } from '../../../lib/auth';
 import { createAbapConnection } from '../../../lib/connectionFactory';
 import { credentialFromHeaders } from '../../../lib/credentialSources';
-import { resolveSystemContext } from '../../../lib/systemContext';
+import {
+  getSystemContext,
+  resetSystemContextCache,
+  resolveSystemContext,
+} from '../../../lib/systemContext';
 
 const build = createAbapConnection as jest.MockedFunction<
   typeof createAbapConnection
@@ -145,6 +149,25 @@ describe('setConnectionContext(destination, destinations)', () => {
     expect(build).not.toHaveBeenCalled();
     expect(resolve).not.toHaveBeenCalled();
     expect(provider.prepare).not.toHaveBeenCalled();
+  });
+
+  it('the master system and responsible from configuration reach the context, with no connection', async () => {
+    const saved = { ...process.env };
+    try {
+      resetSystemContextCache();
+      process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_CONFIG';
+      process.env.SAP_RESPONSIBLE = 'USER_FROM_CONFIG';
+      const server = new TestServer();
+      await server.fromDestination('dest-a', stubDestinations(fakeProvider()));
+      expect(getSystemContext()).toMatchObject({
+        masterSystem: 'SYSTEM_FROM_CONFIG',
+        responsible: 'USER_FROM_CONFIG',
+      });
+      expect(build).not.toHaveBeenCalled();
+    } finally {
+      process.env = saved;
+      resetSystemContextCache();
+    }
   });
 
   it('a client the settings do not state stays unstated (the system default applies)', async () => {

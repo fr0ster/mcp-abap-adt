@@ -13,11 +13,14 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 }));
 
 import { AdtClient, getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../handlers/interfaces';
 import { createAdtClient } from '../../lib/clients';
+import { createAbapConnection } from '../../lib/connectionFactory';
 import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type {
@@ -40,16 +43,35 @@ import {
 
 const lookup = getSystemInformation as jest.Mock;
 
-function cloudConn(): IAbapConnection {
-  return {
-    getBaseUrl: async () => 'https://my-abap.abap.eu10.hana.ondemand.com',
-  } as unknown as IAbapConnection;
+const credential: IAuthProvider = {
+  kind: 'test',
+  prepare: async () => ({ ok: true as const }),
+  establish: async () => ({ ok: true as const }),
+  authorize: async () => ({ ok: true as const }),
+  rejected: async () => ({ ok: true as const }),
+};
+
+/**
+ * Connections built by the factory, so the system kind is the one they were
+ * built for: a jwt is cloud, anything else on-premise, SAP_SYSTEM_TYPE wins.
+ * The URL decides nothing.
+ */
+function built(settings: Partial<SapConfig>): IAbapConnection {
+  return createAbapConnection(settings as SapConfig, credential);
 }
 
+function cloudConn(): IAbapConnection {
+  return built({ url: 'https://system.example.invalid', authType: 'jwt' });
+}
+
+/** An https URL without a port: a URL guess could not call it on-premise. */
 function onPremConn(): IAbapConnection {
-  return {
-    getBaseUrl: async () => 'http://sap.example.com:8000',
-  } as unknown as IAbapConnection;
+  return built({ url: 'https://system.example.invalid', authType: 'basic' });
+}
+
+/** A connection the factory did not build (an embedder's own). */
+function foreignConn(url: string): IAbapConnection {
+  return { getBaseUrl: async () => url } as unknown as IAbapConnection;
 }
 
 type Options =
@@ -69,7 +91,14 @@ function seen() {
   };
 }
 
+const savedSystemType = process.env.SAP_SYSTEM_TYPE;
+afterEach(() => {
+  if (savedSystemType === undefined) delete process.env.SAP_SYSTEM_TYPE;
+  else process.env.SAP_SYSTEM_TYPE = savedSystemType;
+});
+
 beforeEach(() => {
+  delete process.env.SAP_SYSTEM_TYPE;
   resetSystemContextCache();
   setSystemContext({});
   (AdtClient as jest.Mock).mockClear();
@@ -85,12 +114,44 @@ describe('defaultSystemContextResolver', () => {
     });
   });
 
-  it('returns null on-premise without asking the system', async () => {
+  it('returns null on-premise without asking the system, whatever the URL', async () => {
     await expect(defaultSystemContextResolver(onPremConn())).resolves.toBe(
       null,
     );
+    await expect(
+      defaultSystemContextResolver(
+        built({
+          url: 'https://system.abap.example.hana.ondemand.com',
+          authType: 'basic',
+        }),
+      ),
+    ).resolves.toBe(null);
     expect(lookup).not.toHaveBeenCalled();
   });
+
+  it('SAP_SYSTEM_TYPE states the kind: a jwt on-premise is not asked', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
+    await expect(defaultSystemContextResolver(cloudConn())).resolves.toBe(null);
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['https://system.abap.example.hana.ondemand.com'],
+    ['https://system.example.invalid'],
+  ])(
+    'a connection the factory did not build: SAP_SYSTEM_TYPE alone, never the URL (%s)',
+    async (url) => {
+      await expect(
+        defaultSystemContextResolver(foreignConn(url)),
+      ).resolves.toBe(null);
+      expect(lookup).not.toHaveBeenCalled();
+      process.env.SAP_SYSTEM_TYPE = 'cloud';
+      await expect(
+        defaultSystemContextResolver(foreignConn(url)),
+      ).resolves.toEqual({ responsible: 'CB_USER', masterSystem: 'CLD' });
+      expect(lookup).toHaveBeenCalledTimes(1);
+    },
+  );
 
   it('returns null when the system information is null', async () => {
     lookup.mockResolvedValue(null);

@@ -350,7 +350,7 @@ EXAMPLES:
   # (or SAP_CONNECTION_TYPE=rfc in the .env file)
   mcp-abap-adt --env-path=my-system.env --connection-type=rfc
 
-  # Explicit system type (bypass auto-detection)
+  # Explicit system type (default: cloud for a jwt, else onprem)
   mcp-abap-adt --env-path=e96.env --system-type=onprem
   # Or set SAP_SYSTEM_TYPE=onprem in .env file
 

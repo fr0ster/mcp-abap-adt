@@ -279,6 +279,20 @@ export interface ConnectionRecord {
 
 const records = new WeakMap<object, ConnectionRecord>();
 
+/**
+ * The system kind a connection was built for: `resolveSystemKind` of the
+ * settings the factory recorded. A connection the factory did not build (an
+ * embedder's own) has no settings, so `SAP_SYSTEM_TYPE` alone states it —
+ * on-premise when unset. The URL decides nothing.
+ */
+export function systemKindOf(
+  connection: object,
+  env: NodeJS.ProcessEnv | Record<string, string | undefined> = process.env,
+): AbapSystemKind {
+  const record = records.get(connection);
+  return resolveSystemKind(record?.settings ?? ({} as SapConfig), env);
+}
+
 /** The record of a connection this factory built; undefined for any other. */
 export function siblingRecordOf(
   connection: object,

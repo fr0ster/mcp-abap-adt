@@ -66,6 +66,10 @@ import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCre
 import { handleCreateUnitTest } from '../../handlers/unit_test/high/handleCreateUnitTest';
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import {
+  resetSystemContextCache,
+  setSystemContext,
+} from '../../lib/systemContext';
+import {
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
@@ -479,6 +483,16 @@ const cases: ChannelCase[] = [
 ];
 
 describe('every write in task 20 and task 23 lands where its shipped member sends it (real client)', () => {
+  // A change is refused without a responsible and a master system
+  // (systemContextGuard.ts); the writes here state both.
+  beforeEach(() => {
+    setSystemContext({
+      masterSystem: 'SYSTEM_PLACEHOLDER',
+      responsible: 'USER_PLACEHOLDER',
+    });
+  });
+  afterEach(() => resetSystemContextCache());
+
   it.each(cases)(
     '$name reaches $urlContains and carries the marker',
     async (c) => {

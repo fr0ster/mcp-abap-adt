@@ -11,6 +11,7 @@
 import type { IAdtError, IAdtResponse } from '@mcp-abap-adt/interfaces-adt';
 import type { AnswerDetail } from './strategies/projections';
 import { safeCleanup, safeRequest } from './strategies/safeFields';
+import { isSystemContextRefusal } from './systemContextGuard';
 
 export type { AnswerDetail };
 
@@ -160,10 +161,12 @@ export function return_answer<T>(
   ctx: AnswerContext,
 ): McpResult {
   if (!answer.ok) {
-    return json(
-      failurePayload(answer.getError() as IAdtError & MessageCarrier),
-      true,
-    );
+    const error = answer.getError() as IAdtError & MessageCarrier;
+    // Refused here, before any request: not a claim about the server.
+    if (isSystemContextRefusal(error.message)) {
+      return local('system_context_missing', ctx, error.message);
+    }
+    return json(failurePayload(error), true);
   }
 
   const projected = project(answer.getResult().value);

@@ -1380,7 +1380,6 @@ Generated from code in `src/handlers/**` (not from docs).
 **Source:** `src/handlers/package/low/handleDeletePackage.ts`
 
 **Parameters:**
-- `connection_config` (object, optional) - Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.
 - `force_new_connection` (boolean, optional) - Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.
 - `package_name` (string, required) - Package name.
 - `transport_request` (string, optional) - Transport request number, not a task. Required for transportable objects. Optional for local objects.

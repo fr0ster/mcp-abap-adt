@@ -1238,7 +1238,7 @@
   {
     "group": "low",
     "name": "DeletePackageLow",
-    "inputs": "package_name*, transport_request, force_new_connection, connection_config, detail",
+    "inputs": "package_name*, transport_request, force_new_connection, detail",
     "available_in": "cloud, onprem"
   },
   {

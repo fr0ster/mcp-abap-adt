@@ -19,6 +19,7 @@
  * It only fills what the request did not carry: a value from the request scope
  * or from the process context always wins.
  */
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { getSystemInformation } from '@mcp-abap-adt/adt-clients';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { errorClassOf } from './auth/errors';
@@ -86,6 +87,17 @@ export function systemContextResolverFor(
 
 export const defaultSystemContextResolver: SystemContextResolver =
   systemContextResolverFor(undefined);
+
+/**
+ * Set around a call whose cloud lookup threw: the guard then refuses a
+ * missing responsible as a failure to retry, not as a key to set.
+ */
+const lookupFailed = new AsyncLocalStorage<true>();
+
+/** Whether this call's cloud lookup threw (see `withResolvedSystemContext`). */
+export function systemLookupFailed(): boolean {
+  return lookupFailed.getStore() === true;
+}
 
 const memo = new WeakMap<
   SystemContextResolver,
@@ -186,9 +198,11 @@ export async function withResolvedSystemContext<T>(
   if (stated.responsible && stated.masterSystem) return fn();
 
   let resolved: ResolvedSystemContext;
+  let failed = false;
   try {
     resolved = await resolveOnce(resolver, connection);
   } catch (error) {
+    failed = true;
     // The class only: a lookup's message may quote what the system answered (H4).
     logger.warn(
       `Could not resolve responsible/master system from the connection: ${errorClassOf(error)}`,
@@ -200,18 +214,21 @@ export async function withResolvedSystemContext<T>(
   // Not a cloud connection: nothing asked, the login applies as it is.
   if (!resolved) return fn();
 
-  return runWithRequestContext(
-    {
-      ...getRequestContext(),
-      login: undefined,
-      responsible: stated.responsible || resolved.responsible,
-      masterSystem: stated.masterSystem || resolved.masterSystem,
-      // The effective value, not the scope's: inside a scope it IS the scope's
-      // value, so an outer scope's language is kept; outside any scope it is
-      // the process language, which entering this new scope would otherwise
-      // drop, since a scope's masterLanguage never falls back to the process.
-      masterLanguage: effective.masterLanguage,
-    },
-    fn,
-  );
+  const scoped = () =>
+    runWithRequestContext(
+      {
+        ...getRequestContext(),
+        login: undefined,
+        responsible: stated.responsible || resolved.responsible,
+        masterSystem: stated.masterSystem || resolved.masterSystem,
+        // The effective value, not the scope's: inside a scope it IS the
+        // scope's value, so an outer scope's language is kept; outside any
+        // scope it is the process language, which entering this new scope
+        // would otherwise drop, since a scope's masterLanguage never falls
+        // back to the process.
+        masterLanguage: effective.masterLanguage,
+      },
+      fn,
+    );
+  return failed ? lookupFailed.run(true, scoped) : scoped();
 }

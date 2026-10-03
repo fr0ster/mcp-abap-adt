@@ -163,7 +163,8 @@ know some of these; the server does not serve them. What to do instead:
     cloud system only `systeminformation`'s user, never `SAP_USERNAME` or `x-sap-login`.
     A create (or a transport without an `owner`)
     that finds none is **refused before any request**: `"error": "system_context_missing"`, naming
-    `SAP_RESPONSIBLE`, the header and the login. 15.x sent such a create with an empty or missing
+    `SAP_RESPONSIBLE`, the header and the login (or, when a cloud system could not be asked, saying to
+    retry). 15.x sent such a create with an empty or missing
     responsible. **The one exception:** a message class is created with the system's own default
     responsible — adt-clients' message class create takes none (15.x the same) — and is never refused.
     The master system comes from `x-sap-master-system` (now read; no tool takes it as an argument),

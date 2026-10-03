@@ -13,28 +13,36 @@
  * The master system is not guarded: when none is known it is left out of the
  * request (adt-clients omits the attribute), and the system applies itself.
  *
- * The words are fixed and name only keys: no value reaches them (H4).
+ * The words are fixed and name only keys: no value reaches them (H4). A call
+ * whose cloud lookup threw gets its own words: a retry, not a key to set.
  */
 
+import { systemLookupFailed } from './requestSystemResolution';
 import {
   getEffectiveSystemContext,
   type IAdtSystemContext,
 } from './systemContext';
 
 export const MISSING_RESPONSIBLE =
-  'No responsible person for this change: set SAP_RESPONSIBLE (the destination .env or the environment), or send the x-sap-responsible header, or pass the tool argument where the tool has one. Without them the login is used (SAP_USERNAME, x-sap-login; on ABAP Cloud the user the system names), and none was found. ADT changes are not made without one';
+  'No responsible person for this change: set SAP_RESPONSIBLE (the destination .env or the environment), or send the x-sap-responsible header, or pass the tool argument where the tool has one. Without them the login is the responsible: on-premise SAP_USERNAME, or x-sap-login with x-sap-url; on ABAP Cloud only the user the system names. ADT changes are not made without one';
+
+export const RESPONSIBLE_LOOKUP_FAILED =
+  'No responsible person for this change: the ABAP Cloud system could not be asked for its user, so nothing was sent. Retry; or set SAP_RESPONSIBLE, or send the x-sap-responsible header. ADT changes are not made without one';
 
 /** The refusal of a change that lacks a responsible person. */
 export class SystemContextMissingError extends Error {
-  constructor() {
-    super(MISSING_RESPONSIBLE);
+  /** `lookupFailed`: the cloud system could not be asked — a retry may help. */
+  constructor(lookupFailed = systemLookupFailed()) {
+    super(lookupFailed ? RESPONSIBLE_LOOKUP_FAILED : MISSING_RESPONSIBLE);
     this.name = 'SystemContextMissingError';
   }
 }
 
 /** Whether a failure's words are this refusal's (adt-clients keeps only the message). */
 export function isSystemContextRefusal(message: unknown): boolean {
-  return message === MISSING_RESPONSIBLE;
+  return (
+    message === MISSING_RESPONSIBLE || message === RESPONSIBLE_LOOKUP_FAILED
+  );
 }
 
 /**

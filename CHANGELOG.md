@@ -51,7 +51,8 @@ Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
   on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an `x-sap-url` connection (not of a
   destination request), the process `SAP_USERNAME`; on a cloud system only `systeminformation`'s user. A create (or a transport without an owner) that finds none
   (SNC or a token you hold, with no `SAP_RESPONSIBLE`) is refused before any request —
-  `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the header and the login — where it used
+  `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the header and the login (or, when a
+  cloud system could not be asked, saying to retry) — where it used
   to be sent with an empty or missing responsible. `CreateBehaviorImplementation`, whose adt-clients class
   is built with an empty system context, now passes the responsible and master system itself. The one
   exception is a message class: it is created with the system's own default responsible (adt-clients'

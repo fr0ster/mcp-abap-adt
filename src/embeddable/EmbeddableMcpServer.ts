@@ -108,10 +108,16 @@ export interface EmbeddableMcpServerOptions {
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
 
   /**
-   * Fills the responsible person and master system a call lacks — neither in
-   * its request scope nor in the process context — from the connection's
-   * system. The default resolves them on ABAP Cloud (one lookup per
-   * connection) and does nothing on-premise. `null` disables it.
+   * Asks the connection's system for the responsible person and master
+   * system a call does not state. Its answer decides whether the login counts:
+   * `null` means not asked (on-premise) — the login (`SAP_USERNAME`, or
+   * `x-sap-login` with `x-sap-url`) stands as the responsible; a non-null
+   * answer is a cloud system's — the login does not count, and only what the
+   * call does not state is taken from it (`{}`: the system named nothing, so a
+   * create without a stated responsible is refused). A resolver that throws is
+   * treated like `{}`, and the create is refused as one to retry. The default
+   * asks on ABAP Cloud (one lookup per connection) and answers `null`
+   * on-premise. `null` as the option disables it.
    * @default defaultSystemContextResolver
    */
   systemContextResolver?: SystemContextResolver | null;

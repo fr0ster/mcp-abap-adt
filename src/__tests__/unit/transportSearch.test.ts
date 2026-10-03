@@ -132,9 +132,10 @@ describe('ListTransports asks for the saved search rather than assuming one', ()
     expect(JSON.parse(asked.content[0].text).count).toBe(0);
 
     // Without a user to filter by there is nothing to attribute, so it shows.
-    // `SAP_USERNAME` is cleared for this half: the handler falls back to it
-    // when the caller names nobody, and an environment that happened to carry
-    // one would turn this into a filtered call and pass for the wrong reason.
+    // `SAP_USERNAME` is cleared for this half: the effective context falls
+    // back to it as the login when the caller names nobody, and an environment
+    // that happened to carry one would turn this into a filtered call and pass
+    // for the wrong reason.
     const savedUser = process.env.SAP_USERNAME;
     process.env.SAP_USERNAME = '';
     try {

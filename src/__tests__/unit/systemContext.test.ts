@@ -1,23 +1,16 @@
 import {
+  getEffectiveSystemContext,
   getSystemContext,
   resetSystemContextCache,
-  resolveSystemContext,
+  systemContextFromConfiguration,
 } from '../../lib/systemContext';
 
-// Mock @mcp-abap-adt/adt-clients — covers both static import and dynamic import()
-const mockGetSystemInformation = jest.fn().mockResolvedValue(undefined);
-jest.mock('@mcp-abap-adt/adt-clients', () => ({
-  get getSystemInformation() {
-    return mockGetSystemInformation;
-  },
-}));
-
-// Minimal mock connection
-const mockConnection = {
-  makeAdtRequest: jest.fn(),
-} as any;
-
-describe('resolveSystemContext', () => {
+/**
+ * The process context the configuration states. It sends nothing: the cloud
+ * lookup is the request's (requestSystemResolution.ts), and the per-request
+ * order lives in the request scope.
+ */
+describe('systemContextFromConfiguration', () => {
   const originalEnv = process.env;
 
   beforeEach(() => {
@@ -26,122 +19,40 @@ describe('resolveSystemContext', () => {
     delete process.env.SAP_MASTER_SYSTEM;
     delete process.env.SAP_RESPONSIBLE;
     delete process.env.SAP_USERNAME;
-    delete process.env.SAP_SYSTEM_TYPE;
+    delete process.env.SAP_LANGUAGE;
   });
 
   afterAll(() => {
     process.env = originalEnv;
   });
 
-  it('should use overrides when masterSystem is provided', async () => {
-    process.env.SAP_MASTER_SYSTEM = 'FROM_ENV';
-    process.env.SAP_RESPONSIBLE = 'ENV_USER';
-
-    const result = await resolveSystemContext(mockConnection, {
-      masterSystem: 'FROM_HEADER',
-      responsible: 'HEADER_USER',
+  it('reads SAP_MASTER_SYSTEM and SAP_RESPONSIBLE into the process context', () => {
+    process.env.SAP_MASTER_SYSTEM = 'SYSTEM_FROM_CONFIG';
+    process.env.SAP_RESPONSIBLE = 'USER_FROM_CONFIG';
+    expect(systemContextFromConfiguration()).toMatchObject({
+      masterSystem: 'SYSTEM_FROM_CONFIG',
+      responsible: 'USER_FROM_CONFIG',
     });
-
-    expect(result.masterSystem).toBe('FROM_HEADER');
-    expect(result.responsible).toBe('HEADER_USER');
+    expect(getSystemContext().masterSystem).toBe('SYSTEM_FROM_CONFIG');
   });
 
-  it('should use overrides when only responsible is provided', async () => {
-    process.env.SAP_RESPONSIBLE = 'ENV_USER';
-
-    const result = await resolveSystemContext(mockConnection, {
-      responsible: 'HEADER_USER',
-    });
-
-    expect(result.responsible).toBe('HEADER_USER');
-    expect(result.masterSystem).toBeUndefined();
+  it('SAP_USERNAME is the login: the responsible when SAP_RESPONSIBLE is not set', () => {
+    process.env.SAP_USERNAME = 'USER_FROM_LOGON';
+    systemContextFromConfiguration();
+    expect(getEffectiveSystemContext().responsible).toBe('USER_FROM_LOGON');
+    // The process context holds what is stated; the login is a fallback.
+    expect(getSystemContext().responsible).toBeUndefined();
   });
 
-  it('should return overrides via getSystemContext() after resolve', async () => {
-    await resolveSystemContext(mockConnection, {
-      masterSystem: 'SYS1',
-      responsible: 'USER1',
-    });
-
-    const ctx = getSystemContext();
-    expect(ctx.masterSystem).toBe('SYS1');
-    expect(ctx.responsible).toBe('USER1');
+  it('SAP_RESPONSIBLE wins over SAP_USERNAME', () => {
+    process.env.SAP_USERNAME = 'USER_FROM_LOGON';
+    process.env.SAP_RESPONSIBLE = 'USER_FROM_CONFIG';
+    systemContextFromConfiguration();
+    expect(getEffectiveSystemContext().responsible).toBe('USER_FROM_CONFIG');
   });
 
-  it('should fall back to process.env when overrides is undefined', async () => {
-    process.env.SAP_MASTER_SYSTEM = 'ENV_SYS';
-    process.env.SAP_RESPONSIBLE = 'ENV_USER';
-
-    const result = await resolveSystemContext(mockConnection);
-
-    expect(result.masterSystem).toBe('ENV_SYS');
-    expect(result.responsible).toBe('ENV_USER');
+  it('states nothing when nothing is configured', () => {
+    expect(systemContextFromConfiguration()).toBeUndefined();
+    expect(getSystemContext()).toEqual({});
   });
-
-  it('should fall back to process.env when overrides is empty object', async () => {
-    process.env.SAP_MASTER_SYSTEM = 'ENV_SYS';
-
-    const result = await resolveSystemContext(mockConnection, {});
-
-    expect(result.masterSystem).toBe('ENV_SYS');
-  });
-
-  it('should work after resetSystemContextCache + new resolve with overrides', async () => {
-    // First resolve with env
-    process.env.SAP_MASTER_SYSTEM = 'OLD_SYS';
-    await resolveSystemContext(mockConnection);
-    expect(getSystemContext().masterSystem).toBe('OLD_SYS');
-
-    // Reset and resolve with overrides
-    resetSystemContextCache();
-    await resolveSystemContext(mockConnection, {
-      masterSystem: 'NEW_SYS',
-      responsible: 'NEW_USER',
-    });
-
-    expect(getSystemContext().masterSystem).toBe('NEW_SYS');
-    expect(getSystemContext().responsible).toBe('NEW_USER');
-  });
-
-  it('should use SAP_USERNAME as fallback for responsible', async () => {
-    process.env.SAP_MASTER_SYSTEM = 'SYS';
-    process.env.SAP_USERNAME = 'USERNAME_FALLBACK';
-
-    const result = await resolveSystemContext(mockConnection);
-
-    expect(result.responsible).toBe('USERNAME_FALLBACK');
-  });
-
-  it('should use cached result on second call without reset', async () => {
-    process.env.SAP_MASTER_SYSTEM = 'CACHED_SYS';
-    await resolveSystemContext(mockConnection);
-
-    // Change env — should not affect cached result
-    process.env.SAP_MASTER_SYSTEM = 'CHANGED_SYS';
-    const result = await resolveSystemContext(mockConnection);
-
-    expect(result.masterSystem).toBe('CACHED_SYS');
-  });
-
-  it('overrides should win over cached value', async () => {
-    // First resolve caches via env
-    process.env.SAP_MASTER_SYSTEM = 'CACHED';
-    await resolveSystemContext(mockConnection);
-
-    // Overrides should replace the cache
-    const result = await resolveSystemContext(mockConnection, {
-      masterSystem: 'OVERRIDE',
-    });
-
-    expect(result.masterSystem).toBe('OVERRIDE');
-  });
-
-  /**
-   * Four tests lived here pinning `isLegacy` — that a legacy system is
-   * detected from `SAP_SYSTEM_TYPE`, that the flag survives an override, and
-   * that `getSystemContext()` exposes it. The flag is gone: legacy support is
-   * parked on `parked/legacy-support` until it can be tried against a live
-   * system, and no tool declares that environment any more. The tests went
-   * with it rather than being weakened into asserting `undefined`.
-   */
 });

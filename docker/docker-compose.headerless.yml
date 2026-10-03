@@ -10,9 +10,7 @@ version: '3.8'
 # - x-mcp-destination: Destination name (requires --allow-destination-header flag)
 # OR
 # - x-sap-url: SAP system URL
-# - x-sap-auth-type: jwt, basic, or xsuaa
-# - x-sap-jwt-token: JWT token (for jwt auth)
-# - x-sap-refresh-token: Refresh token (optional, for auto-refresh)
+# - x-sap-jwt-token: a JWT you hold (used as it is; the server cannot renew it)
 # OR
 # - x-sap-login: Username (for basic auth)
 # - x-sap-password: Password (for basic auth)
@@ -32,7 +30,7 @@ services:
     ports:
       - "3000:3000"
 
-    # Minimal environment - no auth-broker needed
+    # Minimal environment - no destination needed
     environment:
       - NODE_ENV=production
       - MCP_HTTP_PORT=3000

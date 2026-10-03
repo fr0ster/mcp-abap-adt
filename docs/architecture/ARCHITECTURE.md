@@ -36,10 +36,9 @@ Each package owns exactly one responsibility:
 |:---|:---|
 | Interface contracts | `@mcp-abap-adt/interfaces-adt`, `-auth`, `-auth-sap`, `-network`, `-utils` |
 | Logging abstraction | `@mcp-abap-adt/logger` |
-| Header validation | `@mcp-abap-adt/header-validator` |
 | Credential storage | `@mcp-abap-adt/auth-stores` |
-| Token orchestration | `@mcp-abap-adt/auth-broker` |
-| Token acquisition flows | `@mcp-abap-adt/auth-providers` |
+| Credential orchestration | `@mcp-abap-adt/auth-broker` |
+| Credentials and token flows | `@mcp-abap-adt/auth-providers` |
 | HTTP transport to SAP | `@mcp-abap-adt/connection` |
 | ABAP object operations | `@mcp-abap-adt/adt-clients` |
 | MCP protocol adapter | `mcp-abap-adt` (main server) |
@@ -69,7 +68,7 @@ Every public function and method operates against well-defined input/output type
 |:---|:---|:---|
 | Connection | `IAbapConnection`, `IAbapRequestOptions`, `IAdtResponse` | HTTP communication with SAP ADT |
 | Authentication | `IAuthorizationConfig`, `IConnectionConfig`, `IConfig` | Auth credential structures |
-| Token | `ITokenProvider`, `ITokenResult`, `ITokenRefresher` | Token lifecycle management |
+| Credential | `IAuthProvider`, `AuthOutcome` | What a connector presents: `prepare`, `establish`, `authorize`, `rejected` |
 | Session | `ISessionStore`, `ISessionStorage`, `ISessionState` | Session persistence |
 | Service Key | `IServiceKeyStore` | Service key access |
 | ADT Objects | `IAdtObject<TConfig, TState>`, `IAdtObjectState`, `IAdtObjectConfig` | CRUD lifecycle for ABAP objects |
@@ -102,25 +101,24 @@ This allows `IAdtObject<TConfig, TState>` to provide a uniform CRUD interface ac
 
 ---
 
-### 2.3 @mcp-abap-adt/header-validator
+### 2.3 Request credentials (HTTP/SSE headers)
 
 | Attribute | Value |
 |:---|:---|
-| **Responsibility** | Validates and normalizes incoming HTTP authorization headers |
-| **Public interface** | `IHeaderValidationResult`, `IValidatedAuthConfig` |
-| **Replaceable** | Yes |
-| **Runtime role** | Used by HTTP/SSE transport servers to extract auth parameters from request headers |
-| **Dependencies** | the contract packages it names (`interfaces-network`, `-auth`, `-auth-sap`) |
+| **Responsibility** | Turns the connection headers of a request into settings and a credential, or names the destination the request asks for |
+| **Where** | `src/lib/credentialSources.ts` (`credentialFromHeaders`), `server/src/destinationRequest.ts` (`destinationFromHeader`) |
+| **Runtime role** | Used by the HTTP and SSE transport servers; stdio has no request headers |
 
-Supports prioritized authentication methods:
+Per request, in this order:
 
 | Priority | Method | Headers |
 |:---|:---|:---|
-| 4 (highest) | SAP Destination (AuthBroker) | `x-sap-destination` |
-| 3 | MCP Destination + JWT | `x-mcp-destination` + `x-sap-auth-type=jwt` |
-| 2 | Direct JWT | `x-sap-jwt-token` |
-| 1 | Basic Auth | `x-sap-login` + `x-sap-password` |
-| 0 | None | No valid auth |
+| 3 (highest) | A named destination, only with `--allow-destination-header` | `x-mcp-destination` (a plain name; anything else is refused with `400`, naming the header) |
+| 2 | A token you hold | `x-sap-url` + `x-sap-jwt-token` |
+| 1 | Basic | `x-sap-url` + `x-sap-login` + `x-sap-password` |
+| 0 | The default destination (`--mcp`, `--env`, `--env-path`) | none; with no default, `400` |
+
+A header connection gets a fixed credential (`TokenAuthProvider.fixed`, `BasicAuthProvider`); nothing renews it.
 
 ---
 
@@ -143,31 +141,14 @@ Service key stores read `{destination}.json` files from a configurable directory
 
 | Attribute | Value |
 |:---|:---|
-| **Responsibility** | Token orchestration -- coordinates stores and providers to produce valid tokens |
-| **Public interface** | `AuthBroker` class, `ITokenRefresher` factory |
-| **Replaceable** | Yes -- any object satisfying the same method signatures |
-| **Runtime role** | Central authentication coordinator; creates `ITokenRefresher` for injection into connections |
-| **Dependencies** | the contract packages it names (`interfaces-network`, `-auth`, `-auth-sap`) |
+| **Responsibility** | Builds the credential a destination states, from the service key store's *means* and the session store's *secret*, and keeps what the credential obtains stored |
+| **Public interface** | `AuthBroker` (`getProvider(destination)`, `flush()`, `getConnectionConfig`, `getAuthorizationConfig`), `DestinationConfigError` |
+| **Runtime role** | One broker per destination; `getProvider` returns an `IAuthProvider` that a connector presents on every logon and request |
+| **Dependencies** | `interfaces-auth`, `interfaces-auth-broker`, `interfaces-auth-sap`, `auth-providers` |
 
-**Token acquisition flow** (multi-step with fallback):
+The server calls `getProvider(destination)` and hands the provider to the connector; there is no token to fetch first and no token refresher. The provider decides whether its token is still good, renews it (refresh first, then a new login) and the broker writes what it obtained to the session store. `flush()` tells the server at shutdown whether everything landed.
 
-```
-1. Check session store for cached token
-   └─ Valid? → return token
-2. Attempt token refresh via refresh_token
-   └─ Success? → persist to session store, return token
-3. Fall back to browser-based OAuth2 authorization_code flow
-   └─ Success? → persist to session store, return token
-4. Fail with typed error (BROWSER_AUTH_REQUIRED, REFRESH_ERROR, etc.)
-```
-
-`AuthBroker` accepts three injected dependencies:
-
-- `ISessionStore` (required) -- cached tokens and connection config
-- `IServiceKeyStore` (optional) -- initial credentials from service key files
-- `ITokenProvider` (required) -- handles actual token acquisition (browser OAuth, client credentials, etc.)
-
-It also produces `ITokenRefresher` instances that are injected into `JwtAbapConnection` for transparent token renewal on 401/403 responses.
+`AuthBroker` takes a service key store (means), a session store (the secret alone) and, for the interactive grant, an `authorization` strategy that the server supplies (the browser login on port `61001`). The stores and the strategy are injected, never defaulted by the broker.
 
 ---
 
@@ -175,26 +156,22 @@ It also produces `ITokenRefresher` instances that are injected into `JwtAbapConn
 
 | Attribute | Value |
 |:---|:---|
-| **Responsibility** | Concrete token acquisition strategies |
-| **Public interface** | `ITokenProvider` (from interfaces package) |
-| **Default implementations** | `AuthorizationCodeProvider`, `ClientCredentialsProvider`, `DeviceFlowProvider`, `OidcBrowserProvider`, `OidcDeviceFlowProvider`, `OidcPasswordProvider`, `OidcTokenExchangeProvider`, `Saml2BearerProvider`, `Saml2PureProvider` |
-| **Replaceable** | Yes -- any `ITokenProvider` implementation |
-| **Runtime role** | Injected into `AuthBroker` to perform specific OAuth2/OIDC/SAML flows |
+| **Responsibility** | Every `IAuthProvider`: the credential a process presents, and the token providers behind it |
+| **Public interface** | `IAuthProvider` (`prepare`, `establish`, `authorize`, `rejected`) from `interfaces-auth` |
+| **Replaceable** | Yes -- any `IAuthProvider` |
+| **Runtime role** | Built by the broker for a destination; the connector calls its four methods |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios`, `express`, `open` |
 
-All providers extend `BaseTokenProvider` which manages token caching, expiration tracking, and the `getTokens()` lifecycle. Each provider implements a specific grant type:
+The server supports four authentications, each served by one handler (`src/lib/auth/handlers/`):
 
-| Provider | Grant Type | Use Case |
+| Authentication | `SAP_AUTH_TYPE` / `SAP_GRANT_TYPE` | Provider |
 |:---|:---|:---|
-| `AuthorizationCodeProvider` | `authorization_code` | Interactive browser-based BTP auth |
-| `ClientCredentialsProvider` | `client_credentials` | Machine-to-machine, no user context |
-| `DeviceFlowProvider` | `device_code` | Devices without browser |
-| `OidcBrowserProvider` | OIDC + browser | Generic OIDC with browser |
-| `OidcDeviceFlowProvider` | OIDC + device | Generic OIDC without browser |
-| `OidcPasswordProvider` | `password` | Resource owner password (legacy) |
-| `OidcTokenExchangeProvider` | `token_exchange` | Token exchange flows |
-| `Saml2BearerProvider` | `saml2_bearer` | SAML2 bearer assertion |
-| `Saml2PureProvider` | Pure SAML | Direct SAML authentication |
+| Basic (HTTP or RFC) | `basic` | `BasicAuthProvider` |
+| SNC (RFC only, passwordless) | `snc` | `SncLogonProvider` |
+| JWT, browser login | `jwt` / `authorization_code` | `AuthorizationCodeProvider` |
+| JWT you hold | `jwt` / `none` | `TokenAuthProvider` |
+
+Adding an authentication means a handler there, a row in this table and a test; nothing else. The package ships other providers (client credentials, passcode, the OIDC and SAML ones); this server does not serve them, and a destination that states one is refused at startup.
 
 ---
 
@@ -204,24 +181,18 @@ All providers extend `BaseTokenProvider` which manages token caching, expiration
 |:---|:---|
 | **Responsibility** | HTTP transport layer to SAP ADT REST API |
 | **Public interface** | `IAbapConnection` |
-| **Default implementations** | `BaseAbapConnection` (Basic auth), `JwtAbapConnection` (JWT/BTP), `SamlAbapConnection` (SAML) |
+| **Default implementations** | `AdtOnPremConnector`, `AdtCloudConnector` -- one connector per *system*; the credential is a parameter, not a subclass |
 | **Replaceable** | Yes -- any `IAbapConnection` implementation |
-| **Runtime role** | Executes HTTP requests against SAP ADT endpoints |
+| **Runtime role** | Executes ADT requests over HTTP or RFC against a SAP system, presenting the `IAuthProvider` it is handed |
 | **Dependencies** | `@mcp-abap-adt/interfaces-auth`, `-auth-sap`, `-utils`, `axios` |
 
-**Factory function:**
-
-```typescript
-createAbapConnection(config: SapConfig, logger?: ILogger, sessionId?: string, tokenRefresher?: ITokenRefresher): IAbapConnection
-```
-
-Automatically selects the correct implementation based on `config.authType` (`basic`, `jwt`, or `saml`).
+**Construction** -- the server has one place that builds a connector (`src/lib/connectionFactory.ts`): the system kind and the wire follow from the settings (`SAP_SYSTEM_TYPE`, `connectionType`), and the credential is the one the caller hands in. Where a credential comes from is `src/lib/credentialSources.ts` (headers, an embedder's `SapConfig`) or the broker's `getProvider(destination)`; the factory never builds one from `settings.authType`.
 
 **Key capabilities:**
 - CSRF token management (automatic fetch, cache, refresh on error)
 - Stateful/stateless session switching via `sap-contextid` headers
 - Cookie management for session persistence
-- Automatic token refresh on 401/403 via injected `ITokenRefresher`
+- A `401` the wire's own recovery cannot clear is put to the credential (`rejected`); if it answers Ok (a renewed token), the request gets one more attempt
 - TLS configuration respecting `NODE_TLS_REJECT_UNAUTHORIZED`
 - Retry logic for transient errors
 
@@ -423,7 +394,7 @@ graph TD
     AdtClients["@mcp-abap-adt/adt-clients<br/>(AdtClient factory)"]
     Connection["@mcp-abap-adt/connection<br/>(IAbapConnection)"]
     AuthBroker["@mcp-abap-adt/auth-broker<br/>(AuthBroker)"]
-    Providers["@mcp-abap-adt/auth-providers<br/>(ITokenProvider)"]
+    Providers["@mcp-abap-adt/auth-providers<br/>(IAuthProvider)"]
     Stores["@mcp-abap-adt/auth-stores<br/>(IServiceKeyStore, ISessionStore)"]
     SAP["SAP ABAP System<br/>(ADT REST API)"]
 
@@ -435,7 +406,7 @@ graph TD
     Handlers -->|"HandlerContext"| AdtClients
     AdtClients -->|"IAbapConnection"| Connection
     Connection -->|"HTTP/HTTPS"| SAP
-    Connection -->|"ITokenRefresher"| AuthBroker
+    Connection -->|"IAuthProvider (getProvider)"| AuthBroker
     AuthBroker --> Providers
     AuthBroker --> Stores
     Providers -->|"OAuth2/OIDC/SAML"| SAP
@@ -451,9 +422,9 @@ graph TD
    └── new BaseMcpServer() instance per request
 
 3. Connection context resolution
-   ├── From x-mcp-destination header → AuthBrokerFactory.getBroker(destination)
-   ├── From x-sap-url + auth headers → Direct connection params
-   └── From default destination (startup config)
+   ├── From x-mcp-destination header (--allow-destination-header) → IDestinations: settingsFor + getProvider(destination)
+   ├── From x-sap-url + auth headers → settings and a fixed credential from the headers
+   └── From default destination (startup config) → the same IDestinations path
 
 4. Handler invocation
    ├── BaseMcpServer resolves tool name → handler function
@@ -476,7 +447,7 @@ The system has three distinct IoC boundaries:
 
 | Boundary | What is Inverted | Composition Point |
 |:---|:---|:---|
-| **Auth** | Token acquisition strategy | `AuthBroker` constructor receives `ITokenProvider`, `ISessionStore`, `IServiceKeyStore` |
+| **Auth** | The credential a connector presents | `ConnectionContext.credential` (an `IAuthProvider`) is built by `AuthBrokerFactory.getProvider` or from headers; the connector never builds one |
 | **Transport** | HTTP communication with SAP | `AdtClient` constructor receives `IAbapConnection` |
 | **Handlers** | Tool behavior per transport/mode | `CompositeHandlersRegistry` receives `IHandlerGroup[]` |
 
@@ -485,9 +456,9 @@ The system has three distinct IoC boundaries:
 `mcp-abap-adt/src/server/launcher.ts` is the single composition root for the main server. It:
 
 1. Reads configuration (CLI, YAML, env)
-2. Instantiates concrete store implementations (`AbapServiceKeyStore`, `AbapSessionStore`)
-3. Creates token providers (`AuthorizationCodeProvider`)
-4. Assembles `AuthBroker` instances via `AuthBrokerFactory`
+2. Chooses the stores of a destination (`src/lib/auth/destinationStores.ts`): an env file, or a named destination's `sessions/<name>.env` over `service-keys/<name>.json`
+3. Passes the browser-login strategy (`browserCallbackStrategy`) to `AuthBrokerFactory`; the library defaults to none
+4. Assembles one `AuthBroker` per destination via `AuthBrokerFactory`, on first use
 5. Creates handler groups with `HandlerContext`
 6. Assembles `CompositeHandlersRegistry`
 7. Starts the appropriate transport server
@@ -505,44 +476,36 @@ Any interface-backed component can be replaced. The general pattern:
 ```typescript
 // 1. Implement the interface
 class CustomSessionStore implements ISessionStore {
-  async loadSession(destination: string): Promise<IConfig | null> { /* custom logic */ }
-  async saveSession(destination: string, config: IConfig): Promise<void> { /* custom logic */ }
-  async getAuthorizationConfig(destination: string): Promise<IAuthorizationConfig | null> { /* ... */ }
-  async getConnectionConfig(destination: string): Promise<IConnectionConfig | null> { /* ... */ }
-  async setAuthorizationConfig(destination: string, config: IAuthorizationConfig): Promise<void> { /* ... */ }
-  async setConnectionConfig(destination: string, config: IConnectionConfig): Promise<void> { /* ... */ }
+  // the contract is in @mcp-abap-adt/interfaces-auth-broker: a session store
+  // holds the secret alone (token or cookies, expiry, refresh token, issuedFor, issuedBy)
 }
 
-// 2. Inject at composition root
+// 2. Inject at the composition root (destinationStores.ts)
 const broker = new AuthBroker({
+  serviceKeyStore, // the means: authType, grantType, URL, client
   sessionStore: new CustomSessionStore(),
-  tokenProvider: new AuthorizationCodeProvider(providerConfig),
+  authorization: () => browserLogin, // for authorization_code
 });
 ```
 
 ### 5.2 Custom Authentication Logic
 
-To inject a custom authentication flow:
+To add an authentication the server serves:
 
-1. **Implement `ITokenProvider`** with a `getTokens()` method that returns `ITokenResult`
-2. **Pass it to `AuthBroker`** in the composition root
-3. The rest of the system remains unchanged -- `AuthBroker` will use the custom provider for token acquisition
+1. **Implement or reuse an `IAuthProvider`** (`prepare`, `establish`, `authorize`, `rejected`; none may throw -- each answers `{ ok: true }` or a refusal)
+2. **Add an `AuthenticationHandler`** in `src/lib/auth/handlers/` that tells the broker what the destination needs, and register it in `HANDLERS`
+3. Add its row to the table in section 2.6 and a test; the rest of the system remains unchanged -- the connector presents whatever `IAuthProvider` it is given
 
-```typescript
-class CustomTokenProvider implements ITokenProvider {
-  async getTokens(): Promise<ITokenResult> {
-    // Custom token acquisition (e.g., corporate SSO, hardware token, vault)
-    return { authorizationToken: '...', authType: 'authorization_code' };
-  }
-}
-```
+An embedder that has its own credential passes it as `ConnectionContext.credential` and the server builds nothing from settings.
+
+---
 
 ### 5.3 Custom Configuration Handling
 
 `ServerConfigManager` supports:
-- CLI arguments (`--transport`, `--host`, `--port`, `--conf`, `--mcp`, `--env`)
-- YAML configuration files (via `--conf <path>`)
-- Environment variables (`MCP_TRANSPORT`, `MCP_HTTP_HOST`, `MCP_HTTP_PORT`)
+- CLI arguments (`--transport`, `--host`, `--port`, `--conf`, `--mcp`, `--env`, and the authentication parameters of `src/lib/config/authParameters.ts`)
+- YAML configuration files (via `--conf <path>`) -- configuration only; a secret-looking key is refused
+- Environment variables (`MCP_TRANSPORT`, `MCP_HTTP_HOST`, `MCP_HTTP_PORT`, `MCP_BROWSER_AUTH_PORT`, ...); secrets and the session live in `.env` files
 
 For deeper customization, consumers can bypass `ServerConfigManager` and construct `IServerConfig` directly.
 
@@ -575,7 +538,7 @@ registry.addHandlerGroup(new CustomHandlerGroup(baseContext));
 ### 5.5 Architectural Guarantees
 
 - **Interface stability** -- every contract package follows semver; breaking changes require major version bumps, and a consumer takes them one domain at a time rather than inheriting every package's history through an umbrella
-- **No hidden state** -- components do not share global mutable state (except the explicit `AuthBrokerRegistry` global for cross-package token refresh)
+- **No hidden state** -- components do not share global mutable state (the server holds no global broker registry: each `AuthBrokerFactory` owns its brokers, and the process serves its destinations through it)
 - **Typed errors** -- all error conditions use typed error code constants, enabling programmatic error handling
 - **Operation auditability** -- `IAdtObjectState` accumulates every operation result, providing full trace of create/update/delete chains
 
@@ -633,7 +596,7 @@ For troubleshooting:
 
 **Supporting patterns:**
 - Factory pattern (`AdtClient`, `createAbapConnection`, `AuthBrokerFactory`)
-- Strategy pattern (`ITokenProvider` implementations selected at composition time)
+- Strategy pattern (`IAuthProvider` implementations selected per destination by the authentication handlers)
 - Composite pattern (`CompositeHandlersRegistry` aggregates `IHandlerGroup[]`)
 - Chain of Responsibility (operation chains in `IAdtObject` implementations)
 - Template Method (`BaseTokenProvider`, `AbstractAbapConnection`, `BaseHandlerGroup`)
@@ -644,7 +607,7 @@ For troubleshooting:
 |:---|:---|:---|
 | Interface coupling | Low | All cross-package communication through interfaces |
 | Data coupling | Low | Well-defined DTOs (`IConfig`, `ITokenResult`, `IAdtResponse`) |
-| Runtime coupling | Medium | `AuthBrokerRegistry` global for cross-package token refresh |
+| Runtime coupling | Low | A connector receives its credential; no global registry |
 | Temporal coupling | Low | No implicit ordering between components (explicit operation chains only) |
 | Build coupling | None | Each package builds independently |
 
@@ -655,7 +618,7 @@ For troubleshooting:
 | Logger | Full | Implement 4-method `ILogger` interface |
 | Session Store | Full | Implement `ISessionStore` (6 methods) |
 | Service Key Store | Full | Implement `IServiceKeyStore` (3 methods) |
-| Token Provider | Full | Implement `ITokenProvider` (1-2 methods) |
+| Credential | Full | Implement `IAuthProvider` (4 methods) |
 | Connection | Full | Implement `IAbapConnection` (4 methods) |
 | Handler Groups | Full | Implement `IHandlerGroup` (3 methods) |
 | Auth Broker | Moderate | Replace `AuthBroker` class (non-interface, but clear method contract) |
@@ -664,7 +627,7 @@ For troubleshooting:
 ### 7.4 Strengths
 
 - **Strict interface isolation** prevents accidental coupling between packages
-- **Multi-auth strategy** supports Basic, JWT, SAML, OIDC, device flow -- covering on-premise through BTP cloud
+- **Four authentications** -- basic, SNC, JWT with browser login, JWT you hold -- covering on-premise through BTP cloud
 - **Operation chain model** provides atomic, auditable CRUD sequences with automatic lock/unlock
 - **Exposition control** enables deployment profiles (read-only, full CRUD, low-level)
 - **Transport flexibility** (stdio, HTTP, SSE) adapts to different client architectures
@@ -674,7 +637,7 @@ For troubleshooting:
 
 | Risk | Mitigation |
 |:---|:---|
-| `AuthBrokerRegistry` global state could cause conflicts in multi-tenant scenarios | Scoped to destination key; documented as known limitation |
+| Two destinations logging in at once would race for the callback port | One login at a time per process; the first connect of a destination runs inside its lock |
 | Large handler count (~150 tools) may overwhelm AI model context | `exposition` config limits visible tools per deployment |
 | XML parsing of ADT responses is fragile across SAP versions | `fast-xml-parser` with per-object-type parsers; integration tests validate against real systems |
 | Service key files stored on filesystem | Configurable directory; `unsafe` flag controls file vs. in-memory storage |
@@ -694,8 +657,6 @@ For troubleshooting:
 @mcp-abap-adt/interfaces-adt, -auth, -auth-sap, -network, -utils (the contracts)
 │
 ├── @mcp-abap-adt/logger
-│
-├── @mcp-abap-adt/header-validator
 │
 ├── @mcp-abap-adt/auth-stores
 │

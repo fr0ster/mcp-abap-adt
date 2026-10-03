@@ -27,16 +27,16 @@ Quick configuration files for connecting Cline to MCP ABAP ADT server.
 **Files**: 
 - `cline-http-npx-config.json` - for NPX/NPM package
 - `cline-http-config.json` - for local development
-- `cline-http-service-key-npx-config.json` - **for Service Keys (auth-broker)**
+- `cline-http-service-key-npx-config.json` - **for Service Keys (a named destination)**
 
 **Setup**:
 1. Start server in separate terminal:
    ```bash
-   # With NPX (recommended) - uses auth-broker by default
-   npx @mcp-abap-adt/core --transport=http --port=3000
+   # With NPX (recommended); a .env you name is the default destination
+   npx @mcp-abap-adt/core --transport=http --port=3000 --env-path=./.env
    
-   # Or force auth-broker (ignores .env)
-   npx @mcp-abap-adt/core --transport=http --port=3000 --auth-broker
+   # Or a named destination
+   npx @mcp-abap-adt/core --transport=http --port=3000 --mcp=TRIAL
    
    # Or with global install
    mcp-abap-adt --transport=http --port=3000
@@ -70,19 +70,19 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
    EOF
    ```
 
-2. **Start server with auth-broker**:
+2. **Start the server, allowing the destination header**:
    ```bash
    # With NPX (recommended)
-   npx @mcp-abap-adt/core --transport=http --port=3000 --auth-broker
+   npx @mcp-abap-adt/core --transport=http --port=3000 --allow-destination-header
    
    # Or with global install
-   mcp-abap-adt --transport=http --port=3000 --auth-broker
+   mcp-abap-adt --transport=http --port=3000 --allow-destination-header
    ```
    
    **Note**: 
-   - The `--auth-broker` flag forces use of auth-broker (service keys), ignoring any `.env` file
-   - By default (without `--env` or `--auth-broker`), the server uses `.env` from current directory if it exists, otherwise uses auth-broker
-   - Auth-broker is available for stdio/SSE via `--mcp=<destination>` and for HTTP via destination headers
+   - `x-mcp-destination` is honoured only with `--allow-destination-header`; use `--mcp=TRIAL` instead to serve one destination without a header
+   - Without `--mcp`, `--env` or `--env-path` there is no default destination: nothing is looked up in the working directory
+   - An XSUAA service key needs `XSUAA_MCP_URL` in `sessions/TRIAL.env`
 
 3. **Use config** with destination header:
    ```json
@@ -92,7 +92,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
          "url": "http://localhost:3000",
          "transport": "http",
          "headers": {
-           "x-sap-destination": "TRIAL"
+           "x-mcp-destination": "TRIAL"
          },
          "disabled": false
        }
@@ -100,7 +100,7 @@ Use `cline-http-service-key-npx-config.json` for destination-based authenticatio
    }
    ```
 
-**First-time authentication**: Browser will open for OAuth2 login. Tokens are saved automatically.
+**First-time authentication**: The browser opens for the login (callback port `61001`). The token is kept in memory, or saved to `sessions/TRIAL.env` with `--unsafe`.
 
 ### SSE Transport  
 **Files**:
@@ -180,11 +180,12 @@ SAP_USERNAME=your-username
 SAP_PASSWORD=your-password
 ```
 
-Or for JWT:
+Or for a JWT you hold:
 ```env
 SAP_URL=https://your-sap-system.com
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
+SAP_GRANT_TYPE=none
 SAP_JWT_TOKEN=your-jwt-token
 ```
 

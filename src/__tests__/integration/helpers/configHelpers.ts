@@ -36,15 +36,16 @@ function resolveUseAuthBrokerFlag(): boolean {
       !!cfg?.abap?.service_keys?.destination ||
       !!cfg?.abap?.sessions?.destination;
 
+    // test-config.yaml alone decides. MCP_USE_AUTH_BROKER is not read: the
+    // server refuses it since 16.0.0, so the harness neither reads nor sets it.
     return (
-      process.env.MCP_USE_AUTH_BROKER === 'true' ||
       cfg?.auth_broker?.use_auth_broker === true ||
       cfg?.environment?.use_auth_broker === true ||
       !!cfg?.auth_broker || // prefer auth-broker if config section exists
       hasDestination // if destination is specified, always use auth-broker
     );
   } catch {
-    return process.env.MCP_USE_AUTH_BROKER === 'true';
+    return false;
   }
 }
 

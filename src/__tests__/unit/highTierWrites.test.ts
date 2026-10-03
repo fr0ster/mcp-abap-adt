@@ -70,6 +70,10 @@ import { handleCreateCdsUnitTest } from '../../handlers/unit_test/high/handleCre
 import { handleUpdateCdsUnitTest } from '../../handlers/unit_test/high/handleUpdateCdsUnitTest';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import {
+  resetSystemContextCache,
+  setSystemContext,
+} from '../../lib/systemContext';
+import {
   fakeClientOf,
   okResponse,
   reading,
@@ -85,6 +89,11 @@ const context = {
 };
 
 describe('high-tier creates: no lock, single POST', () => {
+  // CreateBehaviorImplementation passes the responsible itself and is refused
+  // without one (systemContextRequired.test.ts); state one for the fakes.
+  beforeEach(() => setSystemContext({ responsible: 'USER_PLACEHOLDER' }));
+  afterEach(() => resetSystemContextCache());
+
   it.each([
     [
       'CreateBehaviorImplementation',

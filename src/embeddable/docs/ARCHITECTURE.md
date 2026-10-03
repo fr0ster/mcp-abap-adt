@@ -13,40 +13,34 @@ Base class that extends `McpServer` from SDK and provides context for handlers:
 ```typescript
 abstract class BaseMcpServer extends McpServer {
   protected connectionContext: ConnectionContext | null = null;
-  protected authBroker?: AuthBroker; // From @mcp-abap-adt/auth-broker
-  
+
   constructor(options: { name: string; version: string }) {
     super(options);
   }
-  
+
   /**
-   * Sets connection context using auth broker
+   * Sets the connection context of a destination.
    * For stdio: called once on startup
-   * For SSE/HTTP: called per-request
+   * For SSE/HTTP: called per session or request
+   *
+   * No token is read and no authentication type is branched on: the context
+   * holds the destination's settings and its credential (an IAuthProvider),
+   * and the credential renews itself.
    */
   protected async setConnectionContext(
     destination: string,
-    authBroker: AuthBroker
+    destinations: IDestinations // settingsFor(destination), getProvider(destination)
   ): Promise<void> {
-    this.authBroker = authBroker;
-    
-    // Get connection parameters from broker
-    const token = await authBroker.getToken(destination);
-    const serviceKey = authBroker.getServiceKey(destination);
-    
+    const settings = await destinations.settingsFor(destination);
+    const credential = await destinations.getProvider(destination);
+
     this.connectionContext = {
       sessionId: destination,
-      connectionParams: {
-        sapUrl: serviceKey.sapUrl,
-        auth: {
-          type: 'jwt',
-          jwtToken: token,
-        },
-        client: serviceKey.client,
-      },
+      connectionParams: settings, // URL, client, auth type, connection type -- no secret
+      credential,                 // what the connector presents
     };
   }
-  
+
   /**
    * Gets current connection context
    * Handlers can access this via `this.connectionContext` in their class
@@ -56,18 +50,22 @@ abstract class BaseMcpServer extends McpServer {
   }
   
   /**
-   * Gets ABAP connection from connection context
-   * Creates connection using connectionParams from context
+   * Gets ABAP connection from connection context:
+   * a connector built from the context's settings and credential, then connected
    */
-  protected getConnection(): AbapConnection {
+  protected async getConnection(): Promise<AbapConnection> {
     if (!this.connectionContext?.connectionParams) {
       throw new Error('Connection context not set');
     }
-    
-    // Create ABAP connection from context
-    return createAbapConnection(this.connectionContext.connectionParams);
+
+    const connection = createAbapConnection(
+      this.connectionContext.connectionParams,
+      this.connectionContext.credential
+    );
+    await connection.connect();
+    return connection;
   }
-  
+
   /**
    * Registers handlers from registry
    * Wraps handlers to inject connection as first parameter
@@ -87,7 +85,7 @@ abstract class BaseMcpServer extends McpServer {
           // Wrapped handler: (args: any) => handler(getConnection(), args)
           const wrappedHandler = async (args: any) => {
             // Get connection from context (this.connectionContext)
-            const connection = this.getConnection();
+            const connection = await this.getConnection();
             
             // Call original handler with connection as first parameter
             return await entry.handler(connection, args);
@@ -109,21 +107,17 @@ abstract class BaseMcpServer extends McpServer {
 }
 
 interface ConnectionContext {
-  // Connection parameters to ABAP system
-  connectionParams?: {
-    sapUrl: string;
-    auth: {
-      type: 'jwt' | 'basic';
-      jwtToken?: string;
-      username?: string;
-      password?: string;
-    };
-    client?: string;
-  };
-  
+  // The connector's settings: URL, client, authentication type, connection type.
+  // They hold no secret.
+  connectionParams: SapConfig;
+
+  // The credential the connector presents: a destination's provider
+  // (IDestinations.getProvider) or the one the request headers carry
+  credential: IAuthProvider;
+
   // Session information
   sessionId: string;
-  
+
   // Additional metadata
   metadata?: Record<string, any>;
 }
@@ -132,44 +126,40 @@ interface ConnectionContext {
 ### Configuration
 
 Server can be configured via:
-1. **CLI arguments**: `--mcp=destination --config=path/to/config.yaml`
-2. **YAML config file**: Contains service keys, destinations, etc.
+1. **CLI arguments**: `--mcp=destination --conf=path/to/config.yaml`
+2. **YAML config file**: configuration only (transport, destination name, ports); a secret-looking key is refused
+3. **Environment and `.env` files**: secrets and the session
 
 ```yaml
 # config.yaml
-destinations:
-  trial:
-    serviceKey: /path/to/service-key.json
-    sapUrl: https://your-system.sap.com
-  production:
-    serviceKey: /path/to/prod-key.json
-    sapUrl: https://prod-system.sap.com
+transport: stdio
+mcp: trial
+browser-auth-port: 61001
 ```
 
-### Auth Broker Setup
+A destination -- `service-keys/trial.json` and `sessions/trial.env` -- is read field by field, once per process.
 
-Auth broker is created from configuration and used to get connection context:
+### Destinations Setup
+
+The destinations are an `AuthBrokerFactory` (`@mcp-abap-adt/lib/auth`), built once. It builds one `AuthBroker` per destination on first use; the stores come from the destination's mode (an env file, or a named destination) and the browser login strategy is passed in -- the library has no default:
 
 ```typescript
-// Create auth broker from service key store
-const serviceKeyStore = new AbapServiceKeyStore(config.serviceKeysPath);
-const sessionStore = new AbapSessionStore();
-const tokenProvider = new AuthorizationCodeProvider({
-  uaaUrl: 'https://auth.example.com',
-  clientId: '...',
-  clientSecret: '...',
+import { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
+
+const destinations = new AuthBrokerFactory({
+  mcpDestination: 'trial',   // or envFile: { path, source } for one .env file
+  unsafe: false,             // true: write named sessions to disk
   browser: 'system',
+  browserAuthPort: 61001,
+  browserStrategy: browserCallbackStrategy,
 });
 
-const authBrokerFactory = new AuthBrokerFactory(
-  serviceKeyStore,
-  sessionStore,
-  tokenProvider
-);
-
-// Get or create broker for destination
-const authBroker = authBrokerFactory.getOrCreateBroker(destination);
+const settings = await destinations.settingsFor('trial');
+const credential = await destinations.getProvider('trial');
 ```
+
+The four supported authentications -- basic, SNC, `jwt` / `authorization_code`, `jwt` / `none` -- are the handlers in `src/lib/auth/handlers/`.
 
 ## Server Classes
 
@@ -181,7 +171,7 @@ const authBroker = authBrokerFactory.getOrCreateBroker(destination);
 class StdioServer extends BaseMcpServer {
   constructor(
     private handlersRegistry: IHandlersRegistry,
-    private authBroker: AuthBroker
+    private destinations: IDestinations
   ) {
     super({
       name: "mcp-abap-adt",
@@ -190,9 +180,9 @@ class StdioServer extends BaseMcpServer {
   }
   
   async start(destination: string): Promise<void> {
-    // 1. Set connection context using auth broker
+    // 1. Set connection context from the destination's settings and credential
     // Context is available in handlers via this.connectionContext
-    await this.setConnectionContext(destination, this.authBroker);
+    await this.setConnectionContext(destination, this.destinations);
     
     // 2. Register handlers from registry
     // Handlers will have access to this.connectionContext
@@ -213,19 +203,17 @@ class StdioServer extends BaseMcpServer {
 // Or from YAML config
 const destination = args.mcp || config.defaultDestination;
 
-// Create auth broker (from config or CLI)
-const authBroker = authBrokerFactory.getOrCreateBroker(destination);
-
+// Destinations: an AuthBrokerFactory (see "Destinations Setup")
 // Create and start server
-const server = new StdioServer(handlersRegistry, authBroker);
+const server = new StdioServer(handlersRegistry, destinations);
 await server.start(destination);
 ```
 
 **Flow**:
 - Create `StdioServer` instance (extends `BaseMcpServer` which extends `McpServer`)
-- Inject `IHandlersRegistry` and `AuthBroker`
+- Inject `IHandlersRegistry` and `IDestinations`
 - Call `start(destination)` where destination comes from CLI (`--mcp=...`) or YAML config
-- `setConnectionContext()` uses auth broker to get token and service key
+- `setConnectionContext()` takes the destination's settings and credential (`settingsFor`, `getProvider`)
 - Context is available as `this.connectionContext` in handlers
 - Register handlers from `IHandlersRegistry` via `registerHandlers()`
 - Create `StdioServerTransport` and connect
@@ -390,7 +378,7 @@ sequenceDiagram
 class StreamableHttpServer extends BaseMcpServer {
   constructor(
     private handlersRegistry: IHandlersRegistry,
-    private authBrokerFactory: AuthBrokerFactory,
+    private destinations: IDestinations,
     private port: number = 8083
   ) {
     super({
@@ -414,11 +402,9 @@ class StreamableHttpServer extends BaseMcpServer {
       // Get destination from request (headers or body)
       const destination = req.headers['x-destination'] || req.body?.destination || 'default';
       
-      // Get or create auth broker for this destination
-      const authBroker = this.authBrokerFactory.getOrCreateBroker(destination);
       
-      // Setup connection context using auth broker
-      await this.setConnectionContext(destination, authBroker);
+      // Setup connection context from the destination (settings + credential)
+      await this.setConnectionContext(destination, this.destinations);
       
       try {
         // Create new transport for each request
@@ -454,20 +440,18 @@ class StreamableHttpServer extends BaseMcpServer {
 // Or from YAML config
 const port = args.port || config.port || 8083;
 
-// Create auth broker factory (from config)
-const authBrokerFactory = createAuthBrokerFactory(config);
-
+// Destinations: an AuthBrokerFactory (see "Destinations Setup")
 // Create and start server
-const server = new StreamableHttpServer(handlersRegistry, authBrokerFactory, port);
+const server = new StreamableHttpServer(handlersRegistry, destinations, port);
 await server.start();
 ```
 
 **Flow**:
 - Create `StreamableHttpServer` instance (extends `BaseMcpServer` which extends `McpServer`)
-- Inject `IHandlersRegistry` and `AuthBrokerFactory`
+- Inject `IHandlersRegistry` and `IDestinations`
 - Register handlers from `IHandlersRegistry` via `registerHandlers()`
 - Start HTTP server
-- **POST /mcp**: For each request, get destination from headers/body, get auth broker from factory, set connection context via `setConnectionContext()`, create new `StreamableHTTPServerTransport`, connect, call `handleRequest`
+- **POST /mcp**: For each request, get the destination, set connection context via `setConnectionContext()`, create new `StreamableHTTPServerTransport`, connect, call `handleRequest`
 - Connection context is available in handlers via `this.connectionContext`
 
 **Sequence Diagram**:
@@ -623,7 +607,7 @@ export async function handleCreateClass(
 
 1. **BaseMcpServer Class**: Extends `McpServer` from SDK and provides `connectionContext` property
    - Handlers can access context via `this.connectionContext` in their class
-   - Context is set via `setConnectionContext(destination, authBroker)` which uses auth broker to get token and service key
+   - Context is set via `setConnectionContext(destination, destinations)`, which takes the destination's settings and credential; no token is read first
    - Handlers can be wrapped during registration to bind to class instance, or defined as class methods
    
 2. **Three Server Classes**: 
@@ -641,16 +625,16 @@ export async function handleCreateClass(
 4. **Configuration**: 
    - CLI arguments: `--mcp=destination`, `--port=8083`, `--config=path/to/config.yaml`
    - YAML config file: Contains destinations, service keys paths, etc.
-   - Configuration is used to create `AuthBrokerFactory` and get `AuthBroker` instances
+   - Configuration is used to create the `AuthBrokerFactory`; secrets live in `.env` files, never in YAML
    
-5. **Auth Broker**: 
-   - Created from `AuthBrokerFactory` using service key store, session store, and token provider
-   - Used in `setConnectionContext()` to get JWT token and service key for destination
-   - For stdio: one broker per destination (from CLI/YAML)
-   - For HTTP: broker retrieved per-request based on destination from request headers/body
-   
+5. **Auth Broker**:
+   - Created by `AuthBrokerFactory`, one per destination, on first use
+   - `getProvider(destination)` gives the connector its credential; the provider renews its token and the broker stores what it obtains
+   - For stdio: one destination (from CLI/YAML)
+   - For HTTP/SSE: the default destination, or the one in `x-mcp-destination` when `--allow-destination-header` is set
+
 6. **Connection Setup**: 
-   - For stdio: context set once via `setConnectionContext(destination, authBroker)` before connecting transport
-   - For SSE/HTTP: destination extracted from request, broker retrieved from factory, context set via `setConnectionContext()` per-request
+   - For stdio: context set once via `setConnectionContext(destination, destinations)` before connecting transport
+   - For SSE/HTTP: destination extracted from the request, context set via `setConnectionContext()` per session or request
    
 7. **Context Access**: Connection parameters are accessed in handlers via `this.connectionContext` property

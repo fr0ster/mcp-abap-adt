@@ -26,7 +26,7 @@ Refactor `src/index.ts` to:
 - Connection is obtained via `getManagedConnection()` from session context
 - Session context is set via `sessionContext.run()` with `{ sessionId, sapConfig, destination }`
 - Auth broker is used when `defaultMcpDestination` is set or headers contain destination info
-- Direct auth via headers: `x-sap-url`, `x-sap-auth-type`, etc.
+- Direct auth via headers: `x-sap-url` with `x-sap-jwt-token`, or `x-sap-login` and `x-sap-password`.
 
 ## Tasks
 

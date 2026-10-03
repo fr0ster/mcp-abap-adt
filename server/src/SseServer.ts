@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -9,10 +9,19 @@ import type {
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+import {
+  type RequestContext,
+  requestContextFromHeaders,
+  runWithRequestContext,
+} from '@mcp-abap-adt/lib/request-context';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
+import {
+  destinationFailureAnswer,
+  destinationFromHeader,
+  FirstConnectLock,
+} from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
@@ -77,8 +86,11 @@ export interface SseServerOptions {
 type SessionEntry = {
   server: BaseMcpServer;
   transport: SSEServerTransport;
-  /** Per-session master language (x-sap-language), scoped around each POST dispatch (#110). */
-  masterLanguage?: string;
+  /**
+   * What the session's headers state (x-sap-language, x-sap-responsible,
+   * x-sap-master-system), scoped around each POST dispatch (#110).
+   */
+  requestContext: RequestContext;
 };
 
 /**
@@ -95,6 +107,8 @@ export class SseServer {
   private readonly postPath: string;
   private readonly defaultDestination?: string;
   private readonly sessions = new Map<string, SessionEntry>();
+  /** Per-destination lock around the first connect: it serialises the first login. */
+  private readonly firstConnect = new FirstConnectLock();
   private readonly logger: Logger;
   private readonly version: string;
   private readonly externalApp?: IHttpApplication;
@@ -107,7 +121,8 @@ export class SseServer {
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    private readonly authBrokerFactory: AuthBrokerFactory,
+    /** The destinations: settings and the counted provider, nothing else. */
+    private readonly destinations: IDestinations,
     opts?: SseServerOptions,
   ) {
     this.host = opts?.host ?? '127.0.0.1';
@@ -239,39 +254,55 @@ export class SseServer {
     });
   }
 
+  /**
+   * Stops taking connections (shutdown, step 1). Requests already running are
+   * not waited for, nor is an open stream: the factory's gate holds them.
+   * Embedded on an external app, there is no listener of its own to stop.
+   */
+  async stop(): Promise<void> {
+    const server = this.standaloneServer;
+    if (!server) return;
+    this.standaloneServer = undefined;
+    server.close();
+    server.closeIdleConnections();
+  }
+
   private async handleGet(req: any, res: any): Promise<void> {
     let destination: string | undefined;
-    let broker: any;
+    let fromHeaders = false;
 
-    // Priority 1: Check x-mcp-destination header (only when --allow-destination-header)
-    const destinationHeader = this.allowDestinationHeader
-      ? ((req.headers['x-mcp-destination'] as string | undefined) ??
-        (req.headers['X-MCP-Destination'] as string | undefined))
-      : undefined;
+    try {
+      // Priority 1: x-mcp-destination (only with --allow-destination-header),
+      // refused when it is not a destination name
+      const destinationHeader = destinationFromHeader(
+        req.headers,
+        this.allowDestinationHeader,
+      );
 
-    if (destinationHeader) {
-      destination = destinationHeader;
-      broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
-    }
-    // Priority 2: Check SAP connection headers (x-sap-url + auth params)
-    // Headers will be passed directly to handlers, no broker needed
-    else if (this.hasSapConnectionHeaders(req.headers)) {
-      // No destination, no broker - handlers will use headers directly
-      destination = undefined;
-      broker = undefined;
-    }
-    // Priority 3: Use default destination
-    else if (this.defaultDestination) {
-      destination = this.defaultDestination;
-      broker = await this.authBrokerFactory.getOrCreateAuthBroker(destination);
-    }
-    // Priority 4: No auth params at all -> reject request
-    else {
-      res
-        .status(400)
-        .send(
-          'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
-        );
+      if (destinationHeader !== undefined) {
+        destination = destinationHeader;
+      }
+      // Priority 2: Check SAP connection headers (x-sap-url + auth params)
+      // The settings and the credential come from the headers, no destination
+      else if (this.hasSapConnectionHeaders(req.headers)) {
+        destination = undefined;
+        fromHeaders = true;
+      }
+      // Priority 3: Use default destination
+      else if (this.defaultDestination) {
+        destination = this.defaultDestination;
+      }
+      // Priority 4: No auth params at all -> reject request
+      else {
+        res
+          .status(400)
+          .send(
+            'Missing SAP connection context. Provide x-mcp-destination header, configure default destination (--mcp/--env-path), or pass x-sap-* headers.',
+          );
+        return;
+      }
+    } catch (error) {
+      this.answerFailure(res, error);
       return;
     }
 
@@ -285,9 +316,18 @@ export class SseServer {
       ) {
         super({ name: 'mcp-abap-adt-sse', version: ver, logger: loggerImpl });
       }
-      async init(dest: string | undefined, b: any, hdrs?: any) {
-        if (dest && b) {
-          await this.setConnectionContext(dest, b);
+      async init(
+        dest: string | undefined,
+        destinations: IDestinations,
+        firstConnect: FirstConnectLock,
+        hdrs?: any,
+      ) {
+        if (dest) {
+          await firstConnect.run(
+            dest,
+            () => this.setConnectionContext(dest, destinations),
+            () => this.getConnection(),
+          );
         } else if (hdrs) {
           this.setConnectionContextFromHeaders(hdrs);
         }
@@ -300,11 +340,17 @@ export class SseServer {
       this.logger,
       this.version,
     );
-    await server.init(
-      destination,
-      broker,
-      this.hasSapConnectionHeaders(req.headers) ? req.headers : undefined,
-    );
+    try {
+      await server.init(
+        destination,
+        this.destinations,
+        this.firstConnect,
+        fromHeaders ? req.headers : undefined,
+      );
+    } catch (error) {
+      this.answerFailure(res, error);
+      return;
+    }
 
     const transport = new SSEServerTransport(this.postPath, res);
     const sessionId = transport.sessionId;
@@ -312,15 +358,12 @@ export class SseServer {
     console.error(
       `[SSE GET] Created session ${sessionId} for destination ${destination}`,
     );
-    // Capture the per-session master language (x-sap-language) once at
-    // connection time; it is scoped around each POST dispatch below so it
-    // never leaks into other sessions via a process-global cache (#110).
-    const rawSseLang =
-      req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
-    const masterLanguage = Array.isArray(rawSseLang)
-      ? rawSseLang[0]
-      : rawSseLang;
-    this.sessions.set(sessionId, { server, transport, masterLanguage });
+    // Capture what the session states (x-sap-language, x-sap-responsible,
+    // x-sap-master-system) once at connection time; it is scoped around each
+    // POST dispatch below so it never leaks into other sessions via a
+    // process-global cache (#110).
+    const requestContext = requestContextFromHeaders(req.headers);
+    this.sessions.set(sessionId, { server, transport, requestContext });
     console.error(
       `[SSE GET] Session stored, total sessions: ${this.sessions.size}`,
     );
@@ -382,9 +425,8 @@ export class SseServer {
     }
 
     try {
-      await runWithRequestContext(
-        { masterLanguage: entry.masterLanguage },
-        () => entry.transport.handlePostMessage(req, res, req.body),
+      await runWithRequestContext({ ...entry.requestContext }, () =>
+        entry.transport.handlePostMessage(req, res, req.body),
       );
       if (!isPing) {
         console.error(
@@ -399,6 +441,20 @@ export class SseServer {
       if (!res.headersSent) {
         res.writeHead(500).end('Internal Server Error');
       }
+    }
+  }
+
+  /** A session whose destination failed: the error's words, or as before. */
+  private answerFailure(res: any, error: unknown): void {
+    const answer = destinationFailureAnswer(error);
+    if (answer.known) {
+      console.error(`[SSE GET] FAILED: ${answer.text}`);
+    } else {
+      // No words for it: its class only — a message may quote a file (H4).
+      console.error(`[SSE GET] FAILED: ${errorClassOf(error)}`);
+    }
+    if (!res.headersSent) {
+      res.status(answer.status).send(answer.text);
     }
   }
 

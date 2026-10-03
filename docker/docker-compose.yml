@@ -1,9 +1,9 @@
 version: '3.8'
 
-# MCP ABAP ADT Server with AuthBroker and destination-based authentication
+# MCP ABAP ADT Server with destination-based authentication
 #
 # Architecture:
-# - Uses AuthBroker for authentication management
+# - A destination is a service key (and optionally a session file)
 # - Service keys stored in volume (./service-keys)
 # - HTTP transport on port 3000
 
@@ -25,18 +25,23 @@ services:
       - MCP_HTTP_PORT=3000
       - MCP_HTTP_HOST=0.0.0.0
 
-      # Destination name (service key filename without .json)
-      # Override with: docker-compose run -e MCP_DESTINATION=your-dest mcp-abap-adt
-      - MCP_DESTINATION=${MCP_DESTINATION:-default}
-
-      # Optional: Custom paths for AuthBroker
-      # - AUTH_BROKER_PATH=/app/service-keys
+      # Base directory of service-keys/ and sessions/ inside the container.
+      # One directory (a list is not split): set it, or the server reads the home directory's.
+      - AUTH_BROKER_PATH=/app
+    # The destination is chosen by the command, not by an environment variable:
+    #   --mcp=<name>                an own default destination (service-keys/<name>.json)
+    #   --allow-destination-header  a client names it per request with x-mcp-destination
+    # (the image's default command is --allow-destination-header alone)
+    command: ["node", "./dist/server/launcher.js", "--mcp=trial", "--allow-destination-header"]
 
     # Volumes for AuthBroker data
     volumes:
       # Service keys directory - put your {destination}.json files here
       # Example: ./service-keys/trial.json, ./service-keys/dev.json
       - ./service-keys:/app/service-keys:ro
+
+      # Sessions: written only with --unsafe (otherwise the session is kept in memory)
+      # - ./sessions:/app/sessions
 
       # Optional: Cache directory
       # - ./cache:/app/cache

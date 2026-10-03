@@ -15,7 +15,6 @@
  */
 
 import { packageDocuments } from '@mcp-abap-adt/adt-clients';
-import type { SapConfig } from '@mcp-abap-adt/connection';
 import { answer } from '../../../lib/answer';
 import { createAdtClient } from '../../../lib/clients';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
@@ -51,11 +50,6 @@ export const TOOL_DEFINITION = {
         description:
           'Force creation of a new connection (bypass cache). Useful when package was locked/unlocked and needs to be deleted in a fresh session. Default: false.',
       },
-      connection_config: {
-        type: 'object',
-        description:
-          'Optional SAP connection config to create a fresh connection for deletion. Useful when the existing connection config is unavailable.',
-      },
       ...DETAIL_PROPERTY,
     },
     required: ['package_name'],
@@ -66,7 +60,6 @@ interface DeletePackageArgs {
   package_name: string;
   transport_request?: string;
   force_new_connection?: boolean;
-  connection_config?: SapConfig;
   detail?: 'terse' | 'full' | 'raw';
 }
 
@@ -79,7 +72,6 @@ export async function handleDeletePackage(
     package_name,
     transport_request,
     force_new_connection = false,
-    connection_config,
   } = args;
 
   if (!package_name) {
@@ -100,13 +92,7 @@ export async function handleDeletePackage(
   let deleteConnection = connection;
   if (force_new_connection) {
     try {
-      deleteConnection = await openFreshConnection(
-        connection,
-        logger,
-        connection_config ??
-          (connection as { getConfig?: () => unknown }).getConfig?.() ??
-          (connection as { config?: unknown }).config,
-      );
+      deleteConnection = await openFreshConnection(connection, logger);
       logger?.info(
         `DeletePackage using fresh connection for ${packageName} (force_new_connection=true)`,
       );

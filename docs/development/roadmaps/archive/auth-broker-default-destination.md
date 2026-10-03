@@ -1,5 +1,7 @@
 # Roadmap: AuthBroker Refactoring for Default Destination Support
 
+> **Archived.** This roadmap describes the authentication wiring of 15.x and earlier. In 16.0.0 it is replaced by `AuthBrokerFactory` on auth-broker 4 (`getProvider`); see [MIGRATION-16.0.md](../../../MIGRATION-16.0.md) and `src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md`. Kept for history only.
+
 ## Implementation Status: ✅ Core Features Completed + Security & UX Improvements
 
 **Last Updated**: Implementation completed for core features (Stages 1-5) + Security improvements and YAML enhancements

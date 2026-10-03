@@ -7,15 +7,174 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [16.0.0] - 2026-10-03
+
+Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).
+
+### Breaking
+
+- **Authentication runs on `@mcp-abap-adt/auth-broker` 4, `connection` 10, `auth-providers` 5 and
+  `auth-stores` 3, and the server serves exactly four authentications**: basic (HTTP or RFC), SNC
+  (RFC only, no user and no password), `jwt` / `authorization_code` (browser login; an ABAP or XSUAA
+  service key) and `jwt` / `none` (a token you hold). A destination that states anything else —
+  `certificate`, `kerberos`, `saml` or another `jwt` grant — is refused at startup, naming the
+  authentication (a `saml` destination with no grant is refused with `lacks: grantType`).
+- **A `.env` states its authentication.** `SAP_AUTH_TYPE` has no default, and a `jwt` `.env` states
+  `SAP_GRANT_TYPE`; without them the destination is refused (`Destination "X" lacks: authType` /
+  `grantType`, with a hint to regenerate it with `mcp-auth generate-env --grant`). The `mcp-auth`
+  command comes from `@mcp-abap-adt/auth-broker-cli`.
+- **An XSUAA service key needs `XSUAA_MCP_URL`** in `sessions/<destination>.env`: the key carries the UAA,
+  not the system.
+- **An `--env` / `--env-path` `.env` is read and written back** with a renewed token,
+  whatever `--unsafe` says. A destination is read once per process: a changed `.env` takes effect on
+  restart. A named destination's session is read from `sessions/<destination>.env` only with
+  `--unsafe`: a `jwt` / `none` token there is refused without it (`lacks: authorizationToken`, with a
+  hint).
+- **Nothing is looked up in the working directory.** Finding configuration where the process happens to
+  start is a vulnerability: a server started inside someone else's project took their settings and
+  credentials. A `.env` there is no longer read — pass `--env-path=./.env` (or `--env=<name>`, `--mcp`,
+  YAML); without one there is no default destination (stdio: inspection-only). The working directory is
+  gone from `getPlatformPaths` too.
+- **`--auth-broker`, `MCP_USE_AUTH_BROKER` and YAML `auth-broker` are removed**; their only purpose was to
+  switch the working-directory `.env` off. A leftover form stops the start, naming the form used ("was
+  removed in 16.0.0 — remove it from the configuration") — drop it from client configs.
+- **The master system is determined from configuration, or by a request in the cloud.** The setup-time
+  master-system lookup is gone (setting a destination's context up builds no connection), and cloud versus
+  on-premise is the kind the connection was built for (`SAP_SYSTEM_TYPE`, else `jwt` is cloud), never a
+  guess from the URL. On-premise nothing is asked: the master system is `SAP_MASTER_SYSTEM`, or left out
+  of the request when none is set. A cloud destination without
+  `SAP_CLIENT` uses the system's default client.
+- **A created object always carries a responsible person; the master system only when known.** The
+  responsible comes from, first found: the tool's own argument (`CreateTransport`'s `owner`); the
+  `x-sap-responsible` header; `SAP_RESPONSIBLE` in the destination's own `.env` (the `--env` /
+  `--env-path` file or `sessions/<destination>.env`), then in the process environment; else the login —
+  on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an `x-sap-url` connection (not of a
+  destination request), the process `SAP_USERNAME`; on a cloud system only `systeminformation`'s user. A create (or a transport without an owner) that finds none
+  (SNC or a token you hold, with no `SAP_RESPONSIBLE`) is refused before any request —
+  `"error": "system_context_missing"`, naming `SAP_RESPONSIBLE`, the header and the login (or, when a
+  cloud system could not be reached, saying to retry when it is available) — where it used
+  to be sent with an empty or missing responsible. `CreateBehaviorImplementation`, whose adt-clients class
+  is built with an empty system context, now passes the responsible and master system itself. The one
+  exception is a message class: it is created with the system's own default responsible (adt-clients'
+  message class create takes none, as in 15.x). The master system comes from `x-sap-master-system` (no
+  tool takes it as an argument), `SAP_MASTER_SYSTEM` (destination `.env`, then process), else a cloud system's
+  id; otherwise it is left out of the request, as before — never refused. Reads are unaffected. On a
+  cloud connection an empty value is filled from `systeminformation` even when a host's request scope
+  carries its key as `undefined`. `SAP_RESPONSIBLE` from any source now wins over every login, outside a request scope that carries
+  `responsible`. The process environment is read once: a change while the server runs is not picked up. The
+  `--env` file's `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are no longer copied into the
+  process environment: they are that destination's own, and over HTTP/SSE they had become every other
+  destination's fallback. `getSystemContext()` no longer reports `SAP_USERNAME` as `responsible`.
+- **`@mcp-abap-adt/adt-clients` is pinned to `~24.1.0`**: the refusal relies on its `protected
+  systemContext` being read where a value is sent, which a minor release could change. Its service
+  definition, transformation and access control builders write `adtcore:responsible=""` when the value is
+  empty; the refusal is what keeps that from being sent.
+- **An embedder's own cloud connection is no longer recognised by its URL.** A connection the factory did
+  not build is cloud only when the server's `systemType` option or `SAP_SYSTEM_TYPE` says so; otherwise
+  nothing is asked of the system, and a create without configured values is refused.
+- **The browser callback port is `61001`** unless `--browser-auth-port` says otherwise (it was `5000`,
+  `4000` and `4001` by transport).
+- **`x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read**; a direct
+  connection is `x-sap-url` with `x-sap-jwt-token`, or with `x-sap-login` and `x-sap-password`.
+- **`AUTH_BROKER_PATH` is one base directory** (the value is not split).
+- **`DeletePackageLow` lost `connection_config`**; a connection comes from the destination alone.
+- **`@mcp-abap-adt/lib` public API**: `registerAuthBroker`, `getAuthBroker`, `ConfigLoader`,
+  `buildRuntimeConfig` and `AuthBrokerConfig` are gone; `AuthBrokerFactory` has a new surface
+  (`defaultDestination`, `getBroker`, `settingsFor`, `getProvider`, `settle`) and needs a
+  `browserStrategy`; `ConnectionContext` carries `credential: IAuthProvider`;
+  `BaseMcpServer.setConnectionContext` and the three transport servers take `IDestinations`.
+  `@mcp-abap-adt/core` no longer depends on `@mcp-abap-adt/auth-broker`.
+
+### Added
+
+- **SNC logon over RFC** (`SAP_AUTH_TYPE=snc`, `SAP_SNC_PARTNERNAME`, optional `SAP_SNC_QOP`,
+  `SAP_SNC_LIB`, `SAP_SNC_MYNAME`): passwordless, through an installed SNC product such as a Secure Login
+  Client. `@mcp-abap-adt/sap-rfc-lite` stays an optional dependency.
+- **Every authentication and connection parameter in three forms, in one table**: CLI, YAML and, for seven
+  of them, an environment variable (`--browser`, `--browser-auth-port`, `--allow-destination-header`,
+  `--system-type` and the rest); precedence CLI, environment, YAML. An invalid port, enum or flag value is
+  refused at startup, naming the parameter. YAML holds configuration only: a key that looks like a secret
+  is refused, naming the key.
+- **One connector construction, three credential sources**: a destination's provider, the request's
+  headers, or a credential an embedder hands over.
+- **`requestContextFromHeaders`** (`@mcp-abap-adt/lib/request-context`) and the optional
+  **`IDestinations.systemContextFor`**: the request scope a request's headers state, and the responsible,
+  login and master system a destination's own `.env` states. `RequestContext` gains `login` (the
+  destination's `SAP_USERNAME`, or an `x-sap-url` basic connection's `x-sap-login`): the responsible when
+  none is stated, on a connection that is not cloud. A resolver's `{}` means a cloud system that gave
+  nothing; `null` means not asked.
+- **`ListTransports`** filters by the effective responsible alone, no longer by a raw `SAP_USERNAME`.
+- **Shutdown that settles**: on `SIGTERM`, `SIGINT` or the end of stdin the server stops accepting, waits
+  up to 30 s for logins and refreshes in flight, and flushes every session; a secret that could not be
+  stored, a login or refresh still running at the deadline, a server that did not close, or a failed settle
+  exits `1` with one stderr line per fact (the destination and the error class, never a secret).
+- **Destination names are vetted** before any file is read (letters, digits, `_`, `.`, `-`), and an env file
+  named with `--env` / `--env-path` that does not exist is refused naming the parameter and the path.
+- **Errors in the server's own words**: `Destination "X" lacks: <fields>` with a hint, and
+  `Destination "X" uses <type> / <grant>, which this server does not support`; never a value read from a
+  file. Under HTTP and SSE a refused credential is answered with the provider's own fixed words (status
+  `500`) instead of `Internal Server Error`.
+
+### Changed
+
+- **The docker files documented `MCP_DESTINATION`, which no code ever read.** They now show the real ways:
+  `--mcp=<name>` in the container command, YAML `mcp` through `--config`, or `x-mcp-destination` with
+  `--allow-destination-header`; the compose files set `AUTH_BROKER_PATH=/app`.
+- **The documentation describes the four authentications**, the parameter table, the `.env` write-back and
+  the restart rule; the stale `npm install -g @mcp-abap-adt/auth-broker` and the 5000/4000/4001 port
+  defaults are gone, in the help text as well.
+- **The npm tarball carries no working documents**: `docs/superpowers/` is excluded from `files`.
+- **The tests are type-checked in CI and in the release workflow** (#268). `npm run test:check` ran
+  nowhere, so a test that used a type it did not import ran green while the type check failed; both
+  workflows now run it after the build.
+- **`MCP_TEST_CONFIG` names the integration-test config a run reads** (#266), so one checkout carries a
+  config per system; a named file that does not exist fails the run instead of falling back to the
+  template.
+
 ### Fixed
 
+- **`x-sap-responsible` and `x-sap-master-system` are read.** They were written to the connection's
+  metadata and read by nothing; they now enter the request scope over HTTP and SSE, for destination and
+  `x-sap-*` connection requests alike, and a request with `x-sap-*` connection headers reads the process
+  configuration too.
 - **`SAP_LANGUAGE` from `--env-path` reaches the objects it creates** (#182).
   The env file goes to the auth broker's session store, which never fills
   `process.env`; the launcher bridged six system-context keys from it and not
   the language, so every object created through such a session took the
   library's default language. The bridge now lives in `@mcp-abap-adt/lib/config`
   (`hydrateSystemContextFromEnvFile`, `ENV_FILE_CONTEXT_KEYS`) and carries
-  `SAP_LANGUAGE`; a value already in the process environment still wins.
+  `SAP_LANGUAGE`; a value already in the process environment still wins. The
+  responsible and master system are no longer among its keys: they are read
+  as the file's destination's own (see Breaking).
+- **`SAP_SYSTEM_TYPE` in the `--env` / `--env-path` file beats YAML `system-type`.** The argument
+  parser wrote the YAML (or CLI) system type into the process environment before the env file was
+  read, and the file's value, which never replaces one already set, was lost: YAML `cloud` beside
+  `SAP_SYSTEM_TYPE=onprem` in the file built the cloud connector. The precedence is now resolved after
+  the file joins the environment, as for the connection type: the CLI, then the environment (the file's
+  value included, never over one set before), then YAML. A word in the environment that is not
+  `onprem`, `cloud` or `legacy` stops the start, naming the key without quoting it.
+  `ArgumentsParser.parse()` and `ServerConfigManager` (`@mcp-abap-adt/lib/config`) no longer write
+  `SAP_SYSTEM_TYPE` into `process.env`: an embedder that parses the configuration itself reads
+  `systemType` / `systemTypeSource` from the parsed config.
+- **The login URL reaches stderr without `DEBUG_AUTH_LOG`.** The browser strategy prints the URL to
+  open (`--browser=none` / `headless`, or `auto` when it could not open one) through the broker's
+  logger, which is silent unless `DEBUG_AUTH_LOG=true`: the user never saw it and the login timed out.
+  The strategy now gets a logger whose prompts are lines on stderr always; its warnings, errors and
+  debug lines stay behind `DEBUG_AUTH_LOG`. Nothing goes to stdout.
+- **`GetInactiveObjects` reads the older document and keeps a function module's group** (#266).
+  BASIS 7.40 answers `adtcore:objectReferences`, which the reader did not know: it answered `count: 0`
+  over inactive objects. It now reads that document, refuses a root it does not know instead of
+  answering an empty list, and gives each entry its `parentName` (the group of a function module, from
+  `adtcore:parentUri`), so the entry can be handed to `ActivateObjectLow` as it is.
+- **The shared test setup activates a function module through its group** (#266). The module's own name
+  stood in the group's place in the address, and the whole activation batch answered
+  `500 invalidFunctionGroup`.
+- **Enhancement types ADT does not expose are named as such** (#267). `GetEnhancementSpot` on a plain
+  enhancement spot, and `GetEnhancementImpl` on a class enhancement, answer that the object is not
+  available through ADT (Eclipse opens it in SAP GUI) instead of passing a raw `500` on; a BAdI
+  implementation is answered as having no source, and a source code plugin asked under a spot name
+  gets the hint to read it with `enhancement_spot "enhoxhh"`. A plugin read under `enhoxhh` that
+  fails keeps its own failure. What worked keeps one request and its answer.
 
 ## [15.1.0] - 2026-10-01
 

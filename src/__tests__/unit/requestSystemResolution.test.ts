@@ -13,11 +13,14 @@ jest.mock('@mcp-abap-adt/adt-clients', () => ({
 }));
 
 import { AdtClient, getSystemInformation } from '@mcp-abap-adt/adt-clients';
+import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
+import type { IAuthProvider } from '@mcp-abap-adt/interfaces-auth';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { EmbeddableMcpServer } from '../../embeddable/EmbeddableMcpServer';
 import type { HandlerContext } from '../../handlers/interfaces';
 import { createAdtClient } from '../../lib/clients';
+import { createAbapConnection } from '../../lib/connectionFactory';
 import { BaseHandlerGroup } from '../../lib/handlers/base/BaseHandlerGroup';
 import { HandlerExporter } from '../../lib/handlers/HandlerExporter';
 import type {
@@ -40,16 +43,35 @@ import {
 
 const lookup = getSystemInformation as jest.Mock;
 
-function cloudConn(): IAbapConnection {
-  return {
-    getBaseUrl: async () => 'https://my-abap.abap.eu10.hana.ondemand.com',
-  } as unknown as IAbapConnection;
+const credential: IAuthProvider = {
+  kind: 'test',
+  prepare: async () => ({ ok: true as const }),
+  establish: async () => ({ ok: true as const }),
+  authorize: async () => ({ ok: true as const }),
+  rejected: async () => ({ ok: true as const }),
+};
+
+/**
+ * Connections built by the factory, so the system kind is the one they were
+ * built for: a jwt is cloud, anything else on-premise, SAP_SYSTEM_TYPE wins.
+ * The URL decides nothing.
+ */
+function built(settings: Partial<SapConfig>): IAbapConnection {
+  return createAbapConnection(settings as SapConfig, credential);
 }
 
+function cloudConn(): IAbapConnection {
+  return built({ url: 'https://system.example.invalid', authType: 'jwt' });
+}
+
+/** An https URL without a port: a URL guess could not call it on-premise. */
 function onPremConn(): IAbapConnection {
-  return {
-    getBaseUrl: async () => 'http://sap.example.com:8000',
-  } as unknown as IAbapConnection;
+  return built({ url: 'https://system.example.invalid', authType: 'basic' });
+}
+
+/** A connection the factory did not build (an embedder's own). */
+function foreignConn(url: string): IAbapConnection {
+  return { getBaseUrl: async () => url } as unknown as IAbapConnection;
 }
 
 type Options =
@@ -69,7 +91,14 @@ function seen() {
   };
 }
 
+const savedSystemType = process.env.SAP_SYSTEM_TYPE;
+afterEach(() => {
+  if (savedSystemType === undefined) delete process.env.SAP_SYSTEM_TYPE;
+  else process.env.SAP_SYSTEM_TYPE = savedSystemType;
+});
+
 beforeEach(() => {
+  delete process.env.SAP_SYSTEM_TYPE;
   resetSystemContextCache();
   setSystemContext({});
   (AdtClient as jest.Mock).mockClear();
@@ -85,16 +114,50 @@ describe('defaultSystemContextResolver', () => {
     });
   });
 
-  it('returns null on-premise without asking the system', async () => {
+  it('returns null on-premise without asking the system, whatever the URL', async () => {
     await expect(defaultSystemContextResolver(onPremConn())).resolves.toBe(
       null,
     );
+    await expect(
+      defaultSystemContextResolver(
+        built({
+          url: 'https://system.abap.example.hana.ondemand.com',
+          authType: 'basic',
+        }),
+      ),
+    ).resolves.toBe(null);
     expect(lookup).not.toHaveBeenCalled();
   });
 
-  it('returns null when the system information is null', async () => {
-    lookup.mockResolvedValue(null);
+  it('SAP_SYSTEM_TYPE states the kind: a jwt on-premise is not asked', async () => {
+    process.env.SAP_SYSTEM_TYPE = 'onprem';
     await expect(defaultSystemContextResolver(cloudConn())).resolves.toBe(null);
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['https://system.abap.example.hana.ondemand.com'],
+    ['https://system.example.invalid'],
+  ])(
+    'a connection the factory did not build: SAP_SYSTEM_TYPE alone, never the URL (%s)',
+    async (url) => {
+      await expect(
+        defaultSystemContextResolver(foreignConn(url)),
+      ).resolves.toBe(null);
+      expect(lookup).not.toHaveBeenCalled();
+      process.env.SAP_SYSTEM_TYPE = 'cloud';
+      await expect(
+        defaultSystemContextResolver(foreignConn(url)),
+      ).resolves.toEqual({ responsible: 'CB_USER', masterSystem: 'CLD' });
+      expect(lookup).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it('a cloud system that answers nothing is {} — asked, so no login stands in — not null', async () => {
+    lookup.mockResolvedValue(null);
+    await expect(defaultSystemContextResolver(cloudConn())).resolves.toEqual(
+      {},
+    );
   });
 });
 
@@ -171,23 +234,23 @@ describe('withResolvedSystemContext', () => {
     });
   });
 
-  it('a scope carrying responsible as undefined keeps it empty, and still fills the master system', async () => {
-    // 10.1.0's rule, which this must not quietly overturn: a key the scope
-    // carries has answered the question, even when its value is `undefined`.
-    // Deciding by truthiness instead would fill exactly the case a host
-    // deliberately emptied, and would make CLIENT_CONFIGURATION.md's
-    // "present (even `undefined`) → the scope's value" row false on cloud.
+  it('a scope carrying responsible as undefined is filled from the system, like an absent one', async () => {
+    // Ruling 17: a host that always enters a scope with both keys — values
+    // possibly undefined (cloud-llm-hub) — must still get the cloud values.
+    // An empty value is missing, whether its key is present or not.
     const conn = cloudConn();
     await runWithRequestContext({ responsible: undefined }, () =>
       withResolvedSystemContext(conn, () => {
         createAdtClient(conn);
       }),
     );
-    expect(lastOptions()?.responsible).toBeUndefined();
-    expect(lastOptions()).toMatchObject({ masterSystem: 'CLD' });
+    expect(lastOptions()).toMatchObject({
+      responsible: 'CB_USER',
+      masterSystem: 'CLD',
+    });
   });
 
-  it('a scope carrying both keys as undefined asks the system nothing', async () => {
+  it('a scope carrying both keys as undefined asks the system and fills both', async () => {
     const conn = cloudConn();
     await runWithRequestContext(
       { responsible: undefined, masterSystem: undefined },
@@ -196,9 +259,23 @@ describe('withResolvedSystemContext', () => {
           createAdtClient(conn);
         }),
     );
-    expect(lookup).not.toHaveBeenCalled();
-    expect(lastOptions()?.responsible).toBeUndefined();
-    expect(lastOptions()?.masterSystem).toBeUndefined();
+    expect(lookup).toHaveBeenCalledTimes(1);
+    expect(lastOptions()).toMatchObject({
+      responsible: 'CB_USER',
+      masterSystem: 'CLD',
+    });
+  });
+
+  it('a scope carrying both keys as undefined does not inherit the process values', async () => {
+    // Key presence still decides against the process cache: what stops one
+    // user's process-wide value reaching another user's scope.
+    setSystemContext({ responsible: 'PROC_USER', masterSystem: 'PROC_SYS' });
+    const result = await runWithRequestContext(
+      { responsible: undefined, masterSystem: undefined },
+      () => withResolvedSystemContext(onPremConn(), seen),
+    );
+    expect(result.responsible).toBeUndefined();
+    expect(result.masterSystem).toBeUndefined();
   });
 
   it('with no scope and an empty process context, fills and keeps the process language', async () => {
@@ -236,6 +313,9 @@ describe('withResolvedSystemContext', () => {
     lookup.mockRejectedValue(new Error('ICM down'));
     const result = await withResolvedSystemContext(cloudConn(), seen);
     expect(warn).toHaveBeenCalledTimes(1);
+    // The class only: a lookup's message may quote what the system answered (H4).
+    expect(String(warn.mock.calls[0][0])).toContain('Error');
+    expect(String(warn.mock.calls[0][0])).not.toContain('ICM down');
     expect(result.responsible).toBeUndefined();
     warn.mockRestore();
   });
@@ -425,6 +505,55 @@ describe('BaseMcpServer.registerHandlers', () => {
       masterSystem: 'CLD',
     });
     expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    ['cloud', 1, { responsible: 'CB_USER', masterSystem: 'CLD' }],
+    ['onprem', 0, {}],
+  ] as const)(
+    "an injected connection: the server's systemType %s states the kind, SAP_SYSTEM_TYPE unset",
+    async (systemType, lookups, expected) => {
+      const server = new EmbeddableMcpServer({
+        connection: foreignConn(
+          'https://system.abap.example.hana.ondemand.com',
+        ) as never,
+        handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+        systemType,
+      });
+      const result = textOf(await callTool(server, 'WithContext'));
+      expect(lookup).toHaveBeenCalledTimes(lookups);
+      expect(result).toMatchObject(expected);
+      if (lookups === 0) expect(result.masterSystem).toBeUndefined();
+    },
+  );
+
+  it("two servers stating systemType 'cloud' over one connection make one lookup", async () => {
+    // A host builds a server per request: the memo must span server instances.
+    const connection = foreignConn(
+      'https://system.abap.example.hana.ondemand.com',
+    );
+    for (let i = 0; i < 2; i++) {
+      const server = new EmbeddableMcpServer({
+        connection: connection as never,
+        handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+        systemType: 'cloud',
+      });
+      expect(textOf(await callTool(server, 'WithContext'))).toMatchObject({
+        responsible: 'CB_USER',
+        masterSystem: 'CLD',
+      });
+    }
+    expect(lookup).toHaveBeenCalledTimes(1);
+  });
+
+  it("a factory-built connection follows its recorded settings, not the server's systemType", async () => {
+    const server = new EmbeddableMcpServer({
+      connection: onPremConn() as never,
+      handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+      systemType: 'cloud',
+    });
+    await callTool(server, 'WithContext');
+    expect(lookup).not.toHaveBeenCalled();
   });
 
   it('systemContextResolver: null disables resolution', async () => {

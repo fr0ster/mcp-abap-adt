@@ -57,7 +57,9 @@ Service key format (ABAP environment):
 
 ```bash
 cp .env.example .env
-# Edit .env and set MCP_DESTINATION to match your service key filename (without .json)
+# The destination is chosen by the container command, not by an environment variable:
+# edit `--mcp=<name>` in docker-compose.yml (or docker-compose.package.yml) so that it
+# matches your service key's file name (without .json)
 ```
 
 ### 3. Start Server
@@ -107,8 +109,12 @@ docker-compose ps
    - Read-only volume mount
    - Contains OAuth2 credentials for SAP system
 
-2. **Destination**: Specified via `MCP_DESTINATION` environment variable
-   - Determines which service key to use
+2. **Destination**: Chosen by the container command; the server reads no environment variable for it
+   - `--mcp=<name>`: the container's own default destination, `service-keys/<name>.json`
+   - YAML `mcp: <name>` in a file passed with `--config=<file>`
+   - `x-mcp-destination: <name>` per request, with `--allow-destination-header` (the Dockerfile's default command)
+   - `AUTH_BROKER_PATH=/app` makes `/app/service-keys` and `/app/sessions` the directories the server reads
+3. **Login**: a browser login needs a browser and a reachable callback port (default `61001`), which a container does not have by default; obtain the session outside the container and mount `sessions/`, or hand a token in a header
 
 ### Directory Structure
 
@@ -129,24 +135,19 @@ docker/
 ### Single Destination
 
 ```bash
-# Use default destination from .env
+# Edit the command in docker-compose.yml:
+#   command: ["node", "./dist/server/launcher.js", "--mcp=trial"]
 docker-compose up -d
-
-# Or specify destination
-MCP_DESTINATION=trial docker-compose up -d
 ```
 
 ### Multiple Destinations
 
-Create multiple service key files and switch between them:
+Create multiple service key files, and either let clients choose per request (start with `--allow-destination-header` and send `x-mcp-destination: dev`), or change `--mcp=<name>` in the compose command and restart:
 
 ```bash
-# Use trial
-MCP_DESTINATION=trial docker-compose up -d
-
-# Stop and switch to dev
 docker-compose down
-MCP_DESTINATION=dev docker-compose up -d
+# edit the command: --mcp=dev
+docker-compose up -d
 ```
 
 ### Development with Volume Mounts
@@ -174,10 +175,10 @@ docker-compose -f docker-compose.package.yml up -d
 
 ### Environment Variables
 
-- `MCP_DESTINATION`: Destination name (default: "default")
 - `MCP_HTTP_PORT`: Server port (default: 3000)
 - `MCP_HTTP_HOST`: Server host (default: 0.0.0.0)
-- `AUTH_BROKER_PATH`: Custom path for service keys (default: /app/service-keys)
+- `AUTH_BROKER_PATH`: Base directory of `service-keys/` and `sessions/` (the compose files set `/app`)
+- `MCP_BROWSER_AUTH_PORT`: Login callback port (default: 61001)
 
 ### Volumes
 
@@ -204,23 +205,21 @@ docker-compose logs
 # Check service key exists
 ls -la service-keys/
 
-# Check destination matches filename
-echo $MCP_DESTINATION  # Should match {destination}.json
+# Check the --mcp=<name> in the container command matches a {name}.json
 
 # Check session was created
 ls -la sessions/
 
-# View session contents (after first successful auth)
-cat sessions/${MCP_DESTINATION}.env
+# A session file exists only with --unsafe and a mounted sessions/ directory
 ```
 
 ### Token expired
 
-AuthBroker automatically refreshes tokens. If manual refresh needed:
+The server renews its token with the refresh token. If manual refresh needed:
 
 ```bash
 # Remove session file to force re-authentication
-rm sessions/${MCP_DESTINATION}.env
+rm sessions/<name>.env
 
 # Restart container
 docker-compose restart

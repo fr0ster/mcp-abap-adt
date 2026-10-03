@@ -2,19 +2,21 @@ import * as fs from 'node:fs';
 import * as dotenv from 'dotenv';
 
 /**
- * The keys the system context reads from `process.env` (`systemContext.ts`):
- * who creates objects, on which system and client, and in which language.
+ * The keys of an `--env` file the process reads from `process.env`: the
+ * client, the connection and system type, and the language.
  *
  * `--env-path` hands the file to the auth broker's session store, which
- * connects with it but never touches `process.env`, so the context would read
- * none of these. They are bridged here. `SAP_LANGUAGE` was missing from the
- * list, and every object created through a session from `--env-path` took the
- * library's default language instead of the file's (#182).
+ * connects with it but never touches `process.env`, so these are bridged
+ * here. `SAP_LANGUAGE` was missing from the list, and every object created
+ * through a session from `--env-path` took the library's default language
+ * instead of the file's (#182).
+ *
+ * `SAP_RESPONSIBLE`, `SAP_MASTER_SYSTEM` and `SAP_USERNAME` are not bridged
+ * (16.0.0): they are the file's destination's own, read per destination
+ * (`IDestinations.systemContextFor`). In the process environment they would
+ * become every other destination's fallback.
  */
 export const ENV_FILE_CONTEXT_KEYS = [
-  'SAP_MASTER_SYSTEM',
-  'SAP_RESPONSIBLE',
-  'SAP_USERNAME',
   'SAP_CLIENT',
   'SAP_CONNECTION_TYPE',
   'SAP_SYSTEM_TYPE',

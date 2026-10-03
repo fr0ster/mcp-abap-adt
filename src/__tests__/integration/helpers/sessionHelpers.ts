@@ -1,37 +1,21 @@
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 /**
  * Session management helpers for low-level handler integration tests
  *
- * Uses the same approach as index.ts getOrCreateConnectionForServer:
- * - Create connection via AuthBroker (from destination or .env file directory)
- * - Fallback to getSapConfigFromEnv() if AuthBroker fails
+ * A connection is built the way the server builds one:
+ * - the test config's destination: its settings and its provider, from the
+ *   factory (`getTestDestination`)
+ * - fallback: the .env config (`getSapConfigFromEnv`) and the credential it
+ *   describes (`credentialFromSapConfig`)
  * - Call connect() once
  * - Extract session state directly from connection
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
-import { AuthBroker } from '@mcp-abap-adt/auth-broker';
-import {
-  AuthorizationCodeProvider,
-  browserCallbackStrategy,
-} from '@mcp-abap-adt/auth-providers';
-import type { SapConfig } from '@mcp-abap-adt/connection';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
-import type {
-  IServiceKeyStore,
-  ISessionStore,
-} from '@mcp-abap-adt/interfaces-auth-sap';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { createAbapConnection } from '../../../lib/connectionFactory';
+import { credentialFromSapConfig } from '../../../lib/credentialSources';
 import { generateSessionId } from '../../../lib/sessionUtils';
-import { getPlatformStoresAsync } from '../../../lib/stores';
-import { resolveSystemContext } from '../../../lib/systemContext';
-import {
-  createBrokerLogger,
-  createConnectionLogger,
-  createProviderLogger,
-  createStoreLogger,
-} from './authHelpers';
+import { createConnectionLogger, getTestDestination } from './authHelpers';
 import {
   getSapConfigFromEnv,
   loadTestConfig,
@@ -39,6 +23,7 @@ import {
 } from './configHelpers';
 import { createTestLogger } from './loggerHelpers';
 import { trackConnection } from './openConnections';
+import { primeSystemContext } from './primeSystemContext';
 import { extractSessionState } from './testHelpers';
 
 /**
@@ -65,13 +50,6 @@ function withCsrfChannel(logger: ILogger | undefined): ILogger | undefined {
 
 const sessionLogger = createTestLogger('connection');
 
-// Module-level cache for AuthBroker — reuse across test suites (maxWorkers: 1)
-let cachedBroker: {
-  broker: InstanceType<typeof AuthBroker>;
-  destination: string;
-  serviceUrl: string;
-} | null = null;
-
 export interface SessionInfo {
   session_id: string;
   session_state: {
@@ -82,173 +60,28 @@ export interface SessionInfo {
 }
 
 /**
- * Create connection via AuthBroker (same approach as index.ts getOrCreateConnectionForServer)
- * Priority:
- * 1. If destination is provided - use AuthBroker with destination
- * 2. If no destination but .env file exists - use AuthBroker with SessionStore from .env file directory
- * 3. Fallback to getSapConfigFromEnv() if AuthBroker fails
+ * A connection to the test config's destination: its settings and its
+ * provider from the factory, one provider for the whole process.
+ * `null` when the config names no destination or the destination fails.
  */
-async function createConnectionViaBroker(
-  destination?: string,
-  envFilePath?: string,
-): Promise<IAbapConnection | null> {
+async function createConnectionViaBroker(): Promise<IAbapConnection | null> {
   try {
-    const config = loadTestConfig();
-    const useUnsafe =
-      process.env.MCP_UNSAFE === 'true' ||
-      config?.auth_broker?.unsafe === true ||
-      config?.auth_broker?.unsafe_session_store === true;
-
-    // Get destination from config if not provided
-    const actualDestination =
-      destination ||
-      config?.auth_broker?.abap?.destination ||
-      config?.abap?.destination ||
-      config?.environment?.destination ||
-      config?.abap?.service_keys?.destination ||
-      config?.abap?.sessions?.destination;
-
-    if (!actualDestination && !envFilePath) {
-      // No destination and no .env file - cannot use AuthBroker
-      return null;
-    }
-
-    // Skip AuthBroker when no broker usage is indicated
-    // AuthBroker requires destination, auth_broker config section, or explicit flag
-    if (
-      !actualDestination &&
-      !config?.auth_broker &&
-      !config?.environment?.use_auth_broker &&
-      !process.env.MCP_USE_AUTH_BROKER
-    ) {
-      return null;
-    }
-
-    let sessionStore: ISessionStore;
-    let serviceKeyStore: IServiceKeyStore;
-    let storeType: 'abap' | 'btp';
-
-    // Create loggers based on environment variables
-    const storeLogger = createStoreLogger();
-
-    // If no destination but .env file exists, create SessionStore from .env file directory
-    // (same logic as index.ts lines 1128-1147)
-    if (!actualDestination && envFilePath) {
-      const envFileDir = path.dirname(envFilePath);
-      const stores = await getPlatformStoresAsync(
-        envFileDir,
-        useUnsafe,
-        'default',
-        storeLogger,
-      );
-      serviceKeyStore = stores.serviceKeyStore;
-      sessionStore = stores.sessionStore;
-      storeType = stores.storeType;
-
-      sessionLogger?.debug('Created SessionStore from .env file directory', {
-        envFilePath,
-        envFileDir,
-        destination: 'default',
-        storeType,
-        unsafe: useUnsafe,
-      });
-    } else if (actualDestination) {
-      // Use destination-based stores
-      const stores = await getPlatformStoresAsync(
-        undefined,
-        useUnsafe,
-        actualDestination,
-        storeLogger,
-      );
-      serviceKeyStore = stores.serviceKeyStore;
-      sessionStore = stores.sessionStore;
-      storeType = stores.storeType;
-    } else {
-      return null;
-    }
-
-    const brokerDestination = actualDestination || 'default';
-
-    // Reuse cached broker if available (same destination, same process)
-    let authBroker: InstanceType<typeof AuthBroker>;
-    let serviceUrl: string;
-
-    if (cachedBroker && cachedBroker.destination === brokerDestination) {
-      authBroker = cachedBroker.broker;
-      serviceUrl = cachedBroker.serviceUrl;
-    } else {
-      const authConfig =
-        (await sessionStore.getAuthorizationConfig(brokerDestination)) ||
-        (await serviceKeyStore.getAuthorizationConfig(brokerDestination));
-      if (!authConfig) {
-        throw new Error(
-          `Missing authorization config for destination "${brokerDestination}".`,
-        );
-      }
-      const sessionConnConfig =
-        await sessionStore.getConnectionConfig(brokerDestination);
-
-      // Create loggers based on environment variables (storeLogger already created above)
-      const providerLogger = createProviderLogger();
-      const brokerLogger = createBrokerLogger();
-
-      // Which browser opens is the provider's `authorization` strategy since
-      // auth-providers 2.0.0; a `browser` field here was ignored, and the
-      // strategy's default is to open none.
-      const providerConfig = {
-        uaaUrl: authConfig.uaaUrl,
-        clientId: authConfig.uaaClientId,
-        clientSecret: authConfig.uaaClientSecret,
-        refreshToken: authConfig.refreshToken,
-        accessToken: sessionConnConfig?.authorizationToken,
-        authorization: browserCallbackStrategy({ browser: 'system' }),
-        logger: providerLogger,
-      };
-      const tokenProvider = new AuthorizationCodeProvider(providerConfig);
-      authBroker = new AuthBroker(
-        {
-          serviceKeyStore,
-          sessionStore,
-          provider: tokenProvider,
-        },
-        brokerLogger,
-      );
-
-      const connConfig =
-        await authBroker.getConnectionConfig(brokerDestination);
-      if (!connConfig?.serviceUrl) {
-        return null;
-      }
-      serviceUrl = connConfig.serviceUrl;
-
-      // Cache broker for reuse by subsequent test suites
-      cachedBroker = {
-        broker: authBroker,
-        destination: brokerDestination,
-        serviceUrl,
-      };
-    }
-
-    // Get token from cached broker — provider returns cached valid token without browser
-    const jwtToken = await authBroker.getToken(brokerDestination);
-    if (jwtToken) {
-      const config: SapConfig = {
-        url: serviceUrl,
-        authType: 'jwt',
-        jwtToken,
-      };
-      sessionLogger?.info('Using connection from auth broker', {
-        destination: brokerDestination,
-        url: config.url,
-        authType: config.authType,
-      });
-      // Only pass connection logger if DEBUG_CONNECTION is set
-      const connectionLogger = createConnectionLogger();
-      const connectionLoggerWithCsrf = withCsrfChannel(connectionLogger);
-      return trackConnection(
-        createAbapConnection(config, connectionLoggerWithCsrf),
-      );
-    }
+    const target = await getTestDestination();
+    if (!target) return null;
+    sessionLogger?.info('Using connection from auth broker', {
+      destination: target.destination,
+      url: target.settings.url,
+      authType: target.settings.authType,
+    });
+    // Only pass connection logger if DEBUG_CONNECTION is set
+    const connectionLoggerWithCsrf = withCsrfChannel(createConnectionLogger());
+    return trackConnection(
+      createAbapConnection(
+        target.settings,
+        target.credential,
+        connectionLoggerWithCsrf,
+      ),
+    );
   } catch (error: any) {
     sessionLogger?.warn('Failed to create connection via AuthBroker', {
       error: error instanceof Error ? error.message : String(error),
@@ -287,7 +120,7 @@ export async function createTestConnectionAndSession(): Promise<{
     // Try AuthBroker only when no explicit env file is configured
     if (!hasExplicitEnv) {
       try {
-        connection = await createConnectionViaBroker(undefined, undefined);
+        connection = await createConnectionViaBroker();
         if (connection) {
           connectionSource = 'auth_broker';
         }
@@ -311,7 +144,11 @@ export async function createTestConnectionAndSession(): Promise<{
 
       // Create connection directly (fallback when AuthBroker is not available)
       connection = trackConnection(
-        createAbapConnection(config, connectionLoggerWithCsrf),
+        createAbapConnection(
+          config,
+          credentialFromSapConfig(config),
+          connectionLoggerWithCsrf,
+        ),
       );
       connectionSource = 'env';
     }
@@ -373,7 +210,7 @@ export async function createTestConnectionAndSession(): Promise<{
     }
 
     // Resolve system context (legacy detection) so createAdtClient() picks the correct client
-    await resolveSystemContext(connection);
+    await primeSystemContext(connection);
 
     // Generate session ID
     const sessionId = generateSessionId();

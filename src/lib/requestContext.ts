@@ -15,15 +15,26 @@ export interface RequestContext {
   /** Master/original language for created objects (adtcore:masterLanguage), from x-sap-language. */
   masterLanguage?: string;
   /**
-   * Responsible person for created objects (adtcore:responsible), e.g. from
-   * `x-sap-responsible` or the caller's own SAP user. When the key is present —
-   * even as `undefined` — it replaces the process value for this request. When
-   * it is absent, the process value stays.
+   * Responsible person for created objects (adtcore:responsible), as stated:
+   * `x-sap-responsible`, or `SAP_RESPONSIBLE` of the request's destination.
+   * When the key is present — even as `undefined` — it replaces the process
+   * value (and the process login) for this request. When it is absent, the
+   * process value stays.
    */
   responsible?: string;
   /**
+   * The login of this request — the destination's `SAP_USERNAME`, or the
+   * `x-sap-login` of an `x-sap-*` basic connection (the server enters it; a
+   * destination request's `x-sap-login` logs nobody on). The responsible when
+   * none is stated: after every `SAP_RESPONSIBLE` (the process one included),
+   * before the process `SAP_USERNAME`. Not on a cloud connection, where the
+   * login is the system's user.
+   */
+  login?: string;
+  /**
    * Master system for created objects (adtcore:masterSystem), e.g. from
-   * `x-sap-master-system`. Same presence rule as `responsible`.
+   * `x-sap-master-system`. Same presence rule as `responsible`. When none is
+   * known it is left out of the request.
    */
   masterSystem?: string;
 }
@@ -33,6 +44,41 @@ const storage = new AsyncLocalStorage<RequestContext>();
 /** Run `fn` (and everything it awaits) with the given request-scoped context. */
 export function runWithRequestContext<T>(ctx: RequestContext, fn: () => T): T {
   return storage.run(ctx, fn);
+}
+
+/** A header's first value, its name matched case-insensitively. */
+function headerValue(
+  headers: Record<string, string | string[] | undefined>,
+  name: string,
+): string | undefined {
+  for (const [key, raw] of Object.entries(headers)) {
+    if (key.toLowerCase() !== name) continue;
+    const value = Array.isArray(raw) ? raw[0] : raw;
+    if (value) return value;
+  }
+  return undefined;
+}
+
+/**
+ * The request scope an HTTP/SSE request states in its headers:
+ * `x-sap-language` as `masterLanguage` (the key always present, as #110
+ * established), and `x-sap-responsible` / `x-sap-master-system` as
+ * `responsible` / `masterSystem` — each of these present only when its header
+ * carries a value, so a request that states none leaves the destination's
+ * `.env`, the process configuration, the login and the cloud lookup to fill
+ * it. `x-sap-login` is not read here: it is a login only on an `x-sap-*`
+ * basic connection, which the server enters itself.
+ */
+export function requestContextFromHeaders(
+  headers: Record<string, string | string[] | undefined>,
+): RequestContext {
+  const responsible = headerValue(headers, 'x-sap-responsible');
+  const masterSystem = headerValue(headers, 'x-sap-master-system');
+  return {
+    masterLanguage: headerValue(headers, 'x-sap-language'),
+    ...(responsible ? { responsible } : {}),
+    ...(masterSystem ? { masterSystem } : {}),
+  };
 }
 
 /**

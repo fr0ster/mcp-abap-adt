@@ -237,19 +237,8 @@ Uses **stdio** mode (must be explicitly specified).
 **Important notes for Windows:**
 - Use double backslashes `\\` or forward slashes `/` in file paths
 - `--transport=stdio` is the default; HTTP/SSE require `--transport=http`/`--transport=sse`
-- `--env` argument is **required** if `.env` file is not in the current working directory
-- If `.env` file is in the current directory, you can omit `--env` argument:
-
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt": {
-      "command": "mcp-abap-adt",
-      "args": ["--transport=stdio"]
-    }
-  }
-}
-```
+- Name the env file with `--env` (or `--env-path`, or use `--mcp=<name>`): nothing is looked up in the
+  working directory, so a `.env` there is read only when named (`--env-path=./.env`)
 
 **Alternative: Using node with full path (if global command not in PATH):**
 
@@ -309,7 +298,7 @@ Add to Cursor settings:
 }
 ```
 
-**Note:** If `.env` file is in the current directory, you can omit `--env` argument.
+**Note:** The `--env` argument is required: the server reads no `.env` it was not given.
 
 ### HTTP Mode (Streamable HTTP)
 
@@ -355,7 +344,6 @@ Server will be available at: `http://localhost:8080/mcp/stream/http`
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
       "x-sap-url": "https://your-sap-system.com:8000",
-      "x-sap-auth-type": "basic",
       "x-sap-login": "your_username",
       "x-sap-password": "your_password",
       "x-sap-client": "100"

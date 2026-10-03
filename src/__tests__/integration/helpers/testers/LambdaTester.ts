@@ -10,7 +10,6 @@
  */
 
 import type { AbapConnection } from '@mcp-abap-adt/connection';
-import { resolveSystemContext } from '../../../../lib/systemContext';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
@@ -25,6 +24,7 @@ import {
   resolveTransportRequest,
 } from '../configHelpers';
 import { createTestLogger, type LoggerWithExtras } from '../loggerHelpers';
+import { primeSystemContext } from '../primeSystemContext';
 import {
   createTestConnectionAndSession,
   type SessionInfo,
@@ -277,7 +277,7 @@ export class LambdaTester {
         process.env.SAP_RESPONSIBLE = testCtx.responsible;
       }
       // Populate system context cache so createAdtClient() picks it up
-      await resolveSystemContext(connection);
+      await primeSystemContext(connection);
       authType =
         connectionResult.authType ||
         ((connection as any)?.getConfig?.()?.authType as string | undefined);

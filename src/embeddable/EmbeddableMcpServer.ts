@@ -81,6 +81,12 @@ export interface EmbeddableMcpServerOptions {
    * Use this when a single host serves multiple SAP systems (e.g., a proxy
    * that handles both OnPremise and cloud destinations per request) —
    * mutating `process.env.SAP_SYSTEM_TYPE` per instance is not safe.
+   *
+   * It also states the injected connection's kind for the responsible /
+   * master-system lookup: `'cloud'` asks the system's `systeminformation`
+   * for what the call lacks; anything else — and, when omitted,
+   * `SAP_SYSTEM_TYPE`, else on-premise — asks nothing. The URL is never
+   * consulted.
    */
   systemType?: SapEnvironment;
 
@@ -102,10 +108,16 @@ export interface EmbeddableMcpServerOptions {
   readOnlyDedupStrategy?: IReadOnlyDedupStrategy;
 
   /**
-   * Fills the responsible person and master system a call lacks — neither in
-   * its request scope nor in the process context — from the connection's
-   * system. The default resolves them on ABAP Cloud (one lookup per
-   * connection) and does nothing on-premise. `null` disables it.
+   * Asks the connection's system for the responsible person and master
+   * system a call does not state. Its answer decides whether the login counts:
+   * `null` means not asked (on-premise) — the login (`SAP_USERNAME`, or
+   * `x-sap-login` with `x-sap-url`) stands as the responsible; a non-null
+   * answer is a cloud system's — the login does not count, and only what the
+   * call does not state is taken from it (`{}`: the system named nothing, so a
+   * create without a stated responsible is refused). A resolver that throws is
+   * treated like `{}`, and the create is refused as the system being unreachable, to retry later. The default
+   * asks on ABAP Cloud (one lookup per connection) and answers `null`
+   * on-premise. `null` as the option disables it.
    * @default defaultSystemContextResolver
    */
   systemContextResolver?: SystemContextResolver | null;

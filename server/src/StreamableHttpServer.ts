@@ -1,6 +1,6 @@
 import type { Server as HttpServer } from 'node:http';
 import type { Server as HttpsServer } from 'node:https';
-import type { AuthBrokerFactory } from '@mcp-abap-adt/lib/auth';
+import { errorClassOf, type IDestinations } from '@mcp-abap-adt/lib/auth';
 import type { TlsConfig } from '@mcp-abap-adt/lib/config';
 import type {
   IHttpApplication,
@@ -9,10 +9,18 @@ import type {
 import { BaseMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
-import { runWithRequestContext } from '@mcp-abap-adt/lib/request-context';
+import {
+  requestContextFromHeaders,
+  runWithRequestContext,
+} from '@mcp-abap-adt/lib/request-context';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import express, { type Request, type Response } from 'express';
+import {
+  destinationFailureAnswer,
+  destinationFromHeader,
+  FirstConnectLock,
+} from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
 
@@ -97,12 +105,13 @@ export class StreamableHttpServer extends BaseMcpServer {
   private readonly allowedHosts?: string[];
   private readonly allowedOrigins?: string[];
   private readonly enableDnsRebindingProtection?: boolean;
-  /** Per-destination lock to serialize token acquisition (prevents concurrent OAuth flows) */
-  private readonly authLocks = new Map<string, Promise<void>>();
+  /** Per-destination lock around the first connect: it serialises the first login. */
+  private readonly firstConnect = new FirstConnectLock();
 
   constructor(
     private readonly handlersRegistry: IHandlersRegistry,
-    private readonly authBrokerFactory: AuthBrokerFactory,
+    /** The destinations: settings and the counted provider, nothing else. */
+    private readonly destinations: IDestinations,
     opts?: StreamableHttpServerOptions,
   ) {
     super({
@@ -155,27 +164,21 @@ export class StreamableHttpServer extends BaseMcpServer {
       try {
         const server = this.createPerRequestServer();
         let destination: string | undefined;
-        let broker: Awaited<
-          ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>
-        >;
 
-        // Priority 1: Check x-mcp-destination header (only when --allow-destination-header)
-        const destinationHeader = this.allowDestinationHeader
-          ? ((req.headers['x-mcp-destination'] as string | undefined) ??
-            (req.headers['X-MCP-Destination'] as string | undefined))
-          : undefined;
+        // Priority 1: x-mcp-destination (only with --allow-destination-header),
+        // refused when it is not a destination name
+        const destinationHeader = destinationFromHeader(
+          req.headers,
+          this.allowDestinationHeader,
+        );
 
-        if (destinationHeader) {
+        if (destinationHeader !== undefined) {
           destination = destinationHeader;
-          broker =
-            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
         // Priority 2: Check SAP connection headers (x-sap-url + auth params)
-        // Headers will be passed directly to handlers, no broker needed
+        // The settings and the credential come from the headers, no destination
         else if (this.hasSapConnectionHeaders(req.headers)) {
-          // No destination, no broker - create connection directly from headers
           destination = undefined;
-          broker = undefined;
           if (!isPing) {
             server.setConnectionContextFromHeadersPublic(req.headers);
           }
@@ -183,9 +186,6 @@ export class StreamableHttpServer extends BaseMcpServer {
         // Priority 3: Use default destination
         else if (this.defaultDestination) {
           destination = this.defaultDestination;
-          // Initialize broker for the selected default destination
-          broker =
-            await this.authBrokerFactory.getOrCreateAuthBroker(destination);
         }
         // Priority 4: No auth params at all -> reject request
         else {
@@ -197,30 +197,17 @@ export class StreamableHttpServer extends BaseMcpServer {
           return;
         }
 
-        if (destination && !broker) {
-          throw new Error(
-            `Auth broker not initialized for destination: ${destination}`,
-          );
-        }
-
         // Skip SAP connection setup for ping — it's a protocol-level check,
         // no need to acquire JWT tokens or contact the SAP system
-        if (!isPing && destination && broker) {
-          // Serialize token acquisition per destination to prevent concurrent
-          // OAuth flows from racing for the same callback port
-          const existingLock = this.authLocks.get(destination);
-          if (existingLock) {
-            await existingLock;
-          }
-          const authPromise = server
-            .setConnectionContextPublic(destination, broker)
-            .finally(() => {
-              if (this.authLocks.get(destination) === authPromise) {
-                this.authLocks.delete(destination);
-              }
-            });
-          this.authLocks.set(destination, authPromise);
-          await authPromise;
+        if (!isPing && destination) {
+          // The first request of a destination connects inside the lock:
+          // two first logins must not race for the same callback port
+          const chosen = destination;
+          await this.firstConnect.run(
+            chosen,
+            () => server.setConnectionContextPublic(chosen, this.destinations),
+            () => server.connectPublic(),
+          );
         }
 
         const authSource = destination
@@ -244,14 +231,12 @@ export class StreamableHttpServer extends BaseMcpServer {
         });
 
         await server.connect(transport);
-        // Scope the per-request master language (x-sap-language) to this
-        // request's dispatch so it cannot leak into other requests/modes via
-        // a process-global cache (#110).
-        const rawLang =
-          req.headers['x-sap-language'] ?? req.headers['X-SAP-Language'];
-        const masterLanguage = Array.isArray(rawLang) ? rawLang[0] : rawLang;
-        await runWithRequestContext({ masterLanguage }, () =>
-          transport.handleRequest(req, res, req.body),
+        // Scope what the request states — x-sap-language, x-sap-responsible,
+        // x-sap-master-system — to this request's dispatch, so it cannot
+        // leak into other requests/modes via a process-global cache (#110).
+        await runWithRequestContext(
+          requestContextFromHeaders(req.headers),
+          () => transport.handleRequest(req, res, req.body),
         );
         if (!isPing) {
           console.error(
@@ -259,12 +244,19 @@ export class StreamableHttpServer extends BaseMcpServer {
           );
         }
       } catch (err) {
-        console.error(
-          `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED:`,
-          err,
-        );
+        const answer = destinationFailureAnswer(err);
+        if (!answer.known) {
+          // No words for it: its class only — a message may quote a file (H4).
+          console.error(
+            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED: ${errorClassOf(err)}`,
+          );
+        } else {
+          console.error(
+            `[StreamableHttpServer] ${methodInfo} (id=${mcpId ?? '-'}) FAILED: ${answer.text}`,
+          );
+        }
         if (!res.headersSent) {
-          res.status(500).send('Internal Server Error');
+          res.status(answer.status).send(answer.text);
         }
       }
     };
@@ -369,6 +361,19 @@ export class StreamableHttpServer extends BaseMcpServer {
   }
 
   /**
+   * Stops taking connections (shutdown, step 1). Requests already running are
+   * not waited for, nor is an open stream: the factory's gate holds them.
+   * Embedded on an external app, there is no listener of its own to stop.
+   */
+  async stop(): Promise<void> {
+    const server = this.standaloneServer;
+    if (!server) return;
+    this.standaloneServer = undefined;
+    server.close();
+    server.closeIdleConnections();
+  }
+
+  /**
    * Check if request has SAP connection headers
    */
   private hasSapConnectionHeaders(
@@ -387,11 +392,12 @@ export class StreamableHttpServer extends BaseMcpServer {
     connect: BaseMcpServer['connect'];
     setConnectionContextPublic: (
       destination: string,
-      broker: Awaited<ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>>,
+      destinations: IDestinations,
     ) => Promise<void>;
     setConnectionContextFromHeadersPublic: (
       headers: Record<string, string | string[] | undefined>,
     ) => void;
+    connectPublic: () => Promise<unknown>;
   } {
     class PerRequestServer extends BaseMcpServer {
       constructor(
@@ -405,12 +411,14 @@ export class StreamableHttpServer extends BaseMcpServer {
 
       public setConnectionContextPublic(
         destination: string,
-        broker: Awaited<ReturnType<AuthBrokerFactory['getOrCreateAuthBroker']>>,
+        destinations: IDestinations,
       ): Promise<void> {
-        if (!broker) {
-          return Promise.resolve();
-        }
-        return this.setConnectionContext(destination, broker);
+        return this.setConnectionContext(destination, destinations);
+      }
+
+      /** The context's connection, connected (cached for this request). */
+      public connectPublic(): Promise<unknown> {
+        return this.getConnection();
       }
 
       public setConnectionContextFromHeadersPublic(

@@ -1,6 +1,6 @@
 # Docker Deployment Guide
 
-This guide explains how to deploy MCP ABAP ADT Server using Docker with the current AuthBroker + destination-based architecture.
+This guide explains how to deploy MCP ABAP ADT Server using Docker with destination-based authentication.
 
 ## Quick Start
 
@@ -38,7 +38,8 @@ This guide explains how to deploy MCP ABAP ADT Server using Docker with the curr
 3. **Configure environment**:
    ```bash
    cp .env.example .env
-   # Edit .env and set MCP_DESTINATION=trial
+   # The destination is chosen by the container command (--mcp=trial in the compose file),
+   # not by an environment variable
    ```
 
 4. **Start the server**:
@@ -71,9 +72,12 @@ The Docker deployment uses:
    - Never committed to git (.gitignore)
 
 2. **Destination**:
-   - Specified via `MCP_DESTINATION` environment variable
-   - Determines which service key to use
-   - Example: `MCP_DESTINATION=trial` uses `service-keys/trial.json`
+   - Chosen by the container command: `--mcp=<name>` (an own default destination), a YAML `mcp` key passed with `--config`, or `x-mcp-destination` per request with `--allow-destination-header` (the Dockerfile's default command)
+   - The server reads no environment variable for it
+   - Example: `--mcp=trial` uses `service-keys/trial.json`
+   - `AUTH_BROKER_PATH=/app` (set in the compose files) makes `/app/service-keys` and `/app/sessions` the directories it reads
+
+3. **Login**: a browser login needs a browser and a reachable callback port (default `61001`), which a container does not have by default. Obtain the session outside the container and mount `sessions/`, or hand a token in a header (`x-sap-url` and `x-sap-jwt-token`).
 
 ### Container Configuration
 
@@ -83,10 +87,10 @@ Container: mcp-abap-adt-server
 ├── Transport: streamable-http
 ├── Volumes:
 │   ├── ./service-keys:/app/service-keys (ro)  # Service keys
+├── Command: --mcp=<name> and/or --allow-destination-header
 └── Environment:
-    ├── MCP_DESTINATION (default: default)
     ├── MCP_HTTP_PORT (default: 3000)
-    └── AUTH_BROKER_PATH (default: /app/service-keys)
+    └── AUTH_BROKER_PATH (/app in the compose files)
 ```
 
 ## Service Key Format
@@ -142,8 +146,10 @@ curl http://localhost:3000/health
 # Stop current
 docker-compose down
 
-# Start with different destination
-MCP_DESTINATION=dev docker-compose up -d
+# Edit the command in docker-compose.yml: --mcp=dev
+docker-compose up -d
+
+# Or start with --allow-destination-header and send x-mcp-destination: dev per request
 ```
 
 ## Troubleshooting
@@ -157,22 +163,22 @@ docker-compose logs
 # Verify service key exists
 ls -la service-keys/
 
-# Check destination name matches filename
-cat .env | grep MCP_DESTINATION
-ls service-keys/${MCP_DESTINATION}.json
+# Check the --mcp=<name> in the container command matches a service key file
+docker-compose config | grep -- --mcp
+ls service-keys/
 ```
 
 ### Authentication errors
 
 ```bash
 # Check service key format
-cat service-keys/${MCP_DESTINATION}.json | jq .
+cat service-keys/<name>.json | jq .
 
 # Check if session was created
 ls -la sessions/
 
-# Force re-authentication (remove session)
-rm sessions/${MCP_DESTINATION}.env
+# Force re-authentication (remove session; written only with --unsafe)
+rm sessions/<name>.env
 docker-compose restart
 ```
 
@@ -203,12 +209,14 @@ service-keys/
 ### Switch Between Environments
 
 ```bash
-# Use trial
-MCP_DESTINATION=trial docker-compose up -d
+# Use trial: --mcp=trial in the compose command
+docker-compose up -d
 
-# Switch to dev
+# Switch to dev: change the command to --mcp=dev
 docker-compose down
-MCP_DESTINATION=dev docker-compose up -d
+docker-compose up -d
+
+# Or serve both: --allow-destination-header, and clients send x-mcp-destination
 ```
 
 ## Advanced Configuration

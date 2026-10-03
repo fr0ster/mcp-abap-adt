@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import * as crypto from 'node:crypto';
 import { randomUUID } from 'node:crypto';
 import {
   getTimeout,
@@ -16,6 +15,7 @@ import {
   registerConnectionResetHook,
 } from './connectionEvents';
 import { createAbapConnection } from './connectionFactory.js';
+import { credentialFromSapConfig } from './credentialSources.js';
 import { connectionManagerLogger, logger } from './logger';
 import { loggerAdapter } from './loggerAdapter';
 import { getSystemContext } from './systemContext';
@@ -27,59 +27,12 @@ let overrideConnection: IAbapConnection | undefined;
 let cachedConnection: IAbapConnection | undefined;
 let cachedConfigSignature: string | undefined;
 
-// Connection cache per session + config hash
-interface ConnectionCacheEntry {
-  connection: IAbapConnection;
-  configSignature: string;
-  sessionId: string;
-  lastUsed: Date;
-}
-
-const connectionCache = new Map<string, ConnectionCacheEntry>();
-
 // AsyncLocalStorage for storing session context
 export const sessionContext = new AsyncLocalStorage<{
   sessionId?: string;
   sapConfig?: SapConfig;
-  destination?: string; // Store destination for AuthBroker-based token refresh
+  destination?: string;
 }>();
-
-// Fixed session ID for server connection (allows session persistence across requests)
-const _SERVER_SESSION_ID = 'mcp-abap-adt-session';
-
-// Global AuthBroker registry for destination-based authentication
-// This allows JwtAbapConnection to access AuthBroker instances for token refresh
-// Store in global object so it can be accessed from @mcp-abap-adt/connection package
-declare global {
-  // eslint-disable-next-line no-var
-  var __mcpAbapAdtAuthBrokerRegistry: Map<string, any> | undefined;
-}
-
-if (!global.__mcpAbapAdtAuthBrokerRegistry) {
-  global.__mcpAbapAdtAuthBrokerRegistry = new Map<string, any>();
-}
-
-const authBrokerRegistry = global.__mcpAbapAdtAuthBrokerRegistry;
-
-/**
- * Register AuthBroker instance for a destination
- * This allows JwtAbapConnection to use AuthBroker for token refresh when destination is set
- */
-export function registerAuthBroker(destination: string, authBroker: any): void {
-  authBrokerRegistry.set(destination, authBroker);
-  connectionManagerLogger?.debug(
-    `[DEBUG] registerAuthBroker - Registered AuthBroker for destination "${destination}"`,
-  );
-}
-
-/**
- * Get AuthBroker instance for a destination
- * Returns undefined if not registered
- * This function can be called from @mcp-abap-adt/connection package via global registry
- */
-export function getAuthBroker(destination: string): any | undefined {
-  return authBrokerRegistry.get(destination);
-}
 
 // Compatibility re-export: `@mcp-abap-adt/lib/utils` exposes the SDK's McpError /
 // ErrorCode before #155. Internal code no longer throws McpError (enforced by
@@ -430,150 +383,17 @@ export function return_error(error: any) {
   };
 }
 
-/**
- * Generate cache key for connection based on sessionId, config signature, and destination
- * This ensures each client session with different SAP config or destination gets its own connection
- *
- * Example scenarios:
- * - 4 clients, each with 2 destinations = up to 8 different connections
- * - Each combination of (sessionId, config, destination) gets its own isolated connection
- */
-function generateConnectionCacheKey(
-  sessionId: string,
-  configSignature: string,
-  destination?: string,
-): string {
-  const hash = crypto.createHash('sha256');
-  hash.update(sessionId);
-  hash.update(configSignature);
-  // Include destination in cache key to ensure different destinations get different connections
-  // This is critical for multi-tenant scenarios where same sessionId might use different destinations
-  hash.update(destination || '');
-  return hash.digest('hex');
-}
-
-/**
- * Clean up old connections from cache (older than 1 hour)
- */
-function cleanupConnectionCache() {
-  const now = new Date();
-  const maxAge = 60 * 60 * 1000; // 1 hour
-
-  for (const [key, entry] of connectionCache.entries()) {
-    const age = now.getTime() - entry.lastUsed.getTime();
-    if (age > maxAge) {
-      connectionManagerLogger?.debug(
-        `[DEBUG] Cleaning up old connection cache entry: ${key.substring(0, 16)}...`,
-      );
-      connectionCache.delete(key);
-    }
-  }
-}
-
-/**
- * Get or create connection for a specific session and config
- */
-function getConnectionForSession(
-  sessionId: string,
-  config: SapConfig,
-  destination?: string,
-): IAbapConnection {
-  const configSignature = sapConfigSignature(config);
-  const cacheKey = generateConnectionCacheKey(
-    sessionId,
-    configSignature,
-    destination,
-  );
-
-  // Clean up old entries periodically
-  if (connectionCache.size > 100) {
-    cleanupConnectionCache();
-  }
-
-  let entry = connectionCache.get(cacheKey);
-
-  if (!entry || entry.configSignature !== configSignature) {
-    connectionManagerLogger?.debug(
-      `[DEBUG] getManagedConnection - Creating new connection for session ${sessionId.substring(0, 8)}... (cache key: ${cacheKey.substring(0, 16)}...)`,
-    );
-
-    // Dispose old connection if exists
-    if (entry) {
-      /* cleanup */
-    }
-
-    // Create new connection with unique session ID per client session
-    const connectionSessionId = `mcp-abap-adt-session-${sessionId}`;
-
-    // Get tokenRefresher from AuthBroker if destination is provided (for JWT connections)
-    let tokenRefresher: any;
-    if (destination && config.authType === 'jwt') {
-      const authBroker = getAuthBroker(destination);
-      if (authBroker?.createTokenRefresher) {
-        tokenRefresher = authBroker.createTokenRefresher(destination);
-        connectionManagerLogger?.debug(
-          `[DEBUG] Created tokenRefresher for destination "${destination}"`,
-        );
-      }
-    }
-
-    // Create connection with optional tokenRefresher for automatic token refresh
-    const connection = createAbapConnection(
-      config,
-      loggerAdapter,
-      connectionSessionId,
-      tokenRefresher,
-    );
-
-    // Don't call enableStatefulSession during module import - it may trigger connection attempts
-    // Session ID is already set via createAbapConnection() constructor
-    // enableStatefulSession() will be called lazily when first request is made (if needed)
-
-    // Don't call connect() here - it will be called lazily on first request
-    // This prevents unnecessary connection attempts during module import (e.g., in Jest tests)
-    // The retry logic in makeAdtRequest will handle connection establishment automatically
-
-    entry = {
-      connection,
-      configSignature,
-      sessionId,
-      lastUsed: new Date(),
-    };
-
-    connectionCache.set(cacheKey, entry);
-  } else {
-    entry.lastUsed = new Date();
-    connectionManagerLogger?.debug(
-      `[DEBUG] getManagedConnection - Reusing cached connection for session ${sessionId.substring(0, 8)}...`,
-    );
-  }
-
-  return entry.connection;
-}
-
 export function getManagedConnection(): IAbapConnection {
   // If override connection is set, use it (for backward compatibility)
   if (overrideConnection) {
     return overrideConnection;
   }
 
-  // Try to get session context from AsyncLocalStorage
-  const context = sessionContext.getStore();
-
-  if (context?.sessionId && context?.sapConfig) {
-    // Use session-specific connection with destination for AuthBroker-based token refresh
-    return getConnectionForSession(
-      context.sessionId,
-      context.sapConfig,
-      context.destination,
-    );
-  }
-
   // Config must be provided via overrideConfig (from connection provider/broker)
   // No fallback to getConfig() - incompatible with broker-based architecture
   if (!overrideConfig) {
     throw new Error(
-      'Connection config must be provided via overrideConfig or session context. In v2 architecture, config comes from connection provider (broker), not from environment variables.',
+      'Connection config must be provided via overrideConfig. In v2 architecture, config comes from connection provider (broker), not from environment variables.',
     );
   }
   const config = overrideConfig;
@@ -671,6 +491,7 @@ export function getManagedConnection(): IAbapConnection {
 
     cachedConnection = createAbapConnection(
       config,
+      credentialFromSapConfig(config),
       loggerAdapter,
       fallbackSessionId,
     );
@@ -712,47 +533,6 @@ export function getManagedConnection(): IAbapConnection {
   }
 
   return cachedConnection;
-}
-
-/**
- * Remove connection from cache for a specific session
- * Called when session is closed
- *
- * If destination is provided, removes only the connection for that specific destination.
- * If destination is not provided, removes all connections for the session (all destinations).
- */
-export function removeConnectionForSession(
-  sessionId: string,
-  config?: SapConfig,
-  destination?: string,
-) {
-  if (config) {
-    const configSignature = sapConfigSignature(config);
-    const cacheKey = generateConnectionCacheKey(
-      sessionId,
-      configSignature,
-      destination,
-    );
-    const entry = connectionCache.get(cacheKey);
-    if (entry) {
-      connectionManagerLogger?.debug(
-        `[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}... (destination: ${destination || 'none'})`,
-      );
-      /* cleanup */
-      connectionCache.delete(cacheKey);
-    }
-  } else {
-    // Remove all entries for this sessionId (all destinations and configs)
-    for (const [key, entry] of connectionCache.entries()) {
-      if (entry.sessionId === sessionId) {
-        connectionManagerLogger?.debug(
-          `[DEBUG] Removing connection cache entry for session ${sessionId.substring(0, 8)}...`,
-        );
-        /* cleanup */
-        connectionCache.delete(key);
-      }
-    }
-  }
 }
 
 /**
@@ -799,7 +579,11 @@ export function setConfigOverride(override?: SapConfig) {
   overrideConfig = override;
   /* cleanup */
   overrideConnection = override
-    ? createAbapConnection(override, loggerAdapter, undefined)
+    ? createAbapConnection(
+        override,
+        credentialFromSapConfig(override),
+        loggerAdapter,
+      )
     : undefined;
 
   // Reset shared connection so that it will be re-created lazily with fresh config
@@ -1239,33 +1023,29 @@ ENVIRONMENT FILE:
   --env=<name>                     Env destination name (resolved to sessions/<name>.env)
   --env <name>                     Alternative syntax for --env
   --env-path=<path|file>           Explicit .env file path (or relative file name)
-  --auth-broker                    Force use of auth-broker (service keys) instead of .env file
-                                   Ignores .env file even if present in current directory
-                                   By default, .env in current directory is used automatically (if exists)
-  --auth-broker-path=<path>        Custom path for auth-broker service keys and sessions
-                                   Creates service-keys and sessions subdirectories in this path
+                                   Nothing is looked up in the working directory: a .env
+                                   there is read only when named (--env-path=./.env)
+  --auth-broker-path=<path>        Base directory of the service-keys and sessions subdirectories
                                    Example: --auth-broker-path=~/prj/tmp/
                                    This will use ~/prj/tmp/service-keys and ~/prj/tmp/sessions
-  --mcp=<destination>              Default MCP destination name (overrides x-mcp-destination header)
-                                   If specified, this destination will be used when x-mcp-destination
-                                   header is not provided in the request
+  --mcp=<destination>              Default destination: service-keys/<destination>.json and
+                                   sessions/<destination>.env, read field by field
                                    Example: --mcp=TRIAL
-                                   This allows using auth-broker with stdio and SSE transports
-                                   When --mcp is specified, .env file is not loaded automatically
-                                   (even if it exists in current directory)
+                                   Works with every transport
+                                   x-mcp-destination overrides it per request, only with
+                                   --allow-destination-header
+  --allow-destination-header       Honour the x-mcp-destination header (HTTP/SSE, off by default)
+  --unsafe                         Write named destinations' sessions to disk (default: in memory)
+  --browser=<name>                 Browser for a login: chrome|edge|firefox|system|headless|none
+  --browser-auth-port=<port>       Login callback port, 1-65535 (default: 61001)
 
 TRANSPORT SELECTION:
   --transport=<type>               Transport type: stdio|http|streamable-http|sse
                                    Default: stdio (for MCP clients)
-                                   Shortcuts: --http (same as --transport=http)
-                                             --sse (same as --transport=sse)
-                                             --stdio (same as --transport=stdio)
 
 HTTP/STREAMABLE-HTTP OPTIONS:
   --http-port=<port>               HTTP server port (default: 3000)
-  --http-host=<host>               HTTP server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: When listening on 0.0.0.0, client must provide all connection headers
-                                   Server will not use default destination for non-local connections
+  --http-host=<host>               HTTP server host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   --http-json-response             Enable JSON response format
   --http-allowed-origins=<list>    Comma-separated allowed origins for CORS
                                    Example: --http-allowed-origins=http://localhost:3000,https://example.com
@@ -1274,9 +1054,7 @@ HTTP/STREAMABLE-HTTP OPTIONS:
 
 SSE (SERVER-SENT EVENTS) OPTIONS:
   --sse-port=<port>                SSE server port (default: 3001)
-  --sse-host=<host>                SSE server host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
-                                   Security: When listening on 0.0.0.0, client must provide all connection headers
-                                   Server will not use default destination for non-local connections
+  --sse-host=<host>                SSE server host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   --sse-allowed-origins=<list>     Comma-separated allowed origins for CORS
                                    Example: --sse-allowed-origins=http://localhost:3000
   --sse-allowed-hosts=<list>       Comma-separated allowed hosts
@@ -1284,24 +1062,24 @@ SSE (SERVER-SENT EVENTS) OPTIONS:
 
 ENVIRONMENT VARIABLES:
   MCP_ENV_PATH                     Explicit .env file path (same as --env-path)
-  MCP_SKIP_ENV_LOAD                Skip automatic .env loading (true|false)
+  MCP_UNSAFE                       Same as --unsafe (true|false)
+  MCP_BROWSER                      Same as --browser
+  MCP_BROWSER_AUTH_PORT            Same as --browser-auth-port (default: 61001)
   MCP_SKIP_AUTO_START              Skip automatic server start (true|false)
   MCP_TRANSPORT                    Transport type (stdio|http|sse)
                                    Default: stdio if not specified
   MCP_HTTP_PORT                    Default HTTP port (default: 3000)
-  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+  MCP_HTTP_HOST                    Default HTTP host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   MCP_HTTP_ENABLE_JSON_RESPONSE   Enable JSON responses (true|false)
   MCP_HTTP_ALLOWED_ORIGINS         Allowed CORS origins (comma-separated)
   MCP_HTTP_ALLOWED_HOSTS           Allowed hosts (comma-separated)
   MCP_HTTP_ENABLE_DNS_PROTECTION   Enable DNS protection (true|false)
   MCP_SSE_PORT                     Default SSE port (default: 3001)
-  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1 for local only, use 0.0.0.0 for all interfaces)
+  MCP_SSE_HOST                     Default SSE host (default: 127.0.0.1, use 0.0.0.0 for all interfaces)
   MCP_SSE_ALLOWED_ORIGINS          Allowed CORS origins for SSE (comma-separated)
   MCP_SSE_ALLOWED_HOSTS            Allowed hosts for SSE (comma-separated)
   MCP_SSE_ENABLE_DNS_PROTECTION    Enable DNS protection for SSE (true|false)
-  AUTH_BROKER_PATH                 Custom paths for service keys and sessions
-                                   Unix: colon-separated (e.g., /path1:/path2)
-                                   Windows: semicolon-separated (e.g., C:\\path1;C:\\path2)
+  AUTH_BROKER_PATH                 Base directory of service-keys/ and sessions/
                                    If not set, uses platform defaults:
                                    Unix: ~/.config/mcp-abap-adt/service-keys
                                    Windows: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys
@@ -1334,27 +1112,26 @@ SAP CONNECTION (.env file):
                                    Example: https://your-system.sap.com
   SAP_CLIENT                       SAP client number (required for basic auth)
                                    Example: 100
-  SAP_AUTH_TYPE                    Authentication type: basic|jwt|saml|certificate|kerberos (default: basic)
+  SAP_AUTH_TYPE                    Authentication type: basic|snc|jwt (required)
+                                   saml, certificate and kerberos are not supported
+  SAP_GRANT_TYPE                   With jwt (required): authorization_code|none
   SAP_CONNECTION_TYPE              Connection type: http|rfc (default: http)
+                                   Precedence: --connection-type, then the environment
+                                   (the .env joins it, never over a value set), then YAML
   SAP_USERNAME                     SAP username (required for basic auth)
   SAP_PASSWORD                     SAP password (required for basic auth)
-  SAP_JWT_TOKEN                    JWT token (required for jwt auth)
-  SAP_CERT_PATH / SAP_CERT_KEY_PATH         Client cert + key (PEM) for certificate auth
-  SAP_CERT_PFX_PATH / SAP_CERT_PASSPHRASE   PKCS#12 cert for certificate auth (alternative to PEM)
-  SAP_KERBEROS_SPN                          SPN for kerberos auth (default HTTP@<host>)
-  SAP_KERBEROS_SERVICE                      Service class for SPN derivation when SAP_KERBEROS_SPN unset (default HTTP)
+  SAP_JWT_TOKEN                    JWT token (with SAP_GRANT_TYPE=none)
+  SAP_SNC_PARTNERNAME              snc (RFC only, no user, no password): the system's SNC name
+  SAP_SNC_QOP / SAP_SNC_LIB / SAP_SNC_MYNAME   snc, optional
+  XSUAA_MCP_URL                    An XSUAA service key's system URL, in sessions/<destination>.env
 
-GENERATING .ENV FROM SERVICE KEY (JWT Authentication):
-  To generate .env file from SAP BTP service key JSON file, install the
-  auth broker globally (it ships mcp-auth):
+GENERATING A .ENV (JWT Authentication):
+  The mcp-auth command ships in @mcp-abap-adt/auth-broker-cli:
 
-    npm install -g @mcp-abap-adt/auth-broker
+    npm install -g @mcp-abap-adt/auth-broker-cli
+    mcp-auth generate-env --grant authorization_code
 
-  Then use the mcp-auth command:
-
-    mcp-auth --service-key path/to/service-key.json --output .env
-
-  This will create/update .env file with JWT tokens and connection details.
+  mcp-auth --help lists the other flags. A jwt .env must state SAP_GRANT_TYPE.
 
 EXAMPLES:
   # Default stdio mode (for MCP clients, requires .env file or --mcp parameter)
@@ -1366,25 +1143,22 @@ EXAMPLES:
   # HTTP server on custom port, localhost only (default)
   mcp-abap-adt --transport=http --http-port=8080
 
-  # HTTP server accepting connections from all interfaces (less secure)
+  # HTTP server accepting connections from all interfaces
   mcp-abap-adt --transport=http --http-host=0.0.0.0 --http-port=8080
 
   # Use YAML configuration file
   mcp-abap-adt --conf=config.yaml
 
-  # Use stdio mode with --mcp parameter (uses auth-broker, skips .env file)
+  # Use stdio mode with --mcp parameter (a named destination, skips .env file)
   mcp-abap-adt --mcp=TRIAL
 
-  # Default: uses .env from current directory if exists, otherwise auth-broker
-  mcp-abap-adt
+  # A .env in the current directory is read only when named
+  mcp-abap-adt --env-path=./.env
 
-  # Force use of auth-broker (service keys), ignore .env file even if exists
-  mcp-abap-adt --auth-broker
+  # Use custom base directory (service-keys and sessions subdirectories)
+  mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 
-  # Use custom path for auth-broker (creates service-keys and sessions subdirectories)
-  mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-
-  # Use SSE transport with --mcp parameter (allows auth-broker with SSE transport)
+  # Use SSE transport with --mcp parameter
   mcp-abap-adt --transport=sse --mcp=TRIAL
 
   # Use env destination from sessions store
@@ -1405,10 +1179,6 @@ EXAMPLES:
                 --sse-allowed-origins=http://localhost:3000 \\
                 --sse-enable-dns-protection
 
-  # Using shortcuts
-  mcp-abap-adt --http --http-port=8080
-  mcp-abap-adt --sse --sse-port=3001
-
 QUICK REFERENCE:
   Transport types:
     http            - HTTP StreamableHTTP transport (default)
@@ -1419,9 +1189,9 @@ QUICK REFERENCE:
   Common use cases:
     Web interfaces (HTTP):        mcp-abap-adt (default, no .env needed)
     MCP clients (Cline, Cursor):  mcp-abap-adt --transport=stdio
-    MCP clients with auth-broker: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
+    MCP clients with a destination: mcp-abap-adt --transport=stdio --mcp=TRIAL (skips .env)
     Web interfaces (SSE):         mcp-abap-adt --transport=sse --sse-port=3001
-    SSE with auth-broker:         mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
+    SSE with a destination:       mcp-abap-adt --transport=sse --mcp=TRIAL (skips .env)
 
 DOCUMENTATION:
   https://github.com/fr0ster/mcp-abap-adt
@@ -1429,17 +1199,14 @@ DOCUMENTATION:
   Configuration:   docs/user-guide/CLIENT_CONFIGURATION.md
 
 AUTHENTICATION:
-  For JWT authentication with SAP BTP service keys:
-  1. Install: npm install -g @mcp-abap-adt/auth-broker
-  2. Run:     mcp-auth --service-key path/to/service-key.json --output .env
-  3. This generates .env file with JWT tokens automatically
+  Four authentications: basic, snc (RFC only), jwt/authorization_code (browser login),
+  jwt/none (a token you hold). A jwt .env must state SAP_GRANT_TYPE.
+  To write a .env: npm install -g @mcp-abap-adt/auth-broker-cli, then
+  mcp-auth generate-env --grant authorization_code
 
 SERVICE KEYS (Destination-Based Authentication):
   The server supports destination-based authentication using service keys stored locally.
   This allows you to configure authentication once per destination and reuse it.
-
-  IMPORTANT: Auth-broker (service keys) is only available for HTTP/streamable-http transport.
-  For stdio and SSE transports, use .env file instead.
 
   How to Save Service Keys:
 
@@ -1483,17 +1250,14 @@ SERVICE KEYS (Destination-Based Authentication):
       Service keys: %USERPROFILE%\\Documents\\mcp-abap-adt\\service-keys\\{destination}.json
       Sessions:     %USERPROFILE%\\Documents\\mcp-abap-adt\\sessions\\{destination}.env
 
-  Fallback: Server also searches in current working directory (where server is launched)
-
   Service Key:
     Download the service key JSON file from SAP BTP (from the corresponding service instance)
     and save it as {destination}.json (e.g., TRIAL.json).
     The filename without .json extension becomes the destination name (case-sensitive).
 
   Using Destinations:
-    In HTTP headers, use:
-      x-sap-destination: TRIAL    (for SAP Cloud, URL derived from service key)
-      x-mcp-destination: TRIAL    (for MCP destinations, URL derived from service key)
+    --mcp=TRIAL on any transport, or in HTTP headers (with --allow-destination-header):
+      x-mcp-destination: TRIAL    (URL derived from the destination)
 
     The destination name must exactly match the service key filename (without .json extension, case-sensitive).
 
@@ -1535,7 +1299,7 @@ SERVICE KEYS (Destination-Based Authentication):
         }
       }
 
-    4. HTTP with destination (requires proxy server running):
+    4. HTTP with destination (the server runs with --allow-destination-header):
       {
         "mcpServers": {
           "mcp-abap-adt-http": {
@@ -1549,7 +1313,7 @@ SERVICE KEYS (Destination-Based Authentication):
         }
       }
 
-    5. HTTP with direct auth (manual token refresh needed):
+    5. HTTP with a token you hold (the server does not renew it):
       {
         "mcpServers": {
           "mcp-abap-adt-direct": {
@@ -1557,9 +1321,7 @@ SERVICE KEYS (Destination-Based Authentication):
             "url": "http://localhost:3000/mcp/stream/http",
             "headers": {
               "x-sap-url": "https://your-system.com",
-              "x-sap-auth-type": "jwt",
-              "x-sap-jwt-token": "your-token",
-              "x-sap-refresh-token": "your-refresh-token"
+              "x-sap-jwt-token": "your-token"
             },
             "timeout": 60
           }
@@ -1568,9 +1330,9 @@ SERVICE KEYS (Destination-Based Authentication):
 
   First-Time Authentication:
     - Server reads service key from {destination}.json
-    - Opens browser for OAuth2 authentication (if no valid session exists)
-    - Saves tokens to {destination}.env for future use
-    - Subsequent requests use cached tokens automatically
+    - Opens browser for OAuth2 authentication (if no valid session exists), callback port 61001
+    - Keeps the session in memory, or saves it to sessions/{destination}.env with --unsafe
+    - Subsequent requests use the stored token automatically
 
   Automatic Token Management:
     - Validates tokens before use
@@ -1579,15 +1341,15 @@ SERVICE KEYS (Destination-Based Authentication):
     - Falls back to browser authentication if refresh fails
 
   Custom Paths:
-    Set AUTH_BROKER_PATH environment variable to override default paths:
-      Linux/macOS: export AUTH_BROKER_PATH="/custom/path:/another/path"
-      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path;C:\\another\\path
+    Set AUTH_BROKER_PATH environment variable to override the default base directory:
+      Linux/macOS: export AUTH_BROKER_PATH="/custom/path"
+      Windows:     set AUTH_BROKER_PATH=C:\\custom\\path
 
     Or use --auth-broker-path command-line option:
-      mcp-abap-adt --auth-broker --auth-broker-path=~/prj/tmp/
-      This creates service-keys and sessions subdirectories in the specified path.
+      mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
+      This uses the service-keys and sessions subdirectories of the specified path.
 
-  For more details, see: docs/user-guide/CLIENT_CONFIGURATION.md#destination-based-authentication
+  For more details, see: docs/user-guide/AUTHENTICATION.md
 
 `;
   console.log(help);
@@ -1716,8 +1478,8 @@ export function parseTransportConfig(transportType: string): TransportConfig {
 
   if (sseRequested) {
     const port = resolvePortOption('--sse-port', 'MCP_SSE_PORT', 3001);
-    // Default to localhost (127.0.0.1) for security - only accepts local connections
-    // Use 0.0.0.0 to accept connections from all interfaces (less secure)
+    // Default to localhost (127.0.0.1)
+    // Use 0.0.0.0 to accept connections from all interfaces
     const host =
       getArgValue('--sse-host') ?? process.env.MCP_SSE_HOST ?? '127.0.0.1';
     const allowedOrigins = resolveListOption(
@@ -1754,8 +1516,8 @@ export function parseTransportConfig(transportType: string): TransportConfig {
 
   if (httpRequested) {
     const port = resolvePortOption('--http-port', 'MCP_HTTP_PORT', 3000);
-    // Default to localhost (127.0.0.1) for security - only accepts local connections
-    // Use 0.0.0.0 to accept connections from all interfaces (less secure)
+    // Default to localhost (127.0.0.1)
+    // Use 0.0.0.0 to accept connections from all interfaces
     const host =
       getArgValue('--http-host') ?? process.env.MCP_HTTP_HOST ?? '127.0.0.1';
     const enableJsonResponse = resolveBooleanOption(

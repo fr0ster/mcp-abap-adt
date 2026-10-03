@@ -11,16 +11,14 @@ import type { AdtClient } from '@mcp-abap-adt/adt-clients';
 import { analyseDeletion } from '@mcp-abap-adt/adt-strategies';
 import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { createAdtClient } from '../../../lib/clients';
-import {
-  getSystemContext,
-  resolveSystemContext,
-} from '../../../lib/systemContext';
+import { getSystemContext } from '../../../lib/systemContext';
 import {
   getSharedDependenciesConfig,
   getTimeout,
   loadTestConfig,
 } from '../../integration/helpers/configHelpers';
 import { createTestLogger } from '../../integration/helpers/loggerHelpers';
+import { primeSystemContext } from '../../integration/helpers/primeSystemContext';
 import { createTestConnectionAndSession } from '../../integration/helpers/sessionHelpers';
 import {
   resetSharedDependencyCache,
@@ -38,7 +36,7 @@ describe('Admin: Teardown shared dependencies', () => {
     try {
       const result = await createTestConnectionAndSession();
       connection = result.connection;
-      await resolveSystemContext(connection);
+      await primeSystemContext(connection);
       const systemCtx = getSystemContext();
       client = createAdtClient(connection);
       hasConfig = true;

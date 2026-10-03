@@ -217,6 +217,10 @@ import { corpusBody } from '../../lib/adtCorpus';
 import { analyseDeletion } from '../../lib/strategies/deletionRefusal';
 import { analyseLock } from '../../lib/strategies/lockAnswer';
 import { structured, verbatim } from '../../lib/strategies/reading';
+import {
+  resetSystemContextCache,
+  setSystemContext,
+} from '../../lib/systemContext';
 import { sessionContext } from '../../lib/utils';
 import {
   fakeClientOf,
@@ -748,6 +752,11 @@ describe('behavior_definition', () => {
 });
 
 describe('behavior_implementation — declared over the class document set', () => {
+  // The create passes the responsible itself and is refused without one
+  // (systemContextRequired.test.ts); state one for the fake client.
+  beforeEach(() => setSystemContext({ responsible: 'USER_PLACEHOLDER' }));
+  afterEach(() => resetSystemContextCache());
+
   // No Activate, Delete, Unlock or Check tool exists for this family (only
   // Create, Lock and Validate do) — the it.each table above and the
   // lock/unlock/check-param prescription below apply only where a tool
@@ -813,6 +822,8 @@ describe('behavior_implementation — declared over the class document set', () 
       description: 'x',
       packageName: 'ZP',
       transportRequest: 'SIDK900001',
+      responsible: 'USER_PLACEHOLDER',
+      masterSystem: undefined,
     });
     expect(createCall?.analyse).toBe(analyseException);
 

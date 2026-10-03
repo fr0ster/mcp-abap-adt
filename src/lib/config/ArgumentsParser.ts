@@ -4,9 +4,9 @@
  * Used by both old server (mcp_abap_adt_server) and new servers
  */
 
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import { authParameterSource, readAuthParameters } from './authParameters';
 import { resolveEnvFilePath } from './envResolver';
+import type { YamlConfig } from './yamlConfig';
 
 export interface ParsedArguments {
   /** Default MCP destination from --mcp parameter */
@@ -17,14 +17,14 @@ export interface ParsedArguments {
   authBrokerPath?: string;
   /** Use unsafe mode */
   unsafe: boolean;
-  /** Use auth-broker instead of .env file */
-  useAuthBroker: boolean;
   /** Transport type */
   transport?: string;
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
   /** SAP system type override: onprem | cloud | legacy */
   systemType?: 'onprem' | 'cloud' | 'legacy';
+  /** The form `systemType` came from (`--system-type`, `SAP_SYSTEM_TYPE`, the YAML key). */
+  systemTypeSource?: string;
   /** Path to YAML config file */
   config?: string;
   /** HTTP port */
@@ -53,6 +53,19 @@ export interface ParsedArguments {
   browserAuthPort?: number;
   /** Allow x-mcp-destination header to override default destination */
   allowDestinationHeader?: boolean;
+  /** Browser for a login */
+  browser?: string;
+  /** --env as the user gave it: a destination name or a path */
+  envDestination?: string;
+  /** --env-path as the user gave it */
+  envPath?: string;
+  /**
+   * Where `env` came from, as the user gave it: `--env`, `--env-path`,
+   * `MCP_ENV_PATH`, or the YAML key.
+   */
+  envFileSource?: string;
+  /** The form `connectionType` came from (`--connection-type`, `SAP_CONNECTION_TYPE`, the YAML key). */
+  connectionTypeSource?: string;
   /** TLS certificate file path */
   tlsCert?: string;
   /** TLS private key file path */
@@ -65,11 +78,10 @@ export class ArgumentsParser {
   /**
    * Parse command-line arguments and environment variables
    */
-  static parse(): ParsedArguments {
+  static parse(yaml?: YamlConfig | null): ParsedArguments {
     const args = process.argv;
     const result: ParsedArguments = {
       unsafe: false,
-      useAuthBroker: false,
     };
 
     // Helper to get argument value
@@ -142,75 +154,56 @@ export class ArgumentsParser {
       return defaultValue;
     };
 
-    // Parse --mcp
-    result.mcp = getArgValue('--mcp');
+    // The auth and connection parameters: CLI, then env, then YAML (authParameters.ts)
+    const auth = readAuthParameters(
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
+    result.mcp = auth.mcpDestination;
+    result.authBrokerPath = auth.authBrokerPath;
+    result.browserAuthPort = auth.browserAuthPort;
+    result.allowDestinationHeader = auth.allowDestinationHeader ?? false;
+    result.browser = auth.browser;
+    result.envDestination = auth.envDestination;
+    result.envPath = auth.envPath;
+    result.unsafe = auth.unsafe ?? false;
+    result.connectionType = auth.connectionType;
+    result.connectionTypeSource = authParameterSource(
+      'connectionType',
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
+    // Not written to process.env here: the env file's SAP_SYSTEM_TYPE joins
+    // the environment later, and the launcher resolves the precedence then
+    // (effectiveSystemType), as for the connection type.
+    result.systemType = auth.systemType;
+    result.systemTypeSource = authParameterSource(
+      'systemType',
+      args,
+      process.env,
+      yaml as Record<string, unknown> | null | undefined,
+    );
 
-    // Parse --auth-broker-path
-    result.authBrokerPath = getArgValue('--auth-broker-path');
-
-    // Parse browser auth callback port
-    {
-      const raw =
-        getArgValue('--browser-auth-port') || process.env.MCP_BROWSER_AUTH_PORT;
-      if (raw) {
-        const port = parseInt(raw, 10);
-        if (!Number.isNaN(port) && port > 0 && port <= 65535) {
-          result.browserAuthPort = port;
-        }
-      }
-    }
-
-    // Parse --allow-destination-header
-    result.allowDestinationHeader = hasFlag('--allow-destination-header');
-
-    // Parse --env and --env-path
     // --env: destination name (resolved to sessions/<name>.env in platform path)
     // --env-path: explicit file path or file name (resolved against cwd if relative)
-    const envDestination = getArgValue('--env');
-    const envPathArg = getArgValue('--env-path');
-    const envPathFromEnv = process.env.MCP_ENV_PATH;
-
     const resolvedEnv = resolveEnvFilePath({
-      envDestination,
-      envPath: envPathArg || envPathFromEnv,
+      envDestination: auth.envDestination,
+      envPath: auth.envPath,
       authBrokerPath: result.authBrokerPath,
     });
 
     if (resolvedEnv) {
       result.env = resolvedEnv;
-    } else if (!result.mcp) {
-      // Backward-compatible fallback: .env in current directory
-      const cwdEnvPath = path.resolve(process.cwd(), '.env');
-      if (fs.existsSync(cwdEnvPath)) {
-        result.env = cwdEnvPath;
-      }
+      // The resolver prefers the path over the name; so does the source.
+      const yamlRows = yaml as Record<string, unknown> | null | undefined;
+      result.envFileSource = auth.envPath
+        ? authParameterSource('envPath', args, process.env, yamlRows)
+        : authParameterSource('envDestination', args, process.env, yamlRows);
     }
-
-    // Parse --unsafe
-    result.unsafe = hasFlag('--unsafe') || process.env.MCP_UNSAFE === 'true';
-
-    // Parse --auth-broker
-    result.useAuthBroker =
-      hasFlag('--auth-broker') || process.env.MCP_USE_AUTH_BROKER === 'true';
-
-    // Parse --connection-type (http or rfc)
-    const connType =
-      getArgValue('--connection-type') || process.env.SAP_CONNECTION_TYPE;
-    if (connType?.trim().toLowerCase() === 'rfc') {
-      result.connectionType = 'rfc';
-    }
-
-    // Parse --system-type (onprem | cloud | legacy)
-    const sysType = (
-      getArgValue('--system-type') || process.env.SAP_SYSTEM_TYPE
-    )
-      ?.trim()
-      .toLowerCase();
-    if (sysType === 'onprem' || sysType === 'cloud' || sysType === 'legacy') {
-      result.systemType = sysType;
-      // Propagate to env so systemContext.ts detectLegacy() picks it up
-      process.env.SAP_SYSTEM_TYPE = sysType;
-    }
+    // Nothing is looked up in the working directory: a .env there is read
+    // only when named (--env-path=./.env).
 
     // Parse --conf / --config
     result.config = getArgValue('--conf') || getArgValue('--config');

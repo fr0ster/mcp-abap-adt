@@ -76,6 +76,15 @@ npm test -- --testPathPatterns="class|unitTest|cds"
 - **Soft mode** (default, `integration_hard_mode.enabled: false`): calls handlers directly, no MCP subprocess. Use for mass regression testing.
 - **Hard mode** (`integration_hard_mode.enabled: true`): spawns full MCP server via stdio, calls tools through MCP protocol. Use for targeted verification.
 
+## Live Connection Test
+
+`src/__tests__/live/liveConnection.test.ts` packs and installs the library and the core package into a temporary directory (as `binSmoke.test.ts` does), starts the installed server over stdio once per destination, lists tools, calls `GetAdtTypes`, then shuts the server down (`SIGTERM`; end of stdin on Windows) and expects exit code 0 and nothing on stdout but MCP frames. It needs no `test-config.yaml`: set `MCP_LIVE_ENV_PATHS` to one or more session `.env` paths separated by the platform path delimiter (`:` on Linux/macOS, `;` on Windows), optionally `MCP_LIVE_ARGS` for extra launcher arguments (e.g. `--connection-type=rfc`), build, and run it. `MCP_LIVE_ARGS` is split on whitespace with no quoting, so an argument cannot contain a space; a `.env` path that contains the delimiter itself is not supported. Without `MCP_LIVE_ENV_PATHS` it skips and prints why.
+
+```bash
+npm run build
+MCP_LIVE_ENV_PATHS=/path/to/a.env:/path/to/b.env npm test -- src/__tests__/live
+```
+
 ## Test Levels
 
 Each object type has up to three test levels:

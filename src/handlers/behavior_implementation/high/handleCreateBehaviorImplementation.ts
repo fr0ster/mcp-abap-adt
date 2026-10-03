@@ -27,6 +27,7 @@ import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { DETAIL_PROPERTY, detailOf } from '../../../lib/strategies/detail';
 import { project, terseWrite } from '../../../lib/strategies/projections';
 import { resultsFor } from '../../../lib/strategies/resultSets';
+import { requireSystemContextForCreate } from '../../../lib/systemContextGuard';
 import { return_error } from '../../../lib/utils';
 import { validateTransportRequest } from '../../../utils/transportValidation.js';
 
@@ -99,8 +100,12 @@ export async function handleCreateBehaviorImplementation(
 
   return answer(
     { tool: 'CreateBehaviorImplementation', detail },
-    () =>
-      createAdtClient(connection, logger)
+    async () => {
+      // adt-clients builds a behavior implementation's inner class with an
+      // empty system context, so the responsible and master system go in the
+      // config — the responsible guarded like every other create.
+      const { responsible, masterSystem } = requireSystemContextForCreate();
+      return createAdtClient(connection, logger)
         .getBehaviorImplementation(resultsFor(classDocuments))
         .create(
           {
@@ -109,9 +114,12 @@ export async function handleCreateBehaviorImplementation(
             packageName: args.package_name.toUpperCase(),
             description: args.description || className,
             transportRequest: args.transport_request,
+            responsible,
+            masterSystem,
           },
           { analyse: analyseException },
-        ),
+        );
+    },
     project(detail, terseWrite),
   );
 }

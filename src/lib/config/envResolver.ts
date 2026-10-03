@@ -21,10 +21,7 @@ function resolvePathLike(input: string): string {
 }
 
 function firstPlatformSessionsDir(customPath?: string): string {
-  const sessionsPaths = getPlatformPaths(customPath, 'sessions');
-  const cwd = path.resolve(process.cwd());
-  const nonCwd = sessionsPaths.find((p) => path.resolve(p) !== cwd);
-  return nonCwd || sessionsPaths[0];
+  return getPlatformPaths(customPath, 'sessions')[0];
 }
 
 export function resolveEnvFilePath(options: {

@@ -22,6 +22,7 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import { handleDeleteClass } from '../../../../handlers/class/low/handleDeleteClass';
 import { createAdtClient } from '../../../../lib/clients';
 import { createAbapConnection } from '../../../../lib/connectionFactory';
+import { credentialFromSapConfig } from '../../../../lib/credentialSources';
 import {
   getCleanupAfter,
   getCleanupAfterRun,
@@ -115,7 +116,11 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
 
         // Create connection directly (same as in adt-clients tests)
         connection = trackConnection(
-          createAbapConnection(config, connectionLogger),
+          createAbapConnection(
+            config,
+            credentialFromSapConfig(config),
+            connectionLogger,
+          ),
         );
 
         // Check refresh token availability before connecting

@@ -36,6 +36,16 @@ export interface IServerConfig {
 
   /** Path to .env file */
   envFilePath?: string;
+  /** `--env` / `env` as the user gave it: a destination name or a path */
+  envDestination?: string;
+  /** `--env-path` / `MCP_ENV_PATH` / `env-path` as the user gave it */
+  envPath?: string;
+  /**
+   * The parameter `envFile` came from, as the user gave it: `--env`,
+   * `--env-path`, `MCP_ENV_PATH`, `env (config file)`,
+   * or `env-path (config file)`.
+   */
+  envFileSource?: string;
   /** Alias for envFilePath (v2 compatibility) */
   envFile?: string;
   /** Custom path for auth broker storage */
@@ -44,8 +54,6 @@ export interface IServerConfig {
   mcpDestination?: string;
   /** Use unsafe mode (file-based session store) */
   unsafe?: boolean;
-  /** Use auth-broker instead of .env file */
-  useAuthBroker?: boolean;
   /**
    * Browser type for authentication (chrome, edge, firefox, system, headless, none)
    * - 'system' (default): Opens system default browser
@@ -108,9 +116,26 @@ export interface IServerConfig {
 
   /** SAP connection type: http (default) or rfc */
   connectionType?: 'http' | 'rfc';
+  /**
+   * The form `connectionType` came from: `--connection-type`,
+   * `SAP_CONNECTION_TYPE`, or `connection-type (config file)`. Only the CLI
+   * form beats an `SAP_CONNECTION_TYPE` the env file brings (as in 15.x).
+   */
+  connectionTypeSource?: string;
 
-  /** SAP system type override: onprem | cloud | legacy (overrides auto-detection) */
+  /**
+   * SAP system type: onprem | cloud | legacy (`--system-type`, `SAP_SYSTEM_TYPE`).
+   * The tools offered default to cloud. The connector, and whether the master
+   * system is asked of the system, default to cloud for a jwt destination and
+   * on-premise otherwise — stated, never guessed from the URL.
+   */
   systemType?: 'onprem' | 'cloud' | 'legacy';
+  /**
+   * The form `systemType` came from: `--system-type`, `SAP_SYSTEM_TYPE`, or
+   * `system-type (config file)`. Only the CLI form beats an `SAP_SYSTEM_TYPE`
+   * the env file brings, as for the connection type.
+   */
+  systemTypeSource?: string;
 
   // ============================================================================
   // LEGACY FIELDS (for v1 backward compatibility)

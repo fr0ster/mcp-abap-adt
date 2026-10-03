@@ -5,19 +5,18 @@
 ### Unix (Linux/macOS):
 - **Service keys**: `~/.config/mcp-abap-adt/service-keys/{destination}.json`
 - **Sessions (.env)**: `~/.config/mcp-abap-adt/sessions/{destination}.env`
-- **Also searches in**: current working directory (where mcp-abap-adt is launched from)
 
 ### Windows:
 - **Service keys**: `%USERPROFILE%\Documents\mcp-abap-adt\service-keys\{destination}.json`
 - **Sessions (.env)**: `%USERPROFILE%\Documents\mcp-abap-adt\sessions\{destination}.env`
-- **Also searches in**: current working directory (where mcp-abap-adt is launched from)
 
 ## Search Priority:
 
 1. **Custom path** (if provided in constructor)
 2. **AUTH_BROKER_PATH** (environment variable)
 3. **Platform-specific paths** (listed above)
-4. **Current working directory** (process.cwd())
+
+Never the working directory: nothing is looked up where the server happens to start.
 
 ## How to Test:
 
@@ -64,7 +63,7 @@ x-sap-url: https://your-sap-url.com
 
 Or:
 ```
-x-sap-destination: TRIAL
+x-mcp-destination: TRIAL
 ```
 
 ### 4. Verify that .env file was created:
@@ -87,25 +86,14 @@ cat ~/.config/mcp-abap-adt/sessions/TRIAL.env
 # SAP_UAA_CLIENT_SECRET=...
 ```
 
-## Alternative: Using Current Directory
+## Alternative: A Directory of Your Own
 
-If you want to use the current directory (where the server is launched from):
+To keep the stores elsewhere, name the base directory (it holds `service-keys/` and `sessions/`):
 
 ```bash
-# Create service key in current directory
-cat > TRIAL.json << 'EOF'
-{
-  "uaa": {
-    "url": "https://your-uaa-url.com",
-    "clientid": "your-client-id",
-    "clientsecret": "your-client-secret"
-  },
-  "url": "https://your-sap-url.com"
-}
-EOF
-
-# Start server from this directory
-npm run dev
+mkdir -p ~/prj/tmp/service-keys
+# put TRIAL.json in ~/prj/tmp/service-keys/
+mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 ```
 
 ## Debug Mode:

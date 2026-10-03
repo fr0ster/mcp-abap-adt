@@ -4,10 +4,31 @@ import type { IAbapConnection } from '@mcp-abap-adt/interfaces-adt-connection';
 import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import { registerConnectionResetHook } from './connectionEvents';
 import { getEffectiveSystemContext } from './systemContext';
+import { guardedSystemContext } from './systemContextGuard';
 import { getManagedConnection } from './utils';
 
 let adtClient: AdtClient | undefined;
 let adtClientConnection: AbapConnection | undefined;
+
+/**
+ * The AdtClient this server builds: its system context refuses an empty
+ * responsible where adt-clients is about to send one (`guardedSystemContext`),
+ * so a change is never sent without one. An empty master system is left out.
+ */
+class GuardedAdtClient extends AdtClient {
+  constructor(
+    connection: IAbapConnection,
+    logger: ILogger | undefined,
+    options: ConstructorParameters<typeof AdtClient>[2],
+  ) {
+    super(connection, logger, options);
+    this.systemContext = guardedSystemContext({
+      masterSystem: options?.masterSystem,
+      responsible: options?.responsible,
+      masterLanguage: options?.masterLanguage,
+    });
+  }
+}
 
 export function createAdtClient(
   connection: IAbapConnection,
@@ -26,7 +47,7 @@ export function createAdtClient(
           masterLanguage: ctx.masterLanguage,
         }
       : undefined;
-  return new AdtClient(connection, logger, options);
+  return new GuardedAdtClient(connection, logger, options);
 }
 
 export function getAdtClient(): AdtClient {

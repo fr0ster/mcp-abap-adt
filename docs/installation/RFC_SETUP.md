@@ -42,11 +42,13 @@ export LD_LIBRARY_PATH=$SAPNWRFC_HOME/lib:${LD_LIBRARY_PATH:-}
 
 ### 3. @mcp-abap-adt/sap-rfc-lite Package
 
+`@mcp-abap-adt/sap-rfc-lite` is an **optional dependency** of `@mcp-abap-adt/lib` (and so of the server): npm installs it when it can, and a machine without the SAP NW RFC SDK simply cannot use RFC. If it is missing, install it explicitly:
+
 ```bash
 npm install @mcp-abap-adt/sap-rfc-lite
 ```
 
-`@mcp-abap-adt/sap-rfc-lite` is a lightweight fork of the archived `node-rfc` package, containing only the API surface needed for ADT RFC connections. It is loaded dynamically at runtime — it is not a declared dependency.
+It is a lightweight fork of the archived `node-rfc` package, containing only the API surface needed for ADT RFC connections, and it is loaded only when an RFC connection opens.
 
 Verify installation:
 
@@ -68,15 +70,37 @@ SAP_USERNAME=DEVELOPER
 SAP_PASSWORD=secret
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
-SAP_CONNECTION_TYPE=rfc
 ```
 
-- `SAP_AUTH_TYPE` — authentication method (`basic` or `jwt`). RFC uses basic auth with username/password.
-- `SAP_CONNECTION_TYPE` — transport layer (`http` or `rfc`).
+Start the server with `--connection-type=rfc`.
+
+- `SAP_AUTH_TYPE` — authentication (`basic` or `snc` over RFC; the JWT authentications are HTTP).
+- The transport layer (`http` or `rfc`): `SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` or the process environment, `--connection-type=rfc`, or YAML `connection-type: rfc`. Precedence: CLI, then the environment (the `.env` value joins it, never over one already set), then YAML.
+
+## SNC (passwordless logon)
+
+SNC logs on over RFC with the credential of an installed SNC product (for example a Secure Login Client). **The `.env` has no user and no password**: the system maps the client's SNC name to an ABAP user.
+
+```env
+SAP_URL=http://saphost:8000
+SAP_CLIENT=100
+SAP_AUTH_TYPE=snc
+SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
+# Optional:
+# SAP_SNC_QOP=9
+# SAP_SNC_LIB=/path/to/the/snc/library
+# SAP_SNC_MYNAME=p:CN=<client name>
+```
+
+- `SAP_SNC_PARTNERNAME` — the system's SNC name (required).
+- `SAP_SNC_QOP`, `SAP_SNC_LIB`, `SAP_SNC_MYNAME` — optional: quality of protection, the SNC library (otherwise it is located the way `SNC_LIB` and the product's install path say), and the client's own SNC name.
+- SNC needs `--connection-type=rfc` (see above). With `http` the destination is refused at startup, naming `connection-type`.
+- A destination that states `snc` without `SAP_SNC_PARTNERNAME` is refused with `Destination "X" lacks: sncPartnerName`.
+- Prerequisites on the system side: SNC enabled on the application server, and the client's SNC name mapped to an ABAP user (user maintenance, SNC tab).
 
 ## How It Works
 
-1. `SAP_CONNECTION_TYPE=rfc` tells the server to create an `RfcAbapConnection` instead of HTTP
+1. `--connection-type=rfc` tells the server to connect over the RFC transport instead of HTTP
 2. The connection calls SAP function module `SADT_REST_RFC_ENDPOINT` for every ADT request
 3. The RFC session is inherently stateful — lock handles persist across calls
 4. Host and system number are derived from `SAP_URL` (port 80XX -> system number XX)

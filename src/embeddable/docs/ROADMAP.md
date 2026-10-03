@@ -183,9 +183,9 @@ Implementation roadmap for the new simplified architecture based on `BaseMcpServ
 ## Dependencies
 
 - `@modelcontextprotocol/sdk` - MCP SDK with `McpServer` and transports
-- `@mcp-abap-adt/auth-broker` - AuthBroker for token management
+- `@mcp-abap-adt/auth-broker` - AuthBroker: builds a destination's credential (`getProvider`)
 - `@mcp-abap-adt/auth-stores` - ServiceKeyStore and SessionStore
-- `@mcp-abap-adt/auth-providers` - TokenProvider implementations
+- `@mcp-abap-adt/auth-providers` - IAuthProvider implementations
 - `@mcp-abap-adt/connection` - AbapConnection type
 - `@mcp-abap-adt/adt-clients` - CRUD clients for ABAP operations
 

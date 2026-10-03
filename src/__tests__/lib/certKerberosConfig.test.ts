@@ -1,6 +1,8 @@
 /**
  * Tests that cert/kerberos env vars are read into SapConfig
- * and that username/password are NOT required for those auth types.
+ * and that username/password are NOT required for those auth types; and
+ * that the credential such a config describes (`credentialFromSapConfig`)
+ * is a certificate provider, or refused for kerberos.
  *
  * We test against the config.ts getConfig() which is the simpler builder
  * with no circular-dep concerns; it uses setSapConfigOverride as the reset hook.
@@ -50,6 +52,16 @@ describe('certificate auth: reads cert env, no user/pass required', () => {
       expect(cfg.certPassphrase).toBe('  secret with spaces  ');
       expect(cfg.username).toBeUndefined();
       expect(cfg.password).toBeUndefined();
+
+      const {
+        credentialFromSapConfig,
+      } = require('../../lib/credentialSources');
+      const {
+        CertificateAuthProvider,
+      } = require('@mcp-abap-adt/auth-providers');
+      expect(credentialFromSapConfig(cfg)).toBeInstanceOf(
+        CertificateAuthProvider,
+      );
     } finally {
       for (const [k, v] of Object.entries(saved)) {
         if (v === undefined) delete process.env[k];
@@ -64,7 +76,7 @@ describe('kerberos auth: reads SPN + service, no user/pass required', () => {
   const REQUIRED_ENV: Record<string, string> = {
     SAP_URL: 'https://host:44300',
     SAP_AUTH_TYPE: 'kerberos',
-    SAP_KERBEROS_SPN: 'HTTP@mysaphost.corp.example',
+    SAP_KERBEROS_SPN: 'HTTP@system.example.invalid',
     SAP_KERBEROS_SERVICE: 'SAP/ERP',
   };
 
@@ -89,10 +101,17 @@ describe('kerberos auth: reads SPN + service, no user/pass required', () => {
 
       const cfg = getConfig();
       expect(cfg.authType).toBe('kerberos');
-      expect(cfg.kerberosSpn).toBe('HTTP@mysaphost.corp.example');
+      expect(cfg.kerberosSpn).toBe('HTTP@system.example.invalid');
       expect(cfg.kerberosService).toBe('SAP/ERP');
       expect(cfg.username).toBeUndefined();
       expect(cfg.password).toBeUndefined();
+
+      const {
+        credentialFromSapConfig,
+      } = require('../../lib/credentialSources');
+      expect(() => credentialFromSapConfig(cfg)).toThrow(
+        /Kerberos authentication is not available/,
+      );
     } finally {
       for (const [k, v] of Object.entries(saved)) {
         if (v === undefined) delete process.env[k];

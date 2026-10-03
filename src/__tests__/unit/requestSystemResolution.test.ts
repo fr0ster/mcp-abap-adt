@@ -488,6 +488,36 @@ describe('BaseMcpServer.registerHandlers', () => {
     expect(lookup).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    ['cloud', 1, { responsible: 'CB_USER', masterSystem: 'CLD' }],
+    ['onprem', 0, {}],
+  ] as const)(
+    "an injected connection: the server's systemType %s states the kind, SAP_SYSTEM_TYPE unset",
+    async (systemType, lookups, expected) => {
+      const server = new EmbeddableMcpServer({
+        connection: foreignConn(
+          'https://system.abap.example.hana.ondemand.com',
+        ) as never,
+        handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+        systemType,
+      });
+      const result = textOf(await callTool(server, 'WithContext'));
+      expect(lookup).toHaveBeenCalledTimes(lookups);
+      expect(result).toMatchObject(expected);
+      if (lookups === 0) expect(result.masterSystem).toBeUndefined();
+    },
+  );
+
+  it("a factory-built connection follows its recorded settings, not the server's systemType", async () => {
+    const server = new EmbeddableMcpServer({
+      connection: onPremConn() as never,
+      handlersRegistry: new CompositeHandlersRegistry([jsonGroup()]),
+      systemType: 'cloud',
+    });
+    await callTool(server, 'WithContext');
+    expect(lookup).not.toHaveBeenCalled();
+  });
+
   it('systemContextResolver: null disables resolution', async () => {
     const server = new EmbeddableMcpServer({
       connection: cloudConn() as never,

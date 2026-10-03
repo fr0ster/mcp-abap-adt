@@ -47,14 +47,27 @@ export type SystemContextResolver = (
  * the kind the connection was built for (`systemKindOf`), never a guess from
  * its URL.
  */
-export const defaultSystemContextResolver: SystemContextResolver = async (
-  connection,
-) => {
-  if (systemKindOf(connection) !== 'cloud') return null;
-  const info = await getSystemInformation(connection);
-  if (!info) return null;
-  return { responsible: info.userName, masterSystem: info.systemID };
-};
+export const defaultSystemContextResolver: SystemContextResolver =
+  systemContextResolverFor(undefined);
+
+/**
+ * The default resolver for a server that states its system kind
+ * (`systemType`): for a connection the factory did not build, that kind wins
+ * over `SAP_SYSTEM_TYPE`. A connection the factory built follows its
+ * recorded settings either way.
+ */
+export function systemContextResolverFor(
+  systemType: string | undefined,
+): SystemContextResolver {
+  return async (connection) => {
+    if (systemKindOf(connection, process.env, systemType) !== 'cloud') {
+      return null;
+    }
+    const info = await getSystemInformation(connection);
+    if (!info) return null;
+    return { responsible: info.userName, masterSystem: info.systemID };
+  };
+}
 
 const memo = new WeakMap<
   SystemContextResolver,

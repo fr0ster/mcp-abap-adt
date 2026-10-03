@@ -173,11 +173,13 @@ from a broker uses the broker's own token API with a provider of its own. The ne
 `@mcp-abap-adt/interfaces-auth-broker` contract (the secret alone, with `issuedFor` and `issuedBy`).
 
 An embedder that has its own credential passes it as `ConnectionContext.credential`; the server builds
-nothing from `settings.authType`.
+nothing from `settings.authType`. See [UNIFIED_BROKER_LOGIC.md](../src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
+and [CONNECTION_ISOLATION.md](architecture/CONNECTION_ISOLATION.md).
 
 `getPlatformPaths` no longer returns the working directory. `BaseMcpServer.setConnectionContext` builds no
-connection and calls no `getSystemInformation`; the per-call resolver (`defaultSystemContextResolver`,
-`resolveSystemContext`) asks the system only for a cloud connection — the kind the server's factory built
-it for, or, for a connection you built yourself, `SAP_SYSTEM_TYPE` alone (on-premise when unset). An
-embedder with its own cloud connection sets `SAP_SYSTEM_TYPE=cloud`, or passes a `systemContextResolver`. See [UNIFIED_BROKER_LOGIC.md](../src/lib/auth/brokerFactory/UNIFIED_BROKER_LOGIC.md)
-and [CONNECTION_ISOLATION.md](architecture/CONNECTION_ISOLATION.md).
+connection and calls no `getSystemInformation`. The per-call resolver asks the system only for a cloud
+connection, and never decides cloud from the URL: a connection the server's factory built follows the
+settings it was built from; a connection you built yourself (`EmbeddableMcpServer`'s `connection`) takes
+the server's `systemType` option, then `SAP_SYSTEM_TYPE`, else on-premise. A host that passes
+`systemType: 'cloud'` keeps the lookup without setting `SAP_SYSTEM_TYPE`; `systemContextResolver` still
+replaces the resolver (`null` disables it).

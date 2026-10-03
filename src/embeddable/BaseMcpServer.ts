@@ -14,6 +14,7 @@ import { jsonSchemaToZod } from '../lib/handlers/utils/schemaUtils.js';
 import {
   defaultSystemContextResolver,
   type SystemContextResolver,
+  systemContextResolverFor,
   withResolvedSystemContext,
 } from '../lib/requestSystemResolution.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
@@ -68,7 +69,9 @@ export abstract class BaseMcpServer extends McpServer {
     this.systemType = options.systemType;
     this.systemContextResolver =
       options.systemContextResolver === undefined
-        ? defaultSystemContextResolver
+        ? options.systemType
+          ? systemContextResolverFor(options.systemType)
+          : defaultSystemContextResolver
         : options.systemContextResolver;
   }
 

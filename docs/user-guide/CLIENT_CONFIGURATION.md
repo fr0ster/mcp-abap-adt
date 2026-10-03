@@ -294,7 +294,7 @@ new EmbeddableMcpServer({
 
 Use this when one host serves multiple SAP systems per request — for example, a proxy that resolves a BTP destination at request time and decides whether it is OnPremise (Cloud Connector) or an internet-facing cloud endpoint. Mutating `process.env.SAP_SYSTEM_TYPE` per request is not safe and is not required.
 
-**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE` → default `cloud`.
+**Resolution order:** `options.systemType` → `process.env.SAP_SYSTEM_TYPE` → default `cloud`. That order picks the tools. The same option also states the kind of the injected connection for the master-system lookup (`cloud` asks the system, per call): `options.systemType` → `process.env.SAP_SYSTEM_TYPE` → on-premise, never the URL.
 
 ### System Context for On-Premise Systems
 
@@ -307,7 +307,7 @@ When creating or updating ABAP objects on on-premise systems, SAP ADT requires `
 | `SAP_MASTER_SYSTEM` | SAP system ID (the three-character SID) | 1. Env var `SAP_MASTER_SYSTEM` → 2. `getSystemInformation()` API (cloud only, per call) |
 | `SAP_RESPONSIBLE` | Responsible user for the object | 1. Env var `SAP_RESPONSIBLE` → 2. Env var `SAP_USERNAME` → 3. `getSystemInformation()` API (cloud only, per call) |
 
-The master system is determined from configuration, or by a request in the cloud — there is no other way. Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type`, else a `jwt` destination is cloud and any other on-premise. It is never guessed from the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: `SAP_SYSTEM_TYPE` alone states its kind, on-premise when unset.
+The master system is determined from configuration, or by a request in the cloud — there is no other way. Whether a system is cloud is the kind its connection was built for: `SAP_SYSTEM_TYPE` / `--system-type`, else a `jwt` destination is cloud and any other on-premise. It is never guessed from the URL. A connection an embedding host builds itself (not through the server's factory) has no settings to read: the server's `systemType` option states its kind, then `SAP_SYSTEM_TYPE`, else on-premise.
 
 **On-premise systems**: nothing is asked of the system, so `SAP_MASTER_SYSTEM` **must** be set in the `.env` file. Without it, create/update operations may fail with `403 Forbidden` because the object gets bound to the wrong transport request.
 

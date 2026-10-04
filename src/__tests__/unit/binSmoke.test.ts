@@ -44,6 +44,40 @@ const version = (manifest: string): string =>
 const runNode = (args: string[], cwd: string): string =>
   execFileSync(process.execPath, args, { cwd, encoding: 'utf8' });
 
+/**
+ * The `serverInfo.version` a bin answers to `initialize` over stdio, started the
+ * way an MCP client or `mcp-proxy` starts it: no npm in between, so no
+ * `npm_package_version` in the environment — the case that answered `1.0.0`.
+ */
+const serverInfoVersion = (bin: string, cwd: string): string => {
+  const { npm_package_version: _unset, ...env } = process.env;
+  const initialize = JSON.stringify({
+    jsonrpc: '2.0',
+    id: 1,
+    method: 'initialize',
+    params: {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'bin-smoke', version: '0' },
+    },
+  });
+  // stdin closes after the request: the server answers, sees end of input, exits.
+  const stdout = execFileSync(process.execPath, [bin], {
+    cwd,
+    env,
+    input: `${initialize}\n`,
+    encoding: 'utf8',
+    stdio: ['pipe', 'pipe', 'ignore'],
+    timeout: 60_000,
+  });
+  const reply = stdout
+    .split('\n')
+    .filter((line) => line.trim() !== '')
+    .map((line) => JSON.parse(line))
+    .find((message) => message.id === 1);
+  return reply.result.serverInfo.version;
+};
+
 describe('the published bins start from an installed package', () => {
   // `npm pack` twice and an install of both tarballs: minutes on a cold cache.
   jest.setTimeout(10 * 60 * 1000);
@@ -99,5 +133,15 @@ describe('the published bins start from an installed package', () => {
     // And not the library's, which is what two levels up answered in a checkout
     // — the same number today, so this only bites when they diverge.
     expect(printed).not.toBe('');
+
+    // `initialize` reports the same versions. It answered `1.0.0` whenever npm
+    // had not started the process — under every MCP client and under Glama's
+    // `mcp-proxy` — because it read `npm_package_version`.
+    expect(serverInfoVersion(bin, workdir)).toBe(
+      version('server/package.json'),
+    );
+    expect(serverInfoVersion(compactBin, workdir)).toBe(
+      version('compact/package.json'),
+    );
   });
 });

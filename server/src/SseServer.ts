@@ -17,6 +17,7 @@ import {
 import type { Logger } from '@mcp-abap-adt/logger';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import express from 'express';
+import { CORE_VERSION } from './coreVersion.js';
 import {
   destinationFailureAnswer,
   destinationFromHeader,
@@ -24,8 +25,6 @@ import {
 } from './destinationRequest.js';
 import { withDnsRebindingProtection } from './dnsRebindingProtection.js';
 import { createServerListener, getProtocol } from './tlsUtils.js';
-
-const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
 
 export interface SseServerOptions {
   /**
@@ -131,7 +130,7 @@ export class SseServer {
     this.postPath = opts?.postPath ?? '/messages';
     this.defaultDestination = opts?.defaultDestination;
     this.logger = opts?.logger ?? noopLogger;
-    this.version = opts?.version ?? DEFAULT_VERSION;
+    this.version = opts?.version ?? CORE_VERSION;
     this.externalApp = opts?.app;
     this.tls = opts?.tls;
     this.allowDestinationHeader = opts?.allowDestinationHeader ?? false;

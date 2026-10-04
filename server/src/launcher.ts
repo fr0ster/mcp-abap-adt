@@ -1,5 +1,4 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
+import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   AuthBrokerFactory,
   assertDestinationName,
@@ -16,7 +15,6 @@ import {
   validateExposition,
 } from '@mcp-abap-adt/lib/config';
 import type { HandlerContext, IHandlerGroup } from '@mcp-abap-adt/lib/handlers';
-import type { ILogger } from '@mcp-abap-adt/interfaces-utils';
 import {
   CompositeHandlersRegistry,
   HighLevelHandlersGroup,
@@ -30,6 +28,7 @@ import {
   type AuthDisplayConfig,
   formatAuthConfigForDisplay,
 } from '@mcp-abap-adt/lib/utils';
+import { CORE_VERSION } from './coreVersion.js';
 import { SseServer } from './SseServer.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
@@ -80,9 +79,7 @@ function hasArg(name: string): boolean {
  * should answer with.
  */
 function showVersion(): void {
-  const packageJsonPath = path.join(__dirname, '..', 'package.json');
-  const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
-  console.log(packageJson.version);
+  console.log(CORE_VERSION);
   process.exit(0);
 }
 
@@ -232,6 +229,11 @@ export interface LauncherOptions {
    * a command whose whole point is a tool list of a known size says `false`.
    */
   includeSearch?: boolean;
+  /**
+   * The version `initialize` reports in `serverInfo`. Defaults to core's own; a
+   * sibling command passes ITS version, as it does for `--version`.
+   */
+  version?: string;
 }
 
 export async function main(options: LauncherOptions = {}) {
@@ -603,6 +605,7 @@ export async function launch(
     }
 
     const server = new StdioServer(handlersRegistry, destinations, {
+      version: options.version,
       logger: loggerForTransport,
     });
     activeServer = server;
@@ -621,6 +624,7 @@ export async function launch(
 
   if (config.transport === 'sse') {
     const server = new SseServer(handlersRegistry, factory, {
+      version: options.version,
       host: config.host,
       port: config.port,
       ssePath: config.ssePath,
@@ -647,6 +651,7 @@ export async function launch(
 
   // http
   const server = new StreamableHttpServer(handlersRegistry, factory, {
+    version: options.version,
     host: config.host,
     port: config.port,
     enableJsonResponse: config.httpJsonResponse,

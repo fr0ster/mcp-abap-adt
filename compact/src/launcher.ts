@@ -95,8 +95,8 @@ export async function main(): Promise<void> {
   // `--version` answers THIS package's version, not core's. The launcher core owns
   // would print its own manifest, which is the defect 13.0.0 shipped in the other
   // direction: a version that belongs to a different package reads as the truth.
+  const manifest = require('../package.json') as { version: string };
   if (process.argv.includes('--version') || process.argv.includes('-v')) {
-    const manifest = require('../package.json') as { version: string };
     console.log(manifest.version);
     return;
   }
@@ -110,11 +110,13 @@ export async function main(): Promise<void> {
       extraGroups?: (context: never) => unknown[];
       exposition?: readonly string[];
       includeSearch?: boolean;
+      version?: string;
     }) => Promise<void>;
   };
 
   await launch({
     program: 'mcp-abap-adt-compact',
+    version: manifest.version,
     helpExposition: HELP_EXPOSITION,
     exposition: [],
     includeSearch: false,

@@ -4,8 +4,7 @@ import type { IHandlersRegistry } from '@mcp-abap-adt/lib/handlers';
 import { noopLogger } from '@mcp-abap-adt/lib/logger';
 import type { Logger } from '@mcp-abap-adt/logger';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-
-const DEFAULT_VERSION = process.env.npm_package_version ?? '1.0.0';
+import { CORE_VERSION } from './coreVersion.js';
 
 export interface StdioServerOptions {
   name?: string;
@@ -27,7 +26,7 @@ export class StdioServer extends BaseMcpServer {
   ) {
     super({
       name: opts?.name ?? 'mcp-abap-adt',
-      version: opts?.version ?? DEFAULT_VERSION,
+      version: opts?.version ?? CORE_VERSION,
       logger: opts?.logger ?? noopLogger,
     });
   }

@@ -1,6 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
-  "version": "16.0.0",
+  "mcpName": "io.github.fr0ster/mcp-abap-adt",
+  "version": "16.0.1",
   "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports.",
   "license": "AGPL-3.0-only",
   "publishConfig": {

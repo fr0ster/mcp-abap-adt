@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [16.0.1] - 2026-10-04
+
 ### Fixed
 
 - **`initialize` reports the installed version in `serverInfo.version`.** Every transport read
@@ -15,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   answered `1.0.0` whatever was installed. `mcp-abap-adt` now reads `@mcp-abap-adt/core`'s own
   manifest, and `mcp-abap-adt-compact` reports its own version, as `--version` already did. The
   bin smoke test now checks `initialize` from an installed tarball as well.
+- **`@mcp-abap-adt/core` carries `mcpName` again, so the MCP Registry can take it.** `mcpName` stayed
+  in the root manifest — `@mcp-abap-adt/lib` — when the server moved to `server/`, and the registry
+  reads it from the package `server.json` names. No `core` from 10.0.1 to 16.0.0 had it, and the
+  registry entry stopped at 8.8.1. `docs/deployment/MCP_REGISTRY.md` now says where it lives and
+  that `npm publish` precedes `mcp-publisher publish`.
 
 ## [16.0.0] - 2026-10-03
 

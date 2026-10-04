@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`initialize` reports the installed version in `serverInfo.version`.** Every transport read
+  `npm_package_version`, which npm sets only for a process it starts itself (`npm run`, `npx`);
+  started by an MCP client, by `node`, or by `mcp-proxy` (as Glama's image does), the server
+  answered `1.0.0` whatever was installed. `mcp-abap-adt` now reads `@mcp-abap-adt/core`'s own
+  manifest, and `mcp-abap-adt-compact` reports its own version, as `--version` already did. The
+  bin smoke test now checks `initialize` from an installed tarball as well.
+
 ## [16.0.0] - 2026-10-03
 
 Migration: [`docs/MIGRATION-16.0.md`](docs/MIGRATION-16.0.md).

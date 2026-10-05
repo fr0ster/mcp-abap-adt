@@ -95,7 +95,8 @@ Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
   that cannot run and are removed, with the `tools/dev-*.js` launchers they called.
   `tools/mcp-crud-smoke.js` spawns the installed `mcp-abap-adt` for stdio by default.
 - **CI packs and installs all five packages** and checks that no package took a sibling from the
-  registry instead of this build; it packed only `lib` and `core`. It also builds the Docker image.
+  registry instead of this build; it packed only `lib` and `core`. It also builds both Docker images —
+  the one that packs from the checkout, and `Dockerfile.package` from the tarballs the job packed.
 - `--help`: a message class is no longer described as the exception to the responsible rule, and the RFC
   requirement says the module is compiled by `npm install`.
 - The compose health checks asked `/health`; the server answers `/mcp/health`.

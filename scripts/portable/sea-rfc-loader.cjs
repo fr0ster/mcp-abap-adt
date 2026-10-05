@@ -34,10 +34,12 @@ const digest = (bytes) => crypto.createHash('sha256').update(bytes).digest('hex'
 function prepareAddon({ dir, addon, platform, fromEnv = false, fsImpl = fs }) {
   const library = sdkLibraryName(platform);
   if (!library || !fsImpl.existsSync(path.join(dir, library))) {
+    // Set by hand or by an SDK installation, SAPNWRFC_HOME pointing at the wrong
+    // folder is the likelier cause than a folder still to be filled.
     throw new Error(
-      `RFC needs the SAP NW RFC SDK: copy the files of the SDK's lib/ folder into ${dir}` +
-        (fromEnv ? ' (SAPNWRFC_HOME is set)' : '') +
-        ` — ${library ?? 'this platform'} was not found there`,
+      fromEnv
+        ? `RFC needs the SAP NW RFC SDK: SAPNWRFC_HOME points at ${dir}, which has no ${library ?? 'SDK for this platform'} — fix it, or clear SAPNWRFC_HOME to use nwrfcsdk/lib beside the executable`
+        : `RFC needs the SAP NW RFC SDK: copy the files of the SDK's lib/ folder into ${dir} — ${library ?? 'this platform'} was not found there`,
     );
   }
   const file = path.join(dir, 'sapnwrfc.node');

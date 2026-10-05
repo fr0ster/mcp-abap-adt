@@ -19,6 +19,11 @@ const repo = path.resolve(here, '../..');
 const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, parseArgs } = require_('./args.cjs');
 const { sdkHome, addonRpath, builtAddon, isStaged, markStaged } = require_('./staging.cjs');
+const { patchRunpath } = require_('./elf.cjs');
+const { npmCommand, tarCommand } = require_('./tools.cjs');
+// Taken before cleanEnv drops the npm_* variables.
+const npm = npmCommand();
+const tar = tarCommand();
 
 const NODE_MAJOR = 'v24.';
 const SEA_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
@@ -43,8 +48,6 @@ function cleanEnv(extra = {}) {
   return env;
 }
 
-const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-
 function stage(work, version) {
   const dir = path.join(work, 'stage');
   let sdk;
@@ -60,10 +63,10 @@ function stage(work, version) {
   fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
   console.log(`portable: installing ${SERVERS.full.pkg}@${version} and ${SERVERS.compact.pkg}@${version} from npm`);
   run(
-    npm,
-    ['install', '--prefer-online', '--no-audit', '--no-fund', '--foreground-scripts',
+    npm.cmd,
+    [...npm.args, 'install', '--prefer-online', '--no-audit', '--no-fund', '--foreground-scripts',
       `${SERVERS.full.pkg}@${version}`, `${SERVERS.compact.pkg}@${version}`],
-    { cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'], shell: process.platform === 'win32' },
+    { cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'] },
   );
   try {
     markStaged({ dir, version, sdk });
@@ -76,19 +79,18 @@ function stage(work, version) {
 function addon(stageDir, sdk, work, platform) {
   const built = builtAddon(stageDir);
   const out = path.join(work, 'sapnwrfc.node');
-  const bytes = fs.readFileSync(built);
+  let bytes = fs.readFileSync(built);
   if (platform === 'linux-x64') {
-    // The addon's RUNPATH names the SDK on this machine; rewrite it to $ORIGIN
-    // in place (NUL-terminated, shorter than the original) so it finds the SDK
-    // in its own folder — where the loader writes it.
-    const old = Buffer.from(`${addonRpath(sdk)}\0`);
-    const at = bytes.indexOf(old);
-    if (at < 0 || bytes.indexOf(old, at + 1) >= 0) fail('could not locate exactly one RUNPATH in the RFC addon');
-    const origin = Buffer.from('$ORIGIN\0');
-    origin.copy(bytes, at);
-    bytes.fill(0, at + origin.length, at + old.length);
+    // The addon's RUNPATH names the SDK on this machine; it becomes $ORIGIN, so
+    // the addon finds the SDK in its own folder (elf.cjs).
+    try {
+      bytes = patchRunpath(bytes, addonRpath(sdk), '$ORIGIN');
+    } catch (error) {
+      fail(error.message);
+    }
   }
   fs.writeFileSync(out, bytes);
+  if (platform === 'linux-x64') checkElf(built, out);
   if (platform === 'macos-arm64') {
     run('install_name_tool', ['-delete_rpath', addonRpath(sdk), '-add_rpath', '@loader_path', out]);
     run('codesign', ['--force', '--sign', '-', out]);
@@ -96,9 +98,45 @@ function addon(stageDir, sdk, work, platform) {
   return out;
 }
 
+// The patched addon must differ from the built one in its RUNPATH only: a linker
+// may tail-merge another dynamic string into the one overwritten. readelf comes
+// with binutils, which the C++ toolchain brings; without it, say so.
+function dynamicEntries(file) {
+  return run('readelf', ['-d', file], { stdio: ['ignore', 'pipe', 'ignore'] })
+    .split('\n')
+    .filter((line) => /\((NEEDED|SONAME|RUNPATH|RPATH)\)/.test(line))
+    .map((line) => line.replace(/^\s*0x[0-9a-f]+\s+/i, '').trim());
+}
+
+function checkElf(before, after) {
+  let original;
+  try {
+    original = dynamicEntries(before);
+  } catch {
+    console.log('portable: readelf not found — the RUNPATH rewrite is not cross-checked');
+    return;
+  }
+  const expected = original.map((line) =>
+    /\((RUNPATH|RPATH)\)/.test(line) ? line.replace(/\[.*\]$/, '[$ORIGIN]') : line,
+  );
+  const actual = dynamicEntries(after);
+  if (JSON.stringify(expected) !== JSON.stringify(actual)) {
+    fail(
+      `the RUNPATH rewrite changed more than the RUNPATH:\n  ${expected.join('\n  ')}\nbecame\n  ${actual.join('\n  ')}`,
+    );
+  }
+}
+
+// A download that is not 2xx is named as such, not mistaken for a checksum.
+async function download(url) {
+  const res = await fetch(url);
+  if (!res.ok) fail(`download failed: ${res.status} ${res.statusText} for ${url}`);
+  return res;
+}
+
 async function nodeBinary(work, platform) {
   const { node: target, ext, exe } = PLATFORMS[platform];
-  const index = await (await fetch('https://nodejs.org/dist/index.json')).json();
+  const index = await (await download('https://nodejs.org/dist/index.json')).json();
   const version = index.find((v) => v.version.startsWith(NODE_MAJOR)).version;
   const dir = path.join(work, 'node');
   const bin = path.join(dir, `node-${version}-${target}`, exe ? 'node.exe' : 'bin/node');
@@ -106,13 +144,22 @@ async function nodeBinary(work, platform) {
   fs.mkdirSync(dir, { recursive: true });
   const file = `node-${version}-${target}.${ext}`;
   const base = `https://nodejs.org/dist/${version}`;
-  const data = Buffer.from(await (await fetch(`${base}/${file}`)).arrayBuffer());
-  const sums = await (await fetch(`${base}/SHASUMS256.txt`)).text();
+  const data = Buffer.from(await (await download(`${base}/${file}`)).arrayBuffer());
+  const sums = await (await download(`${base}/SHASUMS256.txt`)).text();
   const expected = sums.split('\n').find((l) => l.endsWith(`  ${file}`))?.split(' ')[0];
   const actual = createHash('sha256').update(data).digest('hex');
   if (!expected || expected !== actual) fail(`checksum mismatch for ${file}`);
   fs.writeFileSync(path.join(dir, file), data);
-  run('tar', ['-xf', file], { cwd: dir });
+  // Unpacked aside and moved into place: an interrupted run leaves no half tree
+  // that the next one would take for a Node.js.
+  const unpacked = `node-${version}-${target}`;
+  const scratch = path.join(dir, `extract-${process.pid}`);
+  fs.rmSync(scratch, { recursive: true, force: true });
+  fs.mkdirSync(scratch);
+  run(tar, ['-xf', path.join(dir, file)], { cwd: scratch });
+  fs.rmSync(path.join(dir, unpacked), { recursive: true, force: true });
+  fs.renameSync(path.join(scratch, unpacked), path.join(dir, unpacked));
+  fs.rmSync(scratch, { recursive: true, force: true });
   console.log(`portable: Node ${version} for ${target}, checksum verified`);
   return { bin, version };
 }
@@ -269,8 +316,8 @@ function inject({ bundleFile, addonFile, nodeBin, work, server, platform, versio
   const archiveFile = path.join(repo, 'dist-portable', `${name}.${archive}`);
   fs.rmSync(archiveFile, { force: true });
   const cwd = path.join(repo, 'dist-portable');
-  if (archive === 'tar.gz') run('tar', ['-czf', archiveFile, name], { cwd });
-  else run('tar', ['-a', '-cf', archiveFile, name], { cwd });
+  if (archive === 'tar.gz') run(tar, ['-czf', archiveFile, name], { cwd });
+  else run(tar, ['-a', '-cf', archiveFile, name], { cwd });
   const size = (f) => `${(fs.statSync(f).size / 1048576).toFixed(1)} MB`;
   console.log(`portable: ${target} (${size(target)}), ${archiveFile} (${size(archiveFile)})`);
 }

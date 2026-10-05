@@ -33,6 +33,9 @@ const PLATFORMS = {
   },
 };
 
+// A semver or an npm dist-tag: the value reaches npm as `<package>@<version>`.
+const VERSION = /^(\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?|[a-z][a-z0-9-]*)$/;
+
 function currentPlatform(platform = process.platform, arch = process.arch) {
   const key = { linux: 'linux', win32: 'win', darwin: 'macos' }[platform];
   return `${key}-${arch}`;
@@ -50,6 +53,14 @@ function parseArgs(argv, here = currentPlatform()) {
   }
   if (!['full', 'compact', 'all'].includes(opts.which)) {
     throw new Error(`unknown server "${opts.which}": full, compact or all`);
+  }
+  if (opts.version !== undefined && !VERSION.test(opts.version)) {
+    throw new Error(`"${opts.version}" is not a version: a semver (1.2.3) or a dist-tag (latest)`);
+  }
+  if (!PLATFORMS[here] && opts.platform === here) {
+    throw new Error(
+      `this machine (${here}) cannot build portable executables: ${Object.keys(PLATFORMS).join(', ')}`,
+    );
   }
   if (!PLATFORMS[opts.platform]) {
     throw new Error(

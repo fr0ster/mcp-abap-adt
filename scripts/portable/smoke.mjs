@@ -16,15 +16,27 @@ import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js'
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
-const { SERVERS, PLATFORMS, currentPlatform } = createRequire(import.meta.url)('./args.cjs');
+const require_ = createRequire(import.meta.url);
+const { SERVERS, PLATFORMS, currentPlatform } = require_('./args.cjs');
+const { withoutSdk } = require_('./tools.cjs');
 const version =
   process.argv[2] ?? JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
 const platform = currentPlatform();
-const { exe } = PLATFORMS[platform];
+const { exe, sdkLib } = PLATFORMS[platform];
 
-// The archive's own SDK folder is what is checked, not an SDK the shell knows.
+// The archive's own SDK folder is what is checked, not an SDK the shell knows:
+// no SAPNWRFC_HOME, and no search-path folder that holds an SDK library.
 const env = { ...process.env };
 delete env.SAPNWRFC_HOME;
+for (const key of ['PATH', 'Path', 'LD_LIBRARY_PATH', 'DYLD_LIBRARY_PATH']) {
+  if (env[key] !== undefined) env[key] = withoutSdk(env[key], sdkLib);
+}
+if (process.platform === 'win32') {
+  const system32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', sdkLib);
+  if (fs.existsSync(system32)) {
+    console.log(`warn ${system32} exists: Windows may load it before the archive's copy — check the loaded path as the archive README shows`);
+  }
+}
 
 const envFile = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'portable-smoke-')), 'rfc.env');
 fs.writeFileSync(
@@ -56,7 +68,13 @@ for (const server of Object.values(SERVERS)) {
     continue;
   }
   checked++;
-  const answered = execFileSync(bin, ['--version'], { env, encoding: 'utf8' }).trim();
+  let answered;
+  try {
+    answered = execFileSync(bin, ['--version'], { env, encoding: 'utf8' }).trim();
+  } catch (error) {
+    check(`${server.name} --version`, false, `did not run: ${String(error.message).split('\n')[0]}`);
+    continue;
+  }
   check(`${server.name} --version`, answered === version, answered);
 
   const client = new Client({ name: 'portable-smoke', version: '0' });

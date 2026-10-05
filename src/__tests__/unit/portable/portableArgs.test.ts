@@ -49,6 +49,21 @@ describe('portable build arguments', () => {
     );
   });
 
+  it('refuses a version that is neither a semver nor a dist-tag', () => {
+    expect(() => args.parseArgs(['--version=1.0.0&calc'], 'linux-x64')).toThrow(
+      /not a version/,
+    );
+    expect(args.parseArgs(['--version=latest'], 'linux-x64').version).toBe(
+      'latest',
+    );
+  });
+
+  it('names an unsupported host as such, not as an unknown platform', () => {
+    expect(() => args.parseArgs([], 'linux-arm64')).toThrow(
+      /this machine \(linux-arm64\) cannot build portable executables.*linux-x64, win-x64, macos-arm64/,
+    );
+  });
+
   it('describes every platform the spec names', () => {
     expect(Object.keys(args.PLATFORMS).sort()).toEqual([
       'linux-x64',

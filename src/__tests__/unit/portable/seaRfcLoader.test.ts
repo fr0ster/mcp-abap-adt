@@ -43,7 +43,9 @@ describe('portable RFC loader', () => {
     const dir = tmp();
     expect(() =>
       loader.prepareAddon({ dir, addon, platform: 'linux', fromEnv: true }),
-    ).toThrow(/SAPNWRFC_HOME is set/);
+    ).toThrow(
+      /SAPNWRFC_HOME points at .* fix it, or clear SAPNWRFC_HOME to use nwrfcsdk\/lib/,
+    );
   });
 
   it('writes nothing when the identical addon is already there (read-only folder)', () => {

@@ -25,7 +25,14 @@ The same as building the RFC module of the npm install ([RFC Setup](RFC_SETUP.md
 - the SAP NW RFC SDK of this platform, with `SAPNWRFC_HOME` pointing at it;
 - a C++ toolchain (Windows: Visual Studio Build Tools, "Desktop development with C++"; macOS: Xcode
   Command Line Tools; Linux: `g++`, `make`, Python 3);
-- Node.js 22 or 24 and a checkout of this repository (`npm ci`).
+- Node.js 22 or 24 and a checkout of this repository (`npm ci`);
+- on Windows, the system `tar` (`%SystemRoot%\System32\tar.exe`, present since Windows 10) — the build
+  calls it by that path, so a GNU tar earlier on the `PATH` (Git Bash) does not get in the way;
+- on Linux, `readelf` (binutils, part of the toolchain) to cross-check the RFC module after its
+  `RUNPATH` is rewritten — without it the build says the check was skipped.
+
+Only these machines can build: Linux x64, Windows x64, macOS arm64 (Apple silicon). Another one —
+Linux on ARM, an Intel Mac — is refused with that list.
 
 The Node.js 24 runtime that goes inside the executable is downloaded from nodejs.org and its SHA-256
 checksum verified. The servers themselves are installed from npm at the repository's version.
@@ -40,7 +47,7 @@ The command chooses what is built, always for the platform it runs on:
 | `npm run portable:build:compact` | the compact server |
 | `npm run portable:build` | both |
 
-`--version=<version>` builds another published version:
+`--version=<version>` builds another published version — a semver or a dist-tag such as `latest`:
 `npm run portable:build -- --version=<version>`.
 
 ```text
@@ -55,6 +62,13 @@ dist-portable/
 Building for another platform (Windows on Linux, for example) is not supported yet: it needs the RFC
 module of the target platform built in advance.
 
+**The build cache.** The servers installed from npm, the RFC module compiled against your SDK and the
+downloaded Node.js are kept in `<temp>/mcp-abap-adt-portable/<version>/<platform>/` (`<temp>` is the
+system's temporary folder: `/tmp` on Linux, `%TEMP%` on Windows, `$TMPDIR` on macOS). A build reuses it
+only for the same version and the same `SAPNWRFC_HOME`, and only when the RFC module was really built
+there; a changed SDK, or a first run without a compiler, is rebuilt. To start from nothing, delete that
+folder.
+
 Then check what was built:
 
 ```bash
@@ -63,7 +77,9 @@ npm run portable:smoke
 
 For each executable it checks the version, MCP `initialize` and `tools/list` over stdio, and an RFC call
 to an unreachable host, which must answer an RFC error — proof that the module and the SDK load from
-`nwrfcsdk/lib`. It ignores `SAPNWRFC_HOME`, so the archive's own SDK is what is checked.
+`nwrfcsdk/lib`. It runs them without `SAPNWRFC_HOME` and without the `PATH` / `LD_LIBRARY_PATH` /
+`DYLD_LIBRARY_PATH` folders that hold an SDK library, so the archive's own SDK is what is checked. On
+Windows it warns when `System32` holds `sapnwrfc.dll`, which Windows could load first.
 
 ## Running it
 
@@ -83,8 +99,9 @@ archive's README shows how, and how to see which folder the SDK was loaded from 
 Windows, `/proc/<pid>/maps` on Linux, `vmmap` on macOS). If the library is missing from the chosen
 folder, the first RFC call is refused naming the folder it looked in.
 
-**Signing.** The macOS executable is signed ad hoc; the Windows executable is unsigned, so SmartScreen
-asks once. Enough for a build that stays on your machine.
+**Signing.** The macOS executable is signed ad hoc. The Windows executable is Node.js's own `node.exe`
+with the server injected, which invalidates its Authenticode signature: Windows treats it as unsigned,
+and SmartScreen asks once. Enough for a build that stays on your machine.
 
 ## Verified
 

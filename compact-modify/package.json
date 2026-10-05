@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/compact-modify",
-  "version": "17.0.0",
+  "version": "17.0.1",
   "description": "The compact ABAP ADT tools that write, lock, activate or execute: one tool per operation, the object in the arguments.",
   "license": "Apache-2.0",
   "author": "Oleksii Kyslytsia <oleksij.kyslytsja@gmail.com>",

@@ -9,6 +9,7 @@ import type { SapConfig } from '@mcp-abap-adt/connection';
 import * as dotenv from 'dotenv';
 import * as yaml from 'js-yaml';
 import { applyCertKerberosFields } from '../../../lib/config/applyAuthFields';
+import { resolveEnvFilePath } from '../../../lib/config/envResolver';
 import { parseAuthType } from '../../../lib/config/parseAuthType';
 import { invalidateConnectionCache } from '../../../lib/utils';
 import { setupAuthBrokerForTests } from './authHelpers';
@@ -49,6 +50,18 @@ function resolveUseAuthBrokerFlag(): boolean {
   }
 }
 
+/**
+ * The base directory of service-keys/ and sessions/ the test destination uses:
+ * `auth_broker.paths.service_keys_dir` (as the test auth-broker reads it),
+ * else undefined — the platform directory.
+ */
+export function testAuthBrokerPath(cfg: any): string | undefined {
+  const dir = cfg?.auth_broker?.paths?.service_keys_dir;
+  return dir
+    ? path.resolve(String(dir).replace(/^~/, require('node:os').homedir()))
+    : undefined;
+}
+
 function resolveUnsafeFlag(): boolean {
   try {
     const cfg = loadTestConfig();
@@ -63,14 +76,17 @@ function resolveUnsafeFlag(): boolean {
 }
 
 /**
- * Load environment variables from .env file
- * Priority:
- * 1. Check if already loaded (SAP_URL exists)
- * 2. Use MCP_ENV_PATH if set
- * 3. Try current working directory (where test was run from)
- * 4. Fallback to project root (for tests run from project root)
+ * The destination's environment, as the server would read it. In order:
+ * 1. `environment.env` of test-config.yaml — a name is the sessions store's
+ *    `<name>.env`, exactly as `--env=<name>` (under
+ *    `auth_broker.paths.service_keys_dir` when set, else the platform
+ *    directory); a path is that file;
+ * 2. the auth-broker destination (`auth_broker.abap.destination`);
+ * 3. `MCP_ENV_PATH`, a file named explicitly.
  *
- * Also attempts to refresh tokens using AuthBroker if destination is available
+ * Nothing is looked up in the working directory or the repository root: the
+ * server stopped doing that in 16.0.0, and a test that found a stray `.env`
+ * there tested a configuration no user can have.
  */
 export async function loadTestEnv(): Promise<void> {
   if (envLoaded) {
@@ -87,14 +103,15 @@ export async function loadTestEnv(): Promise<void> {
 
   let envPath: string | null = null;
 
-  // Priority 0: Use environment.env from test-config.yaml (e.g., "e77.env")
-  // Path is resolved relative to project root (tests/../)
+  // Priority 0: environment.env — a sessions-store name, or a path
   try {
     const cfg = loadTestConfig();
     const envFile = cfg?.environment?.env;
     if (envFile) {
-      const projectRoot = path.resolve(__dirname, '../../../..');
-      const resolved = path.resolve(projectRoot, envFile);
+      const resolved = resolveEnvFilePath({
+        envDestination: String(envFile),
+        authBrokerPath: testAuthBrokerPath(cfg),
+      }) as string;
       if (fs.existsSync(resolved)) {
         envPath = resolved;
         configLogger?.debug(
@@ -150,22 +167,6 @@ export async function loadTestEnv(): Promise<void> {
     }
   }
 
-  // Priority 2: Try current working directory (where test was run from)
-  if (!envPath) {
-    const cwdEnvPath = path.resolve(process.cwd(), '.env');
-    if (fs.existsSync(cwdEnvPath)) {
-      envPath = cwdEnvPath;
-    }
-  }
-
-  // Priority 3: Fallback to project root (for tests run from project root)
-  if (!envPath) {
-    const projectRootEnvPath = path.resolve(__dirname, '../../../../.env');
-    if (fs.existsSync(projectRootEnvPath)) {
-      envPath = projectRootEnvPath;
-    }
-  }
-
   // Load .env file if found
   if (envPath) {
     const result = dotenv.config({
@@ -185,7 +186,7 @@ export async function loadTestEnv(): Promise<void> {
     }
   } else {
     configLogger?.warn(
-      '⚠️ No .env file found. Set environment.env in test-config.yaml.',
+      '⚠️ No destination: set environment.env (a sessions-store name) or auth_broker.abap.destination in test-config.yaml.',
     );
   }
 
@@ -205,7 +206,7 @@ export async function loadTestEnv(): Promise<void> {
   // Final guard: require SAP_URL
   if (!process.env.SAP_URL) {
     envLoadError = new Error(
-      'SAP_URL is not set. Set environment.env in test-config.yaml pointing to a valid .env file.',
+      'SAP_URL is not set. Set environment.env (a sessions-store name, or a path) or auth_broker.abap.destination in test-config.yaml.',
     );
     throw envLoadError;
   }

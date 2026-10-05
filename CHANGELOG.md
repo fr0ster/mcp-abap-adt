@@ -101,6 +101,13 @@ Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
 - `--help`: a message class is no longer described as the exception to the responsible rule, and the RFC
   requirement says the module is compiled by `npm install`.
 - The compose health checks asked `/health`; the server answers `/mcp/health`.
+- **The integration tests read no `.env` from the working directory or the repository root.** `environment.env`
+  in `tests/test-config.yaml` is a sessions-store name, as the docs said, resolved exactly as
+  `--env=<name>` (under `auth_broker.paths.service_keys_dir`, else the platform directory); it was
+  resolved against the repository root, and a missing destination fell back to a `.env` in the working
+  directory or the root — the lookup the server dropped in 16.0.0. Hard mode passes the same file to the
+  server (`--env` / `--env-path`, with `--auth-broker-path`) and refuses to start without a destination
+  instead of defaulting to `./.env`.
 - The release notes linked `doc/installation/…`; the workflows checked out submodules the repository
   no longer has (the empty `.gitmodules` is removed).
 

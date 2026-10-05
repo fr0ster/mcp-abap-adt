@@ -3,7 +3,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { SSEClientTransport } from '@modelcontextprotocol/sdk/client/sse.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
-import { loadTestConfig } from '../configHelpers';
+import { loadTestConfig, testAuthBrokerPath } from '../configHelpers';
 
 export interface HardModeConfig {
   enabled: boolean;
@@ -126,16 +126,30 @@ export async function createHardModeClient(): Promise<{
       `--exposition=${exposition}`,
       ...(useUnsafe ? ['--unsafe'] : []),
     ];
+    // The stores soft mode reads, so a destination name means the same file.
+    const brokerPath = testAuthBrokerPath(cfg);
+    if (brokerPath) args.push(`--auth-broker-path=${brokerPath}`);
     if (hard.mcp_destination) {
       args.push(`--mcp=${hard.mcp_destination}`);
     } else if (hard.env_destination) {
       args.push(`--env=${hard.env_destination}`);
-    } else {
-      const envPath = path.resolve(
-        process.cwd(),
-        String(hard.env_path || '.env'),
+    } else if (hard.env_path) {
+      args.push(`--env-path=${path.resolve(String(hard.env_path))}`);
+    } else if (cfg?.environment?.env) {
+      // The same file soft mode reads: a sessions-store name goes to the
+      // server as --env (resolved there), a path as --env-path.
+      const env = String(cfg.environment.env);
+      args.push(
+        /[\\/]/.test(env) || env.startsWith('.') || env.startsWith('~')
+          ? `--env-path=${path.resolve(env)}`
+          : `--env=${env}`,
       );
-      args.push(`--env-path=${envPath}`);
+    } else {
+      // No .env from the working directory: the server reads none there
+      // since 16.0.0, so neither does the harness.
+      throw new Error(
+        'hard mode needs a destination: integration_hard_mode.mcp_destination, env_destination or env_path, or environment.env',
+      );
     }
     await client.connect(
       new StdioClientTransport({

@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [17.0.1] - 2026-10-05
+
+Documentation and release metadata; no change to what the servers do.
+
 ### Changed
 
 - **The registry and Glama metadata is part of a release.** `releaseMetadata.test.ts` fails until
   `server.json`, `server-compact.json` and the Glama image (`docker/Dockerfile.inspect`) name the version
   the manifests carry, the registry entries name their package and `mcpName`, their descriptions stay
   within the MCP Registry's 100 characters, and every sibling range is on the current major. The Glama
-  image is pinned to `@mcp-abap-adt/core@17.0.0` (it installed `latest`). `glama.json` names the variants.
+  image is pinned to the release of `@mcp-abap-adt/core` (it installed `latest`). `glama.json` names the variants.
   `docs/deployment/RELEASE.md` makes these a step of the release PR and gives `mcp-publisher` one command
   per registry entry.
 - **The compact tool counts are the ones the server lists**: 25 tools, 16 that change nothing

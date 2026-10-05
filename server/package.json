@@ -1,7 +1,7 @@
 {
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
-  "version": "17.0.0",
+  "version": "17.0.1",
   "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports; connects to the system over HTTP, RFC or SNC (passwordless). RFC and SNC need the SAP NW RFC SDK at install time. The compact variant is @mcp-abap-adt/compact.",
   "license": "AGPL-3.0-only",
   "publishConfig": {

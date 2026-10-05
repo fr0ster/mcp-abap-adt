@@ -5,7 +5,9 @@
 
 FROM node:22-bookworm-slim
 
-ARG CORE_VERSION=latest
+# Pinned to the release (releaseMetadata.test.ts): a rebuild cannot put a newer
+# package under an older release number.
+ARG CORE_VERSION=17.0.0
 RUN npm install -g --omit=optional --no-audit --no-fund "@mcp-abap-adt/core@${CORE_VERSION}" mcp-proxy@6.7.19 \
  && npm cache clean --force \
  && mcp-abap-adt --version

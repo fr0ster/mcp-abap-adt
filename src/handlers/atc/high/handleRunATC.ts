@@ -1,6 +1,6 @@
 import { AdtRuntimeClient } from '@mcp-abap-adt/adt-clients';
 import { analyseException } from '@mcp-abap-adt/adt-strategies';
-import type { AtcObjectType } from '@mcp-abap-adt/interfaces-adt';
+import type { AtcNamedObjectType } from '@mcp-abap-adt/interfaces-adt';
 import { answer } from '../../../lib/answer';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
 import { ourAtc } from '../../../lib/strategies/resultSets';
@@ -87,7 +87,9 @@ export const TOOL_DEFINITION = {
 } as const;
 
 interface RunATCArgs {
-  objects?: Array<{ name?: string; type?: AtcObjectType }>;
+  // The kinds a name alone addresses: interfaces-adt 12's include kinds carry
+  // their owner as well, and the schema above offers none of them.
+  objects?: Array<{ name?: string; type?: AtcNamedObjectType }>;
   check_variant?: string;
   max_findings?: number;
   wait?: boolean;
@@ -119,7 +121,7 @@ export async function handleRunATC(context: HandlerContext, args: RunATCArgs) {
 
   const [first, ...rest] = objects.map((o) => ({
     objectName: (o.name as string).toUpperCase(),
-    objectType: o.type as AtcObjectType,
+    objectType: o.type as AtcNamedObjectType,
   }));
   const target = { objects: [first, ...rest] as const };
 

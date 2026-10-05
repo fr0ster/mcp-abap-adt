@@ -281,20 +281,32 @@ describe('on-premise', () => {
     );
   });
 
-  it('the one exception: a message class is created with the system default responsible, the guard not consulted', async () => {
-    // adt-clients' messageClass/create.js takes no responsible (15.x the
-    // same). If a release starts sending one, this test is where it shows.
-    const connection = recordingConnection();
-    const result = await handleCreateMessageClass(
-      { connection, logger: undefined } as never,
-      {
-        message_class_name: 'ZMSG_PLACEHOLDER',
-        package_name: 'ZPACKAGE_PLACEHOLDER',
-        description: 'placeholder',
-      } as never,
+  it('a message class is no exception: refused without a responsible, sent with one', async () => {
+    // adt-clients 25.0.1: a message class create sends `adtcore:responsible`
+    // from the system context, where up to 24.x it took none and the system
+    // filled its own default.
+    const MSAG_ARGS = {
+      message_class_name: 'ZMSG_PLACEHOLDER',
+      package_name: 'ZPACKAGE_PLACEHOLDER',
+      description: 'placeholder',
+    };
+    const refusedConnection = recordingConnection();
+    const refused = await handleCreateMessageClass(
+      { connection: refusedConnection, logger: undefined } as never,
+      MSAG_ARGS as never,
     );
-    expect(textOf(result)).not.toContain(MISSING_RESPONSIBLE);
-    expect(createBody(connection)).not.toContain('adtcore:responsible');
+    expect(textOf(refused)).toContain(MISSING_RESPONSIBLE);
+    expect(refusedConnection.requests).toEqual([]);
+
+    setSystemContext({ responsible: 'USER_PLACEHOLDER' });
+    const sentConnection = recordingConnection();
+    await handleCreateMessageClass(
+      { connection: sentConnection, logger: undefined } as never,
+      MSAG_ARGS as never,
+    );
+    expect(createBody(sentConnection)).toContain(
+      'adtcore:responsible="USER_PLACEHOLDER"',
+    );
   });
 
   it('a transport without an owner is refused naming SAP_RESPONSIBLE; the owner argument is enough', async () => {

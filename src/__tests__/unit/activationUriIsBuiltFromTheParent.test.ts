@@ -39,20 +39,21 @@ describe('the URI an activation carries for a function module', () => {
   });
 
   /**
-   * The failure the refusal exists to prevent — and note it does not throw.
-   * A group named after the module is a request SAP answers, about an object
-   * nobody meant.
+   * The failure the refusal exists to prevent. Up to adt-clients 24 the
+   * builder did not throw: it named a group after the module, a request SAP
+   * answers about an object nobody meant. From 25.0.0 it throws, before any
+   * request.
    */
-  it('names a group after the module when nothing says otherwise', () => {
-    expect(buildObjectUri('Z_AC_FM01', 'FUGR/FF')).toBe(
-      '/sap/bc/adt/functions/groups/z_ac_fm01/fmodules/z_ac_fm01',
+  it('throws when nothing names the group', () => {
+    expect(() => buildObjectUri('Z_AC_FM01', 'FUGR/FF')).toThrow(
+      /addressed under its function group; pass the group as parentName/,
     );
   });
 
   /** The recommendation this file replaced, kept so it cannot come back. */
-  it('does not split a GROUP|MODULE name — that convention is another builder’s', () => {
-    expect(buildObjectUri('ZAC_FGR01|Z_AC_FM01', 'FUGR/FF')).toBe(
-      '/sap/bc/adt/functions/groups/zac_fgr01%7cz_ac_fm01/fmodules/zac_fgr01%7cz_ac_fm01',
+  it('does not read a GROUP|MODULE name as the group — that convention is another builder’s', () => {
+    expect(() => buildObjectUri('ZAC_FGR01|Z_AC_FM01', 'FUGR/FF')).toThrow(
+      /pass the group as parentName/,
     );
   });
 

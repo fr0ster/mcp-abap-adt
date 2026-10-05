@@ -286,10 +286,11 @@ export async function handleActivateObject(
   // What it does NOT do is fix addressing, and saying so here saves the next
   // person the two measurements it took: `activateObjectsGroup` builds the
   // reference with `buildObjectUri(name, type, parentName)` and never looks
-  // at `uri`; and for `fugr/ff` that builder ignores `parentName` as well,
-  // requiring the group inside the name — `GROUP|MODULE` — and throwing
-  // otherwise. A function module is therefore activated by naming it that
-  // way, not by supplying an address.
+  // at `uri`; and for `fugr/ff` that builder addresses the module under
+  // `parentName` and throws without it (adt-clients 25), never reading a
+  // `GROUP|MODULE` name as the group. A function module is therefore
+  // activated by naming its group in `parentName`, not by supplying an
+  // address.
   //
   // `parentName` travels by the same contract — "Owning object, where the
   // reference is to a part of one" — and is read for the types whose builder

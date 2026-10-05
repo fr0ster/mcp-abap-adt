@@ -2,7 +2,7 @@
   "name": "@mcp-abap-adt/core",
   "mcpName": "io.github.fr0ster/mcp-abap-adt",
   "version": "16.0.1",
-  "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports.",
+  "description": "Standalone MCP server for SAP ABAP ADT: stdio, SSE and streamable HTTP transports; connects to the system over HTTP, RFC or SNC (passwordless). RFC and SNC need the SAP NW RFC SDK at install time. The compact variant is @mcp-abap-adt/compact.",
   "license": "AGPL-3.0-only",
   "publishConfig": {
     "access": "public"
@@ -94,12 +94,12 @@
     "docker:rebuild:headerless": "npm run docker:down:headerless && npm run docker:build:headerless && npm run docker:up:headerless"
   },
   "dependencies": {
-    "@mcp-abap-adt/interfaces-utils": "^1.1.0",
+    "@mcp-abap-adt/interfaces-utils": "^1.1.1",
     "@mcp-abap-adt/lib": "^16.0.0",
-    "@mcp-abap-adt/logger": "^0.4.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
-    "dotenv": "^18.0.3",
-    "express": "^5.1.0"
+    "@mcp-abap-adt/logger": "^0.4.1",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "dotenv": "^18.0.5",
+    "express": "^5.2.1"
   },
   "jest": {
     "preset": "ts-jest",

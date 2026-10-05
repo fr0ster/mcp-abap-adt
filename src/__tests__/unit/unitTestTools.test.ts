@@ -22,6 +22,10 @@ import {
 } from '../../handlers/unit_test/shared/writeTests';
 import { corpusBody } from '../../lib/adtCorpus';
 import {
+  resetSystemContextCache,
+  setSystemContext,
+} from '../../lib/systemContext';
+import {
   type RecordedRequest,
   recordingConnection,
 } from '../helpers/recordingConnection';
@@ -156,6 +160,11 @@ describe('CreateUnitTest: the class test include, under the class lock', () => {
 });
 
 describe('CreateProgramUnitTest: a test include, pulled into the report', () => {
+  // adt-clients 25.0.1 hands an include create the system context, so the
+  // include is a create like any other: it needs a responsible.
+  beforeEach(() => setSystemContext({ responsible: 'USER_PLACEHOLDER' }));
+  afterEach(() => resetSystemContextCache());
+
   const METADATA =
     '<program:abapProgram xmlns:program="http://www.sap.com/adt/programs/programs" xmlns:adtcore="http://www.sap.com/adt/core" adtcore:name="ZR_X"><adtcore:packageRef adtcore:name="ZPKG"/></program:abapProgram>';
 

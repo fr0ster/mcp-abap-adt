@@ -33,8 +33,15 @@ the first failure so that no package goes out on top of a dependency that is mis
    ```
    Every range must be a semver range that resolves on the registry (no `file:`, `link:` or
    `workspace:`).
-2. **Bump the registry metadata**: both version fields in `server.json` and in
-   `server-compact.json` (see [MCP_REGISTRY.md](./MCP_REGISTRY.md)).
+2. **Bump the registry and Glama metadata** — part of the release, in the same PR:
+   - `server.json` and `server-compact.json`: both version fields each, and a description of at
+     most 100 characters (see [MCP_REGISTRY.md](./MCP_REGISTRY.md));
+   - `docker/Dockerfile.inspect`: `ARG CORE_VERSION=<version>` — the image Glama builds, pinned so a
+     rebuild cannot put a newer package under an older release number;
+   - `glama.json`: the description, when what the server does changed.
+
+   `src/__tests__/unit/releaseMetadata.test.ts` fails until the versions agree with the manifests.
+   Glama picks the release up by itself from npm and the repository; nothing is set there by hand.
 3. **Update `CHANGELOG.md` and the documentation** the change touches; for a breaking release, a
    migration note (`docs/MIGRATION-<major>.0.md`). If tools changed, regenerate the tool lists with
    `npm run docs:tools`.
@@ -63,8 +70,15 @@ the first failure so that no package goes out on top of a dependency that is mis
    ```
    On the first package a browser window may open for 2FA. If a publish fails (often a dropped
    login: `npm whoami`, `npm login`), re-run: packages already on npm are skipped.
-8. **Publish the registry entries** (`server.json`, `server-compact.json`) with `mcp-publisher` —
-   see [MCP_REGISTRY.md](./MCP_REGISTRY.md).
+8. **Publish the registry entries** — two commands, one per server package (`mcp-publisher publish`
+   alone takes `./server.json` only):
+   ```bash
+   mcp-publisher login github      # once per session
+   mcp-publisher publish server.json
+   mcp-publisher publish server-compact.json
+   ```
+   See [MCP_REGISTRY.md](./MCP_REGISTRY.md). npm may answer the new version only a few minutes after
+   the publish; install with `--prefer-online` if it still says `ETARGET`.
 9. **Check an installed copy**, outside the repository:
    ```bash
    npm install -g @mcp-abap-adt/core@<version>

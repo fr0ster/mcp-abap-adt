@@ -7,7 +7,8 @@ This directory contains all documentation for the `mcp-abap-adt` project, organi
 ### [installation/](installation/) - For Administrators
 Complete installation instructions for different platforms and environments.
 
-- `INSTALLATION.md` - Main installation guide with quick links
+- `INSTALLATION.md` - Main installation guide: the installation variants (full or compact server; HTTP, RFC or SNC) and the commands for each
+- `RFC_SETUP.md` - RFC and SNC: the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` before the install
 - `platforms/` - Platform-specific installation guides
   - `INSTALL_WINDOWS.md` - Windows installation
   - `INSTALL_MACOS.md` - macOS installation
@@ -46,7 +47,6 @@ Documentation for developers: testing, development guides, and internal document
 
 - `ASSISTANT_GUIDELINES.md` - Guidelines for AI assistants working on this project
 - `TEST_SYSTEM_SETUP.md` - Test system setup guide
-- `DetectObjectTypeListTools.md` - Documentation for object type detection tools
 - `tests/` - Test documentation and configuration
   - `TESTING_GUIDE.md` - Testing guide
   - `TEST_INFRASTRUCTURE.md` - Test infrastructure documentation

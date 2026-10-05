@@ -89,8 +89,7 @@ A created object always carries its responsible person: the first stated of the 
 the `x-sap-responsible` header, `SAP_RESPONSIBLE` in the destination's own `.env`, then in the process
 environment — else the login: on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an
 `x-sap-url` connection, the process `SAP_USERNAME`; on a cloud system only the system's user. A create
-that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent. A message
-class is the one exception: it is created with the system's own default responsible. The master system
+that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent — a message class included, from 17.0.0. The master system
 comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process) — no tool
 takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
 applies itself — never refused. Reads are unaffected. The process environment is read once: a change
@@ -150,7 +149,7 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
 
 ## Quick Start
 
-1. **Install server**: See [Installation Guide](docs/installation/INSTALLATION.md)
+1. **Install server**: pick the [installation variant](docs/installation/INSTALLATION.md#installation-variants) — full or compact, HTTP, RFC or SNC — and follow the [Installation Guide](docs/installation/INSTALLATION.md)
 2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf), docs: [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md))
 3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
 4. **Use**:
@@ -225,7 +224,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 
 ### For Users
 - **[Docs Index](docs/README.md)** - Full documentation index
-- **[Installation Guide](docs/installation/README.md)** - Installation overview and platform guides
+- **[Installation Guide](docs/installation/README.md)** - Installation variants (full or compact; HTTP, RFC or SNC) and platform guides
+- **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
@@ -243,6 +243,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
+- **[docs/MIGRATION-16.0.md](docs/MIGRATION-16.0.md)** - Authentication on auth-broker 4: four authentications, destinations
 - **[docs/MIGRATION-14.0.md](docs/MIGRATION-14.0.md)** - The compact facade moved to its own
   packages and `--exposition=compact` became the `mcp-abap-adt-compact` command
 - **[docs/MIGRATION-13.0.md](docs/MIGRATION-13.0.md)** - What a consumer on the 12.x contract changes
@@ -296,6 +298,9 @@ mcp-abap-adt --transport=sse --port=3001
 
 # SSE mode with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=sse --mcp=TRIAL
+
+# The compact server takes the same options (npm install -g @mcp-abap-adt/compact)
+mcp-abap-adt-compact --env-path=/path/to/my.env
 ```
 
 ### Development Mode
@@ -365,7 +370,7 @@ SAP_RESPONSIBLE=<your ABAP user>
 ```
 The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. `SAP_CONNECTION_TYPE=rfc` (or `--connection-type=rfc`) is required: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
 
-> **Not supported in 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `lacks: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
+> **Not supported since 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `lacks: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
 
 **Generate a `.env` (JWT):**
 ```bash

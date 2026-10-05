@@ -62,6 +62,25 @@ Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
   read from there), no longer install from a `.tgz` or through git submodules, and no longer advise
   `--no-optional`. The README's development commands (`npm start`, `npm run start:http`) named scripts
   that do not exist; running a build from a checkout is described instead.
+- **Client configuration examples** (`docs/installation/examples/`, the Cline and client guides) use
+  `--env-path` for a path (`--env` takes a sessions-store name), and cover the variants: full and compact
+  server, RFC/SNC with the process-level `env` block, a company CA. Checkout-based configs
+  (`dist/index.js`, `bin/mcp-abap-adt.js`) and duplicate npx variants are gone; the HTTP and SSE examples
+  carry their paths (`/mcp/stream/http`, `/sse`).
+- **Docker and release docs** match the files: the image has no RFC SDK, so RFC and SNC are not
+  available in it; `NODE_EXTRA_CA_CERTS` / `TLS_REJECT_UNAUTHORIZED` are container environment; npm
+  publishing is `npm run release:publish` of the five packages in dependency order; `MCP_REGISTRY.md`
+  covers `server.json` and `server-compact.json`.
+
+### Fixed
+
+- **`@mcp-abap-adt/compact` can be registered in the MCP Registry**: it had no `mcpName`, and
+  `server-compact.json` still named 14.0.1 with a description over the registry's 100 characters.
+- `server.json` / `server-compact.json` described a `.env` in the working directory as a fallback; nothing
+  has been read from there since 16.0.0.
+- The compose health checks asked `/health`; the server answers `/mcp/health`.
+- The release notes linked `doc/installation/…`; the workflows checked out submodules the repository
+  no longer has (the empty `.gitmodules` is removed).
 
 ## [16.0.1] - 2026-10-04
 

@@ -2,9 +2,10 @@ version: '3.8'
 
 # MCP ABAP ADT Server using npm package tarball
 #
-# Before building:
-# 1. Run 'npm pack' in project root
-# 2. Move .tgz to docker/packages/
+# Before building, put exactly ONE @mcp-abap-adt/core tarball in docker/packages/
+# (a root 'npm pack' makes the @mcp-abap-adt/lib tarball, which has no server):
+#   npm pack @mcp-abap-adt/core@<version> --pack-destination docker/packages
+# See docker/README.package.md
 #
 # Usage: docker-compose -f docker-compose.package.yml up -d
 
@@ -50,7 +51,7 @@ services:
 
     # Healthcheck
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/mcp/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 5s
       retries: 3

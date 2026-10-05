@@ -6,9 +6,8 @@
         "-y",
         "@mcp-abap-adt/core",
         "--transport=stdio",
-        "--env=/REPLACE/WITH/PATH/TO/.env"
+        "--env-path=/path/to/<destination>.env"
       ],
-      "env": {},
       "disabled": false
     }
   }

@@ -2,7 +2,7 @@
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "args": ["--transport=stdio", "--mcp=<destination>"],
       "disabled": false
     }
   }

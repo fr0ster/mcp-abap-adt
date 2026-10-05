@@ -1,26 +1,43 @@
 # Cline MCP Configuration
 
-This guide shows how to configure Cline to connect to the MCP ABAP ADT server using different transport protocols.
+How to configure Cline to start or connect to the MCP ABAP ADT server. Which server and which connection
+to choose: [Installation variants](INSTALLATION.md#installation-variants). Ready-made files:
+[examples/](examples/README.md).
 
 ## Prerequisites
 
-1. Build the project:
-```bash
-npm run build
-```
+1. Install the server (Node.js 22 or 24):
 
-2. Prepare your `.env` file with SAP credentials (required for stdio and SSE):
-```env
-SAP_URL=https://your-sap-system.com
-SAP_CLIENT=100
-SAP_USERNAME=your-username
-SAP_PASSWORD=your-password
-# or for a JWT you hold:
-# SAP_AUTH_TYPE=jwt
-# SAP_GRANT_TYPE=none
-# SAP_JWT_TOKEN=your-jwt-token
-# or a named destination: start the server with --mcp=<destination>
-```
+   ```bash
+   npm install -g @mcp-abap-adt/core        # full server, command mcp-abap-adt
+   npm install -g @mcp-abap-adt/compact     # compact server, command mcp-abap-adt-compact
+   ```
+
+   Or run it without installing: `npx -y @mcp-abap-adt/core …`. For RFC and SNC, install **after** the
+   SAP NW RFC SDK is in place — see [RFC Setup](RFC_SETUP.md).
+
+2. Name the destination. The server reads a `.env` only when you name it — nothing is read from the
+   working directory:
+   - `--env-path=<file>` — any `.env` file;
+   - `--env=<name>` — the sessions store file `<sessions>/<name>.env`
+     (`~/.config/mcp-abap-adt/sessions/` on Unix, `%USERPROFILE%\Documents\mcp-abap-adt\sessions\` on Windows);
+   - `--mcp=<destination>` — a service key and its session ([SERVICE_KEY_SETUP.md](examples/SERVICE_KEY_SETUP.md)).
+
+   A `.env` for basic authentication:
+
+   ```env
+   SAP_URL=https://your-sap-system.example
+   SAP_CLIENT=100
+   SAP_AUTH_TYPE=basic
+   SAP_USERNAME=<your ABAP user>
+   SAP_PASSWORD=<your password>
+   # or a JWT you hold:
+   # SAP_AUTH_TYPE=jwt
+   # SAP_GRANT_TYPE=none
+   # SAP_JWT_TOKEN=<token>
+   ```
+
+   All authentications: [Authentication & Destinations](../user-guide/AUTHENTICATION.md).
 
 ## Configuration Files
 
@@ -29,101 +46,21 @@ Cline reads MCP server configurations from:
 - **Cursor**: `~/Library/Application Support/Cursor/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 - **Windsurf**: `~/Library/Application Support/Windsurf/User/globalStorage/saoudrizwan.claude-dev/settings/cline_mcp_settings.json`
 
-## Installation Method
+## Option 1: STDIO (Recommended for Cline)
 
-### Using NPM Package (Recommended)
+Cline starts the server itself.
 
-If you installed via npm:
-```bash
-npm install -g @mcp-abap-adt/core
-# or
-npx @mcp-abap-adt/core
-```
+### Full server
 
-Use the simpler configurations below (no need to specify full paths).
-
-### Using Local Development
-
-If you cloned the repository and are developing locally, use the full path configurations.
-
-## Transport Options
-
-### Option 1: STDIO (Recommended for Cline)
-
-**Best for**: Local development, maximum compatibility with MCP clients
-
-#### A. Using NPX (No Installation Required)
-
-**Recommended for most users**. NPX downloads and runs the latest version:
+With a `.env` file:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@mcp-abap-adt/core",
-        "--transport=stdio",
-        "--env=/absolute/path/to/.env"
-      ],
-      "env": {},
-      "disabled": false
-    }
-  }
-}
-```
-
-**Example** (macOS/Linux):
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@mcp-abap-adt/core",
-        "--transport=stdio",
-        "--env=/Users/username/.env"
-      ],
-      "env": {},
-      "disabled": false
-    }
-  }
-}
-```
-
-**Example** (Windows):
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "@mcp-abap-adt/core",
-        "--transport=stdio",
-        "--env=C:/Users/username/.env"
-      ],
-      "env": {},
-      "disabled": false
-    }
-  }
-}
-```
-
-#### B. Using Global Installation
-
-If you installed globally (`npm install -g @mcp-abap-adt/core`):
-
-**With .env file:**
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-stdio": {
       "type": "stdio",
       "command": "mcp-abap-adt",
-      "args": ["--env=/absolute/path/to/.env"],
+      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
       "timeout": 60,
       "disabled": false
     }
@@ -131,95 +68,45 @@ If you installed globally (`npm install -g @mcp-abap-adt/core`):
 }
 ```
 
-**With MCP destination (requires service key):**
+With a named destination: `"args": ["--transport=stdio", "--mcp=<destination>"]`. Add `--unsafe` to keep
+its session on disk across restarts.
+
+Without installing: `"command": "npx"`, `"args": ["-y", "@mcp-abap-adt/core", "--transport=stdio", "--env-path=/path/to/<destination>.env"]`.
+
+### Compact server
+
+The same arguments, the command `mcp-abap-adt-compact` (through npx:
+`"args": ["-y", "-p", "@mcp-abap-adt/compact", "mcp-abap-adt-compact", …]`):
+
 ```json
 {
   "mcpServers": {
-    "mcp-abap-adt-mcp": {
+    "mcp-abap-adt-compact": {
       "type": "stdio",
-      "command": "mcp-abap-adt",
-      "args": ["--unsafe", "--mcp=trial"],
+      "command": "mcp-abap-adt-compact",
+      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
       "timeout": 60,
-      "autoApprove": [],
       "disabled": false
     }
   }
 }
 ```
 
-**With SAP destination (requires service key):**
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-sap": {
-      "type": "stdio",
-      "command": "mcp-abap-adt",
-      "args": ["--unsafe", "--sap=PROD"],
-      "timeout": 60,
-      "autoApprove": [],
-      "disabled": false
-    }
-  }
-}
-```
+### RFC and SNC
 
-#### C. Using Local Development (Repository Clone)
-
-For developers working on the source code:
+The same arguments; the `.env` states the connection. Process-level variables are not read from the
+`.env` — they go in the `env` block. On Windows the SDK's `lib` directory must be on `PATH` when the
+server runs:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt": {
-      "command": "node",
-      "args": [
-        "/absolute/path/to/mcp-abap-adt/bin/mcp-abap-adt.js",
-        "--transport=stdio",
-        "--env=/absolute/path/to/mcp-abap-adt/.env"
-      ],
-      "env": {},
-      "disabled": false
-    }
-  }
-}
-```
-
-### Option 2: HTTP (Streamable HTTP)
-
-**Best for**: Remote connections, web interfaces, multiple clients
-
-#### Step 1: Start the HTTP Server
-
-Choose one method:
-
-**A. Using NPX** (recommended):
-```bash
-npx @mcp-abap-adt/core --transport=http --port=3000
-```
-
-**B. Using Global Install**:
-```bash
-mcp-abap-adt --transport=http --port=3000
-```
-
-**C. Using NPM Script** (local development):
-```bash
-npm run start:http
-```
-
-#### Step 2: Configure Cline
-
-#### Cline Configuration Options
-
-**Option A: With Destination (Recommended)** - start the server with `--allow-destination-header` (or `--mcp=trial` and no header):
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-http": {
-      "type": "streamableHttp",
-      "url": "http://localhost:3001/mcp/stream/http",
-      "headers": {
-        "x-mcp-destination": "trial"
+      "type": "stdio",
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--env-path=C:/path/to/<destination>.env"],
+      "env": {
+        "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
       },
       "timeout": 60,
       "disabled": false
@@ -228,7 +115,84 @@ npm run start:http
 }
 ```
 
-**Option B: Direct Auth** - a token you hold; the server does not renew it:
+A `PATH` in `env` replaces the inherited one: keep the rest of it in the value. When the system number
+cannot be derived from the `SAP_URL` port (`80NN` → `NN`), add `"SAP_SYSNR": "<NN>"` to the block.
+
+The `.env` for SNC:
+
+```env
+SAP_URL=http://your-sap-system.example:8000
+SAP_CLIENT=100
+SAP_CONNECTION_TYPE=rfc
+SAP_AUTH_TYPE=snc
+SAP_SNC_PARTNERNAME=p:CN=<system>, O=<org>, C=<country>
+SAP_RESPONSIBLE=<your ABAP user>
+```
+
+RFC with a user and password: `SAP_AUTH_TYPE=basic` with `SAP_USERNAME` and `SAP_PASSWORD`. The SDK,
+the install order and the SNC options: [RFC Setup](RFC_SETUP.md).
+
+### A company CA
+
+An `https://` system whose certificate is self-signed or issued by a company CA is refused until Node.js
+trusts that CA. The setting belongs to the process, so it goes in `env`:
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "type": "stdio",
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "env": {
+        "NODE_EXTRA_CA_CERTS": "/path/to/company-ca.pem"
+      },
+      "timeout": 60,
+      "disabled": false
+    }
+  }
+}
+```
+
+See [HTTPS certificates](INSTALLATION.md#https-certificates).
+
+## Option 2: HTTP (Streamable HTTP)
+
+**Best for**: a server shared by several clients or running remotely.
+
+### Step 1: Start the HTTP Server
+
+```bash
+mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+# or a named destination
+mcp-abap-adt --transport=http --port=3000 --mcp=<destination>
+```
+
+`mcp-abap-adt-compact` and `npx -y @mcp-abap-adt/core` take the same arguments. Process-level variables
+(`NODE_EXTRA_CA_CERTS`, on Windows `PATH` for RFC) belong in the environment of that terminal.
+
+### Step 2: Configure Cline
+
+**With the server's default destination**:
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt-http": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
+      "timeout": 60,
+      "disabled": false
+    }
+  }
+}
+```
+
+**A destination per request** — start the server with `--allow-destination-header` and add
+`"headers": { "x-mcp-destination": "<destination>" }`.
+
+**Direct auth** — a token you hold; the server does not renew it:
+
 ```json
 {
   "mcpServers": {
@@ -236,8 +200,8 @@ npm run start:http
       "type": "streamableHttp",
       "url": "http://localhost:3000/mcp/stream/http",
       "headers": {
-        "x-sap-url": "https://your-system.com",
-        "x-sap-jwt-token": "your-jwt-token"
+        "x-sap-url": "https://your-sap-system.example",
+        "x-sap-jwt-token": "<token>"
       },
       "timeout": 60,
       "disabled": false
@@ -246,32 +210,14 @@ npm run start:http
 }
 ```
 
-**Note**: HTTP mode can work without `.env` file if you provide SAP credentials via HTTP headers in each request.
+Without a default destination, every request must name one or carry `x-sap-url` with a credential. The
+headers: [CLIENT_CONFIGURATION.md](../user-guide/CLIENT_CONFIGURATION.md).
 
-### Option 3: SSE (Server-Sent Events)
+## Option 3: SSE (Server-Sent Events)
 
-**Best for**: Long-running connections, real-time updates
-
-#### Step 1: Start the SSE Server
-
-Choose one method:
-
-**A. Using NPX** (recommended):
 ```bash
-npx @mcp-abap-adt/core --transport=sse --port=3001 --env=/path/to/.env
+mcp-abap-adt --transport=sse --port=3001 --env-path=/path/to/<destination>.env
 ```
-
-**B. Using Global Install**:
-```bash
-mcp-abap-adt --transport=sse --port=3001 --env=/path/to/.env
-```
-
-**C. Using NPM Script** (local development):
-```bash
-npm run start:sse
-```
-
-#### Cline Configuration
 
 ```json
 {
@@ -286,158 +232,82 @@ npm run start:sse
 }
 ```
 
-**With Custom Port**:
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt-sse-custom": {
-      "type": "sse",
-      "url": "http://localhost:8081/sse",
-      "timeout": 60,
-      "disabled": false
-    }
-  }
-}
-```
-
 ## Platform-Specific Notes
 
 ### macOS/Linux
 
-Use absolute paths in configuration. You can use `pwd` to get current directory:
-```bash
-cd /path/to/mcp-abap-adt
-echo "$(pwd)/bin/mcp-abap-adt.js"
-```
+Use absolute paths in `--env-path`. If Cline cannot find `mcp-abap-adt`, give the full path of the
+command (`npm prefix -g` shows the directory; the command is in its `bin/`).
 
 ### Windows
 
-Use Windows-style paths with forward slashes or escaped backslashes:
-```json
-{
-  "mcpServers": {
-    "mcp-abap-adt": {
-      "command": "node",
-      "args": [
-        "C:/Users/username/projects/mcp-abap-adt/bin/mcp-abap-adt.js",
-        "--transport=stdio",
-        "--env=C:/Users/username/projects/mcp-abap-adt/.env"
-      ],
-      "env": {},
-      "disabled": false
-    }
-  }
-}
-```
-
-Or with escaped backslashes:
-```json
-"args": [
-  "C:\\Users\\username\\projects\\mcp-abap-adt\\bin\\mcp-abap-adt.js",
-  "--transport=stdio"
-]
-```
+Write paths with forward slashes (`C:/path/to/<destination>.env`) or escaped backslashes
+(`C:\\path\\to\\<destination>.env`).
 
 ## Testing Connection
 
-1. **Restart Cline** after updating configuration
-2. **Open Cline panel** in your editor
-3. **Check available tools** - you should see ABAP tools like:
-   - `abap_get_class`
-   - `abap_get_program`
-   - `abap_create_package`
-   - etc.
-
-4. **Try a simple command**:
-   ```
-   Get the source code of class ZCL_HELLO_WORLD
-   ```
+1. **Restart Cline** after updating the configuration.
+2. **Check the available tools** — for example `ReadClass`, `ReadProgram`, `SearchObject`.
+3. **Ask for a read**, for example the source of a class you know exists.
 
 ## Troubleshooting
 
 ### "Server not found" or "Connection failed"
 
-1. Check that paths are absolute (not relative)
-2. Verify `npm run build` was successful
-3. Check that `dist/index.js` exists
-4. For stdio: Verify `.env` file exists and has correct SAP credentials
+1. Check that the command is installed: `mcp-abap-adt --version`.
+2. Check that the `--env-path` path is absolute and the file exists — a missing file is refused at
+   startup, naming the parameter and the path.
+3. Run the same command in a terminal and read what it prints on stderr.
 
-### "No tools available" or empty response
+### "No tools available" or every call fails
 
-1. Check server logs in terminal where server is running
-2. Verify SAP credentials in `.env` are correct
-3. Test connection manually:
+1. Without `--mcp`, `--env` or `--env-path`, stdio starts in inspection-only mode: the tool list answers,
+   a tool call needs a connection.
+2. Check the credentials in the `.env`; a destination refused at startup names the fields it lacks.
+3. For RFC: `npm ls -g @mcp-abap-adt/sap-rfc-lite` must show a version — see [RFC Setup](RFC_SETUP.md#troubleshooting).
+4. Test stdio by hand:
    ```bash
-   # For stdio:
-   echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | node ./dist/index.js --transport=stdio --env=.env
-   
-   # For HTTP:
-   curl -X POST http://localhost:3000/mcp/v1/tools/list
+   echo '{"jsonrpc":"2.0","method":"tools/list","id":1}' | mcp-abap-adt --transport=stdio --env-path=/path/to/<destination>.env
    ```
 
 ### Windows-specific issues
 
-1. Use `spawn()` instead of direct execution (already handled by `bin/mcp-abap-adt.js`)
-2. Check for `\r\n` line ending issues in `.env` file
-3. Use PowerShell or CMD with proper encoding (UTF-8)
+1. Check for `\r\n` line ending issues in the `.env` file.
+2. Use PowerShell or CMD with UTF-8 encoding.
 
 ## Multiple Server Instances
 
-You can run multiple instances with different SAP systems:
+One entry per system, each with its own destination:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-dev": {
-      "command": "node",
-      "args": [
-        "/path/to/mcp-abap-adt/bin/mcp-abap-adt.js",
-        "--transport=stdio",
-        "--env=/path/to/dev.env"
-      ],
-      "env": {},
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--env-path=/path/to/dev.env"],
       "disabled": false
     },
     "mcp-abap-prod": {
-      "command": "node",
-      "args": [
-        "/path/to/mcp-abap-adt/bin/mcp-abap-adt.js",
-        "--transport=stdio",
-        "--env=/path/to/prod.env"
-      ],
-      "env": {},
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--env-path=/path/to/prod.env"],
       "disabled": false
     }
   }
 }
 ```
 
-## Advanced Options
+## Environment Variables
 
-### Custom Ports
-
-```bash
-# HTTP
-node ./bin/mcp-abap-adt.js --transport=http --port=8080 --host=0.0.0.0
-
-# SSE
-node ./bin/mcp-abap-adt.js --transport=sse --port=8081 --host=0.0.0.0
-```
-
-### Environment Variables
-
-Instead of command-line arguments, you can use environment variables:
+Instead of arguments the server takes environment variables:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt": {
-      "command": "node",
-      "args": ["/path/to/mcp-abap-adt/bin/mcp-abap-adt.js"],
+      "command": "mcp-abap-adt",
       "env": {
         "MCP_TRANSPORT": "stdio",
-        "MCP_ENV_PATH": "/path/to/.env",
-        "MCP_HTTP_PORT": "3000"
+        "MCP_ENV_PATH": "/path/to/<destination>.env"
       },
       "disabled": false
     }
@@ -445,28 +315,28 @@ Instead of command-line arguments, you can use environment variables:
 }
 ```
 
-**Available Environment Variables**:
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `MCP_TRANSPORT` | Transport type: stdio, http, sse | `stdio` |
+| `MCP_ENV_PATH` | Path to a `.env` file (same as `--env-path`) | none |
+| `MCP_HTTP_PORT` | HTTP server port | `3000` |
+| `MCP_SSE_PORT` | SSE server port | `3001` |
 
-| Variable | Description | Default | Platform Notes |
-|----------|-------------|---------|----------------|
-| `MCP_TRANSPORT` | Transport type: stdio, http, sse | `stdio` (if piped) or `http` | All platforms |
-| `MCP_ENV_PATH` | Path to .env file | `./.env` | Use absolute paths |
-| `MCP_HTTP_PORT` | HTTP server port | `3000` | All platforms |
-| `MCP_SSE_PORT` | SSE server port | `3001` | All platforms |
+Every option with its environment and YAML forms: [CLI_OPTIONS.md](../user-guide/CLI_OPTIONS.md).
 
 ## Security Notes
 
-1. **Never commit** `.env` files with credentials to git
-2. **Use JWT authentication** for production environments
+1. **Never commit** `.env` files with credentials to git.
+2. **Use JWT authentication** for production environments.
 3. **Enable DNS-rebinding protection** for HTTP/SSE servers exposed to network — use `--http-enable-dns-protection` with `--http-allowed-hosts` to restrict which Host headers are accepted. Example:
    ```bash
    mcp-abap-adt --transport=http --http-enable-dns-protection --http-allowed-hosts=localhost:3000
    ```
    This is Host/Origin allowlist validation, NOT browser CORS — no `Access-Control-Allow-Origin` headers are emitted. A non-allowlisted Host gets HTTP 403. The `--http-allowed-hosts` value must include the port (e.g. `localhost:3000`, not `localhost`).
-4. **Use HTTPS** in production (configure reverse proxy)
+4. **Use HTTPS** in production (configure reverse proxy).
 
 ## Next Steps
 
-- See [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) for list of all tools
-- See [CLIENT_CONFIGURATION.md](../user-guide/CLIENT_CONFIGURATION.md) for more client examples
-- See [CROSS_PLATFORM_FIXES.md](../development/CROSS_PLATFORM_FIXES.md) for troubleshooting
+- [AVAILABLE_TOOLS.md](../user-guide/AVAILABLE_TOOLS.md) — all tools
+- [CLIENT_CONFIGURATION.md](../user-guide/CLIENT_CONFIGURATION.md) — other clients and HTTP headers
+- [examples/](examples/README.md) — ready-made configuration files

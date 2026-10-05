@@ -19,8 +19,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v4
@@ -61,8 +59,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
 
       - name: Extract version from tag
         id: version
@@ -81,7 +77,7 @@ jobs:
             npm install @mcp-abap-adt/core
             ```
 
-            See [Installation Guide](https://github.com/${{ github.repository }}/blob/main/doc/installation/INSTALLATION.md) for details.
+            See [Installation Guide](https://github.com/${{ github.repository }}/blob/main/docs/installation/INSTALLATION.md) for details.
 
             ## What's Changed
         env:

@@ -1,6 +1,8 @@
 # Development Documentation
 
-This directory contains documentation for developers: testing guides, development artifacts, and internal documentation.
+Documentation for developers: testing guides, development artifacts, and internal documentation.
+Building and running a checkout: [Installation — from source](../installation/INSTALLATION.md#from-source-development).
+Releasing: [docs/deployment/RELEASE.md](../deployment/RELEASE.md).
 
 ## Files
 
@@ -11,21 +13,28 @@ This directory contains documentation for developers: testing guides, developmen
 
 ## Roadmaps
 
-- `roadmaps/HANDLER_BUILD_ERRORS_ROADMAP.md`
-- `roadmaps/INFRASTRUCTURE_HANDLERS.md`
-- `roadmaps/MCP_SERVER_REFACTORING_ROADMAP.md`
-- `roadmaps/TEST_LOGGING_ROADMAP.md`
-- `roadmaps/TEST_REFACTORING_ROADMAP.md`
-- `roadmaps/TODO_ROADMAP.md`
-- `roadmaps/USAGE_DOCUMENTATION_ROADMAP.md`
-- `roadmaps/parameter_passing_unit_tests_roadmap.md`
+In [`roadmaps/`](roadmaps/) (older ones under `roadmaps/archive/`):
+
+- `COMPACT_FACADE_ROUTER_ROADMAP.md`
+- `HANDLER_BUILD_ERRORS_ROADMAP.md`
+- `INFRASTRUCTURE_HANDLERS.md`
+- `MCP_SERVER_REFACTORING_ROADMAP.md`
+- `TEST_LOGGING_ROADMAP.md`
+- `TEST_REFACTORING_ROADMAP.md`
+- `TODO_ROADMAP.md`
+- `TRANSPORT_CRUD_ISSUE_11.md`
+- `USAGE_DOCUMENTATION_ROADMAP.md`
+- `parameter_passing_unit_tests_roadmap.md`
 
 ## Test Documentation
 
 The **[tests/](tests/)** subdirectory contains:
 
+- `README.md` - Test documentation index
 - `TESTING_GUIDE.md` - Testing guide
 - `TEST_INFRASTRUCTURE.md` - Test infrastructure documentation
 - `ORGANIZATION.md` - Test organization
+- `TESTING_AUTH.md` - Testing the platform-specific auth stores
+- `DEBUGGING.md` - Debugging integration tests
+- `CREATE_DOMAIN_TOOL.md` - The CreateDomain tool
 - `test-config.yaml.template` - Test configuration template
-- `README.md` - Test documentation index

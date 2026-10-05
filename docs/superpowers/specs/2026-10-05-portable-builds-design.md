@@ -4,16 +4,23 @@ Status: draft for review (2026-10-05). Deleted once implemented or cancelled.
 
 ## Goal
 
-A user copies one archive to a machine, unpacks it and runs the server. Nothing else is installed:
+A user copies one archive to a machine, unpacks it and runs the server — the full one or the compact
+one, each its own archive. Nothing else is installed:
 no Node.js, no npm, no compiler, no `SAPNWRFC_HOME` at install time. For HTTP that is the whole
 story. For RFC and SNC the only extra is the SAP NW RFC SDK's `lib` folder, dropped into the unpacked
 archive — SAP distributes the SDK through its Support Portal, so we do not ship it.
 
-| Platform | Connections | Archive |
+Two archives per platform, one per server (`<server>` is `mcp-abap-adt` — the full server,
+`@mcp-abap-adt/core` — or `mcp-abap-adt-compact`, `@mcp-abap-adt/compact`):
+
+| Platform | Connections | Archives |
 |---|---|---|
-| Windows x64 | HTTP, RFC, SNC | `mcp-abap-adt-<version>-win-x64.zip` |
-| macOS arm64 | HTTP, RFC, SNC | `mcp-abap-adt-<version>-macos-arm64.zip` |
-| Linux x64 | HTTP, RFC | `mcp-abap-adt-<version>-linux-x64.tar.gz` |
+| Windows x64 | HTTP, RFC, SNC | `<server>-<version>-win-x64.zip` |
+| macOS arm64 | HTTP, RFC, SNC | `<server>-<version>-macos-arm64.zip` |
+| Linux x64 | HTTP, RFC | `<server>-<version>-linux-x64.tar.gz` |
+
+Six archives per release. The two servers share everything below; only the bundled entry point and
+the executable's name differ.
 
 Out of scope: macOS x64 (no Intel SDK at hand), SNC on Linux, bundling the SDK, an RFC client
 without the SDK (`open-rfc` has no SNC and no transport encryption, beta), installers, auto-update.
@@ -22,7 +29,7 @@ without the SDK (`open-rfc` has no SNC and no transport encryption, beta), insta
 
 ```text
 mcp-abap-adt-17.x.y-win-x64/
-  mcp-abap-adt.exe          ← the server (Node.js inside)
+  mcp-abap-adt.exe          ← the server (Node.js inside); mcp-abap-adt-compact.exe in the compact archive
   README.txt                ← these steps, short
   nwrfcsdk/lib/             ← empty; for RFC/SNC copy the SDK's lib/ contents here
 ```
@@ -37,7 +44,7 @@ has the SDK installed needs no copy.
 
 ## Architecture
 
-### One executable per platform: Node SEA
+### One executable per server and platform: Node SEA
 
 The executable is the official Node.js single executable application: the Node binary of the target
 platform with our bundled program injected as a blob (`postject`). Node **24** (LTS, on SAP BTP's
@@ -47,15 +54,16 @@ advise against cross-generation, and the RFC addon is native anyway.
 
 ### The program inside: one bundle
 
-`esbuild` bundles `server/` (the `mcp-abap-adt` launcher) with `@mcp-abap-adt/lib` and every
-dependency into one CommonJS file, the SEA's main script. Dynamic requires that must survive bundling
+`esbuild` bundles one entry point with `@mcp-abap-adt/lib` and every dependency into one CommonJS
+file, the SEA's main script: `server/` (the `mcp-abap-adt` launcher) for the full server,
+`compact/` (`mcp-abap-adt-compact`, which hands its tool list to the same launcher) for the compact
+one. Dynamic requires that must survive bundling
 are listed and handled explicitly (the build fails if an unexpected one remains):
 
 - `@mcp-abap-adt/sap-rfc-lite` (required lazily by `@mcp-abap-adt/connection` when an RFC
   conversation opens) is bundled; its native loader is replaced, see below.
 - `open` (browser login) and similar optional paths are bundled as they are.
 
-The compact server is **not** in the first version — see *Decisions to confirm*.
 
 ### The RFC addon: prebuilt, embedded, extracted next to the SDK
 
@@ -107,8 +115,9 @@ how the RFC addon and the SDK are found.
 
 - **Unit:** the SEA loader's folder resolution and refusals (`SAPNWRFC_HOME` vs `<exe dir>`, missing
   library, unwritable folder), with the filesystem stubbed.
-- **CI smoke, every platform:** the built executable answers `--version`, MCP `initialize` and
-  `tools/list` over stdio (the tool count equal to the npm server's); with the SDK copied into
+- **CI smoke, every platform and both servers:** each built executable answers `--version`, MCP
+  `initialize` and `tools/list` over stdio (the tool count equal to the same npm server's — the full
+  server's, and 25 for compact); with the SDK copied into
   `nwrfcsdk/lib/` the addon loads (no SAP system needed — an RFC open to an unreachable host must fail
   with an RFC error, not a load error); without the SDK the first RFC call is refused naming the folder.
 - **Manual, before the first release:** SNC on Windows and macOS against a real system (read, create,
@@ -122,8 +131,8 @@ generated from it. `RELEASE.md`: the portable workflow runs on the tag.
 
 ## Decisions to confirm
 
-1. **The compact server.** Leave it out of the first version (one executable, ~100 MB), or ship it as
-   a second executable (doubles the archive), or one executable selecting the surface with an option.
-   Proposed: out of the first version.
-2. **SDK storage for CI:** a private repository's release assets + `NWRFC_SDK_TOKEN`, as above.
-3. **Signing:** ad-hoc on macOS, none on Windows, for now.
+1. **SDK storage for CI:** a private repository's release assets + `NWRFC_SDK_TOKEN`, as above.
+2. **Signing:** ad-hoc on macOS, none on Windows, for now.
+
+Decided: the compact server ships in the first version as its own archive per platform (stated
+2026-10-05) — not a second executable in the full server's archive.

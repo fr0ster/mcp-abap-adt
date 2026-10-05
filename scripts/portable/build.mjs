@@ -21,9 +21,9 @@ const SERVERS = {
   compact: { name: 'mcp-abap-adt-compact', pkg: '@mcp-abap-adt/compact' },
 };
 const PLATFORMS = {
-  'linux-x64': { node: 'linux-x64', ext: 'tar.xz', exe: '', sdkLib: 'libsapnwrfc.so', archive: 'tar.gz' },
-  'win-x64': { node: 'win-x64', ext: 'zip', exe: '.exe', sdkLib: 'sapnwrfc.dll', archive: 'zip' },
-  'macos-arm64': { node: 'darwin-arm64', ext: 'tar.gz', exe: '', sdkLib: 'libsapnwrfc.dylib', archive: 'zip' },
+  'linux-x64': { node: 'linux-x64', ext: 'tar.xz', exe: '', sdkLib: 'libsapnwrfc.so', sdkExt: '.so', archive: 'tar.gz' },
+  'win-x64': { node: 'win-x64', ext: 'zip', exe: '.exe', sdkLib: 'sapnwrfc.dll', sdkExt: '.dll', archive: 'zip' },
+  'macos-arm64': { node: 'darwin-arm64', ext: 'tar.gz', exe: '', sdkLib: 'libsapnwrfc.dylib', sdkExt: '.dylib', archive: 'zip' },
 };
 const NODE_MAJOR = 'v24.';
 const SEA_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
@@ -236,13 +236,22 @@ function sdkFolderNote(name, exe, sdkLib, platform) {
   return lines;
 }
 
-function inject({ bundleFile, addonFile, nodeBin, work, server, platform, version }) {
-  const { exe, sdkLib, archive } = PLATFORMS[platform];
+function inject({ bundleFile, addonFile, nodeBin, work, server, platform, version, sdk }) {
+  const { exe, sdkLib, sdkExt, archive } = PLATFORMS[platform];
   const name = `${server.name}-${version}-${platform}`;
   const outDir = path.join(repo, 'dist-portable', name);
   fs.rmSync(outDir, { recursive: true, force: true });
-  fs.mkdirSync(path.join(outDir, 'nwrfcsdk', 'lib'), { recursive: true });
-  fs.writeFileSync(path.join(outDir, 'nwrfcsdk', 'lib', '.keep'), '');
+  // A personal build, not one to hand out: the SDK this machine compiled the
+  // addon against goes into the archive (its runtime libraries only), and the
+  // addon beside it — so the executable needs nothing at run time and writes
+  // nothing, even from a read-only folder.
+  const sdkOut = path.join(outDir, 'nwrfcsdk', 'lib');
+  fs.mkdirSync(sdkOut, { recursive: true });
+  const sdkLibDir = path.join(sdk, 'lib');
+  const runtime = fs.readdirSync(sdkLibDir).filter((f) => f.toLowerCase().endsWith(sdkExt));
+  if (!runtime.includes(sdkLib)) fail(`${sdkLib} is not in ${sdkLibDir}: is SAPNWRFC_HOME the SDK of ${platform}?`);
+  for (const file of runtime) fs.copyFileSync(path.join(sdkLibDir, file), path.join(sdkOut, file));
+  fs.copyFileSync(addonFile, path.join(sdkOut, 'sapnwrfc.node'));
 
   const config = path.join(work, `${server.name}.sea.json`);
   const blob = path.join(work, `${server.name}.blob`);
@@ -278,9 +287,12 @@ function inject({ bundleFile, addonFile, nodeBin, work, server, platform, versio
       'Nothing to install. Start it the way an MCP client starts the npm server:',
       `  ${server.name}${exe} --env-path=<your .env>`,
       '',
-      'HTTP needs nothing else.',
-      `RFC and SNC: copy the files of the SAP NW RFC SDK's lib/ folder into nwrfcsdk/lib/ (${sdkLib} among them),`,
-      'or set SAPNWRFC_HOME to an installed SDK. SNC also needs the SNC product (SAP Secure Login Client).',
+      `${platform === 'linux-x64' ? 'HTTP and RFC need' : 'HTTP, RFC and SNC need'} nothing else: nwrfcsdk/lib/ holds the SAP NW RFC SDK libraries`,
+      'this build was made with.' +
+        (platform === 'linux-x64' ? '' : ' SNC also needs the SNC product (SAP Secure Login Client).'),
+      '',
+      'A PERSONAL BUILD: it contains the SAP NW RFC SDK, which SAP licenses through its Support Portal.',
+      'Do not hand this archive on; whoever needs one builds their own (npm run portable:build).',
       '',
       ...sdkFolderNote(server.name, exe, sdkLib, platform),
       'Documentation: https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md',
@@ -307,5 +319,5 @@ const servers = opts.which === 'all' ? ['full', 'compact'] : [opts.which];
 for (const key of servers) {
   const server = SERVERS[key];
   const bundleFile = await bundle(work, stageDir, server);
-  inject({ bundleFile, addonFile, nodeBin, work, server, platform: opts.platform, version: opts.version });
+  inject({ bundleFile, addonFile, nodeBin, work, server, platform: opts.platform, version: opts.version, sdk });
 }

@@ -1,0 +1,5 @@
+# The images install from npm and copy nothing from this directory: send only
+# the Dockerfiles, never service-keys/, sessions/ or a .env.
+*
+!Dockerfile
+!Dockerfile.inspect

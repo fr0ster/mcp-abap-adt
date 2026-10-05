@@ -131,20 +131,13 @@ jobs:
           ./node_modules/.bin/mcp-abap-adt --help
           ./node_modules/.bin/mcp-abap-adt-compact --version
 
-      # The image builds from this checkout and installs the packed packages;
-      # it stopped starting once and nothing noticed, because nothing built it.
+      # The image installs the published packages from npm (nothing of this
+      # checkout goes into it); this keeps the Dockerfile itself working — it
+      # stopped starting once and nothing noticed, because nothing built it.
       - name: Build the Docker image
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
-        run: docker build -f docker/Dockerfile -t mcp-abap-adt:ci .
-
-      # The package image installs the tarballs in docker/packages/: here the
-      # five this job packed, so its own build context and .dockerignore are
-      # exercised, not only the image that packs inside itself.
-      - name: Build the package Docker image
-        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
-          mkdir -p docker/packages
-          cp mcp-abap-adt-*.tgz docker/packages/
-          docker build -f docker/Dockerfile.package -t mcp-abap-adt:ci-package .
-          docker run --rm mcp-abap-adt:ci-package mcp-abap-adt --version
-          docker run --rm mcp-abap-adt:ci-package mcp-abap-adt-compact --version
+          docker build -f docker/Dockerfile -t mcp-abap-adt:ci .
+          docker run --rm mcp-abap-adt:ci mcp-abap-adt --version
+          docker run --rm mcp-abap-adt:ci mcp-abap-adt-compact --version
+

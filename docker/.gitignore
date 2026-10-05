@@ -6,9 +6,6 @@ service-keys/
 sessions/
 *.env
 
-# Package tarballs for Docker deployment
-packages/
-
 # Locks directory
 locks/
 

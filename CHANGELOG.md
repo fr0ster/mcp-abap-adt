@@ -78,25 +78,26 @@ Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
   `server-compact.json` still named 14.0.1 with a description over the registry's 100 characters.
 - `server.json` / `server-compact.json` described a `.env` in the working directory as a fallback; nothing
   has been read from there since 16.0.0.
-- **The Docker image starts again, and installs the server as packages.** `docker/Dockerfile` built only
+- **The Docker image starts again, and installs the server from npm.** `docker/Dockerfile` built only
   the library (`build:fast`) and ran `dist/server/launcher.js`, which no build produces, so
-  `docker-compose.yml` and `docker-compose.headerless.yml` could not start. It is now two stages: the
-  first builds the checkout and packs the five packages, the second installs the tarballs together with
-  `npm install -g` — the siblings this build, everything else from the registry — and runs
-  `mcp-abap-adt` (`mcp-abap-adt-compact` is in the image too) as the `node` user. The Node inspector is
-  no longer open on `0.0.0.0:9229` by default. `Dockerfile.package` installs whatever tarballs
-  `docker/packages/` holds the same way; `Dockerfile.inspect` installs the published `core` behind a
-  pinned `mcp-proxy` instead of building a fixed commit from 2025. Built and run on 2026-10-05: HTTP
-  `initialize` and the tool list answer, the health check reports healthy. `service-keys/`, `sessions/`
-  and `backups/` are kept out of the build context.
+  `docker-compose.yml` and `docker-compose.headerless.yml` could not start. Nothing is built now: stage 1
+  installs the published `@mcp-abap-adt/core` and `@mcp-abap-adt/compact` with `npm install -g` into
+  their own prefix (build argument `MCP_ABAP_ADT_VERSION`, default `latest`), stage 2 copies that
+  installation into a clean runtime image and runs `mcp-abap-adt` as the `node` user. The Node inspector
+  is no longer open on `0.0.0.0:9229` by default. The build context is `docker/`, and its
+  `.dockerignore` sends only the Dockerfiles — never `service-keys/`, `sessions/` or a `.env`.
+  `Dockerfile.inspect` installs the published `core` behind a pinned `mcp-proxy` instead of building a
+  fixed commit from 2025. `Dockerfile.package` and `docker-compose.package.yml`, a second way to the same
+  npm package, are removed. Built and run on 2026-10-05: HTTP `initialize` and the tool list answer,
+  the health check reports healthy.
 - **`npm run docker:*` and `npm run smoke:mcp:*` run from the repository root.** They were declared in
   `server/package.json` with paths relative to `server/`, where neither `docker/` nor `tools/` is; so were
   `start`, `start:http`, `start:sse`, `dev`, `dev:http`, `dev:sse` and `kill-ports`, which ran a checkout
   that cannot run and are removed, with the `tools/dev-*.js` launchers they called.
   `tools/mcp-crud-smoke.js` spawns the installed `mcp-abap-adt` for stdio by default.
 - **CI packs and installs all five packages** and checks that no package took a sibling from the
-  registry instead of this build; it packed only `lib` and `core`. It also builds both Docker images —
-  the one that packs from the checkout, and `Dockerfile.package` from the tarballs the job packed.
+  registry instead of this build; it packed only `lib` and `core`. It also builds the Docker image
+  and runs both commands in it.
 - `--help`: a message class is no longer described as the exception to the responsible rule, and the RFC
   requirement says the module is compiled by `npm install`.
 - The compose health checks asked `/health`; the server answers `/mcp/health`.

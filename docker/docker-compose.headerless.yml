@@ -15,9 +15,12 @@
 
 services:
   mcp-abap-adt:
+    # Installs the published packages from npm; nothing of the checkout goes in.
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MCP_ABAP_ADT_VERSION: ${MCP_ABAP_ADT_VERSION:-latest}
     image: mcp-abap-adt:headerless
     container_name: mcp-abap-adt-headerless
     restart: unless-stopped

@@ -16,19 +16,18 @@ in the images: `mcp-abap-adt` (the full one, `@mcp-abap-adt/core`) and `mcp-abap
 
 ## The images
 
-Every image installs the server the way a user does — as npm packages, with `npm install -g` — and
-none runs from a source tree.
+The images install the server the way a user does — the **published packages from npm**, with
+`npm install -g`. Nothing of this checkout goes into them: the build context is the `docker/`
+directory and the Dockerfile reads nothing from it.
 
 | File | What it is |
 |---|---|
-| `docker/Dockerfile` + `docker-compose.yml`, `docker-compose.headerless.yml` | **Two stages from this checkout.** Stage 1 builds and packs the five packages (`lib`, `compact-readonly`, `compact-modify`, `core`, `compact`); stage 2 installs the tarballs together, so the siblings are this build and every other dependency comes from the registry. |
-| `docker/Dockerfile.package` + `docker-compose.package.yml` | Installs the tarballs you put in `docker/packages/` — typically the published `core`, packed from the registry. |
-| `docker/Dockerfile.inspect` + `docker-compose.inspect.yml` | The published `core` from the registry behind `mcp-proxy`, with no destination: the image Glama builds for inspecting the tools. Not for deployment. |
+| `docker/Dockerfile` + `docker-compose.yml`, `docker-compose.headerless.yml` | **Two stages.** Stage 1 installs `@mcp-abap-adt/core` and `@mcp-abap-adt/compact` from npm into their own prefix; stage 2 copies that installation into a clean runtime image, without npm's cache. The version is the build argument `MCP_ABAP_ADT_VERSION` (default `latest`). |
+| `docker/Dockerfile.inspect` + `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, with no destination: the image Glama builds for inspecting the tools. Not for deployment. |
 
-All are `node:22-bookworm-slim` and run as the unprivileged `node` user. The builds need BuildKit (the
-default builder of current Docker) for `RUN --mount`.
+Both are `node:22-bookworm-slim` and run as the unprivileged `node` user.
 
-## Quick start (from the checkout)
+## Quick start
 
 From the repository root:
 
@@ -42,6 +41,13 @@ npm run docker:logs
 npm run docker:down
 ```
 
+Without the repository: `docker build -f Dockerfile -t mcp-abap-adt .` in a directory holding the
+Dockerfile, then `docker run -p 3000:3000 mcp-abap-adt`.
+
+**A version:** `MCP_ABAP_ADT_VERSION=<version>` in `docker/.env` (see `docker/.env.example`), or
+`docker build --build-arg MCP_ABAP_ADT_VERSION=<version> …`. `latest` is resolved when the image is
+built: rebuild (`docker compose build --no-cache`) to take a newer release.
+
 The MCP endpoint is `http://localhost:3000/mcp/stream/http`. The image's command is
 `mcp-abap-adt --allow-destination-header`: a client names its destination per request with
 `x-mcp-destination`. Add `--mcp=<destination>` to the compose `command` for a default one. For the
@@ -49,20 +55,6 @@ compact server, make the command `mcp-abap-adt-compact` with the same arguments.
 
 `npm run docker:up:headerless` (`docker-compose.headerless.yml`) runs the same image with no
 destinations at all: every request carries its system in headers (see below).
-
-## Quick start (published package)
-
-```bash
-npm run docker:pack            # npm pack @mcp-abap-adt/core into docker/packages/
-npm run docker:build:package
-npm run docker:up:package
-```
-
-`docker/packages/` may hold more than one tarball — `lib` and `core` packed from one build, the compact
-packages too — and they are installed together; what is not there comes from the registry. To pin a
-version: `npm pack @mcp-abap-adt/core@<version> --pack-destination docker/packages`. Without the
-compose `command`, `Dockerfile.package` starts `--transport=stdio` with no destination:
-inspection-only mode.
 
 ## Configuration
 
@@ -73,7 +65,7 @@ The process environment of the container is the server's process environment; se
 
 | Variable | Meaning |
 |---|---|
-| `MCP_TRANSPORT` | `stdio`, `http` or `sse`. `docker/Dockerfile` sets `http`. |
+| `MCP_TRANSPORT` | `stdio`, `http` or `sse`. The image sets `http`. |
 | `MCP_HTTP_HOST` | Listen address. The images set `0.0.0.0`; the server's own default, `127.0.0.1`, is unreachable from outside a container. |
 | `MCP_HTTP_PORT` | Listen port, default `3000`. Change the `ports:` mapping with it. |
 | `AUTH_BROKER_PATH` | Base directory of `service-keys/` and `sessions/` (one directory). The images set `/app`. |
@@ -138,8 +130,6 @@ the container and mount the session with `--unsafe`, or hand a token per request
 |---|---|
 | `docker:build`, `docker:up`, `docker:down`, `docker:logs` | `docker compose -f docker/docker-compose.yml …` |
 | `docker:build:headerless`, `docker:up:headerless`, `docker:down:headerless` | the same with `docker-compose.headerless.yml` |
-| `docker:pack` | empties `docker/packages/` and packs the published `@mcp-abap-adt/core` into it |
-| `docker:build:package`, `docker:up:package`, `docker:down:package` | the same with `docker-compose.package.yml` |
 
 **Health:** `GET /mcp/health` answers `{"status":"ok",…}`; the images and compose files probe it.
 
@@ -149,7 +139,7 @@ The inspector runs any code it is sent: never expose it beyond your own machine.
 ## Security
 
 - Never commit `service-keys/` or `sessions/`; mount service keys read-only (the compose files do).
-  They are also kept out of the build context (`.dockerignore`).
+  The build context is `docker/`, and the image copies nothing from it.
 - To keep the port on the host's loopback, map it there (`"127.0.0.1:3000:3000"`). Setting
   `MCP_HTTP_HOST=127.0.0.1` inside the container makes the server unreachable instead.
 - A reverse proxy in front of the container (TLS termination, access control) passes requests to

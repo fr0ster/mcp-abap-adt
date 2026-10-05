@@ -71,9 +71,6 @@ Thumbs.db
 
 # Package files
 *.tgz
-# ...except the tarballs Dockerfile.package installs (*.tgz above matches the
-# context root only; this keeps them in if it ever becomes **/*.tgz)
-!docker/packages/*.tgz
 
 # Config files not needed in container
 sk.json

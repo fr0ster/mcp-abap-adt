@@ -131,11 +131,7 @@
     "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
     "docker:build:headerless": "docker compose -f docker/docker-compose.headerless.yml build",
     "docker:up:headerless": "docker compose -f docker/docker-compose.headerless.yml up -d",
-    "docker:down:headerless": "docker compose -f docker/docker-compose.headerless.yml down",
-    "docker:pack": "node -e \"const fs=require('node:fs');fs.rmSync('docker/packages',{recursive:true,force:true});fs.mkdirSync('docker/packages',{recursive:true})\" && npm pack @mcp-abap-adt/core --pack-destination docker/packages",
-    "docker:build:package": "docker compose -f docker/docker-compose.package.yml build",
-    "docker:up:package": "docker compose -f docker/docker-compose.package.yml up -d",
-    "docker:down:package": "docker compose -f docker/docker-compose.package.yml down"
+    "docker:down:headerless": "docker compose -f docker/docker-compose.headerless.yml down"
   },
   "keywords": [
     "abap",

@@ -21,9 +21,12 @@ Every step gates the run; none is `continue-on-error`.
 
 **On Ubuntu / Node 22 only:**
 - `npm audit --omit=dev --audit-level=high`
-- `npm pack` and `npm pack ./server` (the `lib` and `core` tarballs)
-- an install of both tarballs into an empty directory, a check that `core` resolved the `lib`
-  built in that run (not another one from the registry), and `mcp-abap-adt --help`.
+- `npm pack` of all five packages (`lib`, `compact-readonly`, `compact-modify`, `core`, `compact`)
+- an install of the five tarballs into an empty directory, a check that no package resolved a
+  sibling other than the one built in that run (a nested copy is one the registry supplied), and
+  `mcp-abap-adt --help`, `mcp-abap-adt-compact --version`
+- `docker build -f docker/Dockerfile` — the image installs the published packages from npm, so this
+  checks the Dockerfile, not this run's code — and both commands' `--version` in it.
 
 ## Release (`release.yml`)
 

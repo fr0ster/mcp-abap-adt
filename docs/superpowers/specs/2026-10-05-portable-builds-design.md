@@ -96,10 +96,19 @@ how the RFC addon and the SDK are found.
 ## Build and release
 
 - `scripts/portable/` — bundle (esbuild), SEA config, inject (postject), addon patching, archive.
-  `npm run portable:build` builds the current platform; it needs the SDK at `SAPNWRFC_HOME` (for the
+  **What is built is chosen by the command**, always for the current platform:
+
+  | Command | Builds |
+  |---|---|
+  | `npm run portable:build:full` | the full server: `mcp-abap-adt-<version>-<platform>` |
+  | `npm run portable:build:compact` | the compact server: `mcp-abap-adt-compact-<version>-<platform>` |
+  | `npm run portable:build` | both |
+
+  The three are one script with the server as its argument (`scripts/portable/build.mjs full|compact|all`);
+  an unknown argument is refused, naming the three. CI runs the same commands. Each build needs the SDK at `SAPNWRFC_HOME` (for the
   addon) and a C++ toolchain, the same prerequisites as building `sap-rfc-lite` today.
 - `.github/workflows/portable.yml` — three jobs (`windows-latest`, `macos-latest` (arm64),
-  `ubuntu-latest`). Each fetches its SDK archive from private storage, builds, smoke-tests and uploads
+  `ubuntu-latest`). Each fetches its SDK archive from private storage, runs `npm run portable:build`, smoke-tests and uploads
   the archive. On a `v*.*.*` tag the archives are attached to the GitHub Release; on a pull request
   they are build artifacts only.
 - **SDK in CI:** the three SDK archives live as assets of a release in a private repository; the job

@@ -1,59 +1,96 @@
 # MCP ABAP ADT Server - Installation Guide
 
-Complete installation guide for MCP ABAP ADT Server across different platforms.
+How to install the server, which variant to install, and what each variant needs on the machine.
+Platform walk-throughs: [Windows](./platforms/INSTALL_WINDOWS.md), [macOS](./platforms/INSTALL_MACOS.md),
+[Linux](./platforms/INSTALL_LINUX.md). RFC and SNC in detail: [RFC Setup](RFC_SETUP.md).
 
-## 📋 Quick Links
+## Installation variants
 
-- **[Windows Installation](./platforms/INSTALL_WINDOWS.md)** - Using PowerShell and winget
-- **[macOS Installation](./platforms/INSTALL_MACOS.md)** - Using Homebrew
-- **[Linux Installation](./platforms/INSTALL_LINUX.md)** - Using package managers
+Two choices make a variant: **which server** and **how it connects to the ABAP system**. They are
+independent — either server connects every way.
 
-## 🎯 What You'll Get
+### Which server
 
-After installation, you'll be able to:
-- Work with SAP ABAP systems through MCP protocol
-- Integrate ABAP development with AI tools (Cline, Cursor, GitHub Copilot)
-- Use 50+ ABAP tools via natural language
+| Package | What it is | Command |
+|---|---|---|
+| [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | **The full server**: one tool per object type and operation (`CreateClass`, `GetTable`, …), in the `readonly`, `high` and `low` sets. | `mcp-abap-adt` |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | **The compact server**: one tool per operation, the object type in the arguments (`HandlerCreate` with `object_type`) — a short tool list for a host that cannot select tools per request. Configuration is the full server's. | `mcp-abap-adt-compact` |
+| [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib), [`compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Libraries, not servers: the tool handlers and an embeddable server for your own application. | — |
 
-## 🔧 Prerequisites
+### How it connects
 
-All platforms require:
-- **Node.js** 22 or later
-- **npm** (comes with Node.js)
-- **Git**
-- Access to SAP ABAP system (on-premise or BTP)
+| Connection | Authentication (`SAP_AUTH_TYPE`) | What the machine needs besides Node.js |
+|---|---|---|
+| **HTTP** (default) | `basic`, or `jwt` (browser login with a service key, or a token you hold) | Nothing. |
+| **RFC** (`SAP_CONNECTION_TYPE=rfc`) | `basic` | The SAP NW RFC SDK and a C++ build toolchain **at install time** — the RFC module is compiled by `npm install`. |
+| **SNC** (RFC, passwordless) | `snc` | Everything RFC needs, plus an SNC product logged on — typically SAP Secure Login Client. No user, no password in the `.env`. |
 
-## � Installation Methods
+The authentications in full: [Authentication & Destinations](../user-guide/AUTHENTICATION.md).
 
-There are two main ways to install MCP ABAP ADT Server:
+### What to run
 
-### Method 1: Install from Pre-built Package (Recommended for Production)
-
-Download and install from a pre-built `.tgz` package:
+**HTTP** — full or compact:
 
 ```bash
-# Download the package (replace URL with actual location)
-# Or receive it from your administrator
-
-# Install globally (recommended)
-npm install -g ./mcp-abap-adt-core-<version>.tgz
-
-# Or install locally in your project
-npm install ./mcp-abap-adt-core-<version>.tgz
+npm install -g @mcp-abap-adt/core        # mcp-abap-adt
+npm install -g @mcp-abap-adt/compact     # mcp-abap-adt-compact
 ```
 
-After installation, you'll have access to:
-- `mcp-abap-adt` - MCP ABAP ADT Server (default: stdio mode)
-- `mcp-abap-adt --transport=stdio` - stdio transport (for MCP clients)
-- `mcp-abap-adt --transport=http` - HTTP server transport
-- `mcp-abap-adt --transport=sse` - SSE transport
+**RFC and SNC** — the same command, run **after** the SDK and the toolchain are in place and with
+`SAPNWRFC_HOME` set in the shell that runs it:
+
+```bash
+# Linux / macOS
+export SAPNWRFC_HOME=/path/to/nwrfcsdk
+npm install -g @mcp-abap-adt/core        # or @mcp-abap-adt/compact
+```
+
+```powershell
+# Windows (PowerShell)
+$env:SAPNWRFC_HOME = "C:\nwrfcsdk\nwrfcsdk"
+$env:PATH = "$env:SAPNWRFC_HOME\lib;$env:PATH"
+npm install -g @mcp-abap-adt/core        # or @mcp-abap-adt/compact
+```
+
+Then check that the RFC module is there:
+
+```bash
+npm ls -g @mcp-abap-adt/sap-rfc-lite
+```
+
+**`(empty)` means the server was installed without RFC.** `@mcp-abap-adt/sap-rfc-lite` is an optional
+dependency, and when it cannot be compiled — no SDK, `SAPNWRFC_HOME` unset, no compiler — npm drops it
+and still reports success. The server then starts with every tool and refuses the first RFC call with
+`@mcp-abap-adt/sap-rfc-lite is not available`. Fix the cause and run the install again. The toolchain per
+platform, the runtime settings and the SNC prerequisites: [RFC Setup](RFC_SETUP.md).
+
+### HTTPS certificates
+
+The server verifies the certificate of an `https://` system (from 17.0.0). A system whose certificate is
+self-signed or issued by a company CA is refused at its first request until Node.js trusts that CA:
+point `NODE_EXTRA_CA_CERTS` at a PEM file holding it, in the environment of the server process. Turning
+verification off is `TLS_REJECT_UNAUTHORIZED=0` in that same environment — a destination's `.env` is not
+read for either. See [Migrating to 17.0.0](../MIGRATION-17.0.md).
+
+## Prerequisites
+
+- **Node.js** 22 or 24, with **npm** 9 or later
+- Access to an SAP ABAP system (on-premise or BTP)
+- For RFC and SNC: see the table above
+- Git only to build from source
+
+## Installing
+
+After `npm install -g @mcp-abap-adt/core` you have the `mcp-abap-adt` command (default: stdio);
+`--transport=http` and `--transport=sse` serve the other MCP transports. `@mcp-abap-adt/compact` gives
+`mcp-abap-adt-compact`, which takes the same options.
 
 **To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` and `mcp-sso` ship in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
 ```bash
 npm install -g @mcp-abap-adt/auth-broker-cli
 mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
 ```
-A `jwt` `.env` must state `SAP_GRANT_TYPE`. For RFC (including SNC) the optional dependency `@mcp-abap-adt/sap-rfc-lite` and the SAP NW RFC SDK are needed: see [RFC Setup](RFC_SETUP.md).
+A `jwt` `.env` must state `SAP_GRANT_TYPE`.
 
 **Get help on available options:**
 ```bash
@@ -87,14 +124,21 @@ npm install -g @mcp-abap-adt/auth-broker-cli
 mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
 ```
 
+For RFC with basic authentication, add `SAP_CONNECTION_TYPE=rfc` to the basic `.env` above.
+
 For SNC (passwordless logon over RFC; no user, no password):
 ```bash
-SAP_URL=https://your-sap-system.example
+SAP_URL=http://your-sap-system.example:8000
 SAP_CLIENT=100
+SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
+# Creates need a responsible person: no login is known over SNC
+SAP_RESPONSIBLE=<your ABAP user>
 ```
-SNC logs on over RFC only: add `SAP_CONNECTION_TYPE=rfc` to this `.env`, or start with `--connection-type=rfc`.
+Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`). For a URL
+whose port follows no such rule (an `https` port such as `44300`), set `SAP_SYSNR` in the process
+environment. See [RFC Setup](RFC_SETUP.md).
 
 **Run the server:**
 ```bash
@@ -103,7 +147,7 @@ SNC logs on over RFC only: add `SAP_CONNECTION_TYPE=rfc` to this `.env`, or star
 # and per request on HTTP/SSE with the x-mcp-destination header (--allow-destination-header)
 mcp-abap-adt
 
-# stdio mode (for MCP clients, requires a .env file, --env, --env-path or --mcp)
+# stdio mode (for MCP clients, requires --env, --env-path or --mcp)
 # Example: mcp-abap-adt --transport=stdio --mcp=TRIAL
 mcp-abap-adt --transport=stdio
 
@@ -127,189 +171,36 @@ mcp-abap-adt --transport=http --port=8080
 Nothing is looked up in the working directory: a server started inside someone else's project must not take
 their settings. A `.env` there is read only when you name it (`--env-path=./.env`).
 
-See [Package Installation Guide](#package-installation-details) below for detailed instructions.
-
-### Method 2: Install from Source (Recommended for Development)
-
-Clone the repository and build from source:
+### From source (development)
 
 ```bash
-# Clone with submodules
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
+git clone https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
-
-# Install dependencies and build
-npm install
+npm install          # set SAPNWRFC_HOME first if you want RFC
 npm run build
-
-# Run the server
-npm start
+npm test             # unit tests; integration tests need a system, see docs/development/tests
 ```
 
-This method is recommended if you want to:
-- Contribute to development
-- Customize the server
-- Build your own package
-
----
-
-## �🚀 Quick Start
-
-Choose your platform:
-
-### Windows
-```powershell
-# Install Node.js via winget
-winget install OpenJS.NodeJS.LTS
-
-# Clone with submodules and build
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
-cd mcp-abap-adt
-npm install
-npm run build
-```
-
-### macOS
-```bash
-# Install Node.js via Homebrew
-brew install node
-
-# Clone with submodules and build
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
-cd mcp-abap-adt
-npm install
-npm run build
-```
-
-### Linux
-```bash
-# Install Node.js (Ubuntu/Debian)
-curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
-sudo apt-get install -y nodejs
-
-# Clone with submodules and build
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
-cd mcp-abap-adt
-npm install
-npm run build
-```
-
-### 📦 Working with Git Submodules
-
-This project uses a git submodule for the `@mcp-abap-adt/connection` package. If you've already cloned the repository without submodules, initialize them:
+The checkout is not runnable as a server by itself: `server/` and `compact/` take `@mcp-abap-adt/lib` as a
+package. To run what you built, pack it and install the tarballs together:
 
 ```bash
-# Initialize and update submodules
-git submodule update --init --recursive
+npm pack                                  # @mcp-abap-adt/lib
+(cd server && npm pack)                   # @mcp-abap-adt/core
+npm install -g ./mcp-abap-adt-lib-<version>.tgz ./server/mcp-abap-adt-core-<version>.tgz
 ```
-
-To update submodules to their latest commits:
-
-```bash
-# Update all submodules
-# Dependencies are automatically installed via npm install
-# To update to latest versions, run:
-npm update @mcp-abap-adt/connection @mcp-abap-adt/adt-clients
-```
-
-## ⚠️ Important: Workspace Setup
-
-This project uses **npm workspaces** to manage multiple packages (`@mcp-abap-adt/connection`, `@mcp-abap-adt/adt-clients`). 
-
-**❌ DO NOT run `npm install` in individual package directories!**
-
-**✅ Correct installation process:**
-
-1. **Only run `npm install` in the root directory:**
-   ```bash
-   cd mcp-abap-adt
-   npm install
-   ```
-   This will automatically install dependencies for all workspace packages.
-
-2. **Build all packages from root:**
-   ```bash
-   npm run build
-   ```
-   This will build all workspace packages in the correct order, then build the main project.
-
-**Why?** 
-- npm workspaces automatically link packages together
-- Running `npm install` in root installs all dependencies for all packages
-- The build script ensures packages are built in the correct order (dependencies first)
-- Using `npx tsc` ensures TypeScript is found from `node_modules` without global installation
-
-**If you get errors:**
-- `tsc: command not found` → Make sure you ran `npm install` in the root directory (TypeScript is in `devDependencies`)
-- `Cannot find module '@mcp-abap-adt/connection'` → Run `npm install` in root, then `npm run build` (packages need to be built first)
 
 ---
 
 ## 📦 Package Installation Details
-
-### Installing from Pre-built Package
-
-The pre-built package (`mcp-abap-adt-core-<version>.tgz`) contains everything you need to run the server without building from source.
-
-#### Prerequisites
-- Node.js 22 or later
-- npm 9 or later
-
-#### Global Installation (Recommended)
-
-Install globally to use commands from anywhere:
-
-```bash
-# Install from local package file
-npm install -g ./mcp-abap-adt-core-<version>.tgz
-
-# Verify installation
-mcp-abap-adt --help
-mcp-abap-adt --transport=http --help
-mcp-abap-adt --transport=sse --help
-```
-
-**Available commands after global installation:**
-
-```bash
-# Default stdio mode (HTTP/SSE require --transport=http/--transport=sse)
-mcp-abap-adt
-
-# A named destination: service-keys/TRIAL.json + sessions/TRIAL.env
-mcp-abap-adt --mcp=TRIAL
-
-# stdio mode (for MCP clients, requires a .env file, --env, --env-path or --mcp)
-mcp-abap-adt --transport=stdio
-
-# One .env file, read and written back with a renewed token
-mcp-abap-adt --env-path=/path/to/.env
-
-# HTTP server transport
-mcp-abap-adt --transport=http --port=3000
-
-# SSE transport
-mcp-abap-adt --transport=sse --port=3001
-```
-
-**To write a `.env` for JWT authentication**, install the CLI separately (`mcp-auth` and `mcp-sso` ship in `@mcp-abap-adt/auth-broker-cli`, not in `@mcp-abap-adt/auth-broker`):
-```bash
-npm install -g @mcp-abap-adt/auth-broker-cli
-mcp-auth generate-env --grant authorization_code   # `mcp-auth --help` lists the other flags
-```
-A `jwt` `.env` must state `SAP_GRANT_TYPE`. For RFC (including SNC) the optional dependency `@mcp-abap-adt/sap-rfc-lite` and the SAP NW RFC SDK are needed: see [RFC Setup](RFC_SETUP.md).
 
 #### Local Installation (Project-specific)
 
 Install in your project directory:
 
 ```bash
-# Navigate to your project
 cd /path/to/your/project
-
-# Install the package
-npm install /path/to/mcp-abap-adt-core-<version>.tgz
-
-# Use via npx
+npm install @mcp-abap-adt/core
 npx mcp-abap-adt --transport=http --port=3000
 ```
 
@@ -529,7 +420,7 @@ To update to a newer version:
 npm uninstall -g @mcp-abap-adt/core
 
 # Install new version
-npm install -g ./mcp-abap-adt-core-<version>.tgz
+npm install -g @mcp-abap-adt/core   # with SAPNWRFC_HOME set again, for RFC
 ```
 
 #### Troubleshooting Package Installation
@@ -553,7 +444,7 @@ $env:PATH += ";$(npm config get prefix)"
 Solution:
 ```bash
 # Use sudo for global installation
-sudo npm install -g ./mcp-abap-adt-core-<version>.tgz
+sudo npm install -g @mcp-abap-adt/core
 
 # Or configure npm to use a different directory (recommended)
 mkdir ~/.npm-global
@@ -562,7 +453,7 @@ echo 'export PATH=~/.npm-global/bin:$PATH' >> ~/.bashrc
 source ~/.bashrc
 
 # Then install without sudo
-npm install -g ./mcp-abap-adt-core-<version>.tgz
+npm install -g @mcp-abap-adt/core
 ```
 
 ---

@@ -172,9 +172,11 @@ sent with an empty responsible. A missing master
 system is never refused: the attribute is left out and the system applies itself, as in 15.x. A read is
 never refused for either.
 
-**The one exception: a message class.** adt-clients' message class create takes no responsible (15.x the
-same), so a message class is created with the system's own default responsible, whatever is stated, and
-is never refused for a missing one.
+**There is no exception.** Up to 16.0.x a message class was created with the system's own default
+responsible and never refused, because adt-clients' message class create took none. From 17.0.0 it
+sends the responsible like every other create (adt-clients 25.0.1), and is refused the same way when
+none is found — and so is a program's test include (`CreateProgramUnitTest`), whose include create
+now receives the same context.
 
 ## HTTP/SSE headers
 

@@ -58,6 +58,8 @@ Documentation for developers: testing, development guides, and internal document
 - **Getting Started**: [Installation Guide](installation/INSTALLATION.md)
 - **User Configuration**: [Client Configuration](user-guide/CLIENT_CONFIGURATION.md)
 - **Authentication**: [Destinations & Auth](user-guide/AUTHENTICATION.md)
+- **Installation variants** (full or compact; HTTP, RFC or SNC): [Installation Guide](installation/INSTALLATION.md#installation-variants) | [RFC Setup](installation/RFC_SETUP.md)
+- **Upgrading from 16.x**: [Migration to 17.0](MIGRATION-17.0.md)
 - **Upgrading from 15.x**: [Migration to 16.0](MIGRATION-16.0.md)
 - **Terminology**: [Project Terms](user-guide/TERMINOLOGY.md)
 - **Handlers Management**: [Handler Groups](user-guide/HANDLERS_MANAGEMENT.md)

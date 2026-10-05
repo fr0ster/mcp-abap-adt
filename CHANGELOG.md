@@ -7,6 +7,62 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
+
+### Breaking
+
+- **The HTTPS server certificate is verified** (`@mcp-abap-adt/connection` 11). Up to 16.0.x the server
+  accepted any certificate unless `TLS_REJECT_UNAUTHORIZED` or `NODE_TLS_REJECT_UNAUTHORIZED` was `1`; a
+  system with a self-signed or company-CA certificate is now refused at its first request. Trust the CA
+  with `NODE_EXTRA_CA_CERTS`, or opt out with `TLS_REJECT_UNAUTHORIZED=0` — both in the process
+  environment: a destination's `.env` is not copied into it, so a line there is not read (it was not
+  on 16.x either). RFC, SNC and plain `http://` are unaffected.
+- **`CreateMessageClass` and `CreateProgramUnitTest` need a responsible person**, like every other create
+  since 16.0.0. `@mcp-abap-adt/adt-clients` 25.0.1 sends `adtcore:responsible` from the system context for
+  a message class and for an include, where 24.x sent none and the system filled its own default; with
+  no responsible found (SNC or a token you hold, no `SAP_RESPONSIBLE`) both are now refused with
+  `system_context_missing` before the create is sent.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` `~25.0.1`** (was `~24.1.0`; still pinned to a minor, for the same
+  reason), **`@mcp-abap-adt/adt-strategies` `^0.7.0`** and **`@mcp-abap-adt/interfaces-adt` `^12.0.1`**,
+  which move together — one copy of the contract in the tree. From adt-clients 25: `getVersions()` reaches
+  the history of DDL sources, access controls, function includes and table types (it asked an address
+  SAP answers `404`); a namespaced enhancement is no longer encoded twice; a function module reference
+  without its group is refused by the client too, before any request. `RunATC` takes the same seven
+  object types: interfaces-adt 12's program and include kinds are not offered by the tool yet.
+- **`@mcp-abap-adt/auth-broker` `^4.1.0`, `auth-providers` `^5.4.0`, `auth-stores` `^3.3.0`,
+  `interfaces-auth` `^3.2.0`, `interfaces-auth-broker` `^1.2.0`.** Nothing the server serves changes. A
+  malformed service key file no longer puts its bytes — a client secret, a private key — into the
+  thrown error and the log (Node's `JSON.parse` quotes its input); a log line about a failed SNC library
+  lookup or a failed probe carries fixed words instead of the error's message. The x509 service keys
+  these releases add are not served yet.
+- `@mcp-abap-adt/interfaces-adt-connection` `^1.0.1`, `interfaces-network` `^2.0.1`, `interfaces-utils`
+  `^1.1.1` (built from the registry, contract unchanged); `@modelcontextprotocol/sdk` `^1.32.0`,
+  `dotenv` `^18.0.5`, `fast-xml-parser` `^5.11.2`, `pino` `^10.4.0`, `pino-pretty` `^13.2.0`; dev:
+  `@biomejs/biome` `^2.5.15`, `@modelcontextprotocol/inspector` `^2.9.0`, `@types/node` `^22.20.5`.
+  TypeScript stays on 6.x and `@types/node` on 22, as SAP's toolchain does.
+
+### Documentation
+
+- **Installation variants, in one place**: `docs/installation/INSTALLATION.md` opens with the full
+  (`@mcp-abap-adt/core`) and the compact (`@mcp-abap-adt/compact`) server, and with what HTTP, RFC and
+  SNC each need on the machine; the README, the platform guides, the compact READMEs and the package
+  descriptions point at it.
+- **RFC: the SDK, a C++ toolchain and `SAPNWRFC_HOME` come before `npm install`.** `@mcp-abap-adt/sap-rfc-lite`
+  ships no prebuilt binary and is compiled during the install; when it cannot be, npm leaves the optional
+  dependency out and reports success, and the server refuses only the first RFC call. Measured
+  2026-10-05 on clean installs from the registry. `RFC_SETUP.md` now gives the toolchain per platform,
+  the check (`npm ls -g @mcp-abap-adt/sap-rfc-lite`), the runtime `PATH` on Windows, `SAP_SYSNR` for a
+  port that does not say the system number, how the SNC library is found, and a troubleshooting entry
+  per failure. It installed `sap-rfc-lite` locally for a global server and checked it with a `require`
+  that resolves from the working directory; both are gone.
+- The platform guides no longer put `TLS_REJECT_UNAUTHORIZED=0` in their sample `.env` (it was never
+  read from there), no longer install from a `.tgz` or through git submodules, and no longer advise
+  `--no-optional`. The README's development commands (`npm start`, `npm run start:http`) named scripts
+  that do not exist; running a build from a checkout is described instead.
+
 ## [16.0.1] - 2026-10-04
 
 ### Fixed

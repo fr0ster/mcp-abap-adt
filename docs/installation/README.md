@@ -4,7 +4,8 @@ This directory contains installation guides for the MCP ABAP ADT Server.
 
 ## Files
 
-- **[INSTALLATION.md](INSTALLATION.md)** - Main installation guide with platform-specific quick links
+- **[INSTALLATION.md](INSTALLATION.md)** - Main installation guide: the [installation variants](INSTALLATION.md#installation-variants) (full or compact server; HTTP, RFC or SNC) and the commands for each
+- **[RFC_SETUP.md](RFC_SETUP.md)** - RFC and SNC: the C++ toolchain, the SAP NW RFC SDK, `SAPNWRFC_HOME` before the install, the check, SNC prerequisites
 - **[CLINE_CONFIGURATION.md](CLINE_CONFIGURATION.md)** - Cline client configuration examples
 - **[platforms/](platforms/)** - Platform-specific installation guides
   - `INSTALL_WINDOWS.md` - Windows installation using PowerShell and winget

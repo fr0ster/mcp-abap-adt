@@ -193,7 +193,7 @@ Adding an authentication means a handler there, a row in this table and a test; 
 - Stateful/stateless session switching via `sap-contextid` headers
 - Cookie management for session persistence
 - A `401` the wire's own recovery cannot clear is put to the credential (`rejected`); if it answers Ok (a renewed token), the request gets one more attempt
-- TLS configuration respecting `NODE_TLS_REJECT_UNAUTHORIZED`
+- The HTTPS server certificate verified by default (connection 11); `TLS_REJECT_UNAUTHORIZED=0` or `NODE_TLS_REJECT_UNAUTHORIZED=0` in the process environment opts out, `NODE_EXTRA_CA_CERTS` adds a CA
 - Retry logic for transient errors
 
 ---

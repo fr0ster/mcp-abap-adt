@@ -123,6 +123,7 @@
     "portable:build": "node scripts/portable/build.mjs all",
     "portable:build:full": "node scripts/portable/build.mjs full",
     "portable:build:compact": "node scripts/portable/build.mjs compact",
+    "portable:smoke": "node scripts/portable/smoke.mjs",
     "package": "npm pack",
     "package:build": "npm run build && npm pack",
     "prepare": "husky",

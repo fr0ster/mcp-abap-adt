@@ -1,6 +1,6 @@
 # @mcp-abap-adt/compact-readonly
 
-Compact read-only tools — 13 tools that change nothing.
+Compact read-only tools — 16 tools that change nothing.
 
 > **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
 
@@ -9,7 +9,7 @@ Compact read-only tools — 13 tools that change nothing.
 A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
-`HandlerCreate` with `object_type`. Twenty-two tool schemas instead of hundreds.
+`HandlerCreate` with `object_type`. Twenty-five tool schemas instead of hundreds.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP

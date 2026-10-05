@@ -16,6 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image is pinned to `@mcp-abap-adt/core@17.0.0` (it installed `latest`). `glama.json` names the variants.
   `docs/deployment/RELEASE.md` makes these a step of the release PR and gives `mcp-publisher` one command
   per registry entry.
+- **The compact tool counts are the ones the server lists**: 25 tools, 16 that change nothing
+  (`@mcp-abap-adt/compact-readonly`, `--exposition=ro`) and 9 that write (`compact-modify`). The READMEs and
+  the package description said 22 and 13; the generated tool page takes its count from the tool list.
 
 ## [17.0.0] - 2026-10-05
 

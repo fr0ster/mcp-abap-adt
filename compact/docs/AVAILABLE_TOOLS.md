@@ -11,7 +11,7 @@ definitions a client receives.
 ## How it works
 
 One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with
-`object_type: "CLASS"` rather than a `CreateClass` tool. 22 schemas instead of
+`object_type: "CLASS"` rather than a `CreateClass` tool. 25 schemas instead of
 the object-oriented surface's hundreds, for a host that cannot select tools
 per request.
 

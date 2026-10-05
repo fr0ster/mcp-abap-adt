@@ -1,13 +1,13 @@
 # @mcp-abap-adt/compact
 
-The compact MCP server — the command that serves all 22.
+The compact MCP server — the command that serves all 25.
 
 ## What compact is
 
 A different decomposition of the same ABAP ADT surface: the **operation** is the
 tool and the object moves into the arguments. Where the object-oriented surface has
 `CreateClass`, `CreateDomain`, `CreateDdl` and so on, compact has one
-`HandlerCreate` with `object_type`. Twenty-two tool schemas instead of hundreds.
+`HandlerCreate` with `object_type`. Twenty-five tool schemas instead of hundreds.
 
 It exists for a host that **cannot build a retrieval pipeline of its own** — a small
 context, no tool-RAG, no way to select tools per request — and must still drive ABAP

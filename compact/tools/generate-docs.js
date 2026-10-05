@@ -136,7 +136,7 @@ function page(entries) {
   md +=
     'One tool per OPERATION, with the object in `object_type`: `HandlerCreate` with\n';
   md +=
-    '`object_type: "CLASS"` rather than a `CreateClass` tool. 22 schemas instead of\n';
+    `\`object_type: "CLASS"\` rather than a \`CreateClass\` tool. ${entries.length} schemas instead of\n`;
   md +=
     "the object-oriented surface's hundreds, for a host that cannot select tools\n";
   md += 'per request.\n\n';

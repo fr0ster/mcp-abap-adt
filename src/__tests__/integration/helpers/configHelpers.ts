@@ -369,6 +369,43 @@ export function getSharedDependenciesConfig(): any {
 }
 
 /**
+ * Where `name` is a shared dependency — `shared_dependencies.<kind>`, or
+ * `package` for the shared package — or undefined. Case-insensitive: ADT
+ * names are.
+ */
+export function sharedDependencyKind(name: string): string | undefined {
+  const shared = getSharedDependenciesConfig();
+  if (!shared || !name) return undefined;
+  const wanted = String(name).toUpperCase();
+  if (String(shared.package ?? '').toUpperCase() === wanted) return 'package';
+  for (const [kind, list] of Object.entries(shared)) {
+    if (!Array.isArray(list)) continue;
+    if (
+      list.some(
+        (item: any) => String(item?.name ?? '').toUpperCase() === wanted,
+      )
+    ) {
+      return kind;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * A test that creates and deletes an object of its own must never be pointed
+ * at a shared one: it would delete what other suites depend on. Thrown before
+ * any request, naming the config entry to change.
+ */
+export function assertNotSharedDependency(what: string, name: string): void {
+  const kind = sharedDependencyKind(name);
+  if (kind) {
+    throw new Error(
+      `${what} ${name} is a shared dependency (shared_dependencies.${kind}) — this test creates and deletes its own object, so it must have a name of its own in tests/test-config.yaml (see the template)`,
+    );
+  }
+}
+
+/**
  * Resolve a shared dependency by type and name.
  * @param type - 'tables' | 'views' | 'behavior_definitions'
  * @param name - Object name (e.g., "ZMCP_SHR_TABLE01")

@@ -30,7 +30,10 @@ const testsLogger = createTestLogger('shared-teardown');
 describe('Admin: Teardown shared dependencies', () => {
   let connection: IAbapConnection;
   let client: AdtClient;
-  let hasConfig = false;
+  // An admin script runs only when asked for (npm run shared:*), so a system
+  // it cannot reach is a failure, not a skip: a green run that did nothing
+  // reads as "the shared objects are torn down".
+  let connectionError: Error | undefined;
 
   beforeAll(async () => {
     try {
@@ -39,27 +42,25 @@ describe('Admin: Teardown shared dependencies', () => {
       await primeSystemContext(connection);
       const systemCtx = getSystemContext();
       client = createAdtClient(connection);
-      hasConfig = true;
     } catch (error: any) {
-      testsLogger?.warn?.(
-        `Skipping: No SAP configuration found: ${error.message}`,
-      );
-      hasConfig = false;
+      connectionError = error;
     }
   });
 
   it(
     'should delete all shared dependencies in reverse order',
     async () => {
-      if (!hasConfig) {
-        testsLogger?.warn?.('Skipping: SAP not configured');
-        return;
+      if (connectionError) {
+        throw new Error(
+          `No connection to the system, nothing was torn down: ${connectionError.message}`,
+        );
       }
 
       const sharedConfig = getSharedDependenciesConfig();
       if (!sharedConfig) {
-        testsLogger?.warn?.('Skipping: No shared_dependencies in config');
-        return;
+        throw new Error(
+          'No shared_dependencies in tests/test-config.yaml, nothing to do',
+        );
       }
 
       const config = loadTestConfig();

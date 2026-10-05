@@ -16,7 +16,7 @@ import { handleRuntimeListFeeds } from '../../../../handlers/system/readonly/han
 import { handleRuntimeListProfilerTraceFiles } from '../../../../handlers/system/readonly/handleRuntimeListProfilerTraceFiles';
 import { handleRuntimeRunClassWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunClassWithProfiling';
 import { handleRuntimeRunProgramWithProfiling } from '../../../../handlers/system/readonly/handleRuntimeRunProgramWithProfiling';
-import { getTimeout } from '../../helpers/configHelpers';
+import { getTimeout, sharedDependencyKind } from '../../helpers/configHelpers';
 import { candidatesWorthOpening } from '../../helpers/dumpFeed';
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { createTestConnectionAndSession } from '../../helpers/sessionHelpers';
@@ -156,6 +156,13 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         if (!className) {
           throw new Error('profiled_class_name is not configured');
         }
+        // The class must be the runnable one shared:setup creates; any other
+        // class runs nothing and leaves no trace, which reads as a server fault.
+        if (sharedDependencyKind(className) !== 'classes') {
+          throw new Error(
+            `profiled_class_name ${className} is not a shared class (shared_dependencies.classes): point it at the profiled class shared:setup creates — see the template`,
+          );
+        }
         const args = {
           class_name: className,
           description: `MCP_RUNTIME_CLASS_${Date.now()}`,
@@ -180,7 +187,11 @@ describe('Runtime Profiling and Dumps Handlers Integration', () => {
         expect(run.isError).toBe(false);
         const data = parseTextPayload(run);
         expect(data.success).toBe(true);
-        expect(data.trace_id).toBeTruthy();
+        if (!data.trace_id) {
+          throw new Error(
+            `the run of ${className} answered no trace id: ${JSON.stringify(data)}`,
+          );
+        }
         createdTraceIds.add(String(data.trace_id).toUpperCase());
         logger?.info(`class ${className} traced: ${data.trace_id}`);
       });

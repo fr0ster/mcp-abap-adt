@@ -33,6 +33,7 @@ import { handleDeleteFunctionInclude } from '../../../../handlers/function_inclu
 import { handleUpdateFunctionInclude } from '../../../../handlers/function_include/high/handleUpdateFunctionInclude';
 import { handleReadFunctionInclude } from '../../../../handlers/function_include/readonly/handleReadFunctionInclude';
 import {
+  assertNotSharedDependency,
   getCleanupAfter,
   getCleanupAfterRun,
   getEnabledTestCase,
@@ -120,6 +121,8 @@ describe('FunctionInclude High-Level Handlers Integration', () => {
       }
 
       const functionGroupName = testCase.params.function_group_name;
+      // This test creates the group and deletes it again: never a shared one.
+      assertNotSharedDependency('function group', functionGroupName);
       const includeName = testCase.params.include_name;
       const description =
         testCase.params.description || 'Custom include for lifecycle test';

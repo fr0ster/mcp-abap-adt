@@ -110,6 +110,16 @@ Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
   instead of defaulting to `./.env`. `ClassCrudClientDirect`, which builds its own connection, primes the system
   context itself; it passed only through what an auth-broker setup left in the process, and failed the
   responsible guard with a destination read from `environment.env`.
+- **A test that creates and deletes its own object never touches a shared one.** `assertNotSharedDependency`
+  refuses, before any request, a name listed in `shared_dependencies`: the function-include suite was
+  configured onto the shared function group, which it would have created and deleted, and the views a
+  BDEF suite creates are checked the same way. `deleteView` runs in cleanup whether or not the run created
+  the view, so it no longer deletes a shared one — it reports it, and the run fails naming it. A BDEF suite
+  whose test case lacks `root_view_name` / `root_view_source` says so, instead of `view undefined`; the
+  profiling suite requires its class to be the shared, runnable one and shows the answer when no trace id
+  comes back.
+- **`npm run shared:setup` and `shared:teardown` fail when they cannot reach the system** or the config has
+  no `shared_dependencies`. They passed, having done nothing — a green run that read as "set up".
 - The release notes linked `doc/installation/…`; the workflows checked out submodules the repository
   no longer has (the empty `.gitmodules` is removed).
 

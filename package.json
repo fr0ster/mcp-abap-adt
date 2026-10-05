@@ -1,6 +1,6 @@
 {
   "name": "@mcp-abap-adt/lib",
-  "version": "16.0.1",
+  "version": "17.0.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

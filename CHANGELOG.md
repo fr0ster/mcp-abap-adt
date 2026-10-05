@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [17.0.0] - 2026-10-05
+
+The dependency update to `@mcp-abap-adt/adt-clients` 25 and `@mcp-abap-adt/connection` 11, which verifies the
+HTTPS certificate of the SAP system. The installation documentation is rebuilt around the variants — the full
+or the compact server, over HTTP, RFC or SNC — and the Docker image installs the published server from npm.
+All five packages (`lib`, `core`, `compact`, `compact-readonly`, `compact-modify`) are 17.0.0.
+
 Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
 
 ### Breaking

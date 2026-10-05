@@ -14,6 +14,8 @@ The `mcp-abap-adt` server supports multiple transport modes:
 
 For HTTP-based transports (streamable-http and sse), you can configure SAP connection parameters via HTTP headers, allowing dynamic connection configuration per request.
 
+For stdio, the client starts the server itself: `mcp-abap-adt` (or `mcp-abap-adt-compact`, or `npx -y @mcp-abap-adt/core`) with `--env-path=<file>` or `--mcp=<destination>`. Configurations for the full and compact server, RFC/SNC and a company CA: [Cline configuration](../installation/CLINE_CONFIGURATION.md) and [examples](../installation/examples/README.md).
+
 ### Methods That Require SAP Configuration
 
 **Only `tools/call` requires SAP configuration** - all other MCP methods work without SAP connection:
@@ -43,7 +45,7 @@ This means you can query available tools, get tool descriptions, and initialize 
 
 ### Configuration with SAP Connection Headers
 
-When using HTTP transport, a request can carry its own connection. The headers state the system and **one** credential; the authentication is decided by which credential is present, so there is no `x-sap-auth-type`:
+When using HTTP transport, a request can carry its own connection. The headers state the system and **one** credential; the authentication is decided by which credential is present, so no header states it:
 
 ```json
 {
@@ -81,7 +83,7 @@ When using HTTP transport, a request can carry its own connection. The headers s
 - **Precedence per request:** `x-mcp-destination` (with `--allow-destination-header`), then the `x-sap-*` connection headers, then the default destination.
 - A destination name is a plain file name (letters, digits, `_`, `.`, `-`; no path, no leading dot). Anything else is refused with `400`, naming the header.
 - For a token that is renewed for you, use a destination with browser login (below), not a header.
-- The headers `x-sap-destination`, `x-sap-auth-type` and `x-sap-refresh-token` are no longer read in 16.0; see the [migration note](../MIGRATION-16.0.md).
+- 16.0 stopped reading the earlier headers for a destination, an authentication type and a refresh token; see the [migration note](../MIGRATION-16.0.md).
 
 ## Basic Authentication
 
@@ -211,14 +213,16 @@ Every parameter, with its environment and YAML forms, is in [CLI_OPTIONS.md](CLI
 The server can be started in HTTP mode with:
 
 ```bash
-npm run start:http
-# or
-node dist/index.js --transport streamable-http --port 3000
+mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
+# or without installing
+npx -y @mcp-abap-adt/core --transport=http --port=3000 --env-path=/path/to/<destination>.env
 ```
+
+`mcp-abap-adt-compact` takes the same options.
 
 ### Environment Variables
 
-Alternatively, you can configure the server via environment variables in a `.env` file.
+The connection lives in a `.env` file the server is told about (`--env-path`, `--env` or `--mcp`). Of that file only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE` and `SAP_LANGUAGE` reach the process environment; process-level settings (`NODE_EXTRA_CA_CERTS`, `SAP_SYSNR`, `PATH` for the RFC SDK on Windows) belong in the shell or the MCP client's `env` block.
 
 **For a JWT you hold:**
 ```env
@@ -376,21 +380,13 @@ SAP_SYSTEM_TYPE=onprem
 # Optional: SAP_RESPONSIBLE (defaults to SAP_USERNAME), SAP_MASTER_SYSTEM (else left out)
 ```
 
-In Claude Code (`claude_desktop_config.json` or `mcp.json`):
+In Claude Code (`claude_desktop_config.json` or `mcp.json`), name that file — the connection is not read from the `env` block:
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
-      "args": ["--transport=stdio"],
-      "env": {
-        "SAP_URL": "http://your-sap-system:8000",
-        "SAP_AUTH_TYPE": "basic",
-        "SAP_USERNAME": "JSMITH",
-        "SAP_PASSWORD": "secret",
-        "SAP_CLIENT": "100",
-        "SAP_SYSTEM_TYPE": "onprem"
-      }
+      "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"]
     }
   }
 }
@@ -422,7 +418,7 @@ For Server-Sent Events transport, the configuration is similar:
     "disabled": false,
     "timeout": 60,
     "type": "sse",
-    "url": "http://localhost:3001/mcp/events",
+    "url": "http://localhost:3001/sse",
     "headers": {
       "x-sap-url": "https://your-sap-system.example",
       "x-sap-jwt-token": "your_jwt_token_here"
@@ -438,7 +434,7 @@ For Server-Sent Events transport, the configuration is similar:
     "disabled": false,
     "timeout": 60,
     "type": "sse",
-    "url": "http://localhost:3001/mcp/events",
+    "url": "http://localhost:3001/sse",
     "headers": {
       "x-sap-url": "https://your-onpremise-system.com:8000",
       "x-sap-login": "your_username",

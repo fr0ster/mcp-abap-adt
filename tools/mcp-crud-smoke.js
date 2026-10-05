@@ -32,12 +32,11 @@ Options:
   --delete-tool=<name>           Delete tool name (default: DeleteProgramLow)
 
 Stdio options:
-  --stdio-command=<cmd>          Command to spawn (default: node)
+  --stdio-command=<cmd>          Command to spawn (default: mcp-abap-adt, the installed server)
   --stdio-arg=<arg>              Repeat for each arg
                                  default args:
-                                   dist/server/launcher.js
                                    --transport=stdio
-                                   --env=.env
+                                   --env-path=.env
                                    --exposition=readonly,high,low
 
 Examples:
@@ -228,13 +227,12 @@ async function createTransport(args) {
       args.stdioArgs.length > 0
         ? args.stdioArgs
         : [
-            'dist/server/launcher.js',
             '--transport=stdio',
-            '--env=.env',
+            '--env-path=.env',
             '--exposition=readonly,high,low',
           ];
     return new StdioClientTransport({
-      command: args.stdioCommand || 'node',
+      command: args.stdioCommand || 'mcp-abap-adt',
       args: stdioArgs,
       cwd: process.cwd(),
       stderr: 'inherit',
@@ -279,7 +277,6 @@ async function main() {
     const envPath = String(hard.env_path);
     if (envPath.trim()) {
       args.stdioArgs = [
-        'dist/server/launcher.js',
         '--transport=stdio',
         `--env-path=${envPath}`,
         '--exposition=readonly,high,low',

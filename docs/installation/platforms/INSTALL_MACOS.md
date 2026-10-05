@@ -5,6 +5,7 @@ Complete guide for installing MCP ABAP ADT Server on macOS using Homebrew.
 ## 📋 Prerequisites
 
 - macOS 10.15 (Catalina) or later
+- Node.js 22 or 24
 - Terminal access
 - Administrator privileges
 
@@ -46,17 +47,16 @@ echo '[ -s "/opt/homebrew/opt/nvm/etc/bash_completion.d/nvm" ] && \. "/opt/homeb
 source ~/.zshrc
 ```
 
-2. **Install Node.js LTS:**
+2. **Install Node.js 24 (or 22):**
 
 ```bash
-# Install latest LTS version
-nvm install --lts
+nvm install 24
 
 # Use the installed version
-nvm use --lts
+nvm use 24
 
 # Set as default
-nvm alias default lts/*
+nvm alias default 24
 
 # Verify installation
 node -v
@@ -66,15 +66,16 @@ npm -v
 ### Option 2: Using Homebrew (Direct)
 
 ```bash
-# Install Node.js LTS directly
-brew install node
+# Install Node.js 24 (plain `node` may be a newer release than 22/24)
+brew install node@24
+# node@24 is keg-only: follow the PATH line `brew info node@24` prints
 
 # Verify installation
 node -v
 npm -v
 ```
 
-## 📦 Step 3: Install Git
+## 📦 Step 3: Install Git (only to build from source)
 
 ```bash
 # Install Git (if not already installed)
@@ -86,22 +87,17 @@ git --version
 
 ## 🚀 Step 4: Install MCP ABAP ADT Server
 
-You have two installation options:
-
-### Option A: Install from Pre-built Package (Recommended)
-
-Install from a pre-built `.tgz` package file:
-
-**Global Installation (Recommended):**
+### Option A: Install from npm (Recommended)
 
 ```bash
-# Download or obtain the package file
-# Then install globally
-npm install -g ./mcp-abap-adt-core-<version>.tgz
+npm install -g @mcp-abap-adt/core
 
 # Verify installation
 mcp-abap-adt --help
 ```
+
+`@mcp-abap-adt/compact` (command `mcp-abap-adt-compact`) is the alternative compact server; it takes
+the same configuration. See [Installation variants](../INSTALLATION.md#installation-variants).
 
 **Available commands after installation:**
 - `mcp-abap-adt` - stdio transport (default)
@@ -120,21 +116,8 @@ mcp-abap-adt --transport=http --port=8080
 # SSE server accessible from network
 mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3000
 
-# Use custom .env file
-mcp-abap-adt --transport=http --env /path/to/custom/.env --port=8080
-```
-
-**Local Installation (Project-specific):**
-
-```bash
-# Navigate to your project
-cd /path/to/your/project
-
-# Install package locally
-npm install /path/to/mcp-abap-adt-core-<version>.tgz
-
-# Use via npx
-npx mcp-abap-adt --transport=http --port=3000
+# Use a custom .env file
+mcp-abap-adt --transport=http --env-path=/path/to/custom/.env --port=8080
 ```
 
 **Troubleshooting:**
@@ -149,54 +132,52 @@ export PATH="$(npm config get prefix)/bin:$PATH"
 source ~/.zshrc  # or source ~/.bash_profile
 ```
 
-### Option B: Install from Source (For Development)
-
-Clone and build from source code:
+### Option B: Build from Source (For Development)
 
 ```bash
-# Clone repository with submodules
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
+git clone https://github.com/fr0ster/mcp-abap-adt.git
 cd mcp-abap-adt
-
-# If you already cloned without submodules, initialize them:
-# git submodule update --init --recursive
-
-# Install dependencies
 npm install
-
-# Build project
 npm run build
-
-# Verify installation
-npm test
 ```
+
+The checkout is not runnable as a server by itself; to run what you built, see
+[From source (development)](../INSTALLATION.md#from-source-development).
+
+### RFC and SNC
+
+RFC and SNC need, **before** `npm install -g`: the SAP NW RFC SDK, a C++ toolchain, and
+`SAPNWRFC_HOME` set in the shell that runs the install.
+
+- **Toolchain:** `xcode-select --install`.
+- **SDK:** the macOS ARM package on Apple Silicon (x64 on Intel).
+- **SNC:** the library is found at `/Applications/Secure Login Client.app/Contents/MacOS/lib/libsapcrypto.dylib`.
+
+```bash
+export SAPNWRFC_HOME=~/nwrfcsdk
+npm install -g @mcp-abap-adt/core
+npm ls -g @mcp-abap-adt/sap-rfc-lite
+```
+
+`(empty)` from `npm ls` means npm silently dropped the RFC module. Details and the SNC `.env`:
+[RFC Setup](../RFC_SETUP.md).
 
 ## ⚙️ Step 5: Configure SAP Connection
 
-Create `.env` file in project root:
-
-```bash
-# Copy template
-cp .env.template .env
-
-# Edit with your favorite editor
-nano .env
-# or
-vim .env
-# or
-code .env  # if you have VS Code
-```
-
-Example `.env` content:
+Create a `.env` file anywhere (the server reads nothing from the working directory) and start the
+server with `--env-path=<file>`:
 
 ```env
-SAP_URL=https://your-sap-system.com:8000
+SAP_URL=https://your-sap-system.example:8000
 SAP_CLIENT=100
 SAP_LANGUAGE=en
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your_username
 SAP_PASSWORD=your_password
-TLS_REJECT_UNAUTHORIZED=0
+```
+
+```bash
+mcp-abap-adt --env-path=/path/to/your/your-system.env
 ```
 
 > **No `SAP_TIMEOUT_DEFAULT` here on purpose.** The sample used to set it to
@@ -334,7 +315,7 @@ Server will be available at: `http://localhost:8080/mcp/stream/http`
     "type": "streamableHttp",
     "url": "http://localhost:3000/mcp/stream/http",
     "headers": {
-      "x-sap-url": "https://your-sap-system.com:8000",
+      "x-sap-url": "https://your-sap-system.example:8000",
       "x-sap-login": "your_username",
       "x-sap-password": "your_password",
       "x-sap-client": "100"
@@ -400,11 +381,10 @@ Server will be available at: `http://127.0.0.1:4100/sse`
 ## ✅ Step 7: Test Installation
 
 ```bash
-# Run test suite
-npm test
+mcp-abap-adt --help
 
-# Test specific connection
-node tests/test-connection.js
+# In a source checkout: run the unit tests
+npm test
 ```
 
 ## 🐛 Troubleshooting
@@ -426,24 +406,22 @@ Check and switch Node.js versions:
 brew install nvm
 
 # Install specific Node.js version
-nvm install 18
-nvm use 18
+nvm install 24
+nvm use 24
 ```
 
 ### SSL/TLS certificate errors
 
-Set in `.env`:
-
-```env
-TLS_REJECT_UNAUTHORIZED=0
-```
-
-Or install certificates:
+From 17.0.0 the server verifies the HTTPS certificate of the SAP system. For a self-signed or
+company-CA certificate, trust the CA in the environment of the server process (the MCP client's
+`env` block, or the shell that starts the server):
 
 ```bash
-# Update certificates
-brew install ca-certificates
+export NODE_EXTRA_CA_CERTS=/path/to/ca.pem
 ```
+
+Opting out is `TLS_REJECT_UNAUTHORIZED=0` in that same process environment — only on a trusted
+network. A destination's `.env` is not read for either. See [Migrating to 17.0.0](../../MIGRATION-17.0.md).
 
 ### Permission denied errors
 

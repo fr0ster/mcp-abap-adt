@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Publish both packages of this repository to npm, in dependency order.
+# Publish the five packages of this repository to npm, in dependency order.
 #
 # Usage: npm run release:publish            (add --dry-run to rehearse)
 #
 # Same shape as llm-agent's scripts/publish-all.sh, deliberately: one command,
 # already-published versions skipped, abort on the first failure.
 #
-# The two packages are NOT npm workspaces here, and that is on purpose —
+# The packages are NOT npm workspaces here, and that is on purpose —
 # declaring the workspace pulls @mcp-abap-adt/lib into the root install, and a
 # version not yet on the registry makes a plain `npm install` fail with a 404.
 # So each is published by path instead; `npm publish <folder>` runs that
 # package's own prepublishOnly.
 #
 # On the first publish a browser window may open for 2FA. Tick "trust this
-# device for 5 minutes" and the second package goes through without a prompt.
+# device for 5 minutes" and the rest go through without a prompt.
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
@@ -56,7 +56,7 @@ for dir in "${PACKAGES[@]}"; do
   if [ "$status" -ne 0 ]; then
     echo >&2
     echo "ERROR: 'npm publish' failed for $name@$version (exit $status)." >&2
-    echo "Aborting: the remaining package will NOT be published." >&2
+    echo "Aborting: the remaining packages will NOT be published." >&2
     echo "A 404/401/403 here usually means the npm login / 2FA session dropped —" >&2
     echo "re-authenticate ('npm whoami' to check, 'npm login' to renew) and re-run." >&2
     echo "Already-published packages are detected and skipped on the next run." >&2

@@ -7,6 +7,122 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
+
+### Breaking
+
+- **The HTTPS server certificate is verified** (`@mcp-abap-adt/connection` 11). Up to 16.0.x the server
+  accepted any certificate unless `TLS_REJECT_UNAUTHORIZED` or `NODE_TLS_REJECT_UNAUTHORIZED` was `1`; a
+  system with a self-signed or company-CA certificate is now refused at its first request. Trust the CA
+  with `NODE_EXTRA_CA_CERTS`, or opt out with `TLS_REJECT_UNAUTHORIZED=0` — both in the process
+  environment: a destination's `.env` is not copied into it, so a line there is not read (it was not
+  on 16.x either). RFC, SNC and plain `http://` are unaffected.
+- **`CreateMessageClass` and `CreateProgramUnitTest` need a responsible person**, like every other create
+  since 16.0.0. `@mcp-abap-adt/adt-clients` 25.0.1 sends `adtcore:responsible` from the system context for
+  a message class and for an include, where 24.x sent none and the system filled its own default; with
+  no responsible found (SNC or a token you hold, no `SAP_RESPONSIBLE`) both are now refused with
+  `system_context_missing` before the create is sent.
+
+### Changed
+
+- **`@mcp-abap-adt/adt-clients` `~25.0.1`** (was `~24.1.0`; still pinned to a minor, for the same
+  reason), **`@mcp-abap-adt/adt-strategies` `^0.7.0`** and **`@mcp-abap-adt/interfaces-adt` `^12.0.1`**,
+  which move together — one copy of the contract in the tree. From adt-clients 25: `getVersions()` reaches
+  the history of DDL sources, access controls, function includes and table types (it asked an address
+  SAP answers `404`); a namespaced enhancement is no longer encoded twice; a function module reference
+  without its group is refused by the client too, before any request. `RunATC` takes the same seven
+  object types: interfaces-adt 12's program and include kinds are not offered by the tool yet.
+- **`@mcp-abap-adt/auth-broker` `^4.1.0`, `auth-providers` `^5.4.0`, `auth-stores` `^3.3.0`,
+  `interfaces-auth` `^3.2.0`, `interfaces-auth-broker` `^1.2.0`.** Nothing the server serves changes. A
+  malformed service key file no longer puts its bytes — a client secret, a private key — into the
+  thrown error and the log (Node's `JSON.parse` quotes its input); a log line about a failed SNC library
+  lookup or a failed probe carries fixed words instead of the error's message. The x509 service keys
+  these releases add are not served yet.
+- `@mcp-abap-adt/interfaces-adt-connection` `^1.0.1`, `interfaces-network` `^2.0.1`, `interfaces-utils`
+  `^1.1.1` (built from the registry, contract unchanged); `@modelcontextprotocol/sdk` `^1.32.0`,
+  `dotenv` `^18.0.5`, `fast-xml-parser` `^5.11.2`, `pino` `^10.4.0`, `pino-pretty` `^13.2.0`; dev:
+  `@biomejs/biome` `^2.5.15`, `@modelcontextprotocol/inspector` `^2.9.0`, `@types/node` `^22.20.5`.
+  TypeScript stays on 6.x and `@types/node` on 22, as SAP's toolchain does.
+
+### Documentation
+
+- **Installation variants, in one place**: `docs/installation/INSTALLATION.md` opens with the full
+  (`@mcp-abap-adt/core`) and the compact (`@mcp-abap-adt/compact`) server, and with what HTTP, RFC and
+  SNC each need on the machine; the README, the platform guides, the compact READMEs and the package
+  descriptions point at it.
+- **RFC: the SDK, a C++ toolchain and `SAPNWRFC_HOME` come before `npm install`.** `@mcp-abap-adt/sap-rfc-lite`
+  ships no prebuilt binary and is compiled during the install; when it cannot be, npm leaves the optional
+  dependency out and reports success, and the server refuses only the first RFC call. Measured
+  2026-10-05 on clean installs from the registry. `RFC_SETUP.md` now gives the toolchain per platform,
+  the check (`npm ls -g @mcp-abap-adt/sap-rfc-lite`), the runtime `PATH` on Windows, `SAP_SYSNR` for a
+  port that does not say the system number, how the SNC library is found, and a troubleshooting entry
+  per failure. It installed `sap-rfc-lite` locally for a global server and checked it with a `require`
+  that resolves from the working directory; both are gone.
+- The platform guides no longer put `TLS_REJECT_UNAUTHORIZED=0` in their sample `.env` (it was never
+  read from there), no longer install from a `.tgz` or through git submodules, and no longer advise
+  `--no-optional`. The README's development commands (`npm start`, `npm run start:http`) named scripts
+  that do not exist; running a build from a checkout is described instead.
+- **Client configuration examples** (`docs/installation/examples/`, the Cline and client guides) use
+  `--env-path` for a path (`--env` takes a sessions-store name), and cover the variants: full and compact
+  server, RFC/SNC with the process-level `env` block, a company CA. Checkout-based configs
+  (`dist/index.js`, `bin/mcp-abap-adt.js`) and duplicate npx variants are gone; the HTTP and SSE examples
+  carry their paths (`/mcp/stream/http`, `/sse`).
+- **Docker and release docs** match the files: the image has no RFC SDK, so RFC and SNC are not
+  available in it; `NODE_EXTRA_CA_CERTS` / `TLS_REJECT_UNAUTHORIZED` are container environment; npm
+  publishing is `npm run release:publish` of the five packages in dependency order; `MCP_REGISTRY.md`
+  covers `server.json` and `server-compact.json`.
+
+### Fixed
+
+- **`@mcp-abap-adt/compact` can be registered in the MCP Registry**: it had no `mcpName`, and
+  `server-compact.json` still named 14.0.1 with a description over the registry's 100 characters.
+- `server.json` / `server-compact.json` described a `.env` in the working directory as a fallback; nothing
+  has been read from there since 16.0.0.
+- **The Docker image starts again, and installs the server from npm.** `docker/Dockerfile` built only
+  the library (`build:fast`) and ran `dist/server/launcher.js`, which no build produces, so
+  `docker-compose.yml` and `docker-compose.headerless.yml` could not start. Nothing is built now: stage 1
+  installs the published `@mcp-abap-adt/core` and `@mcp-abap-adt/compact` with `npm install -g` into
+  their own prefix (build argument `MCP_ABAP_ADT_VERSION`, default `latest`), stage 2 copies that
+  installation into a clean runtime image and runs `mcp-abap-adt` as the `node` user. The Node inspector
+  is no longer open on `0.0.0.0:9229` by default. The build context is `docker/`, and its
+  `.dockerignore` sends only the Dockerfiles — never `service-keys/`, `sessions/` or a `.env`.
+  `Dockerfile.inspect` installs the published `core` behind a pinned `mcp-proxy` instead of building a
+  fixed commit from 2025. `Dockerfile.package` and `docker-compose.package.yml`, a second way to the same
+  npm package, are removed. Built and run on 2026-10-05: HTTP `initialize` and the tool list answer,
+  the health check reports healthy.
+- **`npm run docker:*` and `npm run smoke:mcp:*` run from the repository root.** They were declared in
+  `server/package.json` with paths relative to `server/`, where neither `docker/` nor `tools/` is; so were
+  `start`, `start:http`, `start:sse`, `dev`, `dev:http`, `dev:sse` and `kill-ports`, which ran a checkout
+  that cannot run and are removed, with the `tools/dev-*.js` launchers they called.
+  `tools/mcp-crud-smoke.js` spawns the installed `mcp-abap-adt` for stdio by default.
+- **CI packs and installs all five packages** and checks that no package took a sibling from the
+  registry instead of this build; it packed only `lib` and `core`. It also builds the Docker image
+  and runs both commands in it.
+- `--help`: a message class is no longer described as the exception to the responsible rule, and the RFC
+  requirement says the module is compiled by `npm install`.
+- The compose health checks asked `/health`; the server answers `/mcp/health`.
+- **The integration tests read no `.env` from the working directory or the repository root.** `environment.env`
+  in `tests/test-config.yaml` is a sessions-store name, as the docs said, resolved exactly as
+  `--env=<name>` (under `auth_broker.paths.service_keys_dir`, else the platform directory); it was
+  resolved against the repository root, and a missing destination fell back to a `.env` in the working
+  directory or the root — the lookup the server dropped in 16.0.0. Hard mode passes the same file to the
+  server (`--env` / `--env-path`, with `--auth-broker-path`) and refuses to start without a destination
+  instead of defaulting to `./.env`. `ClassCrudClientDirect`, which builds its own connection, primes the system
+  context itself; it passed only through what an auth-broker setup left in the process, and failed the
+  responsible guard with a destination read from `environment.env`.
+- **A test that creates and deletes its own object never touches a shared one.** `assertNotSharedDependency`
+  refuses, before any request, a name listed in `shared_dependencies`: the function-include suite was
+  configured onto the shared function group, which it would have created and deleted, and the views a
+  BDEF suite creates are checked the same way. `deleteView` runs in cleanup whether or not the run created
+  the view, so it no longer deletes a shared one — it reports it, and the run fails naming it. A BDEF suite
+  whose test case lacks `root_view_name` / `root_view_source` says so, instead of `view undefined`; the
+  profiling suite requires its class to be the shared, runnable one and shows the answer when no trace id
+  comes back.
+- **`npm run shared:setup` and `shared:teardown` fail when they cannot reach the system** or the config has
+  no `shared_dependencies`. They passed, having done nothing — a green run that read as "set up".
+- The release notes linked `doc/installation/…`; the workflows checked out submodules the repository
+  no longer has (the empty `.gitmodules` is removed).
+
 ## [16.0.1] - 2026-10-04
 
 ### Fixed

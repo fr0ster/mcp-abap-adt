@@ -2,7 +2,7 @@
 
 # Git
 .git/
-.gitignore
+# .gitignore stays: biome reads it during the build (vcs.useIgnoreFile)
 .gitmodules
 .gitattributes
 
@@ -34,6 +34,11 @@ Makefile
 # Build artifacts (will be built in Docker)
 dist/
 node_modules/
+
+# Credentials and sessions never enter the build context
+service-keys/
+sessions/
+backups/
 
 # Environment files (should be provided at runtime)
 .env
@@ -70,7 +75,7 @@ Thumbs.db
 # Config files not needed in container
 sk.json
 smithery.yaml
-.npmrc
+# .npmrc stays: legacy-peer-deps and install-strategy shape the install
 jest.config.js
 jest.setup.js
 # tsconfig.json is needed for build, so don't ignore it

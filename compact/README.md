@@ -48,6 +48,8 @@ tool list to `@mcp-abap-adt/core`'s launcher rather than reimplementing it. The
 object-oriented command no longer accepts `--exposition=compact`; it refuses the
 value and names this package.
 
+**RFC and SNC** work here exactly as in the full server, and need the same preparation **before** `npm install -g @mcp-abap-adt/compact`: the SAP NW RFC SDK, a C++ toolchain and `SAPNWRFC_HOME` set in the shell — the RFC module is compiled during the install and silently left out when it cannot be. Check with `npm ls -g @mcp-abap-adt/sap-rfc-lite`. Steps: [RFC Setup](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/RFC_SETUP.md); every variant: [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
+
 The tool page is generated from the built packages: `docs/AVAILABLE_TOOLS.md`
 (`npm run docs:tools`).
 

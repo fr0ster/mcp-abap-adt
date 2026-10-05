@@ -1,8 +1,8 @@
 {
   "mcpServers": {
-    "mcp-abap-adt": {
-      "url": "http://localhost:3001",
-      "transport": "sse",
+    "mcp-abap-adt-sse": {
+      "type": "sse",
+      "url": "http://localhost:3001/sse",
       "disabled": false
     }
   }

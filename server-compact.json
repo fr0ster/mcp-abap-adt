@@ -1,24 +1,24 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "io.github.fr0ster/mcp-abap-adt-compact",
-  "description": "MCP server for SAP ABAP ADT, compact facade: one tool per operation with the object in the arguments — 22 tools for a host that cannot select tools per request",
+  "description": "Compact MCP server for SAP ABAP ADT over HTTP, RFC or SNC: one tool per operation, object in args",
   "repository": {
     "url": "https://github.com/fr0ster/mcp-abap-adt",
     "source": "github"
   },
-  "version": "14.0.1",
+  "version": "16.0.1",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@mcp-abap-adt/compact",
-      "version": "14.0.1",
+      "version": "16.0.1",
       "transport": {
         "type": "stdio"
       },
       "environmentVariables": [
         {
           "name": "MCP_ENV_PATH",
-          "description": "Path to the .env file that states the destination (the same as the --env-path argument). The file states SAP_URL and SAP_AUTH_TYPE (basic, snc or jwt); a jwt file also states SAP_GRANT_TYPE (authorization_code or none). Without this, --mcp or a .env in the working directory, the server starts in tool-inspection-only mode: SAP_* variables in the process environment alone form no destination.",
+          "description": "Path to the .env file that states the destination (the same as the --env-path argument). The file states SAP_URL and SAP_AUTH_TYPE (basic, snc or jwt); a jwt file also states SAP_GRANT_TYPE (authorization_code or none). Without this or --mcp, the server starts in tool-inspection-only mode: nothing is read from the working directory, and SAP_* variables in the process environment alone form no destination.",
           "format": "string",
           "placeholder": "/path/to/system.env"
         },

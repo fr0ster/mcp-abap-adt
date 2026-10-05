@@ -1,15 +1,11 @@
-version: '3.8'
-
 # MCP ABAP ADT Server - Header-based authentication only
-# Uses v2 server with proper destination header handling
 #
 # This configuration expects all authentication parameters to be passed
 # via HTTP headers in each request. No service keys or sessions needed.
 #
 # Required headers for each request:
-# - x-mcp-destination: Destination name (requires --allow-destination-header flag)
-# OR
 # - x-sap-url: SAP system URL
+# and
 # - x-sap-jwt-token: a JWT you hold (used as it is; the server cannot renew it)
 # OR
 # - x-sap-login: Username (for basic auth)
@@ -19,9 +15,12 @@ version: '3.8'
 
 services:
   mcp-abap-adt:
+    # Installs the published packages from npm; nothing of the checkout goes in.
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MCP_ABAP_ADT_VERSION: ${MCP_ABAP_ADT_VERSION:-latest}
     image: mcp-abap-adt:headerless
     container_name: mcp-abap-adt-headerless
     restart: unless-stopped
@@ -35,6 +34,9 @@ services:
       - NODE_ENV=production
       - MCP_HTTP_PORT=3000
       - MCP_HTTP_HOST=0.0.0.0
+
+    # No destinations: x-mcp-destination is not honoured here
+    command: ["mcp-abap-adt"]
 
     # No volumes needed - all auth via headers
 
@@ -50,7 +52,7 @@ services:
 
     # Healthcheck
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/mcp/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 5s
       retries: 3

@@ -2,6 +2,8 @@
 
 Compact modifying tools — 9 tools that write, lock, activate or execute.
 
+> **A library, not a server.** To run the compact server, install [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) (`mcp-abap-adt-compact`); see [Installation variants](https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md#installation-variants).
+
 ## What compact is
 
 A different decomposition of the same ABAP ADT surface: the **operation** is the

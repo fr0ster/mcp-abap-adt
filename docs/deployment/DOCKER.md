@@ -1,347 +1,153 @@
 # Docker Deployment Guide
 
-This guide explains how to deploy MCP ABAP ADT Server using Docker with destination-based authentication.
+How to run the server in a container, with the files in [`docker/`](../../docker/). Both servers are
+in the images: `mcp-abap-adt` (the full one, `@mcp-abap-adt/core`) and `mcp-abap-adt-compact`
+(`@mcp-abap-adt/compact`).
 
-## Quick Start
+## What works in a container
 
-### Prerequisites
+| | In the images of `docker/` |
+|---|---|
+| HTTP connection (`SAP_CONNECTION_TYPE=http`) | Yes |
+| HTTPS with your own CA, or without verification | Yes — container environment variables, see [TLS](#tls) |
+| RFC connection, SNC | **No** — see [RFC and SNC](#rfc-and-snc) |
+| Browser login (`jwt` / `authorization_code`) | Not inside the container — see [Login](#login) |
+| Basic auth, a token you hold | Yes — in a destination or per request in headers |
 
-- Docker and Docker Compose installed
-- SAP BTP ABAP Environment service key
+## The images
 
-### Two Deployment Options
+The images install the server the way a user does — the **published packages from npm**, with
+`npm install -g`. Nothing of this checkout goes into them: the build context is the `docker/`
+directory and the Dockerfile reads nothing from it.
 
-**Option 1: Using Published Package (Recommended)**
-- Simpler and faster
-- Uses pre-built npm package
-- Best for production use
+| File | What it is |
+|---|---|
+| `docker/Dockerfile` + `docker-compose.yml`, `docker-compose.headerless.yml` | **Two stages.** Stage 1 installs `@mcp-abap-adt/core` and `@mcp-abap-adt/compact` from npm into their own prefix; stage 2 copies that installation into a clean runtime image, without npm's cache. The version is the build argument `MCP_ABAP_ADT_VERSION` (default `latest`). |
+| `docker/Dockerfile.inspect` + `docker-compose.inspect.yml` | The published `core` behind `mcp-proxy`, with no destination: the image Glama builds for inspecting the tools. Not for deployment. |
 
-**Option 2: Building from Source**
-- For development
-- Custom modifications
-- Latest unreleased code
+Both are `node:22-bookworm-slim` and run as the unprivileged `node` user.
 
-### Setup
+## Quick start
 
-1. **Navigate to docker directory**:
-   ```bash
-   cd docker
-   ```
-
-2. **Create service keys directory and add your service key**:
-   ```bash
-   mkdir -p service-keys
-   # Add your service key file (get from SAP BTP)
-   cp /path/to/your-key.json service-keys/trial.json
-   ```
-
-3. **Configure environment**:
-   ```bash
-   cp .env.example .env
-   # The destination is chosen by the container command (--mcp=trial in the compose file),
-   # not by an environment variable
-   ```
-
-4. **Start the server**:
-   
-   **Using npm package (recommended)**:
-   ```bash
-   docker-compose -f docker-compose.package.yml up -d
-   ```
-   
-   **Or from source**:
-   ```bash
-   docker-compose up -d
-   ```
-
-5. **Verify it's running**:
-   ```bash
-   docker-compose logs -f
-   curl http://localhost:3000/health
-   ```
-
-## Architecture
-
-### How It Works
-
-The Docker deployment uses:
-
-1. **Service Keys** (`./service-keys/{destination}.json`):
-   - Mounted as read-only volume
-   - Contains OAuth2 credentials for SAP system
-   - Never committed to git (.gitignore)
-
-2. **Destination**:
-   - Chosen by the container command: `--mcp=<name>` (an own default destination), a YAML `mcp` key passed with `--config`, or `x-mcp-destination` per request with `--allow-destination-header` (the Dockerfile's default command)
-   - The server reads no environment variable for it
-   - Example: `--mcp=trial` uses `service-keys/trial.json`
-   - `AUTH_BROKER_PATH=/app` (set in the compose files) makes `/app/service-keys` and `/app/sessions` the directories it reads
-
-3. **Login**: a browser login needs a browser and a reachable callback port (default `61001`), which a container does not have by default. Obtain the session outside the container and mount `sessions/`, or hand a token in a header (`x-sap-url` and `x-sap-jwt-token`).
-
-### Container Configuration
-
-```
-Container: mcp-abap-adt-server
-├── Port: 3000 (HTTP)
-├── Transport: streamable-http
-├── Volumes:
-│   ├── ./service-keys:/app/service-keys (ro)  # Service keys
-├── Command: --mcp=<name> and/or --allow-destination-header
-└── Environment:
-    ├── MCP_HTTP_PORT (default: 3000)
-    └── AUTH_BROKER_PATH (/app in the compose files)
-```
-
-## Service Key Format
-
-Your service key should be in ABAP environment format:
-
-```json
-{
-  "uaa": {
-    "url": "https://your-account.authentication.region.hana.ondemand.com",
-    "clientid": "your-client-id",
-    "clientsecret": "your-client-secret"
-  },
-  "url": "https://your-abap-system.abap.region.hana.ondemand.com",
-  "abap": {
-    "url": "https://your-abap-system.abap.region.hana.ondemand.com"
-  }
-}
-```
-
-Save this as `service-keys/{destination}.json` (e.g., `service-keys/trial.json`)
-
-## Common Operations
-
-### Start Server
-```bash
-docker-compose up -d
-```
-
-### View Logs
-```bash
-docker-compose logs -f
-```
-
-### Stop Server
-```bash
-docker-compose down
-```
-
-### Restart Server
-```bash
-docker-compose restart
-```
-
-### Check Status
-```bash
-docker-compose ps
-curl http://localhost:3000/health
-```
-
-### Use Different Destination
-```bash
-# Stop current
-docker-compose down
-
-# Edit the command in docker-compose.yml: --mcp=dev
-docker-compose up -d
-
-# Or start with --allow-destination-header and send x-mcp-destination: dev per request
-```
-
-## Troubleshooting
-
-### Container exits immediately
+From the repository root:
 
 ```bash
-# Check logs
-docker-compose logs
-
-# Verify service key exists
-ls -la service-keys/
-
-# Check the --mcp=<name> in the container command matches a service key file
-docker-compose config | grep -- --mcp
-ls service-keys/
+mkdir -p docker/service-keys
+cp /path/to/service-key.json docker/service-keys/<destination>.json   # optional, see below
+npm run docker:build        # docker compose -f docker/docker-compose.yml build
+npm run docker:up
+curl http://localhost:3000/mcp/health
+npm run docker:logs
+npm run docker:down
 ```
 
-### Authentication errors
+Without the repository: `docker build -f Dockerfile -t mcp-abap-adt .` in a directory holding the
+Dockerfile, then `docker run -p 3000:3000 mcp-abap-adt`.
 
-```bash
-# Check service key format
-cat service-keys/<name>.json | jq .
+**A version:** `MCP_ABAP_ADT_VERSION=<version>` in `docker/.env` (see `docker/.env.example`), or
+`docker build --build-arg MCP_ABAP_ADT_VERSION=<version> …`. `latest` is resolved when the image is
+built: rebuild (`docker compose build --no-cache`) to take a newer release.
 
-# Check if session was created
-ls -la sessions/
+The MCP endpoint is `http://localhost:3000/mcp/stream/http`. The image's command is
+`mcp-abap-adt --allow-destination-header`: a client names its destination per request with
+`x-mcp-destination`. Add `--mcp=<destination>` to the compose `command` for a default one. For the
+compact server, make the command `mcp-abap-adt-compact` with the same arguments.
 
-# Force re-authentication (remove session; written only with --unsafe)
-rm sessions/<name>.env
-docker-compose restart
-```
+`npm run docker:up:headerless` (`docker-compose.headerless.yml`) runs the same image with no
+destinations at all: every request carries its system in headers (see below).
 
-### Port already in use
+## Configuration
 
-```bash
-# Check what's using port 3000
-lsof -i :3000
+### Container environment
 
-# Use different port
-echo "MCP_HTTP_PORT=3001" >> .env
-# Update ports in docker-compose.yml: "3001:3001"
-docker-compose up -d
-```
+The process environment of the container is the server's process environment; set it under
+`environment:` in the compose file (or `docker run -e`).
 
-## Multiple Environments
+| Variable | Meaning |
+|---|---|
+| `MCP_TRANSPORT` | `stdio`, `http` or `sse`. The image sets `http`. |
+| `MCP_HTTP_HOST` | Listen address. The images set `0.0.0.0`; the server's own default, `127.0.0.1`, is unreachable from outside a container. |
+| `MCP_HTTP_PORT` | Listen port, default `3000`. Change the `ports:` mapping with it. |
+| `AUTH_BROKER_PATH` | Base directory of `service-keys/` and `sessions/` (one directory). The images set `/app`. |
+| `NODE_EXTRA_CA_CERTS`, `TLS_REJECT_UNAUTHORIZED` | See [TLS](#tls). |
+| `SAP_RESPONSIBLE` | Responsible person for creates when no login is known (a token you hold). |
 
-### Setup
+A destination `.env` mounted into the container and named with `--env-path=<file>` works as on a
+host; the server copies only `SAP_CLIENT`, `SAP_CONNECTION_TYPE`, `SAP_SYSTEM_TYPE` and
+`SAP_LANGUAGE` from it into the process. Anything process-level belongs in `environment:`.
 
-```bash
-# Create service keys for each environment
-service-keys/
-├── trial.json    # Trial environment
-├── dev.json      # Development
-└── prod.json     # Production
-```
+### Destinations per request (no service keys)
 
-### Switch Between Environments
+Over HTTP with no `--mcp`, each request carries the system:
 
-```bash
-# Use trial: --mcp=trial in the compose command
-docker-compose up -d
+- `x-sap-url` with `x-sap-jwt-token` (a token you hold; the server cannot renew it), or
+- `x-sap-url` with `x-sap-login` and `x-sap-password`;
+- or `x-mcp-destination: <destination>`, only with `--allow-destination-header`.
 
-# Switch to dev: change the command to --mcp=dev
-docker-compose down
-docker-compose up -d
+A request with none of them is refused: `Missing SAP connection context`.
 
-# Or serve both: --allow-destination-header, and clients send x-mcp-destination
-```
+### Sessions
 
-## Advanced Configuration
+A destination's session is kept in memory. It is written to `sessions/<destination>.env` only with
+`--unsafe`; then mount a writable `./sessions:/app/sessions`.
 
-### Custom Port
+## TLS
 
-```bash
-# In .env
-MCP_HTTP_PORT=8080
+The server verifies the SAP system's HTTPS certificate. In a container the two settings are
+**container environment variables** (`environment:`), never lines in a destination `.env`:
 
-# Update docker-compose.yml ports:
-ports:
-  - "8080:8080"
-```
-
-### Add nginx Reverse Proxy
-
-Create `nginx.conf`:
-```nginx
-server {
-    listen 80;
-    location / {
-        proxy_pass http://mcp-abap-adt:3000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
-
-Add to `docker-compose.yml`:
 ```yaml
-services:
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
+    environment:
+      - NODE_EXTRA_CA_CERTS=/certs/ca.pem    # trust your CA
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
-    depends_on:
-      - mcp-abap-adt
+      - ./certs/ca.pem:/certs/ca.pem:ro
 ```
+
+`TLS_REJECT_UNAUTHORIZED=0` switches verification off; use it only to diagnose. See
+[HTTPS certificates](../installation/INSTALLATION.md#https-certificates).
+
+## RFC and SNC
+
+Not available in these images. RFC (and SNC, which runs over RFC) needs
+`@mcp-abap-adt/sap-rfc-lite`, which `npm install` compiles against the SAP NW RFC SDK. The images carry
+neither the SDK nor a compiler and install with `--omit=optional`, so the module is absent and the
+first RFC call is refused with `@mcp-abap-adt/sap-rfc-lite is not available`.
+
+An RFC image of your own needs the SDK, the build toolchain and `SAPNWRFC_HOME` set when the packages
+are installed — see [RFC_SETUP.md](../installation/RFC_SETUP.md). SNC needs, besides, an SNC product
+holding a credential inside the container, which a desktop Secure Login Client does not give.
+
+## Login
+
+A browser login (`jwt` with `SAP_GRANT_TYPE=authorization_code`) needs a browser and a reachable
+callback port (`61001`, `--browser-auth-port`). A container has neither by default. Log in outside
+the container and mount the session with `--unsafe`, or hand a token per request
+(`x-sap-url` + `x-sap-jwt-token`).
+
+## Operations
+
+| Script | What it runs |
+|---|---|
+| `docker:build`, `docker:up`, `docker:down`, `docker:logs` | `docker compose -f docker/docker-compose.yml …` |
+| `docker:build:headerless`, `docker:up:headerless`, `docker:down:headerless` | the same with `docker-compose.headerless.yml` |
+
+**Health:** `GET /mcp/health` answers `{"status":"ok",…}`; the images and compose files probe it.
+
+**Debugging:** `NODE_OPTIONS=--inspect=0.0.0.0:9229` in `environment:` and a published `9229`.
+The inspector runs any code it is sent: never expose it beyond your own machine.
 
 ## Security
 
-### Best Practices
-
-1. **Never commit credentials**:
-   - `.gitignore` excludes `service-keys/` and `sessions/`
-   - Use secrets management in production
-
-2. **Use read-only mounts for service keys**:
-   - Already configured in docker-compose.yml
-
-3. **Restrict network access**:
-   - Bind to localhost only: `MCP_HTTP_HOST=127.0.0.1`
-   - Use firewall rules
-
-4. **Regular updates**:
-   ```bash
-   docker-compose pull
-   docker-compose up -d
-   ```
-
-5. **Monitor logs**:
-   ```bash
-   docker-compose logs -f | grep -i error
-   ```
-
-## Production Deployment
-
-### Resource Limits
-
-Already configured in docker-compose.yml:
-- CPU: 1.0 core (limit), 0.5 core (reservation)
-- Memory: 1GB (limit), 512MB (reservation)
-
-### Monitoring
-
-```bash
-# Container stats
-docker stats mcp-abap-adt-server
-
-# Health check status
-docker inspect mcp-abap-adt-server | jq '.[0].State.Health'
-```
-
-### Backup
-
-```bash
-# Backup sessions (tokens)
-tar -czf backup-$(date +%Y%m%d).tar.gz sessions/
-
-# Service keys should be backed up separately with encryption
-```
-
-## Maintenance
-
-### Update Server
-
-```bash
-# Pull latest code
-cd /path/to/mcp-abap-adt
-git pull
-
-# Rebuild and restart
-cd docker
-docker-compose build
-docker-compose up -d
-```
-
-### Clean Up
-
-```bash
-# Remove containers
-docker-compose down
-
-# Remove containers and volumes
-docker-compose down -v
-
-# Remove images
-docker rmi $(docker images -q mcp-abap-adt)
-```
+- Never commit `service-keys/` or `sessions/`; mount service keys read-only (the compose files do).
+  The build context is `docker/`, and the image copies nothing from it.
+- To keep the port on the host's loopback, map it there (`"127.0.0.1:3000:3000"`). Setting
+  `MCP_HTTP_HOST=127.0.0.1` inside the container makes the server unreachable instead.
+- A reverse proxy in front of the container (TLS termination, access control) passes requests to
+  `http://<service>:3000`.
 
 ## See Also
 
-- [Docker README](../docker/README.md) - Detailed Docker documentation
-- [Installation Guide](../installation/INSTALLATION.md) - General installation
-- [CLI Options](../user-guide/CLI_OPTIONS.md) - Command-line options
+- [docker/README.md](../../docker/README.md)
+- [Installation Guide](../installation/INSTALLATION.md)
+- [CLI Options](../user-guide/CLI_OPTIONS.md)
+- [Authentication](../user-guide/AUTHENTICATION.md)

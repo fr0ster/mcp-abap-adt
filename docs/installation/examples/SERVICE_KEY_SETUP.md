@@ -36,17 +36,17 @@ mkdir "%USERPROFILE%\Documents\mcp-abap-adt\service-keys"
 
 ### Step 2: Start the Server with the Destination
 
-The server serves one default destination, named with `--mcp`.
+The server serves one default destination, named with `--mcp`. Over stdio the client starts the server: go to Step 3.
 
 ```bash
-# With NPX (recommended)
-npx @mcp-abap-adt/core --transport=http --port=3000 --mcp=TRIAL
-
-# Or with global install
+# Installed (npm install -g @mcp-abap-adt/core; the compact server: mcp-abap-adt-compact)
 mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL
 
+# Or without installing
+npx -y @mcp-abap-adt/core --transport=http --port=3000 --mcp=TRIAL
+
 # With custom path for service keys and sessions
-mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL --auth-broker-path=~/prj/tmp/
+mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL --auth-broker-path=/path/to/dir/
 ```
 
 **What `--mcp=TRIAL` does:**
@@ -57,18 +57,32 @@ mcp-abap-adt --transport=http --port=3000 --mcp=TRIAL --auth-broker-path=~/prj/t
 
 **Using --auth-broker-path:**
 - `--auth-broker-path=<path>` specifies the base directory of the `service-keys` and `sessions` subdirectories
-- Example: `--auth-broker-path=~/prj/tmp/` uses `~/prj/tmp/service-keys/` and `~/prj/tmp/sessions/`
+- Example: `--auth-broker-path=/path/to/dir/` uses `/path/to/dir/service-keys/` and `/path/to/dir/sessions/`
 
 ### Step 3: Configure Cline
 
-With `--mcp=TRIAL` the client needs no headers:
+A stdio client starts the server itself — no separate server, no URL:
+
+```json
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--mcp=TRIAL"],
+      "disabled": false
+    }
+  }
+}
+```
+
+Over HTTP, with `--mcp=TRIAL` the client needs no headers:
 
 ```json
 {
   "mcpServers": {
     "mcp-abap-adt-service-key": {
-      "url": "http://localhost:3000",
-      "transport": "http",
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
       "disabled": false
     }
   }
@@ -81,8 +95,8 @@ To choose the destination per request, start the server with `--allow-destinatio
 {
   "mcpServers": {
     "mcp-abap-adt-service-key": {
-      "url": "http://localhost:3000",
-      "transport": "http",
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
       "headers": {
         "x-mcp-destination": "TRIAL"
       },
@@ -153,14 +167,14 @@ Either run one server per destination (`--mcp=DEV`, `--mcp=PROD`, each on its ow
 {
   "mcpServers": {
     "mcp-abap-dev": {
-      "url": "http://localhost:3000",
-      "transport": "http",
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
       "headers": { "x-mcp-destination": "DEV" },
       "disabled": false
     },
     "mcp-abap-prod": {
-      "url": "http://localhost:3000",
-      "transport": "http",
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
       "headers": { "x-mcp-destination": "PROD" },
       "disabled": false
     }

@@ -1,10 +1,10 @@
 {
   "mcpServers": {
-    "mcp-abap-adt-service-key": {
-      "url": "http://localhost:3000",
-      "transport": "http",
+    "mcp-abap-adt-http": {
+      "type": "streamableHttp",
+      "url": "http://localhost:3000/mcp/stream/http",
       "headers": {
-        "x-mcp-destination": "sk"
+        "x-mcp-destination": "<destination>"
       },
       "disabled": false
     }

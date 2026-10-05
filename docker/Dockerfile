@@ -1,58 +1,60 @@
-# Multi-stage build for mcp-abap-adt server
-# Optimized for production deployment with AuthBroker + destination-based auth
+# mcp-abap-adt server, installed from the npm registry — the way a user installs
+# it, nothing is built here.
+#
+# Stage 1 installs the published packages into their own prefix; stage 2 copies
+# that installation into a clean runtime image, without npm's cache.
+#
+#   docker build -f docker/Dockerfile -t mcp-abap-adt .
+#   docker build -f docker/Dockerfile --build-arg MCP_ABAP_ADT_VERSION=<version> -t mcp-abap-adt .
+#
+# Both commands are installed: mcp-abap-adt (@mcp-abap-adt/core) and
+# mcp-abap-adt-compact (@mcp-abap-adt/compact).
+#
+# RFC and SNC are not available in this image: @mcp-abap-adt/sap-rfc-lite is
+# compiled at install time against the SAP NW RFC SDK, which the image does not
+# carry, so the optional dependency is left out on purpose.
+
+ARG NODE_IMAGE=node:22-bookworm-slim
 
 # =========================
-# Stage 1: Build
+# Stage 1: install from npm
 # =========================
-FROM node:22-bookworm-slim AS builder
+FROM ${NODE_IMAGE} AS install
+
+ARG MCP_ABAP_ADT_VERSION=latest
+RUN npm install -g --prefix /opt/mcp-abap-adt --omit=dev --omit=optional --no-audit --no-fund \
+      "@mcp-abap-adt/core@${MCP_ABAP_ADT_VERSION}" \
+      "@mcp-abap-adt/compact@${MCP_ABAP_ADT_VERSION}" \
+ && /opt/mcp-abap-adt/bin/mcp-abap-adt --version
+
+# =========================
+# Stage 2: runtime
+# =========================
+FROM ${NODE_IMAGE}
+
+COPY --from=install /opt/mcp-abap-adt /opt/mcp-abap-adt
 
 WORKDIR /app
 
-# Copy package files
-COPY package.json package-lock.json ./
-
-# Install all dependencies (including devDependencies for build)
-ENV NODE_ENV=development
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build TypeScript to JavaScript
-RUN npm run build:fast
-
-# Remove dev dependencies
-RUN npm prune --omit=dev
-
-
-# =========================
-# Stage 2: Runtime
-# =========================
-FROM node:22-bookworm-slim
-
-WORKDIR /app
-
-# Runtime environment
-ENV NODE_ENV=production \
+# AUTH_BROKER_PATH: service-keys/ and sessions/ under /app (mount them).
+ENV PATH=/opt/mcp-abap-adt/bin:$PATH \
+    NODE_ENV=production \
+    MCP_TRANSPORT=http \
     MCP_HTTP_PORT=3000 \
     MCP_HTTP_HOST=0.0.0.0 \
-    MCP_TRANSPORT=http
+    AUTH_BROKER_PATH=/app
 
-# Copy built application
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
+RUN mkdir -p /app/service-keys /app/sessions && chown -R node:node /app
+USER node
 
-# Create directories for service keys and sessions
-RUN mkdir -p /app/service-keys /app/sessions
+EXPOSE 3000
 
-# Expose HTTP and Debug ports
-EXPOSE 3000 9229
-
-# Healthcheck - only relevant for sse/http transports
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD if [ "$MCP_TRANSPORT" = "stdio" ]; then exit 0; else node -e "require('http').get('http://localhost:3000/mcp/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})" || exit 1; fi
+  CMD if [ "$MCP_TRANSPORT" = "stdio" ]; then exit 0; else node -e "require('http').get('http://localhost:' + (process.env.MCP_HTTP_PORT || 3000) + '/mcp/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"; fi
 
-# Start server with v2 launcher
-# Transport will be taken from MCP_TRANSPORT env var (defaults to stdio)
-CMD ["node", "--inspect=0.0.0.0:9229", "./dist/server/launcher.js", "--allow-destination-header"]
+# The transport comes from MCP_TRANSPORT. A client names its destination per
+# request (x-mcp-destination); add --mcp=<destination> for a default one.
+# For the compact server, run `mcp-abap-adt-compact` with the same arguments.
+# Debugging: NODE_OPTIONS=--inspect=0.0.0.0:9229 and publish 9229 — never on
+# a network you do not trust.
+CMD ["mcp-abap-adt", "--allow-destination-header"]

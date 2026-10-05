@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "mcp-abap-adt": {
+      "command": "mcp-abap-adt",
+      "args": ["--transport=stdio", "--env-path=C:/path/to/<destination>.env"],
+      "env": {
+        "PATH": "C:\\nwrfcsdk\\nwrfcsdk\\lib;<the rest of your PATH>"
+      },
+      "disabled": false
+    }
+  }
+}

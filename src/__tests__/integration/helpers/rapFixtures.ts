@@ -41,6 +41,7 @@ import { handleUpdateDdl } from '../../../handlers/ddl/low/handleUpdateDdl';
 import { handleValidateDdl } from '../../../handlers/ddl/low/handleValidateDdl';
 import { handleGetInactiveObjects } from '../../../handlers/system/readonly/handleGetInactiveObjects';
 import type { HandlerContext } from '../../../lib/handlers/interfaces';
+import { assertNotSharedDependency } from './configHelpers';
 import {
   delay,
   extractErrorMessage,
@@ -166,6 +167,12 @@ export async function createView(
   transportRequest: string | undefined,
   logger?: { info?: (message: string) => void },
 ): Promise<void> {
+  if (!view.name || !view.source) {
+    throw new Error(
+      'the view this test is defined over has no name or source: the test case needs params.root_view_name and params.root_view_source in tests/test-config.yaml (see the template)',
+    );
+  }
+  assertNotSharedDependency('view', view.name);
   await assertNameAvailable(`view ${view.name}`, () =>
     handleValidateDdl(context, {
       ddl_name: view.name,
@@ -213,6 +220,15 @@ export async function deleteView(
   transportRequest: string | undefined,
   logger?: { info?: (message: string) => void; error?: (m: string) => void },
 ): Promise<string[]> {
+  // Cleanup runs whether or not this run created the view, so a shared one is
+  // never deleted here: it is reported, and the run fails naming it.
+  try {
+    assertNotSharedDependency('view', view.name);
+  } catch (error: unknown) {
+    const message = (error as Error).message;
+    logger?.error?.(`not deleted: ${message}`);
+    return [message];
+  }
   try {
     const deleted = (await handleDeleteDdl(context, {
       ddl_name: view.name,

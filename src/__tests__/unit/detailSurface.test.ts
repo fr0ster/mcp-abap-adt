@@ -461,7 +461,7 @@ const DETAIL_WIRING_EXCEPTIONS: ReadonlyArray<{
 }> = [
   {
     file: 'src/handlers/common/low/handleActivateObject.ts',
-    line: 336,
+    line: 337,
     reason:
       'the group-activation path: what it answers is an activation run — the id, ' +
       "runs:status and the results' messages — not an AdtReading, so this second " +

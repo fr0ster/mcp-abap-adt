@@ -1,5 +1,3 @@
-version: '3.8'
-
 # MCP ABAP ADT Server with destination-based authentication
 #
 # Architecture:
@@ -9,9 +7,12 @@ version: '3.8'
 
 services:
   mcp-abap-adt:
+    # Installs the published packages from npm; nothing of the checkout goes in.
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: .
+      dockerfile: Dockerfile
+      args:
+        MCP_ABAP_ADT_VERSION: ${MCP_ABAP_ADT_VERSION:-latest}
     container_name: mcp-abap-adt-server
     restart: unless-stopped
 
@@ -31,8 +32,8 @@ services:
     # The destination is chosen by the command, not by an environment variable:
     #   --mcp=<name>                an own default destination (service-keys/<name>.json)
     #   --allow-destination-header  a client names it per request with x-mcp-destination
-    # (the image's default command is --allow-destination-header alone)
-    command: ["node", "./dist/server/launcher.js", "--mcp=trial", "--allow-destination-header"]
+    #   --mcp=<destination>         a default destination: service-keys/<destination>.json
+    command: ["mcp-abap-adt", "--allow-destination-header"]
 
     # Volumes for AuthBroker data
     volumes:
@@ -58,7 +59,7 @@ services:
 
     # Healthcheck
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/mcp/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
       interval: 30s
       timeout: 5s
       retries: 3

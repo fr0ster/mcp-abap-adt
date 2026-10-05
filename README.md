@@ -13,6 +13,7 @@
 - Legacy systems (BASIS < 7.50) are **not supported at present**: that support is parked on the `parked/legacy-support` branch until it can be tried against a live legacy system
 - Four authentications: **basic** (HTTP or RFC), **SNC** (passwordless, RFC), **JWT with browser login** (service key, ABAP or XSUAA) and **JWT you already hold**
 - Multiple transports: **stdio**, **HTTP**, **SSE**
+- Several installation variants: the **full** server (`@mcp-abap-adt/core`) or the **compact** one (`@mcp-abap-adt/compact`), each connecting to the system over **HTTP**, **RFC** or **SNC** — see [Installation variants](docs/installation/INSTALLATION.md#installation-variants)
 - Rich tool surface for ABAP objects, metadata, transports, and search
 
 **Authorization & Destinations (Important):** A *destination* is the filename of a service key stored locally. You place service keys in the service-keys directory, and use `--mcp=<destination>` to select which one to use. This is the primary auth model for on‑prem and BTP systems. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
@@ -36,6 +37,8 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 13. [Running the Server](#running-the-server)
 
 ## Getting Started
+
+Pick a variant first — full or compact server, and HTTP, RFC or SNC to the system. HTTP needs nothing but Node.js 22 or 24; **RFC and SNC need the SAP NW RFC SDK and a C++ toolchain on the machine before `npm install`**, because the RFC module is compiled during the install and silently left out when it cannot be. [Installation variants](docs/installation/INSTALLATION.md#installation-variants) has the table and the commands; [RFC Setup](docs/installation/RFC_SETUP.md) the steps.
 
 Install the server and configure your client using the configurator:
 
@@ -86,19 +89,18 @@ A created object always carries its responsible person: the first stated of the 
 the `x-sap-responsible` header, `SAP_RESPONSIBLE` in the destination's own `.env`, then in the process
 environment — else the login: on-premise the destination's `SAP_USERNAME`, the `x-sap-login` of an
 `x-sap-url` connection, the process `SAP_USERNAME`; on a cloud system only the system's user. A create
-that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent. A message
-class is the one exception: it is created with the system's own default responsible. The master system
+that finds none (SNC, a token you hold) is refused naming `SAP_RESPONSIBLE`; nothing is sent — a message class included, from 17.0.0. The master system
 comes from `x-sap-master-system` or `SAP_MASTER_SYSTEM` (destination `.env`, then process) — no tool
 takes it as an argument — else from a cloud system itself; otherwise it is left out and the system
 applies itself — never refused. Reads are unaffected. The process environment is read once: a change
 made to it while the server runs is not picked up. See [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
-Coming from 15.x? See the [16.0 migration note](docs/MIGRATION-16.0.md).
+Coming from 16.x? See the [17.0 migration note](docs/MIGRATION-17.0.md) — the HTTPS certificate is now verified. From 15.x, the [16.0 note](docs/MIGRATION-16.0.md) first.
 
 For full details (paths, `.env`, direct headers), see [Authentication & Destinations](docs/user-guide/AUTHENTICATION.md).
 
 ## Architecture
 
-The project ships as **two packages**, because the two usage patterns want
+The project ships as **two packages** — and a compact variant of each — because the two usage patterns want
 different licences. Embedding the tools in a network service should not drag in
 the obligations of a server that service never runs.
 
@@ -106,8 +108,10 @@ the obligations of a server that service never runs.
 |---|---|---|
 | [`@mcp-abap-adt/lib`](https://www.npmjs.com/package/@mcp-abap-adt/lib) | Apache-2.0 | The ADT tool handlers and the embeddable MCP server. No transport: the host supplies one. |
 | [`@mcp-abap-adt/core`](https://www.npmjs.com/package/@mcp-abap-adt/core) | AGPL-3.0-only | The standalone server — stdio, SSE and streamable HTTP, the launcher and the `mcp-abap-adt` CLI. Depends on the library. |
+| [`@mcp-abap-adt/compact`](https://www.npmjs.com/package/@mcp-abap-adt/compact) | AGPL-3.0-only | The compact standalone server, `mcp-abap-adt-compact`: one tool per operation, the object type in the arguments. Same launcher and configuration as `core`. |
+| [`@mcp-abap-adt/compact-readonly`](https://www.npmjs.com/package/@mcp-abap-adt/compact-readonly), [`compact-modify`](https://www.npmjs.com/package/@mcp-abap-adt/compact-modify) | Apache-2.0 | The compact tools as libraries, split into the half that changes nothing and the half that writes. |
 
-Install `@mcp-abap-adt/core` to run a server. Install `@mcp-abap-adt/lib` to
+Install `@mcp-abap-adt/core` (or `@mcp-abap-adt/compact`) to run a server. Install `@mcp-abap-adt/lib` to
 embed the tools in your own application.
 
 ### 1. Standalone MCP Server (Default)
@@ -145,7 +149,7 @@ See [Handlers Management → EmbeddableMcpServer dedup strategies](docs/user-gui
 
 ## Quick Start
 
-1. **Install server**: See [Installation Guide](docs/installation/INSTALLATION.md)
+1. **Install server**: pick the [installation variant](docs/installation/INSTALLATION.md#installation-variants) — full or compact, HTTP, RFC or SNC — and follow the [Installation Guide](docs/installation/INSTALLATION.md)
 2. **Configure client (auto)**: Use `mcp-conf` from `@mcp-abap-adt/configurator` (repo: [`mcp-abap-adt-conf`](https://github.com/fr0ster/mcp-abap-adt-conf), docs: [CLIENT_INSTALLERS.md](https://github.com/fr0ster/mcp-abap-adt-conf/tree/main/docs/CLIENT_INSTALLERS.md))
 3. **Configure client (manual)**: See [Client Configuration](docs/user-guide/CLIENT_CONFIGURATION.md)
 4. **Use**:
@@ -220,7 +224,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 
 ### For Users
 - **[Docs Index](docs/README.md)** - Full documentation index
-- **[Installation Guide](docs/installation/README.md)** - Installation overview and platform guides
+- **[Installation Guide](docs/installation/README.md)** - Installation variants (full or compact; HTTP, RFC or SNC) and platform guides
+- **[RFC Setup](docs/installation/RFC_SETUP.md)** - RFC and SNC: the SAP NW RFC SDK and a C++ toolchain before the install
 - **[User Guide](docs/user-guide/README.md)** - End-user docs (auth, config, tools)
 - **[Authentication & Destinations](docs/user-guide/AUTHENTICATION.md)** - Destination-based auth and service keys
 - **[Handlers Management](docs/user-guide/HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups
@@ -238,6 +243,8 @@ Published in the official MCP Registry and listed on Glama.ai.
 - **[Architecture Documentation](docs/architecture/README.md)** - System architecture and design decisions
 - **[Development Documentation](docs/development/README.md)** - Testing guides and development resources
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history and changes
+- **[docs/MIGRATION-17.0.md](docs/MIGRATION-17.0.md)** - The HTTPS certificate is verified; a message class needs a responsible
+- **[docs/MIGRATION-16.0.md](docs/MIGRATION-16.0.md)** - Authentication on auth-broker 4: four authentications, destinations
 - **[docs/MIGRATION-14.0.md](docs/MIGRATION-14.0.md)** - The compact facade moved to its own
   packages and `--exposition=compact` became the `mcp-abap-adt-compact` command
 - **[docs/MIGRATION-13.0.md](docs/MIGRATION-13.0.md)** - What a consumer on the 12.x contract changes
@@ -254,7 +261,7 @@ and six packages declare the contracts both of them and this project are written
 
 The verdict on an ADT answer is a strategy, not a default: since `adt-clients` 23 no member judges its own answer, and **[@mcp-abap-adt/adt-strategies](https://www.npmjs.com/package/@mcp-abap-adt/adt-strategies)** holds the readings this project passes to every call. That is what keeps a refusal ADT embeds in an HTTP `200` — an activation that did not activate, a delete that was refused — from reaching a caller as success.
 
-Everything above is installed by `npm install` and published to npm. `@mcp-abap-adt/sap-rfc-lite` is optional and only needed for the RFC transport, which also requires the SAP NW RFC SDK on the machine.
+Everything above is installed by `npm install` and published to npm. `@mcp-abap-adt/sap-rfc-lite` is optional and only needed for the RFC transport (and so for SNC). It is compiled during `npm install` against the SAP NW RFC SDK that `SAPNWRFC_HOME` names, and npm leaves it out without an error when it cannot be — check with `npm ls -g @mcp-abap-adt/sap-rfc-lite`. See [RFC Setup](docs/installation/RFC_SETUP.md).
 
 ---
 
@@ -291,20 +298,19 @@ mcp-abap-adt --transport=sse --port=3001
 
 # SSE mode with auth-broker (--mcp parameter)
 mcp-abap-adt --transport=sse --mcp=TRIAL
+
+# The compact server takes the same options (npm install -g @mcp-abap-adt/compact)
+mcp-abap-adt-compact --env-path=/path/to/my.env
 ```
 
 ### Development Mode
 ```bash
-# Build and run locally
+npm install
 npm run build
-npm start
-
-# HTTP mode
-npm run start:http
-
-# SSE mode
-npm run start:sse
+npm test
 ```
+
+The checkout is not runnable as a server by itself: `server/` takes `@mcp-abap-adt/lib` as a package. To run a build, pack both and install the tarballs together — see [From source](docs/installation/INSTALLATION.md#from-source-development).
 
 ### Environment Configuration
 
@@ -341,7 +347,7 @@ SAP_JWT_TOKEN=your-jwt-token
 
 For RFC connection:
 ```bash
-SAP_URL=https://your-onprem-system.example
+SAP_URL=http://your-onprem-system.example:8000
 SAP_CLIENT=100
 SAP_AUTH_TYPE=basic
 SAP_USERNAME=your-username
@@ -349,19 +355,22 @@ SAP_PASSWORD=your-password
 SAP_CONNECTION_TYPE=rfc
 ```
 
-`SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK).
+`SAP_CONNECTION_TYPE=rfc` in the `--env` / `--env-path` `.env` selects RFC, as do `--connection-type=rfc`, the process environment and YAML `connection-type: rfc`. Precedence: CLI, then the process environment (which the `.env` value joins, never over one already set), then YAML. Over RFC the host comes from `SAP_URL` and the system number from its port (`80NN` → `NN`); a port that follows no such rule needs `SAP_SYSNR` in the process environment. See [RFC Setup Guide](docs/installation/RFC_SETUP.md) for prerequisites (SAP NW RFC SDK, a C++ toolchain, `SAPNWRFC_HOME` before the install).
 
 For SNC (passwordless logon over RFC, no user or password):
 ```bash
-SAP_URL=https://your-onprem-system.example
+SAP_URL=http://your-onprem-system.example:8000
 SAP_CLIENT=100
+SAP_CONNECTION_TYPE=rfc
 SAP_AUTH_TYPE=snc
 SAP_SNC_PARTNERNAME='p:CN=<system>, O=<org>, C=<country>'
+# Creates need a responsible person; over SNC no login is known
+SAP_RESPONSIBLE=<your ABAP user>
 # Optional: SAP_SNC_QOP, SAP_SNC_LIB, SAP_SNC_MYNAME
 ```
-The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. Start with `--connection-type=rfc`: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
+The credential of the installed SNC product (for example a Secure Login Client) is mapped to an ABAP user by its SNC name. `SAP_CONNECTION_TYPE=rfc` (or `--connection-type=rfc`) is required: SNC logs on over RFC only, and an SNC destination with HTTP is refused. SNC needs the SAP NW RFC SDK and `@mcp-abap-adt/sap-rfc-lite`, an optional dependency — see [RFC Setup](docs/installation/RFC_SETUP.md).
 
-> **Not supported in 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `lacks: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
+> **Not supported since 16.0:** `SAP_AUTH_TYPE=certificate` and `kerberos`, `saml`, and a `jwt` grant other than `authorization_code` and `none`, in a `.env` or service key are refused at startup, naming the authentication (a `saml` destination with no grant: `lacks: grantType`). See the [migration note](docs/MIGRATION-16.0.md) for what to do instead.
 
 **Generate a `.env` (JWT):**
 ```bash

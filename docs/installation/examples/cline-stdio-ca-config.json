@@ -3,6 +3,9 @@
     "mcp-abap-adt": {
       "command": "mcp-abap-adt",
       "args": ["--transport=stdio", "--env-path=/path/to/<destination>.env"],
+      "env": {
+        "NODE_EXTRA_CA_CERTS": "/path/to/company-ca.pem"
+      },
       "disabled": false
     }
   }

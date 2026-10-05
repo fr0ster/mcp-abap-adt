@@ -1,131 +1,97 @@
 # Release Process
 
-This document describes how to create a new release of MCP ABAP ADT Server.
+How a release of this repository is made. Two things happen, and only one of them is automated:
 
-## Automated Release via GitHub Actions
+- **npm publishing is manual**, from a maintainer's machine: `npm run release:publish`
+  (`scripts/publish-all.sh`). No workflow publishes to npm.
+- **The GitHub Release is automated**: pushing a `v*.*.*` tag runs `.github/workflows/release.yml`,
+  which tests the tag and creates a GitHub Release with generated notes. It attaches no files.
 
-Releases are automatically created when you push a version tag.
+## The five packages
 
-### Steps to Create a Release
+| Directory | Package | Depends on |
+|---|---|---|
+| `.` | `@mcp-abap-adt/lib` | — |
+| `compact-readonly/` | `@mcp-abap-adt/compact-readonly` | `lib` |
+| `compact-modify/` | `@mcp-abap-adt/compact-modify` | `lib` |
+| `server/` | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | `lib` |
+| `compact/` | `@mcp-abap-adt/compact` (bin `mcp-abap-adt-compact`) | `lib`, `core`, `compact-readonly`, `compact-modify` |
 
-1. **Update version in package.json**
+They are **not** npm workspaces: each is published by path. `scripts/publish-all.sh` publishes
+them in the order above (dependency order), skips any `name@version` already on npm, and aborts on
+the first failure so that no package goes out on top of a dependency that is missing.
+
+## Steps
+
+1. **Bump every manifest.** `package.json`, `compact-readonly/package.json`,
+   `compact-modify/package.json`, `server/package.json`, `compact/package.json` — and in each, the
+   ranges on sibling packages (`@mcp-abap-adt/lib`, `core`, `compact-readonly`, `compact-modify`)
+   so they accept the new versions. A manifest left at an old version is silently skipped by the
+   publish script ("already on npm"). Then refresh the lockfile:
    ```bash
-   # Edit package.json and update version
-   npm version patch  # for 1.1.0 -> 1.1.1
-   # or
-   npm version minor  # for 1.1.0 -> 1.2.0
-   # or
-   npm version major  # for 1.1.0 -> 2.0.0
+   npm install --package-lock-only
+   ```
+   Every range must be a semver range that resolves on the registry (no `file:`, `link:` or
+   `workspace:`).
+2. **Bump the registry metadata**: both version fields in `server.json` and in
+   `server-compact.json` (see [MCP_REGISTRY.md](./MCP_REGISTRY.md)).
+3. **Update `CHANGELOG.md` and the documentation** the change touches; for a breaking release, a
+   migration note (`docs/MIGRATION-<major>.0.md`). If tools changed, regenerate the tool lists with
+   `npm run docs:tools`.
+4. **Build and test**:
+   ```bash
+   npm ci
+   npm run build          # lib, server, compact-readonly, compact-modify, compact
+   npm run test:check
+   npm test               # includes binSmoke: packs, installs and runs both commands
+   npm --prefix server run test:check
+   npm --prefix server test
+   ```
+5. **Rehearse the publish**:
+   ```bash
+   npm run release:dry    # must end with "Published: 5  Skipped: 0"
+   ```
+6. **Merge**, then tag the merge commit and push the tag:
+   ```bash
+   git tag v<version>
+   git push origin v<version>
+   ```
+   `release.yml` runs the tests on Node 22 and 24 and, if they pass, creates the GitHub Release.
+7. **Publish to npm**:
+   ```bash
+   npm run release:publish
+   ```
+   On the first package a browser window may open for 2FA. If a publish fails (often a dropped
+   login: `npm whoami`, `npm login`), re-run: packages already on npm are skipped.
+8. **Publish the registry entries** (`server.json`, `server-compact.json`) with `mcp-publisher` —
+   see [MCP_REGISTRY.md](./MCP_REGISTRY.md).
+9. **Check an installed copy**, outside the repository:
+   ```bash
+   npm install -g @mcp-abap-adt/core@<version>
+   mcp-abap-adt --version
    ```
 
-2. **Commit changes**
-   ```bash
-   git add package.json
-   git commit -m "chore: bump version to 1.2.0"
-   ```
+## What the workflows check
 
-3. **Create and push tag**
-   ```bash
-   # Tag format: v{major}.{minor}.{patch}
-   git tag v1.2.0
-   git push origin main
-   git push origin v1.2.0
-   ```
+- `ci.yml` (push and pull request to `main` / `develop`): Ubuntu, macOS and Windows × Node 22 and
+  24 — Biome lint, build, test type-check, tests, server tests; on Ubuntu / Node 22 also
+  `npm audit --omit=dev --audit-level=high`, `npm pack` of `lib` and `core`, and an install of both
+  tarballs that runs `mcp-abap-adt --help`.
+- `release.yml` (tag `v*.*.*`): the same lint, build and tests on Ubuntu × Node 22 and 24, then a
+  GitHub Release (`softprops/action-gh-release`, generated notes).
 
-4. **GitHub Actions will automatically:**
-   - Checkout code with submodules
-   - Install dependencies
-   - Build the project
-   - Run tests
-   - Create npm package (.tgz)
-   - Create GitHub Release
-   - Upload package as release asset
-   - Generate release notes
+See [GITHUB_ACTIONS.md](./GITHUB_ACTIONS.md).
 
-5. **Download the package**
-   - Go to https://github.com/fr0ster/mcp-abap-adt/releases
-   - Download the `.tgz` file from the latest release
-   - Share with users or install globally
+## Version numbering
 
-## Manual Release (Alternative)
-
-If you prefer to create releases manually:
-
-```bash
-# 1. Build and create package
-npm run build
-npm pack
-
-# 2. Create release on GitHub UI
-# Go to https://github.com/fr0ster/mcp-abap-adt/releases/new
-# - Tag version: v1.2.0
-# - Release title: MCP ABAP ADT Server v1.2.0
-# - Upload the .tgz file
-# - Write release notes
-# - Publish release
-```
-
-## Version Numbering
-
-We follow [Semantic Versioning](https://semver.org/):
-
-- **MAJOR** version (1.x.x -> 2.x.x): Breaking changes
-- **MINOR** version (1.1.x -> 1.2.x): New features, backward compatible
-- **PATCH** version (1.1.1 -> 1.1.2): Bug fixes, backward compatible
-
-## Release Checklist
-
-Before creating a release:
-
-- [ ] All tests pass
-- [ ] Documentation is up to date
-- [ ] CHANGELOG.md is updated
-- [ ] Version bumped in package.json
-- [ ] Submodules are at correct versions
-- [ ] README.md installation instructions tested
-
-## CI/CD Pipeline
-
-### Continuous Integration (CI)
-- Runs on every push to `main` and `develop` branches
-- Runs on every pull request
-- Tests on multiple OS (Ubuntu, macOS, Windows)
-- Tests on multiple Node.js versions (18, 20)
-
-### Release Workflow
-- Triggers only on version tags (`v*.*.*`)
-- Builds and packages the project
-- Creates GitHub Release with package attached
-- Generates release notes automatically
+[Semantic Versioning](https://semver.org/): MAJOR for breaking changes, MINOR for compatible
+features, PATCH for fixes.
 
 ## Troubleshooting
 
-**Release failed to create:**
-- Check GitHub Actions logs
-- Ensure tag follows `v*.*.*` format
-- Verify GITHUB_TOKEN permissions
-
-**Package not attached:**
-- Check that `npm pack` succeeded
-- Verify package filename matches pattern
-- Check workflow file permissions
-
-## Example Release
-
-```bash
-# Update version
-npm version minor  # 1.1.0 -> 1.2.0
-
-# Commit and push
-git add package.json package-lock.json
-git commit -m "chore: release v1.2.0"
-git push origin main
-
-# Create and push tag
-git tag v1.2.0
-git push origin v1.2.0
-
-# Wait for GitHub Actions to complete
-# Release will be available at:
-# https://github.com/fr0ster/mcp-abap-adt/releases/tag/v1.2.0
-```
+- **The release workflow did not run**: the tag must match `v*.*.*` and be pushed
+  (`git push origin v<version>`).
+- **`release:dry` reports `Skipped`** for a package: its manifest still names a version that is
+  already on npm.
+- **A publish aborted halfway**: fix the cause and run `npm run release:publish` again; it resumes
+  after the packages already published.

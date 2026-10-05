@@ -1,52 +1,68 @@
 # Architecture Documentation
 
-This directory contains technical documentation about the system architecture, design decisions, and internal structure.
+Technical documentation about the system architecture, design decisions, and internal structure.
 
-## Server Architecture (v1.2.0+)
+## Packages
 
-The project has a modular architecture with two main usage patterns:
+The repository holds five npm packages (not npm workspaces; each is built and published by path):
 
-### Standalone Server (v2)
-The default `mcp-abap-adt` command runs the v2 server with full transport support:
-- **StdioServer** - Standard input/output for MCP clients
-- **StreamableHttpServer** - HTTP transport with JSON responses
-- **SseServer** - Server-Sent Events transport
+| Directory | Package | Role |
+|---|---|---|
+| `src/` (root) | `@mcp-abap-adt/lib` | Handlers, handler groups, configuration, auth, connection factory — everything an embedding server needs |
+| `server/` | `@mcp-abap-adt/core` | The `mcp-abap-adt` command: launcher and transports |
+| `compact-readonly/`, `compact-modify/` | `@mcp-abap-adt/compact-readonly`, `@mcp-abap-adt/compact-modify` | The two halves of the compact tool set |
+| `compact/` | `@mcp-abap-adt/compact` | The `mcp-abap-adt-compact` command: core's launcher with the compact tool list |
 
-### Handler Exporter (v1)
-For embedding into existing servers (e.g., CAP/CDS applications):
+### Standalone server
+
+`mcp-abap-adt` (`server/src/launcher.ts`) serves three transports:
+- **StdioServer** — standard input/output for MCP clients (default)
+- **StreamableHttpServer** — `--transport=http`
+- **SseServer** — `--transport=sse`
+
+### Embedding the handlers
+
+For embedding into an existing server (e.g. a CAP/CDS application):
+
 ```typescript
+import { EmbeddableMcpServer } from '@mcp-abap-adt/lib/embeddable';
 import { HandlerExporter } from '@mcp-abap-adt/lib/handlers';
 
 const exporter = new HandlerExporter({
   includeReadOnly: true,
   includeHighLevel: true,
-  includeLowLevel: true,
+  includeLowLevel: false,
   includeSystem: true,
   includeSearch: true,
 });
 
-exporter.registerOnServer(mcpServer, () => connection);
+const server = new EmbeddableMcpServer({
+  connection,
+  handlersRegistry: exporter.createRegistry(),
+});
 ```
 
-### Handler Groups
-Handlers are organized into logical groups for flexible composition:
-- **ReadOnlyHandlersGroup** - Read-only operations (getProgram, getClass, getTable, etc.)
-- **HighLevelHandlersGroup** - High-level operations (create, update)
-- **LowLevelHandlersGroup** - Low-level ADT operations
-- **SystemHandlersGroup** - System operations (getInactiveObjects, etc.)
-- **SearchHandlersGroup** - Search operations (whereUsed, quickFix)
+`getHandlerEntries()` and `getToolNames()` give the same handlers without a server.
+
+### Handler groups
+
+- **ReadOnlyHandlersGroup** — read-only operations
+- **HighLevelHandlersGroup** — high-level operations (create, update)
+- **LowLevelHandlersGroup** — low-level ADT operations
+- **SystemHandlersGroup** — system operations
+- **SearchHandlersGroup** — search operations
 
 ## Files
 
-- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Comprehensive architecture overview: server boot flow, transport/auth model, handler sets, runtime diagnostics tools, and extension points
-- **[STATEFUL_SESSION_GUIDE.md](STATEFUL_SESSION_GUIDE.md)** - Stateful ADT request flow for lock/update/unlock operations
-- **[TOOLS_ARCHITECTURE.md](TOOLS_ARCHITECTURE.md)** - MCP tools architecture and handler structure, explaining how tools are organized and how `TOOL_DEFINITION` works
-- **[CONNECTION_ISOLATION.md](CONNECTION_ISOLATION.md)** - Connection isolation architecture, explaining how per-session connection isolation prevents data mixing between clients (version 1.1.10+)
-- **[HANDLER_EXPORTER.md](HANDLER_EXPORTER.md)** - Legacy handler exporter usage
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** — server boot flow, transport/auth model, handler sets, runtime diagnostics tools, extension points
+- **[STATEFUL_SESSION_GUIDE.md](STATEFUL_SESSION_GUIDE.md)** — stateful ADT request flow for lock/update/unlock
+- **[TOOLS_ARCHITECTURE.md](TOOLS_ARCHITECTURE.md)** — how tools are organized and how `TOOL_DEFINITION` works
+- **[CONNECTION_ISOLATION.md](CONNECTION_ISOLATION.md)** — per-session connection isolation between clients
+- **[HANDLER_EXPORTER.md](HANDLER_EXPORTER.md)** — handler exporter usage
 
 ## Related Documentation
 
-For related guides from different perspectives, see the documentation in the respective npm packages:
+Documentation shipped in the dependency packages:
 
-- `@mcp-abap-adt/adt-clients` - Builder & LockClient perspective
-- `@mcp-abap-adt/connection` - Connection layer perspective
+- `@mcp-abap-adt/adt-clients` — builder and lock client perspective
+- `@mcp-abap-adt/connection` — connection layer perspective

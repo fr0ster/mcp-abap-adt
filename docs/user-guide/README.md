@@ -4,53 +4,40 @@ This directory contains documentation for end users of the MCP ABAP ADT Server.
 
 ## Quick Start
 
-### Installation Options
+### Installation
 
-You can install MCP ABAP ADT Server in two ways:
-
-#### 1. From Pre-built Package (Recommended for Production)
-
-Install from a pre-built `.tgz` package:
+Install from the npm registry (Node.js 22 or 24):
 
 ```bash
-# Install globally
-npm install -g ./mcp-abap-adt-core-<version>.tgz
+npm install -g @mcp-abap-adt/core        # full server: mcp-abap-adt
+npm install -g @mcp-abap-adt/compact     # compact server: mcp-abap-adt-compact (same options)
 
-# Available commands:
-mcp-abap-adt          # stdio transport (default, for MCP clients)
-mcp-abap-adt --transport=http     # HTTP server
-mcp-abap-adt --transport=sse      # SSE server
+# or without installing
+npx -y @mcp-abap-adt/core --help
 ```
 
-**Configuration:**
+Which server and which connection (HTTP, RFC, SNC) to choose, and what RFC needs on the machine:
+[Installation variants](../installation/INSTALLATION.md#installation-variants). Building from a checkout:
+[From source](../installation/INSTALLATION.md#from-source-development).
+
+**Configuration:** the server reads a `.env` only when you name it (`--env-path=<file>`, `--env=<name>` for
+the sessions store, or `--mcp=<destination>` for a service key):
+
 ```bash
-# Create .env file
-cat > .env << 'EOF'
-SAP_URL=https://your-sap-system.com
+cat > /path/to/<destination>.env << 'EOF'
+SAP_URL=https://your-sap-system.example
 SAP_CLIENT=100
 SAP_AUTH_TYPE=jwt
 SAP_GRANT_TYPE=none
-SAP_JWT_TOKEN=your-jwt-token
+SAP_JWT_TOKEN=<token>
 EOF
 
-# Run HTTP server
-mcp-abap-adt --transport=http --port=3000
+# stdio (for MCP clients)
+mcp-abap-adt --env-path=/path/to/<destination>.env
+
+# HTTP server
+mcp-abap-adt --transport=http --port=3000 --env-path=/path/to/<destination>.env
 ```
-
-See [Installation Guide](../installation/INSTALLATION.md#package-installation-details) for detailed instructions.
-
-#### 2. From Source Repository (For Development)
-
-```bash
-# Clone and build
-git clone --recurse-submodules https://github.com/fr0ster/mcp-abap-adt.git
-cd mcp-abap-adt
-npm install
-npm run build
-npm start
-```
-
-See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 
 ---
 
@@ -63,12 +50,13 @@ See [Installation Guide](../installation/INSTALLATION.md) for full instructions.
 - **Compact facade tools** — moved to `@mcp-abap-adt/compact` and documented there (`compact/docs/AVAILABLE_TOOLS.md`) (auto-generated)
 - **[AVAILABLE_TOOLS.md](AVAILABLE_TOOLS.md)** - Full combined tools reference (auto-generated)
 - **[AUTHENTICATION.md](AUTHENTICATION.md)** - The four supported authentications, destinations, service key locations, and header-based auth
+- **[CLI_OPTIONS.md](CLI_OPTIONS.md)** - Every command-line option with its environment and YAML forms
 - **[TERMINOLOGY.md](TERMINOLOGY.md)** - Project-specific terminology
 - **[HANDLERS_MANAGEMENT.md](HANDLERS_MANAGEMENT.md)** - Enable/disable handler groups and exposure
 
 ## Getting Started
 
-1. **Install the server**: Choose package or source installation above
+1. **Install the server**: see Installation above
 2. **Configure your client**:
    - **Auto (recommended)**: Use the configurator (`@mcp-abap-adt/configurator`, repo: `mcp-abap-adt-conf`)
    - **Manual**: See [CLIENT_CONFIGURATION.md](CLIENT_CONFIGURATION.md) for JSON/TOML examples
@@ -90,7 +78,7 @@ objects for each package. Each object includes:
 
 ## Command Reference
 
-After installing from package, these commands are available:
+After installing, these commands are available (`mcp-abap-adt-compact` takes the same options):
 
 ### `mcp-abap-adt` - Default stdio transport
 ```bash
@@ -106,7 +94,7 @@ Starts HTTP server with StreamableHTTP transport.
 
 ### `mcp-abap-adt --transport=sse` - SSE server
 ```bash
-mcp-abap-adt --transport=sse [--port 3000] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
+mcp-abap-adt --transport=sse [--port 3001] [--host localhost] [--env <destination>] [--env-path /path/to/.env]
 ```
 Starts HTTP server with Server-Sent Events transport.
 
@@ -119,7 +107,7 @@ mcp-abap-adt --transport=http --port=8080
 
 ### Example 2: SSE Server Accessible from Network
 ```bash
-mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3000
+mcp-abap-adt --transport=sse --host=0.0.0.0 --port=3001
 ```
 
 ### Example 3: Custom Environment File

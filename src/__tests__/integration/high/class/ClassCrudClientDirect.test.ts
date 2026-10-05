@@ -39,6 +39,7 @@ import {
 import { createTestLogger } from '../../helpers/loggerHelpers';
 import { trackConnection } from '../../helpers/openConnections';
 import { createDiagnosticsTracker } from '../../helpers/persistenceHelpers';
+import { primeSystemContext } from '../../helpers/primeSystemContext';
 import { DEBUG_TESTS, debugLog, delay } from '../../helpers/testHelpers';
 
 // Load environment variables
@@ -150,6 +151,10 @@ describe('Class AdtClient Direct (Reference Implementation)', () => {
         if (connectionAny.connect) {
           await connectionAny.connect();
         }
+        // This test builds its own connection, so it states the system context
+        // itself — the responsible person and master system a create sends —
+        // instead of inheriting whatever an auth-broker setup left in the process.
+        await primeSystemContext(connection);
         client = createAdtClient(connection);
         isCloud = config.authType === 'jwt';
 

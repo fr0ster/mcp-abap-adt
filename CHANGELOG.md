@@ -107,7 +107,9 @@ Migration: [`docs/MIGRATION-17.0.md`](docs/MIGRATION-17.0.md).
   resolved against the repository root, and a missing destination fell back to a `.env` in the working
   directory or the root — the lookup the server dropped in 16.0.0. Hard mode passes the same file to the
   server (`--env` / `--env-path`, with `--auth-broker-path`) and refuses to start without a destination
-  instead of defaulting to `./.env`.
+  instead of defaulting to `./.env`. `ClassCrudClientDirect`, which builds its own connection, primes the system
+  context itself; it passed only through what an auth-broker setup left in the process, and failed the
+  responsible guard with a destination read from `environment.env`.
 - The release notes linked `doc/installation/…`; the workflows checked out submodules the repository
   no longer has (the empty `.gitmodules` is removed).
 

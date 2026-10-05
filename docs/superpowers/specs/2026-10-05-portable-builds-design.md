@@ -125,7 +125,8 @@ New dev dependencies, from the registry: `esbuild`, `postject`. `dist-portable/`
   working, SNC included. With `SAPNWRFC_HOME` unset and no SDK on `PATH`, after one RFC call
   `sapnwrfc.node`, `sapnwrfc.dll` and `icu*57.dll` were loaded from the build's `nwrfcsdk/lib`, not from an
   SDK elsewhere or `System32` — the `PATH` prepend works. The archive README says which folder wins
-  (`SAPNWRFC_HOME` over `nwrfcsdk/lib`) and how to check the loaded path per platform.
+  (`SAPNWRFC_HOME` over `nwrfcsdk/lib`) and how to check the loaded path per platform. Rebuilt after the review fixes (system `tar.exe`, npm
+  without a shell): builds and works.
 - **macOS arm64:** not yet built.
 
 ## Testing

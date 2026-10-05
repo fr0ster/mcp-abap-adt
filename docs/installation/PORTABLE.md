@@ -108,5 +108,6 @@ and SmartScreen asks once. Enough for a build that stays on your machine.
 - **Linux x64:** in a clean container with no Node.js, the archive mounted read-only — version, MCP
   `initialize`, `tools/list`, and the RFC stack loading from `nwrfcsdk/lib` (`npm run portable:smoke`).
 - **Windows 11 x64:** built with `npm run portable:build` and used with SNC; the RFC module and the SDK
-  DLLs load from the archive's `nwrfcsdk/lib`.
+  DLLs load from the archive's `nwrfcsdk/lib`. Rebuilt after the build switched to `System32\\tar.exe` and npm
+  without a shell (2026-10-06): builds and works.
 - **macOS arm64:** build and run `npm run portable:smoke` on a Mac; not verified yet.

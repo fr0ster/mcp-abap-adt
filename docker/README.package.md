@@ -1,29 +1,29 @@
 # Package-Based Docker Deployment
 
-`Dockerfile.package` installs a `@mcp-abap-adt/core` npm tarball instead of building from source.
+`Dockerfile.package` installs the npm tarballs in `docker/packages/` with `npm install -g`, together;
+whatever they depend on and is not there comes from the registry.
 Full guide: [docs/deployment/DOCKER.md](../docs/deployment/DOCKER.md).
 
-## Preparing the tarball
+## Preparing the tarballs
 
-`docker/packages/` must hold **exactly one** `.tgz`: the image extracts `/packages/*.tgz` into
-`/app` and runs `npm install --omit=dev` there.
-
-From the npm registry (from the repository root):
+The published server (from the repository root):
 
 ```bash
-mkdir -p docker/packages
-npm pack @mcp-abap-adt/core@<version> --pack-destination docker/packages
+npm run docker:pack                                              # the latest @mcp-abap-adt/core
+npm pack @mcp-abap-adt/core@<version> --pack-destination docker/packages   # or a pinned one
 ```
 
-Or from the checkout:
+Or a build of the checkout — pack `lib` with `core`, so `core`'s `lib` range is met by this build
+rather than the registry (and the compact packages too, for `mcp-abap-adt-compact`):
 
 ```bash
 npm run build
-npm pack ./server --pack-destination docker/packages   # mcp-abap-adt-core-<version>.tgz
+npm pack --pack-destination docker/packages
+npm pack ./server --pack-destination docker/packages
+# optional: npm pack ./compact-readonly ./compact-modify ./compact --pack-destination docker/packages
 ```
 
-The tarball depends on `@mcp-abap-adt/lib` by range, and the install inside the image takes it
-from npm — a tarball whose `lib` range is not yet published does not install.
+`docker/Dockerfile` does exactly this in its first stage; use it to build from a checkout.
 
 GitHub Releases carry no tarballs.
 
@@ -32,34 +32,32 @@ GitHub Releases carry no tarballs.
 ```bash
 mkdir -p docker/service-keys
 cp /path/to/service-key.json docker/service-keys/<destination>.json
-# edit --mcp=<destination> in docker-compose.package.yml's command
-cd docker
-docker compose -f docker-compose.package.yml up -d --build
-docker compose -f docker-compose.package.yml logs -f
+npm run docker:build:package
+npm run docker:up:package
 curl http://localhost:3000/mcp/health
 ```
 
-The build uses `RUN --mount`, which needs BuildKit (the default builder of current Docker).
+The compose command is `mcp-abap-adt --transport=http --allow-destination-header`; add
+`--mcp=<destination>` for a default destination. The build uses `RUN --mount`, which needs BuildKit
+(the default builder of current Docker).
 
 ## Updating
 
 ```bash
-cd docker
-docker compose -f docker-compose.package.yml down
-rm packages/*.tgz
-npm pack @mcp-abap-adt/core@<new version> --pack-destination packages
-docker compose -f docker-compose.package.yml up -d --build
+npm run docker:down:package
+npm run docker:pack          # empties docker/packages/ first
+npm run docker:build:package
+npm run docker:up:package
 ```
 
-## Checking the tarball
+## Checking the tarballs
 
 ```bash
-tar -xOzf docker/packages/*.tgz package/package.json | grep -E '"(name|version)"'
+for f in docker/packages/*.tgz; do tar -xOzf "$f" package/package.json | grep -E '"(name|version)"'; done
 ```
 
 ## Limits
 
-The image is `node:22-bookworm-slim` with production dependencies only: HTTP connections work, RFC
-and SNC do not (no SAP NW RFC SDK, no compiler). TLS settings (`NODE_EXTRA_CA_CERTS`,
-`TLS_REJECT_UNAUTHORIZED`) go into the compose file's `environment:`. See
-[DOCKER.md](../docs/deployment/DOCKER.md#rfc-and-snc).
+HTTP connections work; RFC and SNC do not (no SAP NW RFC SDK, no compiler, `--omit=optional`). TLS
+settings (`NODE_EXTRA_CA_CERTS`, `TLS_REJECT_UNAUTHORIZED`) go into the compose file's
+`environment:`. See [DOCKER.md](../docs/deployment/DOCKER.md#rfc-and-snc).

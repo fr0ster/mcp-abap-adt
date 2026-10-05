@@ -61,16 +61,19 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: npm audit --omit=dev --audit-level=high
 
-      # Both packages, because 10.0.0 split them: the repository root is
+      # All five packages. 10.0.0 split them: the repository root is
       # `@mcp-abap-adt/lib` and `server/` is `@mcp-abap-adt/core`, which is the
       # one carrying the `mcp-abap-adt` binary. `npm pack` at the root produces
       # `mcp-abap-adt-lib-*.tgz`, so the install step below looked for a file
       # this job had never created and failed on every run since the split.
-      - name: Verify both packages can be created
+      # 14.0.0 added `compact`, `compact-readonly` and `compact-modify`, which
+      # this step did not pack — a compact package that could not be created
+      # or installed reached the release unseen.
+      - name: Verify the packages can be created
         if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
         run: |
           npm pack
-          npm pack ./server
+          npm pack ./compact-readonly ./compact-modify ./server ./compact
 
       # **Both tarballs in one install, or this step cannot pass a release.**
       # `core` depends on `lib` by range, so installing the core tarball alone
@@ -89,9 +92,7 @@ jobs:
         run: |
           mkdir -p /tmp/install-check && cd /tmp/install-check
           npm init -y > /dev/null
-          npm install --no-audit --no-fund \
-            "$GITHUB_WORKSPACE"/mcp-abap-adt-lib-*.tgz \
-            "$GITHUB_WORKSPACE"/mcp-abap-adt-core-*.tgz
+          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/mcp-abap-adt-*.tgz
           # **Did `core` accept the `lib` we just built, or fetch another
           # one?** Not "are the versions equal" — they need not be, and this
           # repository has shipped lib 10.1.0 and 10.2.0 against an unchanged
@@ -110,14 +111,28 @@ jobs:
           # `readFileSync`, not `require`: a package's `exports` map does not
           # offer `./package.json`, so requiring that subpath is
           # ERR_PACKAGE_PATH_NOT_EXPORTED.
+          # The same question for every sibling a package of this repository
+          # depends on: a nested copy is one the registry supplied instead.
           node -e "const {readFileSync,existsSync}=require('node:fs');
-            const v=p=>JSON.parse(readFileSync(p+'/package.json','utf8')).version;
-            const top='node_modules/@mcp-abap-adt/lib';
-            const nested='node_modules/@mcp-abap-adt/core/node_modules/@mcp-abap-adt/lib';
-            if (existsSync(nested)) {
-              console.error('core did not accept the lib built here: it resolved '+v(nested)+' of its own, beside '+v(top)+' at the top level.');
-              console.error('Its declared range is '+JSON.parse(readFileSync('node_modules/@mcp-abap-adt/core/package.json','utf8')).dependencies['@mcp-abap-adt/lib']+'.');
-              process.exit(1);
+            const nm='node_modules/@mcp-abap-adt/';
+            const pkg=n=>JSON.parse(readFileSync(nm+n+'/package.json','utf8'));
+            const ours=['lib','core','compact','compact-readonly','compact-modify'];
+            let bad=0;
+            for (const p of ours) for (const d of Object.keys(pkg(p).dependencies||{})) {
+              const n=d.replace('@mcp-abap-adt/','');
+              if (!ours.includes(n)) continue;
+              if (existsSync(nm+p+'/node_modules/@mcp-abap-adt/'+n)) {
+                console.error(p+' did not accept the '+n+' built here ('+pkg(n).version+'): its range is '+pkg(p).dependencies[d]+', and npm nested another copy.');
+                bad=1;
+              }
             }
-            console.log('core '+v('node_modules/@mcp-abap-adt/core')+' resolved lib '+v(top)+' — the one built here');"
+            if (bad) process.exit(1);
+            console.log(ours.map(p=>p+' '+pkg(p).version).join(', ')+': every sibling is the one built here');"
           ./node_modules/.bin/mcp-abap-adt --help
+          ./node_modules/.bin/mcp-abap-adt-compact --version
+
+      # The image builds from this checkout and installs the packed packages;
+      # it stopped starting once and nothing noticed, because nothing built it.
+      - name: Build the Docker image
+        if: matrix.os == 'ubuntu-latest' && matrix.node-version == 22
+        run: docker build -f docker/Dockerfile -t mcp-abap-adt:ci .

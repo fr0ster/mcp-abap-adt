@@ -158,7 +158,9 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
     SAP_USERNAME                   SAP username
     SAP_PASSWORD                   SAP password
     SAP_CLIENT                     SAP client number
-    Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency)
+    Requires: SAP NW RFC SDK + @mcp-abap-adt/sap-rfc-lite (an optional dependency,
+    compiled by npm install: SAPNWRFC_HOME and a C++ toolchain must be there before it;
+    npm ls -g @mcp-abap-adt/sap-rfc-lite shows (empty) when it was left out)
 
   System Context (per request, first found wins; reads are unaffected):
     SAP_RESPONSIBLE                Responsible person of created objects, always sent. First
@@ -168,8 +170,8 @@ SAP CONNECTION (.env file; secrets and the session live here, never in YAML):
                                    the login: on-premise the destination's SAP_USERNAME, the
                                    x-sap-login of an x-sap-url connection, the environment's
                                    SAP_USERNAME; on a cloud system only the system's user. A create
-                                   that finds none is refused (SNC, a token). A message class
-                                   takes the system's own default responsible.
+                                   that finds none is refused (SNC, a token), a message class
+                                   included.
     SAP_MASTER_SYSTEM              Master system of created objects (no tool takes it as an
                                    argument). First found: x-sap-master-system; the destination's
                                    .env; the environment; on a cloud system, the system id.

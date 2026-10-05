@@ -1,8 +1,16 @@
-FROM debian:bookworm-slim
-ENV DEBIAN_FRONTEND=noninteractive \
-    GLAMA_VERSION="1.0.0"
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl git && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y --no-install-recommends nodejs && npm install -g mcp-proxy@6.1.9 pnpm@10.14.0 && node --version && curl -LsSf https://astral.sh/uv/install.sh | UV_INSTALL_DIR="/usr/local/bin" sh && uv python install 3.13 --default --preview && ln -s $(uv python find) /usr/local/bin/python && python --version && apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-WORKDIR /app
-RUN git clone https://github.com/fr0ster/mcp-abap-adt . && git checkout 2f95e05376e9c2be5095e999178a424b8cd04b10
-RUN (pnpm install) && (pnpm run build)
-CMD ["mcp-proxy","node","./bin/mcp-abap-adt.js"]
+# The image Glama builds for inspecting the server: the published package from
+# the registry behind mcp-proxy, with no destination (inspection-only mode).
+# Glama keeps its own copy of this Dockerfile on its admin page; this one is the
+# reference to keep it in step with.
+
+FROM node:22-bookworm-slim
+
+ARG CORE_VERSION=latest
+RUN npm install -g --omit=optional --no-audit --no-fund "@mcp-abap-adt/core@${CORE_VERSION}" mcp-proxy@6.7.19 \
+ && npm cache clean --force \
+ && mcp-abap-adt --version
+
+USER node
+WORKDIR /home/node
+
+CMD ["mcp-proxy", "mcp-abap-adt"]

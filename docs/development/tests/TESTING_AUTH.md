@@ -44,13 +44,15 @@ EOF
 
 ### 2. Start the server:
 
+With an installed server (a checkout is not runnable by itself — see
+[Installation — from source](../../installation/INSTALLATION.md#from-source-development)):
+
 ```bash
-cd /home/okyslytsia/prj/mcp-abap-adt
-npm run dev
+npx @modelcontextprotocol/inspector mcp-abap-adt --mcp=<destination>   # stdio, in the MCP Inspector
 # or
-npm run dev:http
+mcp-abap-adt --transport=http --allow-destination-header
 # or
-npm run dev:sse
+mcp-abap-adt --transport=sse --allow-destination-header
 ```
 
 ### 3. Test via MCP Inspector or client:
@@ -101,7 +103,7 @@ mcp-abap-adt --mcp=TRIAL --auth-broker-path=~/prj/tmp/
 To enable debug logs for auth-broker:
 
 ```bash
-DEBUG_AUTH_LOG=true npm run dev
+DEBUG_AUTH_LOG=true mcp-abap-adt --transport=http --allow-destination-header
 ```
 
 ## Test Logging Switches

@@ -352,7 +352,7 @@ EXAMPLES:
   mcp-abap-adt --env-path=my-system.env --connection-type=rfc
 
   # Explicit system type (tools default to cloud; the connector to cloud for a jwt, else onprem)
-  mcp-abap-adt --env-path=e96.env --system-type=onprem
+  mcp-abap-adt --env-path=<system>.env --system-type=onprem
   # Or set SAP_SYSTEM_TYPE=onprem in .env file
 
   # Limit to readonly operations only

@@ -122,7 +122,20 @@
     "prepublishOnly": "npm run build",
     "package": "npm pack",
     "package:build": "npm run build && npm pack",
-    "prepare": "husky"
+    "prepare": "husky",
+    "smoke:mcp:crud": "node tools/mcp-crud-smoke.js",
+    "smoke:mcp:matrix": "node tools/mcp-crud-matrix.js",
+    "docker:build": "docker compose -f docker/docker-compose.yml build",
+    "docker:up": "docker compose -f docker/docker-compose.yml up -d",
+    "docker:down": "docker compose -f docker/docker-compose.yml down",
+    "docker:logs": "docker compose -f docker/docker-compose.yml logs -f",
+    "docker:build:headerless": "docker compose -f docker/docker-compose.headerless.yml build",
+    "docker:up:headerless": "docker compose -f docker/docker-compose.headerless.yml up -d",
+    "docker:down:headerless": "docker compose -f docker/docker-compose.headerless.yml down",
+    "docker:pack": "node -e \"const fs=require('node:fs');fs.rmSync('docker/packages',{recursive:true,force:true});fs.mkdirSync('docker/packages',{recursive:true})\" && npm pack @mcp-abap-adt/core --pack-destination docker/packages",
+    "docker:build:package": "docker compose -f docker/docker-compose.package.yml build",
+    "docker:up:package": "docker compose -f docker/docker-compose.package.yml up -d",
+    "docker:down:package": "docker compose -f docker/docker-compose.package.yml down"
   },
   "keywords": [
     "abap",

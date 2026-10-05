@@ -62,15 +62,13 @@ node tools/mcp-crud-smoke.js --help
 
 Defaults not given on the command line come from `tests/test-config.yaml` →
 `environment.integration_hard_mode`. For `--transport=stdio` pass the server command with
-`--stdio-command=` and `--stdio-arg=` (repeat): the built-in default, `node dist/server/launcher.js`,
-does not exist in this layout.
+`--stdio-command=` and `--stdio-arg=` (repeat); the default is the installed `mcp-abap-adt`
+(`--transport=stdio --env-path=.env`).
 
 **`mcp-crud-matrix.js`** — runs the same smoke cases over one protocol from the YAML
 (`--protocol=http|sse|stdio` to override) or, explicitly, several (`--protocols=http,sse,stdio`).
 
-The `smoke:mcp:crud` / `smoke:mcp:matrix` npm scripts are declared in `server/package.json` with
-paths relative to `server/`, where these scripts are not; call them with `node tools/...` from the
-root.
+`npm run smoke:mcp:crud` and `npm run smoke:mcp:matrix` run them from the repository root.
 
 ## Documentation generator
 
@@ -93,11 +91,8 @@ Run it after adding, removing or redescribing tools. The compact tool list is ge
 - `check-todos.js` — lists TODO comments in `src/` (`npm run check-todos`).
 - `version-stats.sh [count]` — version statistics from the git tags (`npm run chrono`).
 - `test-package-read.js`, `run-program-hard-test.js` — one-off probes against a system.
-- `dev-http.js`, `dev-http-v2.js`, `dev-sse.js`, `dev-sse-v2.js` — old dev launchers; they start
-  `dist/server/...` entry points that this layout no longer builds.
 - `bulk-update-interface-handlers.sh` — a one-time migration script, kept for history.
 - `sample-service-key.json` — the shape of a service key, with placeholder values.
-- [`README-v2-test-scripts.md`](README-v2-test-scripts.md) — notes on the `dev-*-v2.js` launchers above (same outdated entry points).
 
 ## Service keys and the `sap-abap-auth` CLI
 

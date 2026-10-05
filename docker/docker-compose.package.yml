@@ -1,13 +1,10 @@
-version: '3.8'
-
-# MCP ABAP ADT Server using npm package tarball
+# MCP ABAP ADT Server installed from the npm tarballs in docker/packages/
 #
-# Before building, put exactly ONE @mcp-abap-adt/core tarball in docker/packages/
-# (a root 'npm pack' makes the @mcp-abap-adt/lib tarball, which has no server):
-#   npm pack @mcp-abap-adt/core@<version> --pack-destination docker/packages
-# See docker/README.package.md
+# Before building, pack the server there (from the repository root):
+#   npm run docker:pack        # the published @mcp-abap-adt/core
+# or a build of the checkout (lib and core together) — see docker/README.package.md
 #
-# Usage: docker-compose -f docker-compose.package.yml up -d
+# Usage (from the repository root): npm run docker:build:package && npm run docker:up:package
 
 services:
   mcp-abap-adt:
@@ -32,7 +29,8 @@ services:
       - AUTH_BROKER_PATH=/app
     # The destination is chosen by the command, not by an environment variable
     # (--mcp=<name> for an own default, --allow-destination-header for x-mcp-destination)
-    command: ["node", "./bin/mcp-abap-adt.js", "--transport", "http", "--mcp=trial", "--allow-destination-header"]
+    #   --mcp=<destination>         a default destination: service-keys/<destination>.json
+    command: ["mcp-abap-adt", "--transport=http", "--allow-destination-header"]
 
     # Volumes for the destinations
     volumes:

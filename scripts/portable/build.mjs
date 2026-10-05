@@ -192,6 +192,50 @@ async function bundle(work, stageDir, server) {
   return outfile;
 }
 
+// README lines on which SDK folder wins and how to check it: SAPNWRFC_HOME,
+// when set, overrides nwrfcsdk/lib, and on Windows a stray copy of the SDK on
+// PATH or in System32 must not be mistaken for the one beside the executable.
+function sdkFolderNote(name, exe, sdkLib, platform) {
+  const lines = [
+    'Which SDK is used: SAPNWRFC_HOME, when set, wins over nwrfcsdk/lib. To use the folder beside the',
+    'executable on a machine where SAPNWRFC_HOME is set globally, clear it for this terminal only:',
+  ];
+  if (platform.startsWith('win')) {
+    lines.push(
+      '  PowerShell:',
+      '    Remove-Item Env:SAPNWRFC_HOME -ErrorAction SilentlyContinue',
+      "    $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -notmatch 'nwrfcsdk' }) -join ';'",
+      `    .\\${name}${exe} --env-path=<your .env> --connection-type=rfc`,
+      '  cmd.exe:',
+      '    set SAPNWRFC_HOME=',
+      `    ${name}${exe} --env-path=<your .env> --connection-type=rfc`,
+      'Removing other SDK folders from PATH is optional; it makes sure a file missing from nwrfcsdk/lib',
+      'is not picked up from another installation.',
+      '',
+      'To see where the SDK was loaded from, make one RFC call (the SDK loads on the first one) and,',
+      'while the server runs:',
+      `  (Get-Process ${name}).Modules | ? FileName -match 'sapnwrfc|icu' | % FileName`,
+    );
+  } else {
+    lines.push(
+      `  env -u SAPNWRFC_HOME ./${name} --env-path=<your .env> --connection-type=rfc`,
+      '',
+      'To see where the SDK was loaded from, make one RFC call (the SDK loads on the first one) and,',
+      'while the server runs:',
+      platform.startsWith('linux')
+        ? `  grep ${sdkLib} /proc/$(pgrep -n ${name})/maps`
+        : `  vmmap $(pgrep -n ${name}) | grep ${sdkLib}`,
+    );
+  }
+  lines.push(
+    '',
+    `If ${sdkLib} is missing from the chosen folder, RFC refuses with "RFC needs the SAP NW RFC SDK"`,
+    'and names the folder it looked in.',
+    '',
+  );
+  return lines;
+}
+
 function inject({ bundleFile, addonFile, nodeBin, work, server, platform, version }) {
   const { exe, sdkLib, archive } = PLATFORMS[platform];
   const name = `${server.name}-${version}-${platform}`;
@@ -238,6 +282,7 @@ function inject({ bundleFile, addonFile, nodeBin, work, server, platform, versio
       `RFC and SNC: copy the files of the SAP NW RFC SDK's lib/ folder into nwrfcsdk/lib/ (${sdkLib} among them),`,
       'or set SAPNWRFC_HOME to an installed SDK. SNC also needs the SNC product (SAP Secure Login Client).',
       '',
+      ...sdkFolderNote(server.name, exe, sdkLib, platform),
       'Documentation: https://github.com/fr0ster/mcp-abap-adt/blob/main/docs/installation/INSTALLATION.md',
       '',
     ].join('\n'),

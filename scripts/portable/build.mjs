@@ -4,61 +4,26 @@
 //
 //   node scripts/portable/build.mjs <full|compact|all> [--platform=<p>] [--version=<v>]
 //
-// PROTOTYPE: builds for the platform it runs on. Cross-building needs the RFC
-// addon of the target platform, which arrives with sap-rfc-lite's prebuilds.
+// Builds for the platform it runs on; cross-building needs the RFC addon of the
+// target platform, which arrives with sap-rfc-lite's prebuilds (a follow-up).
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
+const { SERVERS, PLATFORMS, parseArgs } = createRequire(import.meta.url)('./args.cjs');
 
-const SERVERS = {
-  full: { name: 'mcp-abap-adt', pkg: '@mcp-abap-adt/core' },
-  compact: { name: 'mcp-abap-adt-compact', pkg: '@mcp-abap-adt/compact' },
-};
-const PLATFORMS = {
-  'linux-x64': { node: 'linux-x64', ext: 'tar.xz', exe: '', sdkLib: 'libsapnwrfc.so', sdkExt: '.so', archive: 'tar.gz' },
-  'win-x64': { node: 'win-x64', ext: 'zip', exe: '.exe', sdkLib: 'sapnwrfc.dll', sdkExt: '.dll', archive: 'zip' },
-  'macos-arm64': { node: 'darwin-arm64', ext: 'tar.gz', exe: '', sdkLib: 'libsapnwrfc.dylib', sdkExt: '.dylib', archive: 'zip' },
-};
 const NODE_MAJOR = 'v24.';
 const SEA_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
 
 function fail(message) {
   console.error(`portable: ${message}`);
   process.exit(1);
-}
-
-function currentPlatform() {
-  const key = { linux: 'linux', win32: 'win', darwin: 'macos' }[process.platform];
-  return `${key}-${process.arch}`;
-}
-
-function parseArgs(argv) {
-  const opts = { which: 'all', platform: currentPlatform(), version: undefined };
-  for (const arg of argv) {
-    if (arg.startsWith('--platform=')) opts.platform = arg.slice(11);
-    else if (arg.startsWith('--version=')) opts.version = arg.slice(10);
-    else if (!arg.startsWith('--')) opts.which = arg;
-    else fail(`unknown option ${arg}`);
-  }
-  if (!['full', 'compact', 'all'].includes(opts.which)) {
-    fail(`unknown server "${opts.which}": full, compact or all`);
-  }
-  if (!PLATFORMS[opts.platform]) {
-    fail(`unknown platform "${opts.platform}": ${Object.keys(PLATFORMS).join(', ')}`);
-  }
-  if (opts.platform !== currentPlatform()) {
-    fail(
-      `cross-building ${opts.platform} on ${currentPlatform()} needs the target's prebuilt RFC addon (sap-rfc-lite prebuilds) — not in this prototype`,
-    );
-  }
-  opts.version ??= JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
-  return opts;
 }
 
 const run = (cmd, args, opts = {}) =>
@@ -309,7 +274,13 @@ function inject({ bundleFile, addonFile, nodeBin, work, server, platform, versio
   console.log(`portable: ${target} (${size(target)}), ${archiveFile} (${size(archiveFile)})`);
 }
 
-const opts = parseArgs(process.argv.slice(2));
+let opts;
+try {
+  opts = parseArgs(process.argv.slice(2));
+} catch (error) {
+  fail(error.message);
+}
+opts.version ??= JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')).version;
 const work = path.join(os.tmpdir(), 'mcp-abap-adt-portable', opts.version, opts.platform);
 fs.mkdirSync(work, { recursive: true });
 const { dir: stageDir, sdk } = stage(work, opts.version);

@@ -48,11 +48,23 @@ function prepareAddon({ dir, addon, platform, fromEnv = false, fsImpl = fs }) {
     current = undefined;
   }
   if (!current || digest(current) !== digest(addon)) {
+    // Written aside and renamed over, so a server that is loading the old file
+    // never sees a half-written one.
+    const temporary = `${file}.${process.pid}.tmp`;
     try {
-      fsImpl.writeFileSync(file, addon);
+      fsImpl.writeFileSync(temporary, addon);
+      fsImpl.renameSync(temporary, file);
     } catch (error) {
+      try {
+        fsImpl.rmSync(temporary, { force: true });
+      } catch {
+        // nothing to clean up
+      }
       throw new Error(
-        `the RFC addon could not be written into ${dir}: ${error.code ?? error.message} — the folder must be writable`,
+        `the RFC addon could not be written into ${dir}: ${error.code ?? error.message} — the folder must be writable` +
+          (fromEnv
+            ? ' (SAPNWRFC_HOME chose it; to use the nwrfcsdk/lib folder beside the executable, clear SAPNWRFC_HOME)'
+            : ''),
       );
     }
   }

@@ -69,6 +69,48 @@ describe('portable RFC loader', () => {
     expect(fs.readFileSync(path.join(dir, 'sapnwrfc.node'))).toEqual(addon);
   });
 
+  it('replaces the addon atomically — a temporary file renamed over it', () => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, 'libsapnwrfc.so'), '');
+    fs.writeFileSync(path.join(dir, 'sapnwrfc.node'), 'old');
+    const renameSync = jest.fn(fs.renameSync);
+    const writeFileSync = jest.fn(fs.writeFileSync);
+    loader.prepareAddon({
+      dir,
+      addon,
+      platform: 'linux',
+      fsImpl: { ...fs, renameSync, writeFileSync },
+    });
+    const written = String(writeFileSync.mock.calls[0][0]);
+    expect(written).not.toBe(path.join(dir, 'sapnwrfc.node'));
+    expect(renameSync).toHaveBeenCalledWith(
+      written,
+      path.join(dir, 'sapnwrfc.node'),
+    );
+    expect(fs.readFileSync(path.join(dir, 'sapnwrfc.node'))).toEqual(addon);
+    expect(fs.readdirSync(dir).sort()).toEqual([
+      'libsapnwrfc.so',
+      'sapnwrfc.node',
+    ]);
+  });
+
+  it('suggests clearing SAPNWRFC_HOME when the folder it chose is not writable', () => {
+    const dir = tmp();
+    fs.writeFileSync(path.join(dir, 'libsapnwrfc.so'), '');
+    const writeFileSync = () => {
+      throw Object.assign(new Error('denied'), { code: 'EPERM' });
+    };
+    expect(() =>
+      loader.prepareAddon({
+        dir,
+        addon,
+        platform: 'linux',
+        fromEnv: true,
+        fsImpl: { ...fs, writeFileSync },
+      }),
+    ).toThrow(/SAPNWRFC_HOME chose it.*clear SAPNWRFC_HOME/);
+  });
+
   it('names an unwritable folder', () => {
     const dir = tmp();
     fs.writeFileSync(path.join(dir, 'libsapnwrfc.so'), '');

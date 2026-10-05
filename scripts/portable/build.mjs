@@ -16,7 +16,9 @@ import { fileURLToPath } from 'node:url';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '../..');
-const { SERVERS, PLATFORMS, parseArgs } = createRequire(import.meta.url)('./args.cjs');
+const require_ = createRequire(import.meta.url);
+const { SERVERS, PLATFORMS, parseArgs } = require_('./args.cjs');
+const { sdkHome, addonRpath, builtAddon, isStaged, markStaged } = require_('./staging.cjs');
 
 const NODE_MAJOR = 'v24.';
 const SEA_FUSE = 'NODE_SEA_FUSE_fce680ab2cc467b6e072b8b5df1996b2';
@@ -45,14 +47,14 @@ const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 function stage(work, version) {
   const dir = path.join(work, 'stage');
-  const marker = path.join(dir, '.staged');
-  if (fs.existsSync(marker)) {
-    const staged = JSON.parse(fs.readFileSync(marker, 'utf8'));
-    if (staged.version === version) return { dir, sdk: staged.sdk };
+  let sdk;
+  try {
+    sdk = sdkHome(process.env);
+  } catch (error) {
+    fail(error.message);
   }
-  if (!process.env.SAPNWRFC_HOME) {
-    fail('set SAPNWRFC_HOME to the SAP NW RFC SDK of this platform: the RFC addon is compiled against it');
-  }
+  // Cached per version AND SDK, and only once the addon was really built.
+  if (isStaged(dir, { version, sdk })) return { dir, sdk };
   fs.rmSync(dir, { recursive: true, force: true });
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
@@ -63,24 +65,23 @@ function stage(work, version) {
       `${SERVERS.full.pkg}@${version}`, `${SERVERS.compact.pkg}@${version}`],
     { cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'], shell: process.platform === 'win32' },
   );
-  // The SDK the addon was compiled against: its RUNPATH names this folder.
-  const sdk = path.resolve(process.env.SAPNWRFC_HOME);
-  fs.writeFileSync(marker, JSON.stringify({ version, sdk }));
+  try {
+    markStaged({ dir, version, sdk });
+  } catch (error) {
+    fail(error.message);
+  }
   return { dir, sdk };
 }
 
 function addon(stageDir, sdk, work, platform) {
-  const built = path.join(stageDir, 'node_modules/@mcp-abap-adt/sap-rfc-lite/build/Release/sapnwrfc.node');
-  if (!fs.existsSync(built)) {
-    fail('the RFC addon was not built: check SAPNWRFC_HOME and the C++ toolchain (npm left the optional dependency out)');
-  }
+  const built = builtAddon(stageDir);
   const out = path.join(work, 'sapnwrfc.node');
   const bytes = fs.readFileSync(built);
   if (platform === 'linux-x64') {
     // The addon's RUNPATH names the SDK on this machine; rewrite it to $ORIGIN
     // in place (NUL-terminated, shorter than the original) so it finds the SDK
     // in its own folder — where the loader writes it.
-    const old = Buffer.from(`${path.join(sdk, 'lib')}\0`);
+    const old = Buffer.from(`${addonRpath(sdk)}\0`);
     const at = bytes.indexOf(old);
     if (at < 0 || bytes.indexOf(old, at + 1) >= 0) fail('could not locate exactly one RUNPATH in the RFC addon');
     const origin = Buffer.from('$ORIGIN\0');
@@ -89,7 +90,7 @@ function addon(stageDir, sdk, work, platform) {
   }
   fs.writeFileSync(out, bytes);
   if (platform === 'macos-arm64') {
-    run('install_name_tool', ['-delete_rpath', path.join(sdk, 'lib'), '-add_rpath', '@loader_path', out]);
+    run('install_name_tool', ['-delete_rpath', addonRpath(sdk), '-add_rpath', '@loader_path', out]);
     run('codesign', ['--force', '--sign', '-', out]);
   }
   return out;

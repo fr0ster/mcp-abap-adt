@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **`@mcp-abap-adt/core` no longer declares `dotenv`.** The server never imports it; `.env` files are
+  read by `@mcp-abap-adt/lib`, which keeps its own dependency, so an install of core carries `dotenv`
+  once, through lib.
+
 ## [17.0.1] - 2026-10-05
 
 Documentation and release metadata; no change to what the servers do.

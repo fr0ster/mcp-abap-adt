@@ -20,7 +20,7 @@ const require_ = createRequire(import.meta.url);
 const { SERVERS, PLATFORMS, parseArgs } = require_('./args.cjs');
 const { sdkHome, addonRpath, builtAddon, isStaged, markStaged } = require_('./staging.cjs');
 const { patchRunpath } = require_('./elf.cjs');
-const { npmCommand, tarCommand } = require_('./tools.cjs');
+const { npmCommand, tarCommand, buildToolSpecs, toolsInstalled, markToolsInstalled } = require_('./tools.cjs');
 // Taken before cleanEnv drops the npm_* variables.
 const npm = npmCommand();
 const tar = tarCommand();
@@ -164,8 +164,29 @@ async function nodeBinary(work, platform) {
   return { bin, version };
 }
 
-async function bundle(work, stageDir, server) {
-  const esbuild = await import('esbuild');
+// esbuild and postject at the repository's ranges, in the build cache, so the
+// checkout needs only its production dependencies (tools.cjs).
+function buildTools() {
+  const dir = path.join(os.tmpdir(), 'mcp-abap-adt-portable', 'tools');
+  const specs = buildToolSpecs(JSON.parse(fs.readFileSync(path.join(repo, 'package.json'), 'utf8')));
+  if (!toolsInstalled(dir, specs)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'package.json'), '{"private":true}\n');
+    console.log(`portable: installing ${specs.join(' and ')} into the build cache`);
+    run(npm.cmd, [...npm.args, 'install', '--no-audit', '--no-fund', ...specs], {
+      cwd: dir, env: cleanEnv(), stdio: ['ignore', 'ignore', 'inherit'],
+    });
+    markToolsInstalled(dir, specs);
+  }
+  const resolve = createRequire(path.join(dir, 'package.json'));
+  return {
+    esbuild: resolve('esbuild'),
+    postject: path.join(path.dirname(resolve.resolve('postject/package.json')), 'dist', 'cli.js'),
+  };
+}
+
+async function bundle(work, stageDir, server, esbuild) {
   const entry = path.join(work, `${server.name}-entry.cjs`);
   const launcher = path.join(stageDir, 'node_modules', server.pkg, 'dist/launcher.js');
   fs.writeFileSync(
@@ -249,7 +270,7 @@ function sdkFolderNote(name, exe, sdkLib, platform) {
   return lines;
 }
 
-function inject({ bundleFile, addonFile, nodeBin, work, server, platform, version, sdk }) {
+function inject({ bundleFile, addonFile, nodeBin, postject, work, server, platform, version, sdk }) {
   const { exe, sdkLib, sdkExt, archive } = PLATFORMS[platform];
   const name = `${server.name}-${version}-${platform}`;
   const outDir = path.join(repo, 'dist-portable', name);
@@ -284,7 +305,6 @@ function inject({ bundleFile, addonFile, nodeBin, work, server, platform, versio
   const target = path.join(outDir, `${server.name}${exe}`);
   fs.copyFileSync(nodeBin, target);
   if (platform === 'macos-arm64') run('codesign', ['--remove-signature', target]);
-  const postject = path.join(repo, 'node_modules', 'postject', 'dist', 'cli.js');
   run(process.execPath, [
     postject, target, 'NODE_SEA_BLOB', blob, '--sentinel-fuse', SEA_FUSE,
     ...(platform === 'macos-arm64' ? ['--macho-segment-name', 'NODE_SEA'] : []),
@@ -334,9 +354,13 @@ fs.mkdirSync(work, { recursive: true });
 const { dir: stageDir, sdk } = stage(work, opts.version);
 const addonFile = addon(stageDir, sdk, work, opts.platform);
 const { bin: nodeBin } = await nodeBinary(work, opts.platform);
+const tools = buildTools();
 const servers = opts.which === 'all' ? ['full', 'compact'] : [opts.which];
 for (const key of servers) {
   const server = SERVERS[key];
-  const bundleFile = await bundle(work, stageDir, server);
-  inject({ bundleFile, addonFile, nodeBin, work, server, platform: opts.platform, version: opts.version, sdk });
+  const bundleFile = await bundle(work, stageDir, server, tools.esbuild);
+  inject({
+    bundleFile, addonFile, nodeBin, postject: tools.postject, work, server,
+    platform: opts.platform, version: opts.version, sdk,
+  });
 }

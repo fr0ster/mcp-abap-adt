@@ -16,7 +16,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `npm run portable:build`, `portable:build:full` or `portable:build:compact`, from the published packages of the
   version; checked with `npm run portable:smoke`. It carries the SDK, so it is never published or handed on. Verified on
   Linux in a clean container, on Windows 11 with SNC and on macOS arm64 (SNC not verified there). See
-  `docs/installation/PORTABLE.md`.
+  `docs/installation/PORTABLE.md`. The build needs only the repository's production dependencies
+  (`npm ci --omit=dev --ignore-scripts`): it installs esbuild and postject, at the versions the repository
+  declares, into its own cache.
 - **`@mcp-abap-adt/sap-rfc-lite` 0.2.2**, picked up by the existing `^0.2.1` range, builds the RFC module on a
   current macOS (its minimum was 10.15, which current Xcode's libc++ refuses) and under `FORCE_COLOR` (its
   `binding.gyp` read the N-API version through `node -p`, which colours numbers). The portable build still runs its

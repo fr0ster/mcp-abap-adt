@@ -58,15 +58,7 @@ jobs:
       # report nobody reads.
       - name: Run tests
         run: |
-          if [ "$RUNNER_OS" = macOS ]; then
-            (ulimit -s 1024; node --stack-size=60000 -e "function f(){f()}f()") || echo "node exit $?"
-            launchctl list | grep -i -E "crash|ReportCrash|osanalytics" || echo "no crash agent in launchctl list"
-            sudo launchctl list | grep -i -E "crash|ReportCrash|osanalytics" || echo "no crash daemon (root)"
-            defaults read com.apple.CrashReporter 2>&1 || true
-            for i in 1 2 3 4 5 6; do sleep 10; n=$(find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports /var/db/diagnostics -name '*.ips' -mmin -5 2>/dev/null | wc -l); echo "after $((i*10))s: $n new .ips"; done
-            sudo find / -xdev -name '*.ips' -mmin -5 2>/dev/null | head
-            exit 139
-          fi
+          if [ "$RUNNER_OS" = macOS ]; then (ulimit -s 1024; node --stack-size=60000 -e "function f(){f()}f()"); fi
           npm test
         shell: bash
 

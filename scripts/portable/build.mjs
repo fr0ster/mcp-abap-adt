@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Portable builds: one executable per server and platform, Node.js inside, the
-// RFC addon embedded. See docs/superpowers/specs/2026-10-05-portable-builds-design.md.
+// RFC addon embedded. See docs/installation/PORTABLE.md.
 //
 //   node scripts/portable/build.mjs <full|compact|all> [--platform=<p>] [--version=<v>]
 //

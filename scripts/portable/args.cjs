@@ -69,7 +69,7 @@ function parseArgs(argv, here = currentPlatform()) {
   }
   if (opts.platform !== here) {
     throw new Error(
-      `cross-building ${opts.platform} on ${here} needs the target's prebuilt RFC addon (sap-rfc-lite prebuilds) — not in this version`,
+      `builds only for the platform it runs on (${here}), not ${opts.platform}`,
     );
   }
   return opts;

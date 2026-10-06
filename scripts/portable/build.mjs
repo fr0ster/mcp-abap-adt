@@ -4,8 +4,7 @@
 //
 //   node scripts/portable/build.mjs <full|compact|all> [--platform=<p>] [--version=<v>]
 //
-// Builds for the platform it runs on; cross-building needs the RFC addon of the
-// target platform, which arrives with sap-rfc-lite's prebuilds (a follow-up).
+// Builds for the platform it runs on.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';

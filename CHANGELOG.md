@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [17.1.0] - 2026-10-06
+
+A personal portable build of both servers; no change to what the servers do.
+
 ### Added
 
 - **A personal portable build**: one executable per server (`mcp-abap-adt`, `mcp-abap-adt-compact`) and platform

@@ -73,7 +73,6 @@
     "@mcp-abap-adt/lib": "^17.0.0",
     "@mcp-abap-adt/logger": "^0.4.1",
     "@modelcontextprotocol/sdk": "^1.32.0",
-    "dotenv": "^18.0.5",
     "express": "^5.2.1"
   },
   "jest": {

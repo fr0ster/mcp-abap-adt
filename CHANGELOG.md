@@ -15,10 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Node.js, npm, compiler or `SAPNWRFC_HOME` on the machine. Built from this repository for the platform it runs on with
   `npm run portable:build`, `portable:build:full` or `portable:build:compact`, from the published packages of the
   version; checked with `npm run portable:smoke`. It carries the SDK, so it is never published or handed on. Verified on
-  Linux in a clean container and on Windows 11 with SNC; macOS not yet. See `docs/installation/PORTABLE.md`.
-  The build runs the nested `npm install` with colour off: `@mcp-abap-adt/sap-rfc-lite`'s `binding.gyp` reads its N-API
-  version through `node -p`, which `FORCE_COLOR` turns into ANSI codes and an empty `NAPI_VERSION` — the same happens
-  to a plain `npm install` of the server in a shell or CI that sets `FORCE_COLOR`, until `sap-rfc-lite` is fixed.
+  Linux in a clean container, on Windows 11 with SNC and on macOS arm64 (SNC not verified there). See
+  `docs/installation/PORTABLE.md`.
+- **`@mcp-abap-adt/sap-rfc-lite` 0.2.2**, picked up by the existing `^0.2.1` range, builds the RFC module on a
+  current macOS (its minimum was 10.15, which current Xcode's libc++ refuses) and under `FORCE_COLOR` (its
+  `binding.gyp` read the N-API version through `node -p`, which colours numbers). The portable build still runs its
+  nested `npm install` with colour off.
+
+### Removed
+
+- **`@mcp-abap-adt/core` no longer declares `dotenv`.** The server never imports it; `.env` files are
+  read by `@mcp-abap-adt/lib`, which keeps its own dependency, so an install of core carries `dotenv`
+  once, through lib.
 
 ## [17.0.1] - 2026-10-05
 

@@ -11,6 +11,10 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     strategy:
+      # One platform failing does not cancel the others: the intermittent
+      # macOS segfault below used to take the whole matrix down with it, and
+      # the cancelled jobs told nothing about their own platforms.
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
         node-version: [22, 24]
@@ -23,7 +27,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
+          # The runner image caches a Node per major; without this the job
+          # runs whatever patch the image was built with, however old.
+          check-latest: true
           cache: 'npm'
+
+      - name: Show the runtime
+        run: node -p "process.version + ' ' + process.platform + '-' + process.arch" && npm -v
 
       - name: Install dependencies
         run: npm ci
@@ -48,6 +58,31 @@ jobs:
       # report nobody reads.
       - name: Run tests
         run: npm test
+
+      # **macOS + Node 24: `npm test` dies on SIGSEGV now and then** — exit 139,
+      # at a different test file each time (seen from 2026-10-03, on main and
+      # on branches), and a rerun passes. Jest says nothing because the process
+      # is gone, so the only record is the system's crash report. These two
+      # steps put its summary (process, parent, signal, faulting thread) in the
+      # log and keep the full reports as an artifact.
+      - name: Summarise macOS crash reports
+        if: failure() && runner.os == 'macOS'
+        run: |
+          sw_vers
+          files=$(find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name '*.ips' -newer package.json 2>/dev/null || true)
+          if [ -z "$files" ]; then echo "no crash report written"; exit 0; fi
+          node scripts/ci/ips-summary.cjs $files
+
+      - name: Keep macOS crash reports
+        if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: crash-reports-node${{ matrix.node-version }}
+          path: |
+            ~/Library/Logs/DiagnosticReports/*.ips
+            /Library/Logs/DiagnosticReports/*.ips
+          if-no-files-found: ignore
+          retention-days: 14
 
       # The server package's own tests: the root Jest's roots are `src` and
       # `compact*`, so `server/src/__tests__` never ran in CI before.

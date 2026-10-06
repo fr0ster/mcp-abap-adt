@@ -72,7 +72,12 @@ jobs:
         if: failure() && runner.os == 'macOS'
         run: |
           sw_vers
-          files=$(find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name '*.ips' -newer package.json 2>/dev/null || true)
+          # Only reports written during this job: the image ships older ones
+          # (a JetsamEvent from when it was built), which say nothing here.
+          mkdir -p "$RUNNER_TEMP/crash-reports"
+          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name '*.ips' -newer package.json \
+            -exec cp {} "$RUNNER_TEMP/crash-reports/" \; 2>/dev/null || true
+          files=$(ls "$RUNNER_TEMP"/crash-reports/*.ips 2>/dev/null || true)
           if [ -z "$files" ]; then echo "no crash report written"; exit 0; fi
           node scripts/ci/ips-summary.cjs $files
 
@@ -81,9 +86,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: crash-reports-node${{ matrix.node-version }}
-          path: |
-            ~/Library/Logs/DiagnosticReports/*.ips
-            /Library/Logs/DiagnosticReports/*.ips
+          path: ${{ runner.temp }}/crash-reports/*.ips
           if-no-files-found: ignore
           retention-days: 14
 

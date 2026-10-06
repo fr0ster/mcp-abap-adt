@@ -110,4 +110,7 @@ and SmartScreen asks once. Enough for a build that stays on your machine.
 - **Windows 11 x64:** built with `npm run portable:build` and used with SNC; the RFC module and the SDK
   DLLs load from the archive's `nwrfcsdk/lib`. Rebuilt after the build switched to `System32\\tar.exe` and npm
   without a shell (2026-10-06): builds and works.
-- **macOS arm64:** build and run `npm run portable:smoke` on a Mac; not verified yet.
+- **macOS arm64:** built with `npm run portable:build` on Apple silicon (2026-10-06) — `npm run
+  portable:smoke` passes for both servers, the RFC module's only `LC_RPATH` is `@loader_path` and it
+  links the SDK libraries beside it; the signed executables start. SNC is not verified on macOS: no SAP
+  system was reachable from that Mac.

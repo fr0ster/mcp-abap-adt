@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A personal portable build**: one executable per server (`mcp-abap-adt`, `mcp-abap-adt-compact`) and platform
+  (Windows x64 and macOS arm64: HTTP, RFC, SNC; Linux x64: HTTP, RFC) — Node.js 24 inside as a single executable
+  application, the builder's SAP NW RFC SDK and the RFC module beside it in `nwrfcsdk/lib`. Unpack and run: no
+  Node.js, npm, compiler or `SAPNWRFC_HOME` on the machine. Built from this repository for the platform it runs on with
+  `npm run portable:build`, `portable:build:full` or `portable:build:compact`, from the published packages of the
+  version; checked with `npm run portable:smoke`. It carries the SDK, so it is never published or handed on. Verified on
+  Linux in a clean container and on Windows 11 with SNC; macOS not yet. See `docs/installation/PORTABLE.md`.
+  The build runs the nested `npm install` with colour off: `@mcp-abap-adt/sap-rfc-lite`'s `binding.gyp` reads its N-API
+  version through `node -p`, which `FORCE_COLOR` turns into ANSI codes and an empty `NAPI_VERSION` — the same happens
+  to a plain `npm install` of the server in a shell or CI that sets `FORCE_COLOR`, until `sap-rfc-lite` is fixed.
+
 ### Removed
 
 - **`@mcp-abap-adt/core` no longer declares `dotenv`.** The server never imports it; `.env` files are

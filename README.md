@@ -38,7 +38,7 @@ You can configure MCP clients either manually (JSON/TOML) or via the configurato
 
 ## Getting Started
 
-Pick a variant first — full or compact server, and HTTP, RFC or SNC to the system. HTTP needs nothing but Node.js 22 or 24; **RFC and SNC need the SAP NW RFC SDK and a C++ toolchain on the machine before `npm install`**, because the RFC module is compiled during the install and silently left out when it cannot be. [Installation variants](docs/installation/INSTALLATION.md#installation-variants) has the table and the commands; [RFC Setup](docs/installation/RFC_SETUP.md) the steps.
+Pick a variant first — full or compact server, and HTTP, RFC or SNC to the system. HTTP needs nothing but Node.js 22 or 24; **RFC and SNC need the SAP NW RFC SDK and a C++ toolchain on the machine before `npm install`**, because the RFC module is compiled during the install and silently left out when it cannot be. [Installation variants](docs/installation/INSTALLATION.md#installation-variants) has the table and the commands; [RFC Setup](docs/installation/RFC_SETUP.md) the steps. To run without Node.js on a machine, build your own [portable executable](docs/installation/PORTABLE.md) — Node.js and your SAP NW RFC SDK inside.
 
 Install the server and configure your client using the configurator:
 

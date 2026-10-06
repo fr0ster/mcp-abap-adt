@@ -64,6 +64,13 @@ and still reports success. The server then starts with every tool and refuses th
 `@mcp-abap-adt/sap-rfc-lite is not available`. Fix the cause and run the install again. The toolchain per
 platform, the runtime settings and the SNC prerequisites: [RFC Setup](RFC_SETUP.md).
 
+### Portable build (personal)
+
+One executable per server and platform, with Node.js and your own SAP NW RFC SDK inside: unpack and run,
+no Node.js, npm or compiler on the machine — HTTP, RFC and, on Windows and macOS, SNC. You build it
+yourself from this repository (`npm run portable:build`) and keep it: it carries the SDK, so it is never
+handed on. See [Portable Build](PORTABLE.md).
+
 ### HTTPS certificates
 
 The server verifies the certificate of an `https://` system (from 17.0.0). A system whose certificate is

@@ -15,9 +15,6 @@ Releasing: [docs/deployment/RELEASE.md](../deployment/RELEASE.md).
 Work planned but not started or not finished, in [`roadmaps/`](roadmaps/):
 
 - `PORTABLE_CROSS_BUILD_ROADMAP.md` — a portable executable built for another platform
-- `TEST_LOGGING_ROADMAP.md`
-- `TEST_REFACTORING_ROADMAP.md`
-- `USAGE_DOCUMENTATION_ROADMAP.md`
 
 A roadmap that is done or abandoned is deleted; its history is in git.
 

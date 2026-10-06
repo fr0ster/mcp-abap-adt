@@ -130,3 +130,40 @@ describe('the search path the smoke check runs with', () => {
     );
   });
 });
+
+describe('build tools installed apart from the repository', () => {
+  const manifest = {
+    devDependencies: {
+      '@biomejs/biome': '^2.5.15',
+      esbuild: '^0.28.2',
+      postject: '^1.0.0-alpha.6',
+    },
+  };
+
+  it('takes esbuild and postject at the ranges the repository declares, nothing else', () => {
+    expect(tools.buildToolSpecs(manifest)).toEqual([
+      'esbuild@^0.28.2',
+      'postject@^1.0.0-alpha.6',
+    ]);
+  });
+
+  it('refuses a manifest that lost one of them', () => {
+    expect(() =>
+      tools.buildToolSpecs({ devDependencies: { esbuild: '^0.28.2' } }),
+    ).toThrow(/postject/);
+  });
+
+  it('reuses the tools folder only for the same specs', () => {
+    const fs = require('node:fs');
+    const os = require('node:os');
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'portable-tools-'));
+    const specs = tools.buildToolSpecs(manifest);
+    expect(tools.toolsInstalled(dir, specs)).toBe(false);
+    tools.markToolsInstalled(dir, specs);
+    expect(tools.toolsInstalled(dir, specs)).toBe(true);
+    expect(
+      tools.toolsInstalled(dir, ['esbuild@^0.29.0', 'postject@^1.0.0-alpha.6']),
+    ).toBe(false);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});

@@ -17,8 +17,14 @@ function summarize(text) {
     const thread = (body.threads || [])[index] || {};
     const frames = (thread.frames || []).slice(0, 40).map((f) => {
       const image = (images[f.imageIndex] || {}).name || '?';
-      const where = f.symbol
-        ? `${f.symbol} + ${f.symbolLocation ?? 0}`
+      // V8's templated symbols run to a thousand characters; the name and
+      // the start of the argument list are what tell one frame from another.
+      const symbol =
+        f.symbol && f.symbol.length > 150
+          ? `${f.symbol.slice(0, 150)}…`
+          : f.symbol;
+      const where = symbol
+        ? `${symbol} + ${f.symbolLocation ?? 0}`
         : `0x${(f.imageOffset ?? 0).toString(16)}`;
       return `  ${image} ${where}`;
     });

@@ -54,6 +54,25 @@ describe('ips-summary', () => {
     expect(text).not.toContain('__psynch_cvwait');
   });
 
+  it('cuts a templated C++ symbol to one readable line', () => {
+    const long = `v8::internal::LookupIterator::LookupIterator(${'v8::internal::Smi, '.repeat(40)})`;
+    const text = summarize(
+      report({
+        ...crash,
+        faultingThread: 0,
+        threads: [
+          { frames: [{ imageIndex: 0, symbol: long, symbolLocation: 376 }] },
+        ],
+      }),
+    );
+    const frame = text
+      .split('\n')
+      .find((l: string) => l.includes('LookupIterator'));
+    expect(frame.length).toBeLessThanOrEqual(200);
+    expect(frame).toContain('v8::internal::LookupIterator::LookupIterator(');
+    expect(frame).toMatch(/… \+ 376$/);
+  });
+
   it('says what it could not read instead of throwing', () => {
     expect(summarize('not a crash report')).toMatch(/^unreadable crash report/);
   });

@@ -82,10 +82,16 @@ jobs:
           sw_vers
           # Only reports written during this job: the image ships older ones
           # (a JetsamEvent from when it was built), which say nothing here.
+          # The report lands a few seconds after the crash (measured: 6 s), so
+          # this step, which starts at once, waits for it — up to 30 s.
           mkdir -p "$RUNNER_TEMP/crash-reports"
-          find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name '*.ips' -newer package.json \
-            -exec cp {} "$RUNNER_TEMP/crash-reports/" \; 2>/dev/null || true
-          files=$(ls "$RUNNER_TEMP"/crash-reports/*.ips 2>/dev/null || true)
+          for i in 1 2 3 4 5 6; do
+            find ~/Library/Logs/DiagnosticReports /Library/Logs/DiagnosticReports -name '*.ips' -newer package.json \
+              -exec cp {} "$RUNNER_TEMP/crash-reports/" \; 2>/dev/null || true
+            files=$(ls "$RUNNER_TEMP"/crash-reports/*.ips 2>/dev/null || true)
+            [ -n "$files" ] && break
+            sleep 5
+          done
           if [ -z "$files" ]; then echo "no crash report written"; exit 0; fi
           node scripts/ci/ips-summary.cjs $files
 

@@ -62,9 +62,6 @@ dist-portable/
   mcp-abap-adt-<version>-<platform>.zip | .tar.gz
 ```
 
-Building for another platform (Windows on Linux, for example) is not supported yet: it needs the RFC
-module of the target platform built in advance.
-
 **The build cache.** The servers installed from npm, the RFC module compiled against your SDK and the
 downloaded Node.js are kept in `<temp>/mcp-abap-adt-portable/<version>/<platform>/`, the build tools in
 `<temp>/mcp-abap-adt-portable/tools/` (`<temp>` is the

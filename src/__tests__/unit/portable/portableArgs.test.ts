@@ -37,9 +37,9 @@ describe('portable build arguments', () => {
     );
   });
 
-  it('refuses cross-building before anything is downloaded', () => {
+  it('refuses another platform before anything is downloaded', () => {
     expect(() => args.parseArgs(['--platform=win-x64'], 'linux-x64')).toThrow(
-      /cross-building win-x64 on linux-x64/,
+      /^builds only for the platform it runs on \(linux-x64\), not win-x64$/,
     );
   });
 

@@ -58,7 +58,7 @@ jobs:
       # report nobody reads.
       - name: Run tests
         run: |
-          if [ "$RUNNER_OS" = macOS ]; then node --stack-size=50000000 -e "function f(){f()}f()"; fi
+          if [ "$RUNNER_OS" = macOS ]; then (ulimit -s 1024; node --stack-size=60000 -e "function f(){f()}f()"); fi
           npm test
         shell: bash
 

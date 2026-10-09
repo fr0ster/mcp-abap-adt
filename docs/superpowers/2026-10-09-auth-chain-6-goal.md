@@ -25,7 +25,7 @@ server.
 | Mode | Who uses it | Where credentials come from | Who owns them |
 |---|---|---|---|
 | **stdio** | one user, who owns the process | the default destination (`--mcp` / `--env` / `--env-path`), service keys included — through the broker, with its session files and an interactive (browser) login when one is needed | the server: cancellation, session writes, renewal |
-| **HTTP and SSE** | many users | each request alone: `x-sap-*` headers (a user and password, or a token), through providers the server builds directly from auth-providers 6.0.0 | the request that carries them; the server keeps none |
+| **HTTP and SSE** | many users | **only the credentials the user sends in the request's headers** (`x-sap-*`: a user and password, or a token), through providers the server builds directly from auth-providers 6.0.0 — nothing else: no destination, no server-side token, no credential the server holds of any kind | the request that carries them; the server keeps none |
 | **embedded** (`EmbeddableMcpServer`) | the consumer's application | the consumer: its injected connection, or the credentials it gives per request | the consumer: authentication, cancellation, persistence; the server keeps none |
 
 **The default destination (`--mcp` / `--env` / `--env-path`) exists only for
@@ -164,8 +164,10 @@ never hides one and never guesses one.
    - **Per-request credentials are never stored or shared.** Credentials from
      headers serve only the request that carried them.
 4. **The modes do not mix.** The default destination, the broker, session
-   files and interactive login exist in stdio only. HTTP and SSE take
-   credentials from each request only. An embedding consumer's credentials
+   files and interactive login exist in stdio only. HTTP and SSE work only
+   with the credentials the user sends in the request's headers — nothing
+   else: no destination, no server-side token, no credential the server holds
+   of any kind. An embedding consumer's credentials
    stay the consumer's. A configuration that would mix them is refused, never
    adapted.
 5. **No built-in timeouts of the chain's making.** A wait ends with a result,

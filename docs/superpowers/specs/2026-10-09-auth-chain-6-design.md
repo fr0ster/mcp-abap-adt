@@ -41,11 +41,11 @@ connection 14.0.1 (`6f6bb41`), auth-stores 4.0.0 (`2dbced7`), interfaces-auth
 | Success: failures reach the user as the chain made them | §7; D14–D17, D28 |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
 | Success: a login ends when someone ends it — before any MCP request exists | §5.3; D6, D32 |
-| Success: … cancellation follows the MCP client | §5.2, §5.4; D4, D5, D7, D31, D32 |
+| Success: … cancellation follows the MCP client | §3.1, §5.2, §5.4; D4, D5, D7, D31, D32, D34 |
 | Success: … closing a session cancels its waits | §5.5 |
 | Success: … any bound is the server's, and visible | §5.7; D10 |
 | Success: … nothing keeps waiting for a client that left | §5.1–§5.6, §6.4; D31–D33 |
-| Success: … one waiter leaving ends only its own wait | §5.1, §5.2, §5.6; D31, D32; §13.3 |
+| Success: … one waiter leaving ends only its own wait | §3.1, §5.1, §5.2, §5.6; D31, D32; §13.3 |
 | Success: session writes are the server's stated choice | §6.2–§6.4; D12, D33 |
 | Success: renewal is the server's stated choice | §6.1; D11 |
 | Success: debug output is opt-in and safe | §9; D24, D25 |
@@ -157,7 +157,7 @@ outside the repository; the scripts are not kept, each becomes a test in §13):
   — the cancelled one included. The path is `answerCredentialFailure` → `renewCredential` →
   `authorizedFrom` → `sendObserved` (connection `src/connection/AbstractAbapConnection.ts:1489-1521`),
   which reads no signal: the connection has none to read.
-- **M2 — the server can stop that resend without a connection change.** The same run with a
+- **M2 — a gate in the provider stops that resend over HTTP** (superseded: it sees only provider calls, not an RFC conversation's own logon and open; the user chose the connection prerequisite of §3.1). The same run with a
   provider whose `authorize()` answers `interactive-login` `aborted` when the signal of the request
   it is called for — read from an `AsyncLocalStorage` the request entered — is aborted: the
   cancelled request rejects with `AuthRefusedError` (`interactive-login`) and is **not** resent;
@@ -185,7 +185,7 @@ outside the repository; the scripts are not kept, each becomes a test in §13):
   their JSON per call through `loadKeyFile`), and broker 5.0.1 reads `means` and `client` as two
   reads (`AuthBroker.js` `storeReads`). The server connects to `https://a.example` and the provider presents **`Bearer tokenB`** — A's means
   and URL frozen with B's client.
-- **M6 — `authorize()` itself waits on a renewal, and its late Ok sends a cancelled mutation.** A
+- **M6 — `authorize()` itself waits on a renewal, and its late Ok sends a cancelled mutation** (a boundary the §3.1 contract names). A
   `ClientCredentialsProvider` whose token expires at once (`expires_in: 1`) on one
   `AdtOnPremConnector`; the token endpoint is held after `connect()`; R1 and R2 each `POST`, both
   reach `authorize()`, which waits on the one renewal (`BaseTokenProvider` `onAuthorize` →
@@ -209,21 +209,24 @@ outside the repository; the scripts are not kept, each becomes a test in §13):
 | `@mcp-abap-adt/auth-broker` | `^4.1.0` | `^5.0.1` |
 | `@mcp-abap-adt/auth-providers` | `^5.4.0` | `^6.0.1` |
 | `@mcp-abap-adt/auth-stores` | `^3.3.0` | `^4.0.0` |
-| `@mcp-abap-adt/connection` | `^11.0.0` | `^14.0.1` |
+| `@mcp-abap-adt/connection` | `^11.0.0` | `^14.1.0` — **a prerequisite** (§3.1) |
 | `@mcp-abap-adt/interfaces-auth` | `^3.2.0` | `^7.5.0` |
 | `@mcp-abap-adt/auth-errors` | — | `^2.2.0` (new: `readFailure`, `classify`, `isAuthProviderFailure`, `isMinted`, `isAuthProviderErrorKind`, `logFields`, `authError`, `AuthProviderFailure`) |
 | `@mcp-abap-adt/interfaces-auth-broker` | `^1.2.0` | `^1.3.0` |
 | `@mcp-abap-adt/interfaces-auth-sap` | `^2.0.0` | `^3.3.0` |
-| `@mcp-abap-adt/adt-clients`, `adt-strategies`, `interfaces-adt`, `interfaces-adt-connection`, `interfaces-network`, `interfaces-utils` | unchanged | unchanged |
+| `@mcp-abap-adt/interfaces-adt-connection` | `^1.0.1` | `^1.1.0` — **a prerequisite** (§3.1) |
+| `@mcp-abap-adt/adt-clients`, `adt-strategies`, `interfaces-adt`, `interfaces-network`, `interfaces-utils` | unchanged | unchanged |
 
-Reason: each range is the published release the goal names; one copy of `interfaces-auth` 7 and of
+Reason: each chain range is the published release the goal names, and `connection` /
+`interfaces-adt-connection` the prerequisite releases of §3.1, published before the server; one copy of `interfaces-auth` 7 and of
 `auth-errors` 2 must resolve (`npm ls @mcp-abap-adt/interfaces-auth @mcp-abap-adt/auth-errors`
 shows each once), since a failure of a second copy loses its diagnostics and a refusal of a second
 copy is rebuilt.
 
 **adt-clients, adt-strategies, interfaces-adt need nothing.** adt-clients 25.0.1 and adt-strategies
 0.7.0 depend on `interfaces-adt ^12` and `interfaces-adt-connection ^1` (`npm view`), and
-connection 14.0.1 on `interfaces-adt-connection ^1.0.0`; the server stays on those. interfaces-adt
+connection 14.0.1 on `interfaces-adt-connection ^1.0.0` (14.1.0 on `^1.1.0`, which they dedupe
+to); the server stays on the 1.x line. interfaces-adt
 13.0.0 and interfaces-adt-connection 2.0.0 are published, but nothing in this change needs them,
 and moving to them is adt-clients' change first. The one gap the server meets there — adt-clients
 drops the thrown value (§2) — is answered on the server's side (§7.2, D15), not by a change there.
@@ -232,6 +235,76 @@ drops the thrown value (§2) — is answered on the server's side (§7.2, D15), 
 `^18.0.0` (and `core` `^18.0.0` for `compact`); `core` adds no chain dependency — the browser
 mapping (§8) lives in `lib`. The `auth` script is removed (connection 14 has no `sap-abap-auth`;
 `mcp-auth` belongs to `@mcp-abap-adt/auth-broker-cli`, which is not a dependency of the server).
+
+### 3.1 Prerequisites: a per-request signal in connection
+
+**Decided by the user: option (a).** A cancelled request must not be sent at any boundary on either
+transport, and the boundaries are the connection's: after the server's checks pass, an RFC call can
+still open its own conversation — the provider's `establish()` into the logon parameters, then
+`conversation.open()` — and only then send (`RfcTransport.ts:397-470`, read on connection 14.0.1:
+`carryOnKept` / `carryOnThrowaway` → `openOwn` → `loggedOn` → `carry`), and an HTTP resend follows
+`rejected()` and `authorize()` with no signal (M1, M6). The server waits for these releases and
+depends on them; it does not gate the connection's boundaries itself.
+
+**1. `@mcp-abap-adt/interfaces-adt-connection` 1.1.0** (repository `mcp-abap-adt-interfaces`; a
+minor on the 1.x line, from `interfaces-adt-connection-v1.0.1`, because connection 14, adt-clients 25
+and the server are on `^1`; the same two additions go into 2.1.0 for the 2.x line):
+
+```ts
+export interface IAbapRequestOptions {
+  // … unchanged …
+  /**
+   * The caller no longer needs this request. Checked by the connection before
+   * every send boundary; once aborted, nothing more of this request is sent,
+   * and the request rejects with ADT_REQUEST_ERROR.ABORTED. A request already
+   * sent is not recalled.
+   */
+  signal?: AbortSignal | undefined;
+}
+
+export const ADT_REQUEST_ERROR = {
+  /** The request's signal aborted before it was sent (or before a resend). */
+  ABORTED: 'ADT_REQUEST_ABORTED',
+} as const;
+```
+
+**2. `@mcp-abap-adt/connection` 14.1.0** (repository `mcp-abap-connection`; a minor: an optional
+field honoured, nothing else changes), depending on `interfaces-adt-connection ^1.1.0`:
+
+- **Checked at every send boundary, on both transports:** before the first send; after the
+  credential's `authorize()` answers; after the logon — `establish()` and, over RFC, the
+  conversation's `open()` in `openOwn` / `loggedOn`, kept and throwaway conversations alike; before
+  calling `rejected()` and after it answers; before every resend (the CSRF recovery's included).
+  Aborted at any of them → nothing more of this request is sent and it rejects with an error whose
+  `code` is `ADT_REQUEST_ERROR.ABORTED` and whose message is fixed ("the request was aborted;
+  nothing more of it was sent"); never `AuthRefusedError`, never a session verdict. A conversation
+  opened for this request alone is closed. **What connection mints for an abort today: nothing** —
+  it reads no signal; the closest codes are `ADT_SESSION_ERROR`'s, which are about the session, not
+  the caller (D34 names the alternative).
+- **Its waits for a request race the request's signal, for that caller only:** the credential's
+  `authorize()` (which may wait on a renewal, M6), `rejected()` (which may wait on a login), the
+  logon and `conversation.open()`. An abort settles that request at once; the shared work runs on
+  for every other caller — the provider's renewal, an establishment others joined, a kept
+  conversation; a late answer to the aborted caller is handled (no unhandled rejection) and
+  dropped; a conversation opened for it alone is closed when its open settles.
+- **Not recalled:** a request whose bytes left is answered as today.
+- **Without a signal** (`signal` absent): exactly 14.0.1's behaviour.
+- **Tests in connection**, on HTTP and RFC (RFC through its conversation seam, no SAP system), each
+  with two callers on one connection, one cancelled at each boundary in turn — before the first
+  send; while `authorize()` waits on a renewal; after `authorize()`; during an RFC conversation's
+  logon and its `open()` (kept and throwaway); while `rejected()` waits; before a resend: the
+  endpoint log holds no mutation of the cancelled caller after its abort, the cancelled caller
+  rejects `ADT_REQUEST_ABORTED` at the abort, the other caller succeeds, and no unhandled
+  rejection is recorded. Each with the check removed as the break that turns it red.
+
+**3. adt-clients: no change.** It builds `IAbapRequestOptions` at its call sites and hands the object
+to the connection unchanged (`withRequestTrace`, `adt-clients src/utils/requestTrace.ts:84-121`);
+the server adds the signal below it through a per-request view of the connection (D31). Checked on
+adt-clients 25.0.1 (`342b8f1b`).
+
+**Order:** `interfaces-adt-connection` 1.1.0 → `connection` 14.1.0 → this server's 18.0.0. Each is
+published before the next is built against it; the server's lockfile resolves both from the
+registry (H6).
 
 ## 4. The three credential sources
 
@@ -379,68 +452,60 @@ set of request and setup controllers is kept per process so shutdown can abort t
 The store reads (`settingsFor`, and the broker's own) take no signal — the store contract has none
 (broker README, *Cancellation*); they are file reads that settle.
 
-**Every request-owned wait is the request's own (D32).** The provider's moments wait on the
-collective parties (M3), and the connection's establishment and renewal are shared or carry no
-signal (M1). So wherever a request waits on something that may also serve another caller, the
-server races that wait against the request's own signal: the request settles `aborted` at once,
+**Every request-owned wait the server makes is the request's own (D32).** The provider's moments
+wait on the collective parties (M3), and the connection's establishment (`connect()`) is shared by
+its callers and takes no signal. So wherever the server itself waits, for a request, on something
+that may also serve another caller — `connect()` in a request, the HTTP and SSE pre-dispatch
+connect, `getProvider`'s build — it races that wait against the request's own signal: the request settles `aborted` at once,
 the shared work runs on for the others, and its late result is handled — a late rejection gets a
 handler (never unhandled), a late success that belonged to this request alone (an HTTP request's
 own connection) is cleaned up (`disconnect()`), one shared with others is left to them. This is
-the per-caller wait the chain does not give a moment; no chain change is needed for it (M3).
+the per-caller wait the chain does not give a moment; no chain change is needed for it (M3). The
+waits **inside** a request's send — the provider's `authorize()` and `rejected()`, an RFC
+conversation's logon and open — are the connection's to race, under the prerequisite of §3.1
+(D31).
 
 ### 5.2 In a request
 
-`BaseMcpServer`'s tool wrapper takes the SDK's `extra` beside `args`, creates the request
-controller linked to `extra.signal`, and runs the handler inside an auth scope
-(`src/lib/auth/requestScope.ts`, an `AsyncLocalStorage` of its own beside the request context):
-the request's signal and the auth failure recorded for the request (§7.2).
+`BaseMcpServer`'s tool wrapper takes the SDK's `extra` beside `args` and creates the request
+controller linked to `extra.signal`.
 
 - **Getting the connection** (`getConnection(signal)`): the source's settings and credential
   (§4), the connection (§5.4), `connect()` — **raced against the request's signal** (D32). The
   connection's establishment is shared by every caller of that connection (stdio, SSE); a
   cancelled caller leaves it, the others keep it.
-- **(D31) Every credential boundary a request reaches checks that request's signal.** Every
-  connection the server builds (`createAbapConnection`) is given its credential through a
-  request gate — a wrapper over the provider (the counted one, or a direct provider) that reads
-  the signal of the request it is being called for from the auth scope:
-  - `authorize(target)` — asked by the connection before **every** attempt, the first send and
-    every resend after a renewal (M2). It may itself wait: a provider renews an expired token
-    inside it (M6). So the gate:
-    1. answers `aborted` at once when the signal has already aborted;
-    2. otherwise calls the provider with **a target of its own** that records what the provider
-       writes (`header`, `cookies`), and **races** that call against the signal: an abort settles
-       the attempt `aborted` at once;
-    3. when the provider answers, **checks the signal again**: aborted → `aborted`, and nothing the
-       provider wrote reaches the connection's target; live and Ok → the recorded writes are
-       replayed onto the connection's target, in order, and Ok is answered; Oops → that Oops;
-    4. the provider's late answer after an abort is handled (a rejection handler on the call;
-       its outcome dropped), and the renewal runs on for the other parties.
-
-    **No Ok ever reaches the connection for a cancelled attempt, so the connection sends
-    nothing:** a cancelled request is never sent — first attempt or a resend after a renewal it
-    waited for — whoever else completed the renewal (M1, M2, M6);
-  - `rejected(rejection)` — the request's own renewal (per request in the connection, M2) — the
-    same way: raced against the signal (D32), and the signal checked again before an Ok is
-    returned; a cancelled request is answered `aborted` at once, and the provider's renewal runs
-    on for the other parties;
-  - `prepare()` and `establish()` are not gated: they belong to the connection's shared
-    establishment, whose per-caller wait is the race above.
-
-  Reason: M1 — connection 14.0.1 re-authorizes and resends a request after `rejected()` answers Ok
-  without any signal, so a cancelled mutation would land once another caller's login completes.
-  The connection asks the credential before each attempt, in the request's own async chain, and
-  that is the boundary the server owns. **The limit, stated plainly:** the gate depends on the
-  connection calling `authorize()` per attempt inside the request's async context, which M2
-  measured for 14.0.1 and which is not a written contract of connection; a test pins it (§13.3,
-  test 12), so a connection release that breaks it fails the server's suite before it is taken. A
-  per-request signal in the connection is the cleaner contract and is proposed to connection's
-  repository (§17, *Requests to other repositories*) — **not a prerequisite**: the server holds
-  the rule without it. An injected connection is the consumer's and gets no gate (§4.3).
+- **(D31) Every request carries its signal into the connection — decided by the user: option
+  (a), a per-request signal in connection, a prerequisite (§3.1).** The handler is given, as its
+  `connection`, a **per-request view** of the connection the server built: an object whose
+  `makeAdtRequest(options)` calls the connection's with `{ ...options, signal }` — this request's
+  signal — and which forwards every other member to the connection (bound), its own
+  `makeAdtRequest` assignable, since adt-clients' `withRequestTrace` assigns over it
+  (`adt-clients src/utils/requestTrace.ts:84-121`). connection 14.1.0 then checks that signal at
+  every send boundary and races its own waits for that request against it (§3.1): a cancelled
+  request is never sent — not first, not after `authorize()`, not after an RFC conversation's
+  logon and open, not as a resend after a renewal another caller completed — and it settles at
+  the abort while the shared work runs on for the others.
+  - **Why a view, not adt-clients.** adt-clients 25.0.1 builds `IAbapRequestOptions` itself at 460
+    call sites in 293 files and passes the object it built straight to the connection
+    (`withRequestTrace` calls `base(request)` unchanged); it carries no signal and has no place
+    to take one. The view adds the signal below adt-clients, so **adt-clients needs no change**.
+  - **The view also carries** the request's record of an auth failure (§7.2) and the request's
+    signal for a fresh connection (§4.3); the server's registries (records, fresh-connection
+    factories) are keyed by the connection and looked up through the view's target.
+  - **Not for an injected connection**: it is the consumer's and is not wrapped (§4.3); its
+    requests carry no signal from the server.
+  - **Replaces** the request gate of `c9fb15e5`–`443eba0e` (an `AsyncLocalStorage` scope read in
+    the provider's `authorize()`, the record-and-replay target, the `rejected()` race): M2 and M6
+    showed the gate works on HTTP, but it cannot see a boundary that is not a provider call — an
+    RFC call that opens its own conversation after the gate passed (`RfcTransport.ts:397-470`:
+    `carryOnKept` / `carryOnThrowaway` → `openOwn` → `loggedOn` → `logon`, `conversation.open()`,
+    then `carry`) — and a gate per boundary would re-implement in the server what the connection
+    owns. No `AsyncLocalStorage` remains in the design.
 - **(D5) A request whose signal aborted does not reach its tool.** After the connection is ready,
   an aborted signal answers the request `aborted` and the handler is not called. Reason: two
   requests share one login; the one whose client cancelled must not go on to create or delete
   something once the other's login completes. A renewal inside a running handler (a `401` →
-  `rejected()`) is the request gate's (D31): the cancelled request stops waiting and is not resent.
+  `rejected()`) is the connection's, under the request's signal (D31).
 - **(D7) One retry after another caller's abort.** When `connect()` fails `interactive-login`
   `aborted` while this request's own signal is live, another caller's abort ended an attempt this
   request joined (a shared login, or the connection's shared establishment, whose parties had all
@@ -458,8 +523,7 @@ the request's signal and the auth failure recorded for the request (§7.2).
   the destination, before building the per-request server, before any read. The existing
   listeners (transport close; SSE session removal) stay where they are and also abort it.
 - **The pre-dispatch connect** (`setConnectionContext` + `connect()` while the destination has not
-  connected in this process) runs with the setup signal, in the auth scope of that signal, and its
-  wait is raced against it (D32): a client that leaves settles its setup at once — its response
+  connected in this process) runs with the setup signal, and its wait is raced against it (D32): a client that leaves settles its setup at once — its response
   is not written, its per-request connection is disconnected when the late establishment settles,
   a late rejection is handled — while a login another client also waits on goes on. The setup
   controller is aborted in a `finally` when setup ends (D4).
@@ -670,6 +734,9 @@ of the chain, no `message`, no `name`):
    strategy, the broker throws).
 3. an own `refusal` whose `kind` is a known kind (`isAuthProviderErrorKind`) →
    `classify(refusal, 'unfamiliar-error')` (connection's `AuthRefusedError`, §2).
+3a. an own `code` equal to `ADT_REQUEST_ERROR.ABORTED` (connection 14.1.0, §3.1) → the request was
+   cancelled: answered `request_aborted` in fixed words (its client has usually gone; the answer is
+   for a log and a test);
 4. the server's own error classes (`DestinationRefusal`, `UnsupportedAuthenticationError`, the
    fresh-connection refusal, the destination-changed refusal, the inspection-only refusal) — the
    server's classes, so `instanceof` on them is not on the chain.
@@ -686,9 +753,9 @@ for non-auth values, without its regular expression (D26).
   else as today (`return_error`).
 - **Inside a handler (D15).** adt-clients turns a thrown `AuthRefusedError` into `{ origin:
   'connection', message }` (§2): the words survive, the `kind` does not. So
-  `createAbapConnection` wraps `connect()` and `makeAdtRequest()` of **every connection the server
-  builds** with an observer that, on a throw, records `failureOf(thrown)` in the request's auth
-  scope (§5.2) and rethrows the same value. When a handler answers an error and its request
+  the per-request view of every connection the server builds (D31) observes its `makeAdtRequest()`
+  (and the server observes its own `connect()`): on a throw it records `failureOf(thrown)` for the
+  request and rethrows the same value. When a handler answers an error and its request
   recorded a chain failure, the tool wrapper answers that failure (§7.3) instead — nothing after a
   refused credential reached the system, so the failure is the cause. An injected connection is not
   wrapped (§4.3): there, an auth failure inside a handler reaches the client in connection's own
@@ -852,9 +919,9 @@ as today.
 | `StdioServer.ts:51-67` | fake refusing provider | `inspection_only` refusal of the server's own (D17) |
 | `BaseMcpServer.ts:98-129`, `:136-176` | `setConnectionContext*` build a `ConnectionContext` | set the credential source (§4) |
 | `BaseMcpServer.ts:193-230` | `getConnection()` | `getConnection(signal)` (§5.2, §5.4) |
-| `BaseMcpServer.ts:257` | `async (args) => …` | `async (args, extra) => …` with the request controller, the auth scope, D5, D7, §7.2 |
+| `BaseMcpServer.ts:257` | `async (args) => …` | `async (args, extra) => …` with the request controller, the per-request view (D31), D5, D7, §7.2 |
 | `StreamableHttpServer.ts:145-261`, `SseServer.ts:269-393` | listener after setup; `FirstConnectLock.run` | listener first; setup signal; `FirstConnect` (connected set only) (§5.3) |
-| `connectionFactory.ts:307-357` | builds and records | gives the connector its credential through the request gate (D31), and wraps `connect` / `makeAdtRequest` with the failure observer (§7.2); the record keeps the ungated credential |
+| `connectionFactory.ts:307-357` | builds and records | unchanged but for the view: `viewFor(connection, signal)` — `makeAdtRequest` with the request's signal and the failure observer, every other member forwarded (D31, §7.2) |
 | `credentialSources.ts:33-59` | default branch → basic | refuses, naming the field (D19) |
 | `packageSessions.ts:40-61` | record, else the connection's configuration | record, else the consumer's factory, else refused (§4.3) |
 | `handleDeletePackage.ts:93-108` | fallback to the caller's connection | the failure is the answer (D21) |
@@ -935,7 +1002,9 @@ startup errors, shutdown, the new options), `docs/user-guide/CLI_OPTIONS.md`,
 looks like changes. Release per `docs/deployment/RELEASE.md`: manifests and sibling ranges, the
 registry and Glama metadata (`releaseMetadata.test.ts`), CHANGELOG and docs, `npm ci`, build,
 `test:check`, `npm test` (binSmoke included), `npm --prefix server test:check` and `test`,
-`release:dry` ending `Published: 5  Skipped: 0`. Every dependency is on the registry already (§3);
+`release:dry` ending `Published: 5  Skipped: 0`. **The server waits for its prerequisites** —
+`interfaces-adt-connection` 1.1.0, then `connection` 14.1.0 (§3.1) — and is built and released only
+against them as published; every other dependency is on the registry already (§3);
 the lockfile is checked for `"link": true` and for anything not resolved from the registry. After
 publishing, a clean install of `@mcp-abap-adt/core@18.0.0` outside the repository runs
 `mcp-abap-adt --version` and `--help`. The `npm publish` is the user's.
@@ -1010,28 +1079,28 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
     to the request instead of the login → a long tool after a login is cut.
 11. **Shutdown.** A login in flight at `SIGTERM` ends (`disposed` or `aborted`); the port is free;
     the process exits after flushing.
-12. **A cancelled mutation is never resent after a renewal (M1, M2).** A real `AdtOnPremConnector`
-    over the server's `createAbapConnection` against a local HTTP stand-in that answers `401` to the
-    old token: R1 and R2 each `POST`; both reach `rejected()`, which waits on one shared login; R1 is
-    cancelled; the login completes. Asserted on the stand-in's log: R2 is resent with the new token
-    and answered `200`; **R1 is never sent with the new token** (no `POST` of R1 after the
-    renewal), and R1 answers `aborted`. Also with R1 cancelled before its first send: nothing of
-    R1 is sent. *Break:* remove the gate from `authorize()` → R1's `POST` appears with the new
-    token. Pinned to the installed connection, so a connection release that stops asking
-    `authorize()` per attempt in the request's async context fails here (D31's limit).
-    **The same while `authorize()` waits on a renewal (M6):** a token that expires at once, the
-    token endpoint held, R1 and R2 in `authorize()`; R1 is cancelled after the gate's entry check;
-    then the endpoint answers. Asserted: R1 settles `aborted` before the endpoint is released; R2
-    answers `200`; the stand-in's log holds no `POST` of R1; no unhandled rejection. *Break:* keep
-    only the entry check → R1's `POST` appears with the new token; *break:* replay the recorded
-    writes without the second check → the same.
-13. **The cancelled caller settles first (M3).** R1 and R2 wait on one shared login — in `connect()`
-    (stdio, one connection), in the HTTP pre-dispatch connect (two clients), and in `rejected()`
-    after a `401`; R1 is cancelled while the token endpoint is held: R1's request settles
-    `aborted` before the endpoint is released, R2 settles after it with its token; no unhandled
-    rejection is recorded (an `unhandledRejection` listener), and R1's own HTTP connection is
-    disconnected once the late establishment settles. *Break:* await the shared wait without the
-    race → R1 settles only with R2.
+12. **Every request's signal reaches the connection (D31).** Through the real adt-clients
+    (`createAdtClient` over the per-request view), a tool's every `makeAdtRequest` reaches a
+    recording connection with `options.signal` being that request's signal — for each of two
+    concurrent requests on one stdio connection, its own; the view forwards every other member
+    (`getSessionId`, `setSessionType`, the critical section, `getConfig`), survives adt-clients'
+    `withRequestTrace` assigning over its `makeAdtRequest`, and the server's registries find the
+    connection through it (`openFreshConnection`, `systemKindOf`). An injected connection receives
+    no view. *Break:* hand the handler the connection instead of the view → `signal` absent.
+13. **A cancelled mutation is never sent (M1, M6; needs connection 14.1.0).** A real
+    `AdtOnPremConnector` built by the server, against a local HTTP stand-in: R1 and R2 each `POST`;
+    R1 is cancelled while both wait in `rejected()` on one shared login, and — separately — while
+    both wait in `authorize()` on a renewal. Asserted on the stand-in's log: no `POST` of R1 after
+    its abort; R1 settles `ADT_REQUEST_ABORTED` at the abort and is answered `aborted` (§7.3); R2
+    answers `200`. This pins the prerequisite end to end; the boundary-by-boundary tests, RFC
+    included, are connection's (§3.1). *Break:* drop the signal from the view → R1's `POST`
+    appears after the renewal.
+14. **The cancelled caller settles first (M3).** R1 and R2 wait on one shared login in `connect()`
+    (stdio, one connection) and in the HTTP pre-dispatch connect (two clients); R1 is cancelled
+    while the token endpoint is held: R1's request settles `aborted` before the endpoint is
+    released, R2 settles after it with its token; no unhandled rejection is recorded (an
+    `unhandledRejection` listener), and R1's own HTTP connection is disconnected once the late
+    establishment settles. *Break:* await `connect()` without the race → R1 settles only with R2.
 
 ### 13.4 Session writes and renewal
 
@@ -1111,12 +1180,12 @@ keeps its footprint there small:
 
 | Shared file | What this change does there |
 |---|---|
-| `src/embeddable/BaseMcpServer.ts` | the source union, `getConnection(signal)`, the wrapper's `extra`, the auth scope, the gate; no change to handler registration or `available_in` |
-| `src/lib/connectionFactory.ts` | the request gate on the credential and the observer wrap in `createAbapConnection`; transports untouched |
+| `src/embeddable/BaseMcpServer.ts` | the source union, `getConnection(signal)`, the wrapper's `extra`, the per-request view, the D5 check; no change to handler registration or `available_in` |
+| `src/lib/connectionFactory.ts` | the per-request view (`viewFor`); transports untouched |
 | `src/lib/utils.ts` | `return_error`'s first lines and its two regular expressions; `credentialFromSapConfig` callers unchanged |
 | `src/lib/packageSessions.ts`, `handleDeletePackage.ts` | the fresh-connection registry; the fallback removed |
-| `src/lib/handlers/interfaces.ts` (`HandlerContext`) | **untouched** — the registry and the auth scope avoid it |
-| `src/lib/requestContext.ts` | **untouched** — the auth scope is its own module |
+| `src/lib/handlers/interfaces.ts` (`HandlerContext`) | **untouched** — the registry and the view avoid it |
+| `src/lib/requestContext.ts` | **untouched** |
 | `tools/` | untouched |
 
 A long-running debugger request (a listener waiting minutes for a breakpoint) is unaffected by the
@@ -1131,8 +1200,8 @@ like any request.
 | H2 Nothing goes out that should not | §7.3 (no diagnostics, facts, messages to clients), §9 (no secret fragment, no `message`, no environment-driven `authDebug`), the URL only on stderr from the providers, nothing on stdout; tested in §13.5 |
 | H3 A credential stays bound | providers only from the broker, read once per process; editing a destination's files while the server runs is documented as unsupported, restart after any change (D3, measured reason M4, M5); direct providers never reach a store; per-request and per-session holders (§4.2); an injected connection never re-authenticated (§4.3) |
 | H4 No built-in timeouts of the chain's making | no default bound anywhere: the login bound (D10) and the shutdown bound (D33) exist only when the user states them; the 30 s shutdown deadline and the drain timer are removed |
-| H5 One implementation of each rule | failures read by auth-errors (§7.1); the build shared by the broker (no server provider cache, no `FirstConnectLock` queue); the refresh state the broker's `refreshStatePersistence`; the browsers auth-providers' factories (§8). The cross-destination login queue is the server's own because the chain has none (§5.6) |
-| H6 Registry only | every range in §3 is published; release checks in §12 |
+| H5 One implementation of each rule | failures read by auth-errors (§7.1); the build shared by the broker (no server provider cache, no `FirstConnectLock` queue); the refresh state the broker's `refreshStatePersistence`; cancellation at the send boundaries the connection's (§3.1), not a second gate in the server; the browsers auth-providers' factories (§8). The cross-destination login queue is the server's own because the chain has none (§5.6) |
+| H6 Registry only | every range in §3 is published — the two prerequisites of §3.1 before the server is built against them; release checks in §12 |
 | H7 No regular expressions over untrusted input | D26: `destinationName`, the port and seconds parsers, `errorClassOf`, `return_error`, `notStoredOf`'s removal; a source test (§13.1) |
 
 ## 17. Decisions for the user
@@ -1148,21 +1217,26 @@ The spec is written on each recommendation.
 | D27 | "server text" | text of an authorization server or IdP / also ADT answers | **the former**: ADT answers are the tools' data, and removing them would break every tool's error reporting |
 | D30 | `jwt` / `none` destinations under broker 5 need `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` | the migration note gives the lines to write by hand / the server gains a command that writes them with `bindingOf` / auth-broker-cli gains `--token` for `jwt` / `none` (its own change, as it has `--cookie` for `saml` / `none`) | **the migration note now, and ask the CLI for `--token`** in its own repository: no tool writes the binding for a held token today, and the server writing it would bypass what the binding protects. Until then, `x-sap-jwt-token` is the unbound alternative over HTTP |
 | D3 | a destination's files edited while the server runs | **decided by the user: (c) document, don't engineer** — the server reads a destination once per process as today, and the docs say editing while running is unsupported, may combine old and new values (M4, M5), restart after any change | — |
-| D31 | stopping a cancelled request's resend after a renewal | a request gate in the credential, reading the request's signal from the auth scope (measured, M2) / wait for a per-request signal in connection | **the gate now**, pinned by a test; the connection contract proposed below as an improvement, not a prerequisite |
+| D31 | stopping a cancelled request at the connection's send boundaries | **decided by the user: (a) a per-request signal in connection, a prerequisite (§3.1)**; the server passes each request's signal through a per-request view | — |
+| D34 | what connection answers for an aborted request | a code of its own, `ADT_REQUEST_ERROR.ABORTED` in interfaces-adt-connection / auth-errors' `interactive-login` `aborted` (no contract change, but its words say "the authorization was aborted" for a request that was never about authorization, and an RFC open is not an authentication step) | **its own code**: the abort is the caller's, not an authentication outcome; the server reads `code` structurally, as it reads `ADT_SESSION_ERROR` |
 | D33 | the shutdown bound | none by default; forced only by a `SIGTERM` / `SIGINT` after the start or `--shutdown-timeout` (stdin `end` / `close` never force) / keep 30 s | **none by default**: H4; the cost of ending early is documented with the option |
 | D9 | `--browser` names outside the table | refuse / open the default browser, as 5.x did | **refuse**: H1; `--browser-program` names any other program |
 | D21 | `DeletePackage`'s fallback when no fresh connection can be had | answer the failure / keep falling back to the caller's session | **answer the failure**: H1, and on an injected connection the fallback would hide the refusal the goal requires |
 
 ### Requests to other repositories
 
-**Prerequisites: none.** Each review finding is answered with the published packages
-and measured (M1–M7): the server waits on no change in another repository. The requests below
-would let the server replace a measured mechanism of its own with a written contract; each goes to
-its repository as its own change, and the server adopts it in a later release.
+**Prerequisites (decided by the user: option a)** — the server waits for each, in this order:
+
+| # | Repository | Release | Contract |
+|---|---|---|---|
+| 1 | `mcp-abap-adt-interfaces` | `@mcp-abap-adt/interfaces-adt-connection` 1.1.0 (and 2.1.0) | `IAbapRequestOptions.signal?: AbortSignal \| undefined`; `ADT_REQUEST_ERROR.ABORTED = 'ADT_REQUEST_ABORTED'` (§3.1) |
+| 2 | `mcp-abap-connection` | `@mcp-abap-adt/connection` 14.1.0 | the signal checked at every send boundary on HTTP and RFC; its waits for a request raced for that caller only; an aborted request sends nothing more and rejects `ADT_REQUEST_ABORTED`; tests per boundary with two callers (§3.1) |
+| — | `mcp-abap-adt-clients` | none | forwards the options object unchanged; the server adds the signal below it (D31) |
+
+**Possible later improvements** — not prerequisites; each its own change in its repository:
 
 | Repository | Request | Contract | What it would replace |
 |---|---|---|---|
-| `mcp-abap-adt-interfaces` (interfaces-adt-connection) and `mcp-abap-connection` | a per-request signal | `IAbapRequestOptions.signal?: AbortSignal`; the connection checks it before every attempt — the first send and every resend after `rejected()` — and before calling `rejected()`, and answers `aborted` (an `AuthRefusedError` with `interactive-login` `aborted`, or a session error of its own) without sending; no attempt is sent after the signal aborted | D31's reliance on `authorize()` being called per attempt in the request's async context |
 | `mcp-abap-adt-auth-stores` | stores over content read once | `EnvDestinationStore.fromContent(text, options)`, `AbapServiceKeyStore.fromKey(json, options)`, `XsuaaServiceKeyStore.fromKey(json, options)` — the same projections as the file-backed stores, computed from content the caller read once, reading no file | a possible later improvement: the server could read each file once and derive every projection from it, so an edit while running could no longer combine two states |
 | `mcp-abap-adt-auth-broker` | which means a provider was built from | `getProvider(d, { signal })` also answers, or a sibling `getProviderWithMeans` answers, `{ provider, means }`: the `IConnectionConfig` snapshot the build read, the same object for the life of that provider | a possible later improvement: picking up file changes without a restart, the settings tied to the provider |
 | `mcp-abap-adt-auth-broker` (auth-broker-cli) | write a held token with its binding | `mcp-auth --token <token>` (from a file or stdin, never an argument in history) for `jwt` / `none`, as `saml2-pure --cookie` does for `saml` / `none`: writes `SAP_JWT_TOKEN`, `SAP_REFRESH_TOKEN=` and `bindingOf(means)` | D30's hand-written lines in the migration note |

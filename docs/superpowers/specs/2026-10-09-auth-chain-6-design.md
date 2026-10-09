@@ -185,6 +185,20 @@ outside the repository; the scripts are not kept, each becomes a test in §13):
   their JSON per call through `loadKeyFile`), and broker 5.0.1 reads `means` and `client` as two
   reads (`AuthBroker.js` `storeReads`). The server connects to `https://a.example` and the provider presents **`Bearer tokenB`** — A's means
   and URL frozen with B's client.
+- **M6 — `authorize()` itself waits on a renewal, and its late Ok sends a cancelled mutation.** A
+  `ClientCredentialsProvider` whose token expires at once (`expires_in: 1`) on one
+  `AdtOnPremConnector`; the token endpoint is held after `connect()`; R1 and R2 each `POST`, both
+  reach `authorize()`, which waits on the one renewal (`BaseTokenProvider` `onAuthorize` →
+  `tokensFor`). R1 is cancelled 200 ms in, after a gate's entry check had passed; the endpoint is
+  released at 500 ms. **With a check on entry only:** R1 is sent with the new token and answers
+  `200` at +505 ms. **With `authorize()` raced against R1's signal, the provider writing into a
+  target of the gate's own that is replayed onto the connection's only if R1 is still live after
+  the provider answered:** R1 settles `aborted` at +201 ms, R2 answers `200` at +505 ms, and only
+  R2's `POST` reaches the system.
+- **M7 — a piped stdin's EOF emits both `end` and `close`.** `printf 'x\n' | node -e …` with
+  `data`, `end` and `close` listeners on `process.stdin` (Node 26.7.0) logs `end`, then `close`;
+  `installShutdown` listens to both (`server/src/shutdown.ts:94-97`). An ordinary client leaving
+  is two triggers.
 
 ## 3. Versions and dependencies
 
@@ -352,7 +366,7 @@ interface EmbeddableMcpServerOptions {
 | **request** | per MCP request, in the tool wrapper | the MCP request's `extra.signal` aborts (client cancel, transport close, session close), **or the request ends** (`finally`), or shutdown | `getProvider(destination, { signal })`; `openFreshConnection`; the consumer's `freshConnection` |
 | **setup** | per HTTP request / SSE `GET` before any setup | the client's connection closes (listener installed first), **or setup ends** (`finally`), or shutdown | `getProvider` of the pre-dispatch connect |
 | **startup** | per launcher check | the check ends | `getProvider` of the check |
-| **shutdown** | once | a second `SIGTERM` / `SIGINT`, or `--shutdown-timeout` when the user stated one (§6.4) — never by a default | `flush({ signal })`; the drain |
+| **shutdown** | once | a `SIGTERM` / `SIGINT` received after the shutdown started (never stdin's `end` / `close`), or `--shutdown-timeout` when the user stated one (§6.4) — never by a default | `flush({ signal })`; the drain |
 | **login bound** | per `authorize` of the server's strategy wrapper, when configured | the bound elapses | the strategy, combined with the provider's `AuthorizationRequest.signal` (§5.7) |
 
 **(D4) A request's signal is aborted when the request ends, whatever its outcome.** Reason: the
@@ -390,12 +404,25 @@ the request's signal and the auth failure recorded for the request (§7.2).
   request gate — a wrapper over the provider (the counted one, or a direct provider) that reads
   the signal of the request it is being called for from the auth scope:
   - `authorize(target)` — asked by the connection before **every** attempt, the first send and
-    every resend after a renewal (M2) — answers `interactive-login` `aborted` and writes nothing
-    when that signal has aborted, so the connection sends nothing: **a cancelled request is never
-    sent again after a renewal it waited for**, whoever else completed the renewal;
-  - `rejected(rejection)` — the request's own renewal (per request in the connection, M2) — is
-    raced against the signal (D32): a cancelled request stops waiting at once and is answered
-    `aborted`; the provider's renewal runs on for the other parties;
+    every resend after a renewal (M2). It may itself wait: a provider renews an expired token
+    inside it (M6). So the gate:
+    1. answers `aborted` at once when the signal has already aborted;
+    2. otherwise calls the provider with **a target of its own** that records what the provider
+       writes (`header`, `cookies`), and **races** that call against the signal: an abort settles
+       the attempt `aborted` at once;
+    3. when the provider answers, **checks the signal again**: aborted → `aborted`, and nothing the
+       provider wrote reaches the connection's target; live and Ok → the recorded writes are
+       replayed onto the connection's target, in order, and Ok is answered; Oops → that Oops;
+    4. the provider's late answer after an abort is handled (a rejection handler on the call;
+       its outcome dropped), and the renewal runs on for the other parties.
+
+    **No Ok ever reaches the connection for a cancelled attempt, so the connection sends
+    nothing:** a cancelled request is never sent — first attempt or a resend after a renewal it
+    waited for — whoever else completed the renewal (M1, M2, M6);
+  - `rejected(rejection)` — the request's own renewal (per request in the connection, M2) — the
+    same way: raced against the signal (D32), and the signal checked again before an Ok is
+    returned; a cancelled request is answered `aborted` at once, and the provider's renewal runs
+    on for the other parties;
   - `prepare()` and `establish()` are not gated: they belong to the connection's shared
     establishment, whose per-caller wait is the race above.
 
@@ -590,7 +617,7 @@ end every login, so the drain waits only for calls that settle on their own, and
 contract says `saveSession` settles (broker README, *The store's contract*). What ends a shutdown
 early is always someone's statement:
 
-- **a second `SIGTERM` / `SIGINT`** exits at once, code `1`, with one stderr line naming what was
+- **a `SIGTERM` / `SIGINT` after the shutdown started** exits at once, code `1`, with one stderr line naming what was
   still pending (`N authorizations`, `session writes of "<destination>"`) — the person's own bound,
   as auth-broker-cli 3 does;
 - **`--shutdown-timeout=<seconds>`** (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`;
@@ -602,10 +629,15 @@ process exits is lost. A renewed token is then obtained again on the next start 
 login); a **discarded refresh token can come back** after the restart — the write that would have
 cleared it never landed. Under `--session-write-failure=fail` a write that kept failing had already
 failed its requests and is named on stderr; a write that was merely slow is the case the bound
-gives up on. Without the option and without a second signal, the shutdown waits for every write.
+gives up on. Without the option and without a signal after the start, the shutdown waits for every write.
 
-The end of stdin (stdio) is a trigger like a signal; a second trigger of either kind is the
-second signal.
+**What starts a shutdown and what forces it.** Starting is idempotent: the first trigger —
+`SIGTERM`, `SIGINT`, or the end of stdin under stdio — starts the one sequence, and **every stdin
+`end` / `close` is part of that one start, never a second trigger** (a piped EOF emits both, M7;
+an ordinary client leaving must not lose its writes). Forcing is explicit: only a `SIGTERM` or
+`SIGINT` received **after** the sequence started, or the configured `--shutdown-timeout`, ends it
+early. A client that closes stdin therefore gets every pending session write flushed before the
+process exits.
 
 `notStored` lines become `"<destination>": <reason>` — the destination is the one whose broker
 was flushed (one broker per destination, D2), the reason `classify(entry, 'persisting-tokens').reason`
@@ -811,7 +843,7 @@ as today.
 | `handlers/jwtAuthorizationCode.ts:5-18` | `authorization: () => oneLoginAtATime(strategy({ browser: string, port }), lock)` | `authorization: (destination, grant) => serverLogin(strategy({ browser?: IBrowser, port }), context)` (§5.6) |
 | `handlers/types.ts` `AuthHandlerContext` | `browser: string`, `loginLock`, `browserStrategy` | `browser?: IBrowser`, `logins` (the wrapper's queue and the composed-strategy registry), `loginTimeoutMs?`, `browserStrategy` |
 | `countedProvider.ts:24-27` | unminted shutdown refusal | minted (D17) |
-| `countedProvider.ts:69-82`, `shutdown.ts:22-23`, `:71` | `drained(deadlineMs)` with a timer; `settle(SHUTDOWN_DEADLINE_MS)` | `drained()` with no timer; `settle({ signal })`, the signal from a second signal or `--shutdown-timeout` (D33) |
+| `countedProvider.ts:69-82`, `shutdown.ts:22-23`, `:71` | `drained(deadlineMs)` with a timer; `settle(SHUTDOWN_DEADLINE_MS)` | `drained()` with no timer; `settle({ signal })`, the signal from a `SIGTERM` / `SIGINT` after the start or `--shutdown-timeout` (D33); stdin `end` and `close` one idempotent start (`shutdown.ts:94-97`) |
 | `launcher.ts:257` | `browserStrategy: browserCallbackStrategy` (auth-providers 5) | the same name from auth-providers 6, re-exported by `@mcp-abap-adt/lib/auth` with the browser mapping |
 | `launcher.ts:373-394` `promptsOnStderr` | a separate wrapper | folded into the server's strategy wrapper (§9.2) |
 | `launcher.ts:404-421` `factoryConfigFrom` | `browser: config.browser ?? 'system'` | `browser` mapped (§8), `renewal`, `onWriteFailure`, `authDebug`, `loginTimeoutMs` from the parameters |
@@ -860,7 +892,7 @@ to do"):
   - `--browser`: the platform table (§8), unknown names refused, `none` waits, `--browser-program`
     for an executable the table does not name, no `DISPLAY=:0`;
   - no login timeout by default (it was 30 s); `--login-timeout` to state one;
-  - no shutdown deadline (it was 30 s): a shutdown waits for its session writes; a second signal or
+  - no shutdown deadline (it was 30 s): a shutdown waits for its session writes — closing stdin included; a signal after it started or
     `--shutdown-timeout` ends it early, and what that costs;
   - a session write that does not land fails the request (`--session-write-failure=continue` for a
     read-only store, with what it costs);
@@ -987,6 +1019,12 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
     R1 is sent. *Break:* remove the gate from `authorize()` → R1's `POST` appears with the new
     token. Pinned to the installed connection, so a connection release that stops asking
     `authorize()` per attempt in the request's async context fails here (D31's limit).
+    **The same while `authorize()` waits on a renewal (M6):** a token that expires at once, the
+    token endpoint held, R1 and R2 in `authorize()`; R1 is cancelled after the gate's entry check;
+    then the endpoint answers. Asserted: R1 settles `aborted` before the endpoint is released; R2
+    answers `200`; the stand-in's log holds no `POST` of R1; no unhandled rejection. *Break:* keep
+    only the entry check → R1's `POST` appears with the new token; *break:* replay the recorded
+    writes without the second check → the same.
 13. **The cancelled caller settles first (M3).** R1 and R2 wait on one shared login — in `connect()`
     (stdio, one connection), in the HTTP pre-dispatch connect (two clients), and in `rejected()`
     after a `401`; R1 is cancelled while the token endpoint is held: R1's request settles
@@ -1003,10 +1041,15 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
 - Flush at shutdown: a write queued at `SIGTERM` lands before exit, however long the store takes
   (a store held for longer than the old 30 s deadline in fake time); a store that keeps failing gives
   exit `1` and `"<destination>": persisting the tokens failed (unknown error, EACCES)`. No timer is
-  armed during a shutdown without `--shutdown-timeout` (fake timers: none pending). A second
-  `SIGTERM` exits at once with the pending lines; `--shutdown-timeout=1` ends a held flush at the
+  armed during a shutdown without `--shutdown-timeout` (fake timers: none pending). A `SIGTERM`
+  after the shutdown started exits at once with the pending lines; `--shutdown-timeout=1` ends a held flush at the
   bound with the same lines. *Break:* restore `SHUTDOWN_DEADLINE_MS` → the held store's write is
   abandoned.
+- **A client leaving through stdin loses nothing (M7).** stdio, a session write held by the store;
+  the stand-in stdin emits `end`, then `close` (as a piped EOF does), then the store releases the
+  write: the write lands, then the process exits `0`; `exit` is not called before the write
+  settled. A `SIGTERM` after the `end` exits at once with the pending lines. *Break:* count stdin
+  `close` as a second trigger → the process exits with the write pending.
 - **A discarded refresh token does not come back**: a refresh refused `invalid_grant` discards it;
   shutdown; a new factory over the same files seeds no refresh token and the renewal strategy logs
   in (the token endpoint sees no `refresh_token` grant). *Break:* skip the flush → under a queued
@@ -1106,14 +1149,14 @@ The spec is written on each recommendation.
 | D30 | `jwt` / `none` destinations under broker 5 need `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` | the migration note gives the lines to write by hand / the server gains a command that writes them with `bindingOf` / auth-broker-cli gains `--token` for `jwt` / `none` (its own change, as it has `--cookie` for `saml` / `none`) | **the migration note now, and ask the CLI for `--token`** in its own repository: no tool writes the binding for a held token today, and the server writing it would bypass what the binding protects. Until then, `x-sap-jwt-token` is the unbound alternative over HTTP |
 | D3 | a destination's files edited while the server runs | **decided by the user: (c) document, don't engineer** — the server reads a destination once per process as today, and the docs say editing while running is unsupported, may combine old and new values (M4, M5), restart after any change | — |
 | D31 | stopping a cancelled request's resend after a renewal | a request gate in the credential, reading the request's signal from the auth scope (measured, M2) / wait for a per-request signal in connection | **the gate now**, pinned by a test; the connection contract proposed below as an improvement, not a prerequisite |
-| D33 | the shutdown bound | none by default, a second signal or `--shutdown-timeout` / keep 30 s | **none by default**: H4; the cost of ending early is documented with the option |
+| D33 | the shutdown bound | none by default; forced only by a `SIGTERM` / `SIGINT` after the start or `--shutdown-timeout` (stdin `end` / `close` never force) / keep 30 s | **none by default**: H4; the cost of ending early is documented with the option |
 | D9 | `--browser` names outside the table | refuse / open the default browser, as 5.x did | **refuse**: H1; `--browser-program` names any other program |
 | D21 | `DeletePackage`'s fallback when no fresh connection can be had | answer the failure / keep falling back to the caller's session | **answer the failure**: H1, and on an injected connection the fallback would hide the refusal the goal requires |
 
 ### Requests to other repositories
 
 **Prerequisites: none.** Each review finding is answered with the published packages
-and measured (M1–M5): the server waits on no change in another repository. The requests below
+and measured (M1–M7): the server waits on no change in another repository. The requests below
 would let the server replace a measured mechanism of its own with a written contract; each goes to
 its repository as its own change, and the server adopts it in a later release.
 

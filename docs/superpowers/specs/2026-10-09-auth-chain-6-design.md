@@ -492,6 +492,33 @@ controller linked to `extra.signal`.
   - **The view also carries** the request's record of an auth failure (§7.2) and the request's
     signal for a fresh connection (§4.3); the server's registries (records, fresh-connection
     factories) are keyed by the connection and looked up through the view's target.
+  - **Every connection the server hands on for a request is a view of the current request.** A
+    view carries the request — its signal and its failure record (§7.2) — not the connection's
+    life: a connection the server keeps beyond one request (stdio's, SSE's, a package lock's
+    session) is kept **raw**, and every request that uses it gets a new view carrying **that**
+    request. `viewFor(connection, request)` builds one; `requestOf(view)` and `targetOf(view)` read
+    a view's request and connection; the server's registries (records, fresh-connection factories,
+    lock sessions, the system-context memo) are keyed by the raw connection. Every place in the
+    server that hands code a connection other than the request's own (`grep` over `src`, `server/src`
+    and the three `compact*/src`, for `createAbapConnection`, `openFreshConnection`,
+    `inOwnSessionOverRfc`, `connectionForPackageLock`, `connectionHoldingPackageLock`,
+    `releasePackageLockSession`, `getManagedConnection`, retained `Map`s and `WeakMap`s of
+    connections) — each covered:
+
+    | Site | Today | 18.0.0 |
+    |---|---|---|
+    | `BaseMcpServer.getConnection` (`BaseMcpServer.ts:193-230`): the connection stdio and SSE keep across requests | the kept connection handed to every request | kept raw; each request's handler gets `viewFor(kept, request)` |
+    | `inOwnSessionOverRfc` (`packageSessions.ts:86-100`) — `CreatePackage` high (`handlers/package/high/handleCreatePackage.ts:134`) and low (`handlers/package/low/handleCreatePackage.ts:160`), over RFC | `work(fresh)`: the raw fresh connection | `work(viewFor(fresh, requestOf(caller)))`; the fresh one is closed raw |
+    | `openFreshConnection` (`packageSessions.ts:40-61`) — `DeletePackage` with `force_new_connection` (`handleDeletePackage.ts:93-108`), which builds its client on it | the raw sibling | a server-built sibling is returned as `viewFor(sibling, requestOf(caller))`; the caller closes `targetOf(it)` |
+    | `connectionForPackageLock` (`packageSessions.ts:110-135`) — `LockPackage` (`handleLockPackage.ts:91`), over RFC | the raw fresh connection, kept under the lock handle | the lock runs on `viewFor(fresh, requestOf(caller))`; **`lockSessions` keeps the raw `fresh`** under the handle, never a view (a view would carry the lock request's signal, aborted when that request ended, D4) |
+    | `connectionHoldingPackageLock` (`packageSessions.ts:138-143`) — `UpdatePackage` (`handleUpdatePackage.ts:151`), `UnlockPackage` (`handleUnlockPackage.ts:112`) | the retained raw connection | `viewFor(lockSessions.get(handle), requestOf(caller))` — **a new view carrying the update's or unlock's own request**; the caller's view when no session holds the handle |
+    | `releasePackageLockSession` (`packageSessions.ts:149-157`) | closes the retained connection | closes it raw; it carries no request |
+    | `resolveOnce` (`requestSystemResolution.ts:104-125`) — the cloud system-context lookup, one per connection, shared by concurrent requests | memo keyed by the object it is given; the lookup runs on it | memo keyed by `targetOf(view)`; the shared lookup (a read: `systeminformation`) runs on the raw connection with no request's signal, and each caller's wait is raced against its own signal (D32) — one caller's cancel cannot fail the lookup for the others |
+    | the consumer's `freshConnection` (§4.3) | — | **consumer-owned: never wrapped**; the factory receives the request's signal and the connection it returns is used as given |
+    | `getManagedConnection` / `getAdtClient` (`utils.ts:386-536`, `clients.ts:53-61`) — the legacy `SapConfig` / `setAbapConnectionOverride` path | — | no request exists there (no tool handler calls it): no view, no signal; a request through it is the embedder's own |
+
+    `sessionUtils.ts`'s request helpers take whatever connection they are given (the view, when a
+    handler passes its own) and substitute none.
   - **Not for an injected connection**: it is the consumer's and is not wrapped (§4.3); its
     requests carry no signal from the server.
   - **Replaces** the request gate of `c9fb15e5`–`443eba0e` (an `AsyncLocalStorage` scope read in
@@ -1095,7 +1122,24 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
     answers `200`. This pins the prerequisite end to end; the boundary-by-boundary tests, RFC
     included, are connection's (§3.1). *Break:* drop the signal from the view → R1's `POST`
     appears after the renewal.
-14. **The cancelled caller settles first (M3).** R1 and R2 wait on one shared login in `connect()`
+14. **Every substituted connection carries the current request (D31).** With a recording
+    connection, each server-built: (a) `CreatePackage` high and low over RFC — the fresh
+    connection's every `makeAdtRequest` carries the create request's signal; cancelled before the
+    create, no create reaches it (needs connection 14.1.0; asserted against the stand-in's log), and
+    the fresh connection is closed. (b) `DeletePackage` with `force_new_connection` — the sibling's
+    requests carry the delete's signal; cancelled, no delete is sent, the sibling is closed.
+    (c) `LockPackage` (signal L) → `UpdatePackage` (signal U) → `UnlockPackage` (signal X) over
+    RFC: the lock session's requests carry L, then U, then X — each request's own, never L after
+    the lock request ended; `lockSessions` holds the raw connection; cancelling U sends no update
+    and leaves the session held; the unlock with X then succeeds and closes the session; cancelling
+    the lock request does not affect a later update on another handle. (d) Two concurrent cloud
+    requests sharing one system-context lookup: cancelling the first lets the second get its
+    context. (e) A consumer's `freshConnection` result reaches the handler unwrapped, and the
+    factory got the request's signal. *Breaks:* keep the view in `lockSessions` → the update runs
+    with L, already aborted; hand `work` the raw fresh connection → no signal on the create;
+    key `resolveOnce` by the view / run it under the first caller's signal → the second caller is
+    refused.
+15. **The cancelled caller settles first (M3).** R1 and R2 wait on one shared login in `connect()`
     (stdio, one connection) and in the HTTP pre-dispatch connect (two clients); R1 is cancelled
     while the token endpoint is held: R1's request settles `aborted` before the endpoint is
     released, R2 settles after it with its token; no unhandled rejection is recorded (an
@@ -1183,7 +1227,8 @@ keeps its footprint there small:
 | `src/embeddable/BaseMcpServer.ts` | the source union, `getConnection(signal)`, the wrapper's `extra`, the per-request view, the D5 check; no change to handler registration or `available_in` |
 | `src/lib/connectionFactory.ts` | the per-request view (`viewFor`); transports untouched |
 | `src/lib/utils.ts` | `return_error`'s first lines and its two regular expressions; `credentialFromSapConfig` callers unchanged |
-| `src/lib/packageSessions.ts`, `handleDeletePackage.ts` | the fresh-connection registry; the fallback removed |
+| `src/lib/packageSessions.ts`, `handleDeletePackage.ts` | the fresh-connection registry; views for every fresh or retained connection, raw `lockSessions`; the fallback removed |
+| `src/lib/requestSystemResolution.ts` | `resolveOnce` keyed by the raw connection, its shared lookup unsignalled, each caller's wait raced |
 | `src/lib/handlers/interfaces.ts` (`HandlerContext`) | **untouched** — the registry and the view avoid it |
 | `src/lib/requestContext.ts` | **untouched** |
 | `tools/` | untouched |

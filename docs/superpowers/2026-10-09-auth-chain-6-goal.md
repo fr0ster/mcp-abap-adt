@@ -16,9 +16,17 @@ The server `mcp-abap-adt` stands on the auth chain as it is published now:
 | interfaces-auth | 7.5.x |
 | auth-errors | 2.2.x |
 
-The server reaches authentication only through the broker. Everything 6.0.0
-guarantees a holder of a provider, and everything broker 5.0.0 guarantees its
-consumer, therefore reaches the server's users intact through the server. Some
+Everything 6.0.0 guarantees a holder of a provider, and everything broker
+5.0.0 guarantees its consumer, reaches the server's users intact through the
+server.
+
+**The server has three credential sources:**
+
+| Source | How it authenticates | Who owns it |
+|---|---|---|
+| A destination the server manages: `--env`, the destination folder, service keys | through the broker | the server owns its cancellation, session writes and renewal choice |
+| Credentials given per request or per instance: `x-sap-*` headers, a `SapConfig` | through providers the server builds directly from auth-providers 6.0.0, not through the broker, since nothing is stored | the server; these follow the same failure, cancellation and no-secret rules |
+| A connection an embedding consumer injects into `EmbeddableMcpServer` | by the consumer | the consumer owns its authentication, cancellation and persistence; the server uses it as given and never re-authenticates or wraps it | Some
 decisions the chain leaves to its consumer: how long an interactive login may
 wait, what cancels it, and what a failure looks like to the user. The server
 takes each of these in the open, in its own configuration or code. It never
@@ -34,6 +42,14 @@ hides one and never guesses one.
   - uses `instanceof` on an error class of the chain;
   - parses the text of an `AggregateError` entry.
 - **A login ends when someone ends it.**
+  - **Before any MCP request exists.** The HTTP and SSE transports log in
+    while a client connects (`StreamableHttpServer`'s first connect,
+    `SseServer`'s `init`), before an MCP transport or request exists.
+    - The client's disconnect cancels that login; its listener is installed
+      before setup begins.
+    - A client waiting in the queue for the first connect (`FirstConnectLock`)
+      leaves the queue when it disconnects.
+    - The callback port is free afterwards, and the next client can log in.
   - **Cancellation follows the MCP client.** An interactive login the server
     starts is cancelled when the MCP request that needs it is cancelled. Every
     broker call a request makes takes that request's signal.
@@ -44,6 +60,15 @@ hides one and never guesses one.
     none.
   - **Nothing keeps waiting for a client that left.** A login started for a
     request whose client has gone does not keep running.
+  - **One waiter leaving ends only its own wait.**
+    - **Sharing.** Credentials are shared per destination: one provider per
+      destination's means, as the broker caches it, across MCP sessions.
+    - **"Session"** means an MCP session.
+    - **A request's cancellation, or a session's close, ends only that
+      caller's wait.** A concurrent request on the same destination still gets
+      its token. A later request after a cancellation starts afresh and
+      succeeds. A login on another destination is untouched.
+    - **Tests** cover each of these, one at a time.
 - **Session writes are the server's stated choice.**
   - **Failed writes.** The server chooses what a failed session write means
     (`onWriteFailure`) and says so in its configuration docs.
@@ -105,8 +130,15 @@ hides one and never guesses one.
      authorization URL only where the user can act on it, never in a log line
      or a tool result.
 3. **A credential stays bound to what it was obtained for.** The broker's
-   bindings hold through the server. The server never reuses a credential
-   across destinations, sessions or means it was not obtained for.
+   bindings hold through the server.
+   - **Not across destinations or means.** The server never reuses a
+     credential for another destination, or for means it was not obtained
+     for.
+   - **Across sessions, as the broker shares it.** MCP sessions on the same
+     destination share it as the broker does.
+   - **Per-request credentials are never stored or shared.** Credentials from
+     headers or a `SapConfig` serve only the request or instance that gave
+     them.
 4. **No built-in timeouts of the chain's making.** A wait ends with a result,
    an explicit error, a cancellation, or a bound the server states as its own
    choice.
@@ -136,8 +168,10 @@ hides one and never guesses one.
 1. Where the server's login bound lives:
    - a command-line option, a configuration field or both;
    - its default: none, or a stated value;
-   - how an `EmbeddableMcpServer` consumer sets it.
-2. How MCP request cancellation and session close reach the broker:
+   - how an `EmbeddableMcpServer` consumer sets it for the paths the server
+     owns.
+2. How a client's disconnect before dispatch, an MCP request's cancellation
+   and a session's close reach the broker and the direct providers:
    - which signal each broker call gets;
    - what the server's `LoginLock` becomes, now that the providers' strategies
      own the port.

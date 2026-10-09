@@ -42,8 +42,9 @@ hides one and never guesses one.
   - uses `instanceof` on an error class of the chain;
   - parses the text of an `AggregateError` entry.
 - **A connection derived from an injected one stays the consumer's.** Some
-  operations need a fresh connection of their own: RFC `CreatePackage` and
-  `LockPackage` (`openFreshConnection`, `src/lib/packageSessions.ts`). Today,
+  operations need a fresh connection of their own: every caller of
+  `openFreshConnection` (`src/lib/packageSessions.ts`), which today is RFC
+  `CreatePackage` and `LockPackage`, and `DeletePackage`'s fallback. Today,
   on an injected connection, that path rebuilds credentials from the
   connection's configuration.
   - **Instead:** the server never rebuilds a credential from an injected
@@ -53,8 +54,9 @@ hides one and never guesses one.
     missing. Nothing is guessed.
   - **Ownership:** that connection's authentication, cancellation and
     persistence are the consumer's.
-  - **Tests:** injected RFC `CreatePackage` and `LockPackage`, with a factory
-    and without one, where the configuration holds no usable credential.
+  - **Tests:** each of those callers on an injected connection, with a
+    factory and without one, where the configuration holds no usable
+    credential.
 - **A login ends when someone ends it.**
   - **Before any MCP request exists.** The HTTP and SSE transports log in
     while a client connects (`StreamableHttpServer`'s first connect,

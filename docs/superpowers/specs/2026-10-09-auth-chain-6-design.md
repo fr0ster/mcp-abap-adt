@@ -176,26 +176,15 @@ outside the repository; the scripts are not kept, each becomes a test in §13):
   `userB:pw-userB`. The next `getProvider` builds yet another provider. The broker exposes nothing
   that says which means a provider was built from (`bindingOf` binds token rows only, and `basic`
   binds nothing).
-- **M5 — a key store read once per method closes the basic case only.** The same sequence with the
-  broker's key store wrapped so each method's first answer per destination is kept: both reads
-  answer A, the provider presents `userA:pw-userA`, and the next `getProvider` answers the same
-  provider.
-- **M6 — but per-method reads freeze two different files' states.** A `jwt` /
+- **M5 — means and client can come from two states of the file.** A `jwt` /
   `client_credentials` destination in an `EnvDestinationStore` file, two local token endpoints
   (A's client answers `tokenA`, B's `tokenB`); the file changes from A to B right after the first
   `getConnectionConfig`. auth-stores 4.0.0 reads the file anew in each projection
   (`EnvDestinationStore.readFile` from `getConnectionConfig`, `getAuthorizationConfig` and
   `getClientCertificate`; `getServiceKey` calls the first two again; the key-file fallbacks reload
   their JSON per call through `loadKeyFile`), and broker 5.0.1 reads `means` and `client` as two
-  reads (`AuthBroker.js` `storeReads`). Unwrapped, and with the per-method wrapper of M5 alike: the
-  server connects to `https://a.example` and the provider presents **`Bearer tokenB`** — A's means
+  reads (`AuthBroker.js` `storeReads`). The server connects to `https://a.example` and the provider presents **`Bearer tokenB`** — A's means
   and URL frozen with B's client.
-- **M7 — one acquisition, checked, is coherent.** The same run with one acquisition: every file the
-  destination's stores read is fingerprinted (device and inode, size, `mtimeNs`, `ctimeNs`, SHA-256
-  of the bytes), every projection the server and the broker use is read, the files are
-  fingerprinted again; a difference discards everything and acquires again. The change is seen,
-  the second acquisition reads B whole: the server connects to `https://b.example` and presents
-  `Bearer tokenB` — URL and client of one state.
 
 ## 3. Versions and dependencies
 
@@ -253,64 +242,24 @@ type CredentialSource =
   is the natural owner of that destination's write queue and `flush()`. Reason: the broker's
   sharing and write queue are per destination already; one broker per destination adds nothing to
   re-implement.
-- **(D3) One coherent snapshot of a destination's means per process; the provider per request.**
-  - **The snapshot is one acquisition of the destination's content**, never a cache per method
-    (M6). On a destination's first need the server takes it, in this order:
-    1. **fingerprint every file the destination's stores read** — for each: device and inode,
-       size, `mtimeNs`, `ctimeNs` and the SHA-256 of its bytes, or *absent* (the stores read
-       `ENOENT` as nothing, so absence is part of the state);
-    2. **read every projection** through the real auth-stores 4 stores — the key store's
-       `getConnectionConfig`, `getAuthorizationConfig` and `getServiceKey`; the XSUAA URL store's
-       `getConnectionConfig`; the server's own `keyShapeOf` (which picks the ABAP or XSUAA stores
-       from the key's shape);
-    3. **fingerprint again.** Equal → the answers of step 2 are the destination's snapshot for the
-       life of the process. Different → **all of it is discarded** and the acquisition runs again;
-       three acquisitions in a row that each saw a change refuse the destination ("its files kept
-       changing while they were read") — a count, not a timer. A projection that fails discards
-       the whole acquisition, keeps nothing, and the error is answered; the next request acquires
-       afresh.
-
-    The broker is built over a key store that answers only from the snapshot (`getServiceKey`,
-    `getConnectionConfig`, `getAuthorizationConfig`); `settingsFor` is computed from the same
-    snapshot (the means, and for XSUAA the URL store's answer). The snapshot store implements no
-    `getClientCertificate`: the broker reads it only for a `clientAuthentication` strategy
-    (broker README, *How the Client Authenticates*), which the server does not give, so no
-    certificate file is ever read. For an XSUAA destination the snapshot's means `serviceUrl` must
-    equal the URL store's `XSUAA_MCP_URL`, or the destination is refused.
-
-    **Which files, per mode** (from auth-stores 4.0.0's read paths):
-
-    | Mode | Stores (`destinationStores.ts`) | Files fingerprinted |
-    |---|---|---|
-    | `--env` / `--env-path` | `EnvDestinationStore.forFile(path)`, no fallback | that file |
-    | named, ABAP key | `EnvDestinationStore(sessionsDir, fallback AbapServiceKeyStore(keysDir))` | `sessions/<name>.env`, `service-keys/<name>.json` |
-    | named, XSUAA key | `EnvDestinationStore(sessionsDir, XSUAA vars, fallback XsuaaServiceKeyStore(keysDir))`; URL store `EnvDestinationStore(sessionsDir, XSUAA vars)` | `sessions/<name>.env`, `service-keys/<name>.json` (also what `keyShapeOf` reads to choose the mode) |
-    | certificate inputs (`SAP_UAA_CLIENT_CERT_PATH`, `…_KEY_PATH`) | read only by `getClientCertificate` | none: never read (above) |
-
-    **The residual, stated:** a change that leaves every fingerprinted field equal — the same bytes
-    (then it is the same state, harmless), or different bytes in between restored before the
-    second fingerprint on a file system whose timestamps are coarser than that interval (FAT,
-    HFS+), within one acquisition. `ctimeNs` cannot be set by a user, so on Linux, Windows NTFS and
-    APFS an intervening write is seen. Exact coherence needs the stores to parse content the server
-    read once; that is a request to auth-stores (§17), not a prerequisite.
-  - **The provider.** Every request still calls `getProvider(destination, { signal })` (§5): the
-    broker re-reads its key store on each call — the snapshot — so it answers the one provider it
-    built from the snapshot, with this request's signal attached. The server keeps no provider
-    cache (`brokerFactory.ts:184-198` goes): one would bypass the signal (§5) and duplicate the
-    broker's sharing (H5).
-  - **Reasons.** H3: M4 shows that reading the settings around `getProvider` does not tie the
-    provider to them — a change and its reversal inside one request hands a basic credential of
-    one system to another system's URL — and the published broker exposes nothing that says which
-    means a provider came from. Per-method reads are not enough either: M6 freezes A's URL with B's
-    client, and a login through B presents B's token to A. One checked acquisition makes the
-    settings, the means and the client views of one state (M7); no generation or binding is needed,
-    and no chain change. It is also
-    today's documented contract — "A destination is read once per process … takes effect on
-    restart" (`docs/user-guide/AUTHENTICATION.md`, *What is written back*) — so nothing changes for
-    users.
+- **(D3) A destination is read once per process, as documented today; editing its files while the
+  server runs is unsupported (decided by the user: document, don't engineer).**
+  - **The settings** stay read once per process (`settingsFor`'s cache, `brokerFactory.ts:114-125`,
+    unchanged), from the stores as auth-stores 4 gives them; no wrapper of the server's.
+  - **The provider:** every request calls `getProvider(destination, { signal })` (§5) — the
+    signal is why — and the broker answers its cached provider while its stores answer what its
+    build read. The server keeps no provider cache (`brokerFactory.ts:184-198` goes): one would
+    bypass the signal (§5) and duplicate the broker's sharing (H5).
+  - **What is documented instead of defended.** The destination's files belong to the user. The
+    stores read them per projection and the broker reads means and client apart, so a change
+    written while the server runs can be picked up in part: M4 hands one system's basic credential
+    to another's URL, M5 freezes A's URL with B's OAuth client and presents B's token to A. The
+    docs say plainly (`docs/user-guide/AUTHENTICATION.md`, *What is written back*, and the migration
+    note): **editing a destination's files while the server runs is not supported and may combine
+    old and new values until the next start — restart the server after any change.** Reason: the
+    user's standing rule — a consumer's own misuse is documented, not defended with machinery.
   - **What stays live:** the session store (the secret and its binding), which the broker reads and
-    writes as it must; the broker checks a stored secret's `issuedFor` / `issuedBy` against the
-    snapshot's means.
+    writes as it must, checking a stored secret's `issuedFor` / `issuedBy` against the means.
 - `systemContextFor` (responsible, login, master system) stays cached per process: it holds no
   credential and nothing is bound to it; changing it is outside this change's footprint.
 - **The counted wrapper stays** (`countedProvider`), memoised per inner provider in a `WeakMap` so
@@ -413,8 +362,8 @@ alive after its own waiter left (§2, *A provider's moment waits on all its part
 the server hands the broker is therefore one the server aborts when its holder is done. A live
 set of request and setup controllers is kept per process so shutdown can abort them (§6.4).
 
-The snapshot's first reads (§4.1) take no signal — the store contract has none (broker README,
-*Cancellation*); they are file reads that settle, once per destination.
+The store reads (`settingsFor`, and the broker's own) take no signal — the store contract has none
+(broker README, *Cancellation*); they are file reads that settle.
 
 **Every request-owned wait is the request's own (D32).** The provider's moments wait on the
 collective parties (M3), and the connection's establishment and renewal are shared or carry no
@@ -507,9 +456,8 @@ the request's signal and the auth failure recorded for the request (§7.2).
 
 - **HTTP**: a connection per request, as today.
 - **stdio and SSE**: the server instance keeps its connection while the source answers the same
-  provider (the same counted wrapper) and the same settings — with the snapshot (D3) that is the
-  life of the process; a different provider or settings (a snapshot read again after a failed
-  first read) → a new connection, the old one disconnected. Reason: today's cache
+  provider (the same counted wrapper) and the same settings; a different provider (the broker
+  built a new one) → a new connection, the old one disconnected. Reason: today's cache
   (`BaseMcpServer.ts:205-227`) keyed on the destination name alone would present any provider it
   was first given, whatever the broker answers later.
 
@@ -854,7 +802,7 @@ as today.
 |---|---|---|
 | `brokerFactory.ts:251-258` | `new AuthBroker({ serviceKeyStore, sessionStore, ...handler.brokerOptions(ctx) }, logger)` | `new AuthBroker({ serviceKeyStore, sessionStore, renewal, onWriteFailure, authDebug, ...handler.brokerOptions(ctx) }, logger)` |
 | `brokerFactory.ts:184-198` | `getProvider(d)` cached by the factory | `getProvider(d, { signal })` → `broker.getProvider(d, { signal })`, no factory cache, counted wrapper memoised per inner provider |
-| `brokerFactory.ts:114-125`, `:246-260` | `settingsFor` cached; the broker over the stores as they are | the broker over the snapshot key store (and URL store); `settingsFor` computed from the snapshot, no cache of its own (D3) |
+| `brokerFactory.ts:114-125` | `settingsFor` cached per process | unchanged (D3) |
 | `brokerFactory.ts:217` | `broker.flush()` | `broker.flush({ signal })` (§6.4) |
 | `brokerFactory.ts:58-68`, `:219` | `notStoredOf` with `ENTRY` | per destination, `classify(entry, 'persisting-tokens').reason` |
 | `brokerFactory.ts:134`, `:152`; `vocabulary.ts` | `new DestinationConfigError(d, fields, reason)` | unchanged (the broker 5 constructor takes the same three, plus an optional error) |
@@ -907,6 +855,8 @@ to do"):
     format for the server's `--env` and `sessions/<name>.env` cases, and the alternative of the
     `x-sap-jwt-token` header (a direct provider, not bound); the startup refusal points there
     (D30, §17);
+  - editing a destination's files while the server runs is not supported and may combine old and
+    new values until the next start: restart after any change (D3);
   - `--browser`: the platform table (§8), unknown names refused, `none` waits, `--browser-program`
     for an executable the table does not name, no `DISPLAY=:0`;
   - no login timeout by default (it was 30 s); `--login-timeout` to state one;
@@ -1065,29 +1015,9 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
   server's sentence. Default: a login.
 - The factory refuses to build without `renewal` or `onWriteFailure` (TypeScript and run time).
 
-- **A→B→A cannot hand one system's credential to another (M4, M5).** A basic destination whose
-  file says A (URL of stand-in A, `userA`) is read; the file is rewritten to B (stand-in B,
-  `userB`) before the request builds its provider, and back to A before the connection is built.
-  Asserted: the request reaches stand-in A with `userA`'s `Authorization` and nothing reaches
-  either stand-in with `userB`; the key store's files are read once per destination per process
-  (a counting store). *Break:* remove the snapshot wrapper → stand-in A receives `userB`.
-- **Means and client of one state (M6, M7).** A `jwt` / `client_credentials` destination and,
-  separately, a `jwt` / `authorization_code` one (the fake browser plays the user), each in an
-  `EnvDestinationStore` file, with two local token endpoints and two system stand-ins: the file
-  changes from A to B between the first `getConnectionConfig` and the first
-  `getAuthorizationConfig` read (a store hook). Asserted: **B's token never reaches stand-in A**
-  (stand-in A's log holds no `Bearer` of B's endpoint) and the request reaches the system of the
-  state its client came from; the acquisition ran twice. Repeated for the named ABAP mode with the
-  change in `service-keys/<name>.json` between its reads, and for the XSUAA mode with the change
-  between the key store's and the URL store's reads. *Break:* replace the acquisition with
-  per-method memoisation (c9fb15e5's D3) → stand-in A receives `Bearer` of B.
-- **A failed acquisition keeps nothing**: a projection that throws once (an unreadable key file)
-  answers its error; the next request acquires afresh and succeeds once the file is fixed. Three
-  acquisitions each seeing a change refuse the destination with its words; nothing is kept.
-- An XSUAA destination whose `XSUAA_MCP_URL` and means `serviceUrl` disagree within one
-  acquisition is refused and nothing is kept.
-- The snapshot store exposes no `getClientCertificate`; no certificate file is opened (an `fs`
-  spy).
+- **A destination is read once per process.** `settingsFor` called by many requests reads its
+  stores once (a counting store), as today; a failed read is not kept and the next request reads
+  again.
 
 ### 13.5 Debug output
 
@@ -1156,9 +1086,9 @@ like any request.
 |---|---|
 | H1 The consumer composes; nobody guesses | renewal, `onWriteFailure`, the bound, the browser and `authDebug` are stated in the server's parameters and the factory's required options (D9–D12, D24); the factory adds no default collaborator; `credentialFromSapConfig` and `--browser` refuse instead of guessing (D19, D9); `DeletePackage` no longer falls back (D21) |
 | H2 Nothing goes out that should not | §7.3 (no diagnostics, facts, messages to clients), §9 (no secret fragment, no `message`, no environment-driven `authDebug`), the URL only on stderr from the providers, nothing on stdout; tested in §13.5 |
-| H3 A credential stays bound | providers only from the broker, over one checked acquisition of every file the destination's stores read, from which the means, the client and the settings all come (D3, M4–M7); direct providers never reach a store; per-request and per-session holders (§4.2); an injected connection never re-authenticated (§4.3) |
+| H3 A credential stays bound | providers only from the broker, read once per process; editing a destination's files while the server runs is documented as unsupported, restart after any change (D3, measured reason M4, M5); direct providers never reach a store; per-request and per-session holders (§4.2); an injected connection never re-authenticated (§4.3) |
 | H4 No built-in timeouts of the chain's making | no default bound anywhere: the login bound (D10) and the shutdown bound (D33) exist only when the user states them; the 30 s shutdown deadline and the drain timer are removed |
-| H5 One implementation of each rule | failures read by auth-errors (§7.1); the build shared by the broker (no server provider cache, no `FirstConnectLock` queue; the snapshot is when the means are read, not a second cache of providers); the refresh state the broker's `refreshStatePersistence`; the browsers auth-providers' factories (§8). The cross-destination login queue is the server's own because the chain has none (§5.6) |
+| H5 One implementation of each rule | failures read by auth-errors (§7.1); the build shared by the broker (no server provider cache, no `FirstConnectLock` queue); the refresh state the broker's `refreshStatePersistence`; the browsers auth-providers' factories (§8). The cross-destination login queue is the server's own because the chain has none (§5.6) |
 | H6 Registry only | every range in §3 is published; release checks in §12 |
 | H7 No regular expressions over untrusted input | D26: `destinationName`, the port and seconds parsers, `errorClassOf`, `return_error`, `notStoredOf`'s removal; a source test (§13.1) |
 
@@ -1174,7 +1104,7 @@ The spec is written on each recommendation.
 | D23 | `FirstConnectLock`'s queue | remove it (the chain shares the login) / keep it, made cancellable | **remove it**: two implementations of one rule otherwise (H5), and a queue is one more wait to cancel. The goal names the queue; with no queue its requirement holds trivially and §13.3 test 3 covers the case |
 | D27 | "server text" | text of an authorization server or IdP / also ADT answers | **the former**: ADT answers are the tools' data, and removing them would break every tool's error reporting |
 | D30 | `jwt` / `none` destinations under broker 5 need `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` | the migration note gives the lines to write by hand / the server gains a command that writes them with `bindingOf` / auth-broker-cli gains `--token` for `jwt` / `none` (its own change, as it has `--cookie` for `saml` / `none`) | **the migration note now, and ask the CLI for `--token`** in its own repository: no tool writes the binding for a held token today, and the server writing it would bypass what the binding protects. Until then, `x-sap-jwt-token` is the unbound alternative over HTTP |
-| D3 | how the settings and the provider are tied together | one fingerprinted acquisition of all the destination's files per process (today's documented contract) / a private copy of the files the stores are pointed at (exact, but a second on-disk copy of the secrets) / content-based stores from auth-stores (exact; a request below) / a binding from the broker (a request below) | **the fingerprinted acquisition**: it holds with the published packages (M7), closes A→B→A (M4) and means-versus-client (M6), writes no secret anywhere new, and changes nothing users rely on; its one residual (§4.1) is a write and its exact undo inside one acquisition on a file system with coarse timestamps |
+| D3 | a destination's files edited while the server runs | **decided by the user: (c) document, don't engineer** — the server reads a destination once per process as today, and the docs say editing while running is unsupported, may combine old and new values (M4, M5), restart after any change | — |
 | D31 | stopping a cancelled request's resend after a renewal | a request gate in the credential, reading the request's signal from the auth scope (measured, M2) / wait for a per-request signal in connection | **the gate now**, pinned by a test; the connection contract proposed below as an improvement, not a prerequisite |
 | D33 | the shutdown bound | none by default, a second signal or `--shutdown-timeout` / keep 30 s | **none by default**: H4; the cost of ending early is documented with the option |
 | D9 | `--browser` names outside the table | refuse / open the default browser, as 5.x did | **refuse**: H1; `--browser-program` names any other program |
@@ -1183,14 +1113,14 @@ The spec is written on each recommendation.
 ### Requests to other repositories
 
 **Prerequisites: none.** Each review finding is answered with the published packages
-and measured (M1–M7): the server waits on no change in another repository. The requests below
+and measured (M1–M5): the server waits on no change in another repository. The requests below
 would let the server replace a measured mechanism of its own with a written contract; each goes to
 its repository as its own change, and the server adopts it in a later release.
 
 | Repository | Request | Contract | What it would replace |
 |---|---|---|---|
 | `mcp-abap-adt-interfaces` (interfaces-adt-connection) and `mcp-abap-connection` | a per-request signal | `IAbapRequestOptions.signal?: AbortSignal`; the connection checks it before every attempt — the first send and every resend after `rejected()` — and before calling `rejected()`, and answers `aborted` (an `AuthRefusedError` with `interactive-login` `aborted`, or a session error of its own) without sending; no attempt is sent after the signal aborted | D31's reliance on `authorize()` being called per attempt in the request's async context |
-| `mcp-abap-adt-auth-stores` | stores over content read once | `EnvDestinationStore.fromContent(text, options)`, `AbapServiceKeyStore.fromKey(json, options)`, `XsuaaServiceKeyStore.fromKey(json, options)` — the same projections as the file-backed stores, computed from content the caller read once, reading no file | D3's fingerprint check and its residual: the server would read each file's bytes once and every projection would come from them |
-| `mcp-abap-adt-auth-broker` | which means a provider was built from | `getProvider(d, { signal })` also answers, or a sibling `getProviderWithMeans` answers, `{ provider, means }`: the `IConnectionConfig` snapshot the build read, the same object for the life of that provider | D3's snapshot key store, if the server is ever to pick up file changes without a restart |
+| `mcp-abap-adt-auth-stores` | stores over content read once | `EnvDestinationStore.fromContent(text, options)`, `AbapServiceKeyStore.fromKey(json, options)`, `XsuaaServiceKeyStore.fromKey(json, options)` — the same projections as the file-backed stores, computed from content the caller read once, reading no file | a possible later improvement: the server could read each file once and derive every projection from it, so an edit while running could no longer combine two states |
+| `mcp-abap-adt-auth-broker` | which means a provider was built from | `getProvider(d, { signal })` also answers, or a sibling `getProviderWithMeans` answers, `{ provider, means }`: the `IConnectionConfig` snapshot the build read, the same object for the life of that provider | a possible later improvement: picking up file changes without a restart, the settings tied to the provider |
 | `mcp-abap-adt-auth-broker` (auth-broker-cli) | write a held token with its binding | `mcp-auth --token <token>` (from a file or stdin, never an argument in history) for `jwt` / `none`, as `saml2-pure --cookie` does for `saml` / `none`: writes `SAP_JWT_TOKEN`, `SAP_REFRESH_TOKEN=` and `bindingOf(means)` | D30's hand-written lines in the migration note |
 

@@ -85,10 +85,20 @@ never hides one and never guesses one.
     factory and without one, where the configuration holds no usable
     credential.
 - **A request ends when its client ends it, in every mode.**
-  - **A cancelled request is not sent.** When an MCP request is cancelled, or
-    its client goes away, nothing more of it reaches the SAP system — not a
-    first send, not a resend after a renewal, not after a connection's logon,
-    over HTTP or RFC. A request already sent is not recalled.
+  - **A cancelled request does not reach its tool**, in every mode.
+  - **A cancelled request is not sent, on a connection the server builds.**
+    When an MCP request is cancelled, or its client goes away, nothing more of
+    it reaches the SAP system — not a first send, not a resend after a
+    renewal, not after a connection's logon, over HTTP or RFC. A request
+    already sent is not recalled.
+  - **On a connection the consumer gives** — injected, or returned by its
+    fresh-connection factory — the server passes each request's signal: in
+    every request's options, and to the factory. That is all it does there:
+    honouring the signal is the consumer's contract, stated in the embedding
+    docs and the migration note. Nothing more is promised for a consumer's
+    connection that ignores it.
+  - **Tests:** the signal reaches an injected connection's request options
+    and the consumer's factory; a cancelled request never reaches the tool.
   - **Its waits end.** Every wait the request started ends when it is
     cancelled — a broker call, a login, a renewal, a fresh connection — and
     only that request's wait ends: another request's wait on the same work
@@ -123,6 +133,21 @@ never hides one and never guesses one.
   - SSE: removed. The migration note says to use Streamable HTTP.
   - Compact: as today, over stdio.
   - Embedded consumers: the migration note names every change they meet.
+- **The Docker images and the release artifacts follow the split.**
+  - **`docker/Dockerfile`** (today: HTTP with `--allow-destination-header`,
+    `/mcp/health`, mounted `service-keys/` and `sessions/`) installs and runs
+    the HTTP package: no destination routing, no credential mounts. Its
+    health endpoint and a tool call carrying only `x-sap-*` headers are
+    verified on the built image.
+  - **`docker/Dockerfile.inspect`** (Glama: stdio core behind `mcp-proxy`)
+    keeps working on core, or is migrated explicitly.
+  - **The compose files** (`docker/docker-compose*.yml`) match the images
+    they run.
+  - **Build, publish and smoke** (`.github/workflows/ci.yml`,
+    `release.yml`, the bin smoke test) include the HTTP package;
+    `docs/deployment/RELEASE.md`'s table and publish order name it;
+    `server.json`, `server-compact.json`, `glama.json` and the registry
+    metadata say which package serves which transport.
 - **One release.** Every package, the new HTTP package included, is released
   as one major, 18, from one pull request.
 - **Measured on real systems before release.** These are run against real
@@ -188,7 +213,8 @@ never hides one and never guesses one.
    credentials the user sends in the request's headers — nothing else: no
    destination, no server-side token, no credential the server holds of any
    kind — and depends on neither auth-broker nor auth-stores. An embedding
-   consumer's credentials stay the consumer's.
+   consumer's credentials and connections stay the consumer's: the server
+   hands them each request's signal and does not wrap them.
 5. **No built-in timeouts of the chain's making.** A wait ends with a result,
    an explicit error, a cancellation, or a bound the server states as its own
    choice.

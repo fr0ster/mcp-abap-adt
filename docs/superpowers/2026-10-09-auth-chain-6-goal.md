@@ -12,7 +12,7 @@ The server `mcp-abap-adt` stands on the auth chain as it is published now:
 | auth-broker | 5.0.x |
 | auth-providers | 6.0.x |
 | auth-stores | 4.0.x |
-| connection | 14.0.x |
+| connection | 14.x, with a per-request signal (below) |
 | interfaces-auth | 7.5.x |
 | auth-errors | 2.2.x |
 
@@ -20,19 +20,35 @@ Everything 6.0.0 guarantees a holder of a provider, and everything broker
 5.0.0 guarantees its consumer, reaches the server's users intact through the
 server.
 
-**The server has three credential sources:**
+**The server has three modes, each with its own credentials and owner:**
 
-| Source | How it authenticates | Who owns it |
-|---|---|---|
-| A destination the server manages: `--env`, the destination folder, service keys | through the broker | the server owns its cancellation, session writes and renewal choice |
-| Credentials given per request or per instance: `x-sap-*` headers, a `SapConfig` | through providers the server builds directly from auth-providers 6.0.0, not through the broker, since nothing is stored | the server; these follow the same failure, cancellation and no-secret rules |
-| A connection an embedding consumer injects into `EmbeddableMcpServer` | by the consumer | the consumer owns its authentication, cancellation and persistence; the server uses it as given and never re-authenticates or wraps it | Some
-decisions the chain leaves to its consumer: how long an interactive login may
-wait, what cancels it, and what a failure looks like to the user. The server
-takes each of these in the open, in its own configuration or code. It never
-hides one and never guesses one.
+| Mode | Who uses it | Where credentials come from | Who owns them |
+|---|---|---|---|
+| **stdio** | one user, who owns the process | the default destination (`--mcp` / `--env` / `--env-path`), service keys included — through the broker, with its session files and an interactive (browser) login when one is needed | the server: cancellation, session writes, renewal |
+| **HTTP and SSE** | many users | each request alone: `x-sap-*` headers (a user and password, or a token), through providers the server builds directly from auth-providers 6.0.0 | the request that carries them; the server keeps none |
+| **embedded** (`EmbeddableMcpServer`) | the consumer's application | the consumer: its injected connection, or the credentials it gives per request | the consumer: authentication, cancellation, persistence; the server keeps none |
+
+**The default destination (`--mcp` / `--env` / `--env-path`) exists only for
+stdio.**
+
+Some decisions the chain leaves to its consumer: how long an interactive login
+may wait, what cancels it, and what a failure looks like to the user. The
+server takes each of these in the open, in its own configuration or code. It
+never hides one and never guesses one.
 
 **Success:**
+- **Each mode takes credentials only from its own source.**
+  - **HTTP and SSE serve no destination.** The default destination
+    (`--mcp` / `--env` / `--env-path`, in any of their CLI, environment or
+    YAML forms), `x-mcp-destination` and `--allow-destination-header` do not
+    exist for HTTP and SSE. A configuration that gives HTTP or SSE one is
+    refused at start, with words that name what was given and say to pass
+    `x-sap-*` headers instead.
+  - **HTTP and SSE start no interactive login, read no session file and build
+    no broker.**
+  - **stdio** serves its default destination through the broker; its
+    interactive login shows its URL where the one user can act on it.
+  - **Embedded** uses what the consumer gives and keeps nothing.
 - **Failures reach the user as the chain made them.** A failure the broker, a
   provider or the connection produces reaches the MCP client in the chain's
   own facts and words: its `kind`, its `reason` and `hint`. The server reads
@@ -57,40 +73,29 @@ hides one and never guesses one.
   - **Tests:** each of those callers on an injected connection, with a
     factory and without one, where the configuration holds no usable
     credential.
-- **A login ends when someone ends it.**
-  - **Before any MCP request exists.** The HTTP and SSE transports log in
-    while a client connects (`StreamableHttpServer`'s first connect,
-    `SseServer`'s `init`), before an MCP transport or request exists.
-    - The client's disconnect cancels that login; its listener is installed
-      before setup begins.
-    - A client waiting in the queue for the first connect (`FirstConnectLock`)
-      leaves the queue when it disconnects.
-    - The callback port is free afterwards, and the next client can log in.
-  - **Cancellation follows the MCP client.** An interactive login the server
-    starts is cancelled when the MCP request that needs it is cancelled. Every
-    broker call a request makes takes that request's signal.
-  - **Closing a session cancels its waits.** When an MCP session closes, the
-    waits its `getProvider` signal covers are cancelled.
+- **A request ends when its client ends it, in every mode.**
+  - **A cancelled request is not sent.** When an MCP request is cancelled, or
+    its client goes away, nothing more of it reaches the SAP system — not a
+    first send, not a resend after a renewal, not after a connection's logon,
+    over HTTP or RFC. A request already sent is not recalled.
+  - **Its waits end.** Every wait the request started ends when it is
+    cancelled — a broker call, a login, a renewal, a fresh connection — and
+    only that request's wait ends: another request's wait on the same work
+    goes on.
+  - **stdio's interactive login** ends when the request that needs it is
+    cancelled, or when the client leaves; the callback port is free
+    afterwards, and a later request can log in.
   - **Any bound is the server's, and visible.** The server sets an upper bound
-    on a login only as its own stated, configurable choice. The chain sets
-    none.
-  - **Nothing keeps waiting for a client that left.** A login started for a
-    request whose client has gone does not keep running.
-  - **One waiter leaving ends only its own wait.**
-    - **Sharing.** Credentials are shared per destination: one provider per
-      destination's means, as the broker caches it, across MCP sessions.
-    - **"Session"** means an MCP session.
-    - **A request's cancellation, or a session's close, ends only that
-      caller's wait.** A concurrent request on the same destination still gets
-      its token. A later request after a cancellation starts afresh and
-      succeeds. A login on another destination is untouched.
-    - **Tests** cover each of these, one at a time.
+    on a login, or on anything else, only as its own stated, configurable
+    choice. The chain sets none.
 - **Session writes are the server's stated choice.**
-  - **Failed writes.** The server chooses what a failed session write means
-    (`onWriteFailure`) and says so in its configuration docs.
-  - **Shutdown.** It flushes pending writes when it shuts down.
+  - **Where they happen:** stdio only — the `--env` / `--env-path` file the
+    server serves, and session files under `--unsafe`.
+  - **`--unsafe` is a development mode.** In it a session write that fails
+    warns and the request goes on.
+  - **Shutdown.** The server flushes pending writes when it shuts down.
   - **Discarded refresh tokens.** A refresh token the renewal discarded does
-    not come back after a restart.
+    not come back after a restart, unless a write that failed was reported.
 - **Renewal is the server's stated choice.** The server passes the broker a
   renewal strategy it names, or lets its user choose one, and documents it.
 - **Debug output is opt-in and safe.** The providers' debug line comes on only
@@ -98,18 +103,20 @@ hides one and never guesses one.
   environment. Without it, no log line, MCP response or error the server
   emits carries a secret, server text, an authorization URL or `state`.
 - **What works today keeps working, or the migration note says what to do.**
-  Every way a user configures a destination today keeps working, or the
-  migration note names its replacement:
-  - `--env`, the destination folder and service keys;
-  - basic, `jwt` / `authorization_code`, SNC and the rest;
-  - the browser choice and the callback port.
-
-  This holds for consumers that embed the server (`EmbeddableMcpServer`) too.
+  - stdio: `--mcp`, `--env`, `--env-path`, the destination folder and service
+    keys; basic, `jwt` / `authorization_code`, `jwt` / `none`, SNC; the
+    browser choice and the callback port.
+  - HTTP and SSE: `x-sap-*` headers keep working. The default destination and
+    `x-mcp-destination` go; the migration note says to pass `x-sap-*`
+    headers.
+  - Embedded consumers: the migration note names every change they meet.
 - **Measured on real systems before release.** These are run against real
   systems, each recorded with its date:
+  - stdio, `jwt` / `authorization_code` on the BTP trial, the browser login
+    included;
+  - HTTP with `x-sap-*` headers;
   - basic over HTTP and RFC;
-  - `jwt` / `authorization_code` on the BTP trial, the browser login included;
-  - SNC over RFC on Windows.
+  - SNC over RFC on Windows, over stdio.
 
 ## Why
 
@@ -127,8 +134,12 @@ hides one and never guesses one.
     (`src/lib/auth/errors.ts`).
   - It matches the broker's `AggregateError` entries with a regular
     expression (`src/lib/auth/brokerFactory.ts`).
-  - It passes no cancellation signal to any login.
+  - It passes no cancellation signal to any login or request.
   - It cannot choose renewal or what a failed write means.
+- **Destinations over HTTP and SSE cost more than they give.** A destination
+  served to many users shares one person's credential, session files and
+  browser login across them; nobody uses it, and every rule above would have
+  to hold for it too.
 
 ## Holds throughout
 
@@ -150,53 +161,58 @@ hides one and never guesses one.
    - **Not across destinations or means.** The server never reuses a
      credential for another destination, or for means it was not obtained
      for.
-   - **Across sessions, as the broker shares it.** MCP sessions on the same
-     destination share it as the broker does.
    - **Per-request credentials are never stored or shared.** Credentials from
-     headers or a `SapConfig` serve only the request or instance that gave
-     them.
-4. **No built-in timeouts of the chain's making.** A wait ends with a result,
+     headers serve only the request that carried them.
+4. **The modes do not mix.** The default destination, the broker, session
+   files and interactive login exist in stdio only. HTTP and SSE take
+   credentials from each request only. An embedding consumer's credentials
+   stay the consumer's. A configuration that would mix them is refused, never
+   adapted.
+5. **No built-in timeouts of the chain's making.** A wait ends with a result,
    an explicit error, a cancellation, or a bound the server states as its own
    choice.
-5. **One implementation of each rule.** What the chain already ships, the
+6. **One implementation of each rule.** What the chain already ships, the
    server uses rather than re-implements:
    - reading a failure;
    - sharing a build;
    - the refresh state;
-   - the browsers.
-6. **Registry only.** Released packages declare only semver ranges that
-   resolve on npm.
-7. **No regular expressions over untrusted input.** Error text, server text
+   - the browsers;
+   - cancelling a request at the connection's boundaries.
+7. **Registry only.** Released packages declare only semver ranges that
+   resolve on npm. A change the server needs in a chain package is released
+   there first, and the server waits for it.
+8. **No regular expressions over untrusted input.** Error text, server text
    and configuration values are read by plain code or the platform's parser.
 
 ## Out of scope
 
 - The proxy (`mcp-abap-adt-proxy`) and the calm server. Each migrates in its
   own change afterwards.
-- Changes to the chain's packages. A defect found there goes to its own
-  repository, and the server waits for the fix to be published.
+- Changes to the chain's packages, beyond the per-request signal the server
+  needs from connection. A defect found there goes to its own repository, and
+  the server waits for the fix to be published.
 - New grants, client certificates for the server, and passwordless HTTP
   login.
 - `mcp-auth snc`, which is the CLI's own change (3.1.0).
 
 ## Open — for the spec
 
-1. Where the server's login bound lives:
+1. Where the server's login bound lives (stdio):
    - a command-line option, a configuration field or both;
-   - its default: none, or a stated value;
-   - how an `EmbeddableMcpServer` consumer sets it for the paths the server
-     owns.
-2. How a client's disconnect before dispatch, an MCP request's cancellation
-   and a session's close reach the broker and the direct providers:
+   - its default: none, or a stated value.
+2. How a request's cancellation reaches the broker, the providers and the
+   connection:
    - which signal each broker call gets;
-   - what the server's `LoginLock` becomes, now that the providers' strategies
-     own the port.
-3. The renewal strategy and `onWriteFailure`:
+   - what the connection must offer, and in which release, so that a
+     cancelled request is not sent;
+   - what the server's `LoginLock` becomes in stdio.
+3. Renewal, and what a failed session write means outside `--unsafe` (the
+   `--env` / `--env-path` file stdio writes back):
    - the server's choice;
    - whether the user can change it, and where.
 4. What an MCP client sees for each failure `kind`: words, hint and
    diagnostics, and what stays out.
 5. The browser choice: how today's options map to the providers' `IBrowser`
    factories, and the migration note for any option that goes.
-6. The version, the release (a major), and the migration note for users and
-   for embedding consumers.
+6. The version, the release (a major), and the migration note for users of
+   each mode and for embedding consumers.

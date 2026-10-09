@@ -40,19 +40,19 @@ connection 14.0.1 (`6f6bb41`), auth-stores 4.0.0 (`2dbced7`), interfaces-auth
 |---|---|
 | Success: failures reach the user as the chain made them | §7; D14–D17, D28 |
 | Success: a connection derived from an injected one stays the consumer's | §4.3; D20–D22 |
-| Success: a login ends when someone ends it — before any MCP request exists | §5.3; D6 |
-| Success: … cancellation follows the MCP client | §5.2, §5.4; D4, D5, D7 |
+| Success: a login ends when someone ends it — before any MCP request exists | §5.3; D6, D32 |
+| Success: … cancellation follows the MCP client | §5.2, §5.4; D4, D5, D7, D31, D32 |
 | Success: … closing a session cancels its waits | §5.5 |
 | Success: … any bound is the server's, and visible | §5.7; D10 |
-| Success: … nothing keeps waiting for a client that left | §5.2–§5.6 |
-| Success: … one waiter leaving ends only its own wait | §5.6; §13.3 |
-| Success: session writes are the server's stated choice | §6.2–§6.4; D12 |
+| Success: … nothing keeps waiting for a client that left | §5.1–§5.6, §6.4; D31–D33 |
+| Success: … one waiter leaving ends only its own wait | §5.1, §5.2, §5.6; D31, D32; §13.3 |
+| Success: session writes are the server's stated choice | §6.2–§6.4; D12, D33 |
 | Success: renewal is the server's stated choice | §6.1; D11 |
 | Success: debug output is opt-in and safe | §9; D24, D25 |
 | Success: what works today keeps working, or the migration note says what to do | §8, §11; D9, D19, D21, D30 |
 | Success: measured on real systems before release | §14 |
 | Open 1 — where the login bound lives | §5.7; D10 |
-| Open 2 — how disconnect, cancellation and close reach the broker and the providers; what `LoginLock` becomes | §5; D4–D8, D13, D23 |
+| Open 2 — how disconnect, cancellation and close reach the broker and the providers; what `LoginLock` becomes | §5; D4–D8, D13, D23, D31, D32 |
 | Open 3 — renewal and `onWriteFailure` | §6; D11, D12 |
 | Open 4 — what an MCP client sees per `kind` | §7.3, §7.4; D14–D17, D28 |
 | Open 5 — the browser choice | §8; D9 |
@@ -142,8 +142,43 @@ What the chain does that matters here:
 - **The MCP SDK aborts every in-flight handler's signal** on `notifications/cancelled` and when its
   transport closes (`@modelcontextprotocol/sdk` 1.32.0 `dist/cjs/shared/protocol.js:182`,
   `:266-270`).
-- **The connection takes no signal** in any moment (connection 14 `src/connection/*`): cancellation
-  reaches a provider's moment only through its parties.
+- **The connection takes no signal** in any moment (connection 14 `src/connection/*`), and a request
+  carries none (`IAbapRequestOptions` of interfaces-adt-connection 1: `url`, `method`, `timeout`,
+  `data`, `params`, `headers`): cancellation reaches a provider's moment only through its parties.
+
+**Measured on the published packages** (2026-10-09, Linux, Node 26; a scratch install of
+connection 14.0.1, auth-providers 6.0.1, auth-broker 5.0.1, auth-stores 4.0.0, auth-errors 2.2.0 —
+outside the repository; the scripts are not kept, each becomes a test in §13):
+
+- **M1 — a cancelled request's mutation is resent after a renewal.** Two `POST`s on one
+  `AdtOnPremConnector` against a local HTTP stand-in that answers `401` to the old token; the
+  provider's `rejected()` waits on one shared "login"; the first request's signal is aborted while
+  both wait; the login completes. Both requests are resent with the new token and both answer `200`
+  — the cancelled one included. The path is `answerCredentialFailure` → `renewCredential` →
+  `authorizedFrom` → `sendObserved` (connection `src/connection/AbstractAbapConnection.ts:1489-1521`),
+  which reads no signal: the connection has none to read.
+- **M2 — the server can stop that resend without a connection change.** The same run with a
+  provider whose `authorize()` answers `interactive-login` `aborted` when the signal of the request
+  it is called for — read from an `AsyncLocalStorage` the request entered — is aborted: the
+  cancelled request rejects with `AuthRefusedError` (`interactive-login`) and is **not** resent;
+  the other gets `200`. `authorize()` is asked per attempt, in the request's own async chain
+  (`authorizedFrom` → `credentialHeaders` → `authorizeRequest`, `AbstractAbapConnection.ts:939-958`,
+  `:1225-1239`), and each request renews through its own `rejected()` (`renewal.spent` is per
+  request, `:1604-1625`).
+- **M3 — a cancelled party keeps waiting in a moment.** A `ClientCredentialsProvider` with two
+  attached signals and a token endpoint held open: after the first signal aborts, its `prepare()`
+  stays pending until the endpoint answers (+700 ms), with the other's; a `Promise.race` of the
+  same `prepare()` against the first signal settles at the abort (+200 ms). The moment's wait is
+  collective by design (`BaseTokenProvider.ts:428-440`, `asMoment`).
+- **M4 — two equal settings reads do not tie a provider to them.** With `EnvDestinationStore`: the
+  file says A (`https://a.example`, `userA`) for the first `getConnectionConfig`, B for
+  `getProvider`, A again for the second read. Both reads answer A; the provider presents
+  `userB:pw-userB`. The next `getProvider` builds yet another provider. The broker exposes nothing
+  that says which means a provider was built from (`bindingOf` binds token rows only, and `basic`
+  binds nothing).
+- **M5 — a key store read once closes it.** The same sequence with the broker's key store wrapped
+  so each method's first answer per destination is kept: both reads answer A, the provider presents
+  `userA:pw-userA`, and the next `getProvider` answers the same provider.
 
 ## 3. Versions and dependencies
 
@@ -201,25 +236,33 @@ type CredentialSource =
   is the natural owner of that destination's write queue and `flush()`. Reason: the broker's
   sharing and write queue are per destination already; one broker per destination adds nothing to
   re-implement.
-- **(D3) The server caches no provider and no settings.** Every request that needs a connection
-  reads, in this order: `settingsFor(destination)` (S1), `getProvider(destination, { signal })`
-  (P), `settingsFor(destination)` again (S2). S1 and S2 equal (URL, client, `authType`,
-  `connectionType`) → the connection is built from S2 and P. They differ → the request is refused
-  in fixed words ("the destination changed while the request was being set up; send it again") and
-  nothing is sent. Reasons:
-  - **The broker is the cache.** `getProvider` answers the cached provider while what its build
-    read is unchanged and builds a new one when anything changed (broker README, *A provider is
-    never changed*). A server-side provider cache (`brokerFactory.ts:184-198`) would hand out a
-    provider the broker has replaced and would bypass the signal `getProvider` attaches (§5).
-    Removing it is H5 ("sharing a build").
-  - **H3.** A settings cache outliving the provider (`brokerFactory.ts:114-125`) would connect to
-    yesterday's URL with a provider bound to today's: a token sent to a resource it was not
-    obtained for. Reading the settings on both sides of `getProvider` closes the window in which
-    the files change between the two reads, except a change and its exact reversal inside one
-    request, which presents a credential for the means it was built from.
-  - **The consequence, for the migration note:** a change to a destination's files takes effect
-    on the next request, not on restart; a change to its means costs one login (the broker's
-    new provider starts with nothing). §17 asks the user to confirm it (D3).
+- **(D3) One coherent snapshot of a destination's means per process; the provider per request.**
+  - **The snapshot.** The broker of a destination is built over a key store the server wraps so
+    that each method (`getServiceKey`, `getConnectionConfig`, `getAuthorizationConfig`, and
+    `getClientCertificate` when the inner store has it) reads the files **once** per destination
+    and answers that first answer ever after; a failed read is not kept, so fixing the file lets
+    the next request read again. The URL store of an XSUAA destination is wrapped the same way.
+    The settings (`settingsFor`) are computed from the same snapshot and the server no longer keeps
+    a settings cache of its own. For an XSUAA destination the snapshot's means `serviceUrl` must
+    equal the URL store's `XSUAA_MCP_URL`; when the two first reads disagree (the file changed
+    between them) the destination is refused ("the destination's files changed while they were
+    read; start again") and nothing is kept.
+  - **The provider.** Every request still calls `getProvider(destination, { signal })` (§5): the
+    broker re-reads its key store on each call — the snapshot — so it answers the one provider it
+    built from the snapshot, with this request's signal attached. The server keeps no provider
+    cache (`brokerFactory.ts:184-198` goes): one would bypass the signal (§5) and duplicate the
+    broker's sharing (H5).
+  - **Reasons.** H3: M4 shows that reading the settings around `getProvider` does not tie the
+    provider to them — a change and its reversal inside one request hands a basic credential of
+    one system to another system's URL — and the published broker exposes nothing that says which
+    means a provider came from. Reading the means once makes the settings and the provider two
+    views of one read (M5); no generation or binding is needed, and no chain change. It is also
+    today's documented contract — "A destination is read once per process … takes effect on
+    restart" (`docs/user-guide/AUTHENTICATION.md`, *What is written back*) — so nothing changes for
+    users.
+  - **What stays live:** the session store (the secret and its binding), which the broker reads and
+    writes as it must; the broker checks a stored secret's `issuedFor` / `issuedBy` against the
+    snapshot's means.
 - `systemContextFor` (responsible, login, master system) stays cached per process: it holds no
   credential and nothing is bound to it; changing it is outside this change's footprint.
 - **The counted wrapper stays** (`countedProvider`), memoised per inner provider in a `WeakMap` so
@@ -312,7 +355,7 @@ interface EmbeddableMcpServerOptions {
 | **request** | per MCP request, in the tool wrapper | the MCP request's `extra.signal` aborts (client cancel, transport close, session close), **or the request ends** (`finally`), or shutdown | `getProvider(destination, { signal })`; `openFreshConnection`; the consumer's `freshConnection` |
 | **setup** | per HTTP request / SSE `GET` before any setup | the client's connection closes (listener installed first), **or setup ends** (`finally`), or shutdown | `getProvider` of the pre-dispatch connect |
 | **startup** | per launcher check | the check ends | `getProvider` of the check |
-| **shutdown** | once | the shutdown sequence | `flush({ signal })`, with the server's deadline |
+| **shutdown** | once | a second `SIGTERM` / `SIGINT`, or `--shutdown-timeout` when the user stated one (§6.4) — never by a default | `flush({ signal })`; the drain |
 | **login bound** | per `authorize` of the server's strategy wrapper, when configured | the bound elapses | the strategy, combined with the provider's `AuthorizationRequest.signal` (§5.7) |
 
 **(D4) A request's signal is aborted when the request ends, whatever its outcome.** Reason: the
@@ -322,8 +365,17 @@ alive after its own waiter left (§2, *A provider's moment waits on all its part
 the server hands the broker is therefore one the server aborts when its holder is done. A live
 set of request and setup controllers is kept per process so shutdown can abort them (§6.4).
 
-`settingsFor`'s store reads (`broker.getConnectionConfig`, the URL store) take no signal — the broker
-and store contracts have none (broker README, *Cancellation*); they are file reads that settle.
+The snapshot's first reads (§4.1) take no signal — the store contract has none (broker README,
+*Cancellation*); they are file reads that settle, once per destination.
+
+**Every request-owned wait is the request's own (D32).** The provider's moments wait on the
+collective parties (M3), and the connection's establishment and renewal are shared or carry no
+signal (M1). So wherever a request waits on something that may also serve another caller, the
+server races that wait against the request's own signal: the request settles `aborted` at once,
+the shared work runs on for the others, and its late result is handled — a late rejection gets a
+handler (never unhandled), a late success that belonged to this request alone (an HTTP request's
+own connection) is cleaned up (`disconnect()`), one shared with others is left to them. This is
+the per-caller wait the chain does not give a moment; no chain change is needed for it (M3).
 
 ### 5.2 In a request
 
@@ -333,13 +385,38 @@ controller linked to `extra.signal`, and runs the handler inside an auth scope
 the request's signal and the auth failure recorded for the request (§7.2).
 
 - **Getting the connection** (`getConnection(signal)`): the source's settings and credential
-  (§4), the connection (§5.4), `connect()`.
+  (§4), the connection (§5.4), `connect()` — **raced against the request's signal** (D32). The
+  connection's establishment is shared by every caller of that connection (stdio, SSE); a
+  cancelled caller leaves it, the others keep it.
+- **(D31) Every credential boundary a request reaches checks that request's signal.** Every
+  connection the server builds (`createAbapConnection`) is given its credential through a
+  request gate — a wrapper over the provider (the counted one, or a direct provider) that reads
+  the signal of the request it is being called for from the auth scope:
+  - `authorize(target)` — asked by the connection before **every** attempt, the first send and
+    every resend after a renewal (M2) — answers `interactive-login` `aborted` and writes nothing
+    when that signal has aborted, so the connection sends nothing: **a cancelled request is never
+    sent again after a renewal it waited for**, whoever else completed the renewal;
+  - `rejected(rejection)` — the request's own renewal (per request in the connection, M2) — is
+    raced against the signal (D32): a cancelled request stops waiting at once and is answered
+    `aborted`; the provider's renewal runs on for the other parties;
+  - `prepare()` and `establish()` are not gated: they belong to the connection's shared
+    establishment, whose per-caller wait is the race above.
+
+  Reason: M1 — connection 14.0.1 re-authorizes and resends a request after `rejected()` answers Ok
+  without any signal, so a cancelled mutation would land once another caller's login completes.
+  The connection asks the credential before each attempt, in the request's own async chain, and
+  that is the boundary the server owns. **The limit, stated plainly:** the gate depends on the
+  connection calling `authorize()` per attempt inside the request's async context, which M2
+  measured for 14.0.1 and which is not a written contract of connection; a test pins it (§13.3,
+  test 12), so a connection release that breaks it fails the server's suite before it is taken. A
+  per-request signal in the connection is the cleaner contract and is proposed to connection's
+  repository (§17, *Requests to other repositories*) — **not a prerequisite**: the server holds
+  the rule without it. An injected connection is the consumer's and gets no gate (§4.3).
 - **(D5) A request whose signal aborted does not reach its tool.** After the connection is ready,
   an aborted signal answers the request `aborted` and the handler is not called. Reason: two
   requests share one login; the one whose client cancelled must not go on to create or delete
   something once the other's login completes. A renewal inside a running handler (a `401` →
-  `rejected()`) is aborted by the parties like any login, and is not gated further: the handler is
-  adt-clients' code.
+  `rejected()`) is the request gate's (D31): the cancelled request stops waiting and is not resent.
 - **(D7) One retry after another caller's abort.** When `connect()` fails `interactive-login`
   `aborted` while this request's own signal is live, another caller's abort ended an attempt this
   request joined (a shared login, or the connection's shared establishment, whose parties had all
@@ -357,7 +434,10 @@ the request's signal and the auth failure recorded for the request (§7.2).
   the destination, before building the per-request server, before any read. The existing
   listeners (transport close; SSE session removal) stay where they are and also abort it.
 - **The pre-dispatch connect** (`setConnectionContext` + `connect()` while the destination has not
-  connected in this process) runs with the setup signal; a client that leaves aborts it. The setup
+  connected in this process) runs with the setup signal, in the auth scope of that signal, and its
+  wait is raced against it (D32): a client that leaves settles its setup at once — its response
+  is not written, its per-request connection is disconnected when the late establishment settles,
+  a late rejection is handled — while a login another client also waits on goes on. The setup
   controller is aborted in a `finally` when setup ends (D4).
 - **`FirstConnectLock`'s queue is removed; its "connected" set stays** (`FirstConnect`). Reasons:
   its purpose — "two first logins must not race for the same callback port"
@@ -379,10 +459,11 @@ the request's signal and the auth failure recorded for the request (§7.2).
 
 - **HTTP**: a connection per request, as today.
 - **stdio and SSE**: the server instance keeps its connection while the source answers the same
-  provider (the same counted wrapper, D3) and the same settings; a different provider or
-  different settings → a new connection, the old one disconnected. Reason: today's cache
-  (`BaseMcpServer.ts:205-227`) keyed on the destination name alone would keep presenting a
-  provider the broker replaced.
+  provider (the same counted wrapper) and the same settings — with the snapshot (D3) that is the
+  life of the process; a different provider or settings (a snapshot read again after a failed
+  first read) → a new connection, the old one disconnected. Reason: today's cache
+  (`BaseMcpServer.ts:205-227`) keyed on the destination name alone would present any provider it
+  was first given, whatever the broker answers later.
 
 ### 5.5 A session's close
 
@@ -501,15 +582,40 @@ broker's own remaining limit (a process that dies between a discard and its repo
    being dropped;
 4. **dispose every strategy the factory composed** — a login still running ends `disposed` and
    releases its port;
-5. drain the counted provider calls, then **`flush({ signal })` each destination's broker**, both
-   under the server's shutdown deadline (`SHUTDOWN_DEADLINE_MS`, 30 s, stated as the server's own
-   bound on a shutdown — a store whose `saveSession` never settles would otherwise hold the exit);
+5. drain the counted provider calls, then **`flush({ signal })` each destination's broker** — with
+   **no deadline of the server's choosing**;
 6. exit `0`, or `1` with one stderr line per fact.
+
+**(D33) No built-in shutdown deadline.** `SHUTDOWN_DEADLINE_MS` (30 s, `shutdown.ts:22-23`) and the
+drain's timer (`ProviderGate.drained(deadlineMs)`, `countedProvider.ts:69-82`) go. Reasons: H4 and
+the user's standing rule — a wait ends on its result, an explicit error or a signal someone
+gave; and the 30 s was documented as the providers' login timeout, which 6.0 removed. Steps 3–4
+end every login, so the drain waits only for calls that settle on their own, and the store
+contract says `saveSession` settles (broker README, *The store's contract*). What ends a shutdown
+early is always someone's statement:
+
+- **a second `SIGTERM` / `SIGINT`** exits at once, code `1`, with one stderr line naming what was
+  still pending (`N authorizations`, `session writes of "<destination>"`) — the person's own bound,
+  as auth-broker-cli 3 does;
+- **`--shutdown-timeout=<seconds>`** (`MCP_SHUTDOWN_TIMEOUT`, YAML `shutdown-timeout`;
+  `IAuthBrokerFactory.settle({ signal })` for an embedder), **no default**: when stated, the drain
+  and the flush end at that bound, and the exit is `1` with the same lines.
+
+**What ending early costs** (documented beside the option): a session write still pending when the
+process exits is lost. A renewed token is then obtained again on the next start (a refresh, or a
+login); a **discarded refresh token can come back** after the restart — the write that would have
+cleared it never landed. Under `--session-write-failure=fail` a write that kept failing had already
+failed its requests and is named on stderr; a write that was merely slow is the case the bound
+gives up on. Without the option and without a second signal, the shutdown waits for every write.
+
+The end of stdin (stdio) is a trigger like a signal; a second trigger of either kind is the
+second signal.
 
 `notStored` lines become `"<destination>": <reason>` — the destination is the one whose broker
 was flushed (one broker per destination, D2), the reason `classify(entry, 'persisting-tokens').reason`
 for each entry of the rejection's `errors` (read as an own array, structurally): no regular
-expression, no message. `settle(deadlineMs)` keeps its name and report shape.
+expression, no message. `settle(deadlineMs)` becomes `settle({ signal? })`; its report keeps its
+shape.
 
 ## 7. Failures: how they are read and what an MCP client sees
 
@@ -688,6 +794,7 @@ already keeps out (`error_description` is read by nothing). An ADT answer (`raw_
 | `--renewal` (new) | `MCP_RENEWAL` | `renewal` | enum `refresh-then-login`, `refresh-only` | `refresh-then-login` |
 | `--session-write-failure` (new) | `MCP_SESSION_WRITE_FAILURE` | `session-write-failure` | enum `fail`, `continue` | `fail` |
 | `--auth-debug` (new) | — (none, by design) | `auth-debug` | flag | off |
+| `--shutdown-timeout` (new) | `MCP_SHUTDOWN_TIMEOUT` | `shutdown-timeout` | seconds, 1–86 400 | none (§6.4, D33) |
 
 Each row is read by plain code (D26 replaces the port's regular expression with the same plain
 parser the seconds use). The help text, the YAML template and the validation come from the table,
@@ -699,7 +806,7 @@ as today.
 |---|---|---|
 | `brokerFactory.ts:251-258` | `new AuthBroker({ serviceKeyStore, sessionStore, ...handler.brokerOptions(ctx) }, logger)` | `new AuthBroker({ serviceKeyStore, sessionStore, renewal, onWriteFailure, authDebug, ...handler.brokerOptions(ctx) }, logger)` |
 | `brokerFactory.ts:184-198` | `getProvider(d)` cached by the factory | `getProvider(d, { signal })` → `broker.getProvider(d, { signal })`, no factory cache, counted wrapper memoised per inner provider |
-| `brokerFactory.ts:114-125` | `settingsFor` cached | read per call (D3) |
+| `brokerFactory.ts:114-125`, `:246-260` | `settingsFor` cached; the broker over the stores as they are | the broker over the snapshot key store (and URL store); `settingsFor` computed from the snapshot, no cache of its own (D3) |
 | `brokerFactory.ts:217` | `broker.flush()` | `broker.flush({ signal })` (§6.4) |
 | `brokerFactory.ts:58-68`, `:219` | `notStoredOf` with `ENTRY` | per destination, `classify(entry, 'persisting-tokens').reason` |
 | `brokerFactory.ts:134`, `:152`; `vocabulary.ts` | `new DestinationConfigError(d, fields, reason)` | unchanged (the broker 5 constructor takes the same three, plus an optional error) |
@@ -708,6 +815,7 @@ as today.
 | `handlers/jwtAuthorizationCode.ts:5-18` | `authorization: () => oneLoginAtATime(strategy({ browser: string, port }), lock)` | `authorization: (destination, grant) => serverLogin(strategy({ browser?: IBrowser, port }), context)` (§5.6) |
 | `handlers/types.ts` `AuthHandlerContext` | `browser: string`, `loginLock`, `browserStrategy` | `browser?: IBrowser`, `logins` (the wrapper's queue and the composed-strategy registry), `loginTimeoutMs?`, `browserStrategy` |
 | `countedProvider.ts:24-27` | unminted shutdown refusal | minted (D17) |
+| `countedProvider.ts:69-82`, `shutdown.ts:22-23`, `:71` | `drained(deadlineMs)` with a timer; `settle(SHUTDOWN_DEADLINE_MS)` | `drained()` with no timer; `settle({ signal })`, the signal from a second signal or `--shutdown-timeout` (D33) |
 | `launcher.ts:257` | `browserStrategy: browserCallbackStrategy` (auth-providers 5) | the same name from auth-providers 6, re-exported by `@mcp-abap-adt/lib/auth` with the browser mapping |
 | `launcher.ts:373-394` `promptsOnStderr` | a separate wrapper | folded into the server's strategy wrapper (§9.2) |
 | `launcher.ts:404-421` `factoryConfigFrom` | `browser: config.browser ?? 'system'` | `browser` mapped (§8), `renewal`, `onWriteFailure`, `authDebug`, `loginTimeoutMs` from the parameters |
@@ -718,7 +826,7 @@ as today.
 | `BaseMcpServer.ts:193-230` | `getConnection()` | `getConnection(signal)` (§5.2, §5.4) |
 | `BaseMcpServer.ts:257` | `async (args) => …` | `async (args, extra) => …` with the request controller, the auth scope, D5, D7, §7.2 |
 | `StreamableHttpServer.ts:145-261`, `SseServer.ts:269-393` | listener after setup; `FirstConnectLock.run` | listener first; setup signal; `FirstConnect` (connected set only) (§5.3) |
-| `connectionFactory.ts:307-357` | builds and records | also wraps `connect` / `makeAdtRequest` with the failure observer (§7.2) |
+| `connectionFactory.ts:307-357` | builds and records | gives the connector its credential through the request gate (D31), and wraps `connect` / `makeAdtRequest` with the failure observer (§7.2); the record keeps the ungated credential |
 | `credentialSources.ts:33-59` | default branch → basic | refuses, naming the field (D19) |
 | `packageSessions.ts:40-61` | record, else the connection's configuration | record, else the consumer's factory, else refused (§4.3) |
 | `handleDeletePackage.ts:93-108` | fallback to the caller's connection | the failure is the answer (D21) |
@@ -732,7 +840,7 @@ as today.
   with that option, **`renewal` and `onWriteFailure` required**, `loginTimeoutMs?`, `authDebug?`;
   `IDestinations.getProvider(destination, options?: { signal?: AbortSignal })`;
   `describeAuthError` removed, `failureOf` added; `browserCallbackStrategy` and the browser
-  mapping re-exported; `settle` unchanged in shape.
+  mapping re-exported; `settle({ signal? })` in place of `settle(deadlineMs)`, its report unchanged.
 - `@mcp-abap-adt/lib/embeddable`: `ConnectionContext` is the source union (§4);
   `EmbeddableMcpServerOptions.freshConnection?` (§4.3).
 - `@mcp-abap-adt/core`: `StreamableHttpServer` / `SseServer` constructors unchanged; behaviour as
@@ -751,10 +859,11 @@ to do"):
     format for the server's `--env` and `sessions/<name>.env` cases, and the alternative of the
     `x-sap-jwt-token` header (a direct provider, not bound); the startup refusal points there
     (D30, §17);
-  - a change to a destination's files takes effect on the next request (D3), not on restart;
   - `--browser`: the platform table (§8), unknown names refused, `none` waits, `--browser-program`
     for an executable the table does not name, no `DISPLAY=:0`;
   - no login timeout by default (it was 30 s); `--login-timeout` to state one;
+  - no shutdown deadline (it was 30 s): a shutdown waits for its session writes; a second signal or
+    `--shutdown-timeout` ends it early, and what that costs;
   - a session write that does not land fails the request (`--session-write-failure=continue` for a
     read-only store, with what it costs);
   - `--renewal=refresh-only` for a deployment that must never open a login;
@@ -871,14 +980,35 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
     to the request instead of the login → a long tool after a login is cut.
 11. **Shutdown.** A login in flight at `SIGTERM` ends (`disposed` or `aborted`); the port is free;
     the process exits after flushing.
+12. **A cancelled mutation is never resent after a renewal (M1, M2).** A real `AdtOnPremConnector`
+    over the server's `createAbapConnection` against a local HTTP stand-in that answers `401` to the
+    old token: R1 and R2 each `POST`; both reach `rejected()`, which waits on one shared login; R1 is
+    cancelled; the login completes. Asserted on the stand-in's log: R2 is resent with the new token
+    and answered `200`; **R1 is never sent with the new token** (no `POST` of R1 after the
+    renewal), and R1 answers `aborted`. Also with R1 cancelled before its first send: nothing of
+    R1 is sent. *Break:* remove the gate from `authorize()` → R1's `POST` appears with the new
+    token. Pinned to the installed connection, so a connection release that stops asking
+    `authorize()` per attempt in the request's async context fails here (D31's limit).
+13. **The cancelled caller settles first (M3).** R1 and R2 wait on one shared login — in `connect()`
+    (stdio, one connection), in the HTTP pre-dispatch connect (two clients), and in `rejected()`
+    after a `401`; R1 is cancelled while the token endpoint is held: R1's request settles
+    `aborted` before the endpoint is released, R2 settles after it with its token; no unhandled
+    rejection is recorded (an `unhandledRejection` listener), and R1's own HTTP connection is
+    disconnected once the late establishment settles. *Break:* await the shared wait without the
+    race → R1 settles only with R2.
 
 ### 13.4 Session writes and renewal
 
 - `'fail'`: a store whose `saveSession` throws `EACCES` → the request answers `unknown`
   `persisting-tokens` with the server's sentence; the next request of the destination is refused
   until the store writes. `'continue'`: the request succeeds.
-- Flush at shutdown: a write queued at `SIGTERM` lands before exit; a store that keeps failing gives
-  exit `1` and `"<destination>": persisting the tokens failed (unknown error, EACCES)`.
+- Flush at shutdown: a write queued at `SIGTERM` lands before exit, however long the store takes
+  (a store held for longer than the old 30 s deadline in fake time); a store that keeps failing gives
+  exit `1` and `"<destination>": persisting the tokens failed (unknown error, EACCES)`. No timer is
+  armed during a shutdown without `--shutdown-timeout` (fake timers: none pending). A second
+  `SIGTERM` exits at once with the pending lines; `--shutdown-timeout=1` ends a held flush at the
+  bound with the same lines. *Break:* restore `SHUTDOWN_DEADLINE_MS` → the held store's write is
+  abandoned.
 - **A discarded refresh token does not come back**: a refresh refused `invalid_grant` discards it;
   shutdown; a new factory over the same files seeds no refresh token and the renewal strategy logs
   in (the token endpoint sees no `refresh_token` grant). *Break:* skip the flush → under a queued
@@ -886,6 +1016,15 @@ with `force_new_connection` (HTTP and RFC), on an injected connection whose `get
 - `--renewal=refresh-only`: no login is started; the answer is `renewal-declined` with the
   server's sentence. Default: a login.
 - The factory refuses to build without `renewal` or `onWriteFailure` (TypeScript and run time).
+
+- **A→B→A cannot hand one system's credential to another (M4, M5).** A basic destination whose
+  file says A (URL of stand-in A, `userA`) is read; the file is rewritten to B (stand-in B,
+  `userB`) before the request builds its provider, and back to A before the connection is built.
+  Asserted: the request reaches stand-in A with `userA`'s `Authorization` and nothing reaches
+  either stand-in with `userB`; the key store's files are read once per destination per process
+  (a counting store). *Break:* remove the snapshot wrapper → stand-in A receives `userB`.
+- An XSUAA destination whose `XSUAA_MCP_URL` and means `serviceUrl` disagree on their first reads
+  is refused and nothing is kept.
 
 ### 13.5 Debug output
 
@@ -937,7 +1076,7 @@ keeps its footprint there small:
 | Shared file | What this change does there |
 |---|---|
 | `src/embeddable/BaseMcpServer.ts` | the source union, `getConnection(signal)`, the wrapper's `extra`, the auth scope, the gate; no change to handler registration or `available_in` |
-| `src/lib/connectionFactory.ts` | one observer wrap in `createAbapConnection`; transports untouched |
+| `src/lib/connectionFactory.ts` | the request gate on the credential and the observer wrap in `createAbapConnection`; transports untouched |
 | `src/lib/utils.ts` | `return_error`'s first lines and its two regular expressions; `credentialFromSapConfig` callers unchanged |
 | `src/lib/packageSessions.ts`, `handleDeletePackage.ts` | the fresh-connection registry; the fallback removed |
 | `src/lib/handlers/interfaces.ts` (`HandlerContext`) | **untouched** — the registry and the auth scope avoid it |
@@ -954,9 +1093,9 @@ like any request.
 |---|---|
 | H1 The consumer composes; nobody guesses | renewal, `onWriteFailure`, the bound, the browser and `authDebug` are stated in the server's parameters and the factory's required options (D9–D12, D24); the factory adds no default collaborator; `credentialFromSapConfig` and `--browser` refuse instead of guessing (D19, D9); `DeletePackage` no longer falls back (D21) |
 | H2 Nothing goes out that should not | §7.3 (no diagnostics, facts, messages to clients), §9 (no secret fragment, no `message`, no environment-driven `authDebug`), the URL only on stderr from the providers, nothing on stdout; tested in §13.5 |
-| H3 A credential stays bound | providers only from the broker, per request (D3), settings read on both sides; direct providers never reach a store; per-request and per-session holders (§4.2); an injected connection never re-authenticated (§4.3) |
-| H4 No built-in timeouts of the chain's making | no default bound (D10); the only timers are the server's stated login bound and shutdown deadline |
-| H5 One implementation of each rule | failures read by auth-errors (§7.1); the build shared by the broker (no server provider cache, no `FirstConnectLock` queue); the refresh state the broker's `refreshStatePersistence`; the browsers auth-providers' factories (§8). The cross-destination login queue is the server's own because the chain has none (§5.6) |
+| H3 A credential stays bound | providers only from the broker, over one snapshot of the destination's means from which the settings are also computed (D3, M4, M5); direct providers never reach a store; per-request and per-session holders (§4.2); an injected connection never re-authenticated (§4.3) |
+| H4 No built-in timeouts of the chain's making | no default bound anywhere: the login bound (D10) and the shutdown bound (D33) exist only when the user states them; the 30 s shutdown deadline and the drain timer are removed |
+| H5 One implementation of each rule | failures read by auth-errors (§7.1); the build shared by the broker (no server provider cache, no `FirstConnectLock` queue; the snapshot is when the means are read, not a second cache of providers); the refresh state the broker's `refreshStatePersistence`; the browsers auth-providers' factories (§8). The cross-destination login queue is the server's own because the chain has none (§5.6) |
 | H6 Registry only | every range in §3 is published; release checks in §12 |
 | H7 No regular expressions over untrusted input | D26: `destinationName`, the port and seconds parsers, `errorClassOf`, `return_error`, `notStoredOf`'s removal; a source test (§13.1) |
 
@@ -972,6 +1111,22 @@ The spec is written on each recommendation.
 | D23 | `FirstConnectLock`'s queue | remove it (the chain shares the login) / keep it, made cancellable | **remove it**: two implementations of one rule otherwise (H5), and a queue is one more wait to cancel. The goal names the queue; with no queue its requirement holds trivially and §13.3 test 3 covers the case |
 | D27 | "server text" | text of an authorization server or IdP / also ADT answers | **the former**: ADT answers are the tools' data, and removing them would break every tool's error reporting |
 | D30 | `jwt` / `none` destinations under broker 5 need `SAP_ISSUED_FOR` / `SAP_ISSUED_BY` | the migration note gives the lines to write by hand / the server gains a command that writes them with `bindingOf` / auth-broker-cli gains `--token` for `jwt` / `none` (its own change, as it has `--cookie` for `saml` / `none`) | **the migration note now, and ask the CLI for `--token`** in its own repository: no tool writes the binding for a held token today, and the server writing it would bypass what the binding protects. Until then, `x-sap-jwt-token` is the unbound alternative over HTTP |
-| D3 | a destination's files changing under a running server | per request (the broker re-reads; the docs change) / keep "read once per process" by caching the provider in the server | **per request**: the cache would bypass `getProvider`'s signal and hand out a provider the broker replaced |
+| D3 | how the settings and the provider are tied together | read the means once per process through a snapshot key store (today's documented contract) / a binding or generation from the broker tying a provider to the means it read (not published: a request to auth-broker below) | **the snapshot**: it holds with the published broker (M5), closes A→B→A (M4), and changes nothing users rely on |
+| D31 | stopping a cancelled request's resend after a renewal | a request gate in the credential, reading the request's signal from the auth scope (measured, M2) / wait for a per-request signal in connection | **the gate now**, pinned by a test; the connection contract proposed below as an improvement, not a prerequisite |
+| D33 | the shutdown bound | none by default, a second signal or `--shutdown-timeout` / keep 30 s | **none by default**: H4; the cost of ending early is documented with the option |
 | D9 | `--browser` names outside the table | refuse / open the default browser, as 5.x did | **refuse**: H1; `--browser-program` names any other program |
 | D21 | `DeletePackage`'s fallback when no fresh connection can be had | answer the failure / keep falling back to the caller's session | **answer the failure**: H1, and on an injected connection the fallback would hide the refusal the goal requires |
+
+### Requests to other repositories
+
+**Prerequisites: none.** Each of the four review findings is answered with the published packages
+and measured (M1–M5): the server waits on no change in another repository. The requests below
+would let the server replace a measured mechanism of its own with a written contract; each goes to
+its repository as its own change, and the server adopts it in a later release.
+
+| Repository | Request | Contract | What it would replace |
+|---|---|---|---|
+| `mcp-abap-adt-interfaces` (interfaces-adt-connection) and `mcp-abap-connection` | a per-request signal | `IAbapRequestOptions.signal?: AbortSignal`; the connection checks it before every attempt — the first send and every resend after `rejected()` — and before calling `rejected()`, and answers `aborted` (an `AuthRefusedError` with `interactive-login` `aborted`, or a session error of its own) without sending; no attempt is sent after the signal aborted | D31's reliance on `authorize()` being called per attempt in the request's async context |
+| `mcp-abap-adt-auth-broker` | which means a provider was built from | `getProvider(d, { signal })` also answers, or a sibling `getProviderWithMeans` answers, `{ provider, means }`: the `IConnectionConfig` snapshot the build read, the same object for the life of that provider | D3's snapshot key store, if the server is ever to pick up file changes without a restart |
+| `mcp-abap-adt-auth-broker` (auth-broker-cli) | write a held token with its binding | `mcp-auth --token <token>` (from a file or stdin, never an argument in history) for `jwt` / `none`, as `saml2-pure --cookie` does for `saml` / `none`: writes `SAP_JWT_TOKEN`, `SAP_REFRESH_TOKEN=` and `bindingOf(means)` | D30's hand-written lines in the migration note |
+

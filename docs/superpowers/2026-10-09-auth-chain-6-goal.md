@@ -20,16 +20,27 @@ Everything 6.0.0 guarantees a holder of a provider, and everything broker
 5.0.0 guarantees its consumer, reaches the server's users intact through the
 server.
 
-**The server has three modes, each with its own credentials and owner:**
+**The server is split by transport into packages, one mode each:**
 
-| Mode | Who uses it | Where credentials come from | Who owns them |
-|---|---|---|---|
-| **stdio** | one user, who owns the process | the default destination (`--mcp` / `--env` / `--env-path`), service keys included — through the broker, with its session files and an interactive (browser) login when one is needed | the server: cancellation, session writes, renewal |
-| **HTTP and SSE** | many users | **only the credentials the user sends in the request's headers** (`x-sap-*`: a user and password, or a token), through providers the server builds directly from auth-providers 6.0.0 — nothing else: no destination, no server-side token, no credential the server holds of any kind | the request that carries them; the server keeps none |
-| **embedded** (`EmbeddableMcpServer`) | the consumer's application | the consumer: its injected connection, or the credentials it gives per request | the consumer: authentication, cancellation, persistence; the server keeps none |
+| Mode | Package | Who uses it | Where credentials come from | Who owns them |
+|---|---|---|---|---|
+| **stdio** | `@mcp-abap-adt/core` (bin `mcp-abap-adt`) | one user, who owns the process | the default destination (`--mcp` / `--env` / `--env-path`), service keys included — through the broker, with its session files and an interactive (browser) login when one is needed | the server: cancellation, session writes, renewal |
+| **Streamable HTTP** | a new package with its own bin | many users | **only the credentials the user sends in the request's headers** (`x-sap-*`: a user and password, or a token), through providers built directly from auth-providers 6.0.0 — nothing else: no destination, no server-side token, no credential the server holds of any kind | the request that carries them; the server keeps none |
+| **embedded** | `@mcp-abap-adt/lib` (`EmbeddableMcpServer`) | the consumer's application | the consumer: its injected connection, or the credentials it gives per request | the consumer: authentication, cancellation, persistence; the server keeps none |
 
-**The default destination (`--mcp` / `--env` / `--env-path`) exists only for
-stdio.**
+- **`@mcp-abap-adt/core`** is stdio only. It holds the default destination,
+  service keys, `--unsafe` and the browser login, and it is the only package
+  that depends on auth-broker and auth-stores: that code leaves
+  `@mcp-abap-adt/lib`.
+- **The HTTP package** serves Streamable HTTP only. It depends on
+  `@mcp-abap-adt/lib` and auth-providers, never on auth-broker or
+  auth-stores.
+- **`@mcp-abap-adt/lib`** keeps the tools, the embeddable server, and
+  building providers from header credentials.
+- **SSE is removed.** It has no advantage over Streamable HTTP and is
+  deprecated in MCP.
+- **The compact packages** keep wrapping `@mcp-abap-adt/core` (stdio) as
+  today.
 
 Some decisions the chain leaves to its consumer: how long an interactive login
 may wait, what cancels it, and what a failure looks like to the user. The
@@ -37,17 +48,17 @@ server takes each of these in the open, in its own configuration or code. It
 never hides one and never guesses one.
 
 **Success:**
-- **Each mode takes credentials only from its own source.**
-  - **HTTP and SSE serve no destination.** The default destination
-    (`--mcp` / `--env` / `--env-path`, in any of their CLI, environment or
-    YAML forms), `x-mcp-destination` and `--allow-destination-header` do not
-    exist for HTTP and SSE. A configuration that gives HTTP or SSE one is
-    refused at start, with words that name what was given and say to pass
-    `x-sap-*` headers instead.
-  - **HTTP and SSE start no interactive login, read no session file and build
-    no broker.**
-  - **stdio** serves its default destination through the broker; its
-    interactive login shows its URL where the one user can act on it.
+- **Each package has only its own options and its own credentials.**
+  - **No compatibility checks between modes.** Each binary accepts only the
+    options of its own mode; an option of another mode is unknown to it.
+  - **The HTTP package** has no default destination, no `x-mcp-destination`,
+    no `--allow-destination-header`, no session file and no interactive
+    login. It has no dependency on auth-broker or auth-stores — checked by a
+    test reading its `package.json` and its import graph.
+  - **`@mcp-abap-adt/core`** serves its default destination through the
+    broker; its interactive login shows its URL where the one user can act on
+    it.
+  - **`@mcp-abap-adt/lib`** has no dependency on auth-broker or auth-stores.
   - **Embedded** uses what the consumer gives and keeps nothing.
 - **Failures reach the user as the chain made them.** A failure the broker, a
   provider or the connection produces reaches the MCP client in the chain's
@@ -103,13 +114,17 @@ never hides one and never guesses one.
   environment. Without it, no log line, MCP response or error the server
   emits carries a secret, server text, an authorization URL or `state`.
 - **What works today keeps working, or the migration note says what to do.**
-  - stdio: `--mcp`, `--env`, `--env-path`, the destination folder and service
-    keys; basic, `jwt` / `authorization_code`, `jwt` / `none`, SNC; the
-    browser choice and the callback port.
-  - HTTP and SSE: `x-sap-*` headers keep working. The default destination and
-    `x-mcp-destination` go; the migration note says to pass `x-sap-*`
-    headers.
+  - stdio (`mcp-abap-adt`): `--mcp`, `--env`, `--env-path`, the destination
+    folder and service keys; basic, `jwt` / `authorization_code`, `jwt` /
+    `none`, SNC; the browser choice and the callback port.
+  - HTTP: `x-sap-*` headers keep working, served by the HTTP package and its
+    bin. The migration note says where HTTP moved, and that the default
+    destination and `x-mcp-destination` are gone: pass `x-sap-*` headers.
+  - SSE: removed. The migration note says to use Streamable HTTP.
+  - Compact: as today, over stdio.
   - Embedded consumers: the migration note names every change they meet.
+- **One release.** Every package, the new HTTP package included, is released
+  as one major, 18, from one pull request.
 - **Measured on real systems before release.** These are run against real
   systems, each recorded with its date:
   - stdio, `jwt` / `authorization_code` on the BTP trial, the browser login
@@ -136,10 +151,14 @@ never hides one and never guesses one.
     expression (`src/lib/auth/brokerFactory.ts`).
   - It passes no cancellation signal to any login or request.
   - It cannot choose renewal or what a failed write means.
-- **Destinations over HTTP and SSE cost more than they give.** A destination
-  served to many users shares one person's credential, session files and
-  browser login across them; nobody uses it, and every rule above would have
-  to hold for it too.
+- **Destinations over HTTP cost more than they give.** A destination served to
+  many users shares one person's credential, session files and browser login
+  across them; nobody uses it, and every rule above would have to hold for it
+  too.
+- **One binary for every transport mixes their options.** A package per
+  transport carries only its own options and dependencies, so no check is
+  needed to keep them apart.
+- **SSE adds nothing.** Streamable HTTP covers it, and MCP deprecates it.
 
 ## Holds throughout
 
@@ -163,13 +182,13 @@ never hides one and never guesses one.
      for.
    - **Per-request credentials are never stored or shared.** Credentials from
      headers serve only the request that carried them.
-4. **The modes do not mix.** The default destination, the broker, session
-   files and interactive login exist in stdio only. HTTP and SSE work only
-   with the credentials the user sends in the request's headers — nothing
-   else: no destination, no server-side token, no credential the server holds
-   of any kind. An embedding consumer's credentials
-   stay the consumer's. A configuration that would mix them is refused, never
-   adapted.
+4. **The modes are separated by package.** The default destination, the
+   broker, auth-stores, session files and interactive login exist in
+   `@mcp-abap-adt/core` (stdio) only. The HTTP package works only with the
+   credentials the user sends in the request's headers — nothing else: no
+   destination, no server-side token, no credential the server holds of any
+   kind — and depends on neither auth-broker nor auth-stores. An embedding
+   consumer's credentials stay the consumer's.
 5. **No built-in timeouts of the chain's making.** A wait ends with a result,
    an explicit error, a cancellation, or a bound the server states as its own
    choice.
@@ -199,22 +218,26 @@ never hides one and never guesses one.
 
 ## Open — for the spec
 
-1. Where the server's login bound lives (stdio):
+1. The HTTP package: its name, its bin's name, and its options.
+2. What `@mcp-abap-adt/lib` exports once the destination code moves to
+   `@mcp-abap-adt/core`, and what moves with it.
+3. Whether a compact server over HTTP is wanted; the default is none.
+4. Where the server's login bound lives (stdio):
    - a command-line option, a configuration field or both;
    - its default: none, or a stated value.
-2. How a request's cancellation reaches the broker, the providers and the
+5. How a request's cancellation reaches the broker, the providers and the
    connection:
    - which signal each broker call gets;
    - what the connection must offer, and in which release, so that a
      cancelled request is not sent;
    - what the server's `LoginLock` becomes in stdio.
-3. Renewal, and what a failed session write means outside `--unsafe` (the
+6. Renewal, and what a failed session write means outside `--unsafe` (the
    `--env` / `--env-path` file stdio writes back):
    - the server's choice;
    - whether the user can change it, and where.
-4. What an MCP client sees for each failure `kind`: words, hint and
+7. What an MCP client sees for each failure `kind`: words, hint and
    diagnostics, and what stays out.
-5. The browser choice: how today's options map to the providers' `IBrowser`
+8. The browser choice: how today's options map to the providers' `IBrowser`
    factories, and the migration note for any option that goes.
-6. The version, the release (a major), and the migration note for users of
-   each mode and for embedding consumers.
+9. The release of every package as one major, and the migration note for
+   users of each mode, for users of SSE, and for embedding consumers.

@@ -41,6 +41,13 @@ jobs:
       - name: Run Biome lint
         run: npx biome check src --diagnostic-level=error
 
+      # The root step covers `src` only; core and http lint their own sources.
+      - name: Run Biome lint (server)
+        run: npm --prefix server run lint:check
+
+      - name: Run Biome lint (http)
+        run: npm --prefix http run lint:check
+
       - name: Build project
         run: npm run build
 

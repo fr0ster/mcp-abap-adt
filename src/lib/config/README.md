@@ -32,7 +32,8 @@ The launcher of `@mcp-abap-adt/core` maps an `IServerConfig` to an
 explicitly:
 
 ```typescript
-import { AuthBrokerFactory, browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
+import { AuthBrokerFactory } from '@mcp-abap-adt/core/auth';
+import { browserCallbackStrategy } from '@mcp-abap-adt/lib/auth';
 
 const factory = new AuthBrokerFactory({
   mcpDestination: config.mcpDestination,

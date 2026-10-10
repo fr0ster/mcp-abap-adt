@@ -20,6 +20,7 @@ import { browserCallbackStrategy } from '@mcp-abap-adt/auth-providers';
 import { AuthBrokerFactory } from '@mcp-abap-adt/core/auth';
 import { describeAuthError } from '../../lib/auth/errors';
 import { createAbapConnection } from '../../lib/connectionFactory';
+import { restoreResolution } from './helpers/packageSources';
 import { testConfigPathFromEnv } from './helpers/testConfigPath';
 
 function loadTestConfig(): any {
@@ -46,6 +47,14 @@ function loadTestConfig(): any {
 }
 
 export default async function globalSetup(): Promise<void> {
+  try {
+    await setUp();
+  } finally {
+    restoreResolution();
+  }
+}
+
+async function setUp(): Promise<void> {
   const config = loadTestConfig();
   if (!config) {
     return;

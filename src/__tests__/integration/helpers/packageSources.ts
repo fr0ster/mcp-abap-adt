@@ -8,7 +8,8 @@
  * resolution, and a checkout has no such package installed. This reads the
  * root manifest's mapper and answers its exact package names only, so the two
  * cannot drift. Imported first, for its effect, before anything that imports
- * a sibling by name.
+ * a sibling by name; `globalSetup` restores Node's own resolution when it ends
+ * (`restoreResolution`), so the hook lives no longer than the setup.
  */
 import { readFileSync } from 'node:fs';
 import Module from 'node:module';
@@ -39,10 +40,18 @@ for (const [key, target] of Object.entries(mapper)) {
 type Resolve = (request: string, ...rest: unknown[]) => string;
 const loader = Module as unknown as { _resolveFilename: Resolve };
 const original = loader._resolveFilename;
-loader._resolveFilename = function resolveSibling(
+const resolveSibling: Resolve = function resolveSibling(
   this: unknown,
   request: string,
   ...rest: unknown[]
 ): string {
   return original.call(this, sources.get(request) ?? request, ...rest);
 };
+loader._resolveFilename = resolveSibling;
+
+/** Puts Node's own resolution back, unless something else replaced the hook since. */
+export function restoreResolution(): void {
+  if (loader._resolveFilename === resolveSibling) {
+    loader._resolveFilename = original;
+  }
+}

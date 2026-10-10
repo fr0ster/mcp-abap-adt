@@ -684,7 +684,16 @@ documented limit.
   one process-wide registry in lib (`src/lib/activeTools.ts`), across every server instance;
   core's and http's shutdowns use it, and neither has a second implementation. A tool **settles**
   when its handler's promise settles — after its releases (D40) were sent and answered.
-- **core**, in this order: stop taking input; abort every registered tool; **await their
+- **The admission latch.** The registry holds a synchronous shutdown latch, set **first**, in the
+  same tick the shutdown starts, before anything is aborted (both transports). The wrapper
+  registers a call **at its entry, before any connection is acquired or any handler runs**; once
+  the latch is set, registration refuses, and that request is answered with the shutdown refusal
+  (`interactive-login` `aborted` with the shutdown sentence, §7.4) — no connection, no handler, no
+  request to SAP. So a request accepted before the shutdown whose body is still arriving (HTTP,
+  `express.json()`), or a message read after stdin's end (stdio), reaches no tool. `settled()`
+  waits for every entry registered before the latch; none can be added after it, so the set it
+  waits for is complete, not a snapshot that misses a late one.
+- **core**, in this order: set the latch; stop taking input; abort every registered tool; **await their
   settlement** — the provider gate is still open, so a release can still be authorized with the
   credential held (a refresh included), but no interactive login starts once the shutdown began
   (the login wrapper answers `interactive-login` `aborted` with the shutdown sentence); then close
@@ -698,7 +707,7 @@ documented limit.
   YAML `shutdown-timeout`, **no default**), ends it early — exit `1`, naming what was pending.
   What that costs is documented with the option: a pending write is lost, and a discarded refresh
   token can come back.
-- **http**: stop listening; abort every registered tool (the same registry, across the
+- **http**: set the latch; stop listening; abort every registered tool (the same registry, across the
   per-request server instances); **await their settlement** — each aborted tool's releases
   (D40: an unlock, sent outside the request's signal) land before exit, so a shutdown never leaves
   a SAP lock held; then exit `0`. The same escapes as core and no others: a `SIGTERM` / `SIGINT`
@@ -1161,6 +1170,12 @@ connection, which is disconnected, and no provider is constructed; without it,
   the stand-in) with **no provider call in flight**, and a store whose flush completes at once —
   the `UNLOCK` lands before exit; *break:* drain and flush without awaiting the tools' settlement
   (the `UNLOCK` is missing); close the gate before the tools settle (the `UNLOCK` is refused).
+  **The latch**: (http) a `POST` accepted before `SIGTERM` whose body completes while another
+  tool's `UNLOCK` is held — no mutation of it is sent, it gets the shutdown answer, and the held
+  `UNLOCK` still lands before exit; (stdio) a tool call read after stdin's end gets the shutdown
+  answer and nothing of it is sent, while a held `UNLOCK` lands before exit. *Breaks:* set the
+  latch after `abortAll()` (the late mutation is sent); register after acquiring the connection
+  (a connection is acquired for the late request).
 - `--renewal=refresh-only`: no login; `renewal-declined` with the server's sentence.
 - **Read once per process (D3)**: the settings are read once; a failed read is not kept.
 

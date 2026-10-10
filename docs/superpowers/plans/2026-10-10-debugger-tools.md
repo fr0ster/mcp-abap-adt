@@ -18,7 +18,7 @@
 - `@mcp-abap-adt/adt-strategies` 0.8.1: `analyseDebuggeeEnd`, `analyseException`, `readExceptionSubType`.
 - `@mcp-abap-adt/interfaces-adt` 13.2.0.
 
-**Spec:** `docs/superpowers/specs/2026-10-10-debugger-tools-design.md` (decisions D1–D14).
+**Spec:** `docs/superpowers/specs/2026-10-10-debugger-tools-design.md` (decisions D1–D15).
 
 ## Global Constraints
 
@@ -4844,6 +4844,7 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | D12 (stdio restores the ids; reconciliation) | 5 (listener); 14 (measurement); 15 (breakpoints, if measured possible) |
 | D13 (HTTP carries a session, RFC does not; pool) | 9 |
 | D14 (owner, kinds, limit) | 7, 9, 13 |
+| D15 (a handle is no key; the owner proven by the request's credentials) | 9 (`ownerOf` and its test) |
 | §2 core tools | 10–12 |
 | §3 addressing and answers | 2, 3, 7, 16 |
 | Descriptions (function only) | 7 (schemas), 10–13, ratchet test |

@@ -1,4 +1,4 @@
-import { DebuggerInstance } from '@mcp-abap-adt/lib/debugger';
+import { type AmdpSession, DebuggerInstance } from '@mcp-abap-adt/lib/debugger';
 import type { ArgsOf } from '@mcp-abap-adt/lib/handlers';
 import { InstanceState } from '@mcp-abap-adt/lib/state';
 import { compactDebugEntries } from '../debug/group';
@@ -198,12 +198,15 @@ function fakeAmdp(held: { on: boolean }) {
       return this;
     },
     observe() {},
-    start: async (o: unknown) => {
+    start: async (o: unknown): ReturnType<AmdpSession['start']> => {
       calls.push(['start', o]);
       held.on = true;
-      return { mainId: 'M1', breakpoints: ['PENDING'] };
+      return {
+        mainId: 'M1',
+        breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
+      };
     },
-    wait: async (s: unknown) => {
+    wait: async (s: unknown): ReturnType<AmdpSession['wait']> => {
       calls.push(['wait', s]);
       return {
         state: 'event',
@@ -315,7 +318,7 @@ describe('compact debug verbs on the fake sessions', () => {
     ]);
     expect(json(r)).toEqual({
       mainId: 'M1',
-      breakpoints: ['PENDING'],
+      breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
       state_handle: t.state.handle,
     });
   });

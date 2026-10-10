@@ -20,7 +20,7 @@ describe('AMDP readings', () => {
   it('the start names the session in Location and the HANA session in the body', () => {
     expect(readAmdpStart(START)).toEqual({
       mainId: AMDP_MAIN_ID,
-      hanaSession: 'sap.example.local:30103:225615',
+      hanaSession: 'sap.example.local:PORT:225615',
     });
     expect(
       locationId({
@@ -105,19 +105,27 @@ describe('AMDP readings', () => {
   it('no events in an empty answer', () => {
     expect(readAmdpEvents('')).toEqual([]);
   });
-  it('a data preview becomes rows', () => {
-    const xml =
-      '<dataPreview:tableData xmlns:dataPreview="z"><dataPreview:columns><dataPreview:metadata dataPreview:name="N"/><dataPreview:dataSet><dataPreview:data>1</dataPreview:data><dataPreview:data>2</dataPreview:data></dataPreview:dataSet></dataPreview:columns><dataPreview:columns><dataPreview:metadata dataPreview:name="SQUARE"/><dataPreview:dataSet><dataPreview:data>1</dataPreview:data><dataPreview:data>4</dataPreview:data></dataPreview:dataSet></dataPreview:columns></dataPreview:tableData>';
-    expect(readAmdpPreview(xml)).toEqual({
+  it('a data preview becomes rows: one per position across the columns, none without columns', () => {
+    const recorded = corpusBody('amdp-debugger--08-data-preview-table');
+    // The recorded answer with a second row: one more value in each column, in order.
+    let n = 0;
+    const twoRows = recorded.replace(
+      /<dataPreview:data>1<\/dataPreview:data>/g,
+      (row) =>
+        `${row}<dataPreview:data>${++n === 1 ? '2' : '4'}</dataPreview:data>`,
+    );
+    expect(readAmdpPreview(twoRows)).toEqual({
       columns: ['N', 'SQUARE'],
       rows: [
         { N: '1', SQUARE: '1' },
         { N: '2', SQUARE: '4' },
       ],
     });
-    expect(
-      readAmdpPreview('<dataPreview:tableData xmlns:dataPreview="z"/>'),
-    ).toEqual({ columns: [], rows: [] });
+    const noColumns = recorded.replace(
+      /<dataPreview:columns>[\s\S]*<\/dataPreview:columns>/,
+      '',
+    );
+    expect(readAmdpPreview(noColumns)).toEqual({ columns: [], rows: [] });
   });
 
   describe('recorded on a system', () => {

@@ -10,7 +10,7 @@
     "headers": {
       "Accept": "application/vnd.sap.adt.amdp.dbg.startmain.v1+xml"
     },
-    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system and host replaced by placeholders; Location headers as measured by a separate probe the same day. Authorization, Cookie and CSRF are not recorded.",
+    "headersNote": "On premise (2026-10-11), through this package's debugger sessions (DEBUG_HTTP_WIRE); user, system, host and HANA port replaced by placeholders; Location headers as measured by a separate probe the same day. Authorization, Cookie and CSRF are not recorded.",
     "body": null
   },
   "response": {

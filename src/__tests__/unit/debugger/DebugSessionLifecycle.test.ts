@@ -78,14 +78,69 @@ describe('DebugSession lifecycle', () => {
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
 
-  it('a catch arriving after stop is not attached and no poll follows', async () => {
+  it('a catch in the poll a stop ends is attached and released at once, on a connection of its own; no poll follows', async () => {
     const { session, world } = await started();
-    const stopping = session.stop();
-    world.polls[1].resolve(LISTEN_CATCH());
-    await stopping;
+    // The system answers the open poll with a catch while the stop is running.
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(LISTEN_CATCH());
+      return okResponse(undefined);
+    };
+    await session.stop();
     await jest.advanceTimersByTimeAsync(0);
-    expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(false);
+    const attach = world.calls.findIndex((c) => c.startsWith('attach:'));
+    expect(attach).toBeGreaterThan(world.calls.indexOf('stopListener'));
+    expect(world.calls[attach + 1]).toBe('step:stepContinue:analysed');
     expect(world.polls).toHaveLength(2);
+    expect(session.holdsState()).toBe(false);
+    expect((await session.wait(0)).state).toBe('idle');
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a catch answered just before the stop, its answer not yet handled, is released by the stop', async () => {
+    const { session, world } = await started();
+    world.polls[1].resolve(LISTEN_CATCH()); // answered; its handling waits behind the stop
+    await session.stop();
+    await jest.advanceTimersByTimeAsync(0);
+    expect(world.calls.filter((c) => c.startsWith('attach:'))).toHaveLength(1);
+    expect(world.calls).toContain('step:stepContinue:analysed');
+    expect(session.holdsState()).toBe(false);
+    expect(new Set(world.closed)).toEqual(new Set(world.opened));
+  });
+
+  it('a caught debuggee the stop cannot attach is named in its failures, and kept to report', async () => {
+    const { session, world } = await started();
+    world.attachAnswers.push(async () => refusedResponse('debuggee gone'));
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(LISTEN_CATCH());
+      return okResponse(undefined);
+    };
+    await expect(session.stop()).rejects.toThrow(
+      /a debuggee caught during the stop .* was not attached: .*debuggee gone/,
+    );
+    expect(session.failures()).toEqual([
+      expect.stringMatching(/was not attached/),
+    ]);
+    expect(session.holdsState()).toBe(true);
+    expect((await session.wait(0)).state).toBe('idle'); // not a notice: the failure is the stop's
+  });
+
+  it('a caught debuggee the stop attached but could not release is named in its failures', async () => {
+    const { session, world } = await started();
+    world.stepAnswers.push(refusedResponse('release refused'));
+    world.override.stopListener = async () => {
+      world.calls.push('stopListener');
+      world.polls[1].resolve(LISTEN_CATCH());
+      return okResponse(undefined);
+    };
+    await expect(session.stop()).rejects.toThrow(
+      /a debuggee caught during the stop .*: the debuggee was not released: .*release refused/,
+    );
+    expect(world.calls.some((c) => c.startsWith('attach:'))).toBe(true);
+    expect(session.holdsState()).toBe(true);
+    // The connection opened for it was closed all the same.
+    expect(world.closed).toContain(world.opened[world.opened.length - 1]);
   });
 
   it('a run finishing after stop reports nothing and its connection closes once', async () => {

@@ -27,15 +27,23 @@ function fakeAmdp() {
     observe: (f: () => void) => {
       tell = f;
     },
-    start: async (o: unknown) => {
+    start: async (o: unknown): ReturnType<AmdpSession['start']> => {
       calls.push(['start', o]);
-      return { mainId: 'M1', breakpoints: ['PENDING'] };
+      return {
+        mainId: 'M1',
+        breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
+      };
     },
-    setBreakpoints: async (l: unknown) => {
+    setBreakpoints: async (
+      l: unknown,
+    ): ReturnType<AmdpSession['setBreakpoints']> => {
       calls.push(['setBreakpoints', l]);
-      return { value: ['OK'], raw: '["OK"]' };
+      return {
+        value: [{ class_name: 'ZCL_A', line: 20, state: 'VALID' }],
+        raw: '<sync/>',
+      };
     },
-    wait: async (s: unknown) => {
+    wait: async (s: unknown): ReturnType<AmdpSession['wait']> => {
       calls.push(['wait', s]);
       return {
         state: 'event',
@@ -127,7 +135,7 @@ describe('AMDP debugger handlers', () => {
     ]);
     expect(json(r)).toEqual({
       mainId: 'M1',
-      breakpoints: ['PENDING'],
+      breakpoints: [{ class_name: 'ZCL_A', line: 14, state: 'PENDING' }],
       state_handle: state.handle,
     });
   });
@@ -177,7 +185,9 @@ describe('AMDP debugger handlers', () => {
     expect(f.calls).toEqual([
       ['setBreakpoints', [{ class_name: 'ZCL_A', line: 20 }]],
     ]);
-    expect(json(r)).toEqual({ breakpoints: ['OK'] });
+    expect(json(r)).toEqual({
+      breakpoints: [{ class_name: 'ZCL_A', line: 20, state: 'VALID' }],
+    });
   });
 
   it('wait passes hold_seconds (10 by default); terse events keep the ids that tell them apart', async () => {

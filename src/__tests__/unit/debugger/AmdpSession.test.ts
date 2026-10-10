@@ -54,7 +54,7 @@ function world() {
     },
     getDataPreview: async (o: any) => {
       calls.push(`preview:${o.variableName}:${o.debuggeeId}`);
-      return okResponse('<dataPreview:tableData xmlns:dataPreview="z"/>');
+      return okResponse(corpusBody('amdp-debugger--08-data-preview-table'));
     },
   };
   let opened = 0;
@@ -205,6 +205,26 @@ describe('AmdpSession', () => {
     expect(w.session.holdsState()).toBe(true);
     w.dbg.stop = realStop;
     await w.session.stop();
+    expect(w.closed).toHaveLength(2);
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a read the system never answers holds the stopping call only: a second stop, a dispose and a wait go on', async () => {
+    const w = await started();
+    w.sim.stopAnswersRead = false;
+    let first = false;
+    const stopping = w.session.stop().then(() => {
+      first = true;
+    });
+    await until(() => w.calls.includes('stop'));
+    await expect(w.session.stop()).resolves.toBeUndefined(); // a retried stop / a dispose
+    expect((await w.session.wait(0)).state).toBe('idle');
+    expect(w.calls.filter((c) => c === 'stop')).toHaveLength(1); // nothing sent twice
+    await jest.advanceTimersByTimeAsync(60_000);
+    expect(first).toBe(false);
+    expect(w.session.pending()).toBe(true);
+    w.reads[1].resolve(okResponse(AMDP_STOPPED));
+    await stopping;
     expect(w.closed).toHaveLength(2);
     expect(w.session.holdsState()).toBe(false);
   });

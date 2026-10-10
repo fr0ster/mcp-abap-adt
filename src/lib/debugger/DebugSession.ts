@@ -99,7 +99,7 @@ export class DebugCleanupError extends Error {}
 interface Listener {
   connection: IAbapConnection;
   debugger: Debugger;
-  /** The poll SAP holds open, until it answers: a stop waits for it. */
+  /** The last poll, until its answer was handled: a stop waits for it and handles a catch in it. */
   open?: Promise<IAdtResponse<string>>;
 }
 interface Stop {
@@ -306,6 +306,7 @@ export class DebugSession<O = unknown> {
           identity,
           FIRST_POLL_HOLD_SECONDS,
         );
+        listener.open = undefined; // handled here
         if (!first.ok) throw new DebugListenerError(messageOf(first));
         const caught = readDebuggee(bodyOf(first));
         if (caught) await this.attachTo(caught, bodyOf(first), generation);
@@ -404,10 +405,7 @@ export class DebugSession<O = unknown> {
     const answer = listener.debugger
       .listen(identity, { holdSeconds })
       .catch(asFailure);
-    listener.open = answer;
-    void answer.then(() => {
-      if (listener.open === answer) listener.open = undefined;
-    });
+    listener.open = answer; // cleared once its answer is handled (onPoll, start)
     return answer;
   }
 
@@ -440,7 +438,8 @@ export class DebugSession<O = unknown> {
     generation: number,
     answer: IAdtResponse<string>,
   ): Promise<boolean> {
-    if (!this.owns(listener, generation)) return false;
+    if (!this.owns(listener, generation)) return false; // a stop took it, and its answer
+    listener.open = undefined; // handled here
     if (!answer.ok) {
       this.failure = messageOf(answer);
       await this.dropListener();
@@ -492,13 +491,8 @@ export class DebugSession<O = unknown> {
       }
       if (generation !== this.generation) {
         // Overtaken while attaching: released at once; a release that fails is recorded.
-        const released = await dbg
-          .step('stepContinue', { analyse: analyseDebuggeeEnd })
-          .catch(asFailure);
-        if (!released.ok)
-          this.cleanupFailures.push(
-            `the debuggee was not released: ${messageOf(released)}`,
-          );
+        const notReleased = await this.release(dbg);
+        if (notReleased) this.cleanupFailures.push(notReleased);
         await this.closeOrRecord(connection, "the debuggee's connection");
         return false;
       }
@@ -528,6 +522,52 @@ export class DebugSession<O = unknown> {
       await this.dropListener();
       return false;
     }
+  }
+
+  /** Lets an attached debuggee run on. Never throws: answers why it was not released. */
+  private async release(dbg: Debugger): Promise<string | undefined> {
+    const released = await dbg
+      .step('stepContinue', { analyse: analyseDebuggeeEnd })
+      .catch(asFailure);
+    return released.ok
+      ? undefined
+      : `the debuggee was not released: ${messageOf(released)}`;
+  }
+
+  /**
+   * Inside stop: a poll answered with a catch that no session will work. It is
+   * attached on a connection of its own and released at once, so it does not wait
+   * for the system to let it go. Whether an attach still succeeds after the listener
+   * was stopped is not measured: either outcome is answered. Never throws.
+   */
+  private async releaseCaught(
+    debuggee: DebuggeeReading,
+    failures: string[],
+  ): Promise<void> {
+    if (debuggee.attachImpossible) return; // the system decided: it runs on by itself
+    const what = `a debuggee caught during the stop (${debuggee.debuggeeId})`;
+    let connection: IAbapConnection | undefined;
+    try {
+      const identity = await this.identity();
+      connection = await this.open();
+      const dbg = this.ports.abapDebugger(connection, this.mode);
+      const attached = await dbg
+        .attach(
+          identity.requestUser,
+          debuggee.debuggeeId,
+          debuggee.instance ? { server: debuggee.instance } : {},
+        )
+        .catch(asFailure);
+      if (!attached.ok)
+        failures.push(`${what} was not attached: ${messageOf(attached)}`);
+      else {
+        const notReleased = await this.release(dbg);
+        if (notReleased) failures.push(`${what}: ${notReleased}`);
+      }
+    } catch (error) {
+      failures.push(`${what} was not released: ${thrown(error)}`);
+    }
+    await this.closeOrKeep(connection, `${what}'s connection`, failures);
   }
 
   /** Never throws: a close that throws is kept for the next stop, recorded, and answered. */
@@ -876,8 +916,14 @@ export class DebugSession<O = unknown> {
               // conflictDetected, so the stop returns only after that answer.
               if (open) {
                 const last = await open;
+                listener.open = undefined;
                 if (!last.ok)
                   failures.push(`the listener's last poll: ${messageOf(last)}`);
+                else {
+                  // A catch in it — during the stop, or just before and not yet handled.
+                  const caught = readDebuggee(bodyOf(last));
+                  if (caught) await this.releaseCaught(caught, failures);
+                }
               }
               await this.closeOrKeep(
                 listener.connection,

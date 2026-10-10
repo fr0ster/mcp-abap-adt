@@ -8,8 +8,9 @@
  * the system accepted ends the open event read (a STOP event ~260 ms later,
  * measured on premise 2026-10-11), so stop() returns once that read answered
  * and the read loop, with its last batch, released a break it carries and
- * closed both connections. A stop that was not accepted does not wait: the
- * read then ends when the system says. Nothing ends on a timer of ours; the
+ * closed both connections. Only the call that sent the accepted stop waits,
+ * outside the serial: other calls, a retried stop and a dispose go on. A stop
+ * that was not accepted does not wait: the read then ends when the system says. Nothing ends on a timer of ours; the
  * one bounded wait is a sync's confirmation, inside its own call, at
  * WAIT_MAX_SECONDS.
  */
@@ -73,7 +74,6 @@ interface Open {
   cleared: boolean; // the empty breakpoint sync was answered ok
   stopped: boolean; // the stop request was answered ok
   readDone: boolean; // the read loop's last batch was handled
-  reading?: Promise<IAdtResponse<unknown>>; // the event read the system holds open
   readFailed?: string; // the event read failed: a sync waiting for confirmation hears it at once
   failureReported: boolean; // that failure was already thrown by a sync
 }
@@ -333,9 +333,9 @@ export class AmdpSession<O = unknown> {
   private async readLoop(open: Open): Promise<void> {
     try {
       for (;;) {
-        const reading = open.onEvents.getEvents(open.mainId).catch(asFailure);
-        open.reading = reading;
-        const answer = await reading;
+        const answer = await open.onEvents
+          .getEvents(open.mainId)
+          .catch(asFailure);
         let events: AmdpEvent[] = [];
         let failed = answer.ok ? undefined : messageOf(answer);
         if (answer.ok) {
@@ -370,6 +370,7 @@ export class AmdpSession<O = unknown> {
           open.readDone = true;
           this.failure ??= open.readFailed ?? message;
         }
+        this.notify(); // a stop waiting for this read's end hears it
       }
     }
   }
@@ -557,13 +558,13 @@ export class AmdpSession<O = unknown> {
         if (this.open) this.retire(this.open);
         if (this.closing) {
           const open = this.closing;
+          const stoppedBefore = open.stopped;
           failures.push(...(await this.finishClosing(open, [])));
-          // Accepted: the system answers the open read now. Its answer is awaited here; the
-          // read loop handles it as the last batch once this call leaves the serial.
-          if (open.stopped && !open.readDone && open.reading) {
-            await open.reading;
-            ending = open;
-          }
+          // Accepted in this call: the system answers the open read now, and the read loop
+          // handles that answer as the last batch. This call waits for it outside the serial,
+          // so a read that never answers holds this call only — never another call, a
+          // retried stop, a dispose or a shutdown.
+          if (!stoppedBefore && open.stopped && !open.readDone) ending = open;
         }
       } catch (error) {
         failures.push(thrown(error));
@@ -585,8 +586,8 @@ export class AmdpSession<O = unknown> {
       }
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
-    // The read already answered: its last batch is in the serial behind this call,
-    // and what it could not undo is this stop's failure too.
+    // Outside the serial: the read's last batch, and what it could not undo is this
+    // stop's failure too.
     if (ending) {
       await this.lastBatchHandled(ending);
       if (this.cleanupFailures.length)

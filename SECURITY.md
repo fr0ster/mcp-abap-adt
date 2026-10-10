@@ -77,17 +77,16 @@ http:            # or sse:
   it.
 - **State handles.** A tool that creates state outliving one call, such as a
   debug session, returns a `state_handle`, and later calls send it back.
-  - **A handle is no key.** Every call that carries one is checked against its
-    caller:
-    - an `x-sap-*` request with a user and password must present the same
-      ones (a keyed hash; the key is generated per process and never stored);
-    - a token request must belong to the same SAP user, as answered by SAP
-      itself for that token. SAP is asked again on every call that carries a
-      handle, so a token SAP no longer accepts (expired or revoked) reaches
-      nothing;
-    - a destination request must name the same destination.
-  - A handle travels in tool arguments, so it ends up in the model's context
-    and in chat transcripts. Treat it as internal.
+  - **A handle is a bearer secret.** Whoever holds it acts with the SAP
+    session behind it, like a session cookie: the server does not check who
+    sends it. Keeping it safe is the deployer's job.
+  - It travels in tool arguments, so it ends up in the model's context, chat
+    transcripts and logs. Protect it like a session cookie: HTTPS for anything
+    beyond `127.0.0.1`, callers isolated from one another, and no wire trace
+    on a shared machine.
+  - The server's owner of a state — the destination, or a keyed hash of an
+    `x-sap-*` login and password — only scopes the listing of open states and
+    the limit of one state of a kind per owner. It authorizes nothing.
 
 ## Logs
 

@@ -718,16 +718,35 @@ export class DebugSession<O = unknown> {
   private run?: { generation: number; connection?: IAbapConnection };
   private reconciled = false;
   private cleanupFailures: string[] = [];
+  /** Connections whose work is done but whose close threw: the next stop closes them. */
+  private readonly unclosed = new Set<IAbapConnection>();
+
+  /** Inside stop: a close that throws keeps the connection for the next stop and is named. */
+  private async closeOrKeep(
+    connection: IAbapConnection | undefined,
+    what: string,
+    failures: string[],
+  ): Promise<void> {
+    if (!connection) return;
+    try {
+      await this.close(connection);
+      this.unclosed.delete(connection);
+    } catch (e) {
+      this.unclosed.add(connection);
+      failures.push(`${what} was not closed: ${thrown(e)}`);
+    }
+  }
 
   protected async beforeFirstListen(
     identity: IDebuggerIdentity,
   ): Promise<void> {
     if (!this.ids.stated || this.reconciled) return;
-    this.reconciled = true;
     // A predecessor under these ids may have left a listener (D12); its absence is no failure.
+    // It counts as done only once the request was sent: a start that failed before it retries.
     await (await this.controlDebugger())
       .stopListener(identity)
       .catch(() => undefined);
+    this.reconciled = true;
   }
 
   protected startRun(target: RunTarget, generation: number): void {
@@ -756,25 +775,35 @@ export class DebugSession<O = unknown> {
     })();
   }
 
-  /** Everything off — DebugStop, dispose, shutdown. Required, not best effort. */
+  /**
+   * Everything off — DebugStop, dispose, shutdown. Required, not best effort.
+   * Never throws anything but DebugCleanupError, and whatever failed stays for the next stop.
+   */
   stop(): Promise<void> {
     return this.mutate(async () => {
       this.generation++;
       const failures: string[] = [];
-      const stop = this.current;
-      if (stop) {
-        const released = await stop.debugger
-          .step('stepContinue', { analyse: analyseDebuggeeEnd })
-          .catch(asFailure);
-        if (released.ok) {
-          this.current = undefined;
-          await this.close(stop.connection);
-        } else {
-          failures.push(`release the debuggee: ${messageOf(released)}`); // kept: a later stop retries
+      try {
+        for (const connection of [...this.unclosed])
+          await this.closeOrKeep(connection, 'a connection', failures);
+        const stop = this.current;
+        if (stop) {
+          const released = await stop.debugger
+            .step('stepContinue', { analyse: analyseDebuggeeEnd })
+            .catch(asFailure);
+          if (released.ok) {
+            // Released: only its connection may be left, and a retry must not release twice.
+            this.current = undefined;
+            await this.closeOrKeep(
+              stop.connection,
+              "the debuggee's connection",
+              failures,
+            );
+          } else {
+            failures.push(`release the debuggee: ${messageOf(released)}`); // kept: a later stop retries
+          }
         }
-      }
-      if (this.armed.size > 0 || this.listener) {
-        try {
+        if (this.armed.size > 0 || this.listener) {
           const identity = await this.identity();
           const control = await this.controlDebugger();
           for (const id of [...this.armed.keys()]) {
@@ -791,25 +820,40 @@ export class DebugSession<O = unknown> {
             if (stopped.ok) {
               const listener = this.listener;
               this.listener = undefined;
-              await this.close(listener.connection);
+              await this.closeOrKeep(
+                listener.connection,
+                "the listener's connection",
+                failures,
+              );
             } else {
               failures.push(`listener: ${messageOf(stopped)}`); // kept: a later stop retries
             }
           }
-        } catch (error) {
-          failures.push(thrown(error));
         }
+        if (!failures.length && this.control) {
+          const control = this.control;
+          this.control = undefined;
+          await this.closeOrKeep(
+            control.connection,
+            "the breakpoints' connection",
+            failures,
+          );
+        }
+      } catch (error) {
+        failures.push(thrown(error));
+      } finally {
+        const run = this.run;
+        this.run = undefined;
+        await this.closeOrKeep(
+          run?.connection,
+          "the run's connection",
+          failures,
+        );
+        this.failure = undefined;
+        this.notices.length = 0;
+        this.cleanupFailures = failures;
+        this.notify(); // also tells the instance state (observe) that this part may hold nothing now
       }
-      if (!failures.length) {
-        await this.close(this.control?.connection);
-        this.control = undefined;
-      }
-      await this.close(this.run?.connection);
-      this.run = undefined;
-      this.failure = undefined;
-      this.notices.length = 0;
-      this.cleanupFailures = failures;
-      this.notify(); // also tells the instance state (observe) that this part may hold nothing now
       if (failures.length) throw new DebugCleanupError(failures.join('; '));
     });
   }
@@ -822,7 +866,8 @@ export class DebugSession<O = unknown> {
       this.notices.length > 0 ||
       !!this.run ||
       this.failure !== undefined ||
-      this.cleanupFailures.length > 0
+      this.cleanupFailures.length > 0 ||
+      this.unclosed.size > 0
     );
   }
 

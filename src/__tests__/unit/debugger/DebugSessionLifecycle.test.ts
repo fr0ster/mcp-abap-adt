@@ -149,6 +149,105 @@ describe('DebugSession lifecycle', () => {
     });
   });
 
+  describe('a close that throws during stop', () => {
+    function closeFailsOnce(world: ReturnType<typeof fakeWorld>) {
+      const realClose = world.ports.closeConnection;
+      let once = true;
+      world.ports.closeConnection = async (c) => {
+        if (once) {
+          once = false;
+          throw new Error('close refused');
+        }
+        return realClose(c);
+      };
+    }
+
+    it("the listener's connection is kept, named, and closed by the next stop", async () => {
+      const world = fakeWorld();
+      const { session } = await started(undefined, IDS, world);
+      closeFailsOnce(world);
+      const failed = session.stop();
+      await expect(failed).rejects.toThrow(DebugCleanupError);
+      await expect(failed).rejects.toThrow(/close refused/);
+      expect(session.holdsState()).toBe(true);
+      expect(session.failures().join()).toMatch(/close refused/);
+      await expect(session.stop()).resolves.toBeUndefined();
+      expect(session.holdsState()).toBe(false);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    });
+
+    it("the debuggee's connection is kept without a second release", async () => {
+      const world = fakeWorld();
+      const { session } = await started(undefined, IDS, world);
+      world.polls[1].resolve(LISTEN_CATCH());
+      await until(() => world.calls.includes('getStack'));
+      closeFailsOnce(world);
+      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+      expect(session.holdsState()).toBe(true);
+      expect(session.describe().state).toBe('idle');
+      await expect(session.stop()).resolves.toBeUndefined();
+      expect(
+        world.calls.filter((c) => c === 'step:stepContinue:analysed'),
+      ).toHaveLength(1);
+      expect(session.holdsState()).toBe(false);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    });
+
+    it("the run's connection is fenced, kept and named; a late run reports nothing", async () => {
+      const world = fakeWorld();
+      const { session } = await started(
+        { kind: 'class', name: 'ZCL_X' },
+        IDS,
+        world,
+      );
+      const runConnection = world.opened[1];
+      const realClose = world.ports.closeConnection;
+      let once = true;
+      world.ports.closeConnection = async (c) => {
+        if (c === runConnection && once) {
+          once = false;
+          throw new Error('close refused');
+        }
+        return realClose(c);
+      };
+      await expect(session.stop()).rejects.toThrow(DebugCleanupError);
+      expect(session.holdsState()).toBe(true);
+      world.run.resolve({ ok: true, output: 'late' });
+      await jest.advanceTimersByTimeAsync(0);
+      expect((await session.wait(0)).state).toBe('idle');
+      await expect(session.stop()).resolves.toBeUndefined();
+      expect(session.holdsState()).toBe(false);
+      expect(new Set(world.closed)).toEqual(new Set(world.opened));
+    });
+  });
+
+  it('stated ids: a start that failed before reconciling reconciles on the next start', async () => {
+    const world = fakeWorld();
+    const realOpen = world.ports.openConnection;
+    let once = true;
+    world.ports.openConnection = async (o) => {
+      if (once) {
+        once = false;
+        throw new Error('no route to host');
+      }
+      return realOpen(o);
+    };
+    const session = new DebugSession(world.ports, {
+      ...IDS,
+      stated: true,
+    }).bind('origin');
+    await expect(session.start('refuse')).rejects.toThrow(/no route to host/);
+    expect(world.calls).not.toContain('stopListener');
+    const s = session.start('refuse');
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_NOTHING());
+    await s;
+    expect(world.calls).toContain('stopListener');
+    expect(world.calls.indexOf('stopListener')).toBeLessThan(
+      world.calls.findIndex((c) => c.startsWith('listen:')),
+    );
+  });
+
   it('a stale loop that throws after stop records no failure', async () => {
     const { session, world } = await started();
     await session.stop();

@@ -948,6 +948,29 @@ describe('DebugSession', () => {
     expect(new Set(world.closed)).toEqual(new Set(world.opened));
   });
 
+  it('an attach that throws after arming fails the start and undoes the breakpoints', async () => {
+    const world = fakeWorld();
+    world.attachAnswers.push(async () => { throw new Error('socket hang up'); });
+    const session = new DebugSession(world.ports, IDS).bind('origin');
+    const started = session.start('refuse', { breakpoints: [{ kind: 'line', uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32' }] });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(LISTEN_CATCH());
+    await expect(started).rejects.toThrow(/socket hang up/);
+    expect(session.listBreakpoints()).toEqual([]);
+  });
+
+  it('a rollback step that throws does not skip the next', async () => {
+    const world = fakeWorld();
+    const session = new DebugSession(world.ports, IDS).bind('origin');
+    const realClose = world.ports.closeConnection;
+    world.ports.closeConnection = async (c) => { if (world.closed.length === 0) { world.closed.push(c); throw new Error('close failed'); } return realClose(c); };
+    const started = session.start('refuse', { breakpoints: [{ kind: 'line', uri: '/sap/bc/adt/oo/classes/zcl_cv_dbg_measure/source/main#start=32' }] });
+    await until(() => world.polls.length === 1);
+    world.polls[0].resolve(CONFLICT());
+    await expect(started).rejects.toThrow(DebugListenerError);
+    expect(world.calls.some((c) => c.startsWith('deleteBreakpoint:'))).toBe(true);
+  });
+
   it('a debuggee caught on the first poll is attached at once', async () => {
     const world = fakeWorld();
     const session = new DebugSession(world.ports, IDS).bind('origin');
@@ -1285,13 +1308,14 @@ export class DebugSession<O = unknown> {
         if (caught) await this.attachTo(caught, valueOf(first), generation);
         if (!this.current && this.owns(listener, generation)) void this.loop(listener, generation);
         if (options.run && this.owns(listener, generation)) this.startRun(options.run, generation); // Task 5
+        // Inside the protected part: an attach that failed is reported here (report() throws its failure).
+        return { ...this.report(), ...(armed ? { breakpoints: armed.value } : {}) };
       } catch (error) {
-        // A refused or failed start leaves nothing it armed: the listener goes, what it placed is deleted.
-        await this.dropListener();
-        await this.undoArmed(identity, placedHere());
+        // A refused or failed start leaves nothing it armed. Each undo runs whatever the other did.
+        await this.dropListener().catch(() => undefined);
+        await this.undoArmed(identity, placedHere()).catch(() => undefined);
         throw error;
       }
-      return { ...this.report(), ...(armed ? { breakpoints: armed.value } : {}) };
     });
   }
 
@@ -2032,6 +2056,33 @@ describe('AmdpSession', () => {
     await expect(s).resolves.toMatchObject({ mainId: '0123456789ABCDEF0123456789ABCDEF' });
   });
 
+  it('a breakpoint clear that fails survives the last batch and is retried by the next stop', async () => {
+    const w = await started();
+    const realSync = w.dbg.syncBreakpoints;
+    w.dbg.syncBreakpoints = async (m: string, b: any[]) => (b.length === 0 ? refusedResponse('clear refused') : realSync(m, b));
+    await expect(w.session.stop()).rejects.toThrow(/clear refused/);
+    w.reads[1].resolve(okResponse('<amdpdbg:events xmlns:amdpdbg="x"/>'));   // the last batch arrives
+    await until(() => w.reads.length >= 2);
+    expect(w.session.holdsState()).toBe(true);                // not closed: the clear is still owed
+    w.dbg.syncBreakpoints = realSync;
+    await w.session.stop();
+    expect(w.session.holdsState()).toBe(false);
+  });
+
+  it('a release that fails in the last batch is retried by the next stop', async () => {
+    const w = await started();
+    await w.session.stop();
+    const realDelete = w.dbg.deleteDebuggee;
+    w.dbg.deleteDebuggee = async () => refusedResponse('busy');
+    w.reads[1].resolve(okResponse(BREAK));
+    await until(() => w.session.describe().state === 'closing');
+    expect(w.session.holdsState()).toBe(true);
+    w.dbg.deleteDebuggee = realDelete;
+    await w.session.stop();
+    expect(w.calls).toContain('delete:D1');
+    expect(w.session.holdsState()).toBe(false);
+  });
+
   it('a cleanup that fails is reported', async () => {
     const w = await started();
     w.dbg.stop = async () => refusedResponse('not stopped');
@@ -2178,6 +2229,7 @@ interface Open {
   stopping: boolean;           // stop() was sent; the read loop finishes the cleanup
   released: Set<string>;       // debuggees already deleted
   unreleased: Set<string>;     // debuggees whose deletion failed: kept, with the command session, for a retry
+  cleared: boolean;            // the empty breakpoint sync was answered ok
   stopped: boolean;            // the stop request was answered ok
   readDone: boolean;           // the read loop has returned
 }
@@ -2243,7 +2295,7 @@ export class AmdpSession<O = unknown> {
         throw new DebugListenerError(started.getError().message);
       }
       const { mainId, hanaSession } = readAmdpStart(started.getResult().value as any);
-      const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, stopping: false, released: new Set(), unreleased: new Set(), stopped: false, readDone: false };
+      const open: Open = { events, commands, onEvents, onCommands, mainId, hanaSession, stopping: false, released: new Set(), unreleased: new Set(), cleared: false, stopped: false, readDone: false };
       this.open = open;
       this.failure = undefined;
       this.generation++;
@@ -2317,6 +2369,11 @@ export class AmdpSession<O = unknown> {
   private async finishClosing(open: Open, lastBatch: AmdpEvent[]): Promise<void> {
     for (const e of lastBatch) if (e.kind === 'ON_BREAK' && !open.released.has(e.debuggeeId)) open.unreleased.add(e.debuggeeId);
     const failures: string[] = [];
+    if (!open.cleared) {
+      const cleared = await open.onCommands.syncBreakpoints(open.mainId, []).catch(failed);
+      if (cleared.ok) open.cleared = true;
+      else failures.push(`clear breakpoints: ${cleared.getError().message}`);
+    }
     for (const id of [...open.unreleased]) {
       const a = await open.onCommands.deleteDebuggee(open.mainId, id).catch(failed);
       if (a.ok) { open.unreleased.delete(id); open.released.add(id); }
@@ -2405,8 +2462,6 @@ export class AmdpSession<O = unknown> {
       const failures: string[] = [];
       const open = this.open;
       if (open) {
-        const cleared = await open.onCommands.syncBreakpoints(open.mainId, []).catch(failed);
-        if (!cleared.ok) failures.push(`clear breakpoints: ${cleared.getError().message}`);
         if (this.debuggeeId && !open.released.has(this.debuggeeId)) open.unreleased.add(this.debuggeeId);
         open.stopping = true;
         this.closing = open;
@@ -3143,9 +3198,20 @@ export * from './serial';
   }
 ```
 
-Where the context is built (l.257-261), add `state: this.state, debugger: () => this.debuggerFor()`. In the same `wrappedHandler`, track the handler's promise: `this.inFlight.add(handlerPromise)` after it is created, and `handlerPromise.finally(() => this.inFlight.delete(handlerPromise))`.
+Where the context is built (l.257-261), add `state: this.state, debugger: () => this.debuggerFor()`. In the same `wrappedHandler`, track the whole call from its entry — before `await this.getConnection()` and the context's resolution — so `idle()` cannot miss a call that is still acquiring its connection:
 
-Add to `baseMcpServerState.test.ts`: `idle()` resolves only after a handler that is still running settles. Register one tool whose handler awaits a gate, call it through a connected `InMemoryTransport` pair from the SDK, and check that `idle()` is pending until the gate opens.
+```ts
+          const wrappedHandler = (args: unknown) => {
+            const call = (async () => { /* the existing body, unchanged */ })();
+            this.inFlight.add(call);
+            void call.finally(() => this.inFlight.delete(call));
+            return call;
+          };
+```
+
+Add to `baseMcpServerState.test.ts`, through a connected `InMemoryTransport` pair from the SDK:
+- `idle()` stays pending while a tool handler awaits a gate, and resolves after it opens;
+- `idle()` stays pending while a call is still acquiring its connection: a subclass whose `getConnection()` awaits a gate.
 
 `package.json`: add the `./debugger` and `./state` exports after `./compact-shared` (`types`/`import`/`require` → `./dist/lib/<dir>/index.{d.ts,js}`), and both under `typesVersions["*"]`.
 
@@ -3351,11 +3417,19 @@ class Fake {
   held = false;
   disposed = 0;
   failDispose = false;
+  finishLater = false;        // dispose resolves while the part still holds (AMDP closing)
+  notifyInDispose = false;    // the part tells the state synchronously from inside dispose
   private notify: () => void = () => {};
   constructor(readonly n: number) {
     this.state.attach({
       holdsState: () => this.held,
-      dispose: async () => { this.disposed++; if (this.failDispose) throw new Error('listener still up'); this.held = false; },
+      dispose: async () => {
+        this.disposed++;
+        if (this.failDispose) throw new Error('listener still up');
+        if (this.finishLater) return;
+        this.held = false;
+        if (this.notifyInDispose) this.notify();
+      },
       describe: () => (this.held ? [{ kind: 'abap' }] : []),
       observe: (f) => { this.notify = f; },
     });
@@ -3488,6 +3562,36 @@ describe('InstancePool', () => {
     expect(pool.size()).toBe(0);
   });
 
+  it('a fresh instance whose disposal fails is retained and retried at shutdown', async () => {
+    const pool = new InstancePool<Fake>();
+    let fresh!: Fake;
+    await pool.serve({ owner: 'A' }, () => { fresh = create(); fresh.failDispose = true; return fresh; }, async () => {});
+    expect(fresh.disposed).toBe(1);
+    fresh.failDispose = false;
+    expect(await pool.shutdown()).toEqual([]);
+    expect(fresh.disposed).toBe(2);
+  });
+
+  it('a disposal that leaves state finishing keeps ownership; shutdown waits for it to empty', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    held.finishLater = true;                          // dispose resolves, the part empties later
+    let done = false;
+    const shutting = pool.shutdown().then((f) => { done = true; return f; });
+    await tick();
+    expect(done).toBe(false);
+    held.set(false);                                  // the last batch arrived
+    expect(await shutting).toEqual([]);
+  });
+
+  it('a part that empties synchronously inside dispose re-enters the eviction harmlessly: disposed once', async () => {
+    const pool = new InstancePool<Fake>();
+    const held = await holding(pool);
+    held.notifyInDispose = true;   // dispose empties the part and tells the state at once → onEmpty → evict() again
+    expect(await pool.shutdown()).toEqual([]);
+    expect(held.disposed).toBe(1);
+  });
+
   it('shutdown stops admission, waits for an active lease, disposes held instances and reports failures', async () => {
     const pool = new InstancePool<Fake>();
     const held = await holding(pool);
@@ -3556,7 +3660,8 @@ export class InstancePool<T extends Poolable> {
   private readonly busy = new Map<T, number>();                 // requests working on an instance
   private readonly subscribed = new WeakSet<object>();
   private readonly evicting = new Map<T, Promise<void>>();
-  private readonly failed = new Map<T, string>();               // disposal failed: kept for a retry
+  private readonly failed = new Map<T, string>();               // disposal failed: the message
+  private readonly retained = new Set<T>();                     // disposal failed or still finishing: owned for shutdown
   private readonly active = new Set<Promise<unknown>>();
   private admitting = true;
 
@@ -3636,32 +3741,58 @@ export class InstancePool<T extends Poolable> {
     if (!this.busy.get(instance)) await this.evict(instance);
   }
 
-  /** Once per instance: dispose it; on success it leaves the pool, on failure it stays for a retry. */
+  /**
+   * Once at a time per instance: dispose it. It leaves the pool only when it
+   * holds nothing afterwards — an AMDP stop finishes when its last event batch
+   * arrives, and `onEmpty` calls this again then. A disposal that fails keeps
+   * the instance, fresh or held, for a retry. The guard is set before disposing,
+   * so a part that empties synchronously inside dispose() re-enters harmlessly.
+   */
   private evict(instance: T): Promise<void> {
     const running = this.evicting.get(instance);
     if (running) return running;
-    const eviction = (async () => {
+    let done!: () => void;
+    const eviction = new Promise<void>((resolve) => { done = resolve; });
+    this.evicting.set(instance, eviction);
+    void (async () => {
       try {
         await instance.dispose();
         this.failed.delete(instance);
-        this.held.delete(instance);
-        for (const [key, slot] of this.slots) if (slot.instance === instance) this.slots.delete(key);
+        if (!instance.holdsState()) {
+          this.held.delete(instance);
+          this.retained.delete(instance);
+          for (const [key, slot] of this.slots) if (slot.instance === instance) this.slots.delete(key);
+        } else {
+          this.retained.add(instance);                       // still finishing: owned until it empties
+        }
       } catch (e) {
         this.failed.set(instance, `${instance.stateHandle}: ${e instanceof Error ? e.message : String(e)}`);
+        this.retained.add(instance);                         // fresh or held: kept for a retry
       } finally {
         this.evicting.delete(instance);
+        done();
       }
     })();
-    this.evicting.set(instance, eviction);
     return eviction;
   }
 
-  /** Stop admission, let running requests and disposals finish, dispose what is held; what still failed. */
+  private emptied(instance: T): Promise<void> {
+    if (!instance.holdsState()) return Promise.resolve();
+    return new Promise((resolve) => instance.state.onEmpty(() => resolve()));
+  }
+
+  /**
+   * Stop admission; let running requests and disposals finish; dispose what is
+   * held or retained; wait for what is still finishing (an AMDP session ends
+   * when its last event batch arrives — measured in Task 14); report what failed.
+   */
   async shutdown(): Promise<string[]> {
     this.admitting = false;
     await Promise.allSettled([...this.active]);
     await Promise.allSettled([...this.evicting.values()]);
-    for (const instance of [...this.held.keys()]) await this.evict(instance);
+    const owned = new Set<T>([...this.held.keys(), ...this.retained]);
+    for (const instance of owned) await this.evict(instance);
+    await Promise.allSettled([...owned].filter((i) => !this.failed.has(i)).map((i) => this.emptied(i)));
     return [...this.failed.values()];
   }
 }
@@ -4553,6 +4684,13 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 9 (exceptions after arming) | placements are recorded at once; the whole start after arming rolls back |
 | | 10 (server jest mapping) | `server/package.json` gains `/state` and `/debugger`; server tests run from `server/` |
 | | 11 (descriptions) | `DebugStop` and `DebugListSessions` no longer list their answer |
+
+| Fifth (on `92f1d0da`) | 1 (disposal ≠ completion) | an instance leaves the pool only when it holds nothing after disposal; shutdown waits for what is still finishing |
+| | 2 (fresh disposal failure) | `retained` holds fresh and held instances alike; shutdown retries them |
+| | 3 (breakpoint clear) | `Open.cleared`; retried in `finishClosing` until it succeeds |
+| | 4 (attach exception in start) | `report()` inside the protected part; each rollback step runs on its own |
+| | 5 (`idle()` before connection) | the wrapper is tracked from its entry |
+| | 6 (re-entry before the guard) | the eviction promise is registered before `dispose()` |
 
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 

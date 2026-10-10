@@ -3467,7 +3467,8 @@ class Fake {
       dispose: async () => {
         this.disposed++;
         if (this.failDispose) throw new Error('listener still up');
-        if (this.finishLater) { this.finishing = true; return; }
+        if (this.lateFailures.length) return;                       // a retry that cannot undo it either: still held, not finishing
+        if (this.finishLater) { this.finishLater = false; this.finishing = true; return; }
         this.held = false;
         if (this.notifyInDispose) this.notify();
       },

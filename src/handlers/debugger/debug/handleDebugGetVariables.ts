@@ -37,21 +37,27 @@ export async function handleDebugGetVariables(
   context: HandlerContext,
   args: any,
 ) {
+  const parents =
+    Array.isArray(args.parents) && args.parents.length
+      ? args.parents.map(String)
+      : ['@ROOT'];
+  const byName = Array.isArray(args.names) && args.names.length;
   return debugAnswer(
     args,
     async () => {
       const a = requireDebugger(context, args, 'use').abap;
-      return Array.isArray(args.names) && args.names.length
+      return byName
         ? a.getVariables(args.names.map(String))
-        : a.getChildVariables(
-            Array.isArray(args.parents) && args.parents.length
-              ? args.parents.map(String)
-              : ['@ROOT'],
-          );
+        : a.getChildVariables(parents);
     },
-    (v) =>
-      v.variables.length
-        ? terseVariables(v)
-        : v.children.map((c) => ({ id: c.child, label: c.label })),
+    (v) => {
+      if (byName) return terseVariables(v);
+      // Every member keeps the id a further read takes as a parent; with several parents asked, the link to its parent too.
+      const variables = new Map(terseVariables(v).map((t) => [t.id, t]));
+      return v.children.map((c) => ({
+        ...(variables.get(c.child) ?? { id: c.child, label: c.label }),
+        ...(parents.length > 1 ? { parent: c.parent } : {}),
+      }));
+    },
   );
 }

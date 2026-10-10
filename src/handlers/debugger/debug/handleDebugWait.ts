@@ -25,9 +25,13 @@ export const TOOL_DEFINITION = {
 } as const;
 
 export async function handleDebugWait(context: HandlerContext, args: any) {
-  return debugStateAnswer(args, async () =>
-    requireDebugger(context, args, 'use').abap.wait(
-      Number(args.hold_seconds ?? 10),
-    ),
-  );
+  return debugStateAnswer(args, async () => {
+    const d = requireDebugger(context, args, 'use');
+    const seconds =
+      args.hold_seconds === undefined ? 10 : Number(args.hold_seconds);
+    // A value that is no number would wait 0 ms and look like an answer: refuse it.
+    if (!Number.isFinite(seconds))
+      throw new Error('hold_seconds: a number of seconds');
+    return d.abap.wait(seconds);
+  });
 }

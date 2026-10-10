@@ -13,7 +13,7 @@ export const TOOL_DEFINITION = {
     type: 'object',
     properties: {
       ...STATE_HANDLE_PROPERTY,
-      watchpoint_id: { type: 'string' },
+      watchpoint_id: { type: 'string', description: 'Watchpoint id.' },
       ...DETAIL_PROPERTY,
     },
     required: ['state_handle', 'watchpoint_id'],

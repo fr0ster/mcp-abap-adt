@@ -14,7 +14,12 @@ export const TOOL_DEFINITION = {
     type: 'object',
     properties: {
       ...STATE_HANDLE_PROPERTY,
-      action: { type: 'string', enum: ['into', 'over', 'return', 'continue'] },
+      action: {
+        type: 'string',
+        enum: ['into', 'over', 'return', 'continue'],
+        description:
+          'into enters the call, over runs it, return leaves the current one, continue runs to the next stop.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['state_handle', 'action'],

@@ -239,6 +239,7 @@ export function terseStop(debuggee: DebuggeeReading, stack: StackReading) {
 
 export function terseVariables(r: VariablesReading) {
   return r.variables.map((v) => ({
+    id: v.id,
     name: v.name,
     type: v.type,
     value: v.value,

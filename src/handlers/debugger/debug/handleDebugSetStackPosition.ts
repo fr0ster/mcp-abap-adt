@@ -15,7 +15,11 @@ export const TOOL_DEFINITION = {
     type: 'object',
     properties: {
       ...STATE_HANDLE_PROPERTY,
-      position: { type: 'number', description: 'Frame position.' },
+      position: {
+        type: 'number',
+        description:
+          'Frame position as the stack numbers it; the stopped frame has the highest position.',
+      },
       ...DETAIL_PROPERTY,
     },
     required: ['state_handle', 'position'],

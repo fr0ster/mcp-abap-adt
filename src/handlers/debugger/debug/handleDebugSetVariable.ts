@@ -15,7 +15,10 @@ export const TOOL_DEFINITION = {
     type: 'object',
     properties: {
       ...STATE_HANDLE_PROPERTY,
-      name: { type: 'string' },
+      name: {
+        type: 'string',
+        description: 'Variable to set; a path reaches a component.',
+      },
       value: {
         type: 'string',
         description: 'New value; converted to the type by the system.',

@@ -1,8 +1,24 @@
+import { handleDebugCreateMemorySnapshot } from '../../../handlers/debugger/debug/handleDebugCreateMemorySnapshot';
+import { handleDebugCreateWatchpoint } from '../../../handlers/debugger/debug/handleDebugCreateWatchpoint';
+import { handleDebugDeleteBreakpoint } from '../../../handlers/debugger/debug/handleDebugDeleteBreakpoint';
+import { handleDebugDeleteWatchpoint } from '../../../handlers/debugger/debug/handleDebugDeleteWatchpoint';
+import { handleDebugGetMemorySizes } from '../../../handlers/debugger/debug/handleDebugGetMemorySizes';
 import { handleDebugGetStack } from '../../../handlers/debugger/debug/handleDebugGetStack';
+import { handleDebugGetVariables } from '../../../handlers/debugger/debug/handleDebugGetVariables';
+import { handleDebugListBreakpoints } from '../../../handlers/debugger/debug/handleDebugListBreakpoints';
+import { handleDebugListSessions } from '../../../handlers/debugger/debug/handleDebugListSessions';
+import { handleDebugListWatchpoints } from '../../../handlers/debugger/debug/handleDebugListWatchpoints';
 import { handleDebugSetBreakpoints } from '../../../handlers/debugger/debug/handleDebugSetBreakpoints';
+import { handleDebugSetStackPosition } from '../../../handlers/debugger/debug/handleDebugSetStackPosition';
+import { handleDebugSetVariable } from '../../../handlers/debugger/debug/handleDebugSetVariable';
 import { handleDebugStartListener } from '../../../handlers/debugger/debug/handleDebugStartListener';
+import { handleDebugStep } from '../../../handlers/debugger/debug/handleDebugStep';
+import { handleDebugStepToLine } from '../../../handlers/debugger/debug/handleDebugStepToLine';
 import { handleDebugStop } from '../../../handlers/debugger/debug/handleDebugStop';
+import { handleDebugTakeOverListener } from '../../../handlers/debugger/debug/handleDebugTakeOverListener';
+import { handleDebugTerminate } from '../../../handlers/debugger/debug/handleDebugTerminate';
 import { handleDebugWait } from '../../../handlers/debugger/debug/handleDebugWait';
+import { corpusBody } from '../../../lib/adtCorpus';
 import { AmdpSession } from '../../../lib/debugger/AmdpSession';
 import { DebuggerInstance } from '../../../lib/debugger/DebuggerInstance';
 import { DebugSession } from '../../../lib/debugger/DebugSession';
@@ -198,5 +214,246 @@ describe('debugger handlers', () => {
     expect(r.isError).toBe(true);
     expect(r.content[0].text).toContain('SY 530');
     expect(context.state.holdsState()).toBe(false);
+  });
+
+  describe('every tool reaches its port', () => {
+    async function stopped() {
+      const k = install();
+      const started = handleDebugStartListener(k.context as any, {});
+      await until(() => k.world.polls.length === 1);
+      k.world.polls[0].resolve(LISTEN_CATCH());
+      await started;
+      await until(() => k.world.calls.includes('getStack'));
+      const h = { state_handle: k.state.handle };
+      return {
+        ...k,
+        h,
+        call: (fn: any, a: any = {}) => fn(k.context, { ...h, ...a }),
+      };
+    }
+
+    it('the take-over start opens its debugger in take-over mode', async () => {
+      const { world, context } = install();
+      const started = handleDebugTakeOverListener(context as any, {});
+      await until(() => world.polls.length === 1);
+      world.polls[0].resolve(LISTEN_NOTHING());
+      await started;
+      expect(world.modes).toEqual(['takeOver']);
+    });
+
+    it('the plain start opens its debugger refusing a second one', async () => {
+      const { world, context } = install();
+      await startedListening(world, context);
+      expect(world.modes).toEqual(['refuse']);
+    });
+
+    it('an empty breakpoint list arms nothing at a start', async () => {
+      for (const start of [
+        handleDebugStartListener,
+        handleDebugTakeOverListener,
+      ]) {
+        const { world, context } = install();
+        const started = start(context as any, { breakpoints: [] });
+        await until(() => world.polls.length === 1);
+        world.polls[0].resolve(LISTEN_NOTHING());
+        expect(((await started) as any).isError).toBe(false);
+        expect(
+          world.calls.some(
+            (c) => c.startsWith('setBreakpoints') || c.startsWith('validate'),
+          ),
+        ).toBe(false);
+      }
+    });
+
+    it('Step maps every action to its method and refuses an unknown one', async () => {
+      const { world, call } = await stopped();
+      for (const [action, method] of [
+        ['into', 'stepInto'],
+        ['over', 'stepOver'],
+        ['return', 'stepReturn'],
+        ['continue', 'stepContinue'],
+      ]) {
+        await call(handleDebugStep, { action });
+        expect(world.calls).toContain(`step:${method}:analysed`);
+      }
+      const bad: any = await call(handleDebugStep, { action: 'sideways' });
+      expect(bad.isError).toBe(true);
+      expect(bad.content[0].text).toContain(
+        'action: into, over, return or continue',
+      );
+    });
+
+    it('StepToLine runs or jumps to the line URI', async () => {
+      const { world, call } = await stopped();
+      const target = { object_type: 'CLAS', object_name: 'ZCL_A', line: 9 };
+      await call(handleDebugStepToLine, { mode: 'run', ...target });
+      await call(handleDebugStepToLine, { mode: 'jump', ...target });
+      expect(world.calls).toContain(
+        'stepToLine:stepRunToLine:/sap/bc/adt/oo/classes/zcl_a/source/main#start=9',
+      );
+      expect(world.calls).toContain(
+        'stepToLine:stepJumpToLine:/sap/bc/adt/oo/classes/zcl_a/source/main#start=9',
+      );
+    });
+
+    it('GetVariables reads by names, and by parents with @ROOT as the default', async () => {
+      const { world, call } = await stopped();
+      await call(handleDebugGetVariables, { names: ['lv_counter'] });
+      expect(world.calls).toContain('getVariables');
+      const names = json(
+        await call(handleDebugGetVariables, { names: ['lv_counter'] }),
+      );
+      expect(names[0]).toMatchObject({ id: 'LV_COUNTER', name: 'LV_COUNTER' });
+      const seen: string[][] = [];
+      const root = json(await call(handleDebugGetVariables, {}));
+      expect(world.calls).toContain('getChildVariables');
+      // the variable and the two scopes that have no variable row: every id is one a second read can take
+      expect(root.map((r: any) => r.id)).toEqual([
+        'ME',
+        '@PARAMETERS',
+        '@LOCALS',
+      ]);
+      expect(root[0]).toMatchObject({ name: 'ME', type: 'ZCL_CV_DBG_MEASURE' });
+      expect(root[1]).toMatchObject({ label: 'Parameters' });
+      expect(root[0].parent).toBeUndefined();
+      // a child id goes back in as a parent
+      world.override.getChildVariables = async (p: string[]) => {
+        seen.push(p);
+        return okResponse(
+          corpusBody('debugger-conversation--07-children-root'),
+        );
+      };
+      await call(handleDebugGetVariables, {
+        parents: root.map((r: any) => r.id),
+      });
+      expect(seen[0]).toEqual(['ME', '@PARAMETERS', '@LOCALS']);
+      const several = json(
+        await call(handleDebugGetVariables, { parents: ['@ROOT', 'X'] }),
+      );
+      expect(several[0].parent).toBe('@ROOT');
+    });
+
+    it('SetStackPosition, SetVariable, Terminate reach their ports', async () => {
+      const { world, call } = await stopped();
+      const moved = json(
+        await call(handleDebugSetStackPosition, { position: 7 }),
+      );
+      expect(world.calls).toContain('setStackPosition:7');
+      expect(moved.frames).toHaveLength(5);
+      await call(handleDebugSetVariable, { name: 'lv_counter', value: '3' });
+      expect(world.calls).toContain('setVariableValue:LV_COUNTER');
+      const ended = json(await call(handleDebugTerminate));
+      expect(world.calls).toContain('terminate:analysed');
+      expect(ended.state).toBe('ended');
+    });
+
+    it('breakpoints list and delete reach the session', async () => {
+      const { world, state, context } = install();
+      await startedListening(world, context);
+      const h = { state_handle: state.handle };
+      await handleDebugSetBreakpoints(context as any, {
+        ...h,
+        breakpoints: [
+          { object_type: 'CLAS', object_name: 'ZCL_CV_DBG_MEASURE', line: 32 },
+        ],
+      });
+      const listed = json(await handleDebugListBreakpoints(context as any, h));
+      expect(listed.length).toBeGreaterThan(0);
+      await handleDebugDeleteBreakpoint(context as any, {
+        ...h,
+        breakpoint_id: listed[0].id,
+      });
+      expect(world.calls).toContain(`deleteBreakpoint:${listed[0].id}`);
+    });
+
+    it('watchpoints and memory tools reach the debugger', async () => {
+      const { world, call } = await stopped();
+      const seen: string[] = [];
+      world.override.createWatchpoint = async (n: string, o: any) => {
+        seen.push(`create:${n}:${o?.condition ?? ''}`);
+        return {
+          ok: true,
+          data: '<dbg:watchpoints xmlns:dbg="x"><dbg:w id="1"/></dbg:watchpoints>',
+        };
+      };
+      world.override.listWatchpoints = async () => (
+        seen.push('list'),
+        { ok: true, data: '<dbg:watchpoints xmlns:dbg="x"/>' }
+      );
+      world.override.deleteWatchpoint = async (id: string) => (
+        seen.push(`delete:${id}`), { ok: true, data: undefined }
+      );
+      world.override.getMemorySizes = async () => (
+        seen.push('sizes'),
+        { ok: true, data: '<dbg:memorySizes xmlns:dbg="x"/>' }
+      );
+      world.override.createMemorySnapshot = async () => (
+        seen.push('snapshot'), { ok: true, data: '<dbg:action xmlns:dbg="x"/>' }
+      );
+      await call(handleDebugCreateWatchpoint, {
+        name: 'lv_a',
+        condition: 'lv_a > 1',
+      });
+      await call(handleDebugListWatchpoints);
+      await call(handleDebugDeleteWatchpoint, { watchpoint_id: 'W1' });
+      await call(handleDebugGetMemorySizes);
+      await call(handleDebugCreateMemorySnapshot);
+      expect(seen).toEqual([
+        'create:LV_A:lv_a > 1',
+        'list',
+        'delete:W1',
+        'sizes',
+        'snapshot',
+      ]);
+    });
+
+    it('ListSessions answers the state alone, with a host its peers, and refuses where no state is served', async () => {
+      const { world, state, context } = install();
+      expect(json(await handleDebugListSessions(context as any, {}))).toEqual(
+        [],
+      );
+      await startedListening(world, context);
+      const alone = json(await handleDebugListSessions(context as any, {}));
+      expect(alone[0].state_handle).toBe(state.handle);
+      (state as any).host = {
+        peers: () => [{ state_handle: 'P', states: [] }],
+      };
+      expect(json(await handleDebugListSessions(context as any, {}))).toEqual([
+        { state_handle: 'P', states: [] },
+      ]);
+      const none: any = await handleDebugListSessions({} as any, {});
+      expect(none.isError).toBe(true);
+    });
+
+    it('SetBreakpoints answers exception and statement breakpoints as the readings are', async () => {
+      const { world, state, context } = install();
+      await startedListening(world, context);
+      const okResponse2 = okResponse;
+      world.override.setBreakpoints = async () =>
+        okResponse2(
+          '<dbg:breakpoints xmlns:dbg="http://www.sap.com/adt/debugger"><breakpoint kind="exception" id="E1" exceptionClass="CX_A" condition="x = 1"/><breakpoint kind="statement" id="S1" statement="WRITE"/></dbg:breakpoints>',
+        );
+      const r = json(
+        await handleDebugSetBreakpoints(context as any, {
+          state_handle: state.handle,
+          breakpoints: [{ exception_class: 'cx_a' }, { statement: 'write' }],
+        }),
+      );
+      const text = JSON.stringify(r.placed);
+      expect(text).toContain('CX_A');
+      expect(text).toContain('WRITE');
+      expect(text).toContain('x = 1');
+    });
+
+    it('Wait refuses a hold_seconds that is not a number', async () => {
+      const { world, state, context } = install();
+      await startedListening(world, context);
+      const r: any = await handleDebugWait(context as any, {
+        state_handle: state.handle,
+        hold_seconds: 'soon',
+      });
+      expect(r.isError).toBe(true);
+      expect(r.content[0].text).toContain('hold_seconds');
+    });
   });
 });

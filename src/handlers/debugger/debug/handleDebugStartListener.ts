@@ -34,7 +34,7 @@ export async function handleDebugStartListener(
     async () => {
       const d = requireDebugger(context, args, { create: 'abap' });
       return d.abap.start('refuse', {
-        ...(args.breakpoints
+        ...(Array.isArray(args.breakpoints) && args.breakpoints.length
           ? { breakpoints: breakpointsFromArgs(args.breakpoints) }
           : {}),
         run: runFromArgs(args.run),

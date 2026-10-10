@@ -139,6 +139,8 @@ describe('readings of the debugger documents (recorded answers)', () => {
           corpusBody('debugger-run-to-line--07-variables-at-write'),
         ),
       ),
-    ).toEqual([{ name: 'LV_COUNTER', type: 'I', value: '241' }]);
+    ).toEqual([
+      { id: 'LV_COUNTER', name: 'LV_COUNTER', type: 'I', value: '241' },
+    ]);
   });
 });

@@ -35,13 +35,6 @@ export async function handleDebugSetBreakpoints(
       requireDebugger(context, args, 'use').abap.setBreakpoints(
         breakpointsFromArgs(args.breakpoints),
       ),
-    (v) => ({
-      placed: v.placed.map((p) => ({
-        id: p.id,
-        kind: p.kind,
-        ...(p.uri ? { uri: p.uri } : {}),
-      })),
-      refused: v.refused,
-    }),
+    (v) => v,
   );
 }

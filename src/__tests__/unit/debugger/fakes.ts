@@ -38,6 +38,7 @@ export function fakeWorld() {
   const opened: IAbapConnection[] = [];
   const closed: IAbapConnection[] = [];
   const calls: string[] = [];
+  const modes: string[] = [];
   const run = deferred<RunOutcome>();
   const stepAnswers: any[] = [];
   const attachAnswers: Array<() => Promise<any>> = [];
@@ -144,7 +145,10 @@ export function fakeWorld() {
     closeConnection: async (c) => {
       closed.push(c);
     },
-    abapDebugger: () => make(),
+    abapDebugger: (_c, mode) => {
+      modes.push(String(mode));
+      return make();
+    },
     requestUser: async () => 'SAPUSER01',
     run: async () => run.promise,
   };
@@ -154,6 +158,7 @@ export function fakeWorld() {
     opened,
     closed,
     calls,
+    modes,
     run,
     stepAnswers,
     attachAnswers,

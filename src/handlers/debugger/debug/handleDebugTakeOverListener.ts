@@ -15,7 +15,7 @@ import type { HandlerContext } from '../../interfaces';
 export const TOOL_DEFINITION = {
   name: 'DebugTakeOverListener',
   available_in: ['onprem', 'cloud'] as const,
-  description: `[debug] Opens a debug session of the connected SAP user like a listener start, taking the user's debugging over. ${TAKE_OVER_SENTENCE} ${USER_MODE_SENTENCE}`,
+  description: `[debug] Opens a debug session of the connected SAP user: arms breakpoints, listens for a debuggee and attaches the first one caught. ${TAKE_OVER_SENTENCE} ${USER_MODE_SENTENCE}`,
   inputSchema: {
     type: 'object',
     properties: {
@@ -35,7 +35,7 @@ export async function handleDebugTakeOverListener(
     async () => {
       const d = requireDebugger(context, args, { create: 'abap' });
       return d.abap.start('takeOver', {
-        ...(args.breakpoints
+        ...(Array.isArray(args.breakpoints) && args.breakpoints.length
           ? { breakpoints: breakpointsFromArgs(args.breakpoints) }
           : {}),
         run: runFromArgs(args.run),

@@ -9,7 +9,7 @@ export const TOOL_DEFINITION = {
   name: 'DebugStop',
   available_in: ['onprem', 'cloud'] as const,
   description:
-    '[debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; what could not be undone stays for another stop.',
+    '[debug] Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; a part that could not be undone is reported and kept.',
   inputSchema: {
     type: 'object',
     properties: { ...STATE_HANDLE_PROPERTY, ...DETAIL_PROPERTY },

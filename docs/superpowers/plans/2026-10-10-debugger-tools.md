@@ -125,7 +125,7 @@
 - Test config templates:
   - `tests/test-config.yaml.template`;
   - `docs/development/tests/test-config.yaml.template`.
-- Docs (Task 17).
+- Docs (Task 17), and `SECURITY.md` (new, repository root): the server is never more secure than its host and network.
 
 ---
 
@@ -3230,7 +3230,11 @@ export class InstancePool<T extends Poolable> {
 
 An instance that stops holding state asynchronously (`onEmpty`) is evicted and disposed by the pool, without waiting for a request. A disposal failure is kept and reported by `shutdown()`.
 
-**Owner** (D9): a destination request is owned by `dest:<destination>`. An `x-sap-*` request is owned by a SHA-256 of `<x-sap-url>|<x-sap-client>|<x-sap-login, or the token's user claim>`. With neither a login nor a user claim the owner is `null`, and a state-creating call refuses (`InstanceState.admit`).
+**Owner** (D9, D15). A handle is no key, so the owner is proven by the request's own credentials:
+- **destination request:** `dest:<destination>`;
+- **`x-sap-*` basic request:** `basic:` + HMAC-SHA256 of `<url>|<client>|<login>|<password>`, keyed by `this.ownerSecret = randomBytes(32)`, generated when the server starts and never stored or logged;
+- **`x-sap-*` token request:** `user:` + `<url>|<client>|<SAP user>`, where the SAP user is what `getSystemInformation` answers on a connection built from this request's token. SAP verifies the token; the unverified claim is never used. `ownerOf` caches the user by SHA-256 of the token in a `Map` on the server object, with no timer. A refreshed token of the same user resolves to the same owner;
+- **neither**, or a token SAP refuses: `null`, and a state-creating call refuses (`InstanceState.admit`).
 
 - [ ] **Step 1: Write the failing pool tests**
 
@@ -3500,7 +3504,12 @@ Expected: PASS.
 Rework the request handler (l.164-240) in this order:
 1. Pick the destination as today (Priority 1–4). This block moves above the pool.
 2. Read the handle with `handleOf(req.body)`, answering a `BatchWithHandleError` with 400.
-3. Compute the owner with a private `ownerOf(headers, destination)`, as described above. `tokenUser` decodes the JWT payload without verifying it; it is only a key, and SAP authenticates the token.
+3. Compute the owner with a private `async ownerOf(headers, destination)`, as described above. It is unit-tested on its own (`server/src/__tests__/ownerOf.test.ts`):
+   - the same login with another password is another owner;
+   - two tokens for which SAP answers the same user are one owner;
+   - a token whose payload claims a user SAP does not answer gives no owner;
+   - nothing is logged.
+   Use a fake `getSystemInformation` injected through a constructor option.
 4. Run the rest through the pool:
 
 ```ts

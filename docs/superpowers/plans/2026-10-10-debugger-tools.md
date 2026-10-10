@@ -4,13 +4,15 @@
 
 **Goal:** A model debugs ABAP and AMDP through the server. It can set breakpoints, catch a program at one, read the stack, variables and memory, step, and release the program. This works both when the model starts the program and when someone else does. It ships for every transport: stdio, SSE, Streamable HTTP (through a pool of instances), and compact.
 
+> **Superseded (user decision 2026-10-10, after Task 9):** there is **no owner**. No owner check, no owner index, no per-owner slots or limit, no `peers`, no `StateHost`, no `InstanceState.admit`, no `describe()` chain, and **no `DebugListSessions`** tool. The pool routes by `state_handle` alone; the handle is a bearer secret the deployer protects. Two listeners of one SAP user meet as SAP answers them: the same `ideId` shares breakpoints and catches; another `ideId` meets SAP's listener conflict (409 under refuse, displacement under take-over); ids are random per instance by default. Every passage below that says otherwise is struck or marked superseded and must not be implemented (spec D9, D12, D14, D15).
+
 **Architecture:**
 - **The state lives in the server instance.** Each `BaseMcpServer` owns an `InstanceState`: the generic handle (`state_handle`) and the verdict «holds state», over every stateful part. The debugger is its first part, a `DebugSession` (ABAP) and an `AmdpSession`; the SAP ids (`terminalId`/`ideId`) go into `DebugSession`'s constructor.
 - **Handlers reach it through `HandlerContext.state` and `HandlerContext.debugger`.** The starting tools return the handle, and every other session tool requires it.
 - **Who keeps the instance between calls depends on the transport.**
   - stdio: the process. A restarted process recovers only the ids.
   - SSE: the SSE session, one instance per GET connection, disposed when it closes.
-  - Streamable HTTP: `InstancePool` in `server/src`. Per request it takes the instance named by `state_handle` (owner checked) or a new one, keeps it while `holdsState()` and disposes it otherwise.
+  - Streamable HTTP: `InstancePool` in `server/src`. Per request it takes the instance named by `state_handle` ~~(owner checked)~~ or a new one, keeps it while `holdsState()` and disposes it otherwise.
 
 **Tech Stack:**
 - TypeScript 6, Jest 30 + ts-jest, fast-xml-parser 5.
@@ -30,7 +32,7 @@
   3. the process environment;
   4. random, 32 upper-case hex.
 
-  Each source replaces only its own id. Ids are not validated. The starting tools and `DebugListSessions` answer them.
+  Each source replaces only its own id. Ids are not validated. The starting tools ~~and `DebugListSessions`~~ answer them.
 - **No timeouts and no TTL (D4, D10).** Nothing ends on the server's clock. Bounded waits *inside one call* end nothing:
   - the listener's long poll: `holdSeconds: 60`, and 3 s for the first poll of a start;
   - `DebugWait` / `AmdpDebugWait` / `HandlerDebugWait`: `hold_seconds` ≤ 30, default 10;
@@ -46,8 +48,8 @@
   - The pool takes an instance once per request, which is one stateless MCP session.
   - One transport at a time per instance (a lease); a second request for the same handle waits.
   - A JSON-RPC batch carrying `state_handle` is refused.
-  - The owner is the destination for a destination request, and url, client and login (or the token's user) for an `x-sap-*` request; a request with no identity cannot create state.
-  - The pool indexes instances by owner, so one ABAP and one AMDP session per owner, and the listing of an owner's sessions, hold across the pool.
+  - ~~The owner is the destination for a destination request, and url, client and login (or the token's user) for an `x-sap-*` request; a request with no identity cannot create state.~~ *Superseded: no owner.*
+  - ~~The pool indexes instances by owner, so one ABAP and one AMDP session per owner, and the listing of an owner's sessions, hold across the pool.~~ *Superseded: no owner index, no limit, no listing.*
   - Shutdown order: stop admission, drain the leases, dispose every pooled instance, report failures, then settle the providers.
 - **Descriptions** describe the function, never its use: no other tool's name, no workflow, no list of answer fields. They name nothing concrete.
   - Every tool that sets breakpoints or starts a listener says, as a fact, that it catches every request of the connected SAP user. The take-over tools say they displace another debugger of that user.
@@ -80,7 +82,7 @@
 - `src/lib/debugger/DebugSession.ts` — the ABAP state machine.
 - `src/lib/debugger/AmdpSession.ts` — the AMDP state machine.
 - `src/lib/debugger/ports.ts` — the live ports: connections, debuggers, request user, run.
-- `src/lib/debugger/DebuggerInstance.ts` — both sessions as one part of the instance state: `holdsState()`, `dispose()`, `describe()`, `observe()`.
+- `src/lib/debugger/DebuggerInstance.ts` — both sessions as one part of the instance state: `holdsState()`, `dispose()`, ~~`describe()`~~ (superseded), `observe()`.
 - `src/lib/debugger/access.ts` — `requireDebugger(context, args, mode)`.
 - `src/lib/debugger/answer.ts` — `debugAnswer`, `debugStateAnswer`.
 - `src/lib/debugger/schemas.ts` — shared schema fragments and warnings.
@@ -89,7 +91,7 @@
 - `src/lib/handlers/groups/DebugHandlersGroup.ts`.
 
 **Create (server):**
-- `server/src/InstancePool.ts` — the Streamable HTTP pool: lease, owner check, keep/dispose, shutdown.
+- `server/src/InstancePool.ts` — the Streamable HTTP pool: lease, ~~owner check,~~ keep/dispose, shutdown.
 
 **Create (compact):**
 - `compact/src/debug/group.ts`.
@@ -2660,6 +2662,8 @@ git commit -m "feat(debugger): AmdpSession — run after its sync is confirmed, 
 
 ### Task 7: State in the server instance — `InstanceState`, the debugger as one of its parts, access, answers
 
+> **Superseded in part:** `StateHost`, `owner`, `reserve`, `peers`, `admit`, `kindsHeld` and the `describe()` chain below were removed (no owner). Implemented as on the branch, not as written here.
+
 The instance's handle and its "holds state" verdict are generic (spec D1, D9). `InstanceState` in `src/lib/state/` owns them. The debugger is its first part; locks will be the next. The pool (Task 9) knows only `InstanceState`, never the debugger.
 
 **Files:**
@@ -3570,6 +3574,8 @@ git commit -m "feat(debugger): opt-in debug set; stdio disposes at shutdown, SSE
 
 ### Task 9: `InstancePool` — Streamable HTTP keeps the instance that holds state
 
+> **Superseded in part:** the owner (check, `ownerOf`, HMAC, token user, index, slots, `peers`) below was removed; `serve({ handle }, create, work)` routes by handle alone. Implemented as on the branch, not as written here.
+
 The pool is the host's one mechanism for continuity (spec D9). It knows `stateHandle`, `holdsState()`, `dispose()` and `InstanceState`, and nothing about debugging.
 
 **Files:**
@@ -4163,7 +4169,7 @@ git commit -m "feat(server): one pool keeps the MCP instance that holds state �
   - from Task 6: `readXmlDocument`;
   - from Task 2: `lineUriOf`;
   - `DETAIL_PROPERTY`.
-- Produces: the tool names of spec §2, and `DebugListSessions`.
+- Produces: the tool names of spec §2. ~~and `DebugListSessions`~~ *(superseded: no list tool)*
 
 **The shape of every handler.** One complete file:
 
@@ -4194,7 +4200,7 @@ export async function handleDebugGetStack(context: HandlerContext, args: { state
 - The description starts with `[debug] ` and states the function only. It has no list of answer fields and names no other tool.
 - `available_in: ['onprem', 'cloud'] as const`.
 - `...DETAIL_PROPERTY` is spread into the properties.
-- Every tool except the two starts and `DebugListSessions` spreads `...STATE_HANDLE_PROPERTY` and lists `'state_handle'` in `required`.
+- Every tool except the two starts ~~and `DebugListSessions`~~ spreads `...STATE_HANDLE_PROPERTY` and lists `'state_handle'` in `required`.
 - In the Body column, `U` is `requireDebugger(context, args, 'use')`.
 
 **The two starts:**
@@ -4236,7 +4242,7 @@ To make that work, change `debugStateAnswer`'s third parameter (Task 7) from a f
 | `DebugGetMemorySizes` | `...STATE_HANDLE_PROPERTY` | `Memory the stopped debuggee uses. Needs a stopped debuggee.` | `debugAnswer(args, async () => U.abap.getMemorySizes(), readXmlDocument, readXmlDocument)` |
 | `DebugCreateMemorySnapshot` | `...STATE_HANDLE_PROPERTY` | `Writes a memory snapshot of the stopped debuggee and answers the file written.` | `debugAnswer(args, async () => U.abap.createMemorySnapshot(), readXmlDocument, readXmlDocument)` |
 | `DebugStop` | `...STATE_HANDLE_PROPERTY` | `Ends a debug session, ABAP and AMDP: releases a stopped debuggee, removes the breakpoints, stops listening and closes the connections; what could not be undone stays for another stop.` | `debugAnswer(args, async () => { const d = requireDebugger(context, args, 'use'); context.state!.endWhenEmpty(); await d.stop(); return { value: { state: 'stopped' }, raw: '' }; }, (v) => v)` |
-| `DebugListSessions` | none | `Debug sessions this server holds for the caller.` | `debugAnswer(args, async () => { if (!context.state) throw new Error('debugging is not served by this server'); const l = context.state.host?.peers() ?? (context.state.holdsState() ? [context.state.describe()] : []); return { value: l, raw: JSON.stringify(l) }; }, (v) => v)` |
+<!-- superseded: no DebugListSessions tool -->
 
 Write `U` out in each file as `requireDebugger(context, args, 'use')`, inside the work.
 
@@ -4297,7 +4303,7 @@ describe('debugger handlers', () => {
     for (const n of ['DebugStartListener', 'DebugTakeOverListener', 'DebugWait', 'DebugSetBreakpoints', 'DebugDeleteBreakpoint',
       'DebugListBreakpoints', 'DebugGetStack', 'DebugSetStackPosition', 'DebugGetVariables', 'DebugSetVariable', 'DebugStep',
       'DebugStepToLine', 'DebugTerminate', 'DebugCreateWatchpoint', 'DebugListWatchpoints', 'DebugDeleteWatchpoint',
-      'DebugGetMemorySizes', 'DebugCreateMemorySnapshot', 'DebugStop', 'DebugListSessions']) expect(names).toContain(n);
+      'DebugGetMemorySizes', 'DebugCreateMemorySnapshot', 'DebugStop']) expect(names).toContain(n);
   });
 
   it('start answers the state handle and the SAP ids; wait with it answers the stop, as precise', async () => {
@@ -4919,13 +4925,13 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | D6 (refuse / take over) | 10, 13 |
 | D7 (compact verbs) | 13 |
 | D8 (opt-in set) | 8 |
-| D9 (one pool mechanism, owner index, lease) | 9 |
-| D10 (no TTL; list, stop, limit) | 7, 9, 10 |
+| D9 (one pool mechanism, ~~owner index,~~ lease) | 9 |
+| D10 (no TTL; ~~list,~~ stop~~, limit~~) | 7, 9, 10 |
 | D11 (measured needs) | 4, 6 |
 | D12 (stdio restores the ids; reconciliation) | 5 (listener); 14 (measurement); 15 (breakpoints, if measured possible) |
 | D13 (HTTP carries a session, RFC does not; pool) | 9 |
-| D14 (owner, kinds, limit) | 7, 9, 13 |
-| D15 (a handle is no key; the owner proven by the request's credentials) | 9 (`ownerOf` and its test) |
+| D14 (~~owner,~~ kinds~~, limit~~) | 7, 9, 13 |
+| D15 (*superseded:* no owner; the handle is a bearer secret) | 9 |
 | §2 core tools | 10–12 |
 | §3 addressing and answers | 2, 3, 7, 16 |
 | Descriptions (function only) | 7 (schemas), 10–13, ratchet test |
@@ -4951,13 +4957,13 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 20 | `until()` |
 | | 21 | `debugAnswer(full)` |
 | | 22 | system values come from the config |
-| Second | lease, batch, owner, list, connections, dispose, one handle, limit, compact, restart, HTTP tests | Tasks 7, 9, 10, 13, 14 |
+| Second | lease, batch, ~~owner, list,~~ connections, dispose, one handle, ~~limit,~~ compact, restart, HTTP tests | Tasks 7, 9, 10, 13, 14 |
 | Final | 1 | no `override` |
 | | 2 | AMDP stop does not wait for the poll; the read loop finishes; measured in 14 |
 | | 3, 5, 10 | failed cleanup is kept, retried and reported |
 | | 4 | closed only after success; `disconnect()` never throws |
-| | 6 | the owner rules of D9 |
-| | 7 | owner index, slots, `peers` |
+| | 6 | ~~the owner rules of D9~~ *(superseded: no owner)* |
+| | 7 | ~~owner index, slots, `peers`~~ *(superseded: no owner)* |
 | | 8 | a lease revalidates its entry |
 | | 9 | transport close in `finally`, after the response |
 | | 11 | `endWhenEmpty` |
@@ -4968,7 +4974,7 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 16 | descriptions |
 
 | Fourth (on `3f12c5eb`) | 1 (empty-state notifications) | `InstanceState.attach` samples the part, `dispose` reconciles, `changed` updates before telling; sessions notify after every change (`mutate`) and when `report()` consumes |
-| | 2 (reservations) | a pending reservation holds the slot; slots are released per kind after each request |
+| | 2 (reservations) | ~~a pending reservation holds the slot; slots are released per kind after each request~~ *(superseded: no slots)* |
 | | 3 (eviction vs leases) | one `onEmpty` subscription per instance; eviction waits for the instance's requests; one disposal at a time |
 | | 4 (failed or unfinished disposal) | a failed instance stays held for a retry; `shutdown` drains disposals and retries them |
 | | 5 (asynchronous AMDP end) | `InstanceState.endWhenEmpty`: the handle is invalidated when the last part empties, synchronously or later |
@@ -4977,7 +4983,7 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 | | 8 (disconnect during dispatch) | dispatch races the disconnect; the transport closes at once; `BaseMcpServer.idle()` holds the lease until the handlers settle; tested in JSON and SSE modes |
 | | 9 (exceptions after arming) | placements are recorded at once; the whole start after arming rolls back |
 | | 10 (server jest mapping) | `server/package.json` gains `/state` and `/debugger`; server tests run from `server/` |
-| | 11 (descriptions) | `DebugStop` and `DebugListSessions` no longer list their answer |
+| | 11 (descriptions) | `DebugStop` ~~and `DebugListSessions`~~ no longer list~~s~~ its answer |
 
 | Fifth (on `92f1d0da`) | 1 (disposal ≠ completion) | an instance leaves the pool only when it holds nothing after disposal; shutdown waits for what is still finishing |
 | | 2 (fresh disposal failure) | `retained` holds fresh and held instances alike; shutdown retries them |
@@ -5008,11 +5014,11 @@ Ask for review of #290. After the merge, the release is a tag and a push, on the
 **Placeholders.** The only `<…>` tokens are in run commands, where local config and scratchpad values go. They are deliberately not written down: plans name no system.
 
 **Type consistency.**
-- `InstanceState`: `handle`, `holdsState`, `describe`, `admit`, `check`, `endWhenEmpty`, `onEmpty`, `dispose`, `host`.
-- `StateHost`: `owner`, `reserve`, `peers`.
-- `DebuggerInstance` (a `StatePart`): `abap`, `amdp`, `stop`, `dispose`, `describe`, `observe`.
-- `DebugSession`: `start(mode, {breakpoints, run})`, `wait`, `stop`, `holdsState`, `describe`, `observe`, `ids`.
+- `InstanceState`: `handle`, `holdsState`, `check`, `endWhenEmpty`, `onEmpty`, `onChange`, `dispose`, `settled`, `shutdown`. (~~`describe`, `admit`, `host`~~ — superseded.)
+- ~~`StateHost`: `owner`, `reserve`, `peers`.~~ — superseded: removed.
+- `DebuggerInstance` (a `StatePart`): `abap`, `amdp`, `stop`, `dispose`, `observe`. (~~`describe`~~ — superseded.)
+- `DebugSession`: `start(mode, {breakpoints, run})`, `wait`, `stop`, `holdsState`, `observe`, `ids`. (~~`describe`~~ — superseded.)
 - `AmdpSession`: `start({stopExisting, breakpoints, run})`, `setBreakpoints`, `startRun`, `observe`.
 - `requireDebugger(context, args, {create} | 'use')`.
 - `debugAnswer(args, work, terse, full?, extraOf?)` and `debugStateAnswer(args, work, extraOf?)`.
-- `InstancePool.serve({handle, owner}, create, work)` and `shutdown()`.
+- `InstancePool.serve({handle}, create, work)` and `shutdown()`. (~~`owner`~~ — superseded.)

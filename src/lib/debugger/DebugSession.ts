@@ -318,6 +318,12 @@ export class DebugSession<O = unknown> {
         // A refused or failed start leaves nothing it armed. Each undo runs whatever the other did,
         // and what could not be undone is named in the error the start fails with.
         const failures: string[] = [];
+        failures.push(...(await this.releaseLocked()));
+        const run = this.run;
+        this.run = undefined;
+        await this.close(run?.connection).catch((e) => {
+          failures.push(`the run's connection was not closed: ${thrown(e)}`);
+        });
         await this.dropListener().catch((e) => {
           failures.push(
             `the listener's connection was not closed: ${thrown(e)}`,
@@ -333,6 +339,27 @@ export class DebugSession<O = unknown> {
         throw new DebugListenerError(`${thrown(error)}; ${notUndone}`);
       }
     });
+  }
+
+  /**
+   * Inside the serial, for a failed start: a stop it attached is released. One that
+   * cannot be released stays for DebugStop. Never throws: it answers what it could not undo.
+   */
+  private async releaseLocked(): Promise<string[]> {
+    const stop = this.current;
+    if (!stop) return [];
+    const released = await stop.debugger
+      .step('stepContinue', { analyse: analyseDebuggeeEnd })
+      .catch(asFailure);
+    if (!released.ok)
+      return [`the debuggee was not released: ${messageOf(released)}`];
+    this.current = undefined;
+    try {
+      await this.close(stop.connection);
+      return [];
+    } catch (e) {
+      return [`the debuggee's connection was not closed: ${thrown(e)}`];
+    }
   }
 
   /**
@@ -390,8 +417,10 @@ export class DebugSession<O = unknown> {
         if (!goOn) return;
       }
     } catch (error) {
-      // A stale loop must not drop a newer listener; one already dropped has its failure set.
-      if (this.listener === listener || this.listener === undefined) {
+      // Only a loop that still owns the current generation records anything: a stale one
+      // (stopped, dropped or superseded) changes nothing. A listener this loop dropped itself
+      // already has its failure set.
+      if (this.owns(listener, generation)) {
         this.failure ??= thrown(error);
         await this.dropListener().catch(() => undefined);
       }
@@ -685,9 +714,134 @@ export class DebugSession<O = unknown> {
     return this.document((d) => d.createMemorySnapshot());
   }
 
-  // --- Task 5 ----------------------------------------------------------------
+  // --- lifecycle -------------------------------------------------------------
+  private run?: { generation: number; connection?: IAbapConnection };
+  private reconciled = false;
+  private cleanupFailures: string[] = [];
+
   protected async beforeFirstListen(
-    _identity: IDebuggerIdentity,
-  ): Promise<void> {}
-  protected startRun(_run: RunTarget, _generation: number): void {}
+    identity: IDebuggerIdentity,
+  ): Promise<void> {
+    if (!this.ids.stated || this.reconciled) return;
+    this.reconciled = true;
+    // A predecessor under these ids may have left a listener (D12); its absence is no failure.
+    await (await this.controlDebugger())
+      .stopListener(identity)
+      .catch(() => undefined);
+  }
+
+  protected startRun(target: RunTarget, generation: number): void {
+    this.run = { generation };
+    void (async () => {
+      let connection: IAbapConnection | undefined;
+      let outcome: RunOutcome;
+      try {
+        connection = await this.open();
+        if (this.run?.generation !== generation) return;
+        this.run.connection = connection;
+        outcome = await this.ports.run(connection, target);
+      } catch (error) {
+        outcome = { ok: false, message: thrown(error) };
+      } finally {
+        await this.close(connection);
+      }
+      if (this.run?.generation !== generation) return;
+      this.run = undefined;
+      this.notices.push({
+        state: 'ended',
+        reason: 'run_finished',
+        run: outcome,
+      });
+      this.notify();
+    })();
+  }
+
+  /** Everything off — DebugStop, dispose, shutdown. Required, not best effort. */
+  stop(): Promise<void> {
+    return this.mutate(async () => {
+      this.generation++;
+      const failures: string[] = [];
+      const stop = this.current;
+      if (stop) {
+        const released = await stop.debugger
+          .step('stepContinue', { analyse: analyseDebuggeeEnd })
+          .catch(asFailure);
+        if (released.ok) {
+          this.current = undefined;
+          await this.close(stop.connection);
+        } else {
+          failures.push(`release the debuggee: ${messageOf(released)}`); // kept: a later stop retries
+        }
+      }
+      if (this.armed.size > 0 || this.listener) {
+        try {
+          const identity = await this.identity();
+          const control = await this.controlDebugger();
+          for (const id of [...this.armed.keys()]) {
+            const deleted = await control
+              .deleteBreakpoint(identity, id)
+              .catch(asFailure);
+            if (deleted.ok) this.armed.delete(id);
+            else failures.push(`breakpoint ${id}: ${messageOf(deleted)}`);
+          }
+          if (this.listener) {
+            const stopped = await control
+              .stopListener(identity)
+              .catch(asFailure);
+            if (stopped.ok) {
+              const listener = this.listener;
+              this.listener = undefined;
+              await this.close(listener.connection);
+            } else {
+              failures.push(`listener: ${messageOf(stopped)}`); // kept: a later stop retries
+            }
+          }
+        } catch (error) {
+          failures.push(thrown(error));
+        }
+      }
+      if (!failures.length) {
+        await this.close(this.control?.connection);
+        this.control = undefined;
+      }
+      await this.close(this.run?.connection);
+      this.run = undefined;
+      this.failure = undefined;
+      this.notices.length = 0;
+      this.cleanupFailures = failures;
+      this.notify(); // also tells the instance state (observe) that this part may hold nothing now
+      if (failures.length) throw new DebugCleanupError(failures.join('; '));
+    });
+  }
+
+  holdsState(): boolean {
+    return (
+      !!this.listener ||
+      !!this.current ||
+      this.armed.size > 0 ||
+      this.notices.length > 0 ||
+      !!this.run ||
+      this.failure !== undefined ||
+      this.cleanupFailures.length > 0
+    );
+  }
+
+  /** What the last stop could not undo. */
+  failures(): string[] {
+    return [...this.cleanupFailures];
+  }
+
+  describe() {
+    return {
+      kind: 'abap' as const,
+      state: this.current
+        ? ('stopped' as const)
+        : this.listener
+          ? ('listening' as const)
+          : ('idle' as const),
+      breakpoints: this.armed.size,
+      terminal_id: this.ids.terminalId,
+      ide_id: this.ids.ideId,
+    };
+  }
 }

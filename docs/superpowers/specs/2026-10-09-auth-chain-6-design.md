@@ -833,6 +833,14 @@ documented limit.
   (`disconnect()`, a failure logged in fixed words), closes its MCP server and transport, and is
   idempotent. A process shutdown that meets a closing connection awaits the same dispose; no
   connection's dispose waits for another's. Nothing is bounded by a timer of the server's (H5).
+  **The setup window counts too.** Today the session enters the map before `await
+  server.connect(transport)` and the response's `close` listener is installed only after it
+  (`SseServer.ts:365-387`); a failed `connect` deletes the entry without disposing. So the close
+  tracking is installed **before the first setup await**: one idempotent cleanup promise per
+  connection, reached by the response's `close`, by the stream's failure and by a rejected
+  `connect` alike; an instance whose connection closed during setup is never published to the
+  routing map (or is removed by that same cleanup), and the cleanup runs once — latch, abort,
+  settle, dispose. A shutdown during setup awaits that same promise.
 
 ## 7. Failures: how they are read and what an MCP client sees
 

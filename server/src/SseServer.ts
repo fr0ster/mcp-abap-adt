@@ -408,9 +408,12 @@ export class SseServer {
     // Register cleanup handler AFTER successful connection
     res.on('close', () => {
       console.error(`[SSE CLOSE] Connection closed for session ${sessionId}`);
-      this.sessions.delete(sessionId);
+      const owned = this.sessions.delete(sessionId);
       void transport.close();
       void server.close();
+      // stop() took the session already and disposes it itself: its drain
+      // reports the outcome, so a late close adds nothing untracked.
+      if (!owned) return;
       // The session's instance is owned until its state is gone: it settles on its own (an AMDP
       // session when its last event batch arrives); stop() waits for it.
       const closing = server.shutdownState().then((left) => {

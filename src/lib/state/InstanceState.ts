@@ -222,7 +222,21 @@ export class InstanceState {
    * more what is still held; settle; answer what is left. No timer: an AMDP
    * session settles when its last event batch arrives.
    */
-  async shutdown(): Promise<string[]> {
+  shutdown(): Promise<string[]> {
+    // One run at a time: a second caller (a session's late close beside the
+    // host's drain) gets the run in flight, so dispose never runs twice at once.
+    if (!this.shuttingDown) {
+      const run = this.runShutdown().finally(() => {
+        if (this.shuttingDown === run) this.shuttingDown = undefined;
+      });
+      this.shuttingDown = run;
+    }
+    return this.shuttingDown;
+  }
+
+  private shuttingDown: Promise<string[]> | undefined;
+
+  private async runShutdown(): Promise<string[]> {
     let lastError: string | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
       try {

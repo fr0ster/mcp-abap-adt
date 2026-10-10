@@ -33,6 +33,7 @@ import { CORE_VERSION } from './coreVersion.js';
 import { SseServer } from './SseServer.js';
 import { inspectionOnlyDestinations, StdioServer } from './StdioServer.js';
 import { StreamableHttpServer } from './StreamableHttpServer.js';
+import { closeInstanceState } from './stateClose.js';
 import { installShutdown, type ShutdownProcess } from './shutdown.js';
 
 const stderrLogger: ILogger = {
@@ -630,12 +631,7 @@ export async function launch(
         {
           // The instance owns what it holds (a listener, a session) until it is
           // gone; the close waits for that and reports what was left.
-          close: async () => {
-            const left = await server.shutdownState();
-            if (left.length) {
-              throw new Error(`state cleanup failed: ${left.join('; ')}`);
-            }
-          },
+          close: () => closeInstanceState(server),
         },
       ],
       onStdinEnd: true,

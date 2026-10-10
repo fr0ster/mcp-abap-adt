@@ -249,4 +249,33 @@ describe('InstanceState — isolation', () => {
     await expect(s.dispose()).rejects.toThrow('sync refusal');
     expect(second).toHaveBeenCalledTimes(1);
   });
+  it('two concurrent shutdowns share one run: the state is disposed once', async () => {
+    const s = new InstanceState();
+    let disposals = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((r) => {
+      release = r;
+    });
+    let held = true;
+    s.attach({
+      holdsState: () => held,
+      pending: () => false,
+      failures: () => [],
+      dispose: async () => {
+        disposals++;
+        await gate;
+        held = false;
+      },
+      describe: () => [],
+      observe: () => {},
+    });
+    const first = s.shutdown();
+    const second = s.shutdown();
+    release();
+    await expect(first).resolves.toEqual([]);
+    await expect(second).resolves.toEqual([]);
+    expect(disposals).toBe(1);
+    // settled: a later call runs afresh (nothing held, nothing to dispose)
+    await expect(s.shutdown()).resolves.toEqual([]);
+  });
 });

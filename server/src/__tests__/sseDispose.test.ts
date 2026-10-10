@@ -64,7 +64,11 @@ describe('SseServer disposes the instance of a session', () => {
 
   it('when the connection closes: once; stop() is pending until it settles', async () => {
     const release = deferred<string[]>();
-    shutdown.mockReturnValue(release.promise);
+    const called = deferred<void>();
+    shutdown.mockImplementation(() => {
+      called.resolve();
+      return release.promise;
+    });
     const sse = make();
     await sse.start();
     const port = (sse as any).standaloneServer.address() as AddressInfo;
@@ -73,9 +77,7 @@ describe('SseServer disposes the instance of a session', () => {
     req.on('error', () => {});
     await new Promise<void>((resolve) => req.once('response', () => resolve()));
     req.destroy();
-    for (let i = 0; i < 50 && shutdown.mock.calls.length === 0; i++) {
-      await new Promise((r) => setTimeout(r, 10));
-    }
+    await called.promise;
     expect(shutdown).toHaveBeenCalledTimes(1);
 
     let stopped = false;
@@ -111,6 +113,33 @@ describe('SseServer disposes the instance of a session', () => {
     expect(shutdown).toHaveBeenCalledTimes(1);
   });
 
+  it('a close during stop()\'s drain does not dispose twice, and stop() reports its failure', async () => {
+    const release = deferred<string[]>();
+    shutdown.mockReturnValue(release.promise);
+    const routes: Record<string, any> = {};
+    const app: any = {
+      get: (p: string, h: any) => {
+        routes[p] = h;
+      },
+      post: jest.fn(),
+    };
+    const sse = make({ app });
+    sse.registerRoutes(app);
+    const res = fakeRes();
+    await routes['/sse']({ headers: {}, query: {} }, res);
+    const stopping = sse.stop();
+    await tick();
+    res.emit('close');
+    await tick();
+    expect(shutdown).toHaveBeenCalledTimes(1);
+    release.resolve(['left behind']);
+    await expect(stopping).rejects.toThrow(/left behind/);
+    expect(shutdown).toHaveBeenCalledTimes(1);
+  });
+
+  // The failure of a session that finished closing BEFORE stop() ran is only
+  // logged and then forgotten: stop() reports what it drains, and a settled
+  // closing is no longer pending. Here the close is still pending when stop() runs.
   it('a close that leaves something is logged with it, and stop() reports it too', async () => {
     shutdown.mockResolvedValue(['a session was left']);
     const logger = {

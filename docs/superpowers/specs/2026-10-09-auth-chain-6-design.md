@@ -220,24 +220,62 @@ connection is adt-clients (§2). So the signal enters at adt-clients.
      connection, one cancelled at each boundary in turn: no mutation of the cancelled caller
      reaches the endpoint after its abort, it rejects `ADT_REQUEST_ABORTED` at the abort, the other
      succeeds, no unhandled rejection; each with the check removed as the break.
-3. **`@mcp-abap-adt/adt-clients` 25.1.0** (`mcp-abap-adt-clients`; a minor;
-   `interfaces-adt-connection ^1.1.0`):
-   - `IAdtClientOptions.signal?: AbortSignal | undefined`; **every request an `AdtClient` (and
-     every client and runtime facade it hands out) sends carries `options.signal`** of the client
-     it was sent by — held per client instance, never written onto the shared connection, so two
-     clients over one connection carry their own;
-   - **releases are never cancelled**: a request adt-clients sends to undo what the operation
-     acquired — the unlock of `withLock` after a failure or an abort, `LockRegistry.unlockAll` —
-     is sent without the signal, so a cancel never leaves a lock held;
-   - an aborted request is the connection's `ADT_REQUEST_ABORTED`, reported as the call's failure
-     (`origin: 'connection'`, the code kept as `code`);
-   - **tests**: two clients, one connection, distinct signals; a cancel between lock and update
-     sends the unlock and not the update.
+3. **`@mcp-abap-adt/interfaces-adt` 12.1.0** (`mcp-abap-adt-interfaces`; a minor on the 12.x
+   line, which adt-clients 25 and the server are on — 13.0.0 moved to interfaces-adt-connection 2;
+   the same additions go into 13.1.0). **(D43)** The option belongs to the contract the client's
+   constructor declares — `IAdtClientOptions` and `IAdtError` live here
+   (`packages/interfaces-adt/src/adt/IAdtClientOptions.ts:18-27`), not in
+   interfaces-adt-connection — so it is added there rather than as an adt-clients-local extended
+   type: a consumer type-checks its options against the contract it already imports, and another
+   implementation of the contract is held to the same field.
 
-**Order**: interfaces-adt-connection 1.1.0 → connection 14.1.0 and adt-clients 25.1.0 → this
-server's 18.0.0. Each is published before the next is built against it (H7). **The goal's *Out of
-scope* names only connection's signal**; the interfaces and adt-clients releases are what that
-signal needs to reach a request — §18 asks the user to amend that line.
+   ```ts
+   export interface IAdtClientOptions {
+     // … unchanged …
+     /**
+      * The caller no longer needs the client's requests. Read at each request:
+      * a signal, or a function answering the signal for the request being sent
+      * (undefined: none). Every request carries it in its options, except a
+      * release (below).
+      */
+     signal?: AbortSignal | (() => AbortSignal | undefined) | undefined;
+   }
+   export interface IAdtError {
+     // … unchanged …
+     /**
+      * The authentication refusal the request failed with, as the connection
+      * threw it: the thrown value's own `refusal` (an AuthRefusedError) or
+      * `error` (an AuthProviderFailure), unchanged. Read it with
+      * @mcp-abap-adt/auth-errors' classify; never present for a refusal by SAP.
+      */
+     refusal?: unknown;
+   }
+   ```
+4. **`@mcp-abap-adt/adt-clients` 25.1.0** (`mcp-abap-adt-clients`; a minor;
+   `interfaces-adt-connection ^1.1.0`, `interfaces-adt ^12.1.0`):
+   - **the signal**: every request an `AdtClient` — and every client, facade and runtime client it
+     hands out — sends carries `signal` in its `IAbapRequestOptions`: the client's signal, or what
+     its function answers **at the moment the request is sent**; held per client, never written
+     onto the shared connection; `getSystemInformation(connection, { signal? })` and every other
+     standalone function that sends takes it too;
+   - **releases are never cancelled**: a request adt-clients sends to undo what an operation
+     acquired — `withLock`'s release, `LockRegistry.unlockAll`, an unlock after a failed step — is
+     sent **without** the signal, so a cancel never leaves a lock held;
+   - **the structured failure is kept**: `recogniseFailure` (`src/utils/adtResponse.js:84-96` in
+     the build) copies the thrown value's own `refusal` or `error`, unchanged, to
+     `IAdtError.refusal`, and an error adt-clients throws (`orThrow`, its own guards) carries the
+     same as an own `refusal` — the server reads it with auth-errors in every mode, whoever built
+     the connection;
+   - an aborted request is the connection's `ADT_REQUEST_ABORTED`, kept as the failure's `code`;
+   - **tests**: two clients over one connection with distinct signals; a function signal read per
+     request; a cancel between lock and update sends the unlock and not the update; an
+     `AuthRefusedError` and an `AuthProviderFailure` thrown by a connection reach `IAdtError.refusal`
+     and a thrown error's `refusal` as the same objects.
+
+**Order**: interfaces-adt-connection 1.1.0 and interfaces-adt 12.1.0 (independent) → connection
+14.1.0 (on the first) and adt-clients 25.1.0 (on both) → this server's 18.0.0. Each is published
+before the next is built against it (H7). **The goal's *Out of scope* names only connection's
+signal**; §18 asks the user to amend it to name the four releases.
 
 ### 3.2 The packages
 
@@ -272,16 +310,19 @@ whose graph reaches them. *Break:* import `AuthBrokerFactory` into lib → red.
 | `@mcp-abap-adt/connection` | `^11.0.0` | `^14.1.0` (prerequisite) | lib |
 | `@mcp-abap-adt/adt-clients` | `~25.0.1` | `^25.1.0` (prerequisite) | lib |
 | `@mcp-abap-adt/interfaces-adt-connection` | `^1.0.1` | `^1.1.0` (prerequisite) | lib |
+| `@mcp-abap-adt/interfaces-adt` | `^12.0.1` | `^12.1.0` (prerequisite) | lib |
 | `@mcp-abap-adt/interfaces-auth` | `^3.2.0` | `^7.5.0` | lib, core |
 | `@mcp-abap-adt/auth-errors` | — | `^2.2.0` | lib, core, http |
 | `@mcp-abap-adt/interfaces-auth-broker` | `^1.2.0` | `^1.3.0` | core only |
 | `@mcp-abap-adt/interfaces-auth-sap` | `^2.0.0` | `^3.3.0` | lib (`SapAuthType`) |
-| `adt-strategies`, `interfaces-adt`, `interfaces-network`, `interfaces-utils` | unchanged | unchanged | as today |
+| `adt-strategies`, `interfaces-network`, `interfaces-utils` | unchanged | unchanged | as today |
 | `express` | in core | in http only (core serves no HTTP) | http |
 
 One copy of `interfaces-auth` 7 and of `auth-errors` 2 resolves (`npm ls`). The `auth` script is
-removed. Reason: each chain range is the release the goal names; the three prerequisites are
-published before the server.
+removed. Reason: each chain range is the release the goal names; the four prerequisites are
+published before the server. Type check for the server: `test:check` compiles a typecheck file
+that passes `{ signal: () => currentRequestSignal() }` to `AdtClient` and reads
+`IAdtError.refusal` — it fails against interfaces-adt 12.0.x.
 
 ### 3.4 What moves, and what lib exports (D36)
 
@@ -448,10 +489,12 @@ passes it.
   what `getEffectiveSystemContext` answers): the tool wrapper runs the handler inside
   `runWithRequestSignal(signal, …)`; `currentRequestSignal()` reads it.
 - **`createAdtClient`** (`src/lib/clients.ts:34-51`, the one place every handler builds a client)
-  passes `{ signal: currentRequestSignal() }` to `AdtClient` (adt-clients 25.1.0, §3.1): every
-  request of that client carries it, whatever connection the client was built on. The two requests
-  the server sends itself (`handleGetServiceBindingPreviewUrl.ts:225`, `utils.ts:717`) add
-  `signal: currentRequestSignal()` to their options.
+  passes `{ signal: () => currentRequestSignal() }` to `AdtClient` (adt-clients 25.1.0, §3.1) — a
+  function, read when each request is sent: every request of that client carries the signal of
+  the scope it is sent in, whatever connection the client was built on. The server's own requests
+  (`handleGetServiceBindingPreviewUrl.ts:225`, `utils.ts:717`) add
+  `signal: currentRequestSignal()` to their options; its `getSystemInformation` calls
+  (`handleGetServiceBindingPreviewUrl.ts:145`, `requestSystemResolution.ts:80`) pass it.
 - **This covers every connection the server hands on**, because a client is built per call inside
   the request — checked site by site (`grep` over every package's `src` for `createAbapConnection`,
   `openFreshConnection`, `inOwnSessionOverRfc`, `connectionForPackageLock`,
@@ -466,15 +509,28 @@ passes it.
 | `connectionForPackageLock` (`:110-135`) — `LockPackage` over RFC | the lock's client; `lockSessions` keeps the raw connection, which carries no signal of its own |
 | `connectionHoldingPackageLock` (`:138-143`) — `UpdatePackage` (`handleUpdatePackage.ts:151`), `UnlockPackage` (`handleUnlockPackage.ts:112`) | the update's or the unlock's own client — never the lock request's signal, aborted when that request ended (D4) |
 | `releasePackageLockSession` (`:149-157`) | none: a close carries no request |
-| `resolveOnce` (`requestSystemResolution.ts:104-125`): the cloud system-context lookup shared by concurrent requests | **none**: the shared lookup runs in `runWithRequestSignal(undefined, …)` on the connection (a read: `systeminformation`), and each caller's wait is raced against its own signal (D32) — one caller's cancel cannot fail it for the others |
+| `resolveOnce` (`requestSystemResolution.ts:104-125`): the cloud system-context lookup shared by concurrent requests | **its own attempt (D44)**: auth-errors' `sharedAttempt` per resolver and connection — each caller joins with its own signal; the lookup runs with the attempt's signal (alive while any caller waits, aborted when the last leaves) passed to `getSystemInformation`; a caller that leaves is released at once; an aborted or failed lookup is never memoised (the attempt leaves its slot, the next caller starts afresh); only a completed answer is kept, as today |
 | the consumer's `freshConnection` (§4.3) | the factory receives `{ signal }`; its connection's requests carry it through the client |
 | `getManagedConnection` / `getAdtClient` (`utils.ts:386-536`, `clients.ts:53-61`) — the legacy `SapConfig` path | no request scope there: no signal |
 
-- **Releases are never cancelled (D40).** adt-clients sends its own releases without the signal
-  (§3.1). The server's own release calls — an unlock or a close in a handler's `catch` / `finally`
-  after a failure — use `createAdtClient(connection, logger, { release: true })`, which passes no
-  signal; the plan lists them by a `grep` of `unlock(` / `disconnect(` in `catch` and `finally`
-  blocks, and a source test keeps the list. Reason: a cancel must not leave a lock held.
+- **Releases are never cancelled (D40).** Because the client reads the signal per request
+  (`() => currentRequestSignal()`), a release is sent unsignalled by running it outside the
+  request's signal — `runWithoutRequestSignal(release)` — whichever client it was captured from.
+  Every release path:
+  - **`withLock`'s `runRelease`** (`src/lib/strategies/withLock.ts:26-40`, called at `:107` after
+    the body, success or failure): the release callback — `obj.unlock(…)` of the signalled client
+    the handler built, e.g. `handleUpdateServiceDefinition`'s (`:121`) — runs inside
+    `runWithoutRequestSignal`; this covers the 32 handlers that call `withLock`;
+  - **every other unlock, release or close in a server path that cleans up after a step** — found
+    by a `grep` for `unlock(`, `unlockAll(`, `release`, `disconnect(` and `closeQuietly(` in
+    `src`, `compact*/src`, `server/src`, `http/src`, and listed in the plan site by site;
+    `closeQuietly` and `releasePackageLockSession` carry no request already. An **unlock tool**
+    (`UnlockClass`, `UnlockPackage`, …) is its own request and keeps its own signal: a cancel of
+    it is the user's;
+  - adt-clients' own releases (§3.1).
+
+  A source test keeps the list: every `withLock` release and every listed site runs inside
+  `runWithoutRequestSignal`. Reason: a cancel must never leave a SAP lock held.
 - **Injected connections are not wrapped**: their requests carry the signal because adt-clients
   puts it in the options; honouring it is the consumer's contract (goal), stated in the embedding
   docs and the migration note. Nothing more is promised for a consumer's connection that ignores
@@ -582,6 +638,7 @@ documented limit.
 2. an own `refusal` with a known `kind` → `classify(refusal, 'unfamiliar-error')` (connection's
    `AuthRefusedError`);
 3. an own `code` equal to `ADT_REQUEST_ERROR.ABORTED` → `request_aborted`, fixed words;
+3b. an `IAdtError` (or adt-clients' thrown error) with an own `refusal` → step 1 or 2 on that value;
 4. the server's own refusal classes;
 5. else `undefined` — not an authentication failure, answered as today.
 
@@ -592,12 +649,12 @@ lib depends on no broker (D38), and auth-errors decides what a value is (H6).
 ### 7.2 Where failures are caught
 
 - **Outside a handler** — the tool wrapper's `catch`, the core launcher's check: the reader first.
-- **Inside a handler (D15)**: adt-clients keeps the words and drops the `kind` (§2), so every
-  connection the server builds (`createAbapConnection`) records, on a throw of its `connect()` or
-  `makeAdtRequest()`, `failureOf(thrown)` in the request signal scope (§5.2) and rethrows the same
-  value; a handler answering an error while its request recorded a chain failure is answered with
-  that failure. An injected connection is not wrapped: there the client gets connection's words
-  without `kind` (**D16**).
+- **Inside a handler**: adt-clients 25.1.0 keeps the structured failure — `IAdtError.refusal`,
+  or a thrown error's own `refusal` (§3.1) — so `failureOf` reads it through auth-errors
+  (`classify(refusal, 'unfamiliar-error')`) for **every** connection, the consumer's included,
+  without wrapping one. A handler's error result whose failure carries a `refusal` is answered as
+  §7.3. The earlier drafts' failure observer on server-built connections and D16's "words only for
+  an injected connection" are gone (H6: one place carries the failure).
 - `return_error` and `answer()` call the reader first.
 
 ### 7.3 What the MCP client sees
@@ -705,8 +762,8 @@ stays accepted by core so existing client configurations keep working.
 | `StreamableHttpServer.ts` (→ http) | destinations, `FirstConnectLock`, headers | headers only (D39); no `IDestinations` in its constructor |
 | `SseServer.ts`, `destinationRequest.ts` | SSE; destination header | deleted |
 | `BaseMcpServer.ts:98-230`, `:257` | context setters; `getConnection()`; `(args)` | the source (§4); `getConnection(signal)`; `(args, extra)`, the signal scope, D5, D7, §7.2 |
-| `clients.ts:34-51` | `new GuardedAdtClient(connection, logger, options)` | `+ signal: currentRequestSignal()`; `{ release: true }` passes none (D40) |
-| `connectionFactory.ts:307-357` | builds and records | + the failure observer (D15) |
+| `clients.ts:34-51` | `new GuardedAdtClient(connection, logger, options)` | `+ signal: () => currentRequestSignal()` (read per request) |
+| `withLock.ts:26-40`, `:107` | `runRelease(release, handle)` | the release inside `runWithoutRequestSignal` (D40) |
 | `credentialSources.ts:33-59` | default branch → basic | D19 |
 | `packageSessions.ts:40-61`, `handleDeletePackage.ts:93-108` | record, else configuration; fallback | D20, D21 |
 | `requestSystemResolution.ts:104-125` | memo; lookup on the caller's connection | unsignalled shared lookup, raced per caller |
@@ -830,12 +887,18 @@ Each package runs its own suite (`npm --prefix http test` beside `server/`).
 
 One test per source through a real request — a provider's `AuthProviderFailure`, connection's
 `AuthRefusedError` (`refused-after-renewal`), core's `DestinationConfigError` (a `jwt` / `none`
-without binding), a failure inside a handler (observer), `ADT_REQUEST_ABORTED`; each asserts
+without binding), a failure inside a handler on a server-built **and on an injected** connection (through `IAdtError.refusal`), `ADT_REQUEST_ABORTED`; each asserts
 `error`, `kind`, `message`, `hint` as `render` gives them and no diagnostics. Source tests: no
 `instanceof` of a chain class, no `.message` read in the auth modules, no regex in the touched
 files. Each §7.4 sentence under its condition.
 
 ### 14.3 Injected connections and fresh connections
+
+**An auth failure inside a handler on an injected connection** (a consumer connection that throws
+`AuthRefusedError` from `makeAdtRequest`): the tool result carries `error`, `kind`, `message` and
+`hint` exactly as `render` gives them, read from `IAdtError.refusal`; the connection was not
+wrapped (its `makeAdtRequest` is the consumer's own function, identity checked).
+
 
 For `CreatePackage` (high, low), `LockPackage` over RFC and `DeletePackage` with
 `force_new_connection`, on an injected connection whose configuration holds no usable credential:
@@ -855,16 +918,25 @@ connection, which is disconnected, and no provider is constructed; without it,
    `force_new_connection` — the sibling's carry the delete's; (c) `LockPackage` (L) →
    `UpdatePackage` (U) → `UnlockPackage` (X) over RFC — each step carries its own signal, never L
    after the lock request ended; cancelling U sends no update, keeps the session, and the unlock
-   with X succeeds; (d) two cloud requests sharing one system-context lookup: cancelling the first
-   lets the second get its context. *Breaks:* run the lookup under the first caller's signal; keep a
-   signal on the lock session.
+   with X succeeds. *Break:* keep a signal on the lock session.
+2a. **The shared system-context lookup (D44)**: two cloud requests share one lookup held at the
+   stand-in; **one waiter cancels** → it is released at once, the lookup goes on, the other gets
+   its context, and the answer is memoised; **every waiter cancels** → the lookup's request is
+   aborted (nothing more of it is sent), nothing is memoised, and a later request starts a fresh
+   lookup and succeeds; a failed lookup is not memoised either. *Breaks:* run the lookup under the
+   first caller's signal (the second is refused); memoise the attempt before it settles (the later
+   request inherits the abort).
 3. **A cancelled mutation is never sent** (M1, M6; with connection 14.1.0 and adt-clients 25.1.0):
    a server-built connection against the stand-in; R1 and R2 `POST`; R1 cancelled while both wait in
    `rejected()`, and separately in `authorize()`: no `POST` of R1 after its abort, R1 answered
    `request_aborted`, R2 `200`. Over HTTP in core and in the HTTP package; RFC's boundaries are
    connection's tests (§3.1).
-4. **Releases are not cancelled (D40)**: a cancel between a high-level tool's lock and update sends
-   the unlock and not the update. *Break:* give the release client the signal.
+4. **Releases are not cancelled (D40)**, through real handlers against the stand-in (adt-clients
+   25.1.0, connection 14.1.0): `UpdateServiceDefinition` (its `withLock` release is
+   `obj.unlock` of the signalled client) cancelled after the lock answered and before the update —
+   the stand-in's log holds the `LOCK`, then the `UNLOCK`, and no update; the same for one handler
+   per listed release site and for an adt-clients-internal release (`withLock` of a high-level
+   create). *Break:* run `runRelease` inside the request's signal → the log holds no `UNLOCK`.
 5. **A cancelled request does not reach its tool (D5)**, in each package and embedded.
 6. **The cancelled caller settles first (D32, M3)**: R1 and R2 wait in stdio's shared `connect()`;
    R1 settles `aborted` before the token endpoint answers, R2 after with its token; no unhandled
@@ -941,10 +1013,10 @@ rebase follows renames. Footprint in shared files:
 | Shared file | What this change does there |
 |---|---|
 | `src/embeddable/BaseMcpServer.ts` | the source, `getConnection(signal)`, the wrapper's `extra`, the signal scope, D5 |
-| `src/lib/clients.ts` | `signal` and `release` options of `createAdtClient` |
-| `src/lib/connectionFactory.ts` | the failure observer |
+| `src/lib/clients.ts` | the `signal` function passed by `createAdtClient` |
+| `src/lib/strategies/withLock.ts` | `runRelease` outside the request's signal |
 | `src/lib/utils.ts` | `return_error`'s first lines and two regexes; one request's `signal` |
-| `src/lib/packageSessions.ts`, `handleDeletePackage.ts`, `requestSystemResolution.ts` | D20, D21, the unsignalled lookup |
+| `src/lib/packageSessions.ts`, `handleDeletePackage.ts`, `requestSystemResolution.ts` | D20, D21, the lookup's own attempt (D44) |
 | `src/lib/handlers/interfaces.ts`, `src/lib/requestContext.ts`, handler signatures | untouched |
 | `server/src/*` | split between core and http (D42, commit 1) |
 | `tools/` | untouched |
@@ -961,8 +1033,8 @@ request like any request.
 | H3 A credential stays bound | providers only from the broker in core, the destination read once per process and its edit documented (D3); header credentials per request, never stored or shared (D39); injected connections never re-authenticated (§4.3) |
 | H4 The modes are separated by package | D35, D36, D38: broker, stores, destinations, session files and logins only in core; http works only with header credentials, no server-held credential; embedded keeps none, consumer connections unwrapped, given the signal (§5.2) |
 | H5 No built-in timeouts | no login bound and no shutdown deadline by default (D10, D33); the 30 s deadline and the drain timer removed |
-| H6 One implementation of each rule | failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); cancellation at the send boundaries the connection's (§3.1), the signal carried by adt-clients |
-| H7 Registry only | every range published; the three prerequisites of §3.1 first; §13 |
+| H6 One implementation of each rule | failures read by auth-errors (§7.1); the broker's shared build; the broker's refresh state; auth-providers' browsers (D9); cancellation at the send boundaries the connection's (§3.1), the signal and the structured failure carried by adt-clients; the shared lookup on auth-errors' `sharedAttempt` |
+| H7 Registry only | every range published; the four prerequisites of §3.1 first; §13 |
 | H8 No regular expressions over untrusted input | D26; a source test |
 
 ## 18. Decisions taken by the user, and questions for the user
@@ -983,14 +1055,13 @@ request like any request.
 
 | # | Question | Recommendation |
 |---|---|---|
-| 1 | The goal's *Out of scope* allows a chain change only for connection's signal; carrying the signal into a consumer's request options needs interfaces-adt-connection 1.1.0 and adt-clients 25.1.0 too (§3.1). Amend that line? | yes: name the three releases |
+| 1 | The goal's *Out of scope* allows a chain change only for connection's signal; the design needs four releases (§3.1): interfaces-adt-connection 1.1.0 (`IAbapRequestOptions.signal`, `ADT_REQUEST_ABORTED`), interfaces-adt 12.1.0 (`IAdtClientOptions.signal`, `IAdtError.refusal`), connection 14.1.0 (the signal at every send boundary), adt-clients 25.1.0 (the signal on every request, releases unsignalled, the structured failure kept). Amend that line? | yes: name the four |
 | 2 | D12: what a failed write to the `--env` / `--env-path` file means | `'fail'`, fixed |
 | 3 | D35: names | `@mcp-abap-adt/http`, bin `mcp-abap-adt-http`, directory `http/` |
 | 4 | D37: compact over HTTP | none now; a second launcher in the HTTP package later if wanted |
 | 5 | D34: the abort's code | a code of the connection's own (`ADT_REQUEST_ABORTED`), not auth-errors' `interactive-login` `aborted` |
 | 6 | D30: `jwt` / `none` under broker 5 needs `SAP_ISSUED_FOR` / `SAP_ISSUED_BY`, which no tool writes | the migration note's lines now; ask auth-broker-cli for `mcp-auth --token` |
 | 7 | D22: the server closes the consumer's fresh connection with `disconnect()` | yes |
-| 8 | D16: an auth failure inside a handler on an injected connection reaches the client in connection's words, without `kind` | accept |
 | 9 | D27: "server text" means an authorization server's or IdP's text; ADT answers stay | yes |
 | 10 | D39: `--transport=stdio` still accepted by core | yes, for existing client configurations |
 

@@ -101,6 +101,8 @@
       "^@mcp-abap-adt/lib/auth$": "<rootDir>/../src/lib/auth/index.ts",
       "^@mcp-abap-adt/lib/logger$": "<rootDir>/../src/lib/handlerLogger.ts",
       "^@mcp-abap-adt/lib/request-context$": "<rootDir>/../src/lib/requestContext.ts",
+      "^@mcp-abap-adt/lib/debugger$": "<rootDir>/../src/lib/debugger/index.ts",
+      "^@mcp-abap-adt/lib/state$": "<rootDir>/../src/lib/state/index.ts",
       "^(\\.{1,2}/.*)\\.js$": "$1"
     }
   },

@@ -8,6 +8,10 @@ import type {
 } from '../lib/auth/IAuthBrokerFactory.js';
 import { createAbapConnection } from '../lib/connectionFactory.js';
 import { credentialFromHeaders } from '../lib/credentialSources.js';
+import {
+  createDebuggerInstance,
+  type DebuggerInstance,
+} from '../lib/debugger/DebuggerInstance.js';
 import type {
   IHandlersRegistry,
   SapEnvironment,
@@ -21,6 +25,7 @@ import {
   withDestinationSystemContext,
   withResolvedSystemContext,
 } from '../lib/requestSystemResolution.js';
+import { InstanceState } from '../lib/state/InstanceState.js';
 import { systemContextFromConfiguration } from '../lib/systemContext.js';
 import {
   normalizeToolContent,
@@ -70,6 +75,14 @@ export abstract class BaseMcpServer extends McpServer {
    */
   private destinationSystemContext: DestinationSystemContext | undefined;
 
+  /** What this instance holds between tool calls, and its handle (MCP SEP-2567). */
+  readonly state = new InstanceState();
+
+  private debuggerInstance?: DebuggerInstance;
+
+  /** Every tool call of this instance still running, tracked from its entry. */
+  private readonly inFlight = new Set<Promise<unknown>>();
+
   constructor(options: {
     name: string;
     version?: string;
@@ -86,6 +99,42 @@ export abstract class BaseMcpServer extends McpServer {
           ? systemContextResolverFor(options.systemType)
           : defaultSystemContextResolver
         : options.systemContextResolver;
+  }
+
+  /**
+   * The instance's debugger: created on first use inside a call's scope, so
+   * stated ids are read there; attached to the state.
+   */
+  protected debuggerFor(): DebuggerInstance {
+    if (!this.debuggerInstance) {
+      const created = createDebuggerInstance();
+      this.state.attach(created);
+      this.debuggerInstance = created;
+    }
+    return this.debuggerInstance;
+  }
+
+  get stateHandle(): string {
+    return this.state.handle;
+  }
+
+  holdsState(): boolean {
+    return this.state.holdsState();
+  }
+
+  /** Undoes what the instance holds; awaited by every host before it lets the instance go. */
+  dispose(): Promise<void> {
+    return this.state.dispose();
+  }
+
+  /** Dispose, settle, once more, settle — what a host awaits before letting the instance go; answers what is left. */
+  shutdownState(): Promise<string[]> {
+    return this.state.shutdown();
+  }
+
+  /** Resolves when every tool call of this instance has settled — a host releases the instance only then. */
+  async idle(): Promise<void> {
+    while (this.inFlight.size) await Promise.allSettled([...this.inFlight]);
   }
 
   /**
@@ -254,13 +303,15 @@ export abstract class BaseMcpServer extends McpServer {
           ) => Promise<unknown>;
           type HandlerFnArgsOnly = (args: unknown) => Promise<unknown>;
 
-          const wrappedHandler = async (args: unknown) => {
+          const runCall = async (args: unknown) => {
             try {
               // Get connection from context (this.connectionContext)
               // Token will be automatically refreshed via AuthBroker if needed
               const context: HandlerContext = {
                 connection: await this.getConnection(),
                 logger: this.logger,
+                state: this.state,
+                debugger: () => this.debuggerFor(),
               };
 
               // If handler expects context+args (preferred), pass both.
@@ -328,6 +379,17 @@ export abstract class BaseMcpServer extends McpServer {
                 content: { type: 'text'; text: string }[];
               };
             }
+          };
+
+          // Tracked from its entry — before the connection is acquired — so
+          // idle() cannot miss a call still acquiring its connection.
+          const wrappedHandler = (args: unknown) => {
+            const call = runCall(args);
+            this.inFlight.add(call);
+            call
+              .finally(() => this.inFlight.delete(call))
+              .catch(() => undefined); // runCall answers every failure; nothing rejects unhandled
+            return call;
           };
 
           // Convert JSON Schema to Zod if needed, otherwise pass as-is

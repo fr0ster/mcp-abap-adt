@@ -44,6 +44,12 @@
       ],
       "@mcp-abap-adt/lib/request-context": [
         "../dist/lib/requestContext.d.ts"
+      ],
+      "@mcp-abap-adt/lib/debugger": [
+        "../dist/lib/debugger/index.d.ts"
+      ],
+      "@mcp-abap-adt/lib/state": [
+        "../dist/lib/state/index.d.ts"
       ]
     }
   },
